@@ -298,7 +298,7 @@ const RouterWidget = ({
     recipient, userAddress, externalEvmWalletAddress, isAppAuthenticated,
   ]);
   const rewardedRouteSteps = useMemo(() => {
-    if (sourceMode !== "strato" || !quote || !userRewards) return [];
+    if (!quote || !userRewards) return [];
     // Only the destination hop's rewards are shown; intermediate pool hops are
     // routing detail the user didn't choose.
     const step = [...quote.steps].reverse().find((item) => item.action >= 1 && item.action <= 3);
@@ -323,7 +323,7 @@ const RouterWidget = ({
       ),
       tokenIn: step.tokenIn,
     }];
-  }, [sourceMode, quote, userRewards, tokens]);
+  }, [quote, userRewards, tokens]);
 
   const inputSymbol = sourceMode === "external" ? externalRoute?.externalSymbol : tokenIn?._symbol;
   const inputPrice = sourceMode === "external" ? externalPickerTokens.find(token => token.id === externalRoute?.id)?.price : pickerTokens.find(token => token.id === tokenIn?.address)?.price;
@@ -595,7 +595,7 @@ const RouterWidget = ({
         {recipient && <span className="flex items-center text-[11px] font-mono text-muted-foreground" title={recipient}>{truncateAddress(recipient)}<CopyButton address={recipient} /></span>}
       </div>
       <RouteReceivePanel tokens={pickerTokens.filter(token => routingDisabled ? token.id === bridgedTokenAddress : sourceMode === "external" || token.id !== tokenIn?.address)}
-        token={tokenOut} quote={quote} usd={outputUsd} loading={routeAssetsQuery.isLoading} pending={pending}
+        token={tokenOut} quote={quote} usd={outputUsd} loading={routeAssetsQuery.isLoading} quoteLoading={quoteLoading} pending={pending}
         error={selectionError} onSelect={setTokenOutAddress} />
       </section>
 

@@ -1,4 +1,5 @@
 import type { RoutePickerToken, RouteQuoteResponse, SwapToken } from "@/interface/swap";
+import { Loader2 } from "lucide-react";
 import { useEarnContext } from "@/context/EarnContext";
 import { ROUTE_DESTINATIONS } from "@/lib/constants";
 import { normalizeRouteAddress } from "@/lib/route";
@@ -7,12 +8,13 @@ import { formatAmount, formatUnits } from "@/utils/numberUtils";
 import RouteAssetYield from "./RouteAssetYield";
 import RouteTokenPicker from "./RouteTokenPicker";
 
-export default function RouteReceivePanel({ tokens, token, quote, usd, loading, pending, error, onSelect }: {
+export default function RouteReceivePanel({ tokens, token, quote, usd, loading, quoteLoading, pending, error, onSelect }: {
   tokens: RoutePickerToken[];
   token?: SwapToken;
   quote?: RouteQuoteResponse;
   usd?: string | null;
   loading: boolean;
+  quoteLoading: boolean;
   pending: boolean;
   error?: string;
   onSelect: (address: string) => void;
@@ -54,7 +56,13 @@ export default function RouteReceivePanel({ tokens, token, quote, usd, loading, 
     <div className="flex items-center gap-2 pt-1">
       <RouteTokenPicker label={destination === "vault" ? "Choose yield vault" : destination === "savings" ? "Choose savings product" : "Choose receive token"}
         tokens={choices} value={token?.address} onSelect={onSelect} loading={loading} staticSingle />
-      <div className="h-10 min-w-0 flex-1 flex items-center justify-end text-xl font-bold">{quote ? formatAmount(formatUnits(quote.amountOut, token?.customDecimals ?? 18)) : <span className="text-muted-foreground/50">0</span>}</div>
+      <div className="h-10 min-w-0 flex-1 flex items-center justify-end text-xl font-bold">
+        {quoteLoading
+          ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-label="Calculating receive amount" />
+          : quote
+            ? formatAmount(formatUnits(quote.amountOut, token?.customDecimals ?? 18))
+            : <span className="text-muted-foreground/50">0</span>}
+      </div>
     </div>
     {usd && <p className="text-right text-xs text-muted-foreground pt-0.5">{deposit ? "Estimated shares · " : ""}≈ {usd}</p>}
     {deposit && <p className="mt-2 border-l-2 border-border pl-2 text-xs text-muted-foreground">
