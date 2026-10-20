@@ -7,15 +7,19 @@ export interface RedeemReferralRequestParams {
   r: string;
   s: string;
   recipient: string;
+  /** Claim from the NftEscrow (one NFT) instead of the token Escrow. */
+  nft?: boolean;
 }
 
 export const redeemReferral = async (
   params: RedeemReferralRequestParams,
 ) => {
   try {
+    const nft = !!params.nft;
+    if (nft && !config.escrow.nftAddress) throw new Error("NFT airdrops are not configured on this server");
     return await execute({
-      contractName: "Escrow",
-      contractAddress: config.escrow.address!,
+      contractName: nft ? "NftEscrow" : "Escrow",
+      contractAddress: nft ? config.escrow.nftAddress! : config.escrow.address!,
       method: "redeem",
       args: {
         v: params.v,

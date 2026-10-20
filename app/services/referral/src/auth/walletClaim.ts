@@ -17,6 +17,8 @@ export interface WalletClaimBody {
   r?: unknown;
   s?: unknown;
   recipient?: unknown;
+  /** The claim is for the NftEscrow (one NFT, no fee) rather than the token Escrow. */
+  nft?: unknown;
 }
 
 /** The ephemeral address a redeem signature was made with, or a throw when it is not a valid signature. */
@@ -33,7 +35,9 @@ export function recoverEphemeral(recipient: string, v: number, r: string, s: str
  * @throws when the body or signature is not acceptable, or nothing is left to claim.
  */
 export async function walletClaimAddress(walletAddress: unknown, body: WalletClaimBody | undefined): Promise<string> {
-  const { v, r, s, recipient } = body ?? {};
+  const { v, r, s, recipient, nft } = body ?? {};
+  const escrow = nft ? config.escrow.nftAddress : config.escrow.address;
+  if (!escrow) throw new Error(nft ? "NFT airdrops are not configured on this server" : "ESCROW_ADDRESS is not configured");
   if (typeof recipient !== "string" || !/^(0x)?[0-9a-f]{40}$/i.test(recipient)) throw new Error("recipient must be an address");
   if (walletAddress !== undefined && (typeof walletAddress !== "string" || bare(walletAddress) !== bare(recipient))) throw new Error("X-Wallet-Address must be the recipient");
   if (typeof r !== "string" || typeof s !== "string" || (v !== 27 && v !== 28)) throw new Error("A redeem signature (v, r, s) is required");
@@ -45,11 +49,12 @@ export async function walletClaimAddress(walletAddress: unknown, body: WalletCla
     throw new Error("The redeem signature is not valid");
   }
 
-  // The deposit's struct row in the Escrow's `deposits` mapping: what is left, and until when.
+  // The deposit's struct row in the escrow's `deposits` mapping: what is left, and until when.
+  // Token Escrow: {quantity, expiry, …}. NftEscrow: {nft, tokenId, expiry, …}, one claim.
   const rows: any[] = await cirrus.get("/mapping", {
     params: {
       select: "key,value",
-      address: `eq.${bare(config.escrow.address!)}`,
+      address: `eq.${bare(escrow)}`,
       collection_name: "eq.deposits",
       "key->>key": `eq.${ephemeral}`,
     },
@@ -62,7 +67,7 @@ export async function walletClaimAddress(walletAddress: unknown, body: WalletCla
     }
   };
   const struct = (Array.isArray(rows) ? rows : []).map((row) => ({ k: parse(row.key), v: parse(row.value) })).find(({ k }) => !k?.key2);
-  const quantity = Number(struct?.v?.quantity ?? 0);
+  const quantity = nft ? (/^(0x)?[0-9a-f]{40}$/i.test(String(struct?.v?.nft ?? "")) && !/^(0x)?0{40}$/.test(String(struct?.v?.nft)) ? 1 : 0) : Number(struct?.v?.quantity ?? 0);
   const expiry = Number(struct?.v?.expiry ?? 0);
   if (!(quantity > 0)) throw new Error("Nothing is left to claim under this link");
   if (expiry > 0 && expiry * 1000 <= Date.now()) throw new Error("This airdrop has expired");

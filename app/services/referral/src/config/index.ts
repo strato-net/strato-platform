@@ -16,6 +16,8 @@ const config = {
   },
   escrow: {
     address: process.env.ESCROW_ADDRESS,
+    // Optional: the Liquidity wallet's NftEscrow (airdrops of one NFT), claimed with `nft: true`.
+    nftAddress: process.env.NFT_ESCROW_ADDRESS,
   },
   usdst: {
     address: process.env.USDST_ADDRESS || '937efa7e3a77e20bbdbd7c0d32b6514f368c1010',
