@@ -8,8 +8,9 @@ class ReferralController {
 
       const json = await redeemReferral({ v, r, s, recipient, nft: !!nft });
       res.json({ ok: true, submitted: json });
-    } catch (e) {
-      res.status(400).json({ ok: false, error: e ?? String(e) });
+    } catch (e: any) {
+      // The reason in words: an Error serialises to {} otherwise.
+      res.status(400).json({ ok: false, error: e?.message ?? String(e) });
     }
   }
 }
