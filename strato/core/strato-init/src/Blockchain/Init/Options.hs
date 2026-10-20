@@ -60,7 +60,7 @@ defineFlag "cellId" ("" :: String) "This core's name among the cores sharing a P
 defineFlag "peerDatabase" ("" :: String) "Database for this core's peer store (p_peer, sync_task) on the Postgres host. Every core sharing a cluster needs its own, since strato-p2p resets peer state at startup. Default: the eth database, as on a monolith"
 defineFlag "peerStore" ("postgres" :: String) "Where strato-p2p and ethereum-discover keep peers and sync tasks: 'postgres' (the default, the database above) or 'sqlite' (the file peers.sqlite in the node directory, so a core whose Postgres is elsewhere keeps its networking state on its own disk and no longer depends on the database being reachable)"
 defineFlag "publicStratoRpc" (False :: Bool) "Expose the strato_* simulation/trace methods on the public /rpc endpoint (default: blocked; the bloc simulate endpoint is unaffected)"
-defineFlag "localAuth" (False :: Bool) "Use local auth (Kratos/Hydra) instead of external Keycloak"
+defineFlag "localAuth" (False :: Bool) "Use local auth (Kratos/Hydra) and a node-local Vault instead of external Keycloak and the shared Vault (--role=node and --role=api-node)"
 defineFlag "sslDir" ("" :: String) "Path to directory containing server.pem and server.key (enables SSL)"
 
 defineFlag "dockerMode" ("local" :: String) "Docker compose mode: 'local' for local dev, 'allDocker' for full containerized deployment"
@@ -69,7 +69,8 @@ defineFlag "appUrl" ("" :: String) "Public URL of the app tier, used when --bund
 defineFlag "bundledSmd" (True :: Bool) "Run the SMD next to this node (default). False when the SMD is served from its own deployment (S3 behind CloudFront); pass --smdUrl so the node's /smd redirects there"
 defineFlag "smdUrl" ("" :: String) "Public URL of the SMD deployment, used when --bundledSmd=false"
 defineFlag "bundledPostgrest" (True :: Bool) "Run PostgREST (the Cirrus API at /cirrus) next to this node (default). False when the API tier serves Cirrus; the node's /cirrus then answers 502"
-defineFlag "role" ("node" :: String) "What this directory runs: 'node' (everything, the default), 'core' (consensus, VM, indexers and their Postgres/Redis/broker), or 'api' (strato-api, ethereum-jsonrpc, PostgREST and the nginx sidecar; point --pghost at a core, --ingressUrls at the cells' ingress, and pass the core's Postgres password with --password)"
+defineFlag "role" ("node" :: String) "What this directory runs: 'node' (everything, the default), 'core' (consensus, VM, indexers and their Postgres/Redis/broker), 'api' (strato-api, ethereum-jsonrpc, PostgREST and the nginx sidecar; point --pghost at a core, --ingressUrls at the cells' ingress, and pass the core's Postgres password with --password), 'api-node' (a full node without the services that only serve people: the chain, Cirrus and every API behind nginx, but no app, SMD or Swagger docs; see --monitoring; --localAuth works as on a node), or 'validator' (a lite validator: the chain processes, the Redis block index and apex for the network monitor; no app, SMD, nginx, PostgREST, Cirrus, strato-api or JSON-RPC, no SQL block index or state mirror). This flag is the only way to pick a role: a bare --validator is taken as an abbreviation of --validatorBehavior and sets up a node"
+defineFlag "monitoring" (True :: Bool) "Run the prometheus and apex containers, which produce /health and /apex-api for the network monitor (default). Only --role=api-node may turn this off, for operators who scrape the processes themselves; /health then answers 502"
 
 defineFlag "repoUrl" ("" :: String) "Docker registry URL prefix for images (e.g., 'registry.example.com/org/')"
 

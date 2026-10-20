@@ -3,10 +3,12 @@ const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker')
 const Transaction = require ('../../models/strato/eth/transaction');
 const config = require('../../config/app.config')
 const db = require("../../models/strato/eth/connection");
+const { hasBlockIndex } = require("../../lib/strato-db-data/block-index");
 
 let userCount
 
-function getUserCount() {
+async function getUserCount() {
+  if (!(await hasBlockIndex())) return;
   // TODO: replace with query to count the registered user certificates
   // Temporary counting users who posted at least one transaction:
   Transaction.count(

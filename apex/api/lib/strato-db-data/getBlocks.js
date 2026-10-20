@@ -3,6 +3,7 @@ const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker');
 const BlockDataRef = require('../../models/strato/eth/blockDataRef');
 const BlockTransaction = require('../../models/strato/eth/blockTransaction');
 const db = require('../../models/strato/eth/connection');
+const { hasBlockIndex } = require('./block-index');
 const moment = require('moment');
 const bigInt = require('big-integer');
 
@@ -12,7 +13,8 @@ let propagationDelay = [];
 let lastBlockNumber = bigInt();
 let globalBlocks = [];
 
-function getBlocks() {
+async function getBlocks() {
+  if (!(await hasBlockIndex())) return;
   BlockDataRef
     .findAll(
       {

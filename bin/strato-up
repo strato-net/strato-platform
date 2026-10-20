@@ -39,10 +39,25 @@ for arg in "$@"; do
             SETUP_ARGS+=("$arg")
             ;;
         # --role is passed through to strato-setup; remembered here because a
-        # snapshot (chain state) has nothing to restore into an API-only directory.
+        # snapshot (chain state) has nothing to restore into an API-only directory
+        # and a validator keeps no SQL databases. strato-setup matches the value
+        # case-insensitively, so it is lowercased here too.
         --role=*)
-            ROLE="${arg#*=}"
+            ROLE="$(printf '%s' "${arg#*=}" | tr '[:upper:]' '[:lower:]')"
             SETUP_ARGS+=("$arg")
+            ;;
+        # strato-setup would also take "--role validator" (two arguments), which
+        # the loop above cannot see; the snapshot decisions below need the value.
+        --role)
+            echo "Error: write the role as --role=<node|core|api|api-node|validator>." >&2
+            exit 1
+            ;;
+        # There are no role shorthands. Refused here because strato-setup
+        # would not: its option parser takes --validator as an abbreviation of
+        # --validatorBehavior and sets up a full node.
+        --validator|--validator=*|--apiNode|--apiNode=*)
+            echo "Error: ${arg%%=*} is not a flag; pick the role with --role=validator or --role=api-node." >&2
+            exit 1
             ;;
         *)
             SETUP_ARGS+=("$arg")
@@ -52,7 +67,7 @@ done
 
 NODE_DIR="$1"
 
-if [[ "$FROM_SNAPSHOT" == "true" && "${ROLE:-node}" == "api" ]]; then
+if [[ "$FROM_SNAPSHOT" == "true" && "$ROLE" == "api" ]]; then
     echo "Error: --snapshot restores chain state, which an API-only directory (--role=api) does not hold." >&2
     exit 1
 fi
@@ -79,7 +94,13 @@ if [[ "$FROM_SNAPSHOT" == "true" ]]; then
         SNAPSHOT_ARG=(--snapshot)
         echo "Restoring node from latest $NETWORK snapshot..."
     fi
-    if ! strato-snapshot restore "$NODE_DIR" "${SNAPSHOT_ARG[@]}" --network "$NETWORK" --force; then
+    # A validator keeps no SQL block index and no Cirrus: restore the chain
+    # state only and leave the eth and cirrus dumps out.
+    RESTORE_ARGS=()
+    if [[ "$ROLE" == "validator" ]]; then
+        RESTORE_ARGS+=(--skip-databases)
+    fi
+    if ! strato-snapshot restore "$NODE_DIR" "${SNAPSHOT_ARG[@]}" --network "$NETWORK" --force "${RESTORE_ARGS[@]}"; then
         echo "Error: snapshot restore failed; not starting STRATO." >&2
         exit 1
     fi

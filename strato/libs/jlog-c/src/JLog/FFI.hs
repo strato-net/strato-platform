@@ -29,6 +29,7 @@ module JLog.FFI (
   jlog_ctx_add_subscriber,
   jlog_ctx_add_subscriber_copy_checkpoint,
   jlog_ctx_remove_subscriber,
+  jlog_clean,
   jlog_ctx_list_subscribers,
   -- * Utility
   jlog_ctx_first_log_id,
@@ -177,6 +178,11 @@ foreign import ccall unsafe "jlog_ctx_list_subscribers"
   jlog_ctx_list_subscribers :: Ptr JLogCtx -> Ptr (Ptr CString) -> IO CInt
 
 -- Utility
+-- | Unlink every data file below the earliest remaining checkpoint; the
+-- count of files removed, or -1.
+foreign import ccall unsafe "jlog_clean"
+  jlog_clean :: CString -> IO CInt
+
 foreign import ccall unsafe "jlog_ctx_first_log_id"
   jlog_ctx_first_log_id :: Ptr JLogCtx -> Ptr JLogId -> IO CInt
 
