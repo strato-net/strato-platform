@@ -136,7 +136,7 @@ handleEvents peer = awaitForever $ \case
         when shouldFetch $ do
           $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
           $logInfoS "handleEvents/NewBlock" "#### New block is missing its parent, I am resyncing"
-          syncFetch Forward fetchNumber
+          assignTaskAndRequestBlocks peer
       Just _ -> do
         let ingestBlock = IEBlock $ blockToIngestBlock (Origin.PeerString $ peerString peer) block'
         yieldL $ ToUnseq [ingestBlock]
@@ -147,7 +147,7 @@ handleEvents peer = awaitForever $ \case
     shouldFetch <- lift $ getCurrentSyncTask >>= maybe (tryResyncFrom fetchNumber) (const $ pure False)
     when shouldFetch $ do
       $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
-      syncFetch Forward fetchNumber
+      assignTaskAndRequestBlocks peer
   MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> do
     lift stampActionTimestamp
     start' <- case dir of
@@ -400,7 +400,7 @@ handleEvents peer = awaitForever $ \case
       shouldFetch <- lift $ getCurrentSyncTask >>= maybe (tryResyncFrom start') (const $ pure False)
       when shouldFetch $ do
         $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start'
-        syncFetch Forward start'
+        assignTaskAndRequestBlocks peer
     P2pPushBlocks start end p -> do
       ss <- lift $ shouldSendToPeer p
       when ss $ do
@@ -486,6 +486,14 @@ alignFetchNumber :: Integer -> Integer
 alignFetchNumber n = (max 0 n `div` step) * step
   where
     step = fromIntegral . max 1 $ Conf.maxReturnedHeaders (p2pConfig ethConf)
+
+assignTaskAndRequestBlocks :: MonadP2P m => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
+assignTaskAndRequestBlocks peer = do
+  WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+  syncTask <- lift $ getNewSyncTask (pPeerHost peer) worldNumber
+  $logInfoS "assignTaskAndRequestBlocks" $ T.pack $ "new SyncTask: " ++ show syncTask
+  forM_ syncTask $ \task ->
+    syncFetch Forward $ fromIntegral $ 1000 * syncTaskChiliad task
 
 syncFetch ::
   ( MonadIO m,
