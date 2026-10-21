@@ -95,7 +95,7 @@ const EarnPools = () => {
   const location = useLocation();
   const { getPoolByAddress } = useSwapContext();
   const { tokenApys } = useEarnContext();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
+  const { fetchUsdstBalance } = useTokenContext();
   const { isLoggedIn } = useUser();
 
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
@@ -381,8 +381,6 @@ const EarnPools = () => {
         selectedPool={selectedPool}
         onDepositSuccess={handlePoolActionSuccess}
         operationInProgressRef={operationInProgressRef}
-        usdstBalance={usdstBalance}
-        voucherBalance={voucherBalance}
       />
       <LiquidityWithdrawModal
         isOpen={isPoolWithdrawModalOpen}
@@ -390,8 +388,6 @@ const EarnPools = () => {
         selectedPool={selectedPool}
         onWithdrawSuccess={handlePoolActionSuccess}
         operationInProgressRef={operationInProgressRef}
-        usdstBalance={usdstBalance}
-        voucherBalance={voucherBalance}
       />
     </div>
   );

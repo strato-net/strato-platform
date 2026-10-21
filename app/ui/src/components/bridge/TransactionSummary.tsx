@@ -1,10 +1,9 @@
 import React from "react";
 import { formatUnits, safeParseUnits } from "@/utils/numberUtils";
-import { BRIDGE_OUT_FEE, DECIMAL, WAD } from "@/lib/constants";
+import { BRIDGE_OUT_CALLS, DECIMAL, WAD } from "@/lib/constants";
+import NetworkFee from "@/components/NetworkFee";
 import { BridgeToken } from "@strato/shared-types";
 import { AlertTriangle } from "lucide-react";
-
-const FEE_VOUCHER = parseFloat(BRIDGE_OUT_FEE) * 100;
 
 interface TransactionSummaryProps {
   selectedToken: BridgeToken | null;
@@ -49,7 +48,7 @@ const TransactionSummary: React.FC<TransactionSummaryProps> = ({
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-0.5 md:gap-2">
         <span>Transaction Fee</span>
         <span className="font-medium text-foreground">
-          {BRIDGE_OUT_FEE} USDST ({FEE_VOUCHER} voucher)
+          <NetworkFee calls={BRIDGE_OUT_CALLS} />
         </span>
       </div>
       {selectedToken?.maxPerWithdrawal &&

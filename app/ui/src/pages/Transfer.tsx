@@ -14,9 +14,10 @@ import { ensureStratoChainInWallet, getStratoChainId } from "@/lib/stratoChain";
 import { useUser } from "@/context/UserContext";
 import { useTokenContext, BulkTransferItem, BulkTransferResponse } from "@/context/TokenContext";
 import { useToast } from "@/hooks/use-toast";
-import { usdstAddress, TRANSFER_FEE } from "@/lib/constants";
 import TransferConfirmationModal from "../components/TransferConfirmationModal";
 import BulkTransferModal from "../components/BulkTransferModal";
+import NetworkFee from "@/components/NetworkFee";
+import { TRANSFER_CALLS } from "@/lib/constants";
 import { safeParseUnits, roundToDecimals, addCommasToInput, formatBalance, formatUnits } from "@/utils/numberUtils";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { api } from "@/lib/axios";
@@ -49,7 +50,7 @@ const ensureHexPrefix = (addr: string): `0x${string}` =>
 
 const Transfer = () => {
   const { userAddress, userName, isLoggedIn } = useUser();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance, getTransferableTokens, transferToken, bulkTransferToken } = useTokenContext();
+  const { feeQuote, fetchUsdstBalance, loadingUsdstBalance, getTransferableTokens, transferToken, bulkTransferToken } = useTokenContext();
   const { writeContractAsync } = useWriteContract();
   const { data: walletClient } = useWalletClient();
   const stratoChainId = getStratoChainId();
@@ -75,15 +76,8 @@ const Transfer = () => {
 
   const maxAmount = useMemo(() => {
     if (!fromAsset) return "0";
-    return computeMaxTransferable(
-      fromAsset.balance,
-      fromAsset.address === usdstAddress,
-      voucherBalance,
-      usdstBalance,
-      safeParseUnits(TRANSFER_FEE, 18).toString(),
-      setFeeError
-    );
-  }, [fromAsset, voucherBalance, usdstBalance]);
+    return computeMaxTransferable(fromAsset.balance, fromAsset.address, TRANSFER_CALLS, feeQuote, setFeeError);
+  }, [fromAsset, feeQuote]);
 
   const fetchUserTokens = useCallback(async () => {
     try {
@@ -471,7 +465,7 @@ const Transfer = () => {
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Transaction Fee</span>
                 <span className="font-medium">
-                  {TRANSFER_FEE} USDST ({parseFloat(TRANSFER_FEE) * 100} voucher)
+                  <NetworkFee calls={TRANSFER_CALLS} />
                 </span>
               </div>
             </div>

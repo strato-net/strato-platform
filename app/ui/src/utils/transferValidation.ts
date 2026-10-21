@@ -1,5 +1,6 @@
 import type { ChangeEvent, Dispatch, SetStateAction } from "react";
 import { isAddress } from "ethers";
+import type { FeeQuote } from "@strato/shared-types";
 
 import {
   DECIMAL,
@@ -7,6 +8,7 @@ import {
 import {
   safeParseUnits,
 } from "@/utils/numberUtils";
+import { feeCoverage, feeShortfall, isFeeCurrency } from "@/utils/feeUtils";
 
 const normalizeAddress = (addr?: string): string => (addr || "").toLowerCase().replace(/^0x/, "");
 
@@ -36,30 +38,21 @@ export const handleRecipientAddress = (
 
 export const computeMaxTransferable = (
   tokenBalanceWei: string,           // wei
-  isUsdToken: boolean,
-  userVoucherBalanceWei: string,     // wei
-  userUsdstBalanceWei: string,       // wei
-  gasFeeWei: string,                 // wei
+  tokenAddress: string,
+  calls: number,                     // contract calls the action makes
+  quote: FeeQuote | null,
   setError: Dispatch<SetStateAction<string>>
 ): string => {
   const token = BigInt(tokenBalanceWei || "0");
   if (token <= 0n) return "0";
+  if (!quote) return token.toString();
 
-  const fee = BigInt(gasFeeWei || "0");
-  const usdst = BigInt(userUsdstBalanceWei || "0");
-  const vouchers = BigInt(userVoucherBalanceWei || "0");
+  const shortfall = feeShortfall(quote, calls);
+  setError(shortfall);
+  if (shortfall || !isFeeCurrency(quote, tokenAddress)) return token.toString();
 
-  // Enough means >=, not >
-  if (fee > 0n && (usdst + vouchers) < fee) {
-    setError("Insufficient USDST + voucher balance for transaction fee");
-    return token.toString();
-  }
-  setError("");
-
-  if (!isUsdToken || fee === 0n) return token.toString();
-
-  const usdPortion = fee > vouchers ? fee - vouchers : 0n;
-  const net = token - usdPortion;
+  // The fee is paid in the token being spent: reserve it.
+  const net = token - feeCoverage(quote, calls).chargeWei;
   return net > 0n ? net.toString() : "0";
 };
 

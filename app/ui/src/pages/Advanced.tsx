@@ -28,7 +28,7 @@ import DirectMintPSMSection from '@/components/dashboard/DirectMintPSMSection';
 // import { CollateralData } from "@/interface";
 // import PositionSection from "@/components/Positions";
 // import CollateralModal from "@/components/borrow/CollateralModal";
-// import { WITHDRAW_COLLATERAL_FEE, SUPPLY_COLLATERAL_FEE } from "@/lib/constants";
+import { WITHDRAW_COLLATERAL_CALLS, SUPPLY_COLLATERAL_CALLS } from "@/lib/constants";
 // import BorrowForm from "@/components/borrow/BorrowForm";
 // import RepayForm from "@/components/borrow/RepayForm";
 // import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
@@ -72,7 +72,7 @@ const Advanced = () => {
   const [borrowActiveTab, setBorrowActiveTab] = useState<"borrow" | "repay">("borrow");
   const { userAddress } = useUser();
   const { toast } = useToast();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
+  const { usdstBalance, fetchUsdstBalance } = useTokenContext();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   useEffect(() => {
@@ -311,8 +311,6 @@ const Advanced = () => {
                               loans={loans}
                               borrowLoading={borrowLoading}
                               onBorrow={executeEmbeddedBorrow}
-                              usdstBalance={usdstBalance}
-                              voucherBalance={voucherBalance}
                               collateralInfo={collateralInfo}
                               startPolling={startPolling}
                               stopPolling={stopPolling}
@@ -327,7 +325,6 @@ const Advanced = () => {
                               repayLoading={repayLoading}
                               onRepay={executeEmbeddedRepay}
                               usdstBalance={usdstBalance}
-                              voucherBalance={voucherBalance}
                               guestMode={guestMode}
                             />
                           </TabsContent>
@@ -365,9 +362,7 @@ const Advanced = () => {
                           executeWithdraw(selectedAsset, amount);
                         }
                       }}
-                      usdstBalance={usdstBalance}
-                      voucherBalance={voucherBalance}
-                      transactionFee={modalState.type === "supply" ? SUPPLY_COLLATERAL_FEE : WITHDRAW_COLLATERAL_FEE}
+                      calls={modalState.type === "supply" ? SUPPLY_COLLATERAL_CALLS : WITHDRAW_COLLATERAL_CALLS}
                     />
                   )}
                 </TabsContent>

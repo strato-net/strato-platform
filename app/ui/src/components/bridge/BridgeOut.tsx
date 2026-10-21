@@ -13,7 +13,7 @@ import BridgeWalletStatus from "./BridgeWalletStatus";
 import NetworkSelector from "./NetworkSelector";
 import TokenSelector from "./TokenSelector";
 import TransactionSummary from "./TransactionSummary";
-import { BRIDGE_OUT_FEE, usdstAddress, DECIMAL, MIN_USDST_WITHDRAWAL, WAD } from "@/lib/constants";
+import { BRIDGE_OUT_CALLS, DECIMAL, MIN_USDST_WITHDRAWAL, WAD } from "@/lib/constants";
 import {
   handleAmountInputChange,
   computeMaxTransferable,
@@ -26,9 +26,6 @@ import {
 import { useUser } from "@/context/UserContext";
 import AdvancedOptionsDropdown from "./AdvancedOptionsDropdown";
 
-// Constants
-const FEE_WEI = safeParseUnits(BRIDGE_OUT_FEE).toString();
-
 interface BridgeOutProps {
   isSaving?: boolean; // true for saving mode, false (default) for bridge mode
   guestMode?: boolean;
@@ -38,7 +35,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
   // Hooks & Context
   const { isConnected } = useAccount();
   const { toast } = useToast();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
+  const { feeQuote, fetchUsdstBalance } = useTokenContext();
   const { externalEvmWalletAddress, isExternalEvmWalletConnected, isAppAuthenticated } = useUser();
 
   const {
@@ -107,10 +104,9 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
 
     const maxTransferable = computeMaxTransferable(
       tokenBalanceWei,
-      selectedToken?.stratoToken === usdstAddress,
-      voucherBalance,
-      usdstBalance,
-      FEE_WEI,
+      selectedToken?.stratoToken || "",
+      BRIDGE_OUT_CALLS,
+      feeQuote,
       setFeeError
     );
 
@@ -138,8 +134,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
     selectedToken?.maxPerWithdrawal,
     selectedToken?.maxOutstandingWithdrawal,
     selectedToken?.remainingOutstandingWithdrawal,
-    usdstBalance,
-    voucherBalance,
+    feeQuote,
   ]);
 
   const balanceImpact = useMemo(() => {
@@ -147,10 +142,9 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       const tokenBalanceWei = balanceData?.balance?.toString() || "0";
       const actualBalance = computeMaxTransferable(
         tokenBalanceWei,
-        selectedToken?.stratoToken === usdstAddress,
-        voucherBalance,
-        usdstBalance,
-        FEE_WEI,
+        selectedToken?.stratoToken || "",
+        BRIDGE_OUT_CALLS,
+        feeQuote,
         () => {}
       );
       const balanceWei = BigInt(actualBalance || "0");
@@ -160,7 +154,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
     } catch {
       return { before: "0", after: "0" };
     }
-  }, [balanceData?.balance, selectedToken?.stratoToken, usdstBalance, voucherBalance, amount]);
+  }, [balanceData?.balance, selectedToken?.stratoToken, feeQuote, amount]);
 
   const hasValidAmount = !!amount && !amountError && !feeError;
 

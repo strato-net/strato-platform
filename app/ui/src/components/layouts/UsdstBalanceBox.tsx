@@ -4,19 +4,15 @@ import { useTokenContext } from "@/context/TokenContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Coins, AlertTriangle, HelpCircle, Minus } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import {
-  formatWeiAmount,
-  formatCurrency,
-  safeParseFloat,
-} from "@/utils/numberUtils";
+import { formatWeiAmount, formatCurrency } from "@/utils/numberUtils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Token } from "@/interface";
-import { usdstAddress, VOUCHER_TO_USDST_FACTOR } from "@/lib/constants";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
 
-// Combined balance threshold for warnings (in USDST)
-const COMBINED_BALANCE_THRESHOLD = 10; // Show warning if USDST + vouchers < 10 USDST
+// Warn when vouchers plus the fee currency cover fewer calls than this
+const LOW_CALLS = 1000;
+const CRITICAL_CALLS = 3;
 
 // Optimized InfoTooltip component using hook
 const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
@@ -54,11 +50,11 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
 
 const UsdstBalanceBox: React.FC = () => {
   const { userAddress, isLoggedIn } = useUser();
-  const { usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance, getToken } =
-    useTokenContext();
+  const { feeQuote, loadingUsdstBalance, fetchUsdstBalance, getToken } = useTokenContext();
+  const currency = feeQuote?.currency ?? "STRATO";
   const location = useLocation();
   const [isMinimized, setIsMinimized] = useState(false);
-  const [usdstToken, setUsdstToken] = useState<Token | null>(null);
+  const [feeToken, setFeeToken] = useState<Token | null>(null);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -66,35 +62,25 @@ const UsdstBalanceBox: React.FC = () => {
     }
   }, [fetchUsdstBalance, isLoggedIn]);
 
-  // Fetch USDST token info for image
+  // Fetch the fee token's info for its image
+  const currencyAddress = feeQuote?.currencyAddress;
   useEffect(() => {
-    const fetchUsdstToken = async () => {
-      try {
-        const token = await getToken(usdstAddress);
-        setUsdstToken(token);
-      } catch (error) {
-        console.error("Error fetching USDST token:", error);
-      }
-    };
+    if (!currencyAddress) return;
+    getToken(currencyAddress)
+      .then(setFeeToken)
+      .catch((error) => console.error(`Error fetching ${currency} token:`, error));
+  }, [getToken, currencyAddress, currency]);
 
-    fetchUsdstToken();
-  }, [getToken]);
+  // Calls the user can still pay for: vouchers first, then the fee currency.
+  const affordableCalls = useMemo(() => {
+    if (loadingUsdstBalance || !feeQuote) return 0;
+    const feeWei = BigInt(feeQuote.feeWei);
+    const fromBalance = feeQuote.valid && feeWei > 0n ? BigInt(feeQuote.balanceWei) / feeWei : 0n;
+    return Number(BigInt(feeQuote.vouchers) + fromBalance);
+  }, [feeQuote, loadingUsdstBalance]);
 
-  const combinedBalance = useMemo(() => {
-    if (loadingUsdstBalance) return 0;
-    try {
-      const usdst = safeParseFloat(formatWeiAmount(usdstBalance || "0"));
-      const vouchers = safeParseFloat(formatWeiAmount(voucherBalance || "0", 20));
-      return usdst * Number(VOUCHER_TO_USDST_FACTOR) + vouchers;
-    } catch {
-      return safeParseFloat(formatWeiAmount(usdstBalance || "0"));
-    }
-  }, [usdstBalance, voucherBalance, loadingUsdstBalance]);
-
-  
-  const balanceValue = combinedBalance;
-  const isLowBalance = balanceValue < COMBINED_BALANCE_THRESHOLD && balanceValue > 0.03;
-  const isCriticalBalance = balanceValue <= 0.03;
+  const isLowBalance = affordableCalls < LOW_CALLS && affordableCalls > CRITICAL_CALLS;
+  const isCriticalBalance = affordableCalls <= CRITICAL_CALLS;
 
   // Don't render if user is not logged in or if on homepage
   if (!userAddress || location.pathname === "/") {
@@ -117,11 +103,11 @@ const UsdstBalanceBox: React.FC = () => {
     };
 
     // If we have a token with image, use it
-    if (usdstToken?.images?.[0]?.value) {
+    if (feeToken?.images?.[0]?.value) {
       return (
         <img
-          src={usdstToken.images[0].value}
-          alt="USDST"
+          src={feeToken.images[0].value}
+          alt={currency}
           className={`${sizeClasses[size]} rounded-full object-cover`}
         />
       );
@@ -186,8 +172,8 @@ const UsdstBalanceBox: React.FC = () => {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">
-              <p className="text-xs font-medium text-muted-foreground">USDST Balance</p>
-              <InfoTooltip content="USDST is used to pay for gas fees on the STRATO network">
+              <p className="text-xs font-medium text-muted-foreground">{currency} Balance</p>
+              <InfoTooltip content={`${currency} pays the network fees on STRATO; vouchers cover one call each`}>
                 <HelpCircle className="h-3 w-3 text-muted-foreground hover:text-foreground cursor-help" />
 
               </InfoTooltip>
@@ -196,13 +182,13 @@ const UsdstBalanceBox: React.FC = () => {
               {loadingUsdstBalance ? (
                 <span className="animate-pulse">Loading...</span>
               ) : (
-                `${formatCurrency(formatWeiAmount(usdstBalance))} USDST`
+                `${formatCurrency(formatWeiAmount(feeQuote?.balanceWei || "0"))} ${currency}`
               )}
             </p>
             <p className="text-xs text-muted-foreground truncate">
               {loadingUsdstBalance
                 ? "Calculating voucher credits…"
-                : `${Math.floor(parseFloat(formatWeiAmount(voucherBalance,20))).toLocaleString()} vouchers`}
+                : `${Number(feeQuote?.vouchers || 0).toLocaleString()} vouchers`}
             </p>
           </div>
           <Button
@@ -226,8 +212,8 @@ const UsdstBalanceBox: React.FC = () => {
               <div className="text-xs">
                 <p className="font-medium">
                   {isCriticalBalance
-                    ? "Critical: Low gas funds - add USDST to continue transacting"
-                    : "Warning: Low gas funds - add USDST to continue transacting"}
+                    ? `Critical: Low gas funds - add ${currency} to continue transacting`
+                    : `Warning: Low gas funds - add ${currency} to continue transacting`}
                 </p>
                 <Link
                   to="/dashboard/deposits/?tab=convert"

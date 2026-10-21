@@ -27,7 +27,7 @@ const SwapPoolsSection = () => {
   const operationInProgressRef = useRef(false);
 
   const { pools, poolsLoading, fetchPools, getPoolByAddress } = useSwapContext();
-  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
+  const { fetchUsdstBalance } = useTokenContext();
   const { isLoggedIn } = useUser();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
   const { tokenApys } = useEarnContext();
@@ -288,8 +288,6 @@ const SwapPoolsSection = () => {
         selectedPool={selectedPool}
         onDepositSuccess={handleDepositSuccess}
         operationInProgressRef={operationInProgressRef}
-        usdstBalance={usdstBalance}
-        voucherBalance={voucherBalance}
       />
 
       <LiquidityWithdrawModal
@@ -298,8 +296,6 @@ const SwapPoolsSection = () => {
         selectedPool={selectedPool}
         onWithdrawSuccess={handleWithdrawSuccess}
         operationInProgressRef={operationInProgressRef}
-        usdstBalance={usdstBalance}
-        voucherBalance={voucherBalance}
       />
     </div>
   );

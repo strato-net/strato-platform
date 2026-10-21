@@ -59,12 +59,10 @@ import MetalBuyProgressModal, { type MetalBuyStep } from "./MetalBuyProgressModa
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowDownToLine, Gem, CheckCircle2, ChevronLeft, ChevronRight, AlertTriangle, Mail } from "lucide-react";
-import { usdstAddress, WAD, METAL_BUY_FEE } from "@/lib/constants";
+import { usdstAddress, WAD, METAL_BUY_CALLS } from "@/lib/constants";
 import type { WalletTxProgressEvent } from "@/lib/axios";
 import { isTxPending, isTxSubmitted } from "@/utils/transactionStatus";
 import { captureApi } from "@/lib/analytics";
-
-const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
 
 /** Step 3 card APY row: fixed slot so cards match height with/without APY and vs skeleton */
 const STEP3_APY_ROW_CLASS = "mt-0.5 flex min-h-[18px] items-center";
@@ -352,7 +350,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const { openConnectModal } = useConnectModal();
   const { toast } = useToast();
   const { userAddress, stratoAddress, externalEvmWalletAddress, isExternalEvmWalletConnected, isAppAuthenticated } = useUser();
-  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
+  const { fetchUsdstBalance, feeQuote } = useTokenContext();
   const { activeTokens, fetchTokens } = useUserTokens();
   const {
     availableNetworks,
@@ -515,10 +513,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   }, [selectedPayToken, activeTokens]);
 
   const metalsMaxAmount = useMemo(() => computeMaxTransferable(
-    metalsPayBalanceWei,
-    normAddr(selectedPayToken?.address || "") === normAddr(usdstAddress),
-    voucherBalance, usdstBalance, METAL_BUY_FEE_WEI, setMetalsFeeError
-  ), [metalsPayBalanceWei, selectedPayToken?.address, voucherBalance, usdstBalance]);
+    metalsPayBalanceWei, selectedPayToken?.address || "", METAL_BUY_CALLS, feeQuote, setMetalsFeeError
+  ), [metalsPayBalanceWei, selectedPayToken?.address, feeQuote]);
 
   const metalsPayBalance = useMemo(() => {
     return metalsPayBalanceWei !== "0" ? formatBalance(metalsPayBalanceWei) : "0.00";
