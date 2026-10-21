@@ -14,11 +14,12 @@ where
 
 import Blockchain.SolidVM.Exception
 import Control.Lens
-import Control.Monad ((<=<))
+import Control.Monad (foldM, (<=<))
 import Data.Foldable (foldrM)
 import Data.Function (on)
 import Data.Map (Map)
 import qualified Data.Map.Internal as M
+import qualified Data.Set as S
 import Data.Source
 import SolidVM.Model.CodeCollection
 import SolidVM.Model.SolidString
@@ -38,6 +39,7 @@ validateXabi Xabi{xabiModifiers=mx, xabiContext=ctx} =
 
 applyInheritanceNoFunctions :: CodeCollection -> SolidEither CodeCollection
 applyInheritanceNoFunctions cc = do
+  checkInheritance cc
   ccs <- traverse (addInheritedObjects cc) $ cc ^. contracts
   pure $
     cc
@@ -46,6 +48,7 @@ applyInheritanceNoFunctions cc = do
 
 applyInheritanceFunctions :: CodeCollection -> SolidEither CodeCollection
 applyInheritanceFunctions cc = do
+  checkInheritance cc
   ccs <- traverse (checkForNamingCollisions <=< addInheritedFunctions cc) $ cc ^. contracts
   pure $
     cc
@@ -114,9 +117,22 @@ toUnionMaker f = toUnionMaker' f f match
 
 toUnionMaker' :: (Ord a) => (Contract -> M.Map a b) -> (Contract -> M.Map a b) -> (M.WhenMatched SolidEither a b b b) -> CodeCollection -> Contract -> SolidEither (M.Map a b)
 toUnionMaker' fSelf fAncestors onConflict cc c = do
-  parents' <- getParentsAndUsings cc c
-  parentMaps <- traverse (toUnionMaker' fAncestors fAncestors onConflict cc) parents' -- this allows us to perform fSelf only once
-  foldrM (M.mergeA miss miss onConflict) M.empty $ fSelf c : parentMaps
+  ancestors <- getAncestors cc c
+  foldrM (M.mergeA miss miss onConflict) M.empty $ fSelf c : map fAncestors ancestors
+
+-- | Every contract merged into c: each entry of getParentsAndUsings c followed by
+-- its own ancestors, in first-visit order, which is also merge precedence. A
+-- repeat visit adds nothing, so it is skipped rather than re-walked (which was
+-- exponential in the depth of a diamond-shaped hierarchy).
+getAncestors :: CodeCollection -> Contract -> SolidEither [Contract]
+getAncestors cc c0 = reverse . snd <$> go (S.singleton $ c0 ^. contractName) (S.empty, []) c0
+  where
+    go onPath acc c = foldM (visit onPath) acc =<< getParentsAndUsings cc c
+    visit onPath acc@(seen, out) p
+      | n `S.member` onPath = Left (InternalError "inheritance cycle" (labelToString n), p ^. contractContext)
+      | n `S.member` seen = Right acc
+      | otherwise = go (S.insert n onPath) (S.insert n seen, p : out) p
+      where n = p ^. contractName
 
 resolveLabels :: CodeCollection -> CodeCollection
 resolveLabels cc = cc {_contracts = fmap (resolveLabelsInContract cc) $ cc ^. contracts}
