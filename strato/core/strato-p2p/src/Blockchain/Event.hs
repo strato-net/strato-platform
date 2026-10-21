@@ -132,7 +132,7 @@ handleEvents peer = awaitForever $ \case
         -- Debounced: while we are far behind, every gossiped block misses its
         -- parent, and one 500-header request per gossiped block buries the
         -- BlockBodies responses we actually need.
-        shouldFetch <- lift $ tryResyncFrom fetchNumber
+        shouldFetch <- lift $ getCurrentSyncTask >>= maybe (tryResyncFrom fetchNumber) (const $ pure False)
         when shouldFetch $ do
           $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
           $logInfoS "handleEvents/NewBlock" "#### New block is missing its parent, I am resyncing"
@@ -144,7 +144,7 @@ handleEvents peer = awaitForever $ \case
     lift stampActionTimestamp
     BestSequencedBlock _ bestBlockNum _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
     let fetchNumber = alignFetchNumber $ bestBlockNum + 1
-    shouldFetch <- lift $ tryResyncFrom fetchNumber
+    shouldFetch <- lift $ getCurrentSyncTask >>= maybe (tryResyncFrom fetchNumber) (const $ pure False)
     when shouldFetch $ do
       $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
       syncFetch Forward fetchNumber
@@ -397,7 +397,7 @@ handleEvents peer = awaitForever $ \case
       -- repeated 1,422 times. The longer a stall lasted, the harder p2p
       -- flooded itself, which is what kept the stall going.
       let start' = alignFetchNumber start
-      shouldFetch <- lift $ tryResyncFrom start'
+      shouldFetch <- lift $ getCurrentSyncTask >>= maybe (tryResyncFrom start') (const $ pure False)
       when shouldFetch $ do
         $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start'
         syncFetch Forward start'
