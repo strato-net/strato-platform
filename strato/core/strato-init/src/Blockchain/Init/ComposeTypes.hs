@@ -98,6 +98,7 @@ data Service = Service
   , logging :: Maybe Logging
   , extra_hosts :: Maybe [String]
   , shm_size :: Maybe String
+  , stop_grace_period :: Maybe String
   } deriving stock (Show, Eq, Generic)
     deriving anyclass (Default)
 

@@ -12,6 +12,14 @@ cd "$NODE_DIR"
 
 echo "Stopping STRATO..."
 
+# A --dockerMode=all node (strato-setup) has no host
+# convoke: the strato container runs it, and compose stops the whole project.
+if grep -qx '  strato:' docker-compose.yml 2>/dev/null; then
+    docker compose -p strato down
+    echo "STRATO stopped"
+    exit 0
+fi
+
 if [[ -f .strato.pid ]]; then
     source .strato.pid
     if [[ -n "$CONVOKE_PID" ]] && kill -0 "$CONVOKE_PID" 2>/dev/null; then

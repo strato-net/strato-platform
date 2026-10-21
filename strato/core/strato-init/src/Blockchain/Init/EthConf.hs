@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Blockchain.Init.EthConf (genEthConf, preferIPv4Loopback, runtimeConfig, flagsNetworkIdentity) where
+module Blockchain.Init.EthConf (genEthConf, containerMode, nodeHostname, preferIPv4Loopback, storeHost, runtimeConfig, flagsNetworkIdentity) where
 
 import Blockchain.EthConf
 import Blockchain.Init.Options hiding (flags_localAuth)
@@ -22,24 +22,53 @@ import System.Process (readProcess)
 import Text.ShortDescription
 
 -- | Address strato-api binds its socket to: @--apiIPAddress@ when given,
--- otherwise the docker bridge on Linux (so the nginx container reaches the
--- host process) and loopback elsewhere.
+-- otherwise every interface of the strato container with --dockerMode=all (nginx
+-- reaches it by service name), the docker bridge on Linux (so the nginx
+-- container reaches the host process) and loopback elsewhere.
 getApiListenAddress :: String
 getApiListenAddress
   | not (null flags_apiIPAddress) = flags_apiIPAddress
+  | containerMode = "0.0.0.0"
   | os == "linux" = "172.17.0.1"
   | otherwise = "127.0.0.1"
 
--- | In local mode the generated docker-compose.yml publishes Postgres/Redis only
+-- | With --dockerMode=services the generated docker-compose.yml publishes Postgres/Redis only
 -- on IPv4 (127.0.0.1:PORT). macOS resolves "localhost" to IPv6 (::1) first, so
 -- local STRATO processes fail to connect ("connection to server at \"localhost\"
 -- (::1) ... Connection refused"). Pin the default "localhost" to the IPv4 loopback
 -- the ports are actually bound to. On Linux "localhost" already resolves to
--- 127.0.0.1, so this is a no-op there. Explicit non-localhost hosts (e.g. the
--- "postgres" docker service name used in allDocker mode) are left untouched.
+-- 127.0.0.1, so this is a no-op there. Explicit non-localhost hosts (e.g. a
+-- managed cluster's endpoint) are left untouched.
 preferIPv4Loopback :: String -> String
 preferIPv4Loopback "localhost" = "127.0.0.1"
 preferIPv4Loopback h = h
+
+-- | @--dockerMode@: what runs in Docker. With @services@ the node processes run
+-- on the host under convoke and only the services in containers; with @all@
+-- they run in a strato container too, started from the same compose file.
+containerMode :: Bool
+containerMode = case flags_dockerMode of
+  "services" -> False
+  "all" -> True
+  other -> error $ "Unknown --dockerMode " ++ show other ++ "; expected services or all"
+
+-- | Where a node process finds one of the node's stores: the loopback the
+-- services-mode containers publish on or, with --dockerMode=all, the store's service
+-- name. A remote host (a managed cluster) is left alone.
+storeHost :: String -> String -> String
+storeHost service h
+  | containerMode && h `elem` ["localhost", "127.0.0.1"] = service
+  | otherwise = preferIPv4Loopback h
+
+-- | The node's public host name: @--nodeHost@ when given, otherwise the
+-- machine's @hostname@. The node URL, the auth cookie domain and the
+-- local-auth discovery URL are built from it, and the containers alias it to
+-- the host gateway. strato-up --prebuilt runs strato-setup in a container
+-- with the host's name, so the default holds there too.
+nodeHostname :: IO String
+nodeHostname
+  | null flags_nodeHost = filter (/= '\n') <$> readProcess "hostname" [] ""
+  | otherwise = return flags_nodeHost
 
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
@@ -59,7 +88,7 @@ runtimeConfig = def
   { sqlConfig = def { host = "postgres" }
   , cirrusConfig = def { host = "postgres", database = "cirrus" }
   , redisBlockDBConfig = def
-      { redisHost = preferIPv4Loopback flags_redisHost
+      { redisHost = storeHost "redis" flags_redisHost
       , redisPort = flags_redisPort
       , redisDBNumber = flags_redisDBNumber
       }
@@ -133,7 +162,7 @@ genEthConf :: Role -> IO EthConf
 genEthConf nodeRole = do
   pgPass <- filter (/= '\n') <$> readFile "secrets/postgres_password"
 
-  localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
+  localHostname <- nodeHostname
 
   let ssl = not $ null flags_sslDir
       !nodeBaseUrl = (if ssl then "https://" else "http://")
@@ -155,7 +184,7 @@ genEthConf nodeRole = do
   let readerHost = if null flags_pgReaderHost || nodeRole /= RoleApi then Nothing else Just flags_pgReaderHost
       writerSql = (sqlConfig runtimeConfig)
         { user = flags_pguser
-        , host = preferIPv4Loopback flags_pghost
+        , host = storeHost "postgres" flags_pghost
         , password = pgPass
         }
 
@@ -185,7 +214,7 @@ genEthConf nodeRole = do
     , sqlReaderConfig = (\h -> writerSql { host = h }) <$> readerHost
     , cirrusConfig = (cirrusConfig runtimeConfig)
         { user = flags_pguser
-        , host = maybe (preferIPv4Loopback flags_pghost) id readerHost
+        , host = maybe (storeHost "postgres" flags_pghost) id readerHost
         , password = pgPass
         }
     , streamingConfig = (streamingConfig runtimeConfig)
