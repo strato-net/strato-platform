@@ -37,13 +37,14 @@ import           Blockchain.Strato.RedisBlockDB.Models as Models
 import           Control.Concurrent                    (threadDelay)
 import           Control.Monad
 import           Control.Monad.Composable.Base         (Eff, Logger, runEff)
-import           Control.Monad.Composable.SQL
+import           Control.Monad.Reader                  (ask)
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
 import qualified Data.Text                             as T
 import           Data.Time
 import           Database.Esqueleto.Legacy
 import qualified Database.Persist.Sql                  as SQL
+import           Database.Persist.SqlBackend           (getRDBMS)
 import           Database.Redis                        (Redis, RedisCtx)
 import qualified Database.Redis                        as REDIS
 import           System.Random                         (randomIO)
@@ -342,11 +343,15 @@ class HasSyncDB m where
   clearAllSyncTasks :: Host -> m ()
   getCurrentSyncTask :: Host -> m (Maybe SyncTask)
   getNewSyncTask :: Host -> Integer -> m (Maybe SyncTask)
-  setSyncTaskFinished :: Host -> m ()
+  -- Scoped to the task: a host holds more than one assignment when two
+  -- connections to it overlap, and finishing by host would cover them all.
+  setSyncTaskFinished :: SyncTask -> m ()
   setSyncTaskNotReady :: Host -> m ()
 
-instance HasSQL m => HasSyncDB m where
-  clearAllSyncTasks host = sqlQuery $ do
+-- Sync tasks live in the peer store, which on a cell is not the eth
+-- database (see "Blockchain.DBM").
+instance HasPeerStore m => HasSyncDB m where
+  clearAllSyncTasks host = peerQuery $ do
     rawExecute
         [r|
             UPDATE "sync_task"
@@ -355,7 +360,7 @@ instance HasSQL m => HasSyncDB m where
         |]
         [toPersistValue host]
 
-  getCurrentSyncTask host = sqlQuery $ do
+  getCurrentSyncTask host = peerQuery $ do
     vals <-
         select $ from $ \syncTask -> do
           where_ (
@@ -375,11 +380,33 @@ instance HasSQL m => HasSyncDB m where
       _ -> error $ CL.red $ "multiple sync tasks found in call to getCurrentSyncTask:\n" ++ unlines (map (format . entityVal) vals)
 
   getNewSyncTask "127.0.0.1" _ = return Nothing -- empirically, I've observed a lot of wasted time trying to sync from the loopback....  Probably should just stop self-connect from even happening, but for now I'll just filter it out here
-  getNewSyncTask host highestBlockNum = sqlQuery $ do
+  getNewSyncTask host highestBlockNum = peerQuery $ do
     now <- liftIO getCurrentTime
     let oneMinuteAgo = addUTCTime (-60) now
+    rdbms <- getRDBMS <$> ask
 
-    result <- rawSql
+    -- The SQLite peer store has no row locks (a writer holds the whole file
+    -- for its transaction, which serialises the two processes as FOR UPDATE
+    -- SKIP LOCKED does on Postgres), no sequences (the insert numbers the
+    -- new chiliad from the highest one present, which is what the chiliad
+    -- sequence yields on a table that only ever grows) and no now().
+    result <- if rdbms == "sqlite"
+      then rawSql
+        [r|
+            UPDATE "sync_task"
+            SET "host" = ?, "assignment_time" = ?, "status" = 'Assigned'
+            WHERE "id" = (
+                SELECT "id"
+                FROM "sync_task"
+                WHERE "assignment_time" < ?
+                  AND "status" != 'Finished'
+                ORDER BY "assignment_time" ASC
+                LIMIT 1
+            )
+            RETURNING ??
+        |]
+        [toPersistValue host, toPersistValue now, toPersistValue oneMinuteAgo]
+      else rawSql
         [r|
             UPDATE "sync_task"
             SET "host" = ?, "assignment_time" = ?, "status" = 'Assigned'
@@ -399,31 +426,46 @@ instance HasSQL m => HasSyncDB m where
     case result of
       oneTask:_ -> return $ Just $ entityVal oneTask
       [] -> do
-        --No existing task, make a new one
-        results <- SQL.rawSql
-          [r|
-            INSERT INTO sync_task (host)
-            SELECT ?
-            WHERE (select count(*) from "sync_task") < ?
-            RETURNING
-          |] [toPersistValue host, toPersistValue $ 1 + highestBlockNum `div` 1000]
+        -- No existing task, make a new one, unless the chiliad it would get
+        -- lies beyond the peer's tip. The bound is the chiliad about to be
+        -- allocated (MAX + 1 on SQLite, the sequence's next value on
+        -- Postgres), not the row count: a task table seeded at the chiliad of
+        -- the Redis best block (see strato-p2p's initConfig) is sparse, and a
+        -- row count would let tasks past the tip through.
+        results <- if rdbms == "sqlite"
+          then SQL.rawSql
+            [r|
+              INSERT INTO "sync_task" ("chiliad", "assignment_time", "host", "status")
+              SELECT (SELECT COALESCE(MAX("chiliad") + 1, 0) FROM "sync_task"), ?, ?, 'Assigned'
+              WHERE (SELECT COALESCE(MAX("chiliad") + 1, 0) FROM "sync_task") < ?
+              RETURNING ??
+            |] [toPersistValue now, toPersistValue host, toPersistValue $ 1 + highestBlockNum `div` 1000]
+          else SQL.rawSql
+            [r|
+              INSERT INTO sync_task (host)
+              SELECT ?
+              WHERE (SELECT CASE WHEN is_called THEN last_value + 1 ELSE last_value END FROM chiliad) < ?
+              RETURNING
+            |] [toPersistValue host, toPersistValue $ 1 + highestBlockNum `div` 1000]
 
         case results of
           [v] -> return $ Just $ SQL.entityVal v
           []  -> return Nothing
           _   -> error "this seems impossible, getNewSyncTask tried to create one new task, but multiple were created.  Internal error"
 
-  setSyncTaskFinished host = sqlQuery $ do
+  setSyncTaskFinished task = peerQuery $ do
     update $ \syncTask -> do
       set syncTask [SyncTaskStatus =. val Finished]
       where_ (
-        (syncTask^.SyncTaskHost ==. val host)
+        (syncTask^.SyncTaskHost ==. val (syncTaskHost task))
+        &&.
+        (syncTask^.SyncTaskChiliad ==. val (syncTaskChiliad task))
         &&.
         (syncTask^.SyncTaskStatus ==. val Assigned)
         )
     return ()
 
-  setSyncTaskNotReady host = sqlQuery $ do
+  setSyncTaskNotReady host = peerQuery $ do
     update $ \syncTask -> do
       set syncTask [SyncTaskStatus =. val NotReady]
       where_ (

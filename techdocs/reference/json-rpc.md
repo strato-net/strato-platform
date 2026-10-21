@@ -29,7 +29,7 @@ curl -s -X POST https://noderpc.strato.nexus/rpc \
 | Testnet (helium) | `0xb165855668ca` | `195049586845898` | `114784819836269` |
 
 !!! warning "Use `eth_chainId`, not `net_version`"
-    `net_version` returns STRATO's network ID. That is a different number from the EIP-155 chain ID, and it is larger than JavaScript's `Number.MAX_SAFE_INTEGER`. Wallets and signing libraries need the chain ID.
+    `net_version` returns STRATO's network ID. That is a different number from the EIP-155 chain ID. Mainnet's network ID is larger than JavaScript's `Number.MAX_SAFE_INTEGER`. Wallets and signing libraries need the chain ID.
 
 ## Supported Methods
 
@@ -43,12 +43,12 @@ curl -s -X POST https://noderpc.strato.nexus/rpc \
 | `eth_getBlockTransactionCountByNumber`, `eth_getBlockTransactionCountByHash` | |
 | `eth_getBalance` | The account's **USDST** balance (the native token), read through the token contract. The block parameter is ignored. |
 | `eth_getTransactionCount` | The account's current nonce. The block parameter is ignored. |
-| `eth_getCode` | `0x01` if the address is a contract, otherwise `0x`. SolidVM contracts have no EVM bytecode to return. |
+| `eth_getCode` | The deployed SolidVM source as hex-encoded UTF-8, or `0x` when no code is stored. Sources deployed as multiple files are joined with newlines. This is source text, not EVM bytecode. The block parameter is ignored. |
 | `eth_call` | Runs a read-only call in the VM. Block tag: `latest`, `pending`, a block number or a block hash. Returns error code `3` if the VM doesn't answer within 30 s. |
 | `eth_getProof` | EIP-1186 account and storage proofs against a block's state root. Block tag: `latest`, a block number or a block hash. A storage key is the hex of the raw key bytes, which for SolidVM is the ASCII storage path (`0x` + hex of `balances[<address>]`), not a 32-byte slot. `value` is the leaf's RLP item as stored. See [State proofs](strato-node-api.md#state-proofs). |
 | `eth_getTransactionByHash`, `eth_getTransactionByBlockHashAndIndex`, `eth_getTransactionByBlockNumberAndIndex` | |
 | `eth_getTransactionReceipt`, `eth_getBlockReceipts` | Receipts include `status` and `logs` |
-| `eth_getLogs` | Filter by `address`, `topics`, `fromBlock` and `toBlock`. At most 10,000 blocks per query and at most 1,000 matching events. Narrow the range if you hit a limit. |
+| `eth_getLogs` | Filter by one or more contract addresses, positional topics (including `null` wildcards and arrays of alternatives), and `fromBlock`/`toBlock` or `blockHash`. `blockHash` cannot be combined with a block range. At most 10,000 blocks per query and 1,000 candidate events before topic filtering. Narrow the range or addresses if you hit a limit. |
 | `debug_traceBlockByHash` | Call frames read from stored results (no re-execution) |
 
 ### Writes
@@ -61,16 +61,25 @@ curl -s -X POST https://noderpc.strato.nexus/rpc \
 
 These methods exist for wallet compatibility and always return the same value:
 
-- `eth_gasPrice` returns `0x0`.
+- `eth_gasPrice` returns `0x6edf2a079f` (476,190,476,191 base units per gas), quoting approximately 0.01 USDST at the fixed 21,000-gas estimate.
 - `eth_estimateGas` always returns `0x5208`.
-- `eth_syncing` and `eth_mining` return `"false"`.
-- `net_listening` returns `"true"`.
+- `eth_syncing` and `eth_mining` return the JSON boolean `false`.
+- `net_listening` returns the JSON boolean `true`.
 - `net_peerCount` and `eth_hashrate` return `0x0`.
 - `eth_coinbase` returns the zero address.
-- `eth_accounts` and `eth_getCompilers` return `"[]"`.
+- `eth_accounts` returns the JSON array `[]`; the node manages no wallet accounts.
+- `eth_getCompilers` returns the string `"[]"`.
 - The uncle methods return `0x0` or `null`.
 - `eth_protocolVersion` returns a constant.
 - `rpc_modules` returns a fixed list of module names that doesn't reflect which methods are implemented.
+
+These are fixed compatibility responses, not live node health checks. Older node builds may return strings for `eth_accounts`, `net_listening`, `eth_syncing` and `eth_mining`.
+
+### Gas API and fees
+
+**EIP-1559 support: No.** The API accepts legacy Ethereum transactions and does not implement `eth_feeHistory` or `eth_maxPriorityFeePerGas`.
+
+Use the [JSON-RPC endpoints](#endpoints) with `eth_gasPrice` for the fixed legacy gas-price quote, not a `baseFee` / `priorityFee` pair. Multiplied by the fixed 21,000-gas estimate, it quotes approximately 0.01 USDST. A wallet that increases the gas limit or changes the gas price will display a different estimate. The node still charges the actual fee separately through the Decider contract, using a voucher or USDST; the quote does not account for vouchers or fee exemptions. See [Transactions and Fees](../platform/transactions-and-fees.md).
 
 ### Not supported
 
@@ -117,7 +126,7 @@ To add STRATO to MetaMask or another EIP-1193 wallet, open **Add network → Add
 What to expect:
 
 - **Balance:** the wallet's native balance is your USDST balance.
-- **Gas:** the wallet shows a gas price of 0. The real fee is 0.01 USDST or one voucher per transaction, charged on-chain by the Decider contract, not through gas. See [Transactions & Fees](../platform/transactions-and-fees.md#fees).
+- **Gas:** the fixed gas estimate and gas-price quote give approximately 0.01 USDST. Wallet adjustments can change the displayed estimate. The real fee is 0.01 USDST or one voucher per transaction, charged on-chain by the Decider contract, not through gas. See [Transactions & Fees](../platform/transactions-and-fees.md#fees).
 - **Transactions:** the STRATO app has MetaMask sign transactions with EIP-712 through your on-chain User wallet. You don't have to send Ethereum-format transactions yourself.
 
 ## Library Examples
@@ -168,6 +177,7 @@ Both examples were checked against testnet.
 
 ## Related Docs
 
+- [STRATOscan API](https://stratoscan.strato.nexus/api-docs): Etherscan-compatible `balance`, `txlist`, `tokentx`, `tokenbalance` and `getabi` endpoints
 - [Core Platform API](strato-node-api.md): REST access to blocks, transactions and contract state
 - [Cirrus](cirrus.md): indexed contract data
 - [Transactions & Fees](../platform/transactions-and-fees.md)

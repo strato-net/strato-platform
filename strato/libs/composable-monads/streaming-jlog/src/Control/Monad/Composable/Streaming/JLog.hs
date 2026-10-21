@@ -31,6 +31,7 @@ module Control.Monad.Composable.Streaming.JLog (
   runStreamM,
   runStreamMUsingEnv,
   createStreamEnv,
+  unconnectedStreamEnv,
   closeStreamEnv,
   getStreamEnv,
   -- Producing
@@ -43,6 +44,8 @@ module Control.Monad.Composable.Streaming.JLog (
   consumeBroadcast,
   runConsume,
   consumeFromLatest,
+  seedConsumerGroupFrom,
+  removeConsumerGroup,
   -- Topics
   createTopicAndWait,
   createBroadcastTopic,
@@ -77,7 +80,8 @@ import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
 
 import JLog.FFI (JLogCtx, JLogId(..), JLogMessage(..), jlog_new, jlog_ctx_init, jlog_ctx_open_writer,
-                 jlog_ctx_write, jlog_ctx_close, jlog_ctx_add_subscriber,
+                 jlog_ctx_write, jlog_ctx_close, jlog_ctx_add_subscriber, jlog_ctx_add_subscriber_copy_checkpoint,
+                 jlog_ctx_remove_subscriber, jlog_clean,
                  jlog_ctx_open_reader, jlog_ctx_err_string, jlog_ctx_read_interval,
                  jlog_ctx_read_message, jlog_ctx_read_checkpoint, jlog_ctx_advance_id)
 
@@ -109,6 +113,11 @@ createStreamEnv clientId (basePath, _port) = liftIO $ do
   createDirectoryIfMissing True basePath
   cache <- newIORef Map.empty
   return $ StreamEnv basePath clientId cache
+
+-- | An environment for runs that never touch the stream (in-memory VM
+-- contexts): no directory is created and nothing is opened.
+unconnectedStreamEnv :: MonadIO m => ClientId -> m StreamEnv
+unconnectedStreamEnv clientId = liftIO $ StreamEnv "" clientId <$> newIORef Map.empty
 
 getStreamEnv :: HasStreaming m => m StreamEnv
 getStreamEnv = do
@@ -379,6 +388,57 @@ runConsume consumerGroup topicName f = do
                 poke idPtr lastId
                 void $ jlog_ctx_read_checkpoint ctx idPtr
             jlog_ctx_close ctx
+
+-- | Give a consumer group that does not exist yet the checkpoint of another
+-- one on the same topic, so a group split off an existing consumer resumes
+-- where that consumer was instead of replaying the whole log. A group that
+-- already has a checkpoint is left alone; nothing happens when the old one
+-- has none either. True when a checkpoint was copied.
+seedConsumerGroupFrom :: HasStreaming m => ConsumerGroup -> ConsumerGroup -> TopicName -> m Bool
+seedConsumerGroupFrom new old topicName = do
+  env <- getStreamEnv
+  let topicPath = seBasePath env </> T.unpack (unTopicName topicName)
+  liftIO $ do
+    createDirectoryIfMissing True (seBasePath env)
+    withCString topicPath $ \cpath -> withCString (T.unpack new) $ \cnew -> withCString (T.unpack old) $ \cold -> do
+      ctx <- jlog_new cpath
+      if ctx == nullPtr
+        then return False
+        else do
+          _ <- jlog_ctx_init ctx
+          -- A reader opens only for a subscriber that exists.
+          exists <- (== 0) <$> jlog_ctx_open_reader ctx cnew
+          jlog_ctx_close ctx
+          if exists
+            then return False
+            else do
+              ctx' <- jlog_new cpath
+              rc <- jlog_ctx_add_subscriber_copy_checkpoint ctx' cnew cold
+              jlog_ctx_close ctx'
+              return (rc == 0)
+
+-- | Drop a consumer group's checkpoint from a topic, and the segments it
+-- alone was pinning. JLog trims a segment only once every subscriber has
+-- passed it, so a group whose consumer this node never runs would pin the
+-- log for good; and it trims only while a checkpoint moves, so the segments
+-- the dropped group held below the others' positions are swept here
+-- (jlog_clean), or they would stay on disk for good. False when the group
+-- has no checkpoint there (nothing to do).
+removeConsumerGroup :: HasStreaming m => ConsumerGroup -> TopicName -> m Bool
+removeConsumerGroup group topicName = do
+  env <- getStreamEnv
+  let topicPath = seBasePath env </> T.unpack (unTopicName topicName)
+  liftIO $
+    withCString topicPath $ \cpath -> withCString (T.unpack group) $ \cgroup -> do
+      ctx <- jlog_new cpath
+      if ctx == nullPtr
+        then return False
+        else do
+          -- 1 when the checkpoint file was unlinked; an error code otherwise.
+          rc <- jlog_ctx_remove_subscriber ctx cgroup
+          jlog_ctx_close ctx
+          when (rc == 1) $ void $ jlog_clean cpath
+          return (rc == 1)
 
 consumeFromLatest :: (Binary a, HasStreaming m) =>
                      TopicName -> m () -> ([a] -> m (Maybe b)) -> m b

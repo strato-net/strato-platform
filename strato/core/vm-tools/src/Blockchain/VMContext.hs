@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -26,6 +27,9 @@ module Blockchain.VMContext
     ContextDBs (..),
     MemContextDBs (..),
     Backend (..),
+    StateMirror (..),
+    TrieAccess (..),
+    stateMirror,
     MemDBs (..),
     ContextState (..),
     QueueEvent (..),
@@ -127,7 +131,7 @@ import Control.Monad.Catch (MonadMask)
 import Control.Monad.Composable.Base
 import Control.Monad.Composable.NodeDB
 import Control.Monad.Composable.NodeDB.Cached (cachedNodeDB)
-import Control.Monad.Composable.Streaming (StreamEnv (..), StreamM, createStreamEnv, runStreamMUsingEnv)
+import Control.Monad.Composable.Streaming (StreamEnv, StreamM, createStreamEnv, runStreamMUsingEnv, unconnectedStreamEnv)
 import Control.Monad.IO.Class
 import Prometheus (MonadMonitor)
 import Data.Binary
@@ -202,12 +206,36 @@ makeLenses ''MemContextDBs
 instance Default MemContextDBs where
   def = MemContextDBs M.empty M.empty M.empty
 
+-- | The state as something other than the trie holds it: vm-query's SQL
+-- state mirror. Accounts, storage slots, code and block summaries are read by
+-- key; there are no trie nodes and no hash preimages behind it.
+data StateMirror = StateMirror
+  { mirrorAccount :: Address -> IO (Maybe AddressState),
+    mirrorStorage :: RawStorageKey -> IO (Maybe RawStorageValue),
+    mirrorCode :: Keccak256 -> IO (Maybe DBCode),
+    mirrorBlockSummary :: Keccak256 -> IO (Maybe BlockSummary),
+    -- | Told of every read of the empty trie's root, the one trie node a
+    -- mirror answers; a count of them says how often a run walked a storage
+    -- trie instead of reading slots.
+    mirrorEmptyTrieRead :: IO ()
+  }
+
+-- | Thrown when a run over a 'StateMirror' reaches for the state trie, which
+-- the mirror cannot serve.
+newtype TrieAccess = TrieAccess String
+  deriving (Show)
+
+instance Exception TrieAccess
+
 -- | Where the stores live. 'Sandbox' reads through to the persistent stores
 -- on a miss and keeps every write in the overlay (eth_call, tracing).
+-- 'Mirror' does the same over a 'StateMirror': reads the block maps and the
+-- overlay do not answer come from the mirror, and nothing is written to it.
 data Backend
   = Persistent ContextDBs
   | Memory (IORef MemContextDBs)
   | Sandbox (IORef MemContextDBs) ContextDBs
+  | Mirror (IORef MemContextDBs) StateMirror
 
 data MemDBs = MemDBs
   { -- Accounts modified by the current transaction (for its TransactionResult only).
@@ -289,6 +317,14 @@ type ContextRow = '[Context, NodeDB, IORef StreamEnv, Logger]
 newtype ContextM a = ContextM {unContextM :: Eff ContextRow a}
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadLogger, MonadLoggerIO, AccessibleEnv Context, AccessibleEnv NodeDB, AccessibleEnv (IORef StreamEnv), MonadMonitor)
 
+-- | The mirror the context runs over, if it runs over one.
+stateMirror :: ContextM (Maybe StateMirror)
+stateMirror =
+  accessEnv >>= \ctx -> pure $ case _backend ctx of
+    Mirror _ m -> Just m
+    _ -> Nothing
+{-# INLINE stateMirror #-}
+
 runContextIO :: Context -> ContextM a -> StreamM '[Logger] a
 runContextIO ctx (ContextM m) = do
   db <- nodeDBFor (_backend ctx)
@@ -304,6 +340,23 @@ nodeDBFor :: MonadIO m => Backend -> m NodeDB
 nodeDBFor (Memory _) = mapNodeDB <$> liftIO (newIORef M.empty)
 nodeDBFor (Persistent d) = liftIO $ cachedNodeDB 20000 256 (levelDBBytes . MP.unStateDB $ _stateDB d)
 nodeDBFor (Sandbox _ d) = pure $ nodeDB (levelDBBytes . MP.unStateDB $ _stateDB d)
+nodeDBFor (Mirror _ m) = pure (mirrorNodeDB m)
+
+-- | A mirror has no trie nodes. The empty trie's root is the one node there
+-- is an answer for (there is nothing under it); any other read is a path the
+-- mirror cannot serve, and says so. Writes are dropped.
+mirrorNodeDB :: StateMirror -> NodeDB
+mirrorNodeDB m =
+  NodeDB
+    { lookupNode = \sr ->
+        if sr == MP.emptyTriePtr
+          then Just MP.EmptyNodeData <$ mirrorEmptyTrieRead m
+          else throwIO (TrieAccess ("state trie node " ++ format sr)),
+      insertNode = \_ _ -> pure (),
+      deleteNode = \_ -> pure (),
+      tickNodes = pure (),
+      flushNodes = pure ()
+    }
 
 -- | Build the context inside 'ContextM' (the SQL pool wants the logger),
 -- then run the body under it. The builder runs under an inert in-memory
@@ -412,7 +465,7 @@ runTestContextM ::
 runTestContextM f =
   withRunInIO $ \runInIO -> withSystemTempDirectory "test_evm_context" $ \tmpdir ->
     withTempFile tmpdir "evm.sqlite" $ \filepath _ -> runInIO $ do
-      env <- createStreamEnv "test" (tmpdir ++ "/jlog", 0)
+      env <- createStreamEnv "test" (tmpdir ++ "/stream", 0)
       let mkCtx = do
             conn <- Lite.createSqlitePool (T.pack filepath) 20
             let ldbOptions =
@@ -451,7 +504,7 @@ runTestContextM f =
                           _codeDB = CodeDB cdb,
                           _blockSummaryDB = BlockSummaryDB blksumdb,
                           _redisPool = RBDB.RedisConnection rPool,
-                          _sqldb = SQLDB conn
+                          _sqldb = sqlDB conn
                         },
                   _state = cstate,
                   _stateDiffQueue = que,
@@ -567,7 +620,7 @@ runMemContextM ::
   ContextM a ->
   Eff '[Logger] (a, MemContextDBs)
 runMemContextM resolver dSettings f = do
-  sref <- liftIO $ newIORef . StreamEnv "" "mem" =<< newIORef M.empty
+  sref <- newIORef =<< unconnectedStreamEnv "mem"
   ctx <- memContext resolver dSettings
   a <- provide sref . runContextIO ctx $ do
     MP.initializeBlank
@@ -595,6 +648,7 @@ evalSandboxedContextM f = do
     Persistent d -> Sandbox <$> newIORef def <*> pure d
     Sandbox o d -> Sandbox <$> (newIORef =<< readIORef o) <*> pure d
     Memory o -> Memory <$> (newIORef =<< readIORef o)
+    Mirror o m -> Mirror <$> (newIORef =<< readIORef o) <*> pure m
   nodes <- newIORef M.empty
   ContextM . localEnv @Context (const ctx {_backend = sandboxed, _state = st}) . localEnv @NodeDB (overlayNodeDB nodes) $ unContextM f
 

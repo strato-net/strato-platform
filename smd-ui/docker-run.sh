@@ -9,8 +9,16 @@ cd "$(dirname "$0")"
 # the STRATO App UI. These drive the STRATO chain in the wallet connector. Fail fast
 # (like the STRATO App UI) so a missing/unmounted config surfaces as a crash-loop
 # rather than silently dropping the STRATO wallet from the connector list.
-CHAIN_ID=$(grep "^  chainId:" /config/ethconf.yaml | awk '{print $2}')
-NETWORK_NAME=$(grep "^  network:" /config/ethconf.yaml | awk '{print $2}' | tr -d '"')
+# The node config can arrive as a base64 environment value instead of a
+# mounted file (ECS has no bind mounts): ETHCONF_BASE64 is decoded to a
+# private copy and used from there.
+ETHCONF_FILE=${ETHCONF_FILE:-/config/ethconf.yaml}
+if [ -n "${ETHCONF_BASE64:-}" ]; then
+  ETHCONF_FILE=/tmp/ethconf.yaml
+  echo "$ETHCONF_BASE64" | base64 -d > "$ETHCONF_FILE"
+fi
+CHAIN_ID=$(grep "^  chainId:" "$ETHCONF_FILE" | awk '{print $2}')
+NETWORK_NAME=$(grep "^  network:" "$ETHCONF_FILE" | awk '{print $2}' | tr -d '"')
 
 if [ -z "$CHAIN_ID" ]; then
   echo "ERROR: Could not read chainId from /config/ethconf.yaml" >&2

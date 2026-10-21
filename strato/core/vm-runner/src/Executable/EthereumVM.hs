@@ -87,11 +87,14 @@ ethereumVM = do
         VmFlushMempool req -> handleVmFlushMempool req
         _ -> return ()
 
-      recordBaggerMetrics =<< contextGets _baggerState
       logEventSummaries seqEvents
 
       let !vmInEventBatch = foldr insertInBatch newInBatch seqEvents
       failures <- handleVmTasks vmInEventBatch
+      -- After the batch: the gauge holds until the next batch, which an idle
+      -- network only sends with its next tx, and apex reads a non-zero pending
+      -- count with no new blocks as a stall.
+      recordBaggerMetrics =<< contextGets _baggerState
       -- Trie writes held back over this input batch are made durable before
       -- runConsume advances the input checkpoint.
       flushNodeDB
