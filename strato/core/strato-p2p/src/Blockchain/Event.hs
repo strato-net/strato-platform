@@ -28,7 +28,6 @@ import           Blockchain.Data.BlockHeader           (BlockHeader)
 import qualified Blockchain.Data.BlockHeader           as BlockHeader
 import           Blockchain.Data.Control               (P2PCNC (..))
 import           Blockchain.Data.PubKey
-import           Blockchain.Data.Transaction           (Transaction)
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.EthConf (ethConf, p2pConfig)
@@ -45,7 +44,7 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.SyncDB
-import           Control.Arrow                         (second, (&&&))
+import           Control.Arrow                         ((&&&))
 import           Control.Monad
 import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify           hiding (awaitForever,
@@ -124,7 +123,7 @@ handleEvents peer = awaitForever $ \case
     let parentHash' = blockHeaderParentHash header
     lift . Mod.put (Proxy @WorldBestBlock) . WorldBestBlock $
       BestBlock sha num
-    parentHeader <- lift $ lookup (Proxy @BlockHeader) parentHash'
+    parentHeader <- lift $ select (Proxy @BlockHeader) parentHash'
     case parentHeader of
       Nothing -> do
         BestSequencedBlock _ bestBlockNum _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
@@ -170,7 +169,7 @@ handleEvents peer = awaitForever $ \case
     yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
   MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
     lift stampActionTimestamp
-    maybeHeader <- lift $ lookup (Proxy @BlockHeader) start
+    maybeHeader <- lift $ select (Proxy @BlockHeader) start
     case maybeHeader of
       Nothing -> yieldR (BlockBodies [])
       Just head' -> do
@@ -219,24 +218,9 @@ handleEvents peer = awaitForever $ \case
   MsgEvt (GetBlockBodies shas') -> do
     lift stampActionTimestamp
     let shas = take (Conf.maxReturnedHeaders (p2pConfig ethConf)) shas'
-    lift (getUntilMissing shas) >>= \bodies -> do
-      yieldR . BlockBodies $ map (second (map morphBlockHeader) . toBody) bodies
-    where
-      getUntilMissing ::
-        ( (Keccak256 `Alters` OutputBlock) m
-        ) =>
-        [Keccak256] ->
-        m [OutputBlock]
-      getUntilMissing [] = return []
-      getUntilMissing (h : hs) =
-        lookup (Proxy @OutputBlock) h >>= \case
-          Nothing -> return []
-          Just body -> do
-            rest <- getUntilMissing hs
-            return $ body:rest
-
-      toBody :: OutputBlock -> ([Transaction], [BlockHeader])
-      toBody = ((map otBaseTx . obReceiptTransactions) &&& obBlockUncles)
+    blocks <- lift $ selectMany (Proxy @Block) shas
+    let bodies = catMaybes . takeWhile isJust $ map (`M.lookup` blocks) shas
+    yieldR . BlockBodies $ map (blockReceiptTransactions &&& blockBlockUncles) bodies
 
   -- todo: support the "best effort" behavior that everyone uses for bodies they dont have (mentioned above
   -- todo:
@@ -409,7 +393,7 @@ handleEvents peer = awaitForever $ \case
         when (null chain) $
           $logErrorS "handleEvents/P2pPushBlocks" . T.pack $
             printf
-              "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis"
+              "Blockstanbul believes we have blocks for [%d..%d], they are not found in SQL"
               start
               end
         let outbound = BlockHeaders $ morphBlockHeader . unCanonical . snd <$> chain

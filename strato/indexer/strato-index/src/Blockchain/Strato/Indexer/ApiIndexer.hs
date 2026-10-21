@@ -40,7 +40,6 @@ import Blockchain.Strato.Indexer.Kafka
 import Blockchain.Strato.Indexer.Model
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class (blockHash)
-import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff (StateDiff)
 import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffsSql)
@@ -51,7 +50,6 @@ import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Time.Clock (getCurrentTime)
 import UnliftIO (MonadIO, liftIO, throwIO)
-import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
 import qualified Data.Map.Strict as M
@@ -72,7 +70,6 @@ sqlConsumerGroup = "strato-indexer-sql"
 
 p2pIndexerLoop :: ( MonadLogger m,
                     HasStreaming m,
-                    (Keccak256 `A.Alters` P2P OutputBlock) m,
                     Mod.Modifiable (P2P BestBlock) m
                   ) =>
                   m ()
@@ -277,16 +274,12 @@ kafkaClientIds = ("strato-api-indexer", "strato-api-indexer")
 indexP2P ::
   ( MonadLogger m,
     MonadIO m,
-    (Keccak256 `A.Alters` P2P OutputBlock) m,
     Mod.Modifiable (P2P BestBlock) m
   ) =>
   [IndexEvent] ->
   m ()
 indexP2P idxEvents = do
   forM_ idxEvents $ \case
-    RanBlock b _receipts -> do
-      $logInfoS "p2pIndexer" . T.pack $ "Inserting Redis block with sha: " ++ format (blockHash b)
-      A.insert (A.Proxy @(P2P OutputBlock)) (blockHash b) $ P2P b
     NewBestBlock (sha, num) -> do
       $logInfoS "p2pIndexer" . T.pack $
         "Updating RedisBestBlock as (" ++ format sha ++ ", " ++ show num ++ ")"

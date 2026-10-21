@@ -23,9 +23,10 @@ where
 import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
 import qualified Blockchain.Bagger.Transactions as Flush
-import Blockchain.BlockDB
 import Blockchain.DB.BlockSummaryDB (hasBSum)
-import Blockchain.Data.Block (blockBlockData)
+import Blockchain.Data.Block (Block(..))
+import Blockchain.DB.SQLDB (runPostgresConn)
+import Blockchain.EthConf (connStr)
 import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.DB.CodeDB ()
 import Blockchain.DB.StateDB (setStateDBStateRoot)
@@ -36,6 +37,7 @@ import Blockchain.Bootstrap
 import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Event
 import Blockchain.Model.SyncState
+import Blockchain.Model.JsonBlock (getBlockSql)
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka (seqVmTasksTopicName)
@@ -49,7 +51,9 @@ import Blockchain.Timing
 import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Wiring
+import Control.Concurrent (threadDelay)
 import Control.Monad
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Composable.Redis (execRedis)
 import Control.Monad.Composable.StateDB (flushNodeDB)
 import Control.Monad.Composable.Streaming
@@ -161,24 +165,32 @@ bootstrapIfFirstRun = do
 initializeBestBlock :: ContextM ()
 initializeBestBlock = do
   maybeRedisBestBlockHash <- fmap (fmap bestBlockHash) (execRedis getBestBlockInfo)
-  maybeRedisBestBlock <-
+  genesisBlock <- genesisInfoToBlock <$> getGenesisInfo
+  maybeBestBlock <-
     case maybeRedisBestBlockHash of
       Nothing -> error "no best block hash in redisdb"
-      Just hash -> execRedis $ getBlock hash
+      Just hash | hash == blockHash genesisBlock -> return $ Just genesisBlock
+      Just hash -> do
+        let loadBlock = do
+              block <- liftIO . runNoLoggingT $ runPostgresConn connStr $ getBlockSql hash
+              case block of
+                Nothing -> liftIO (threadDelay 100000) >> loadBlock
+                Just _ -> return block
+        loadBlock
 
-  case maybeRedisBestBlock of
-    Nothing -> error "no best block in redisdb"
-    Just redisBestBlock -> do
-      putContextBestBlockInfo $ outputBlockToContextBestBlockInfo redisBestBlock
+  case maybeBestBlock of
+    Nothing -> error "no best block in SQL"
+    Just bestBlock -> do
+      putContextBestBlockInfo $ blockToContextBestBlockInfo bestBlock
 
-      Bagger.processNewBestBlock (blockHeaderHash $ obBlockData redisBestBlock) (obBlockData redisBestBlock) [] -- bootstrap Bagger with genesis block
+      Bagger.processNewBestBlock (blockHeaderHash $ blockBlockData bestBlock) (blockBlockData bestBlock) [] -- bootstrap Bagger with genesis block
 
 
 
-outputBlockToContextBestBlockInfo :: OutputBlock -> ContextBestBlockInfo
-outputBlockToContextBestBlockInfo block =
-  let header = obBlockData block
-      txs = obReceiptTransactions block
+blockToContextBestBlockInfo :: Block -> ContextBestBlockInfo
+blockToContextBestBlockInfo block =
+  let header = blockBlockData block
+      txs = blockReceiptTransactions block
       txL = length txs
   in ContextBestBlockInfo (blockHeaderHash header) header txL
 

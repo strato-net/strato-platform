@@ -79,9 +79,9 @@ import           GHC.Exts                                (Constraint)
 
 import           BlockApps.Logging
 
-import           Blockchain.BlockDB
 import           Blockchain.Blockstanbul                 (WireMessage)
 import           Blockchain.Data.Block
+import           Blockchain.Data.DataDefs (EntityField(..))
 import           Blockchain.Data.BlockHeader
 import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
@@ -89,8 +89,8 @@ import           Blockchain.DBM
 import           Blockchain.EthConf
 import qualified Blockchain.EthConf.Model as Conf
 import           Blockchain.Model.SyncState
+import           Blockchain.Model.JsonBlock (getBlockSql, getBlocksSql)
 import qualified Blockchain.Model.SyncTask               as SYNCTASK
-import           Blockchain.Model.WrappedBlock
 import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka              as SK
@@ -102,6 +102,7 @@ import           Control.Monad.Composable.Streaming      (StreamEnv,
 import           Blockchain.Strato.Discovery.ContextLite ()
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Class (blockHash, blockHeaderBlockNumber)
 import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Keccak256
 
@@ -231,16 +232,9 @@ instance RunsServer ContextM where
         (handler conduits ip pn)
         (\(e :: SomeException) -> $logErrorS "runServer/Exception" . T.pack $ show e)
 
-instance (Keccak256 `A.Alters` BlockHeader) ContextM where
-  lookup _ = RBDB.withRedisBlockDB . getHeader
-  insert _ k v = void . RBDB.withRedisBlockDB $ insertHeader k v
-  delete _ = void . RBDB.withRedisBlockDB . deleteHeader
-  lookupMany _ =
-    fmap (M.fromList . mapMaybe sequenceA)
-      . RBDB.withRedisBlockDB
-      . getHeaders
-  insertMany _ = void . RBDB.withRedisBlockDB . insertHeaders
-  deleteMany _ = void . RBDB.withRedisBlockDB . deleteHeaders
+instance A.Selectable Keccak256 BlockHeader ContextM where
+  select _ sha = fmap (fmap blockBlockData) $ sqlQuery $ getBlockSql sha
+  selectMany _ shas = M.fromList . map (\b -> (blockHash b, blockBlockData b)) <$> (sqlQuery $ getBlocksSql [BlockDataRefHash SQL.<-. shas])
 
 instance Mod.Modifiable WorldBestBlock ContextM where
   get _ =
@@ -276,18 +270,13 @@ instance Mod.Modifiable BestSequencedBlock ContextM where
       Right _ -> return ()
 
 instance A.Selectable Integer (Canonical BlockHeader) ContextM where
-  select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ getCanonicalHeader i
+  select _ i = M.lookup i <$> A.selectMany (Proxy @(Canonical BlockHeader)) [i]
+  selectMany _ numbers = M.fromList . map (\b -> (blockHeaderBlockNumber (blockBlockData b), Canonical $ blockBlockData b))
+    <$> (sqlQuery $ getBlocksSql [BlockDataRefNumber SQL.<-. numbers, BlockDataRefPowVerified SQL.==. True, BlockDataRefIsConfirmed SQL.==. True])
 
-instance (Keccak256 `A.Alters` OutputBlock) ContextM where
-  lookup _ = RBDB.withRedisBlockDB . getBlock
-  insert _ k v = void . RBDB.withRedisBlockDB $ insertBlock k v
-  delete _ = void . RBDB.withRedisBlockDB . deleteBlock
-  lookupMany _ =
-    fmap (M.fromList . mapMaybe sequenceA)
-      . RBDB.withRedisBlockDB
-      . getBlocks
-  insertMany _ = void . RBDB.withRedisBlockDB . insertBlocks
-  deleteMany _ = void . RBDB.withRedisBlockDB . deleteBlocks
+instance A.Selectable Keccak256 Block ContextM where
+  select _ sha = sqlQuery $ getBlockSql sha
+  selectMany _ shas = M.fromList . map (\b -> (blockHash b, b)) <$> (sqlQuery $ getBlocksSql [BlockDataRefHash SQL.<-. shas])
 
 instance (Keccak256 `A.Alters` Proxy (Inbound WireMessage)) ContextM where
   lookup _ k = do
@@ -492,15 +481,15 @@ type MonadP2P m =
     All2
       '[A.Selectable]
       '[ '(Integer, Canonical BlockHeader),
+         '(Keccak256, BlockHeader),
+         '(Keccak256, Block),
          '((Host, UDPPort, B.ByteString), Point),
          '(Host, PPeer)
        ]
       m,
     All2
       '[A.Alters]
-      '[ '(Keccak256, BlockHeader),
-         '(Keccak256, OutputBlock),
-         '(Keccak256, Proxy (Inbound WireMessage)),
+      '[ '(Keccak256, Proxy (Inbound WireMessage)),
          '((Host, Keccak256), Proxy (Outbound WireMessage))
        ]
       m

@@ -60,26 +60,6 @@ newtype SyncStatus = SyncStatus { unSyncStatus :: Bool }
 liftLog :: MonadIO m => Eff '[Logger] a -> m a
 liftLog = liftIO . runEff . runLogging
 
-inNamespace ::
-  RedisDBKeyable k =>
-  BlockDBNamespace ->
-  k ->
-  S8.ByteString
-inNamespace ns k = ns' `S8.append` toKey k
-  where
-    ns' = namespaceToKeyPrefix ns
-
-namespaceToKeyPrefix :: BlockDBNamespace -> S8.ByteString
-namespaceToKeyPrefix ns = case ns of
-  Headers            -> "h:"
-  Transactions       -> "t:"
-  Numbers            -> "n:"
-  Uncles             -> "u:"
-  Parent             -> "p:"
-  Children           -> "c:"
-  Canonical          -> "q:"
-  Validators         -> "validators"
-
 bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"
 {-# INLINE bestBlockInfoKey #-}
@@ -93,27 +73,9 @@ putBestBlockInfo ::
   Integer ->
   Redis (Either REDIS.Reply REDIS.Status)
 putBestBlockInfo newSha newNumber = do
-  --liftIO . putStrLn . ("New args" ++) $ show (keccak256ToHex newSha, newNumber, newTDiff)
-  oldBBI' <- getBestBlockInfo
-  case oldBBI' of
-    Nothing -> return (Left $ REDIS.SingleLine "Got no block from getBetstBlockInfo")
-    Just (BestBlock oldSha oldNumber) -> do
-      --liftIO . putStrLn . ("Old args" ++) $ show (keccak256ToHex oldSha, oldNumber, oldTDiff)
-      helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
-      case helper' of
-        Left err -> error $ "god save the queen! " ++ show err
-        Right (updates, deletions) -> do
-          --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (keccak256ToHex x, y)) <$> updates)
-          --liftIO . putStrLn $ "Deletions: \n" ++ show deletions
-          res <- REDIS.multiExec $ do
-            forM_ updates $ \(sha, num) -> REDIS.set (inNamespace Canonical num) (toValue sha)
-            unless (null deletions) . void . REDIS.del $ inNamespace Canonical . toKey <$> deletions
-            forceBestBlockInfo newSha newNumber
-          checkAndUpdateSyncStatus
-          case res of
-            REDIS.TxSuccess _ -> return $ Right REDIS.Ok
-            REDIS.TxAborted -> return . Left $ REDIS.SingleLine (S8.pack "Aborted")
-            REDIS.TxError e -> return . Left $ REDIS.SingleLine (S8.pack e)
+  result <- forceBestBlockInfo newSha newNumber
+  checkAndUpdateSyncStatus
+  return result
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> m (f REDIS.Status)
