@@ -33,6 +33,30 @@ export const batchHandleAction = async (
   );
 };
 
+export const batchHandleTransfer = async (
+  actions: NonEmptyArray<RewardsAction>
+): Promise<void> => {
+  const input: FunctionInput = {
+    contractName: "Rewards",
+    contractAddress: config.rewards.address!,
+    method: "batchHandleTransfer",
+    args: {
+      sourceContracts: actions.map((action) => action.sourceContract),
+      eventNames: actions.map((action) => action.eventName),
+      senders: actions.map((action) => action.user),
+      recipients: actions.map((action) => action.recipient),
+      amounts: actions.map((action) => action.amount),
+      blockNumbers: actions.map((action) => action.blockNumber),
+      eventIndexes: actions.map((action) => action.eventIndex),
+    },
+  };
+
+  await retryWithBackoff(
+    () => execute(input),
+    "RewardsService-batchHandleTransfer"
+  );
+};
+
 export const batchAddBonus = async (
   credits: NonEmptyArray<BonusCredit>
 ): Promise<void> => {

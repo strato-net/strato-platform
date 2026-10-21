@@ -10,6 +10,8 @@ const config = require('../config/app.config');
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
+// This process's previous check: {validBlocksCount, pendingTxsCount}, none before the first.
+let previousCheck;
 
 async function singleCheck() {
     try {
@@ -28,22 +30,25 @@ function executeCheck() {
             const validBlocksCount_current = await getVmBlocksValid();
             const pendingTxsCount_current = await getBaggerPending();
 
-            // Get the previous block counts from DB
-            const validBlocksCount_prev_fromDB = await models.StallStat.findOne({
-                where: {blockType: 'Valid'},
-                order: [ [ 'createdAt', 'DESC' ]],
-            });
-            const pendingTxsCount_prev_fromDB = await models.StallStat.findOne({
-                where: {blockType: 'Pending'},
-                order: [ [ 'createdAt', 'DESC' ]],
-            })
-
-            // If executing for the very first time - no previous data exists in database, so using current values as previous.
-            const validBlocksCount_prev = (validBlocksCount_prev_fromDB) ? validBlocksCount_prev_fromDB.dataValues.blockCount : validBlocksCount_current;
-            const pendingTxsCount_prev = (pendingTxsCount_prev_fromDB) ? pendingTxsCount_prev_fromDB.dataValues.blockCount : pendingTxsCount_current;
+            // The previous counts are this process's own previous check, not the
+            // latest StallStat row: several apex instances can share one database
+            // (one per task of an HA API tier), and that row was then usually
+            // another instance's, written seconds earlier. "No new valid block
+            // since" held for such short windows, and a healthy node flickered
+            // to stalled every few minutes.
+            // On the very first check there is no previous data to compare with.
+            // The valid count is taken as unchanged, and the pending count as 0:
+            // with the current count used as previous, a transaction that happened
+            // to be pending at that moment reported the node as stalled for the
+            // whole first interval after every apex start.
+            const validBlocksCount_prev = previousCheck ? previousCheck.validBlocksCount : validBlocksCount_current;
+            const pendingTxsCount_prev = previousCheck ? previousCheck.pendingTxsCount : 0;
             await createStallStats(validBlocksCount_current, pendingTxsCount_current);
             const currentStallHealthData = await getCurrentHealth(pendingTxsCount_prev, pendingTxsCount_current, validBlocksCount_prev, validBlocksCount_current);
             await updateCurrentStallStat(currentStallHealthData);
+            // Kept once the verdict is stored: the retry after a database error
+            // compares with the same previous check, not one taken seconds before.
+            previousCheck = {validBlocksCount: validBlocksCount_current, pendingTxsCount: pendingTxsCount_current};
             return resolve();
 
         } catch (error) {

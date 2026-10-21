@@ -6,6 +6,7 @@ const config = require("../config/app.config");
 
 const utils = require("../lib/utils");
 const nodeStatusDB = require("../lib/node-status-db");
+const redisBlockDB = require("../lib/redis-block-db");
 
 
 const API_VERSION = "2.0";
@@ -19,28 +20,8 @@ module.exports = {
   nodeStatus: async function (req, res, next) {
     try {
       //get node's block number, best block hash, best block parent hash
-      const [lastBlock, bestBlockNumber, activePeerCount, validators] = await Promise.all([
-        BlockDataRef.findOne({
-          where: {
-            pow_verified: true,
-            is_confirmed: true,
-          },
-          order: [["number", "DESC"]],
-          attributes: [
-            "number",
-            "hash",
-            "parent_hash",
-            "nonce",
-          ],
-          raw: true,
-        }),
-        // Source `lastBlock.number` from the node_status table, which the core
-        // mirrors from the same Redis entry `strato-barometer syncstats` reads.
-        // Falls back to BlockDataRef.number if the row is unavailable.
-        nodeStatusDB.getBestBlockNumber().catch((err) => {
-          winston.warn(`Falling back to BlockDataRef for lastBlock.number: ${err.message}`);
-          return null;
-        }),
+      const [lastBlock, activePeerCount, validators] = await Promise.all([
+        getLastBlock(),
         // Peers the node is currently connected to: active (active_state=1)
         // and bonded (bond_state=2). Falls back to null so /status remains usable.
         Peer.count({
@@ -52,13 +33,7 @@ module.exports = {
           winston.warn(`Unable to fetch active peers count: ${err.message}`);
           return null;
         }),
-        // Current validator list, from the same node_status row the
-        // /eth/v1.2/metadata endpoint reads. Falls back to null so /status
-        // remains usable.
-        nodeStatusDB.getValidators().catch((err) => {
-          winston.warn(`Unable to fetch validators: ${err.message}`);
-          return null;
-        }),
+        getValidators(),
       ]);
 
       //adding an empty body so the fields are present in the response even if
@@ -122,12 +97,7 @@ module.exports = {
         nodeAddress,
         activePeerCount,
         validators,
-        lastBlock: {
-          number: bestBlockNumber !== null ? bestBlockNumber : lastBlock.number,
-          hash: lastBlock.hash,
-          parentHash: lastBlock.parent_hash,
-          nonce: lastBlock.nonce,
-        },
+        lastBlock,
         pbftData: findView(pbftData),
         ...healthBody,
       });
@@ -143,28 +113,12 @@ module.exports = {
       const [
         [healthInfo, stallInfo, systemInfo, syncInfo],
         lastBlock,
-        bestBlockNumber,
         pbftData,
         nodeAddress,
         activePeerCount,
       ] = await Promise.all([
         utils.getLatestHealth(),
-        BlockDataRef.findOne({
-          where: {
-            pow_verified: true,
-            is_confirmed: true,
-          },
-          order: [["number", "DESC"]],
-          attributes: ["number", "hash", "parent_hash", "nonce"],
-          raw: true,
-        }),
-        // Source `lastBlock.number` from the node_status table, which the core
-        // mirrors from the same Redis entry `strato-barometer syncstats` reads.
-        // Falls back to BlockDataRef.number if the row is unavailable.
-        nodeStatusDB.getBestBlockNumber().catch((err) => {
-          winston.warn(`Falling back to BlockDataRef for lastBlock.number: ${err.message}`);
-          return null;
-        }),
+        getLastBlock(),
         getPbftDataOrNull(),
         getNodeAddress(),
         // Peers the node is currently connected to: active (active_state=1)
@@ -199,12 +153,7 @@ module.exports = {
         timestamp: new Date().toISOString(),
         nodeAddress,
         activePeerCount,
-        lastBlock: {
-          number: bestBlockNumber !== null ? bestBlockNumber : lastBlock.number,
-          hash: lastBlock.hash,
-          parentHash: lastBlock.parent_hash,
-          nonce: lastBlock.nonce,
-        },
+        lastBlock,
         pbftData: findView(pbftData),
         health: health,
         healthStatus: healthStatus,
@@ -219,6 +168,67 @@ module.exports = {
     }
   },
 };
+
+// The last block, as { number, hash, parentHash, nonce }. Redis first: the
+// block cache strato-indexer keeps for p2p, which is what strato-ps reports
+// and all a lite validator has (no SQL block index, no node_status mirror).
+// Without a Redis block cache here (an API tier's apex), the block_data_ref
+// row with the number the core mirrors into node_status, as before.
+const noBlock = { number: null, hash: null, parentHash: null, nonce: null };
+
+async function getLastBlock() {
+  try {
+    const best = await redisBlockDB.getBestBlock();
+    if (best) {
+      const parentHash = await redisBlockDB.getParentHash(best.hash).catch(() => null);
+      return { number: best.number, hash: best.hash, parentHash, nonce: null };
+    }
+  } catch (err) {
+    winston.debug(`No Redis block cache here, reading the last block from SQL: ${err.message}`);
+  }
+  try {
+    const [row, mirrored] = await Promise.all([
+      BlockDataRef.findOne({
+        where: {
+          pow_verified: true,
+          is_confirmed: true,
+        },
+        order: [["number", "DESC"]],
+        attributes: ["number", "hash", "parent_hash", "nonce"],
+        raw: true,
+      }),
+      nodeStatusDB.getBestBlockNumber().catch((err) => {
+        winston.warn(`Falling back to BlockDataRef for lastBlock.number: ${err.message}`);
+        return null;
+      }),
+    ]);
+    if (!row) return noBlock;
+    return {
+      number: mirrored !== null ? mirrored : row.number,
+      hash: row.hash,
+      parentHash: row.parent_hash,
+      nonce: row.nonce,
+    };
+  } catch (err) {
+    winston.warn(`Unable to read the last block: ${err.message}`);
+    return noBlock;
+  }
+}
+
+// The current validator list: Redis first, else the node_status mirror, else
+// null so /status and /health remain usable.
+async function getValidators() {
+  try {
+    const validators = await redisBlockDB.getValidators();
+    if (validators) return validators;
+  } catch (err) {
+    winston.debug(`No Redis block cache here, reading the validators from node_status: ${err.message}`);
+  }
+  return nodeStatusDB.getValidators().catch((err) => {
+    winston.warn(`Unable to fetch validators: ${err.message}`);
+    return null;
+  });
+}
 
 // Fetches the node's own blockchain address from Prometheus.
 // The address is carried in the `address` label of the `pbft_node_identity`

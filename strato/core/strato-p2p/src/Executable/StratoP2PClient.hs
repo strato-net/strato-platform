@@ -35,7 +35,6 @@ import qualified Blockchain.EthConf.Model as Conf
 import           Blockchain.RLPx
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Threads
 import           Blockchain.TimerSource
 import           Control.Concurrent hiding (yield)
@@ -69,18 +68,7 @@ runPeer peer sSource = do
   ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (format (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer))
   void $ register ender
   myPublic <- getPub
-  otherPubKey <- case (pPeerPubkey peer) of
-    Nothing -> do
-      $logInfoS "getPubKeyRunPeer" $ T.pack $ "Attempting to connect to " ++ pPeerString peer ++ ", but I don't have the pubkey.  I will try to use a UDP ping to get the pubkey."
-      eitherOtherPubKey <- getServerPubKey peer
-      case eitherOtherPubKey of
-        Right pub -> do
-          $logInfoS "getPubKeyRunPeer" $ T.pack $ "#### Success, the pubkey has been obtained: " ++ format pub
-          return pub
-        Left e -> do
-          $logErrorS "getPubKeyRunPeer" $ T.pack $ "Error, couldn't get public key for peer: " ++ show e
-          throwIO NoPeerPubKey
-    Just pub -> return pub
+  otherPubKey <- maybe (throwIO NoPeerPubKey) pure $ pPeerPubkey peer
 
   $logInfoS "runPeer" . T.pack . C.blue $ "Welcome to strato-p2p-client"
   $logInfoS "runPeer" . T.pack . C.blue $ "============================"
@@ -182,7 +170,10 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
         liftIO $ threadDelay 1000000
       Right peers -> do
         numActivePeers <- liftIO $ fmap length getPeersByThreads
-        forM_ (take (Conf.maxConnections (p2pConfig ethConf) - numActivePeers) $ filter ((== 0) . pPeerActiveState) peers) $ \peer -> do
+        -- A peer's key comes from ethereum-discover bonding with it; one
+        -- without a key yet is dialed once discovery has it.
+        let dialable p = pPeerActiveState p == 0 && isJust (pPeerPubkey p)
+        forM_ (take (Conf.maxConnections (p2pConfig ethConf) - numActivePeers) $ filter dialable peers) $ \peer -> do
           _ <- liftIO . forkIO . runner $ \_ -> do
               result <- try . liftIO . runner $ runPeerInList peer
               handleRunPeerResult peer result

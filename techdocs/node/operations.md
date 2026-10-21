@@ -127,6 +127,8 @@ mv mynode mynode.old
 strato-up mynode --network=<network> --sslDir=/path/to/ssl --snapshot
 ```
 
+On a node run from [prebuilt images](prebuilt.md), skip `make`: check out the new tag or commit, then restart the same way with `--dockerMode=all --prebuilt` among the flags.
+
 Pass the same flags you used before. Validators should coordinate upgrades with the other network operators. Releases that change consensus rules activate them at agreed block heights (see [Networks](../platform/networks.md#fork-heights)).
 
 ## Snapshots

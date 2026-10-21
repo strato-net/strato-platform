@@ -36,6 +36,7 @@ import { indexRouteExecutions, getRoutedActivityCaller, resolveRoutedActivityUse
 import {
   addPositionActivityRoute,
   mapPositionSourceEvent,
+  mapShareTransferEvent,
 } from "./positionEvent.adapter";
 
 import { ROUTE_EVENT_PAGE_SIZE, ROUTE_EVENT_TRANSACTION_BATCH_SIZE } from "../../infra/config/constants";
@@ -207,18 +208,20 @@ export const getEventQueryParams = async (): Promise<{
 
     for (const evt of actionableEventsArray) {
       if (evt?.eventName) {
-        contractAddresses.add(item.sourceContract);
-        eventNames.add(evt.eventName);
-        validPairs.add(makeEventPairKey(item.sourceContract, evt.eventName));
-
         if (isPositionActivityType(item.activityType)) {
-          addPositionActivityRoute(
+          const action = addPositionActivityRoute(
             positionActivityRoutes,
             item.sourceContract,
             evt.eventName,
             evt.actionType
           );
+          // Share transfers are relayed through batchHandleTransfer, not the regular event query
+          if (action === "Transfer") continue;
         }
+
+        contractAddresses.add(item.sourceContract);
+        eventNames.add(evt.eventName);
+        validPairs.add(makeEventPairKey(item.sourceContract, evt.eventName));
       }
     }
   }
@@ -344,6 +347,43 @@ export const getPositionSourceEvents = async (
   return events;
 };
 
+export const getShareTransferEvents = async (
+  activityRoutes: PositionActivityRoutes,
+  cursor: EventCursor,
+  custodyAddresses: Set<string>
+): Promise<ProtocolEvent[]> => {
+  const sources = [...activityRoutes.entries()].filter(([, routes]) => routes.Transfer);
+  if (!sources.length) return [];
+
+  const data = await cirrus.get("/event", {
+    params: {
+      address: buildFilter(sources.map(([sourceContract]) => sourceContract)),
+      event_name: buildFilter([...new Set(sources.map(([, routes]) => routes.Transfer!))]),
+      block_timestamp: `gte.${cursor.block_timestamp}`,
+      order: "id.asc",
+      select:
+        "address,block_number,event_name,attributes,event_index,transaction_sender,block_timestamp",
+    },
+  });
+  if (!Array.isArray(data)) return [];
+
+  const events: ProtocolEvent[] = [];
+  for (const item of data as CirrusEvent[]) {
+    const blockNumber = Number(item.block_number);
+    const eventIndex = Number(item.event_index || 0);
+    if (
+      blockNumber < cursor.blockNumber
+      || (blockNumber === cursor.blockNumber && eventIndex <= cursor.eventIndex)
+    ) {
+      continue;
+    }
+
+    const event = mapShareTransferEvent(item, activityRoutes, custodyAddresses);
+    if (event) events.push(event);
+  }
+  return events;
+};
+
 export const getEventsBatch = async (
   contractAddresses: string[],
   eventNames: string[],
@@ -360,7 +400,7 @@ export const getEventsBatch = async (
   const { eventAddresses, lpTokenAddresses, eventEventNames, lpEventNames } =
     splitAddressesAndEvents(contractAddresses, eventNames, mapping);
 
-  const [regularEvents, lpTransferEvents, positionSourceEvents] = await Promise.all([
+  const [regularEvents, lpTransferEvents, positionSourceEvents, shareTransferEvents] = await Promise.all([
     queryRegularEvents(
       eventAddresses,
       eventEventNames,
@@ -370,17 +410,23 @@ export const getEventsBatch = async (
     ),
     getLPTokenTransferEvents(lpTokenAddresses, lpEventNames, cursor),
     getPositionSourceEvents(positionEventSources, cursor, positionActivityRoutes),
+    getShareTransferEvents(
+      positionActivityRoutes,
+      cursor,
+      new Set(positionEventSources.map((source) => source.sourceContract))
+    ),
   ]);
 
   const allEvents = sortEventsByBlock([
     ...regularEvents,
     ...lpTransferEvents,
     ...positionSourceEvents,
+    ...shareTransferEvents,
   ]);
 
   logInfo(
     "CirrusService",
-    `Fetched ${allEvents.length} events (${regularEvents.length} regular, ${lpTransferEvents.length} LP transfers, ${positionSourceEvents.length} position source events)`,
+    `Fetched ${allEvents.length} events (${regularEvents.length} regular, ${lpTransferEvents.length} LP transfers, ${positionSourceEvents.length} position source events, ${shareTransferEvents.length} share transfers)`,
     {
       contractAddresses: contractAddresses.length,
       eventNames: eventNames.length,

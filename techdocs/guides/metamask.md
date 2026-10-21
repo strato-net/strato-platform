@@ -2,11 +2,21 @@
 
 Add STRATO as a custom network in MetaMask to view your USDST balance and sign legacy Ethereum transactions.
 
+<p>
+  <button type="button" class="md-button md-button--primary" id="add-strato-network" aria-describedby="add-strato-network-status" disabled>Add STRATO to MetaMask</button>
+</p>
+<p id="add-strato-network-status" role="status" aria-live="polite"></p>
+
+Use a browser with [MetaMask installed](https://metamask.io/download), or open this page in MetaMask's mobile browser. You can also add the network manually using the settings below.
+
+!!! note "Network currency and fees"
+    MetaMask displays USDST as the native currency. Transactions currently use one voucher or 0.01 USDST under the standard fee policy; this may change in a future network upgrade.
+
 ## Mainnet settings
 
 | Setting | Value |
 |---|---|
-| Network name | STRATO Mainnet |
+| Network name | STRATO |
 | RPC URL | `https://noderpc.strato.nexus/rpc` |
 | Chain ID | `123354377739506` |
 | Currency symbol | `USDST` |
@@ -18,7 +28,7 @@ The alternate mainnet RPC URL is `https://app.strato.nexus/rpc`.
 
 1. Open MetaMask's network selector and choose to add a custom network manually.
 2. Enter the mainnet settings above and save the network.
-3. Switch to STRATO Mainnet.
+3. Switch to STRATO.
 
 Use the EIP-155 chain ID above, equivalent to `0x7030addddcf2`. Do not enter the network ID `33056204878082667`; it identifies STRATO peers and is too large for JavaScript's safe integer range.
 

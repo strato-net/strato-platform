@@ -33,18 +33,15 @@ module Blockchain.Strato.Discovery.ContextLite
 where
 
 import           BlockApps.Logging
-import           Blockchain.Data.PubKey                (secPubKeyToPoint)
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
 import           Blockchain.Model.SyncState
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Discovery.UDP       (processDataStream')
 import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Validator
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.SyncDB
-import           Control.Exception                     hiding (catch)
 import           Control.Monad                         (void)
 import           Control.Monad.Catch                   hiding (bracket)
 import qualified Control.Monad.Change.Alter            as A
@@ -55,7 +52,6 @@ import           Control.Monad.Composable.Vault
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Reader
-import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString                       as B
 import           Data.IP
 import           Data.List
@@ -152,28 +148,6 @@ instance A.Replaceable SockAddr B.ByteString DiscoveryM where
     liftIO $ catch
       (void $ NB.sendTo sock' packet addr')
       (\(err :: IOError) -> runEff . runLogging . $logErrorS "NB.sendTo" . T.pack $ "Could not send data to " <> show addr' <> "; got error: " <> show err)
-
-instance {-# OVERLAPPABLE #-} MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point m where
-  select _ (domain, UDPPort udpPortNum, theMsg) = liftIO $ catch
-    (withSocketsDo $ bracket getSocket close (talk theMsg))
-    (\(err :: IOError) -> (runEff . runLogging $ $logErrorS "withSocketsDo" . T.pack $ "Got error: " <> show err) >> return Nothing)
-    where
-      getSocket :: IO Socket
-      getSocket = do
-        (serveraddr : _) <- getAddrInfo
-          (Just defaultHints {addrFlags = [AI_ALL]})
-          (Just $ hostToString domain)
-          (Just $ show udpPortNum)
-        s <- socket (addrFamily serveraddr) Datagram defaultProtocol
-        _ <- connect s (addrAddress serveraddr)
-        return s
-      talk :: B.ByteString -> Socket -> IO (Maybe Point)
-      talk msg socket' = do
-        _ <- NB.send socket' msg
-
-        --According to https://groups.google.com/forum/#!topic/haskell-cafe/aqaoEDt7auY, it looks like the only way we can time out UDP recv is to
-        --use the Haskell timeout....  I did try setting socket options also, but that didn't work.
-        timeout 5000000 $ secPubKeyToPoint . processDataStream' <$> NB.recv socket' 2000
 
 instance {-# OVERLAPPABLE #-} MonadIO m => A.Selectable (Maybe Host, UDPPort) SockAddr m where
   select _ (Nothing, UDPPort udpPortNum) = liftIO $ do
