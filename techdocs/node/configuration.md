@@ -23,6 +23,8 @@ strato-up mynode --network=helium --sslDir=/path/to/ssl --snapshot
 | `--sslDir` | *(empty)* | Directory holding `server.pem` and `server.key`. Setting it enables HTTPS on 443 and redirects HTTP to HTTPS. |
 | `--localAuth` | `false` | Use the bundled identity provider (Ory Kratos and Hydra) and a node-local Vault instead of external Keycloak and the shared Vault. |
 | `--httpPort` | `8081` | nginx HTTP port. |
+| `--p2pPort` | `30303` | TCP port `strato-p2p` listens on; `ethereum-discover` advertises it to peers. With `--dockerMode=all` the `strato` container publishes it. |
+| `--discoveryPort` | `30303` | UDP port `ethereum-discover` listens on, published the same way. |
 | `--nodeHost` | *(the machine's host name)* | The node's public host name. The node URL, the auth cookie domain and, with `--localAuth`, the OpenID discovery URL are built from it. See [Host name](#host-name). |
 | `--dockerMode` | `services` | What runs in Docker. `services`: only the service containers, the node processes run on the host under `convoke`. `all`: the node processes too, in a `strato` container of the generated `docker-compose.yml`; `strato-up` then starts and stops the compose project. See [Run from prebuilt images](prebuilt.md). |
 | `--repoUrl` | *(empty)* | Registry prefix of the node's images in `docker-compose.yml`, for example `ghcr.io/strato-net/strato-platform/`. `strato-up --prebuilt` sets it. |
@@ -166,7 +168,7 @@ What doesn't: the app, SMD, nginx, PostgREST, Swagger docs, `slipstream` (so no 
 - **Identity.** The node key still comes from the Vault, so [store your OAuth credentials](install.md#4-store-your-oauth-credentials) first. `--localAuth` is refused.
 - **Snapshots.** `--snapshot` restores the chain state, Redis and JLog only; the eth and cirrus dumps are skipped (`strato-snapshot restore --skip-databases`).
 - **Monitoring.** apex serves `/health` and `/status` on port 80 over plain HTTP, so the network monitor can watch the validator: register it there as protocol `http` with host `<host>`. Port 80 is one of the few a CDN such as Cloudflare proxies, so the endpoint can sit behind one. There is no nginx and no TLS on a validator, and port 80 serves apex alone: `/health`, `/status`, `/_ping` and the Prometheus `/metrics`. apex registers neither its `/user` key endpoint nor the SMD socket rooms on a validator, and there is no `/rpc`. `/health` carries only public data (block, PBFT view, node address, health flags), but restrict the port to the monitor's address all the same. `strato-ps` shows the sync position locally.
-- **Ports.** 30303 (TCP and UDP) for peers, and 80 for the monitor.
+- **Ports.** 30303 (TCP and UDP) for peers, or `--p2pPort` and `--discoveryPort`, and 80 for the monitor.
 - **Resources.** The host still needs the validator minimum of 8 GB of RAM. What you save is Cirrus's disk and the app's memory.
 - **Changing your mind.** The role is fixed when the directory is created, like every other flag. To turn a validator into a full node, create a new directory.
 
@@ -196,7 +198,7 @@ What answers:
 | `/docs/` | 502 (a browser is sent through the login first, as on a full node) |
 
 - **`--monitoring=false`** drops `prometheus` and `apex`, for operators who scrape the node processes themselves. `/health` and `/apex-api/` then answer 502, and the network monitor cannot watch the node. The flag is refused with any other `--role`.
-- **Identity, snapshots, ports.** As on a full node: the node key comes from the Vault, `--snapshot` restores the chain state and the `eth` and `cirrus` databases, and the node listens on 30303, `--httpPort` and 443.
+- **Identity, snapshots, ports.** As on a full node: the node key comes from the Vault, `--snapshot` restores the chain state and the `eth` and `cirrus` databases, and the node listens on the peer ports (30303, or `--p2pPort` and `--discoveryPort`), `--httpPort` and 443.
 - **`--localAuth`** works as on a full node: the `local-auth` container and the node-local Vault are added, nginx serves `/auth/` and `/vault/`, and the first `strato-up` creates the admin user. The login pages come from the `local-auth` container, so they do not need the app; after a browser login the user lands on `/`, which answers 404 unless `--appUrl` is set. See [Local auth mode](#local-auth-mode).
 - **Resources.** An API node needs the same host as a full node. On a testnet node, the app, SMD and docs containers use about 170 MB of memory between them and prometheus and apex about 350 MB more, while Postgres, Redis, `vm-runner` and `strato-p2p` use several GB and Cirrus is the disk. What you get is a faster build and fewer containers, not a smaller machine.
 

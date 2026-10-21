@@ -46,7 +46,7 @@ The node scripts also need:
 - `lsof`, only if you create your own snapshots
 
 !!! warning "Run as a regular user, not root"
-    Run the build and every `strato-*` command as a regular user, never as root or with `sudo`. Your user must be in the `docker` group. `install_deps.sh` adds it on Linux; then run `newgrp docker` (or log in again) and check with `docker ps`.
+    Run the build and every `strato-*` command as a regular user, never as root or with `sudo`. Your user must be in the `docker` group. `install_deps.sh` adds it on Linux; then run `newgrp docker` (or log in again) and check with `docker ps`. A node run from [prebuilt images](prebuilt.md) may instead run entirely as root; what matters is one identity for the checkout, the node directory and Docker.
 
 ## Network
 
@@ -55,8 +55,8 @@ Open these inbound ports:
 | Port | Purpose |
 |---|---|
 | 443/tcp | HTTPS: the app, the APIs, the STRATO Management Dashboard and `/rpc` |
-| 30303/tcp | Peer-to-peer block and transaction sync (`strato-p2p`) |
-| 30303/udp | Peer discovery (`ethereum-discover`) |
+| 30303/tcp | Peer-to-peer block and transaction sync (`strato-p2p`). `--p2pPort` changes it. |
+| 30303/udp | Peer discovery (`ethereum-discover`). `--discoveryPort` changes it. |
 | 22/tcp | SSH for administration. Restrict it to your own addresses. |
 
 HTTPS on 443 is served only when the node has a certificate (`--sslDir`). Without one, nginx serves plain HTTP on `--httpPort` (default `8081`). With a certificate, requests to the HTTP port are redirected to HTTPS.
@@ -66,7 +66,7 @@ Outbound, the node must reach:
 - the network's bootnodes and peers on port 30303 (TCP and UDP)
 - the OIDC provider (by default `keycloak.blockapps.net`)
 - the Vault (by default `vault.blockapps.net:8093`)
-- GitHub, Docker Hub and the public snapshot bucket on S3, for installs and snapshot restores
+- GitHub (the repository and, with `--prebuilt`, the images on `ghcr.io`), Docker Hub and the public snapshot bucket on S3, for installs and snapshot restores
 
 !!! warning "Keep internal ports closed"
     Only nginx should face the internet. The internal services bind as follows:

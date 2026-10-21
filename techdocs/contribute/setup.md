@@ -126,7 +126,7 @@ The default target does the following:
 3. Installs the `bin/` scripts to `~/.local/bin`: `strato-login`, `strato-up`, `strato-down`, `strato-ps`, `strato-patch-app`, `strato-user-add`, `strato-snapshot` and `strato-logrotate`.
 4. Builds these Docker images: apex, nginx, postgrest, prometheus, smd, app-backend, app-ui, bridge, bridge-nginx, tracking, tracking-nginx, tracking-ui and local-auth.
 
-Each image is tagged with the version and a hash of its source directory. `make` skips any image whose tag already exists, so later builds only rebuild what changed. Local Haskell packages compile with `-Wall -Werror`, so any warning fails the build.
+Each image is tagged with the version and a hash of its source directory. Node images are built under their registry name, `ghcr.io/strato-net/strato-platform/<image>:<tag>`, plus a bare `<image>:<tag>` alias, which is the name a node's `docker-compose.yml` uses. `make` skips any image whose tag already exists, so later builds only rebuild what changed. Local Haskell packages compile with `-Wall -Werror`, so any warning fails the build.
 
 If `~/.local/bin` is not on your `PATH`, `make` prints a note. Run `source ~/.profile` or open a new terminal.
 
@@ -136,6 +136,9 @@ If `~/.local/bin` is not on your `PATH`, `make` prints a note. Run `source ~/.pr
 |--------|--------------|
 | `make` | Builds everything listed above (target `local`) |
 | `make app` | Builds only the `app-backend` and `app-ui` images, then prints a `strato-patch-app` command |
+| `make strato_docker` | Builds the `strato` image from the installed executables, needed to run `--dockerMode=all` without `--prebuilt` |
+| `make validator`, `make api-node` | Builds the executables and only the images that role runs |
+| `make push-node-images` | Pushes the node images to `ghcr.io` (what CI does; needs a `docker login ghcr.io`) |
 | `make nginx`, `make apex`, `make smd`, `make app-ui`, ... | Builds one image if its tag is missing |
 | `make nginx-force`, `make app-ui-force`, ... | Rebuilds one image unconditionally |
 | `make pretty` | Formats all tracked `.hs` files with ormolu (runs in Docker) |
