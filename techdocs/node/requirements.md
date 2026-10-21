@@ -97,9 +97,11 @@ Pass the directory with `--sslDir=/path/to/ssl`. `strato-setup` checks that both
 ## DNS name
 
 - **DNS record:** create a record that points the node's DNS name at the host's public IP.
-- **Host name:** set the machine's host name to that DNS name before you create the node. `strato-setup` uses the output of `hostname` for these settings:
+- **Host name:** set the machine's host name to that DNS name before you create the node, or pass it with `--nodeHost`. `strato-setup` uses the output of `hostname` (or the flag) for these settings:
     - the node URL (`urlConfig.nodeUrl` in `ethconf.yaml`)
     - the auth cookie domain (`urlConfig.cookieRealm`)
     - with `--localAuth`, the local OIDC discovery URL
 
 Check that `hostname` prints the DNS name first.
+
+With `--localAuth` and no `--sslDir`, the host name must be a single label (no dot), because the node processes accept a plain-HTTP discovery URL only for `localhost` or an unqualified name. It must resolve to the host on the machine itself and from the browsers that use the node (DNS or an `/etc/hosts` entry); the containers do not need to resolve it. A dotted name requires `--sslDir` with a certificate the browsers and the node processes trust.

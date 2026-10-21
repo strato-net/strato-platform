@@ -129,6 +129,7 @@ nav:
       - Overview: node/index.md
       - Requirements: node/requirements.md
       - Install & Run: node/install.md
+      - Run from Prebuilt Images: node/prebuilt.md
       - Configuration: node/configuration.md
       - Operations: node/operations.md
 

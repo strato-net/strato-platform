@@ -25,7 +25,7 @@ A STRATO node joins a STRATO network, and it can do so as a regular syncing node
 
 ## Components
 
-`strato-up` runs a node as two groups: host processes and Docker containers.
+`strato-up` runs a node as two groups: host processes and Docker containers. With `--dockerMode=all` the host processes run in a `strato` container instead; see [Run from prebuilt images](prebuilt.md).
 
 ### Host processes
 
@@ -84,6 +84,7 @@ For details, see [Consensus](../platform/consensus.md).
 
 - [Requirements](requirements.md): hardware, operating systems, ports, credentials, TLS and DNS
 - [Install](install.md): build from source and start with `strato-up`
+- [Run from prebuilt images](prebuilt.md): the release images and `strato-up`, nothing to build
 - [Configuration](configuration.md): flags, `ethconf.yaml`, environment variables, local auth, JSON-RPC and SSL
 - [Operations](operations.md): status, logs, restarts, upgrades, snapshots and troubleshooting
 
