@@ -314,6 +314,9 @@ generateDockerCompose role = do
             , ("BUNDLED_APP", if bundledApp then "true" else "false")
             , ("APP_URL", flags_appUrl)
             , ("ssl", if ssl then "true" else "false")
+            -- Extra set_real_ip_from CIDRs, taken from the host environment
+            -- at compose up; empty by default.
+            , ("NGINX_TRUST_PROXY_CIDRS", "${NGINX_TRUST_PROXY_CIDRS:-}")
             ]
             -- The node processes answer by service name, not on the host.
             ++ containerOnly [("API_UPSTREAM_HOST", "strato")]
