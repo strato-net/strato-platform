@@ -33,8 +33,8 @@ A small supervisor, `convoke`, starts these processes and restarts none of them.
 
 | Process | Role |
 |---|---|
-| `ethereum-discover` | Peer discovery on UDP 30303, seeded from the network's bootnodes |
-| `strato-p2p` | Block and transaction exchange with peers on TCP 30303 |
+| `ethereum-discover` | Peer discovery on UDP 30303 (`--discoveryPort`), seeded from the network's bootnodes |
+| `strato-p2p` | Block and transaction exchange with peers on TCP 30303 (`--p2pPort`) |
 | `strato-sequencer` | Orders transactions and runs PBFT consensus (Blockstanbul) |
 | `vm-runner` | Executes transactions in SolidVM |
 | `strato-indexer` | Writes chain data to Postgres and Redis |
