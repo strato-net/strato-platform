@@ -9,11 +9,30 @@ set -e
 #                              (e.g. to validate a freshly created archive before
 #                              it is published). Takes precedence over --snapshot.
 # Restore happens after strato-setup and before convoke is started.
+#
+# Two more flags change where things run:
+#   --dockerMode=all           (passed on to strato-setup) the node processes run
+#                              in the strato container of the generated compose
+#                              file instead of under a host convoke; strato-up
+#                              then starts and stops the compose project itself.
+#   --prebuilt[=<tag>]         (strato-up only) use the published images instead
+#                              of a local build: --repoUrl is set to the public
+#                              registry, and with --dockerMode=all strato-setup
+#                              runs from the published strato image, so no host
+#                              binaries are needed. CI publishes the images of
+#                              every commit it builds as strato:<VERSION>-<commit>
+#                              and a release tag build also as strato:<tag>; the
+#                              checkout's VERSION file and commit pick the image,
+#                              or name the tag explicitly.
 FROM_SNAPSHOT="false"
 SNAPSHOT_TIMESTAMP=""
 SNAPSHOT_SOURCE=""
 NETWORK="upquark"
 ROLE="node"
+CONTAINER_MODE="false"
+PREBUILT="false"
+PREBUILT_TAG=""
+REPO_URL=""
 SETUP_ARGS=()
 for arg in "$@"; do
     case "$arg" in
@@ -39,9 +58,39 @@ for arg in "$@"; do
             SETUP_ARGS+=("$arg")
             ;;
         # --role is passed through to strato-setup; remembered here because a
-        # snapshot (chain state) has nothing to restore into an API-only directory.
+        # snapshot (chain state) has nothing to restore into an API-only directory
+        # and a validator keeps no SQL databases. strato-setup matches the value
+        # case-insensitively, so it is lowercased here too.
         --role=*)
-            ROLE="${arg#*=}"
+            ROLE="$(printf '%s' "${arg#*=}" | tr '[:upper:]' '[:lower:]')"
+            SETUP_ARGS+=("$arg")
+            ;;
+        # strato-setup would also take "--role validator" (two arguments), which
+        # the loop above cannot see; the snapshot decisions below need the value.
+        --role)
+            echo "Error: write the role as --role=<node|core|api|api-node|validator>." >&2
+            exit 1
+            ;;
+        # There are no role shorthands. Refused here because strato-setup
+        # would not: its option parser takes --validator as an abbreviation of
+        # --validatorBehavior and sets up a full node.
+        --validator|--validator=*|--apiNode|--apiNode=*)
+            echo "Error: ${arg%%=*} is not a flag; pick the role with --role=validator or --role=api-node." >&2
+            exit 1
+            ;;
+        --dockerMode=all)
+            CONTAINER_MODE="true"
+            SETUP_ARGS+=("$arg")
+            ;;
+        --prebuilt)
+            PREBUILT="true"
+            ;;
+        --prebuilt=*)
+            PREBUILT="true"
+            PREBUILT_TAG="${arg#*=}"
+            ;;
+        --repoUrl=*)
+            REPO_URL="${arg#*=}"
             SETUP_ARGS+=("$arg")
             ;;
         *)
@@ -52,7 +101,7 @@ done
 
 NODE_DIR="$1"
 
-if [[ "$FROM_SNAPSHOT" == "true" && "${ROLE:-node}" == "api" ]]; then
+if [[ "$FROM_SNAPSHOT" == "true" && "$ROLE" == "api" ]]; then
     echo "Error: --snapshot restores chain state, which an API-only directory (--role=api) does not hold." >&2
     exit 1
 fi
@@ -66,7 +115,86 @@ if [[ "$FROM_SNAPSHOT" == "true" && -n "$NODE_DIR" && -d "$NODE_DIR" ]]; then
     FROM_SNAPSHOT="false"
 fi
 
-strato-setup "${SETUP_ARGS[@]}"
+# The sibling scripts: next to this one in a checkout, else on PATH.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+strato_tool() {
+    local tool="$1"
+    shift
+    if [[ -x "$SCRIPT_DIR/$tool" ]]; then
+        "$SCRIPT_DIR/$tool" "$@"
+    else
+        "$tool" "$@"
+    fi
+}
+
+if [[ "$PREBUILT" == "true" ]]; then
+    # CI tags the images of every build with the Makefile's VERSION, the VERSION
+    # file plus the short commit (19.5-abc1234), and a release tag build also
+    # aliases the strato image to the tag itself (19.5). The strato image carries
+    # an alias under that VERSION alone; strato-setup inside it knows the full
+    # <VERSION>-<hash> tags of the other images from its BUILD_METADATA. So the
+    # checkout's VERSION file and commit name the image, with the plain VERSION
+    # as the fallback for a checkout without git history (a release tarball),
+    # unless --prebuilt=<tag> names one.
+    if [[ -z "$REPO_URL" ]]; then
+        REPO_URL="ghcr.io/strato-net/strato-platform/"
+        SETUP_ARGS+=("--repoUrl=$REPO_URL")
+    fi
+    if [[ -n "$PREBUILT_TAG" ]]; then
+        IMAGE_TAGS=("$PREBUILT_TAG")
+    else
+        if [[ ! -f "$SCRIPT_DIR/../VERSION" ]]; then
+            echo "Error: --prebuilt needs the checkout's VERSION file next to bin/; run bin/strato-up from a strato-platform checkout, or pass --prebuilt=<tag>." >&2
+            exit 1
+        fi
+        VERSION_FILE="$(tr -d '[:space:]' < "$SCRIPT_DIR/../VERSION")"
+        COMMIT="$(git -C "$SCRIPT_DIR/.." rev-parse --short=7 HEAD 2>/dev/null || true)"
+        IMAGE_TAGS=()
+        [[ -n "$COMMIT" ]] && IMAGE_TAGS+=("$VERSION_FILE-$COMMIT")
+        IMAGE_TAGS+=("$VERSION_FILE")
+    fi
+    STRATO_IMAGE=""
+    for tag in "${IMAGE_TAGS[@]}"; do
+        if docker image inspect "${REPO_URL}strato:$tag" >/dev/null 2>&1 || docker manifest inspect "${REPO_URL}strato:$tag" >/dev/null 2>&1; then
+            STRATO_IMAGE="${REPO_URL}strato:$tag"
+            break
+        fi
+    done
+    if [[ -z "$STRATO_IMAGE" ]]; then
+        echo "Error: no prebuilt strato image for this checkout (tried: ${IMAGE_TAGS[*]} under ${REPO_URL}strato)." >&2
+        echo "CI publishes a commit's images a few minutes after it is pushed: wait for that build, check out a commit that has one, or pass --prebuilt=<tag>." >&2
+        exit 1
+    fi
+    echo "Prebuilt images: $STRATO_IMAGE"
+fi
+
+# A node set up from the prebuilt images is restarted on a host that has no
+# strato-setup; on a directory that is already set up it would only report so.
+if [[ -f "$NODE_DIR/.ethereumH/ethconf.yaml" && " ${SETUP_ARGS[*]} " != *" --regenerate"* ]] && ! command -v strato-setup >/dev/null 2>&1; then
+    echo "Node already exists at $NODE_DIR, skipping setup."
+elif [[ "$CONTAINER_MODE" == "true" && "$PREBUILT" == "true" ]]; then
+    # No host binaries: strato-setup runs from the strato image, over the node
+    # directory's parent mounted at its own path, as the invoking user, with
+    # the host's name (the node URL is built from it) and home (the default
+    # node file, and the OAuth credentials strato-login stored).
+    if ! docker image inspect "$STRATO_IMAGE" >/dev/null 2>&1 && ! docker pull "$STRATO_IMAGE"; then
+        echo "Error: could not pull $STRATO_IMAGE." >&2
+        exit 1
+    fi
+    mkdir -p "$(dirname "$NODE_DIR")" "$HOME/.strato"
+    NODE_PARENT="$(cd "$(dirname "$NODE_DIR")" && pwd)"
+    SECRETS_MOUNT=()
+    [[ -d "$HOME/.secrets" ]] && SECRETS_MOUNT=(-v "$HOME/.secrets:$HOME/.secrets:ro")
+    docker run --rm --entrypoint strato-setup --user "$(id -u):$(id -g)" --hostname "$(hostname)" \
+        -e HOME="$HOME" -v "$HOME/.strato:$HOME/.strato" "${SECRETS_MOUNT[@]}" \
+        -v "$NODE_PARENT:$NODE_PARENT" -w "$NODE_PARENT" \
+        "$STRATO_IMAGE" "$NODE_PARENT/$(basename "$NODE_DIR")" "${SETUP_ARGS[@]:1}"
+elif [[ "$PREBUILT" == "true" ]] && ! command -v strato-setup >/dev/null 2>&1; then
+    echo "Error: --prebuilt without --dockerMode=all keeps the node processes on local binaries, and strato-setup is not on PATH. Run make, or add --dockerMode=all to run everything from the prebuilt images." >&2
+    exit 1
+else
+    strato-setup "${SETUP_ARGS[@]}"
+fi
 
 if [[ "$FROM_SNAPSHOT" == "true" ]]; then
     if [[ -n "$SNAPSHOT_SOURCE" ]]; then
@@ -79,7 +207,13 @@ if [[ "$FROM_SNAPSHOT" == "true" ]]; then
         SNAPSHOT_ARG=(--snapshot)
         echo "Restoring node from latest $NETWORK snapshot..."
     fi
-    if ! strato-snapshot restore "$NODE_DIR" "${SNAPSHOT_ARG[@]}" --network "$NETWORK" --force; then
+    # A validator keeps no SQL block index and no Cirrus: restore the chain
+    # state only and leave the eth and cirrus dumps out.
+    RESTORE_ARGS=()
+    if [[ "$ROLE" == "validator" ]]; then
+        RESTORE_ARGS+=(--skip-databases)
+    fi
+    if ! strato_tool strato-snapshot restore "$NODE_DIR" "${SNAPSHOT_ARG[@]}" --network "$NETWORK" --force "${RESTORE_ARGS[@]}"; then
         echo "Error: snapshot restore failed; not starting STRATO." >&2
         exit 1
     fi
@@ -87,6 +221,35 @@ fi
 
 cd "$NODE_DIR"
 NODE_DIR_ABS="$(pwd)"
+
+# A --dockerMode=all directory is recognised by its compose file, so a restart
+# needs no flags: compose runs the whole node, and there is no host convoke to
+# start, check or stop.
+if grep -qx '  strato:' docker-compose.yml; then
+    if [[ -n "$(docker compose -p strato ps -q --status running strato 2>/dev/null)" ]]; then
+        echo "Error: STRATO is already running in $(pwd) (the strato container)"
+        echo "Run 'strato-down' first to stop the running node."
+        exit 1
+    fi
+    echo "Starting containers..."
+    # --wait: a container that never becomes healthy fails the start instead
+    # of leaving a half-started node behind.
+    if ! docker compose -p strato up -d --wait; then
+        echo "Error: docker compose up failed; STRATO is NOT running in $(pwd)." >&2
+        docker compose -p strato ps >&2 || true
+        exit 1
+    fi
+    if grep -q "local-auth:" docker-compose.yml; then
+        echo "Ensuring local auth admin and node identity setup..."
+        if ! strato_tool strato-user-add "$NODE_DIR_ABS" "${LOCAL_AUTH_ADMIN_USERNAME:-admin}" --with-nodekey; then
+            echo "Error: local auth admin setup failed; stopping STRATO." >&2
+            docker compose -p strato down || true
+            exit 1
+        fi
+    fi
+    echo "STRATO started in: $(pwd)"
+    exit 0
+fi
 
 # Check if node is already running
 if [[ -f .strato.pid ]]; then
@@ -110,8 +273,12 @@ export MALLOC_ARENA_MAX=2
 # Both streams go through "tee -a" (append mode) so the two writers share the
 # file's end position and can't overwrite each other's bytes. Truncate first,
 # since the append redirects no longer reset the log on restart.
+# Each tee has to outlive the terminal or docker exec/ssh session that ran
+# strato-up, so it ignores the SIGHUP sent when that session ends and, with
+# "-p", drops an output it can no longer write (the gone terminal, a closed
+# pipe) instead of exiting: a dead tee leaves convoke's pipe without a reader.
 : > logs/convoke.log
-nohup convoke > >(tee -a logs/convoke.log >/dev/null) 2> >(tee -a logs/convoke.log >&2) &
+nohup convoke > >(trap '' HUP; tee -a -p logs/convoke.log >/dev/null) 2> >(trap '' HUP; tee -a -p logs/convoke.log >&2) &
 CONVOKE_PID=$!
 echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
 
@@ -132,8 +299,12 @@ fi
 
 if grep -q "local-auth:" docker-compose.yml; then
     echo "Ensuring local auth admin and node identity setup..."
-    if ! strato-user-add "$NODE_DIR_ABS" "${LOCAL_AUTH_ADMIN_USERNAME:-admin}" --with-nodekey; then
+    if ! strato_tool strato-user-add "$NODE_DIR_ABS" "${LOCAL_AUTH_ADMIN_USERNAME:-admin}" --with-nodekey; then
         echo "Error: local auth admin setup failed; stopping STRATO." >&2
+        # A failed "docker compose up" is reported only in the log (convoke
+        # sends compose's output there), so show it before stopping.
+        echo "Last lines of logs/convoke.log:" >&2
+        tail -n 15 logs/convoke.log >&2 2>/dev/null || true
         kill "$CONVOKE_PID" 2>/dev/null || true
         rm -f .strato.pid
         exit 1

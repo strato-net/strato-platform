@@ -51,6 +51,14 @@ if [[ ! -d "$NODE_DIR" ]]; then
   exit 1
 fi
 
+# A --dockerMode=all node (strato-setup) runs its
+# processes in the strato container, which holds the binaries this script
+# needs; a host node has them on PATH.
+CONTAINER_MODE=false
+if grep -qx '  strato:' "$NODE_DIR/docker-compose.yml" 2>/dev/null; then
+  CONTAINER_MODE=true
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "Error: docker is required" >&2
   exit 1
@@ -61,7 +69,7 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! command -v strato-vault-import-key >/dev/null 2>&1; then
+if [[ "$CONTAINER_MODE" == false ]] && ! command -v strato-vault-import-key >/dev/null 2>&1; then
   echo "Error: strato-vault-import-key is required. Run make first." >&2
   exit 1
 fi
@@ -85,10 +93,25 @@ fi
 
 COMPOSE=(docker compose -p strato)
 
+# strato-up runs us while convoke is still bringing the services up; once
+# convoke is gone (its "docker compose up" failed) there is nothing to wait
+# for. Only a node started by strato-up has a .strato.pid; run by hand against
+# anything else, the wait loops are unchanged.
+check_convoke() {
+  [[ -f .strato.pid ]] || return 0
+  local CONVOKE_PID=""
+  source .strato.pid
+  if [[ -n "$CONVOKE_PID" ]] && ! kill -0 "$CONVOKE_PID" 2>/dev/null; then
+    echo "Error: convoke is not running; see logs/convoke.log" >&2
+    exit 1
+  fi
+}
+
 for _ in $(seq 1 90); do
   if "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "local-auth"; then
     break
   fi
+  check_convoke
   sleep 2
 done
 
@@ -118,6 +141,7 @@ if "${COMPOSE[@]}" config --services 2>/dev/null | grep -qx "postgres"; then
     if "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "postgres"; then
       break
     fi
+    check_convoke
     sleep 2
   done
   if ! "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "postgres"; then
@@ -144,6 +168,7 @@ for _ in $(seq 1 450); do
   if "${COMPOSE[@]}" exec -T local-auth curl -fsS "http://localhost:4434/admin/identities" >/dev/null 2>&1; then
     break
   fi
+  check_convoke
   sleep 2
 done
 
@@ -156,6 +181,7 @@ for _ in $(seq 1 60); do
   if pg_psql -d oauth -Atc "select count(*) from message;" >/dev/null 2>&1; then
     break
   fi
+  check_convoke
   sleep 2
 done
 
@@ -440,7 +466,11 @@ import_key() {
   local private_key="$1"
   local username="$2"
   local provider="$3"
-  printf "%s" "$private_key" | strato-vault-import-key \
+  local import_cmd=(strato-vault-import-key)
+  if [[ "$CONTAINER_MODE" == true ]]; then
+    import_cmd=("${COMPOSE[@]}" exec -T strato strato-vault-import-key)
+  fi
+  printf "%s" "$private_key" | "${import_cmd[@]}" \
     --pghost "$PG_HOST" --pgport "$PG_PORT" \
     --password "$pg_password" \
     --database oauth \

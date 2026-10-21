@@ -1429,6 +1429,12 @@ node_is_running() {
       return 0
     fi
   fi
+  # A --dockerMode=all node (strato-setup) has no host
+  # convoke: its processes run in the strato compose service.
+  if grep -qx '  strato:' "$node_dir/docker-compose.yml" 2>/dev/null \
+     && [[ -n "$(cd "$node_dir" && docker compose -p strato ps -q --status running strato 2>/dev/null)" ]]; then
+    return 0
+  fi
   return 1
 }
 
