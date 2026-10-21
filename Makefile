@@ -3,7 +3,9 @@
 # registry; the services BlockApps runs itself (vault, highway, bridge) stay in
 # the private AWS ECR. Every image is built once, under the name it is pushed
 # with; the node images also get a bare local tag (apex:<tag>) because the
-# docker-compose.yml of a local node refers to them that way.
+# docker-compose.yml of a local node refers to them that way. The alias is
+# set even when the registry image is already present (pulled by a
+# strato-up --prebuilt, say), not only after a build.
 REPO_GHCR_URL ?= ghcr.io/strato-net/strato-platform/
 REPO_AWS_ECR_URL ?= 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/
 $(info REPO_GHCR_URL is "${REPO_GHCR_URL}", REPO_AWS_ECR_URL is "${REPO_AWS_ECR_URL}" (REPO: "${REPO}"))
@@ -109,6 +111,7 @@ postgrest:
 		DOCKER_TAG=$(REPO_GHCR_URL)postgrest:$(VERSION)-$(HASH_POSTGREST) DOCKER_TAG_ALIAS=postgrest:$(VERSION)-$(HASH_POSTGREST) $(MAKE) --directory=postgrest-packager/; \
 	else \
 		echo "postgrest up to date"; \
+		docker tag $(REPO_GHCR_URL)postgrest:$(VERSION)-$(HASH_POSTGREST) postgrest:$(VERSION)-$(HASH_POSTGREST); \
 	fi
 
 nginx:
@@ -117,6 +120,7 @@ nginx:
 		DOCKER_TAG=$(REPO_GHCR_URL)nginx:$(VERSION)-$(HASH_NGINX) DOCKER_TAG_ALIAS=nginx:$(VERSION)-$(HASH_NGINX) $(MAKE) --directory=nginx-packager/; \
 	else \
 		echo "nginx up to date"; \
+		docker tag $(REPO_GHCR_URL)nginx:$(VERSION)-$(HASH_NGINX) nginx:$(VERSION)-$(HASH_NGINX); \
 	fi
 
 apex:
@@ -125,6 +129,7 @@ apex:
 		DOCKER_TAG=$(REPO_GHCR_URL)apex:$(VERSION)-$(HASH_APEX) DOCKER_TAG_ALIAS=apex:$(VERSION)-$(HASH_APEX) STRATO_VERSION=$(VERSION) $(MAKE) --directory=apex/; \
 	else \
 		echo "apex up to date"; \
+		docker tag $(REPO_GHCR_URL)apex:$(VERSION)-$(HASH_APEX) apex:$(VERSION)-$(HASH_APEX); \
 	fi
 
 app-backend:
@@ -134,6 +139,7 @@ app-backend:
 		docker tag $(REPO_GHCR_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) app-backend:$(VERSION)-$(HASH_APP_BACKEND); \
 	else \
 		echo "app-backend up to date"; \
+		docker tag $(REPO_GHCR_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) app-backend:$(VERSION)-$(HASH_APP_BACKEND); \
 	fi
 
 # The app tier's nginx shares its OpenID and CSRF Lua with the node's nginx;
@@ -148,6 +154,7 @@ app-nginx:
 		docker tag $(REPO_GHCR_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX) app-nginx:$(VERSION)-$(HASH_APP_NGINX); \
 	else \
 		echo "app-nginx up to date"; \
+		docker tag $(REPO_GHCR_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX) app-nginx:$(VERSION)-$(HASH_APP_NGINX); \
 	fi
 
 app-ui:
@@ -157,6 +164,7 @@ app-ui:
 		docker tag $(REPO_GHCR_URL)app-ui:$(VERSION)-$(HASH_APP_UI) app-ui:$(VERSION)-$(HASH_APP_UI); \
 	else \
 		echo "app-ui up to date"; \
+		docker tag $(REPO_GHCR_URL)app-ui:$(VERSION)-$(HASH_APP_UI) app-ui:$(VERSION)-$(HASH_APP_UI); \
 	fi
 
 prometheus:
@@ -165,6 +173,7 @@ prometheus:
 		DOCKER_TAG=$(REPO_GHCR_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS) DOCKER_TAG_ALIAS=prometheus:$(VERSION)-$(HASH_PROMETHEUS) $(MAKE) --directory=prometheus-packager/; \
 	else \
 		echo "prometheus up to date"; \
+		docker tag $(REPO_GHCR_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS) prometheus:$(VERSION)-$(HASH_PROMETHEUS); \
 	fi
 
 smd:
@@ -173,6 +182,7 @@ smd:
 		DOCKER_TAG=$(REPO_GHCR_URL)smd:$(VERSION)-$(HASH_SMD) DOCKER_TAG_ALIAS=smd:$(VERSION)-$(HASH_SMD) STRATO_VERSION=$(VERSION) $(MAKE) --directory=smd-ui/; \
 	else \
 		echo "smd up to date"; \
+		docker tag $(REPO_GHCR_URL)smd:$(VERSION)-$(HASH_SMD) smd:$(VERSION)-$(HASH_SMD); \
 	fi
 
 bridge:
@@ -200,6 +210,7 @@ history:
 		docker tag $(REPO_GHCR_URL)history:$(VERSION)-$(HASH_HISTORY) history:$(VERSION)-$(HASH_HISTORY); \
 	else \
 		echo "history up to date"; \
+		docker tag $(REPO_GHCR_URL)history:$(VERSION)-$(HASH_HISTORY) history:$(VERSION)-$(HASH_HISTORY); \
 	fi
 
 all: local
@@ -277,6 +288,7 @@ local-auth:
 		docker tag $(REPO_GHCR_URL)local-auth:$(VERSION)-$(HASH_LOCAL_AUTH) local-auth:$(VERSION)-$(HASH_LOCAL_AUTH); \
 	else \
 		echo "local-auth up to date"; \
+		docker tag $(REPO_GHCR_URL)local-auth:$(VERSION)-$(HASH_LOCAL_AUTH) local-auth:$(VERSION)-$(HASH_LOCAL_AUTH); \
 	fi
 
 oracle:

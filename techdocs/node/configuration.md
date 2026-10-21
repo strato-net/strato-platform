@@ -121,7 +121,7 @@ All environment variables are optional.
 Where these variables take effect:
 
 - **`strato-setup` variables** matter only when a node directory is created.
-- **`strato-logrotate` variables** are read at runtime, so set them in the environment you run `strato-up` from.
+- **`strato-logrotate` variables** are read at runtime, so set them in the environment you run `strato-up` from. With `--dockerMode=all` they reach the `strato` container the way the app variables do below, so give them on every `strato-up`.
 - **App variables:** the generated `docker-compose.yml` also passes app settings through from your environment, such as the `RPC_URL_*` external-chain RPC endpoints. Docker Compose substitutes them each time the containers start, so pass the same variables on every `strato-up`.
 
 ## Host name
