@@ -20,6 +20,7 @@ defineFlag "kafkaport" (9092 :: Int) "Streaming broker port (unused by the embed
 defineFlag "ingressUrls" ("" :: String) "API role: comma-separated base URLs of the core cells' transaction ingress (strato-ingest, http://<cell>:8600). A submitted batch is posted to every one of them, so each cell's mempool holds it"
 defineFlag "vmQueryUrls" ("" :: String) "API role: comma-separated base URLs of further vm-query instances, tried in order when this directory's own (--vmQuery) cannot be reached"
 defineFlag "ingressPort" (8600 :: Int) "Core role: port strato-ingest listens on for the API tier's transaction batches"
+defineFlag "ingressListen" ("" :: String) "Core role: the address the API tier reaches strato-ingest on. On a host it is the bind address (default: every interface); with --dockerMode=all the host address the ingress port is published on, and required (the cell's private address): the ingress has no authentication and belongs on the cells' network only"
 defineFlag "z:lazyblocks" (False :: Bool) "Don't mine empty blocks"
 defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
 defineCustomFlag

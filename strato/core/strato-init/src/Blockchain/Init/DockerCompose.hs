@@ -10,7 +10,7 @@ import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.EthConf (containerMode, nodeHostname)
 import Blockchain.Init.Role
-import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_discoveryPort, flags_ingressPort, flags_jsonrpc, flags_p2pPort, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_monitoring, flags_publicStratoRpc, flags_repoUrl, flags_sslDir)
+import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_discoveryPort, flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_p2pPort, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_monitoring, flags_publicStratoRpc, flags_repoUrl, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -538,10 +538,10 @@ generateDockerCompose role = do
         -- The peer ports ethconf names (--p2pPort, --discoveryPort), published
         -- one to one: ethereum-discover advertises them to the peers. A core cell
         -- also publishes its transaction ingress (--ingressPort) for the API
-        -- tier, as strato-ingest on a host binds every interface too; it has no
-        -- authentication, so it is for the API tier's network only, as there.
+        -- tier, on the address --ingressListen names and nowhere else: the
+        -- ingress has no authentication (setup refuses a core cell without it).
         , ports = Just $ [show flags_p2pPort ++ ":" ++ show flags_p2pPort, show flags_discoveryPort ++ ":" ++ show flags_discoveryPort ++ "/udp"]
-            ++ [ show flags_ingressPort ++ ":" ++ show flags_ingressPort | role == RoleCore ]
+            ++ [ flags_ingressListen ++ ":" ++ show flags_ingressPort ++ ":" ++ show flags_ingressPort | role == RoleCore ]
         , volumes = Just [".:/var/lib/strato"]
         , restart = Just "unless-stopped"
         -- convoke's shutdown is SIGTERM to the children, five seconds, then

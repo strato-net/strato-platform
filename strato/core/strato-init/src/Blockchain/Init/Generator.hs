@@ -16,7 +16,7 @@ import Blockchain.Init.DockerCompose
 import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer)
+import Blockchain.Init.Options (flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -147,7 +147,7 @@ createCommandsFile role = do
       ++ [restartable "strato-network-monitor"]
       -- A core cell takes the API tier's transactions through its ingress;
       -- a monolith's strato-api writes its own stream directly.
-      ++ [restartable ("strato-ingest --port=" ++ show flags_ingressPort ++ " +RTS -T -RTS") | role == RoleCore]
+      ++ [restartable ("strato-ingest --port=" ++ show flags_ingressPort ++ [ c | not (null flags_ingressListen), c <- " --listen=" ++ flags_ingressListen ] ++ " +RTS -T -RTS") | role == RoleCore]
 
   let apiCommands
         | roleRunsApi role =
@@ -218,6 +218,10 @@ mkFilesAndGenesis nodeDir hasFlags network = do
       liftIO $ error "--localAuth is only supported with --role=node or --role=api-node"
     when (not flags_monitoring && not (roleAllowsMonitoringOff role)) $
       liftIO $ error "--monitoring=false is only supported with --role=api-node"
+    -- The ingress has no authentication: in a container it is published only on
+    -- the address named, never on every interface.
+    when (role == RoleCore && containerMode && null flags_ingressListen) $
+      liftIO $ error "--role=core with --dockerMode=all needs --ingressListen=<the cell's private address>: the transaction ingress is published on that address for the API tier"
 
     -- Validate SSL directory contents before doing any setup
     when (not $ null flags_sslDir) $ do
