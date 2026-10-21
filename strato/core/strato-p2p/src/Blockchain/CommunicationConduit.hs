@@ -83,7 +83,7 @@ handleMsgClientConduit ::
 handleMsgClientConduit myId peer = do
   $logDebugS "handleMsgClientConduit" "<waving hand emoji>"
 
-  lift $ clearAllSyncTasks $ pPeerHost peer
+  lift clearAllSyncTasks
 
   yield $
     Right
@@ -136,7 +136,7 @@ handleMsgClientConduit myId peer = do
               yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) (Conf.maxReturnedHeaders (p2pConfig ethConf)) 0 Forward
             else do
               $logInfoS "handleMsgClientConduit" $ T.pack $ "sync task chiliad higher than world highest block (#" ++ show highestBlockNum' ++ "), marking the new chiliad as 'NotReady'"
-              lift $ setSyncTaskNotReady (pPeerHost peer)
+              lift setSyncTaskNotReady
 
       lift stampActionTimestamp
     other -> assertHandshake other
@@ -150,7 +150,7 @@ handleMsgServerConduit ::
 handleMsgServerConduit myPubkey peer = do
   $logDebugS "handleMsgServerConduit" "about to parse message"
 
-  lift $ clearAllSyncTasks $ pPeerHost peer
+  lift clearAllSyncTasks
 
   numActivePeers <- liftIO $ fmap length getPeersByThreads
 

@@ -248,7 +248,7 @@ handleEvents peer = awaitForever $ \case
 
     yieldL . ToUnseq $ IEBlock . blockToIngestBlock (Origin.PeerString $ peerString peer) <$> blocks'
 
-    currentSyncTask <- fmap (fromMaybe $ error "no current sync task") $ lift $ getCurrentSyncTask (pPeerHost peer)
+    currentSyncTask <- fmap (fromMaybe $ error "no current sync task") $ lift getCurrentSyncTask
     let maxBlockNumber :: Integer
         maxBlockNumber = maximum . (0:) $ map (BlockHeader.number . blockBlockData) blocks'
 
@@ -258,7 +258,7 @@ handleEvents peer = awaitForever $ \case
         if maxBlockNumber >= 1000 * fromIntegral (syncTaskChiliad currentSyncTask) + 999
           then do
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block header " ++ show maxBlockNumber ++ ", we have finished loading chiliad #" ++ show (syncTaskChiliad currentSyncTask)
-            lift $ setSyncTaskFinished (pPeerHost peer)
+            lift setSyncTaskFinished
 
             $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
 
@@ -280,9 +280,9 @@ handleEvents peer = awaitForever $ \case
           $logInfoS "handleEvents/BlockBodies" $ T.pack $ "No new sync tasks available, done downloading"
         Just fetchNumber | fetchNumber <= worldNumber -> syncFetch Forward fetchNumber
         _ -> do
-          currentSyncTask' <- fmap (fromMaybe $ error "no current sync task") $ lift $ getCurrentSyncTask (pPeerHost peer)
+          currentSyncTask' <- fmap (fromMaybe $ error "no current sync task") $ lift getCurrentSyncTask
           $logInfoS "handleEvents/BlockBodies" $ T.pack $ "remaining blocks in chiliad #" ++ show (syncTaskChiliad currentSyncTask') ++ " are higher than the world best block, marking that chiliad as 'NotReady'"
-          lift $ setSyncTaskNotReady (pPeerHost peer)
+          lift setSyncTaskNotReady
       else do
         yieldR $ GetBlockBodies bodyHashes'
 
@@ -422,7 +422,7 @@ handleEvents peer = awaitForever $ \case
     BestSequencedBlock _ myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
     let syncDone = if worldNumber >= 0 then Just (myNumber >= worldNumber) else Nothing
     unless (syncDone == Just True) $ do
-      maybeSyncTask <- lift $ getCurrentSyncTask $ pPeerHost peer
+      maybeSyncTask <- lift getCurrentSyncTask
       case maybeSyncTask of
         Just _ -> return () -- Already have a task, do nothing
         Nothing -> do

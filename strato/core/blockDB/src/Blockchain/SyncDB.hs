@@ -34,7 +34,7 @@ import           Blockchain.Model.SyncTask
 import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.RedisBlockDB.Models as Models
-import           Control.Concurrent                    (threadDelay)
+import           Control.Concurrent                    (myThreadId, threadDelay)
 import           Control.Monad
 import           Control.Monad.Composable.Base         (Eff, Logger, runEff)
 import           Control.Monad.Reader                  (ask)
@@ -42,6 +42,9 @@ import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
 import qualified Data.Text                             as T
 import           Data.Time
+import qualified Data.UUID                             as UUID
+import qualified Data.UUID.V4                          as UUID
+import           System.IO.Unsafe                      (unsafePerformIO)
 import           Database.Esqueleto.Legacy
 import qualified Database.Persist.Sql                  as SQL
 import           Database.Persist.SqlBackend           (getRDBMS)
@@ -340,29 +343,42 @@ putSyncStatus :: RedisCtx m f => Bool -> m (f REDIS.Status)
 putSyncStatus status = REDIS.set syncStatusKey $ toValue status
 
 class HasSyncDB m where
-  clearAllSyncTasks :: Host -> m ()
-  getCurrentSyncTask :: Host -> m (Maybe SyncTask)
+  clearAllSyncTasks :: m ()
+  getCurrentSyncTask :: m (Maybe SyncTask)
   getNewSyncTask :: Host -> Integer -> m (Maybe SyncTask)
-  setSyncTaskFinished :: Host -> m ()
-  setSyncTaskNotReady :: Host -> m ()
+  setSyncTaskFinished :: m ()
+  setSyncTaskNotReady :: m ()
+
+-- Each handler has its own thread; the process namespace prevents ID reuse
+-- after a restart, without passing a connection ID through the P2P monad.
+{-# NOINLINE syncProcessId #-}
+syncProcessId :: UUID.UUID
+syncProcessId = unsafePerformIO UUID.nextRandom
+
+syncConnectionId :: IO T.Text
+syncConnectionId = do
+  thread <- myThreadId
+  return $ UUID.toText syncProcessId <> ":" <> T.pack (show thread)
 
 -- Sync tasks live in the peer store, which on a cell is not the eth
 -- database (see "Blockchain.DBM").
 instance HasPeerStore m => HasSyncDB m where
-  clearAllSyncTasks host = peerQuery $ do
+  clearAllSyncTasks = peerQuery $ do
+    connectionId <- liftIO syncConnectionId
     rawExecute
         [r|
             UPDATE "sync_task"
-            SET "host" = ''
-            WHERE "host" = ?
+            SET "connection_id" = NULL
+            WHERE "connection_id" = ?
         |]
-        [toPersistValue host]
+        [toPersistValue connectionId]
 
-  getCurrentSyncTask host = peerQuery $ do
+  getCurrentSyncTask = peerQuery $ do
+    connectionId <- liftIO syncConnectionId
     vals <-
         select $ from $ \syncTask -> do
           where_ (
-            (syncTask^.SyncTaskHost ==. val host)
+            (syncTask^.SyncTaskConnectionId ==. val (Just connectionId))
             &&.
             (syncTask ^. SyncTaskStatus ==. val Assigned)
             )
@@ -379,6 +395,7 @@ instance HasPeerStore m => HasSyncDB m where
 
   getNewSyncTask "127.0.0.1" _ = return Nothing -- empirically, I've observed a lot of wasted time trying to sync from the loopback....  Probably should just stop self-connect from even happening, but for now I'll just filter it out here
   getNewSyncTask host highestBlockNum = peerQuery $ do
+    connectionId <- liftIO syncConnectionId
     now <- liftIO getCurrentTime
     let oneMinuteAgo = addUTCTime (-60) now
     rdbms <- getRDBMS <$> ask
@@ -392,7 +409,7 @@ instance HasPeerStore m => HasSyncDB m where
       then rawSql
         [r|
             UPDATE "sync_task"
-            SET "host" = ?, "assignment_time" = ?, "status" = 'Assigned'
+            SET "host" = ?, "assignment_time" = ?, "status" = 'Assigned', "connection_id" = ?
             WHERE "id" = (
                 SELECT "id"
                 FROM "sync_task"
@@ -403,11 +420,11 @@ instance HasPeerStore m => HasSyncDB m where
             )
             RETURNING ??
         |]
-        [toPersistValue host, toPersistValue now, toPersistValue oneMinuteAgo]
+        [toPersistValue host, toPersistValue now, toPersistValue connectionId, toPersistValue oneMinuteAgo]
       else rawSql
         [r|
             UPDATE "sync_task"
-            SET "host" = ?, "assignment_time" = ?, "status" = 'Assigned'
+            SET "host" = ?, "assignment_time" = ?, "status" = 'Assigned', "connection_id" = ?
             WHERE "id" = (
                 SELECT "id"
                 FROM "sync_task"
@@ -417,9 +434,9 @@ instance HasPeerStore m => HasSyncDB m where
                 LIMIT 1
                 FOR UPDATE SKIP LOCKED
             )
-            RETURNING
+            RETURNING ??
         |]
-        [toPersistValue host, toPersistValue now, toPersistValue oneMinuteAgo]
+        [toPersistValue host, toPersistValue now, toPersistValue connectionId, toPersistValue oneMinuteAgo]
 
     case result of
       oneTask:_ -> return $ Just $ entityVal oneTask
@@ -428,39 +445,41 @@ instance HasPeerStore m => HasSyncDB m where
         results <- if rdbms == "sqlite"
           then SQL.rawSql
             [r|
-              INSERT INTO "sync_task" ("chiliad", "assignment_time", "host", "status")
-              SELECT (SELECT COALESCE(MAX("chiliad") + 1, 0) FROM "sync_task"), ?, ?, 'Assigned'
+              INSERT INTO "sync_task" ("chiliad", "assignment_time", "host", "status", "connection_id")
+              SELECT (SELECT COALESCE(MAX("chiliad") + 1, 0) FROM "sync_task"), ?, ?, 'Assigned', ?
               WHERE (SELECT COUNT(*) FROM "sync_task") < ?
               RETURNING ??
-            |] [toPersistValue now, toPersistValue host, toPersistValue $ 1 + highestBlockNum `div` 1000]
+            |] [toPersistValue now, toPersistValue host, toPersistValue connectionId, toPersistValue $ 1 + highestBlockNum `div` 1000]
           else SQL.rawSql
             [r|
-              INSERT INTO sync_task (host)
-              SELECT ?
+              INSERT INTO sync_task (host, connection_id)
+              SELECT ?, ?
               WHERE (select count(*) from "sync_task") < ?
-              RETURNING
-            |] [toPersistValue host, toPersistValue $ 1 + highestBlockNum `div` 1000]
+              RETURNING ??
+            |] [toPersistValue host, toPersistValue connectionId, toPersistValue $ 1 + highestBlockNum `div` 1000]
 
         case results of
           [v] -> return $ Just $ SQL.entityVal v
           []  -> return Nothing
           _   -> error "this seems impossible, getNewSyncTask tried to create one new task, but multiple were created.  Internal error"
 
-  setSyncTaskFinished host = peerQuery $ do
+  setSyncTaskFinished = peerQuery $ do
+    connectionId <- liftIO syncConnectionId
     update $ \syncTask -> do
       set syncTask [SyncTaskStatus =. val Finished]
       where_ (
-        (syncTask^.SyncTaskHost ==. val host)
+        (syncTask^.SyncTaskConnectionId ==. val (Just connectionId))
         &&.
         (syncTask^.SyncTaskStatus ==. val Assigned)
         )
     return ()
 
-  setSyncTaskNotReady host = peerQuery $ do
+  setSyncTaskNotReady = peerQuery $ do
+    connectionId <- liftIO syncConnectionId
     update $ \syncTask -> do
       set syncTask [SyncTaskStatus =. val NotReady]
       where_ (
-        (syncTask^.SyncTaskHost ==. val host)
+        (syncTask^.SyncTaskConnectionId ==. val (Just connectionId))
         &&.
         (syncTask^.SyncTaskStatus ==. val Assigned)
         )
