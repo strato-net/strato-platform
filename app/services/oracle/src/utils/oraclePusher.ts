@@ -2,7 +2,7 @@ import { apiPost } from './apiClient';
 import { oauthClient } from './oauth';
 import { logError, logInfo } from './logger';
 import { TransactionResult, CallListArg, AggregatedPrice } from '../types';
-import { GAS_PARAMS, TIMEOUTS, RETRY_DELAYS } from './constants';
+import { CONSTANTS, GAS_PARAMS, TIMEOUTS, RETRY_DELAYS } from './constants';
 import { txMetricsService } from './txMetricsService';
 
 
@@ -96,15 +96,29 @@ function extractTransactionHash(data: any): string {
     throw new Error('No transaction hash returned from STRATO');
 }
 
-export async function pushAssetPrices(validPrices: AggregatedPrice[]): Promise<TransactionResult> {
-    const callListArgs: CallListArg[] = [{
-        contract: { address: process.env.PRICE_ORACLE_ADDRESS!, name: "PriceOracle" },
-        method: "setAssetPrices",
-        args: { 
-            assets: validPrices.map(p => p.targetAddress), 
-            priceValues: validPrices.map(p => p.medianPrice) 
+// A PriceOracle setter run through the AdminRegistry, which executes it at once for this whitelisted
+// feeder. castVoteOnIssue's variadic args carry no ABI, so each is hinted with the setter's declared type
+function oracleSetter(method: string, assets: string[], values: Array<string | number>): CallListArg {
+    return {
+        contract: { address: CONSTANTS.ADMIN_REGISTRY_ADDRESS, name: "AdminRegistry" },
+        method: "castVoteOnIssue",
+        args: {
+            _target: process.env.PRICE_ORACLE_ADDRESS!,
+            _func: method,
+            _args: [
+                { type: "address[]", value: assets },
+                { type: "uint256[]", value: values },
+            ],
         },
-    }];
+    };
+}
+
+export async function pushAssetPrices(validPrices: AggregatedPrice[]): Promise<TransactionResult> {
+    const callListArgs: CallListArg[] = [oracleSetter(
+        "setAssetPrices",
+        validPrices.map(p => p.targetAddress),
+        validPrices.map(p => p.medianPrice),
+    )];
 
     const result = await callListAndWait(callListArgs);
     logInfo('OraclePusher', 'Submission successful');
@@ -112,14 +126,11 @@ export async function pushAssetPrices(validPrices: AggregatedPrice[]): Promise<T
 }
 
 export async function pushRebaseFactors(factors: Array<{ targetAddress: string; factor: bigint }>): Promise<TransactionResult> {
-    const callListArgs: CallListArg[] = [{
-        contract: { address: process.env.PRICE_ORACLE_ADDRESS!, name: "PriceOracle" },
-        method: "setRebaseFactors",
-        args: {
-            assets: factors.map(f => f.targetAddress),
-            factors: factors.map(f => f.factor.toString())
-        },
-    }];
+    const callListArgs: CallListArg[] = [oracleSetter(
+        "setRebaseFactors",
+        factors.map(f => f.targetAddress),
+        factors.map(f => f.factor.toString()),
+    )];
 
     const result = await callListAndWait(callListArgs);
     logInfo('OraclePusher', `Rebase factors pushed for ${factors.length} asset(s)`);
@@ -127,14 +138,11 @@ export async function pushRebaseFactors(factors: Array<{ targetAddress: string; 
 }
 
 export async function pushExchangeRates(rates: Array<{ targetAddress: string; rate: bigint }>): Promise<TransactionResult> {
-    const callListArgs: CallListArg[] = [{
-        contract: { address: process.env.PRICE_ORACLE_ADDRESS!, name: "PriceOracle" },
-        method: "setExchangeRates",
-        args: {
-            assets: rates.map(r => r.targetAddress),
-            rates: rates.map(r => r.rate.toString())
-        },
-    }];
+    const callListArgs: CallListArg[] = [oracleSetter(
+        "setExchangeRates",
+        rates.map(r => r.targetAddress),
+        rates.map(r => r.rate.toString()),
+    )];
 
     const result = await callListAndWait(callListArgs);
     logInfo('OraclePusher', `Exchange rates pushed for ${rates.length} asset(s)`);
