@@ -24,7 +24,6 @@ import           Blockchain.Blockstanbul               (WireMessage,
                                                         blockstanbulSender)
 import           Blockchain.Context
 import           Blockchain.Data.Block
-import           Blockchain.Data.BlockHeader           (BlockHeader)
 import qualified Blockchain.Data.BlockHeader           as BlockHeader
 import           Blockchain.Data.Control               (P2PCNC (..))
 import           Blockchain.Data.PubKey
@@ -44,8 +43,8 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.SyncDB
-import           Control.Arrow                         ((&&&))
 import           Control.Monad
+import           Control.Monad.Composable.BlockDB (getBlockBodies, getBlockHeader, getCanonicalBlockHeaders)
 import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify           hiding (awaitForever,
                                                         get, put, yield)
@@ -123,7 +122,7 @@ handleEvents peer = awaitForever $ \case
     let parentHash' = blockHeaderParentHash header
     lift . Mod.put (Proxy @WorldBestBlock) . WorldBestBlock $
       BestBlock sha num
-    parentHeader <- lift $ select (Proxy @BlockHeader) parentHash'
+    parentHeader <- lift $ getBlockHeader parentHash'
     case parentHeader of
       Nothing -> do
         BestSequencedBlock _ bestBlockNum _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
@@ -156,7 +155,7 @@ handleEvents peer = awaitForever $ \case
     -- 3/4s of the blocks will be dropped when creating the blockheaders
     -- so we overcompensate here.
     let count = (1 + skip') * min (Conf.maxReturnedHeaders (p2pConfig ethConf)) max'
-    chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start' ..]
+    chain <- fmap M.toList . lift . getCanonicalBlockHeaders $ take count [start' ..]
     when (null chain) $
       $logInfoS "handleEvents/GetBlockHeaders" $
         T.concat
@@ -166,10 +165,10 @@ handleEvents peer = awaitForever $ \case
             " I don't know what to do, so I am returning a blank response.",
             " This may indicate something unhealthy in the network."
           ]
-    yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
+    yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . snd <$> chain
   MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
     lift stampActionTimestamp
-    maybeHeader <- lift $ select (Proxy @BlockHeader) start
+    maybeHeader <- lift $ getBlockHeader start
     case maybeHeader of
       Nothing -> yieldR (BlockBodies [])
       Just head' -> do
@@ -181,8 +180,8 @@ handleEvents peer = awaitForever $ \case
                   then num - fromIntegral max'
                   else 1
         let count = (1 + skip') * min (Conf.maxReturnedHeaders (p2pConfig ethConf)) (fromIntegral max')
-        chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start' ..]
-        yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
+        chain <- fmap M.toList . lift . getCanonicalBlockHeaders $ take count [start' ..]
+        yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . snd <$> chain
   MsgEvt (BlockHeaders bHeaders) -> do
     lift stampActionTimestamp
 
@@ -218,9 +217,9 @@ handleEvents peer = awaitForever $ \case
   MsgEvt (GetBlockBodies shas') -> do
     lift stampActionTimestamp
     let shas = take (Conf.maxReturnedHeaders (p2pConfig ethConf)) shas'
-    blocks <- lift $ selectMany (Proxy @Block) shas
+    blocks <- lift $ getBlockBodies shas
     let bodies = catMaybes . takeWhile isJust $ map (`M.lookup` blocks) shas
-    yieldR . BlockBodies $ map (blockReceiptTransactions &&& blockBlockUncles) bodies
+    yieldR . BlockBodies $ map (\txs -> (txs, [])) bodies
 
   -- todo: support the "best effort" behavior that everyone uses for bodies they dont have (mentioned above
   -- todo:
@@ -389,14 +388,14 @@ handleEvents peer = awaitForever $ \case
       ss <- lift $ shouldSendToPeer p
       when ss $ do
         let count = min (Conf.maxReturnedHeaders (p2pConfig ethConf)) . fromIntegral $ end - start + 1
-        chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start ..]
+        chain <- fmap M.toList . lift . getCanonicalBlockHeaders $ take count [start ..]
         when (null chain) $
           $logErrorS "handleEvents/P2pPushBlocks" . T.pack $
             printf
               "Blockstanbul believes we have blocks for [%d..%d], they are not found in SQL"
               start
               end
-        let outbound = BlockHeaders $ morphBlockHeader . unCanonical . snd <$> chain
+        let outbound = BlockHeaders $ morphBlockHeader . snd <$> chain
         $logDebugS "handleEvents/P2pPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
         yieldR outbound
     P2pGetMPNodes srs -> yieldR $ GetMPNodes srs

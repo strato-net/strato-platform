@@ -21,6 +21,7 @@ library
       Blockchain.Model.WrappedBlock
       Blockchain.NodeStatusMirror
       Blockchain.SyncDB
+      Control.Monad.Composable.BlockDB
   other-modules:
       Paths_blockDB
   hs-source-dirs:

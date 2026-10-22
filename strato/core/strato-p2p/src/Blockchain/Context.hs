@@ -68,7 +68,6 @@ import qualified Data.ByteString.Char8                   as BC
 import           Data.Conduit.Network
 import           Data.Foldable                           (toList)
 import qualified Data.Kind                               as DK
-import qualified Data.Map.Strict                         as M
 import           Data.Maybe
 import           Data.Proxy
 import qualified Data.Set.Ordered                        as S
@@ -80,8 +79,6 @@ import           GHC.Exts                                (Constraint)
 import           BlockApps.Logging
 
 import           Blockchain.Blockstanbul                 (WireMessage)
-import           Blockchain.Data.Block
-import           Blockchain.Data.DataDefs (EntityField(..))
 import           Blockchain.Data.BlockHeader
 import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
@@ -89,7 +86,6 @@ import           Blockchain.DBM
 import           Blockchain.EthConf
 import qualified Blockchain.EthConf.Model as Conf
 import           Blockchain.Model.SyncState
-import           Blockchain.Model.JsonBlock (getBlockSql, getBlocksSql)
 import qualified Blockchain.Model.SyncTask               as SYNCTASK
 import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event
@@ -102,7 +98,6 @@ import           Control.Monad.Composable.Streaming      (StreamEnv,
 import           Blockchain.Strato.Discovery.ContextLite ()
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.Class (blockHash, blockHeaderBlockNumber)
 import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Keccak256
 
@@ -110,6 +105,7 @@ import qualified Blockchain.Strato.RedisBlockDB          as RBDB
 import           Blockchain.SyncDB
 import           Control.Monad                           (unless, void)
 import           Control.Monad.Composable.Base
+import           Control.Monad.Composable.BlockDB (BlockDBEnv, HasBlockDB, runBlockDB)
 import qualified Database.Persist.Sql                    as SQL
 import qualified Database.Redis                          as Redis
 import           Network.Wai.Handler.Warp.Internal       (setSocketCloseOnExec)
@@ -184,10 +180,11 @@ makeLenses ''Context
 
 newtype GenesisBlockHash = GenesisBlockHash {unGenesisBlockHash :: Keccak256}
 
-type ContextRow = '[ReaderEnv Config, InternalState, VaultData, Logger]
+type ContextRow = '[BlockDBEnv, ReaderEnv Config, InternalState, VaultData, Logger]
 
 newtype ContextM a = ContextM {unContextM :: Eff ContextRow a}
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadReader Config, MonadLogger, MonadLoggerIO, MonadResource, HasVault)
+  deriving newtype (AccessibleEnv BlockDBEnv)
 
 data P2pConduits m = P2pConduits
   { _peerSource :: ConduitM () B.ByteString m (),
@@ -232,10 +229,6 @@ instance RunsServer ContextM where
         (handler conduits ip pn)
         (\(e :: SomeException) -> $logErrorS "runServer/Exception" . T.pack $ show e)
 
-instance A.Selectable Keccak256 BlockHeader ContextM where
-  select _ sha = fmap (fmap blockBlockData) $ sqlQuery $ getBlockSql sha
-  selectMany _ shas = M.fromList . map (\b -> (blockHash b, blockBlockData b)) <$> (sqlQuery $ getBlocksSql [BlockDataRefHash SQL.<-. shas])
-
 instance Mod.Modifiable WorldBestBlock ContextM where
   get _ =
     RBDB.withRedisBlockDB getWorldBestBlockInfo <&> \case
@@ -268,15 +261,6 @@ instance Mod.Modifiable BestSequencedBlock ContextM where
     RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case
       Left err -> error $ "Failed to update best sequenced block in Redis: " ++ show err
       Right _ -> return ()
-
-instance A.Selectable Integer (Canonical BlockHeader) ContextM where
-  select _ i = M.lookup i <$> A.selectMany (Proxy @(Canonical BlockHeader)) [i]
-  selectMany _ numbers = M.fromList . map (\b -> (blockHeaderBlockNumber (blockBlockData b), Canonical $ blockBlockData b))
-    <$> (sqlQuery $ getBlocksSql [BlockDataRefNumber SQL.<-. numbers, BlockDataRefPowVerified SQL.==. True, BlockDataRefIsConfirmed SQL.==. True])
-
-instance A.Selectable Keccak256 Block ContextM where
-  select _ sha = sqlQuery $ getBlockSql sha
-  selectMany _ shas = M.fromList . map (\b -> (blockHash b, b)) <$> (sqlQuery $ getBlocksSql [BlockDataRefHash SQL.<-. shas])
 
 instance (Keccak256 `A.Alters` Proxy (Inbound WireMessage)) ContextM where
   lookup _ k = do
@@ -455,6 +439,7 @@ type MonadP2P m =
     MonadResource m,
     MonadUnliftIO m,
     HasVault m,
+    HasBlockDB m,
     HasSyncDB m,
     HasPeerDB m,
     m `Mod.Outputs` [IngestEvent],
@@ -480,10 +465,7 @@ type MonadP2P m =
       m,
     All2
       '[A.Selectable]
-      '[ '(Integer, Canonical BlockHeader),
-         '(Keccak256, BlockHeader),
-         '(Keccak256, Block),
-         '((Host, UDPPort, B.ByteString), Point),
+      '[ '((Host, UDPPort, B.ByteString), Point),
          '(Host, PPeer)
        ]
       m,
@@ -521,7 +503,7 @@ clearActionTimestamp :: Mod.Modifiable ActionTimestamp m => m ()
 clearActionTimestamp = Mod.put (Proxy @ActionTimestamp) emptyActionTimestamp
 
 runContextM :: Config -> ContextM a -> Eff '[VaultData, Logger] ()
-runContextM r (ContextM m) = void . withResources $ withReaderEnv r m
+runContextM r (ContextM m) = void . withResources $ withReaderEnv r $ runBlockDB (configSQLDB r) m
 
 initConfig :: (MonadLogger m, MonadUnliftIO m) => IORef (S.OSet Keccak256) -> m Config
 initConfig wireMessagesRef = do
