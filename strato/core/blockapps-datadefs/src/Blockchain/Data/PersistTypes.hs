@@ -16,6 +16,7 @@ import Data.Bifunctor (bimap)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Short as BSS
+import Data.Integer.Conversion (byteStringToInteger)
 import Data.Ratio
 import qualified Data.Text as T
 import Data.Text.Encoding
@@ -44,6 +45,13 @@ instance PersistFieldSql Integer where
 
 instance PersistField Integer where
   toPersistValue = PersistText . T.pack . show
+  fromPersistValue (PersistText t)
+    | let (negative, digits) = case T.uncons t of
+            Just ('-', rest) -> (True, rest)
+            _ -> (False, t)
+          bytes = encodeUtf8 digits
+    , not (B.null bytes), B.all (\c -> c >= 48 && c <= 57) bytes =
+        Right $ (if negative then negate else id) $ byteStringToInteger bytes
   fromPersistValue (PersistRational r) = case denominator r of
     1 -> Right $ fromIntegral $ numerator r
     _ -> Left $ "Invalid Integer: " <> T.pack (show r)
