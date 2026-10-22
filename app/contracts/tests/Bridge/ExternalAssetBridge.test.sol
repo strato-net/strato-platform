@@ -2647,6 +2647,11 @@ contract Describe_ExternalAssetBridge is Authorizable {
         require(rejected, "Operator cannot authorize external refunds");
         bridge.requestDepositRefund(externalChainId, depositRouter, 1, externalVault);
         rejected = false;
+        try user.do(address(bridge), "recordDepositRefundProposal", externalChainId, depositRouter, 1, "0xbbbb") {} catch { rejected = true; }
+        require(rejected, "Only the operator may record a refund Safe proposal");
+        relayer.do(address(bridge), "recordDepositRefundProposal", externalChainId, depositRouter, 1, "0xbbbb");
+        require(bridge.depositRefundProposals(externalChainId, depositRouter, 1) == "0xbbbb", "Refund proposal must persist");
+        rejected = false;
         try user.do(address(bridge), "confirmReviewedDeposit", externalChainId, depositRouter, 1) {} catch { rejected = true; }
         require(rejected, "An old approved delivery cannot mint after a refund decision");
         rejected = false;

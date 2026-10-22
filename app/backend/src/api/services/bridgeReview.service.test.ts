@@ -307,9 +307,12 @@ test("deposit recovery votes offer delivery or an irreversible return and disapp
   assert.deepEqual(await prepareAdminBridgeReview("token", nativeKey, "refund"), { target: address, func: "requestDepositRefund", args: [nativeId] });
   state.tables["/BlockApps-ExternalAssetBridge-deposits"][0].value.status = "8";
   state.tables["/BlockApps-StratoNativeBridge-deposits"][0].value.bridgeStatus = "7";
+  state.tables["/BlockApps-ExternalAssetBridge-depositRefundProposals"] =
+    [{ key: "11155111", key2: address, key3: depositId, value: hash }];
   state.tables["/BlockApps-StratoNativeBridge-depositRefundProposals"] = [{ key: nativeId, value: hash }];
   const items = await getAdminBridgeReviews("token");
   assert.ok(items.filter(item => item.kind === "deposit_recovery").every(item => item.recoveryStatus === "refund_pending" && !item.actions.length));
+  assert.equal(items.find(item => item.id === depositKey)?.safeProposalHash, hash);
   assert.equal(items.find(item => item.id === nativeKey)?.safeProposalHash, hash);
   await assert.rejects(prepareAdminBridgeReview("token", depositKey, "approve"), /unavailable/);
   await assert.rejects(prepareAdminBridgeReview("token", nativeKey, "approve"), /unavailable/);

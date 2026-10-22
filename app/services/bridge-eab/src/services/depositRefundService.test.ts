@@ -54,6 +54,69 @@ test("EAB restart recovers the external refund and waits for verifier proof befo
   assert.equal(execute.mock.callCount(), 1, "a replay flag alone is not refund evidence");
 });
 
+test("EAB deposit refunds reuse and replace persisted Safe approval proposals", async t => {
+  const rpc = await import("./rpcService"), cirrus = await import("./cirrusService"), event = await import("./depositEventService");
+  const bridge = await import("./bridgeService"), helper = await import("../utils/safeHelper"), strato = await import("../utils/stratoHelper");
+  const { DEPOSIT_REFUND_ABI } = await import("../config/bridgeAbi");
+  const { recoverExternalDepositRefund } = await import("./depositRefundService");
+  const directory = await mkdtemp(path.join(tmpdir(), "external-refund-test-")), cwd = process.cwd();
+  process.chdir(directory); t.after(async () => { process.chdir(cwd); await rm(directory, { recursive: true, force: true }); });
+  const iface = new Interface(DEPOSIT_REFUND_ABI);
+  const record = { externalTxHash: blockHash, externalToken: addr("3"), externalSender: addr("4"), externalTokenAmount: "100" };
+  t.mock.method(cirrus, "getRecordedDepositReviews", async () => [record] as any);
+  t.mock.method(cirrus, "getDepositRefundVault", async () => addr("2"));
+  let recorded: string | undefined;
+  t.mock.method(cirrus, "getDepositRefundProposal", async () => recorded);
+  t.mock.method(strato, "execute", async ({ method, args }: any) => {
+    assert.equal(method, "recordDepositRefundProposal");
+    recorded = args.proposalHash;
+    return "recorded";
+  });
+  t.mock.method(event, "recoverDepositObservation", () => ({ ...record, externalChainId: 1, depositRouter: addr("5"), depositId: "7", targetStratoToken: addr("6") }) as any);
+  t.mock.method(rpc, "getTransactionReceiptsBatch", async () => new Map([[blockHash, {}]]) as any);
+  t.mock.method(bridge, "getStratoNetworkId", async () => 90071992547409939999n);
+  let timestamp = 1000, currentNonce = 0;
+  const provider = { getBlock: async () => ({ timestamp, number: 112 }),
+    call: async ({ data }: any) => {
+      const name = iface.parseTransaction({ data })!.name;
+      const values: Record<string, any> = {
+        signerSetVersion: 1, maxAuthorizationValiditySeconds: 1800, depositRefundId: blockHash,
+        refundedDeposits: false, depositRefundReviewDigest: hash, depositRefundApprovalDeadline: 0,
+      };
+      return iface.encodeFunctionResult(name, [values[name]]);
+    } };
+  t.mock.method(rpc, "getChainProvider", () => provider as any);
+  const published = new Set<string>(); let proposals = 0;
+  t.mock.method(helper, "initializeSafeForChain", async () => ({
+    apiKit: {
+      getNextNonce: async () => currentNonce,
+      getTransaction: async (safeHash: string) => {
+        if (!published.has(safeHash)) throw Object.assign(new Error("Not found"), { status: 404 });
+        return {};
+      },
+      proposeTransaction: async ({ safeTxHash }: any) => { proposals++; published.add(safeTxHash); },
+    },
+    protocolKit: {
+      getNonce: async () => currentNonce,
+      createTransaction: async ({ transactions, options }: any) => ({ data: { ...transactions[0], nonce: options.nonce } }),
+      getTransactionHash: async ({ data }: any) => keccak256(toUtf8Bytes(JSON.stringify(data))),
+      signHash: async () => ({ data: "safe-signature" }),
+    },
+  }) as any);
+  await recoverExternalDepositRefund(1, addr("5"), "7");
+  await recoverExternalDepositRefund(1, addr("5"), "7");
+  assert.equal(proposals, 1);
+  timestamp = 1_000_000;
+  await recoverExternalDepositRefund(1, addr("5"), "7");
+  assert.equal(proposals, 2, "proposal is replaced when it cannot cover a fresh verifier authorization");
+  currentNonce = 1;
+  await recoverExternalDepositRefund(1, addr("5"), "7");
+  assert.equal(proposals, 3, "a consumed nonce produces a fresh proposal instead of blocking forever");
+  const proposalDirectories = await import("node:fs/promises").then(fs => fs.readdir(path.join(directory, "data", "safe-proposals")));
+  const files = await import("node:fs/promises").then(fs => fs.readdir(path.join(directory, "data", "safe-proposals", proposalDirectories[0])));
+  assert.equal(files.length, 1);
+});
+
 test("native Safe refunds survive restart, deduplicate proposals, replace stale nonces and verify completion", async t => {
   const rpc = await import("./rpcService"), cirrus = await import("./cirrusService"), bridgeService = await import("./bridgeService");
   const native = await import("./nativeVerificationService"), configModule = await import("../config");

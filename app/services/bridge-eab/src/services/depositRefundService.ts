@@ -9,7 +9,7 @@ import { config, getNativeMintExecutorKmsConfig, getNativeVerifierUrls, getExter
 import { DEPOSIT_REFUND_ABI, DEPOSIT_REFUND_TYPES, NATIVE_REFUND_ABI, NATIVE_REFUND_TYPES } from "../config/bridgeAbi";
 import { DepositRefundAuthorization, NativeDepositInfo, NativeRefundProposal } from "../types";
 import { getChainProvider, getTransactionReceiptsBatch } from "./rpcService";
-import { getRecordedDepositReviews, getBridgeReviewRecords, getDepositRefundVault, getNativeDepositRefundProposal, getNativeDepositRefundEvidence } from "./cirrusService";
+import { getRecordedDepositReviews, getBridgeReviewRecords, getDepositRefundVault, getDepositRefundProposal, getNativeDepositRefundProposal, getNativeDepositRefundEvidence } from "./cirrusService";
 import { recoverDepositObservation } from "./depositEventService";
 import { getStratoNetworkId } from "./bridgeService";
 import { execute, executeAsRelayer } from "../utils/stratoHelper";
@@ -216,6 +216,68 @@ export const recoverNativeDepositRefund = async (d: NativeDepositInfo): Promise<
   });
 };
 
+const ensureExternalDepositRefundApproval = async (
+  chainId: number,
+  vault: Contract,
+  authorization: DepositRefundAuthorization,
+  latestTimestamp: bigint,
+): Promise<{ approved: boolean; proposalHash?: string }> => {
+  const reviewDigest = String(await vault.depositRefundReviewDigest(authorization));
+  const approvedUntil = BigInt(await vault.depositRefundApprovalDeadline(reviewDigest));
+  const requiredApprovalDeadline = BigInt(authorization.deadline);
+  if (approvedUntil >= requiredApprovalDeadline) return { approved: true };
+
+  const safe = safeChecksum(config.safe.address!);
+  const proposer = safeChecksum(config.safe.safeProposerAddress!);
+  const vaultAddress = safeChecksum(authorization.destinationVault);
+  const iface = new Interface(DEPOSIT_REFUND_ABI);
+  const approvalDeadline = latestTimestamp + BigInt(config.externalAssetBridge.manualReviewValiditySeconds);
+  if (approvalDeadline < requiredApprovalDeadline) throw new Error("Deposit refund Safe approval validity is shorter than verifier authorization validity");
+  return withSafeProposalQueue(chainId, `deposit-refund:${reviewDigest}`, async ({ apiKit, protocolKit }, saved) => {
+    let nonce: number | undefined;
+    const currentNonce = Number(await protocolKit.getNonce());
+    if (!Number.isSafeInteger(currentNonce) || currentNonce < 0) throw new Error("Invalid Safe nonce");
+    if (saved) {
+      if (saved.safeAddress.toLowerCase() !== safe.toLowerCase() ||
+          saved.safeTransactionData.to.toLowerCase() !== vaultAddress.toLowerCase() ||
+          String(saved.safeTransactionData.value) !== "0" ||
+          Number(saved.safeTransactionData.operation) !== OperationType.Call) {
+        throw new Error("Persisted deposit refund approval does not match this refund");
+      }
+      const decoded = iface.decodeFunctionData("approveDepositRefund", saved.safeTransactionData.data);
+      const savedNonce = Number(saved.safeTransactionData.nonce);
+      if (String(decoded[0]).toLowerCase() !== reviewDigest.toLowerCase() ||
+          !Number.isSafeInteger(savedNonce) || savedNonce < 0 ||
+          await protocolKit.getTransactionHash({ data: saved.safeTransactionData } as any) !== saved.safeTxHash) {
+        throw new Error("Persisted deposit refund approval does not match this refund");
+      }
+      if (currentNonce <= savedNonce && BigInt(decoded[1]) >= requiredApprovalDeadline) {
+        try {
+          await apiKit.getTransaction(saved.safeTxHash);
+        } catch (error: any) {
+          if (error.statusCode !== 404 && error.status !== 404 && error.response?.status !== 404) throw error;
+          await apiKit.proposeTransaction(saved);
+        }
+        return { approved: false, proposalHash: saved.safeTxHash };
+      }
+      if (currentNonce <= savedNonce) nonce = savedNonce;
+    }
+
+    nonce ??= Number(await apiKit.getNextNonce(safe));
+    if (!Number.isSafeInteger(nonce) || nonce < 0) throw new Error("Invalid Safe nonce");
+    const data = iface.encodeFunctionData("approveDepositRefund", [reviewDigest, approvalDeadline]);
+    const tx = await protocolKit.createTransaction({
+      transactions: [{ to: vaultAddress, value: "0", data, operation: OperationType.Call }],
+      options: { nonce },
+    });
+    const hash = await protocolKit.getTransactionHash(tx);
+    const signature = await protocolKit.signHash(hash);
+    await apiKit.proposeTransaction({ safeAddress: safe, safeTransactionData: tx.data,
+      safeTxHash: hash, senderAddress: proposer, senderSignature: signature.data });
+    return { approved: false, proposalHash: hash };
+  });
+};
+
 export const recoverExternalDepositRefund = async (chainId: number, router: string, id: string): Promise<void> => {
   const records = await getRecordedDepositReviews(chainId, { depositRouter: router, depositId: id }, "8");
   if (records.length !== 1) throw new Error("Deposit refund decision is unavailable");
@@ -241,6 +303,16 @@ export const recoverExternalDepositRefund = async (chainId: number, router: stri
   if (await vault.refundedDeposits(refundId)) {
     refundTxHash = await getEventTransactionHash(provider, vaultAddress, "DepositRefunded", refundId, "0", new Interface(DEPOSIT_REFUND_ABI));
   } else {
+    const approval = await ensureExternalDepositRefundApproval(chainId, vault, a, BigInt(block.timestamp));
+    if (!approval.approved) {
+      const recorded = await getDepositRefundProposal(chainId, router, id);
+      if (approval.proposalHash && recorded?.replace(/^0x/i, "").toLowerCase() !== approval.proposalHash.slice(2).toLowerCase()) {
+        await execute({ contractName: "ExternalAssetBridge", contractAddress: config.externalAssetBridge.address!,
+          method: "recordDepositRefundProposal", args: { externalChainId: chainId, depositRouter: router,
+            depositId: id, proposalHash: approval.proposalHash } });
+      }
+      return;
+    }
     const urls = getExternalBridgeVerifierUrls(BigInt(chainId));
     const threshold = Number(await vault.attestationThreshold());
     if (threshold < 2 || threshold > urls.length) throw new Error("Invalid refund verifier configuration");

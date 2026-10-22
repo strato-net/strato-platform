@@ -530,13 +530,37 @@ describe("ExternalBridgeVault", function () {
       const signers = [signerOne, signerTwo].sort((x, y) => x.address.toLowerCase().localeCompare(y.address.toLowerCase()));
       return [a, await Promise.all(signers.map(signer => signer.signTypedData(domain, refundTypes, a)))];
     }
+    async function approveRefund(a) {
+      const digest = await vault.depositRefundReviewDigest(a);
+      await vault.connect(largeWithdrawalApprover).approveDepositRefund(digest, a.deadline);
+      return digest;
+    }
     it("returns the original asset once and prevents replay after source-bridge migration", async function () {
       const [a, signatures] = await refund();
+      const digest = await approveRefund(a);
       await expect(vault.connect(executor).refundDeposit(a, signatures)).to.changeTokenBalances(token, [vault, recipient], [-100n, 100n]);
+      expect(await vault.depositRefundApprovalDeadline(digest)).to.equal(0n);
       await expect(vault.refundDeposit(a, signatures)).to.be.revertedWithCustomError(vault, "InvalidReservationState");
       await vault.connect(policyAdmin).setSourceBridge(sourceChainId, other.address, true);
       const migrated = await refund({ sourceBridge: other.address });
       await expect(vault.refundDeposit(...migrated)).to.be.revertedWithCustomError(vault, "InvalidReservationState");
+    });
+    it("requires a Safe-role approval bound to the exact refund and consumes it", async function () {
+      const [a, signatures] = await refund();
+      const digest = await vault.depositRefundReviewDigest(a);
+      expect(await vault.depositRefundReviewDigest({ ...a, deadline: a.deadline + 1n, signerSetVersion: a.signerSetVersion + 1n })).to.equal(digest);
+      await expect(vault.refundDeposit(a, signatures)).to.be.revertedWithCustomError(vault, "DepositRefundApprovalRequired");
+      await expect(vault.connect(other).approveDepositRefund(digest, a.deadline)).to.be.reverted;
+      await vault.connect(largeWithdrawalApprover).approveDepositRefund(digest, a.deadline - 1n);
+      await expect(vault.refundDeposit(a, signatures)).to.be.revertedWithCustomError(vault, "DepositRefundApprovalRequired");
+      await vault.connect(largeWithdrawalApprover).approveDepositRefund(digest, a.deadline);
+      const changed = await refund({ amount: a.amount + 1n });
+      await expect(vault.refundDeposit(...changed)).to.be.revertedWithCustomError(vault, "DepositRefundApprovalRequired");
+      await vault.connect(largeWithdrawalApprover).revokeDepositRefundApproval(digest);
+      await expect(vault.refundDeposit(a, signatures)).to.be.revertedWithCustomError(vault, "DepositRefundApprovalRequired");
+      await approveRefund(a);
+      await vault.refundDeposit(a, signatures);
+      expect(await vault.depositRefundApprovalDeadline(digest)).to.equal(0n);
     });
     it("requires quorum and rejects mutation of every signed field", async function () {
       const [a, signatures] = await refund();
@@ -551,8 +575,10 @@ describe("ExternalBridgeVault", function () {
     it("protects reserved liquidity and leaves a failed refund retryable", async function () {
       await reserve(await buildAuthorization());
       const args = await refund({ amount: 4950n });
+      const digest = await approveRefund(args[0]);
       await expect(vault.refundDeposit(...args)).to.be.revertedWithCustomError(vault, "InsufficientLiquidity");
       expect(await vault.refundedDeposits(await vault.depositRefundId(other.address, 1))).to.equal(false);
+      expect(await vault.depositRefundApprovalDeadline(digest)).to.equal(args[0].deadline);
       await token.mint(await vault.getAddress(), 100n);
       await vault.refundDeposit(...args);
       expect(await token.balanceOf(recipient.address)).to.equal(4950n);
@@ -563,8 +589,10 @@ describe("ExternalBridgeVault", function () {
       await vault.connect(guardian).pause();
       await expect(vault.refundDeposit(...args)).to.be.reverted;
       await vault.connect(unpauser).unpause();
+      await approveRefund(args[0]);
       await expect(vault.connect(executor).refundDeposit(...args)).to.changeEtherBalances([vault, recipient], [-100n, 100n]);
       const expired = await refund({ depositId: 2n });
+      await approveRefund(expired[0]);
       await time.increaseTo(expired[0].deadline + 1n);
       await expect(vault.refundDeposit(...expired)).to.be.revertedWithCustomError(vault, "AuthorizationExpired");
     });

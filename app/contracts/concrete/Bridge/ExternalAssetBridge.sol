@@ -260,8 +260,10 @@ contract record ExternalAssetBridge is Ownable {
     mapping(uint256 => mapping(address => mapping(uint256 => string))) public record depositRefundTransactions;
     mapping(uint256 => mapping(address => mapping(uint256 => bytes32))) public record depositDeliveryApprovals;
     mapping(uint256 => mapping(address => mapping(uint256 => bool))) public record depositDeliveryAuthorized;
+    mapping(uint256 => mapping(address => mapping(uint256 => string))) public record depositRefundProposals;
     event DepositRejectedNoFunds(uint256 externalChainId, address depositRouter, uint256 depositId);
     event DepositRefundRequested(uint256 externalChainId, address depositRouter, uint256 depositId, address vault);
+    event DepositRefundProposalRecorded(uint256 externalChainId, address depositRouter, uint256 depositId, string proposalHash);
     event DepositRefunded(uint256 externalChainId, address depositRouter, uint256 depositId, string refundTxHash);
     event MintPolicyUpdated(address token, uint256 capacity, uint256 refillRate);
 
@@ -1174,7 +1176,20 @@ contract record ExternalAssetBridge is Ownable {
         d.timestamp = block.timestamp;
         depositGenerations[externalChainId][depositRouter][depositId]++;
         depositRefundVaults[externalChainId][depositRouter][depositId] = vault;
+        delete depositRefundProposals[externalChainId][depositRouter][depositId];
         emit DepositRefundRequested(externalChainId, depositRouter, depositId, vault);
+    }
+
+    function recordDepositRefundProposal(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
+        string proposalHash
+    ) external onlyBridgeOperator {
+        require(deposits[externalChainId][depositRouter][depositId].status == Status.REFUND_PENDING, "EAB: not refund pending");
+        string memory normalized = proposalHash.normalizeHex();
+        depositRefundProposals[externalChainId][depositRouter][depositId] = normalized;
+        emit DepositRefundProposalRecorded(externalChainId, depositRouter, depositId, normalized);
     }
 
     function getDepositRefundDigest(uint256 externalChainId, address depositRouter, uint256 depositId, string refundTxHash) public view returns (bytes32) {

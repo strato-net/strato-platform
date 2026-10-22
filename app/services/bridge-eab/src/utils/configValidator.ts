@@ -70,6 +70,7 @@ const EXTERNAL_VAULT_ABI = [
   "function attestationSigners(address) view returns (bool)",
   "function attestationThreshold() view returns (uint8)",
   "function maxAuthorizationValiditySeconds() view returns (uint256)",
+  "function hasRole(bytes32,address) view returns (bool)",
 ];
 
 const isAddress = (value: string): boolean =>
@@ -685,6 +686,7 @@ export async function validateBridgeConfig(): Promise<boolean> {
             validitySeconds,
             signerStatuses,
             executorIsSigner,
+            safeCanApproveRefunds,
           ] = await Promise.all([
             vault.attestationThreshold(),
             vault.maxAuthorizationValiditySeconds(),
@@ -694,6 +696,7 @@ export async function validateBridgeConfig(): Promise<boolean> {
               ),
             ),
             vault.attestationSigners(executorAddress),
+            vault.hasRole(id("LARGE_WITHDRAWAL_APPROVER_ROLE"), ensureHexPrefix(config.safe.address!)),
           ]);
           if (executorIsSigner) {
             errors.push(
@@ -711,6 +714,11 @@ export async function validateBridgeConfig(): Promise<boolean> {
             errors.push(
               `External vault on chain ${chainId} maxAuthorizationValiditySeconds must be greater than zero`,
             );
+          } else if (BigInt(config.externalAssetBridge.manualReviewValiditySeconds) < BigInt(validitySeconds.toString())) {
+            errors.push(`External bridge manual review validity must cover vault authorization validity on chain ${chainId}`);
+          }
+          if (!safeCanApproveRefunds) {
+            errors.push(`Configured Safe does not hold LARGE_WITHDRAWAL_APPROVER_ROLE on external vault for chain ${chainId}`);
           }
         } catch (error) {
           errors.push(

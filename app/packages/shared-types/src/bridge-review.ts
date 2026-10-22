@@ -18,6 +18,7 @@ export const buildBridgeReviewQueue = (
     const status = Number(v.status ?? NaN);
     if (status === 9) continue;
     const recovery = status === 0 || status === 7 || status === 8;
+    const refundProposal = status === 8 ? nonzeroHash(v.refundProposalHash) : undefined;
     if (status === 0 && !nonzeroHash(v.externalTxHash)) continue;
     items.push({ id: `eab:deposit:${row.key}:${row.key2}:${row.key3}`, source: "eab", kind: recovery ? "deposit_recovery" : "deposit_review",
       ...(recovery ? { recoveryStatus: status === 8 ? "refund_pending" as const : status === 0 ? "reopened" as const : "rejected" as const } : {}),
@@ -26,13 +27,15 @@ export const buildBridgeReviewQueue = (
       externalBridge: String(row.key2), externalTxHash: nonzeroHash(v.externalTxHash),
       externalAccount: v.externalSender, externalToken: v.externalToken, externalAmount: String(v.externalTokenAmount),
       refundRecipient: v.externalSender, refundToken: v.externalToken, refundAmount: String(v.externalTokenAmount),
-      scenario: status === 8 ? "Deposit refund in progress" : status === 0 ? "Deposit delivery retry"
+      scenario: refundProposal ? "Deposit refund Safe approval" : status === 8 ? "Deposit refund in progress" : status === 0 ? "Deposit delivery retry"
         : recovery ? "Deposit recovery decision" : "Deposit evidence review",
-      reason: status === 8 ? "The bridge is returning the original external asset."
+      reason: refundProposal ? "Safe owners must approve the exact external refund before verifier-authorized execution."
+        : status === 8 ? "The bridge is preparing the external refund Safe approval."
         : recovery ? status === 0
         ? "Delivery was reopened and is being retried."
         : "Choose verified delivery, an external refund, or rejection when no funds were received."
         : "Verify whether the external deposit was received and choose its disposition.",
+      ...(refundProposal ? { safeProposalHash: refundProposal } : {}),
       actions: recovery ? status === 7 ? ["approve", "refund", "reject"] : [] : ["approve", "refund", "reject"],
     });
   }

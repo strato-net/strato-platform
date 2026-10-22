@@ -38,6 +38,9 @@ contract ExternalBridgeVault is
     bytes32 private constant WITHDRAWAL_REVIEW_TYPEHASH = keccak256(
         "WithdrawalReview(uint256 sourceChainId,address sourceBridge,uint256 sourceWithdrawalId,uint256 destinationChainId,address destinationVault,address token,address recipient,uint256 amount)"
     );
+    bytes32 private constant DEPOSIT_REFUND_REVIEW_TYPEHASH = keccak256(
+        "DepositRefundReview(uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationVault,address depositRouter,uint256 depositId,address token,address recipient,uint256 amount)"
+    );
 
     enum ReservationStatus {
         NONE,
@@ -91,6 +94,7 @@ contract ExternalBridgeVault is
     uint256 public signerSetVersion;
     uint256 public maxAuthorizationValiditySeconds;
     mapping(bytes32 => bool) public refundedDeposits;
+    mapping(bytes32 => uint256) public depositRefundApprovalDeadline;
 
     struct DepositRefundAuthorization {
         uint256 sourceChainId;
@@ -109,10 +113,27 @@ contract ExternalBridgeVault is
         "DepositRefundAuthorization(uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationVault,address depositRouter,uint256 depositId,address token,address recipient,uint256 amount,uint256 deadline,uint256 signerSetVersion)"
     );
     event DepositRefunded(bytes32 indexed refundId, address indexed depositRouter, uint256 indexed depositId, address token, address recipient, uint256 amount);
+    event DepositRefundApproved(bytes32 indexed reviewDigest, uint256 approvalDeadline);
+    event DepositRefundApprovalRevoked(bytes32 indexed reviewDigest);
 
     function depositRefundId(address depositRouter, uint256 depositId) public pure returns (bytes32) {
         // A physical deposit is refundable once, even across source-bridge migrations.
         return keccak256(abi.encode(depositRouter, depositId));
+    }
+
+    function depositRefundReviewDigest(DepositRefundAuthorization calldata a) public view returns (bytes32) {
+        return _hashTypedDataV4(keccak256(abi.encode(
+            DEPOSIT_REFUND_REVIEW_TYPEHASH,
+            a.sourceChainId,
+            a.sourceBridge,
+            a.destinationChainId,
+            a.destinationVault,
+            a.depositRouter,
+            a.depositId,
+            a.token,
+            a.recipient,
+            a.amount
+        )));
     }
 
     function refundDeposit(DepositRefundAuthorization calldata a, bytes[] calldata signatures) external nonReentrant whenNotPaused {
@@ -125,7 +146,10 @@ contract ExternalBridgeVault is
         bytes32 refundId = depositRefundId(a.depositRouter, a.depositId);
         if (refundedDeposits[refundId]) revert InvalidReservationState();
         _verifyAttestationSignatures(_hashTypedDataV4(keccak256(abi.encode(DEPOSIT_REFUND_TYPEHASH, a))), signatures);
+        bytes32 reviewDigest = depositRefundReviewDigest(a);
+        if (depositRefundApprovalDeadline[reviewDigest] < a.deadline) revert DepositRefundApprovalRequired();
         if (availableLiquidity(a.token) < a.amount) revert InsufficientLiquidity();
+        delete depositRefundApprovalDeadline[reviewDigest];
         refundedDeposits[refundId] = true;
         if (a.token == address(0)) {
             (bool sent,) = payable(a.recipient).call{value: a.amount}("");
@@ -199,6 +223,7 @@ contract ExternalBridgeVault is
     error BucketCapacityExceeded();
     error InsufficientLiquidity();
     error LargeWithdrawalApprovalRequired();
+    error DepositRefundApprovalRequired();
     error InvalidReservationState();
     error ReservationNotExpired();
     error ETHTransferFailed();
@@ -390,6 +415,27 @@ contract ExternalBridgeVault is
     ) external onlyRole(LARGE_WITHDRAWAL_APPROVER_ROLE) {
         delete largeWithdrawalApprovalDeadline[digest];
         emit LargeWithdrawalApprovalRevoked(digest);
+    }
+
+    function approveDepositRefund(
+        bytes32 reviewDigest,
+        uint256 approvalDeadline
+    ) external onlyRole(LARGE_WITHDRAWAL_APPROVER_ROLE) {
+        if (
+            reviewDigest == bytes32(0) ||
+            approvalDeadline < block.timestamp
+        ) {
+            revert InvalidAuthorization();
+        }
+        depositRefundApprovalDeadline[reviewDigest] = approvalDeadline;
+        emit DepositRefundApproved(reviewDigest, approvalDeadline);
+    }
+
+    function revokeDepositRefundApproval(
+        bytes32 reviewDigest
+    ) external onlyRole(LARGE_WITHDRAWAL_APPROVER_ROLE) {
+        delete depositRefundApprovalDeadline[reviewDigest];
+        emit DepositRefundApprovalRevoked(reviewDigest);
     }
 
     function setTokenPolicy(

@@ -34,6 +34,9 @@ export const DEPOSIT_REFUND_TYPES = {
 export const DEPOSIT_REFUND_ABI = [
   "function refundDeposit((uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationVault,address depositRouter,uint256 depositId,address token,address recipient,uint256 amount,uint256 deadline,uint256 signerSetVersion),bytes[])",
   "function depositRefundId(address,uint256) pure returns (bytes32)",
+  "function depositRefundReviewDigest((uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationVault,address depositRouter,uint256 depositId,address token,address recipient,uint256 amount,uint256 deadline,uint256 signerSetVersion)) view returns (bytes32)",
+  "function depositRefundApprovalDeadline(bytes32) view returns (uint256)",
+  "function approveDepositRefund(bytes32 reviewDigest,uint256 approvalDeadline)",
   "function refundedDeposits(bytes32) view returns (bool)",
   "function signerSetVersion() view returns (uint256)",
   "function attestationThreshold() view returns (uint8)",

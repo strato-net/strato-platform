@@ -27,13 +27,19 @@ const reviewBatches = <T>(items: T[]): T[][] =>
 
 export const getAdminBridgeReviews = async (accessToken: string, userAddress?: string): Promise<BridgeReviewItem[]> => {
   const { ExternalAssetBridge, externalAssetBridge, StratoNativeBridge, stratoNativeBridge } = constants;
-  const [deposits, withdrawals, nativeDeposits, nativeWithdrawals, chainRows] = await Promise.all([
+  const [deposits, withdrawals, nativeDeposits, nativeWithdrawals, chainRows, eabRefundProposals] = await Promise.all([
     readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "deposits", { select: "key,key2,key3,value", order: "key.asc,key2.asc,key3.asc", "value->>status": `in.(0,${"0".repeat(40)},2,7,8)` }),
     readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "withdrawals", { "value->>status": "in.(2,3)" }),
     readReviewRows(accessToken, StratoNativeBridge, stratoNativeBridge, "deposits", { "value->>bridgeStatus": "in.(2,4,7)" }),
     readReviewRows(accessToken, StratoNativeBridge, stratoNativeBridge, "withdrawals", { "value->>bridgeStatus": `in.(2,${ExternalBridgeStatus.CANCELLATION_PENDING})` }),
     readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "chains", {}),
+    readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "depositRefundProposals",
+      { select: "key,key2,key3,value", order: "key.asc,key2.asc,key3.asc" }),
   ]);
+  const eabProposalHashes = new Map(eabRefundProposals.map(row =>
+    [`${row.key}:${String(row.key2).toLowerCase()}:${row.key3}`, row.value]));
+  for (const row of deposits) row.value.refundProposalHash =
+    eabProposalHashes.get(`${row.key}:${String(row.key2).toLowerCase()}:${row.key3}`);
   const ids = withdrawals.filter(row => String(row.value.status) === "2").map(row => row.key);
   const reviews = (await Promise.all(reviewBatches(ids).map(batch =>
     readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "withdrawalManualReviews", {

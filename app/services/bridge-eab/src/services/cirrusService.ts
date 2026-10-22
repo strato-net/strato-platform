@@ -814,6 +814,16 @@ export const getDepositRefundVault = async (chainId: number, router: string, dep
   return vault;
 };
 
+export const getDepositRefundProposal = async (chainId: number, router: string, depositId: string): Promise<string | undefined> => {
+  const rows = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-depositRefundProposals`, { params: {
+    address: `eq.${externalAssetBridgeAddress}`, key: `eq.${chainId}`, key2: `eq.${toCirrusAddress(router)}`,
+    key3: `eq.${depositId}`, select: "value", limit: 1,
+  } });
+  const proposal = rows?.[0]?.value;
+  return typeof proposal === "string" && /^(0x)?[a-f0-9]{64}$/i.test(proposal) &&
+    !/^(0x)?0+$/i.test(proposal) ? proposal : undefined;
+};
+
 export const getNativeDepositRefundEvidence = async (depositId: string): Promise<string | undefined> => {
   const rows = await cirrus.get(`/${NATIVE_BRIDGE_URL}-depositRefundEvidence`, { params: {
     address: `eq.${nativeBridgeAddress}`, key: `eq.${depositId}`, select: "value", limit: 1,
@@ -855,11 +865,13 @@ export const getBridgeReviewRecords = async () => {
     address ? getPaginatedRows(`/${contract}-${table}`, { params: {
       address: `eq.${address}`, select: "key,value", order: "key.asc", ...filters,
     } }) : Promise.resolve([]);
-  const [deposits, withdrawals, nativeDeposits, nativeWithdrawals] = await Promise.all([
+  const [deposits, withdrawals, nativeDeposits, nativeWithdrawals, eabRefundProposals] = await Promise.all([
     read(EXTERNAL_ASSET_BRIDGE_URL, externalAssetBridgeAddress, "deposits", { select: "key,key2,key3,value", order: "key.asc,key2.asc,key3.asc", "value->>status": `in.(0,${"0".repeat(40)},2,7,8)` }),
     read(EXTERNAL_ASSET_BRIDGE_URL, externalAssetBridgeAddress, "withdrawals", { "value->>status": "in.(2,3)" }),
     read(NATIVE_BRIDGE_URL, nativeBridgeAddress, "deposits", { "value->>bridgeStatus": "in.(2,4,7)" }),
     read(NATIVE_BRIDGE_URL, nativeBridgeAddress, "withdrawals", { "value->>bridgeStatus": `in.(2,${ExternalBridgeStatus.CANCELLATION_PENDING})` }),
+    read(EXTERNAL_ASSET_BRIDGE_URL, externalAssetBridgeAddress, "depositRefundProposals",
+      { select: "key,key2,key3,value", order: "key.asc,key2.asc,key3.asc" }),
   ]);
   const [reviews, authorizations, refundProposals, refundEvidence] = await Promise.all([getRowsByIds(`/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawalManualReviews`,
     withdrawals.filter(row => String(row.value.status) === "2").map(row => String(row.key)),
@@ -876,6 +888,9 @@ export const getBridgeReviewRecords = async () => {
   for (const row of nativeDeposits) row.value.refundEvidenceHash = evidence.get(String(row.key));
   const proposals = new Map(refundProposals.map(row => [String(row.key), row.value]));
   for (const row of nativeDeposits) row.value.refundProposalHash = proposals.get(String(row.key));
+  const eabProposals = new Map(eabRefundProposals.map(row => [`${row.key}:${String(row.key2).toLowerCase()}:${row.key3}`, row.value]));
+  for (const row of deposits) row.value.refundProposalHash =
+    eabProposals.get(`${row.key}:${String(row.key2).toLowerCase()}:${row.key3}`);
   return { deposits, withdrawals, reviews, authorizations, nativeDeposits, nativeWithdrawals, legacyDeposits: [], legacyWithdrawals: [] };
 };
 
