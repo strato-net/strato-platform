@@ -14,8 +14,13 @@
 // None of these can live in storage — payFees is DELEGATECALLed and SolidVM storage
 // is name-keyed, so a state read there resolves against the signer, not the router.
 //
-//   node gen-feerouter-source.js [helium|upquark] --pool <poolAddress> [contractName]
+//   node gen-feerouter-source.js [helium|upquark] --pool <poolAddress> [--activate <block>] [contractName]
 //   node gen-feerouter-source.js <stakingAddress> --pool <poolAddress> [contractName]   (helium STRATO)
+//
+// --activate: the block from which the router burns STRATO and pays rewards; before
+// it the router charges the legacy fee (voucher, else 0.01 USDST to FeeCollector)
+// and can be installed early. It must equal that network's `stratoGasForkBlock`
+// (strato-conf Model.hs), so fees and the native token switch at the same block.
 //
 // Before installing, check the pool prices: once the router is deployed, read
 // stratoFeeQuote() after a block has run payBlockRewards; `valid` stays false until
@@ -45,7 +50,14 @@ if (!isAddress(pool)) {
   console.error('FAILED: --pool <address> is required: the canonical STRATO/USDST PoolV3 the fee is priced from');
   process.exit(1);
 }
-const positional = argv.filter((a, i) => a !== '--pool' && i !== poolIdx + 1);
+const activateIdx = argv.indexOf('--activate');
+const activate = activateIdx >= 0 ? argv[activateIdx + 1] : '';
+if (activateIdx >= 0 && !/^[0-9]+$/.test(activate)) {
+  console.error('FAILED: --activate <block> takes a block number');
+  process.exit(1);
+}
+const flagValues = [poolIdx, activateIdx].filter(i => i >= 0).map(i => i + 1);
+const positional = argv.filter((a, i) => !['--pool', '--activate'].includes(a) && !flagValues.includes(i));
 
 const arg = (positional[0] || 'helium').replace(/^0x/, '');
 let network;
@@ -72,6 +84,14 @@ const stakingOverride = network.staking ? `
     }
 ` : '';
 
+const activationOverride = activate ? `
+    // Fees burn STRATO and rewards flow from this block, the network's
+    // stratoGasForkBlock; until then the router charges the legacy fee.
+    function _activationBlock() internal view override returns (uint) {
+        return ${activate};
+    }
+` : '';
+
 const subclass = `
 // Deployment wiring for ${network.label}. Installed with
 // DeciderState(0xDEC1DE02).updatePayFeeContract.
@@ -85,9 +105,9 @@ contract record ${NAME} is FeeRouter {
     function _pool() internal view override returns (address) {
         return address(0x${pool});
     }
-${stakingOverride}}
+${stakingOverride}${activationOverride}}
 `;
 
 fs.writeFileSync(OUT, base.trimEnd() + '\n' + subclass);
 console.log(`${OUT} written: ${fs.statSync(OUT).size} bytes | ${network.label} | contract ${NAME} | ` +
-  `STRATO ${network.strato} | pool ${pool} | staking ${network.staking || '(governance only)'}`);
+  `STRATO ${network.strato} | pool ${pool} | staking ${network.staking || '(governance only)'} | activation ${activate || 'genesis'}`);

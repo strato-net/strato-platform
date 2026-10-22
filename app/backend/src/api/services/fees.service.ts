@@ -7,25 +7,35 @@ import { cirrus } from "../../utils/appApiHelper";
 const DECIDER_STATE = "0x00000000000000000000000000000000dec1de02";
 const GET_IMPL_CONTRACT = "0x56557016"; // getImplContract()
 const STRATO_FEE_QUOTE = "0x462d073f"; // stratoFeeQuote() -> (fee, priceVersion, valid)
+const ACTIVATION_BLOCK = "0x80faa3d2"; // activationBlock(): legacy USDST fee before it
 const USD_FEE_WEI = 10n ** 16n; // 0.01 USDST, what every call is worth
 const VOUCHER_WEI = 10n ** 18n; // one whole voucher
 // The router buys a STRATO shortfall with the signer's USDST at up to twice the
 // call's value (FeeRouter._maxSwapPremiumBps = 10000); anything dearer is rejected.
 const USDST_FALLBACK_MAX_WEI = 2n * USD_FEE_WEI;
 
+const rpc = async (method: string, params: unknown[]): Promise<{ result?: string; error?: { message?: string } }> => {
+  const { data } = await axios.post(`${nodeUrl}/rpc`, { jsonrpc: "2.0", id: 1, method, params }, { timeout: 10_000 });
+  return data;
+};
+
 /** Returns the call's ABI words, or null when the contract has no such function. */
 const ethCall = async (to: string, data: string): Promise<bigint[] | null> => {
-  const { data: res } = await axios.post(
-    `${nodeUrl}/rpc`,
-    { jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to, data }, "latest"] },
-    { timeout: 10_000 }
-  );
+  const res = await rpc("eth_call", [{ to, data }, "latest"]);
   if (res?.error) {
     if (/no function for selector/.test(res.error.message || "")) return null;
     throw new Error(`eth_call ${data} failed: ${res.error.message}`);
   }
   const hex = String(res.result || "").replace(/^0x/, "");
   return (hex.match(/.{64}/g) || []).map((w) => BigInt(`0x${w}`));
+};
+
+/** True until the router's activation block; a router without one is active from genesis. */
+const notYetActive = async (router: string): Promise<boolean> => {
+  const activation = await ethCall(router, ACTIVATION_BLOCK);
+  if (!activation?.length || activation[0] === 0n) return false;
+  const latest = await rpc("eth_blockNumber", []);
+  return BigInt(latest.result || "0") < activation[0];
 };
 
 const balanceOf = async (accessToken: string, table: string, contract: string, user: string): Promise<bigint> => {
@@ -39,7 +49,9 @@ const balanceOf = async (accessToken: string, table: string, contract: string, u
 const stratoQuote = async (): Promise<{ fee: bigint; version: bigint; valid: boolean } | null> => {
   const impl = await ethCall(DECIDER_STATE, GET_IMPL_CONTRACT);
   if (!impl?.length) return null;
-  const words = await ethCall(`0x${impl[0].toString(16).padStart(40, "0")}`, STRATO_FEE_QUOTE);
+  const router = `0x${impl[0].toString(16).padStart(40, "0")}`;
+  if (await notYetActive(router)) return null;
+  const words = await ethCall(router, STRATO_FEE_QUOTE);
   if (!words || words.length < 3) return null;
   return { fee: words[0], version: words[1], valid: words[2] !== 0n };
 };

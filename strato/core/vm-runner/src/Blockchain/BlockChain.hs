@@ -456,6 +456,9 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
               { erAction = combineA (\era ->
                     (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era))
                   . (events %~ (_events era Seq.><))
+                  -- The fee DELEGATECALL's record too, or Cirrus never learns the
+                  -- router's code ran at the payer and receipts cannot resolve FeePaid.
+                  . (delegatecalls %~ (_delegatecalls era Seq.><))
                 ) (erAction feeResult) $ erAction er
               , erTrace = erTrace feeResult ++ erTrace er
               , erLogs = erLogs feeResult ++ erLogs er

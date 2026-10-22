@@ -6,17 +6,22 @@ import { CONSTANTS } from './constants';
 const DECIDER_STATE = '0x00000000000000000000000000000000dec1de02';
 const GET_IMPL_CONTRACT = '0x56557016'; // getImplContract()
 const STRATO_FEE_QUOTE = '0x462d073f'; // stratoFeeQuote() -> (fee, priceVersion, valid)
+const ACTIVATION_BLOCK = '0x80faa3d2'; // activationBlock(): legacy USDST fee before it
 
-/** Returns the call's ABI words, or null when the contract has no such function. */
-async function ethCall(to: string, data: string): Promise<bigint[] | null> {
+async function rpc(method: string, params: unknown[]): Promise<any> {
     const rpcEndpoint = `${process.env.STRATO_NODE_URL}/rpc`;
     const response = await apiPost(
         rpcEndpoint,
-        { jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to, data }, 'latest'] },
+        { jsonrpc: '2.0', id: 1, method, params },
         { timeout: 10000 },
         { logPrefix: 'BalanceChecker', apiUrl: rpcEndpoint, method: 'POST' }
     );
-    const res = response.data;
+    return response.data;
+}
+
+/** Returns the call's ABI words, or null when the contract has no such function. */
+async function ethCall(to: string, data: string): Promise<bigint[] | null> {
+    const res = await rpc('eth_call', [{ to, data }, 'latest']);
     if (res?.error) {
         if (/no function for selector/.test(res.error.message || '')) return null;
         throw new Error(`eth_call ${data} failed: ${res.error.message}`);
@@ -29,7 +34,10 @@ async function ethCall(to: string, data: string): Promise<bigint[] | null> {
 async function stratoFee(): Promise<{ fee: bigint; valid: boolean } | null> {
     const impl = await ethCall(DECIDER_STATE, GET_IMPL_CONTRACT);
     if (!impl?.length) return null;
-    const words = await ethCall(`0x${impl[0].toString(16).padStart(40, '0')}`, STRATO_FEE_QUOTE);
+    const router = `0x${impl[0].toString(16).padStart(40, '0')}`;
+    const activation = await ethCall(router, ACTIVATION_BLOCK);
+    if (activation?.length && activation[0] > BigInt((await rpc('eth_blockNumber', [])).result || '0')) return null;
+    const words = await ethCall(router, STRATO_FEE_QUOTE);
     return words && words.length >= 3 ? { fee: words[0], valid: words[2] !== 0n } : null;
 }
 

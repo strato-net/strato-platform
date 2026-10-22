@@ -67,6 +67,8 @@ contract record FeeRouterHarness is FeeRouter {
     address public deciderStateAddr;
     uint public minLiquidity;
     uint public swapPremiumBps = 10000;
+    uint public activation;
+    address public feeCollectorAddr;
 
     function configure(address v, address u, address g, address d) public {
         voucherAddr = v;
@@ -83,6 +85,7 @@ contract record FeeRouterHarness is FeeRouter {
     function setStakingFallback(address s) public { stakingFallbackAddr = s; }
     function setMinLiquidity(uint l) public { minLiquidity = l; }
     function setSwapPremium(uint bps) public { swapPremiumBps = bps; }
+    function setActivation(uint b, address collector) public { activation = b; feeCollectorAddr = collector; }
 
     function _voucher() internal view override returns (address) { return voucherAddr; }
     function _usdst() internal view override returns (address) { return usdstAddr; }
@@ -93,6 +96,8 @@ contract record FeeRouterHarness is FeeRouter {
     function _pool() internal view override returns (address) { return poolAddr; }
     function _minPoolLiquidity() internal view override returns (uint) { return minLiquidity; }
     function _maxSwapPremiumBps() internal view override returns (uint) { return swapPremiumBps; }
+    function _activationBlock() internal view override returns (uint) { return activation; }
+    function _feeCollector() internal view override returns (address) { return feeCollectorAddr; }
 }
 
 contract record Signer is FeeRouterHarness {
@@ -419,6 +424,77 @@ contract Describe_FeeRouter {
 
         require(_paymentReverts(broke), "unpaid fee fails the transaction");
         require(strato.balanceOf(address(broke)) == 1e16 - 1, "nothing burned");
+    }
+
+    // ---- before the activation block: the legacy fee, no quote, no reward ----
+
+    // payFees runs in the signer's context, so the signer carries the activation too.
+    function _activateAt(uint b) internal {
+        router.setActivation(b, address(feeCollector));
+        signer.setActivation(b, address(feeCollector));
+    }
+
+    function it_charges_the_legacy_usdst_fee_before_activation() public {
+        _pricedPool(0, true);
+        _activateAt(block.number + 10);
+        usdst.mint(address(signer), 1e16);
+
+        signer.pay(address(router));
+        require(usdst.balanceOf(address(signer)) == 0, "0.01 USDST paid");
+        require(usdst.balanceOf(address(feeCollector)) == 1e16, "collected, not burned");
+        require(strato.balanceOf(address(signer)) == 1e18, "STRATO untouched");
+    }
+
+    function it_prefers_a_voucher_before_activation() public {
+        _activateAt(block.number + 10);
+        voucher.mint(address(signer), 1e18);
+        usdst.mint(address(signer), 1e16);
+
+        signer.pay(address(router));
+        require(voucher.balances(address(signer)) == 0, "voucher burned");
+        require(usdst.balanceOf(address(signer)) == 1e16, "USDST untouched");
+    }
+
+    function it_reverts_before_activation_when_usdst_is_short() public {
+        _pricedPool(0, true);
+        _activateAt(block.number + 10);
+
+        require(_paymentReverts(signer), "STRATO does not pay yet");
+        require(strato.balanceOf(address(signer)) == 1e18, "nothing burned");
+    }
+
+    function it_quotes_nothing_and_pays_no_reward_before_activation() public {
+        _pool(0, true);
+        gov.setStakingContract(address(staking));
+        staking.setStratoToken(address(strato));
+        strato.mint(address(router), 1e18);
+        _activateAt(block.number + 10);
+
+        fastForward(WINDOW, 1);
+        router.payBlockRewards();
+        require(router.lastRewardedBlock() == block.number, "latched");
+        require(router.priceVersion() == 0, "no quote written");
+        require(staking.rewarded(PROPOSER) == 0, "no reward paid");
+        require(router.previewStratoFee() == _expectedFee(), "but the pool is seen to price");
+    }
+
+    function it_switches_to_strato_at_the_activation_block() public {
+        _pool(0, true);
+        _activateAt(block.number + 2);
+        usdst.mint(address(signer), 1e16);
+
+        fastForward(WINDOW, 1);
+        router.payBlockRewards();
+        signer.pay(address(router));
+        require(usdst.balanceOf(address(feeCollector)) == 1e16, "legacy fee one block before");
+        require(strato.balanceOf(address(signer)) == 1e18, "STRATO untouched");
+
+        _newBlock();
+        router.payBlockRewards();
+        require(router.priceVersion() == 1, "first quote at the activation block");
+        signer.pay(address(router));
+        require(strato.balanceOf(address(signer)) == 1e18 - _quotedFee(), "STRATO burned from then on");
+        require(usdst.balanceOf(address(feeCollector)) == 1e16, "no more USDST collected");
     }
 
     function it_reverts_when_no_network_strato_is_named() public {

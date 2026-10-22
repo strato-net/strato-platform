@@ -37,7 +37,7 @@ interface IStakingFeeHook {
     function creditBlockReward(address validator, uint256 amount) external;
 }
 
-enum FeeMethod { NONE, VOUCHER, STRATO_BURN, USDST_SWAP_BURN }
+enum FeeMethod { NONE, VOUCHER, STRATO_BURN, USDST_SWAP_BURN, USDST_COLLECTED }
 
 // Transaction fee implementation for Decider (0xDEC1DE), installed with
 // DeciderState.updatePayFeeContract. The platform DELEGATECALLs payFees for every
@@ -69,6 +69,17 @@ contract record FeeRouter {
     function _usdst() internal view virtual returns (address) { return address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010); }
     function _governance() internal view virtual returns (address) { return address(0x100); } // MercataGovernance
     function _deciderState() internal view virtual returns (address) { return address(0xDEC1DE02); }
+    function _feeCollector() internal view virtual returns (address) { return address(0x000000000000000000000000000000000000100d); }
+
+    // Block from which fees burn STRATO and block rewards are paid. Before it the
+    // router charges exactly what DeciderState's own payFees charges (one whole
+    // voucher, else 0.01 USDST to FeeCollector), quotes nothing and pays nothing, so
+    // it can be installed ahead of the platform's native-token flag day and the two
+    // switch at one block: set it to that network's stratoGasForkBlock. 0 is active
+    // from genesis.
+    function _activationBlock() internal view virtual returns (uint) { return 0; }
+    function _active() internal view returns (bool) { return block.number >= _activationBlock(); }
+    function activationBlock() external view returns (uint) { return _activationBlock(); }
 
     // STRATO was deployed after genesis and its address differs per network, so the
     // deployable subclass names it (gen-feerouter-source.js). Zero leaves STRATO out of
@@ -154,9 +165,16 @@ contract record FeeRouter {
     function payBlockRewards() external {
         if (lastRewardedBlock == block.number) return;
         lastRewardedBlock = block.number;
+        if (!_active()) return;
 
         _quoteStratoFee();
         _payBlockReward();
+    }
+
+    // What the pool would price a call at right now, so a router can be checked
+    // before its activation block without writing a quote.
+    function previewStratoFee() external view returns (uint) {
+        return _priceStratoFee();
     }
 
     // Pricing that cannot be trusted leaves the previous quote in place; stratoFeeQuote
@@ -270,7 +288,13 @@ contract record FeeRouter {
         } catch {
         }
 
-        if (!paidWithVoucher) {
+        if (!paidWithVoucher && !_active()) {
+            // The legacy fee, as DeciderState's own payFees charges it: signers see
+            // no change until the activation block.
+            ERC20_Template(_usdst()).transfer(_feeCollector(), USD_FEE);
+            method = FeeMethod.USDST_COLLECTED;
+            amount = USD_FEE;
+        } else if (!paidWithVoucher) {
             // The quote lives in the installed router's own storage, which this
             // DELEGATECALL cannot see; DeciderState names the router, so ask it.
             address router = IFeeContractLookup(_deciderState()).getImplContract();
