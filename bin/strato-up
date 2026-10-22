@@ -154,10 +154,24 @@ if [[ "$PREBUILT" == "true" ]]; then
         IMAGE_TAGS+=("$VERSION_FILE")
     fi
     STRATO_IMAGE=""
+    LOOKUP_ERROR=""
     for tag in "${IMAGE_TAGS[@]}"; do
-        if docker image inspect "${REPO_URL}strato:$tag" >/dev/null 2>&1 || docker manifest inspect "${REPO_URL}strato:$tag" >/dev/null 2>&1; then
+        if docker image inspect "${REPO_URL}strato:$tag" >/dev/null 2>&1; then
             STRATO_IMAGE="${REPO_URL}strato:$tag"
             break
+        fi
+        # The registry answers "manifest unknown" for a tag that does not exist.
+        # Anything else (no route to the registry, a proxy only the daemon knows
+        # about, a CLI without `docker manifest`) is a failed lookup, not a
+        # missing image, and is reported as such.
+        if LOOKUP_ERROR="$(docker manifest inspect "${REPO_URL}strato:$tag" 2>&1 >/dev/null)"; then
+            STRATO_IMAGE="${REPO_URL}strato:$tag"
+            break
+        fi
+        if [[ "$LOOKUP_ERROR" != *"manifest unknown"* ]]; then
+            echo "Error: could not look up ${REPO_URL}strato:$tag on the registry: ${LOOKUP_ERROR}" >&2
+            echo "Check that this machine reaches https://ghcr.io (DNS, firewall, proxy settings of the docker CLI, not only of the daemon) and that 'docker manifest inspect' works here; the image itself may well exist." >&2
+            exit 1
         fi
     done
     if [[ -z "$STRATO_IMAGE" ]]; then
