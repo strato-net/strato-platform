@@ -10,7 +10,7 @@ import Blockchain.Strato.Discovery.Data.Peer (UDPPort(..), TCPPort(..))
 import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Blockchain.Strato.Discovery.UDPServer
 import Control.Monad.Composable.Base
-import Control.Monad.Composable.Vault (runVaultM)
+import Control.Monad.Composable.Vault (runNodeKeyM)
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Data.Maybe (fromMaybe)
@@ -54,14 +54,15 @@ main = do
   putStrLn "ethereum-discover: Peer database setup complete"
 
   let runner f = do
-        let vaultUrl' = vaultUrl . urlConfig $ ethConf
-        $logInfoS "ethereumDiscovery" $ T.pack $ CL.green $ "Talking to vault at " ++ vaultUrl'
+        $logInfoS "ethereumDiscovery" $ T.pack $ CL.green $ case nodeKeyFile (urlConfig ethConf) of
+          Just keyFile -> "Using local node key " ++ keyFile
+          Nothing -> "Talking to vault at " ++ vaultUrl (urlConfig ethConf)
         let port' = discoveryPort $ discoveryConfig ethConf
             udpPort = UDPPort port'
             tcpPort = TCPPort . listenPort $ p2pConfig ethConf
             minPeers = minAvailablePeers (discoveryConfig ethConf)
         cxt <- initContextLite udpPort tcpPort
-        runVaultM vaultUrl' . withResources . runDiscoveryM cxt $
+        runNodeKeyM ethConf . withResources . runDiscoveryM cxt $
           bracket
             (connectMe udpPort)
             (liftIO . S.close)

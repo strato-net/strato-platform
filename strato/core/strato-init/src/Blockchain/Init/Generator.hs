@@ -16,7 +16,8 @@ import Blockchain.Init.DockerCompose
 import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer)
+import Blockchain.Init.NodeKey (nodeKeyEnvVar, nodeKeyFileName, setupLocalNodeKey)
+import Blockchain.Init.Options (flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_localKey, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -213,11 +214,25 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     liftIO $ putStrLn $ "  Network: " ++ network
 
     when (role == RoleValidator && flags_localAuth) $ liftIO $
-      error "--role=validator cannot be combined with --localAuth: a validator runs no identity provider; its node key comes from the shared Vault (run strato-login first)"
+      error "--role=validator cannot be combined with --localAuth: a validator runs no identity provider; keep its node key in the shared Vault (run strato-login first) or in the directory with --localKey"
     when (not (roleRunsLocalAuth role) && flags_localAuth) $
       liftIO $ error "--localAuth is only supported with --role=node or --role=api-node"
     when (not flags_monitoring && not (roleAllowsMonitoringOff role)) $
       liftIO $ error "--monitoring=false is only supported with --role=api-node"
+    when (flags_localKey && not (roleAllowsLocalKey role)) $
+      liftIO $ error "--localKey is only supported with --role=validator"
+    when (flags_localKey && flags_localAuth) $
+      liftIO $ error "--localKey cannot be combined with --localAuth"
+    -- A key file and --localKey go together. Without the flag the file would
+    -- sit there ignored while the Vault key is used; with the flag added to a
+    -- Vault-keyed directory, generating a key would silently give the
+    -- validator a new identity, so the key has to be brought along.
+    nodeKeyPresent <- doesFileExist nodeKeyFileName
+    nodeKeyOffered <- liftIO $ maybe False (not . null) <$> lookupEnv nodeKeyEnvVar
+    when (nodeKeyPresent && not flags_localKey) $
+      liftIO $ error $ "this directory keeps its node key in " ++ nodeKeyFileName ++ "; pass --localKey (moving a file key into the Vault is not supported)"
+    when (regenerate && flags_localKey && not nodeKeyPresent && not nodeKeyOffered) $
+      liftIO $ error $ "--localKey on a directory whose node key is in the Vault: import the key with " ++ nodeKeyEnvVar ++ " or place it at " ++ nodeKeyFileName ++ " (a key generated here would be a new identity)"
     -- The ingress has no authentication: in a container it is published only on
     -- the address named, never on every interface.
     when (role == RoleCore && containerMode && null flags_ingressListen) $
@@ -308,11 +323,17 @@ mkFilesAndGenesis nodeDir hasFlags network = do
 
     when flags_localAuth $ liftIO setupLocalAuthSecrets
 
+    -- A local-key validator's identity is a file in secrets/; no process on
+    -- it talks to a Vault, so it needs no OAuth credentials either.
+    when flags_localKey $ liftIO $ do
+      void setupLocalNodeKey
+      putStrLn "  --vaultUrl and --generateKey do not apply with --localKey"
+
     -- OAuth credentials: generate secure local creds for --localAuth,
     -- otherwise copy from ~/.secrets/ (external OAuth mode)
     let destOauth = "secrets" </> "oauth_credentials.yaml"
     destOauthExists <- doesFileExist destOauth
-    unless destOauthExists $ liftIO $ do
+    unless (destOauthExists || flags_localKey) $ liftIO $ do
       if flags_localAuth
         then do
           localHostname <- nodeHostname
@@ -349,19 +370,21 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     -- Setup OAuth credentials
     liftIO $ do
       let destOauth' = "secrets" </> "oauth_credentials.yaml"
-      if flags_localAuth
-        then putStrLn "  ✓ Local auth mode: OAuth configured for local Hydra"
-        else do
-          -- Copy OAuth credentials from ~/.secrets/
-          home <- getHomeDirectory
-          let sourceOauth = home </> ".secrets" </> "strato_credentials.yaml"
-          sourceExists <- doesFileExist sourceOauth
-          if sourceExists
-            then do
-              copyFile sourceOauth destOauth'
-              void $ chmod roo destOauth'
-            else
-              error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first."
+      if flags_localKey
+        then putStrLn "  ✓ Local key mode: no OAuth credentials needed"
+        else if flags_localAuth
+          then putStrLn "  ✓ Local auth mode: OAuth configured for local Hydra"
+          else do
+            -- Copy OAuth credentials from ~/.secrets/
+            home <- getHomeDirectory
+            let sourceOauth = home </> ".secrets" </> "strato_credentials.yaml"
+            sourceExists <- doesFileExist sourceOauth
+            if sourceExists
+              then do
+                copyFile sourceOauth destOauth'
+                void $ chmod roo destOauth'
+              else
+                error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first."
 
     ethconf <- liftIO $ genEthConf role
 

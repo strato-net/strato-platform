@@ -21,7 +21,7 @@ module Blockchain.Sequencer (
 
 import BlockApps.Logging
 import Blockchain.Blockstanbul
-import Blockchain.EthConf (ethConf, urlConfig, vaultUrl)
+import Blockchain.EthConf (ethConf)
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
@@ -46,7 +46,7 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base (runEff)
 import Control.Monad.Composable.Streaming
-import Control.Monad.Composable.Vault (runVaultM, getPub)
+import Control.Monad.Composable.Vault (runNodeKeyM, getPub)
 import Data.Foldable
 import Data.Maybe
 import Data.Proxy
@@ -97,8 +97,7 @@ tryResolveSelfAddr = do
   case _selfAddr ctx of
     Just addr -> return (Just addr)
     Nothing -> do
-      let vaultUrl' = vaultUrl . urlConfig $ ethConf
-      result <- liftIO $ E.try @E.SomeException $ runEff $ runLogging $ runVaultM vaultUrl' $ do
+      result <- liftIO $ E.try @E.SomeException $ runEff $ runLogging $ runNodeKeyM ethConf $ do
         pubKey <- getPub
         return $ fromPublicKey pubKey
       case result of
@@ -107,7 +106,7 @@ tryResolveSelfAddr = do
           putBlockstanbulContext ctx { _selfAddr = Just addr }
           return (Just addr)
         Left _err -> do
-          $logDebugS "sequencer" "Node identity not available from Vault yet"
+          $logDebugS "sequencer" "Node identity not available yet"
           return Nothing
 
 type MonadSequencer m =

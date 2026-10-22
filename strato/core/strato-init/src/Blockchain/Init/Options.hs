@@ -46,7 +46,7 @@ defineFlag "nodeHost" ("" :: String) "The node's public host name, from which th
 
 defineFlag "svmTrace" (False :: Bool) "Enable verbose logging in SolidVM"
 
-defineFlag "vaultUrl" "https://vault.blockapps.net:8093/strato/v2.3" "URL of the shared vault service"
+defineFlag "vaultUrl" "https://vault.blockapps.net:8093/strato/v2.3" "URL of the shared vault service. Ignored with --localAuth (node-local Vault) and --localKey (no Vault)"
 
 defineFlag "vaultTimeoutSec" (12 :: Int) "HTTP response timeout (seconds) for vault-wrapper signature / key requests"
 
@@ -54,7 +54,7 @@ defineFlag "fileServerUrl" "" "URL of the file server for marketplace (derived f
 
 defineFlag "notificationServerUrl" "" "URL of the notification server for marketplace"
 
-defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
+defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault. Ignored with --localKey"
 defineFlag "jsonrpc" (True :: Bool) "Start the Ethereum JSON-RPC server (port 8545) for wallet integration"
 defineFlag "vmQuery" (False :: Bool) "Run vm-query (port 8546) next to ethereum-jsonrpc and route latest-state eth_call, simulations and call traces to it, against the SQL state mirror instead of the consensus VM"
 defineFlag "validatorBehavior" (True :: Bool) "Whether this node votes and proposes when its key is in the validator set. Pass --validatorBehavior=false for a read-only follower core (an RPC cell) that executes blocks and serves reads but never takes part in consensus"
@@ -64,6 +64,7 @@ defineFlag "peerDatabase" ("" :: String) "Database for this core's peer store (p
 defineFlag "peerStore" ("postgres" :: String) "Where strato-p2p and ethereum-discover keep peers and sync tasks: 'postgres' (the default, the database above) or 'sqlite' (the file peers.sqlite in the node directory, so a core whose Postgres is elsewhere keeps its networking state on its own disk and no longer depends on the database being reachable)"
 defineFlag "publicStratoRpc" (False :: Bool) "Expose the strato_* simulation/trace methods on the public /rpc endpoint (default: blocked; the bloc simulate endpoint is unaffected)"
 defineFlag "localAuth" (False :: Bool) "Use local auth (Kratos/Hydra) and a node-local Vault instead of external Keycloak and the shared Vault (--role=node and --role=api-node)"
+defineFlag "localKey" (False :: Bool) "Keep the node key in the node directory (secrets/node_key.pem, an unencrypted secp256k1 EC PRIVATE KEY PEM, mode 0600) instead of a Vault, so the validator depends on no identity service and strato-login is not needed (--role=validator only). A new key is generated unless STRATO_NODE_KEY holds one to import (PEM text or 64 hex characters) or the file is already in place"
 defineFlag "sslDir" ("" :: String) "Path to directory containing server.pem and server.key (enables SSL)"
 
 defineFlag "dockerMode" ("services" :: String) "What runs in Docker: 'services' (default): only the services, the node processes run on the host under convoke; 'all': the node processes too, in a strato container that strato-up starts from the same docker-compose.yml and that reaches the stores by service name"

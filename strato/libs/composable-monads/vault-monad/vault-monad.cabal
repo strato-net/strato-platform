@@ -12,16 +12,23 @@ build-type:     Simple
 library
   exposed-modules:
       Control.Monad.Composable.Vault
+      Control.Monad.Composable.Vault.NodeKeyFile
   other-modules:
       Paths_vault_monad
   hs-source-dirs:
       src
   build-depends:
-      base >=4.7 && <5
+      asn1-encoding
+    , asn1-types
+    , base >=4.7 && <5
+    , base16-bytestring
     , blockapps-vault-wrapper-api
     , blockapps-vault-wrapper-client
     , bytestring
     , composable-monads-base
     , mtl
+    , pem
     , strato-auth
+    , strato-conf
+    , strato-model
   default-language: Haskell2010

@@ -24,7 +24,7 @@ import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
 import           Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import           Blockchain.Threads
 import           Control.Monad.Composable.Base (Eff, Logger, runEff)
-import           Control.Monad.Composable.Vault (runVaultM)
+import           Control.Monad.Composable.Vault (runNodeKeyM)
 import           Executable.StratoP2P
 import           BlockApps.Init
 import           BlockApps.Logging as BL
@@ -56,9 +56,8 @@ initP2P = labelTheThread "initP2P" $ do
   wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef
   bcast <- newSeqEventBroadcast
-  let vaultUrl' = vaultUrl . urlConfig $ ethConf
-      streamAddr = let k = streamingConfig ethConf in (streamingHost k, streamingPort k)
-      runner f = runEff . runLogging $ runVaultM vaultUrl' $ do
+  let streamAddr = let k = streamingConfig ethConf in (streamingHost k, streamingPort k)
+      runner f = runEff . runLogging $ runNodeKeyM ethConf $ do
         c' <- initContext
         ctx <- liftIO $ newIORef c'
         -- Every peer connection gets its own producer. A single process-wide

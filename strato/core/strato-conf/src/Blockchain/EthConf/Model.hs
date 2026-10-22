@@ -244,8 +244,21 @@ data UrlConfig = UrlConfig
   , notificationServerUrl :: String
   , repoUrl :: String  -- Docker registry URL prefix for images
   , cookieRealm :: String  -- Domain for auth cookies (hostname, or parent domain for subdomain sharing)
+  -- | Where a validator set up with @--localKey@ keeps its node key: an
+  -- unencrypted secp256k1 @EC PRIVATE KEY@ PEM, relative to the node
+  -- directory (@secrets/node_key.pem@). Set, the processes that sign
+  -- (ethereum-discover, strato-p2p, strato-sequencer) load it once at startup
+  -- and never talk to a Vault; absent, the node key is in the Vault at
+  -- 'vaultUrl', as on every other role.
+  , nodeKeyFile :: Maybe FilePath
   }
-  deriving (Show, Eq, Generic, ToJSON)
+  deriving (Show, Eq, Generic)
+
+-- 'nodeKeyFile' is omitted when absent, so the ethconf.yaml of a directory
+-- without a local key is unchanged by the field's existence.
+instance ToJSON UrlConfig where
+  toJSON = Aeson.genericToJSON Aeson.defaultOptions { Aeson.omitNothingFields = True }
+  toEncoding = Aeson.genericToEncoding Aeson.defaultOptions { Aeson.omitNothingFields = True }
 
 -- Manual FromJSON so existing YAML configs without 'vaultTimeoutSec' continue
 -- to parse (defaulting to 12s). Once all deployed configs include the field
@@ -259,6 +272,7 @@ instance FromJSON UrlConfig where
     <*> v .:  "notificationServerUrl"
     <*> v .:  "repoUrl"
     <*> v .:? "cookieRealm" .!= "localhost"
+    <*> v .:? "nodeKeyFile"
 
 data NetworkConf = NetworkConf
   { network :: String
@@ -500,6 +514,7 @@ instance Default UrlConfig where
     , notificationServerUrl = ""
     , repoUrl = ""
     , cookieRealm = "localhost"
+    , nodeKeyFile = Nothing
     }
 
 instance Default NetworkConf where

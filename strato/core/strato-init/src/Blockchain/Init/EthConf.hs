@@ -4,6 +4,7 @@
 module Blockchain.Init.EthConf (genEthConf, containerMode, nodeHostname, preferIPv4Loopback, storeHost, runtimeConfig, flagsNetworkIdentity) where
 
 import Blockchain.EthConf
+import Blockchain.Init.NodeKey (nodeKeyFileName)
 import Blockchain.Init.Options hiding (flags_localAuth)
 import Blockchain.Init.Role
 import Control.Monad.Composable.Streaming.DockerConfig (brokerConfig, bcHost, bcPort)
@@ -11,6 +12,7 @@ import qualified Blockchain.Init.Options as Opts
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Options (flags_network, flags_txSizeLimit, flags_gasLimit, computeNetworkID)
 import Control.Concurrent
+import Control.Monad (unless)
 import Data.Default
 import Network.HTTP.Types.Status
 import Servant.Client
@@ -170,8 +172,10 @@ genEthConf nodeRole = do
         ++ if ssl then "" else ":" ++ show flags_httpPort
 
   -- For local auth mode, skip vault during setup (vault-wrapper starts later).
-  -- An API-only directory has no node identity: it signs nothing.
-  if Opts.flags_localAuth
+  -- An API-only directory has no node identity: it signs nothing. A
+  -- --localKey validator's key is a file, set up (and reported) by
+  -- 'Blockchain.Init.NodeKey.setupLocalNodeKey' before this runs.
+  unless Opts.flags_localKey $ if Opts.flags_localAuth
     then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node key will be provisioned during first admin setup"
     else if not (roleRunsCore nodeRole)
       then putStrLn "  ✓ API role: no node key needed"
@@ -244,6 +248,7 @@ genEthConf nodeRole = do
         , notificationServerUrl = flags_notificationServerUrl
         , repoUrl = flags_repoUrl
         , cookieRealm = localHostname
+        , nodeKeyFile = if Opts.flags_localKey then Just nodeKeyFileName else Nothing
         }
     , networkConfig = def
         { network = flags_network
