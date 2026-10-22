@@ -94,7 +94,31 @@ async function status(router) {
   if (router) {
     const r = await storage(router);
     console.log(`Router ${router}: quotedFee=${r.quotedFee} quotedAt=${r.quotedAt} priceVersion=${r.priceVersion} lastRewardedBlock=${r.lastRewardedBlock}`);
+    // Block rewards come out of the router's own STRATO (0.01 per block, FeeRouter.BLOCK_REWARD),
+    // so its balance is the validators' runway.
+    const { data: held } = await axios.get(`${cirrusUrl}/BlockApps-Token-_balances`, {
+      params: { address: `eq.${STRATO}`, key: `eq.${router}`, select: 'value::text' }, timeout: 30000,
+    });
+    const balance = BigInt(held[0]?.value || '0');
+    const blocksLeft = balance / BLOCK_REWARD;
+    const secondsPerBlock = await recentSecondsPerBlock();
+    console.log(`Router STRATO balance: ${Number(balance) / 1e18} = ${blocksLeft} blocks of rewards` +
+      ` (~${(Number(blocksLeft) * secondsPerBlock / 86400).toFixed(1)} days at ${secondsPerBlock.toFixed(2)} s/block)`);
   }
+}
+
+const BLOCK_REWARD = 10n ** 16n; // FeeRouter.BLOCK_REWARD, 0.01 STRATO per block
+const RATE_WINDOW = 5000; // blocks the block-time estimate averages over
+
+async function recentSecondsPerBlock() {
+  const block = async (tag) => {
+    const { data } = await axios.post(`${config.nodes[0].url}/rpc`,
+      { jsonrpc: '2.0', id: 1, method: 'eth_getBlockByNumber', params: [tag, false] }, { timeout: 30000 });
+    return { number: Number(data.result.number), timestamp: Number(data.result.timestamp) };
+  };
+  const tip = await block('latest');
+  const past = await block(`0x${(tip.number - RATE_WINDOW).toString(16)}`);
+  return (tip.timestamp - past.timestamp) / (tip.number - past.number);
 }
 
 (async () => {

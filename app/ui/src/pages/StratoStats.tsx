@@ -82,6 +82,7 @@ interface AggregatedRevenueResponse {
     yieldVault?: ProtocolRevenueResponse;
   };
   aggregated: RevenuePeriod;
+  stratoBurned?: ProtocolRevenueResponse;
 }
 
 
@@ -134,6 +135,7 @@ const StratoStats = () => {
 
   const [gasTotalRevenue, setGasTotalRevenue] = useState<string>('0');
   const [gasRevenueByPeriod, setGasRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
+  const [stratoBurnedByPeriod, setStratoBurnedByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
 
   const [yieldVaultRevenueByPeriod, setYieldVaultRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
   const [yieldVaultPendingRevenue, setYieldVaultPendingRevenue] = useState<string>('0');
@@ -220,6 +222,7 @@ const StratoStats = () => {
 
       setGasTotalRevenue(response.data.byProtocol.gas.totalRevenue);
       setGasRevenueByPeriod(response.data.byProtocol.gas.revenueByPeriod);
+      if (response.data.stratoBurned) setStratoBurnedByPeriod(response.data.stratoBurned.revenueByPeriod);
 
       if (response.data.byProtocol.yieldVault) {
         setYieldVaultRevenueByPeriod(response.data.byProtocol.yieldVault.revenueByPeriod);
@@ -646,7 +649,25 @@ const StratoStats = () => {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} gas fees
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} USDST gas fees
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">STRATO Burned</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {revenueLoading ? (
+                          <Skeleton className="h-8 w-24" />
+                        ) : (
+                          `${formatLargeNumber(parseFloat(formatUnits(BigInt(stratoBurnedByPeriod[selectedPeriod].total || '0'), 18)))} STRATO`
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} gas fees burned, not revenue
                       </p>
                     </CardContent>
                   </Card>

@@ -8,7 +8,7 @@ import {
 import {
   safeParseUnits,
 } from "@/utils/numberUtils";
-import { feeCoverage, feeShortfall, isFeeCurrency } from "@/utils/feeUtils";
+import { fallbackCharge, feeCoverage, feeShortfall, isFallbackCurrency, isFeeCurrency } from "@/utils/feeUtils";
 
 const normalizeAddress = (addr?: string): string => (addr || "").toLowerCase().replace(/^0x/, "");
 
@@ -49,10 +49,13 @@ export const computeMaxTransferable = (
 
   const shortfall = feeShortfall(quote, calls);
   setError(shortfall);
-  if (shortfall || !isFeeCurrency(quote, tokenAddress)) return token.toString();
+  if (shortfall) return token.toString();
 
-  // The fee is paid in the token being spent: reserve it.
-  const net = token - feeCoverage(quote, calls).chargeWei;
+  // The fee comes out of the token being spent: reserve it. STRATO pays first;
+  // USDST buys only what the STRATO balance cannot cover.
+  const reserve = isFeeCurrency(quote, tokenAddress) ? feeCoverage(quote, calls).chargeWei
+    : isFallbackCurrency(quote, tokenAddress) ? fallbackCharge(quote, calls) : 0n;
+  const net = token - reserve;
   return net > 0n ? net.toString() : "0";
 };
 

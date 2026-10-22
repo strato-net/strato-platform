@@ -37,19 +37,54 @@ const normalize = (address: string) => address.toLowerCase().replace(/^0x/, "");
 export const isFeeCurrency = (quote: FeeQuote, tokenAddress?: string): boolean =>
   !!tokenAddress && normalize(tokenAddress) === normalize(quote.currencyAddress);
 
-/** How much of the fee currency an action spends by itself: `amountWei` when it spends that token. */
-export const feeCurrencySpend = (quote: FeeQuote, tokenAddress: string | undefined, amountWei: bigint): bigint =>
-  isFeeCurrency(quote, tokenAddress) ? amountWei : 0n;
+/** True when `tokenAddress` is the USDST that buys what the fee currency cannot cover. */
+export const isFallbackCurrency = (quote: FeeQuote, tokenAddress?: string): boolean =>
+  !!quote.fallback && !!tokenAddress && normalize(tokenAddress) === normalize(quote.fallback.address);
+
+/** What an action spends by itself of the fee currency and of its USDST fallback, wei. */
+export interface FeeSpend {
+  currencyWei: bigint;
+  fallbackWei: bigint;
+}
+
+const NO_SPEND: FeeSpend = { currencyWei: 0n, fallbackWei: 0n };
+
+/** `amountWei` of `tokenAddress` as a fee spend: it counts only when that token pays fees. */
+export const feeCurrencySpend = (quote: FeeQuote, tokenAddress: string | undefined, amountWei: bigint): FeeSpend => ({
+  currencyWei: isFeeCurrency(quote, tokenAddress) ? amountWei : 0n,
+  fallbackWei: isFallbackCurrency(quote, tokenAddress) ? amountWei : 0n,
+});
 
 /**
- * Why `calls` cannot be paid for right now, or "" when they can. `spendingWei` is what the
- * action itself spends of the fee currency, which must still leave the fee.
+ * USDST the router may spend buying the STRATO that `calls` still need once the action has
+ * spent `currencyWei` of the user's STRATO; 0n when the STRATO balance covers them.
  */
-export const feeShortfall = (quote: FeeQuote, calls: number, spendingWei = 0n): string => {
+export const fallbackCharge = (quote: FeeQuote, calls: number, currencyWei = 0n): bigint => {
+  if (!quote.fallback) return 0n;
+  const feeWei = BigInt(quote.feeWei);
+  const short = feeCoverage(quote, calls).chargeWei + currencyWei - BigInt(quote.balanceWei);
+  return short > 0n ? (short * BigInt(quote.fallback.maxWei) + feeWei - 1n) / feeWei : 0n;
+};
+
+/** "Not enough STRATO for the fee: up to 0.02 USDST buys the rest", or "" when STRATO covers it. */
+export const describeFallback = (quote: FeeQuote, calls: number, currencyWei = 0n): string => {
+  const usdst = fallbackCharge(quote, calls, currencyWei);
+  return usdst > 0n ? `Not enough ${quote.currency} for the fee: up to ${fmt(usdst, 4)} USDST buys the rest` : "";
+};
+
+/**
+ * Why `calls` cannot be paid for right now, or "" when they can. `spend` is what the action
+ * itself spends of the tokens that pay fees, which must still leave the fee.
+ */
+export const feeShortfall = (quote: FeeQuote, calls: number, spend = NO_SPEND): string => {
   const { uncoveredCalls, chargeWei } = feeCoverage(quote, calls);
   if (!uncoveredCalls) return "";
   if (!quote.valid) return "Network fee price unavailable: only vouchers can pay right now";
-  if (chargeWei + spendingWei > BigInt(quote.balanceWei)) return `Insufficient ${quote.currency} for the network fee`;
+  if (chargeWei + spend.currencyWei <= BigInt(quote.balanceWei)) return "";
+  if (!quote.fallback) return `Insufficient ${quote.currency} for the network fee`;
+  if (fallbackCharge(quote, calls, spend.currencyWei) + spend.fallbackWei > BigInt(quote.fallback.balanceWei)) {
+    return `Insufficient ${quote.currency} and USDST for the network fee`;
+  }
   return "";
 };
 
@@ -57,11 +92,11 @@ export const feeShortfall = (quote: FeeQuote, calls: number, spendingWei = 0n): 
 const LOW_BALANCE_CALLS = 10n;
 
 /**
- * True when, after `calls` are paid and `spendingWei` of the fee currency is spent by the
+ * True when, after `calls` are paid and `spend.currencyWei` of the fee currency is spent by the
  * action itself, the fee currency left covers fewer than ten more calls.
  */
-export const feeBalanceLow = (quote: FeeQuote, calls: number, spendingWei = 0n): boolean => {
+export const feeBalanceLow = (quote: FeeQuote, calls: number, spend = NO_SPEND): boolean => {
   const { chargeWei } = feeCoverage(quote, calls);
-  const remaining = BigInt(quote.balanceWei) - spendingWei - chargeWei;
+  const remaining = BigInt(quote.balanceWei) - spend.currencyWei - chargeWei;
   return remaining >= 0n && remaining <= BigInt(quote.feeWei) * LOW_BALANCE_CALLS;
 };

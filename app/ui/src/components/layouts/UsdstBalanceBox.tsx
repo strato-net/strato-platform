@@ -71,12 +71,14 @@ const UsdstBalanceBox: React.FC = () => {
       .catch((error) => console.error(`Error fetching ${currency} token:`, error));
   }, [getToken, currencyAddress, currency]);
 
-  // Calls the user can still pay for: vouchers first, then the fee currency.
+  // Calls the user can still pay for: vouchers first, then the fee currency, then USDST buying STRATO.
   const affordableCalls = useMemo(() => {
     if (loadingUsdstBalance || !feeQuote) return 0;
     const feeWei = BigInt(feeQuote.feeWei);
-    const fromBalance = feeQuote.valid && feeWei > 0n ? BigInt(feeQuote.balanceWei) / feeWei : 0n;
-    return Number(BigInt(feeQuote.vouchers) + fromBalance);
+    if (!feeQuote.valid || feeWei === 0n) return Number(feeQuote.vouchers);
+    const { fallback } = feeQuote;
+    const fromFallback = fallback ? BigInt(fallback.balanceWei) / BigInt(fallback.maxWei) : 0n;
+    return Number(BigInt(feeQuote.vouchers) + BigInt(feeQuote.balanceWei) / feeWei + fromFallback);
   }, [feeQuote, loadingUsdstBalance]);
 
   const isLowBalance = affordableCalls < LOW_CALLS && affordableCalls > CRITICAL_CALLS;
