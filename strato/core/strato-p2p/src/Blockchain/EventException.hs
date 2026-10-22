@@ -8,6 +8,8 @@ import Control.Exception.Lifted
 
 data EventException
   = PeerDisconnected
+  | -- | The peer said why it hung up (TooManyPeers, UselessPeer, ...).
+    RemoteDisconnect TerminationReason
   | PeerNonResponsive
   | CurrentlyTooManyPeers
   | EventBeforeHandshake Message

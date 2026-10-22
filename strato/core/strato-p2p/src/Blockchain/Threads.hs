@@ -6,7 +6,8 @@ module Blockchain.Threads (
   labelPeerThreadM,
   changeLabelStatusM,
   formatThread,
-  getPeersByThreads
+  getPeersByThreads,
+  countEstablishedPeers
   ) where
 
 import Control.Monad
@@ -82,7 +83,20 @@ getPeersByThreads = do
   let peerThreadGroups = Map.toList $ Map.fromListWith (++) $
                          [(p, [(l, s)]) | ParsedLabel p l s <- map parseLabel [ v | Just v <- maybeThreadLabels]]
 
-  return $ map (fmap (summarizeThreadState . sort)) $ filter ((/= "") . fst) $ peerThreadGroups
+  return $ map (fmap (summarizeThreadState . sort)) $ filter (isPeerLabel . fst) $ peerThreadGroups
+
+-- | Peer threads are labelled "<host" (inbound) or ">host:port" (outbound).
+-- Any other label with a slash in it, such as warp's "Warp HTTP/1.1 client"
+-- on the p2p API's threads, is not a peer and must not take a connection slot.
+isPeerLabel :: String -> Bool
+isPeerLabel (c : _) = c == '<' || c == '>'
+isPeerLabel []      = False
+
+-- | Peers past the RLPx handshake: what the connection limit is spent on. A
+-- dial or an accept still in its handshake is labelled otherwise and is not
+-- counted, so attempts arriving together do not refuse each other.
+countEstablishedPeers :: IO Int
+countEstablishedPeers = length . filter ((== "CONNECTED") . snd) <$> getPeersByThreads
 
 summarizeThreadState :: [(String, Maybe String)] -> String
 summarizeThreadState [

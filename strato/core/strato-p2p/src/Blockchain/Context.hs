@@ -56,7 +56,7 @@ module Blockchain.Context
 
 import           Conduit
 import           Control.Applicative
-import           Control.Exception                       hiding (bracket, catch)
+import           Control.Exception                       hiding (bracket, catch, throwIO)
 import           Control.Lens                            hiding (Context)
 import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.Change.Modify             as Mod
@@ -216,9 +216,14 @@ instance RunsClient ContextM where
       let pSource = appSource app
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
+      -- Logged here, where the address is known, and rethrown so the client
+      -- loop's handler can disable the peer: swallowed, every failure was
+      -- followed by a fresh dial five seconds later.
       catch
         (handler conduits)
-        (\(e :: SomeException) -> $logErrorS "runClientConnection/Exception" . T.pack $ show e)
+        (\(e :: SomeException) -> do
+          $logErrorS "runClientConnection/Exception" . T.pack $ show e
+          throwIO e)
 
 instance RunsServer ContextM where
   runServer (TCPPort listenPort') runner handler = do
