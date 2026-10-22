@@ -66,7 +66,9 @@ instance PersistField Integer where
               Nothing -> Left $ "Invalid Integer: " <> t
 
 instance PersistField Word256 where
-  toPersistValue i = PersistText . T.pack $ showHexFixed 64 (fromIntegral i :: Integer)
+  toPersistValue = PersistText . decodeUtf8 . B16.encode . word256ToBytes
+  fromPersistValue (PersistText s)
+    | T.length s == 64, Right bytes <- B16.decode (encodeUtf8 s) = Right $ bytesToWord256 bytes
   fromPersistValue (PersistText s) = case readHex $ T.unpack s of
     [] -> Left $ "PersistField Word256: Could not read hex from string " <> s
     (x:_) -> Right $ (fromIntegral $ ((fst x) :: Integer) :: Word256)
