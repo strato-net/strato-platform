@@ -3,7 +3,7 @@ import test from "node:test";
 import JSONBig from "json-bigint";
 import { bloc, cirrus, eth, strato } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
-import { castVoteOnIssueById, createIssue } from "./user.service";
+import { castVoteOnIssueById, createIssue, governedInput } from "./user.service";
 
 const JSONBigString = JSONBig({ storeAsString: true });
 
@@ -84,23 +84,20 @@ test("traces create-issue argument transformations through the STRATO request", 
     exit: result,
   }, (_key, value) => typeof value === "bigint" ? value.toString() : value, 2));
 
-  assert.equal(sentArgs.recipient.type, "address");
+  assert.equal(sent.txs[0].payload.method, "castVoteOnIssue");
+  assert.equal(sentArgs._target, target);
+  assert.equal(sentArgs._func, "captureArguments");
+  const [recipient, amount, enabled, label, labels] = sentArgs._args;
+  assert.equal(recipient.type, "address");
+  assert.equal(recipient.value, "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
+  assert.equal(amount.type, "uint256");
   assert.equal(
-    sentArgs.recipient.value,
-    "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-  );
-  assert.equal(sentArgs.amount.type, "uint256");
-  assert.equal(
-    sentArgs.amount.value,
+    amount.value,
     submittedArgs[1],
     "the backend must preserve every large integer digit before STRATO",
   );
   assert.deepEqual(
-    JSON.parse(JSON.stringify({
-      enabled: sentArgs.enabled,
-      label: sentArgs.label,
-      labels: sentArgs.labels,
-    })),
+    JSON.parse(JSON.stringify({ enabled, label, labels })),
     {
       enabled: { type: "bool", value: true },
       label: { type: "string", value: "preserve surrounding spaces" },
@@ -112,6 +109,51 @@ test("traces create-issue argument transformations through the STRATO request", 
     hash: "0xsemantictrace",
     issueId: "semantic-trace-issue",
     governed: true,
+  });
+});
+
+test("governedInput turns a direct call's named args into a typed castVoteOnIssue call", async (t) => {
+  const target = "0x0000000000000000000000000000000000001008";
+  t.mock.method(bloc, "get", (async (_token: string, path: string) => ({
+    status: path === `/contracts/contract/${target}/details` ? 200 : 404,
+    data: {
+      _contractName: "MercataBridge",
+      _functions: {
+        setAssetRoute: {
+          _funcArgs: [
+            ["enabled", { index: 3, type: { tag: "Bool" } }],
+            ["externalToken", { index: 0, type: { tag: "Address" } }],
+            ["externalChainId", { index: 1, type: { tag: "Int", signed: false, bytes: 32 } }],
+            ["targetStratoToken", { index: 2, type: { tag: "Address" } }],
+          ],
+        },
+      },
+    },
+  })) as typeof bloc.get);
+
+  const input = await governedInput("access-token", {
+    contractName: "MercataBridge",
+    contractAddress: target,
+    method: "setAssetRoute",
+    args: {
+      externalToken: "0000000000000000000000000000000000001234",
+      externalChainId: "900719925474099312345678901234567890",
+      targetStratoToken: "0x0000000000000000000000000000000000005555",
+      enabled: true,
+    },
+  });
+
+  assert.equal(input.contractAddress, constants.adminRegistry);
+  assert.equal(input.method, "castVoteOnIssue");
+  assert.deepEqual(JSON.parse(JSON.stringify(input.args)), {
+    _func: "setAssetRoute",
+    _target: target,
+    _args: [
+      { type: "address", value: "0x0000000000000000000000000000000000001234" },
+      { type: "uint256", value: "900719925474099312345678901234567890" },
+      { type: "address", value: "0x0000000000000000000000000000000000005555" },
+      { type: "bool", value: true },
+    ],
   });
 });
 

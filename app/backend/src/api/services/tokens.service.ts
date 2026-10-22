@@ -1,5 +1,6 @@
 import { cirrus, strato, eth } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
+import { governedInput } from "./user.service";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { usc } from "../../utils/importer";
 import { extractContractName } from "../../utils/utils";
@@ -396,12 +397,12 @@ export const createToken = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = await buildFunctionTx({
+    const tx = await buildFunctionTx(await governedInput(accessToken, {
       contractName: extractContractName(TokenFactory),
       contractAddress: tokenFactory,
       method: "createToken",
       args: usc(body),
-    }, userAddress, accessToken);
+    }), userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -570,14 +571,14 @@ export const setTokenStatus = async (
   body: Record<string, string | number>
 ) => {
   try {
-    const tx = await buildFunctionTx({
+    const tx = await buildFunctionTx(await governedInput(accessToken, {
       contractName: extractContractName(Token),
       contractAddress: body.address as string,
       method: "setStatus",
       args: {
         newStatus: body.status,
       },
-    }, userAddress, accessToken);
+    }), userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)

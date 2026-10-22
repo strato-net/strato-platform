@@ -1,5 +1,6 @@
 import { cirrus } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
+import { governedInput } from "./user.service";
 import { executeTransaction } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { constants } from "../../config/constants";
@@ -894,12 +895,12 @@ export const createPool = async (
   userAddress: string
 ): Promise<TransactionResponse> => {
   const { isStable, ...restBody } = body;
-  const tx = await buildFunctionTx({
+  const tx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(PoolFactory),
     contractAddress: constants.poolFactory,
     method: isStable ? "createStablePool" : "createPool",
     args: restBody,
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);
 };
@@ -1148,7 +1149,7 @@ export const setPoolRates = async (
   const { poolAddress, swapFeeRate, lpSharePercent } = setPoolRatesParams;
 
   // Call setPoolFeeParameters on PoolFactory instead of calling Pool directly
-  const tx = await buildFunctionTx({
+  const tx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(PoolFactory),
     contractAddress: config.poolFactory,
     method: "setPoolFeeParameters",
@@ -1157,7 +1158,7 @@ export const setPoolRates = async (
       newSwapFeeRate: swapFeeRate.toString(),
       newLpSharePercent: lpSharePercent.toString(),
     },
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);
 };
@@ -1167,14 +1168,14 @@ export const pausePool = async (
   poolAddress: string,
   userAddress: string
 ): Promise<TransactionResponse> => {
-  const tx = await buildFunctionTx({
+  const tx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(PoolTable),
     contractAddress: poolAddress,
     method: "setPaused",
     args: {
       _isPaused: true,
     },
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);
 };
@@ -1184,14 +1185,14 @@ export const unpausePool = async (
   poolAddress: string,
   userAddress: string
 ): Promise<TransactionResponse> => {
-  const tx = await buildFunctionTx({
+  const tx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(PoolTable),
     contractAddress: poolAddress,
     method: "setPaused",
     args: {
       _isPaused: false,
     },
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);
 };
@@ -1201,14 +1202,14 @@ export const disablePool = async (
   poolAddress: string,
   userAddress: string
 ): Promise<TransactionResponse> => {
-  const tx = await buildFunctionTx({
+  const tx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(PoolTable),
     contractAddress: poolAddress,
     method: "setDisabled",
     args: {
       _isDisabled: true,
     },
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);
 };
@@ -1218,14 +1219,14 @@ export const enablePool = async (
   poolAddress: string,
   userAddress: string
 ): Promise<TransactionResponse> => {
-  const tx = await buildFunctionTx({
+  const tx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(PoolTable),
     contractAddress: poolAddress,
     method: "setDisabled",
     args: {
       _isDisabled: false,
     },
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);
 };

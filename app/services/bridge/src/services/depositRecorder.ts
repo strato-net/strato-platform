@@ -1,6 +1,6 @@
 import { config } from "../config";
 import { FunctionInput, NonEmptyArray, TxResponse, WindowDeposit } from "../types";
-import { execute } from "../utils/stratoHelper";
+import { executeGoverned } from "../utils/stratoHelper";
 import { logError, logInfo } from "../utils/logger";
 import { getRecordedDepositKeys } from "./cirrusService";
 import { blockTrackingService } from "./blockTrackingService";
@@ -310,7 +310,7 @@ export const createDepositRecorder = (deps: DepositRecorderDeps) => {
 };
 
 export const depositRecorder = createDepositRecorder({
-  execute,
+  execute: executeGoverned,
   getRecordedDepositKeys,
   deadLetters: createDepositDeadLetterStore(),
   commitLocalCheckpoint: (chainId, block) =>

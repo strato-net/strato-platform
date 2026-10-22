@@ -4,6 +4,7 @@
 
 import { strato, cirrus } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
+import { governedInput } from "./user.service";
 import { FunctionInput } from "../../types/types";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
@@ -1103,12 +1104,12 @@ export const pause = async (
     throw new Error("Vault not found");
   }
 
-  const builtTx = await buildFunctionTx({
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(Vault),
     contractAddress: vaultAddress,
     method: "pause",
     args: {},
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
 
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
@@ -1128,12 +1129,12 @@ export const unpause = async (
     throw new Error("Vault not found");
   }
 
-  const builtTx = await buildFunctionTx({
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(Vault),
     contractAddress: vaultAddress,
     method: "unpause",
     args: {},
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
 
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
@@ -1156,12 +1157,12 @@ export const setMinReserve = async (
 
   const { token, minReserve } = body;
 
-  const builtTx = await buildFunctionTx({
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(Vault),
     contractAddress: vaultAddress,
     method: "setMinReserve",
     args: { asset: token, newMinReserve: minReserve },
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
 
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
@@ -1184,12 +1185,12 @@ export const setBotExecutor = async (
 
   const { executor } = body;
 
-  const builtTx = await buildFunctionTx({
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(Vault),
     contractAddress: vaultAddress,
     method: "setBotExecutor",
     args: { newBotExecutor: executor },
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
 
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
@@ -1212,12 +1213,12 @@ export const addSupportedAsset = async (
 
   const { token } = body;
 
-  const builtTx = await buildFunctionTx({
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(Vault),
     contractAddress: vaultAddress,
     method: "addSupportedAsset",
     args: { asset: token },
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
 
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
@@ -1240,12 +1241,12 @@ export const removeSupportedAsset = async (
 
   const { token } = body;
 
-  const builtTx = await buildFunctionTx({
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(Vault),
     contractAddress: vaultAddress,
     method: "removeSupportedAsset",
     args: { asset: token },
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
 
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)

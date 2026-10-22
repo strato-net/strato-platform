@@ -1,6 +1,6 @@
 import { logInfo } from '../utils/logger';
 import { config } from '../config';
-import { execute } from '../utils/stratoHelper';
+import { executeGoverned } from '../utils/stratoHelper';
 import { JsonFileStore, dataFilePath } from '../utils/jsonFileStore';
 
 const BLOCK_TRACKING_FILE = 'lastProcessedBlocks.json';
@@ -49,7 +49,7 @@ class BlockTrackingService {
    * Update the last processed block on the blockchain
    */
   async updateLastProcessedBlockOnBlockchain(chainId: number, blockNumber: number): Promise<void> {
-    await execute({
+    await executeGoverned({
       contractName: "MercataBridge",
       contractAddress: config.bridge.address!,
       method: "setLastProcessedBlock",

@@ -100,7 +100,7 @@ class UserController {
       res.status(RestStatus.OK).json({
         message: result.governed
           ? "Issue created successfully"
-          : "Function executed directly: no issue was created and no vote was recorded",
+          : "Transaction succeeded but no issue event was found for it",
         target,
         func,
         args,

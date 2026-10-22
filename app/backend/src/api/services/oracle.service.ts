@@ -1,5 +1,6 @@
 import { strato, cirrus } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
+import { governedInput } from "./user.service";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
@@ -272,7 +273,7 @@ export const setPrice = async (
       select: "priceOracle",
     });
     const priceOracle = registry.priceOracle;
-    const tx = await buildFunctionTx({
+    const tx = await buildFunctionTx(await governedInput(accessToken, {
       contractName: extractContractName(PriceOracle),
       contractAddress: priceOracle,
       method: "setAssetPrice",
@@ -280,7 +281,7 @@ export const setPrice = async (
         asset: body.token,
         price: body.price,
       },
-    }, userAddress, accessToken);
+    }), userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
