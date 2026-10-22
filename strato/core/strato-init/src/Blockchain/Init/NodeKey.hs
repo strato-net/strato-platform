@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 -- | The node key of a @--localKey@ validator: a secp256k1 private key kept
 -- in the node directory as @secrets/node_key.pem@ (an unencrypted
 -- @EC PRIVATE KEY@ PEM, mode 0600, the file @openssl ecparam -name secp256k1
@@ -17,6 +19,7 @@ import Blockchain.Strato.Model.Secp256k1 (PrivateKey, newPrivateKey)
 import Control.Monad.Composable.Vault.NodeKeyFile (parseNodeKey, readNodeKeyFile, renderNodeKeyPem)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
+import Control.Exception (IOException, catch)
 import Control.Monad (when)
 import Data.Bits ((.&.))
 import Data.Char (isSpace)
@@ -60,7 +63,9 @@ setupLocalNodeKey = do
         -- the usual umask); the key is meant to be readable by its owner only.
         mode <- fileMode <$> getFileStatus nodeKeyFileName
         when (mode .&. 0o077 /= 0) $ do
-          setFileMode nodeKeyFileName 0o600
+          setFileMode nodeKeyFileName 0o600 `catch` \(e :: IOException) ->
+            error $ "cannot set " ++ nodeKeyFileName ++ " to mode 0600 (" ++ show e
+              ++ "); the file must belong to the user that runs the node"
           putStrLn $ "  Set " ++ nodeKeyFileName ++ " to mode 0600"
         case parseNodeKey . C8.pack <$> offered of
           Nothing -> return ()

@@ -98,18 +98,15 @@ tryResolveSelfAddr = do
   case _selfAddr ctx of
     Just addr -> return (Just addr)
     Nothing -> do
-      result <- tryAny (fromPublicKey <$> getPub)
+      result <- try (fromPublicKey <$> getPub)
       case result of
         Right addr -> do
           $logInfoS "sequencer" $ "Node identity resolved: " <> T.pack (format addr)
           putBlockstanbulContext ctx { _selfAddr = Just addr }
           return (Just addr)
-        Left _err -> do
+        Left (_err :: SomeException) -> do
           $logDebugS "sequencer" "Node identity not available yet"
           return Nothing
-
-tryAny :: MonadCatch m => m a -> m (Either SomeException a)
-tryAny = try
 
 type MonadSequencer m =
   ( MonadCatch m,
