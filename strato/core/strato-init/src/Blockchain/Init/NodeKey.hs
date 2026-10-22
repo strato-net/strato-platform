@@ -1,7 +1,7 @@
 -- | The node key of a @--localKey@ validator: a secp256k1 private key kept
 -- in the node directory as @secrets/node_key.pem@ (an unencrypted
 -- @EC PRIVATE KEY@ PEM, mode 0600, the file @openssl ecparam -name secp256k1
--- -genkey@ writes) instead of in a Vault. strato-setup creates or imports it
+-- -genkey -noout@ writes) instead of in a Vault. strato-setup creates or imports it
 -- here; the processes read it through
 -- "Control.Monad.Composable.Vault.NodeKeyFile", which owns the format.
 module Blockchain.Init.NodeKey
@@ -17,10 +17,12 @@ import Blockchain.Strato.Model.Secp256k1 (PrivateKey, newPrivateKey)
 import Control.Monad.Composable.Vault.NodeKeyFile (parseNodeKey, readNodeKeyFile, renderNodeKeyPem)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
+import Control.Monad (when)
+import Data.Bits ((.&.))
 import Data.Char (isSpace)
 import System.Environment (lookupEnv)
 import System.FilePath ((</>))
-import System.Posix.Files (setFileMode)
+import System.Posix.Files (fileMode, getFileStatus, setFileMode)
 import UnliftIO.Directory (doesFileExist)
 
 -- | Where the key lives, relative to the node directory; written to
@@ -28,7 +30,9 @@ import UnliftIO.Directory (doesFileExist)
 nodeKeyFileName :: FilePath
 nodeKeyFileName = "secrets" </> "node_key.pem"
 
--- | The node's address, for operators and tooling (world-readable).
+-- | The node's address, for operators and tooling (world-readable): 40 hex
+-- characters, no @0x@ prefix, the form the @pbft_node_identity@ metric label
+-- and the staking contracts use.
 nodeAddressFileName :: FilePath
 nodeAddressFileName = "secrets" </> "node_address"
 
@@ -52,6 +56,12 @@ setupLocalNodeKey = do
     if exists
       then do
         key <- readNodeKeyFile nodeKeyFileName >>= either (error . (("existing node key is unusable: " ++))) return
+        -- A file the operator copied in keeps the mode cp gave it (0644 under
+        -- the usual umask); the key is meant to be readable by its owner only.
+        mode <- fileMode <$> getFileStatus nodeKeyFileName
+        when (mode .&. 0o077 /= 0) $ do
+          setFileMode nodeKeyFileName 0o600
+          putStrLn $ "  Set " ++ nodeKeyFileName ++ " to mode 0600"
         case parseNodeKey . C8.pack <$> offered of
           Nothing -> return ()
           Just (Left err) -> error $ nodeKeyEnvVar ++ ": " ++ err

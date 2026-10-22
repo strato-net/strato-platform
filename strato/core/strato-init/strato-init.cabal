@@ -114,12 +114,15 @@ test-suite strato-init-test
       test/
   ghc-options: -Wall -O2 -threaded -Wall -threaded
   build-depends:
-      base
+      asn1-encoding
+    , asn1-types
+    , base
     , base16-bytestring
     , bytestring
     , composable-monads-base
     , filepath
     , hspec
+    , pem
     , strato-init
     , strato-model
     , temporary

@@ -76,11 +76,14 @@ tests:
     main: Main.hs
     other-modules: []
     dependencies:
+      - asn1-encoding
+      - asn1-types
       - base16-bytestring
       - bytestring
       - composable-monads-base
       - filepath
       - hspec
+      - pem
       - strato-init
       - strato-model
       - temporary

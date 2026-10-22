@@ -20,6 +20,10 @@ import Control.Monad (forM_)
 import Control.Monad.Composable.Base (provide, runEff)
 import Control.Monad.Composable.Vault (HasVault (..), VaultData (..))
 import Control.Monad.Composable.Vault.NodeKeyFile
+import Data.ASN1.BinaryEncoding (DER (..))
+import Data.ASN1.BitArray (toBitArray)
+import Data.ASN1.Encoding (encodeASN1')
+import Data.ASN1.Types
 import Data.Bits ((.&.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
@@ -28,6 +32,7 @@ import Data.Either (isLeft)
 import Data.List (isInfixOf, isPrefixOf)
 import System.FilePath ((</>))
 import System.IO.Temp (withSystemTempDirectory)
+import Data.PEM (PEM (..), pemWriteBS)
 import System.Posix.Files (fileMode, getFileStatus)
 import Test.Hspec
 
@@ -138,6 +143,20 @@ main = hspec $ do
       renderNodeKeyPem key `shouldBe` opensslPem
     it "reads the same key in PKCS#8 form (openssl pkcs8 -topk8 -nocrypt)" $
       fmap exportPrivateKey (parseNodeKey opensslPkcs8) `shouldBe` Right (unhex opensslPrivHex)
+    it "skips the EC PARAMETERS block openssl ecparam -genkey writes without -noout" $
+      fmap exportPrivateKey (parseNodeKey opensslTwoBlocks) `shouldBe` Right (unhex "d26c6cb7f8ae8e801db2a789c349516b50e7afe2f241a920deb1e1b10894720c")
+    it "refuses a key with explicit curve parameters" $
+      parseNodeKey opensslExplicitParams `shouldSatisfy` leftMentioning "explicit curve parameters"
+    it "refuses a key that does not name its curve" $
+      parseNodeKey (ecKeyPem [Start Sequence, IntVal 1, OctetString (unhex opensslPrivHex), End Sequence]) `shouldSatisfy` leftMentioning "does not name its curve"
+    it "refuses a key whose embedded public key is not its own" $ do
+      other <- newPrivateKey
+      let wrongPub = exportPublicKey False (derivePublicKey other)
+      parseNodeKey (ecKeyPem
+        [ Start Sequence, IntVal 1, OctetString (unhex opensslPrivHex)
+        , Start (Container Context 0), OID [1, 3, 132, 0, 10], End (Container Context 0)
+        , Start (Container Context 1), BitString (toBitArray wrongPub 0), End (Container Context 1)
+        , End Sequence ]) `shouldSatisfy` leftMentioning "public key"
     it "reads 64 hex characters, with or without 0x, ignoring surrounding whitespace" $ do
       fmap exportPrivateKey (parseNodeKey opensslPrivHex) `shouldBe` Right (unhex opensslPrivHex)
       fmap exportPrivateKey (parseNodeKey ("0x" <> opensslPrivHex)) `shouldBe` Right (unhex opensslPrivHex)
@@ -183,12 +202,13 @@ main = hspec $ do
     hex = B16.encode
     unhex = either error id . B16.decode
     leftMentioning needle = either (needle `isInfixOf`) (const False)
+    ecKeyPem asn1 = pemWriteBS PEM { pemName = "EC PRIVATE KEY", pemHeader = [], pemContent = encodeASN1' DER asn1 }
 
 -- A key generated with `openssl ecparam -name secp256k1 -genkey -noout`,
 -- its private scalar and uncompressed public key (`openssl ec -text`), the
 -- same key after `openssl pkcs8 -topk8 -nocrypt`, and after
 -- `openssl ec -aes256`; and a prime256v1 key.
-opensslPem, opensslPkcs8, encryptedPem, p256Pem, opensslPrivHex, opensslPubHex :: B.ByteString
+opensslPem, opensslPkcs8, encryptedPem, p256Pem, opensslTwoBlocks, opensslExplicitParams, opensslPrivHex, opensslPubHex :: B.ByteString
 opensslPem = C8.unlines
   [ "-----BEGIN EC PRIVATE KEY-----"
   , "MHQCAQEEIFdcWVX/258WH9w+get5LWYtPBBVZysN9Zp9bHOBdQrJoAcGBSuBBAAK"
@@ -220,5 +240,30 @@ p256Pem = C8.unlines
   , "MHcCAQEEIFZPjRsshmYjPD+V0uy+2YBbcRIZV/Z6vnWPkoKaW8mSoAoGCCqGSM49"
   , "AwEHoUQDQgAEhssztac8aI/pNc2Ug0wtRM1kAmtPItCeP4InUjBsyaF9MatfuQYW"
   , "eJw4kxubDKZUs0bf23BGEixNdskR0yO6DA=="
+  , "-----END EC PRIVATE KEY-----"
+  ]
+
+-- `openssl ecparam -name secp256k1 -genkey` without -noout: parameters block first.
+opensslTwoBlocks = C8.unlines
+  [ "-----BEGIN EC PARAMETERS-----"
+  , "BgUrgQQACg=="
+  , "-----END EC PARAMETERS-----"
+  , "-----BEGIN EC PRIVATE KEY-----"
+  , "MHQCAQEEINJsbLf4ro6AHbKnicNJUWtQ56/i8kGpIN6x4bEIlHIMoAcGBSuBBAAK"
+  , "oUQDQgAEJZwnBpKV2XXilIhRTDuz90Zxou2eigTvB2OSMGfSBzwgl8rbDAtYhODf"
+  , "yxM/ft3BZTGZmf0cEDN4HeJKOlGm7A=="
+  , "-----END EC PRIVATE KEY-----"
+  ]
+-- `openssl ecparam -name secp256k1 -genkey -noout -param_enc explicit`.
+opensslExplicitParams = C8.unlines
+  [ "-----BEGIN EC PRIVATE KEY-----"
+  , "MIIBUQIBAQQgC7Ki6KQFZNtpTkRlnaxGS9FI8xffwkqGi17WH9fUvPOggeMwgeAC"
+  , "AQEwLAYHKoZIzj0BAQIhAP////////////////////////////////////7///wv"
+  , "MEQEIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABCAAAAAAAAAAAAAA"
+  , "AAAAAAAAAAAAAAAAAAAAAAAAAAAABwRBBHm+Zn753LusVaBilc6HCwcCm/zbLc4o"
+  , "2VnygVsW+BeYSDradyajxGVdpPv8DhEIqP0XtEimhVQZnEfQj/sQ1LgCIQD/////"
+  , "///////////////+uq7c5q9IoDu/0l6M0DZBQQIBAaFEA0IABBTYuMUsLc8niBuM"
+  , "26TtIOmTMSDHY49bFnV+pD3OVQqRmMKJQGk+LUfj0CifS2WH8GHOImcDO/fb3/Gr"
+  , "X1nDHrg="
   , "-----END EC PRIVATE KEY-----"
   ]

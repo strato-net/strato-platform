@@ -199,8 +199,11 @@ elif [[ "$CONTAINER_MODE" == "true" && "$PREBUILT" == "true" ]]; then
     NODE_PARENT="$(cd "$(dirname "$NODE_DIR")" && pwd)"
     SECRETS_MOUNT=()
     [[ -d "$HOME/.secrets" ]] && SECRETS_MOUNT=(-v "$HOME/.secrets:$HOME/.secrets:ro")
+    # A node key to import (--localKey) reaches strato-setup inside the container.
+    NODE_KEY_ENV=()
+    [[ -n "${STRATO_NODE_KEY:-}" ]] && NODE_KEY_ENV=(-e STRATO_NODE_KEY)
     docker run --rm --entrypoint strato-setup --user "$(id -u):$(id -g)" --hostname "$(hostname)" \
-        -e HOME="$HOME" -v "$HOME/.strato:$HOME/.strato" "${SECRETS_MOUNT[@]}" \
+        -e HOME="$HOME" -v "$HOME/.strato:$HOME/.strato" "${SECRETS_MOUNT[@]}" "${NODE_KEY_ENV[@]}" \
         -v "$NODE_PARENT:$NODE_PARENT" -w "$NODE_PARENT" \
         "$STRATO_IMAGE" "$NODE_PARENT/$(basename "$NODE_DIR")" "${SETUP_ARGS[@]:1}"
 elif [[ "$PREBUILT" == "true" ]] && ! command -v strato-setup >/dev/null 2>&1; then
@@ -209,6 +212,9 @@ elif [[ "$PREBUILT" == "true" ]] && ! command -v strato-setup >/dev/null 2>&1; t
 else
     strato-setup "${SETUP_ARGS[@]}"
 fi
+# The key to import is for strato-setup alone; the node processes and the
+# containers started below must not inherit it in their environment.
+unset STRATO_NODE_KEY
 
 if [[ "$FROM_SNAPSHOT" == "true" ]]; then
     if [[ -n "$SNAPSHOT_SOURCE" ]]; then

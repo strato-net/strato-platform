@@ -3,9 +3,10 @@
 
 -- | The node key file of a @--localKey@ validator: a secp256k1 private key
 -- in the standard @EC PRIVATE KEY@ PEM form (RFC 5915), unencrypted, the
--- file @openssl ecparam -name secp256k1 -genkey@ writes and @openssl ec@
--- reads. One module owns the format, so strato-setup (which writes it) and
--- the processes (which read it) cannot drift apart.
+-- file @openssl ecparam -name secp256k1 -genkey -noout@ writes and
+-- @openssl ec@ reads (without @-noout@ openssl puts an @EC PARAMETERS@ block
+-- in front; that is skipped). One module owns the format, so strato-setup
+-- (which writes it) and the processes (which read it) cannot drift apart.
 --
 -- Operators may also supply the key as 64 hex characters; 'parseNodeKey'
 -- takes either form.
@@ -19,9 +20,9 @@ module Control.Monad.Composable.Vault.NodeKeyFile
 
 import Blockchain.Strato.Model.Secp256k1 (PrivateKey, derivePublicKey, exportPrivateKey, exportPublicKey, importPrivateKey)
 import Control.Exception (IOException, try)
-import Control.Monad (when)
+import Control.Monad (unless, when)
 import Data.ASN1.BinaryEncoding (DER (..))
-import Data.ASN1.BitArray (toBitArray)
+import Data.ASN1.BitArray (bitArrayGetData, toBitArray)
 import Data.ASN1.Encoding (decodeASN1', encodeASN1')
 import Data.ASN1.Types
 import Data.ByteString (ByteString)
@@ -29,6 +30,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as C8
 import Data.Char (isSpace, toLower)
+import Data.List (intercalate)
 import Data.PEM (PEM (..), pemParseBS, pemWriteBS)
 
 -- | A node key as an operator supplies it: a PEM block, or 64 hex characters
@@ -52,7 +54,11 @@ parseNodeKeyHex raw =
       | otherwise = trimmed
 
 -- | An @EC PRIVATE KEY@ (RFC 5915) or PKCS#8 @PRIVATE KEY@ PEM block holding
--- a secp256k1 key. Passphrase-protected PEM is refused: the validator
+-- a secp256k1 key; other blocks in the file (openssl's @EC PARAMETERS@) are
+-- skipped. The curve must be named, and named secp256k1: a key that does not
+-- say its curve, or carries explicit curve parameters, is refused rather than
+-- read as a secp256k1 scalar it may not be. A public key in the file must
+-- match the private key. Passphrase-protected PEM is refused: the validator
 -- restarts unattended, so there is nobody to type the passphrase.
 parseNodeKeyPem :: ByteString -> Either String PrivateKey
 parseNodeKeyPem bs = do
@@ -62,25 +68,50 @@ parseNodeKeyPem bs = do
   when (any (`B.isInfixOf` bs) ["Proc-Type: 4,ENCRYPTED", "DEK-Info:", "-----BEGIN ENCRYPTED PRIVATE KEY-----"]) $
     Left "passphrase-protected PEM is not supported (the validator restarts unattended); decrypt it first: openssl ec -in key.pem -out plain.pem"
   pems <- either (Left . ("not a PEM file: " ++)) Right (pemParseBS bs)
-  pem <- case pems of
-    [] -> Left "no PEM block found"
-    (p : _) -> Right p
-  decoder <- case pemName pem of
-    "EC PRIVATE KEY" -> Right ecPrivateKey
-    "PRIVATE KEY" -> Right pkcs8PrivateKey
-    other -> Left $ "unsupported PEM block " ++ show other ++ "; expected EC PRIVATE KEY (openssl ecparam -name secp256k1 -genkey) or PRIVATE KEY (PKCS#8)"
+  when (null pems) $ Left "no PEM block found"
+  (pem, decoder) <- case [(p, d) | p <- pems, Just d <- [decoderFor (pemName p)]] of
+    (found : _) -> Right found
+    [] -> Left $ "no private key block found (got " ++ intercalate ", " (map (show . pemName) pems)
+            ++ "); expected EC PRIVATE KEY (openssl ecparam -name secp256k1 -genkey -noout) or PRIVATE KEY (PKCS#8)"
   decodeDer (pemContent pem) >>= decoder
+  where
+    decoderFor "EC PRIVATE KEY" = Just (ecPrivateKey False)
+    decoderFor "PRIVATE KEY" = Just pkcs8PrivateKey
+    decoderFor _ = Nothing
 
 decodeDer :: ByteString -> Either String [ASN1]
 decodeDer = either (Left . ("invalid DER: " ++) . show) Right . decodeASN1' DER
 
 -- RFC 5915: SEQUENCE { version 1, privateKey OCTET STRING,
--- parameters [0] OID OPTIONAL, publicKey [1] BIT STRING OPTIONAL }
-ecPrivateKey :: [ASN1] -> Either String PrivateKey
-ecPrivateKey (Start Sequence : IntVal 1 : OctetString priv : rest) = do
-  checkCurve [oid | (Start (Container Context 0), OID oid) <- zip rest (drop 1 rest)]
-  importScalar priv
-ecPrivateKey _ = Left "not an EC private key structure (RFC 5915)"
+-- parameters [0] OID OPTIONAL, publicKey [1] BIT STRING OPTIONAL }.
+-- @curveNamed@: the enclosing PKCS#8 header already named secp256k1.
+ecPrivateKey :: Bool -> [ASN1] -> Either String PrivateKey
+ecPrivateKey curveNamed (Start Sequence : IntVal 1 : OctetString priv : rest) = do
+  namedHere <- curveParameters rest
+  unless (curveNamed || namedHere) $
+    Left "the key does not name its curve; expected a named-curve secp256k1 key (openssl ecparam -name secp256k1 -genkey -noout)"
+  key <- importScalar priv
+  checkPublicKey key rest
+  return key
+ecPrivateKey _ _ = Left "not an EC private key structure (RFC 5915)"
+
+-- The [0] parameters, if present: True when they name secp256k1.
+curveParameters :: [ASN1] -> Either String Bool
+curveParameters rest = case dropWhile (/= Start (Container Context 0)) rest of
+  _ : OID oid : _ -> checkNamedCurve oid >> Right True
+  _ : Start Sequence : _ -> Left "explicit curve parameters are not supported; use a named curve (openssl ecparam -name secp256k1 -genkey -noout, or convert with openssl ec -param_enc named_curve)"
+  _ : _ -> Left "unexpected curve parameters in the key"
+  [] -> Right False
+
+-- The [1] public key, if present, must be this private key's.
+checkPublicKey :: PrivateKey -> [ASN1] -> Either String ()
+checkPublicKey key rest = case dropWhile (/= Start (Container Context 1)) rest of
+  _ : BitString bits : _
+    | bitArrayGetData bits `elem` [exportPublicKey False pub, exportPublicKey True pub] -> Right ()
+    | otherwise -> Left "the public key in the file does not belong to its private key: the file is corrupted or was edited"
+  _ -> Right ()
+  where
+    pub = derivePublicKey key
 
 -- PKCS#8: SEQUENCE { version 0, SEQUENCE { id-ecPublicKey, curve OID },
 -- OCTET STRING (the RFC 5915 structure) }
@@ -88,15 +119,16 @@ pkcs8PrivateKey :: [ASN1] -> Either String PrivateKey
 pkcs8PrivateKey (Start Sequence : IntVal 0 : Start Sequence : OID alg : rest)
   | alg /= ecPublicKeyOid = Left $ "not an EC key: PKCS#8 algorithm " ++ showOid alg ++ " is not id-ecPublicKey"
   | otherwise = case rest of
-      OID curve : End Sequence : OctetString inner : _ -> checkCurve [curve] >> decodeDer inner >>= ecPrivateKey
-      End Sequence : OctetString inner : _ -> decodeDer inner >>= ecPrivateKey
+      OID curve : End Sequence : OctetString inner : _ -> checkNamedCurve curve >> decodeDer inner >>= ecPrivateKey True
+      End Sequence : OctetString inner : _ -> decodeDer inner >>= ecPrivateKey False
+      Start Sequence : _ -> Left "explicit curve parameters are not supported; use a named curve (openssl ecparam -name secp256k1 -genkey -noout)"
       _ -> Left "unexpected PKCS#8 private key structure"
 pkcs8PrivateKey _ = Left "not a PKCS#8 private key structure"
 
-checkCurve :: [[Integer]] -> Either String ()
-checkCurve (oid : _)
+checkNamedCurve :: [Integer] -> Either String ()
+checkNamedCurve oid
   | oid /= secp256k1Oid = Left $ "curve " ++ showOid oid ++ " is not secp256k1; generate the key with: openssl ecparam -name secp256k1 -genkey -noout -out node_key.pem"
-checkCurve _ = Right ()
+  | otherwise = Right ()
 
 -- The scalar is 32 bytes (SEC1); a shorter encoding has had leading zeros
 -- stripped and is padded back.
@@ -107,8 +139,9 @@ importScalar bytes
       maybe (Left "not a valid secp256k1 private key (zero, or not below the curve order)") Right $
         importPrivateKey (B.replicate (32 - B.length bytes) 0 <> bytes)
 
--- | The PEM text for a key, byte for byte what @openssl ecparam -genkey@
--- writes: RFC 5915 with the named curve and the uncompressed public key.
+-- | The PEM text for a key, byte for byte what @openssl ecparam -genkey
+-- -noout@ writes: RFC 5915 with the named curve and the uncompressed public
+-- key.
 renderNodeKeyPem :: PrivateKey -> ByteString
 renderNodeKeyPem key =
   pemWriteBS PEM
