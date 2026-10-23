@@ -51,6 +51,7 @@ import "Staking/ValidatorRegistry.sol";
 
 //Bridging
 import "./Bridge/MercataBridge.sol";
+import "./Bridge/ExternalAssetBridge.sol";
 import "./Bridge/StratoNativeBridge.sol";
 import "./Bridge/StratoNativeCustodyVault.sol";
 
@@ -75,6 +76,9 @@ import "YieldVault/YieldVault.sol";
 
 //Direct Mint PSM
 import "./Pools/DirectMintPSM.sol";
+
+//Router
+import "./Router/TokenRouter.sol";
 
 //Flash mint
 import "./Flash/FlashMint.sol";

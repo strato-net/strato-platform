@@ -1,0 +1,17 @@
+{
+  "chainId": 84532,
+  "bridgeAddress": "REVIEW_REQUIRED",
+  "safeAddress": "REVIEW_REQUIRED",
+  "executor": "REVIEW_REQUIRED",
+  "eabExecutor": "REVIEW_REQUIRED",
+  "attestationSigners": ["REVIEW_REQUIRED", "REVIEW_REQUIRED", "REVIEW_REQUIRED"],
+  "disabledAttestationSigners": [],
+  "attestationThreshold": "REVIEW_REQUIRED",
+  "maxAttestationValiditySeconds": "REVIEW_REQUIRED",
+  "tokens": [{
+    "stratoToken": "0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
+    "representationToken": "REVIEW_REQUIRED",
+    "freezeRoute": "REVIEW_REQUIRED",
+    "transfersEnabled": "REVIEW_REQUIRED"
+  }]
+}

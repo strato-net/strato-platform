@@ -39,6 +39,7 @@ const event = (
   event_index: 7,
   event_name: eventName,
   transaction_sender: custodyVault,
+  transaction_hash: "0x" + "a".repeat(64),
   attributes,
 });
 
@@ -121,6 +122,7 @@ const transfer = (attributes: Record<string, unknown>): CirrusEvent => ({
   block_timestamp: "2026-09-03 12:00:00 UTC",
   event_index: 9,
   event_name: "Transfer",
+  transaction_hash: "0x" + "b".repeat(64),
   transaction_sender: user,
   attributes,
 });

@@ -33,13 +33,14 @@ contract StratoNativeRepresentationBridge is
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UNPAUSER_ROLE = keccak256("UNPAUSER_ROLE");
     bytes32 public constant ATTESTATION_ADMIN_ROLE = keccak256("ATTESTATION_ADMIN_ROLE");
-    // Grant this role only to the custody Safe.
+    bytes32 public constant MINT_CANCELLER_ROLE = keccak256("MINT_CANCELLER_ROLE");
+    // Grant to the dedicated instant executor; manual mints require the custody Safe.
     bytes32 public constant MINT_EXECUTOR_ROLE = keccak256("MINT_EXECUTOR_ROLE");
-    bytes32 private constant NATIVE_MINT_ATTESTATION_TYPEHASH = keccak256(
-        "NativeMintAttestation(uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationBridge,uint256 sourceWithdrawalId,address stratoToken,address representationToken,address recipient,uint256 amount,uint256 notBefore,uint256 deadline)"
+    bytes32 private constant NATIVE_MINT_ATTESTATION_V2_TYPEHASH = keccak256(
+        "NativeMintAttestationV2(uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationBridge,uint256 sourceWithdrawalId,address stratoToken,address representationToken,address recipient,uint256 amount,uint256 notBefore,uint256 deadline,bool useInstantPath,uint256 signerSetVersion)"
     );
 
-    struct NativeMintAttestation {
+    struct NativeMintAttestationV2 {
         uint256 sourceChainId;
         address sourceBridge;
         uint256 destinationChainId;
@@ -51,6 +52,8 @@ contract StratoNativeRepresentationBridge is
         uint256 amount;
         uint256 notBefore;
         uint256 deadline;
+        bool useInstantPath;
+        uint256 signerSetVersion;
     }
 
     mapping(address => address) public stratoToRepresentation;
@@ -66,6 +69,51 @@ contract StratoNativeRepresentationBridge is
     uint256 public maxAttestationValiditySeconds;
     bool public mintsPaused;
     bool public redemptionsPaused;
+    mapping(uint256 => bool) public refundedRedemptions;
+    mapping(bytes32 => bool) public canceledMints;
+    uint256 public signerSetVersion;
+
+    event NativeMintCanceled(bytes32 indexed mintId, uint256 sourceChainId, address sourceBridge, uint256 sourceWithdrawalId);
+
+    function cancelMint(uint256 sourceChainId, address sourceBridge, uint256 sourceWithdrawalId) external onlyRole(MINT_CANCELLER_ROLE) {
+        if (sourceChainId == 0 || sourceBridge == address(0) || sourceWithdrawalId == 0) revert InvalidAttestation();
+        bytes32 mintId = keccak256(abi.encode(sourceChainId, sourceBridge, sourceWithdrawalId));
+        if (processedMints[mintId]) revert DuplicateMint();
+        canceledMints[mintId] = true;
+        emit NativeMintCanceled(mintId, sourceChainId, sourceBridge, sourceWithdrawalId);
+    }
+
+    struct RedemptionRefund {
+        uint256 sourceChainId;
+        address sourceBridge;
+        uint256 destinationChainId;
+        address destinationBridge;
+        uint256 redemptionId;
+        address representationToken;
+        address recipient;
+        uint256 amount;
+        uint256 deadline;
+        uint256 signerSetVersion;
+    }
+    bytes32 private constant REDEMPTION_REFUND_TYPEHASH = keccak256(
+        "RedemptionRefund(uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationBridge,uint256 redemptionId,address representationToken,address recipient,uint256 amount,uint256 deadline,uint256 signerSetVersion)"
+    );
+    event RedemptionRefunded(uint256 indexed redemptionId, address indexed representationToken, address indexed recipient, uint256 amount);
+
+    function refundRedemption(RedemptionRefund calldata a, bytes[] calldata signatures)
+        external onlyRole(MINT_EXECUTOR_ROLE) whenNotPaused whenMintsNotPaused nonReentrant {
+        if (a.sourceChainId == 0 || a.sourceBridge == address(0) || a.destinationChainId != block.chainid ||
+            a.destinationBridge != address(this) || a.redemptionId == 0 || a.redemptionId > redemptionId ||
+            a.representationToken == address(0) || a.recipient == address(0) || a.amount == 0) revert InvalidAttestation();
+        if (a.deadline < block.timestamp) revert AttestationExpired();
+        if (a.deadline > block.timestamp + maxAttestationValiditySeconds) revert InvalidAttestation();
+        if (a.signerSetVersion != signerSetVersion) revert InvalidAttestation();
+        if (refundedRedemptions[a.redemptionId]) revert DuplicateMint();
+        _verifyAttestationSignatures(_hashTypedDataV4(keccak256(abi.encode(REDEMPTION_REFUND_TYPEHASH, a))), signatures);
+        refundedRedemptions[a.redemptionId] = true;
+        StratoNativeRepresentationToken(a.representationToken).mint(a.recipient, a.amount);
+        emit RedemptionRefunded(a.redemptionId, a.representationToken, a.recipient, a.amount);
+    }
 
     event RepresentationMinted(
         uint256 sourceChainId,
@@ -84,6 +132,16 @@ contract StratoNativeRepresentationBridge is
         address indexed stratoRecipient,
         uint96 redemptionId
     );
+    event RedemptionRequestedWithRoute(
+        address indexed representationToken,
+        uint256 amount,
+        address indexed sender,
+        address indexed stratoRecipient,
+        uint96 redemptionId,
+        address actionToken,
+        uint256 minFinalOut
+    );
+
     event TokenMappingRegistered(
         address indexed stratoToken,
         address indexed representationToken,
@@ -161,17 +219,27 @@ contract StratoNativeRepresentationBridge is
         _grantRole(UNPAUSER_ROLE, admin);
         _grantRole(ATTESTATION_ADMIN_ROLE, admin);
         _grantRole(MINT_EXECUTOR_ROLE, admin);
+        _grantRole(MINT_CANCELLER_ROLE, admin);
         maxAttestationValiditySeconds = 7 days;
     }
 
-    function mintRepresentationWithAttestation(
-        NativeMintAttestation calldata attestation,
+    function mintRepresentationWithAttestationV2(
+        NativeMintAttestationV2 calldata attestation,
         bytes[] calldata signatures
-    ) external onlyRole(MINT_EXECUTOR_ROLE) whenNotPaused whenMintsNotPaused {
-        bytes32 mintId = _validateMintAttestation(attestation);
-        _verifyAttestationSignatures(attestationDigest(attestation), signatures);
+    ) external whenNotPaused whenMintsNotPaused nonReentrant {
+        _checkRole(
+            attestation.useInstantPath
+                ? MINT_EXECUTOR_ROLE
+                : DEFAULT_ADMIN_ROLE
+        );
+        _verifyAttestationSignatures(attestationDigestV2(attestation), signatures);
+        _settleMint(attestation);
+    }
 
-        if (processedMints[mintId]) revert DuplicateMint();
+    function _settleMint(NativeMintAttestationV2 memory attestation) internal {
+        bytes32 mintId = _validateMintAttestation(attestation);
+
+        if (processedMints[mintId] || canceledMints[mintId]) revert DuplicateMint();
         processedMints[mintId] = true;
 
         StratoNativeRepresentationToken(attestation.representationToken).mint(
@@ -191,31 +259,8 @@ contract StratoNativeRepresentationBridge is
         );
     }
 
-    function attestationDigest(
-        NativeMintAttestation calldata attestation
-    ) public view returns (bytes32) {
-        return _hashTypedDataV4(
-            keccak256(
-                abi.encode(
-                    NATIVE_MINT_ATTESTATION_TYPEHASH,
-                    attestation.sourceChainId,
-                    attestation.sourceBridge,
-                    attestation.destinationChainId,
-                    attestation.destinationBridge,
-                    attestation.sourceWithdrawalId,
-                    attestation.stratoToken,
-                    attestation.representationToken,
-                    attestation.recipient,
-                    attestation.amount,
-                    attestation.notBefore,
-                    attestation.deadline
-                )
-            )
-        );
-    }
-
     function _validateMintAttestation(
-        NativeMintAttestation calldata attestation
+        NativeMintAttestationV2 memory attestation
     ) internal view returns (bytes32 mintId) {
         if (attestation.sourceChainId == 0) revert InvalidAttestation();
         if (attestation.sourceBridge == address(0)) revert InvalidAttestation();
@@ -227,22 +272,20 @@ contract StratoNativeRepresentationBridge is
         if (attestation.notBefore > block.timestamp) revert AttestationNotReady();
         if (attestation.deadline < block.timestamp) revert AttestationExpired();
         if (attestation.deadline < attestation.notBefore) revert InvalidAttestation();
+        if (attestation.signerSetVersion != signerSetVersion) revert InvalidAttestation();
         if (attestation.deadline > attestation.notBefore + maxAttestationValiditySeconds) {
             revert InvalidAttestation();
         }
-
         address representationToken = stratoToRepresentation[attestation.stratoToken];
         if (representationToken == address(0)) revert TokenNotMapped();
         if (representationToken != attestation.representationToken) revert InvalidAttestation();
         if (!routeActive[attestation.stratoToken]) revert RouteDisabled();
 
-        mintId = keccak256(
-            abi.encode(
-                attestation.sourceChainId,
-                attestation.sourceBridge,
-                attestation.sourceWithdrawalId
-            )
-        );
+        mintId = keccak256(abi.encode(
+            attestation.sourceChainId,
+            attestation.sourceBridge,
+            attestation.sourceWithdrawalId
+        ));
     }
 
     function _verifyAttestationSignatures(
@@ -250,7 +293,7 @@ contract StratoNativeRepresentationBridge is
         bytes[] calldata signatures
     ) internal view {
         uint8 threshold = attestationThreshold;
-        if (threshold == 0 || signatures.length < threshold) {
+        if (threshold < 2 || signatures.length < threshold) {
             revert InvalidAttestationThreshold();
         }
 
@@ -275,6 +318,27 @@ contract StratoNativeRepresentationBridge is
         uint256 amount,
         address stratoRecipient
     ) external whenNotPaused whenRedemptionsNotPaused nonReentrant {
+        _burnForRedemption(representationToken, amount, stratoRecipient);
+        emit RedemptionRequested(representationToken, amount, msg.sender, stratoRecipient, redemptionId);
+    }
+
+    function requestRedemptionWithRoute(
+        address representationToken,
+        uint256 amount,
+        address stratoRecipient,
+        address actionToken,
+        uint256 minFinalOut
+    ) external whenNotPaused whenRedemptionsNotPaused nonReentrant {
+        if (actionToken == address(0)) revert InvalidAddress();
+        if (minFinalOut == 0) revert ZeroAmount();
+        _burnForRedemption(representationToken, amount, stratoRecipient);
+        emit RedemptionRequestedWithRoute(
+            representationToken, amount, msg.sender, stratoRecipient,
+            redemptionId, actionToken, minFinalOut
+        );
+    }
+
+    function _burnForRedemption(address representationToken, uint256 amount, address stratoRecipient) internal {
         if (representationToken == address(0)) revert InvalidAddress();
         if (stratoRecipient == address(0)) revert InvalidAddress();
         if (amount == 0) revert ZeroAmount();
@@ -284,17 +348,39 @@ contract StratoNativeRepresentationBridge is
 
         IERC20(representationToken).safeTransferFrom(msg.sender, address(this), amount);
         StratoNativeRepresentationToken(representationToken).burn(amount);
+        ++redemptionId;
+    }
 
-        unchecked {
-            ++redemptionId;
-        }
-
-        emit RedemptionRequested(
-            representationToken,
-            amount,
-            msg.sender,
-            stratoRecipient,
-            redemptionId
+    function attestationDigestV2(
+        NativeMintAttestationV2 calldata attestation
+    ) public view returns (bytes32) {
+        // Encoded in two halves and concatenated. Every field is a value
+        // type, so abi.encode is plain 32-byte-word concatenation and the
+        // result is byte-identical to encoding all fields at once -- which
+        // does not fit in one stack frame.
+        return _hashTypedDataV4(
+            keccak256(
+                bytes.concat(
+                    abi.encode(
+                        NATIVE_MINT_ATTESTATION_V2_TYPEHASH,
+                        attestation.sourceChainId,
+                        attestation.sourceBridge,
+                        attestation.destinationChainId,
+                        attestation.destinationBridge,
+                        attestation.sourceWithdrawalId,
+                        attestation.stratoToken,
+                        attestation.representationToken
+                    ),
+                    abi.encode(
+                        attestation.recipient,
+                        attestation.amount,
+                        attestation.notBefore,
+                        attestation.deadline,
+                        attestation.useInstantPath,
+                        attestation.signerSetVersion
+                    )
+                )
+            )
         );
     }
 
@@ -392,17 +478,20 @@ contract StratoNativeRepresentationBridge is
         }
 
         attestationSigners[signer] = enabled;
+        signerSetVersion++;
         emit AttestationSignerUpdated(signer, enabled);
     }
 
     function setAttestationThreshold(
         uint8 threshold
     ) external onlyRole(ATTESTATION_ADMIN_ROLE) {
-        if (threshold == 0 || threshold > attestationSignerCount) {
+        if (threshold < 2 || threshold > attestationSignerCount) {
             revert InvalidAttestationThreshold();
         }
+        if (attestationThreshold == threshold) return;
 
         attestationThreshold = threshold;
+        signerSetVersion++;
         emit AttestationThresholdUpdated(threshold);
     }
 
@@ -446,6 +535,7 @@ contract StratoNativeRepresentationBridge is
     function _authorizeUpgrade(address) internal override onlyRole(UPGRADER_ROLE) {}
 
     function version() external pure returns (string memory) {
-        return "1.1.0";
+        return "3.0.0";
     }
+
 }

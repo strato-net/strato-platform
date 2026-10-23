@@ -67,6 +67,22 @@ async function saveDeploymentInfo(contractName, network, deploymentInfo) {
   console.log(`Latest deployment info saved to: ${latestFilepath}`);
 }
 
+async function readProxyAddresses(proxyAddress) {
+  let lastError;
+  for (let attempt = 1; attempt <= 10; attempt++) {
+    try {
+      return {
+        implementationAddress: await upgrades.erc1967.getImplementationAddress(proxyAddress),
+        adminAddress: await upgrades.erc1967.getAdminAddress(proxyAddress),
+      };
+    } catch (error) {
+      lastError = error;
+      if (attempt < 10) await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Main deployment function
  */
@@ -145,8 +161,7 @@ async function main() {
 
   // Get addresses
   const proxyAddress = await proxy.getAddress();
-  const implementationAddress = await upgrades.erc1967.getImplementationAddress(proxyAddress);
-  const adminAddress = await upgrades.erc1967.getAdminAddress(proxyAddress);
+  const { implementationAddress, adminAddress } = await readProxyAddresses(proxyAddress);
 
   console.log("\n" + "=".repeat(60));
   console.log("DEPLOYMENT SUCCESSFUL!");

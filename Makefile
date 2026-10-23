@@ -1,9 +1,11 @@
 # Registries. The STRATO node images (strato, nginx, apex, postgrest, prometheus,
 # smd, local-auth and the app images) are published to the public GitHub
 # registry; the services BlockApps runs itself (vault, highway, bridge) stay in
-# the private AWS ECR. Every image is built once, under the name it is pushed
+# the private AWS ECR, and the EAB bridge images (bridge-eab, bridge-eab-nginx)
+# go to both. Every image is built once, under the name it is pushed
 # with; the node images also get a bare local tag (apex:<tag>) because the
-# docker-compose.yml of a local node refers to them that way. The alias is
+# docker-compose.yml of a local node refers to them that way, and the EAB
+# images a GitHub registry tag next to their ECR name. The alias is
 # set even when the registry image is already present (pulled by a
 # strato-up --prebuilt, say), not only after a build.
 REPO_GHCR_URL ?= ghcr.io/strato-net/strato-platform/
@@ -67,6 +69,8 @@ HASH_PROMETHEUS := $(call dir_hash,prometheus-packager)
 HASH_SMD := $(call dir_hash,smd-ui)
 HASH_BRIDGE := $(call dir_hash,app/services/bridge)
 HASH_BRIDGE_NGINX := $(call dir_hash,app/services/bridge/nginx)
+HASH_BRIDGE_EAB := $(call dir_hash,app/services/bridge-eab app/packages/shared-types)
+HASH_BRIDGE_EAB_NGINX := $(call dir_hash,app/services/bridge-eab/nginx)
 HASH_HISTORY := $(call dir_hash,app/services/history)
 HASH_LOCAL_AUTH := $(call dir_hash,local-auth)
 
@@ -101,7 +105,9 @@ HASH_SUBS = -e 's|<HASH_STRATO>|$(HASH_STRATO)|g' \
             -e 's|<HASH_PROMETHEUS>|$(HASH_PROMETHEUS)|g' \
             -e 's|<HASH_SMD>|$(HASH_SMD)|g' \
             -e 's|<HASH_BRIDGE>|$(HASH_BRIDGE)|g' \
-            -e 's|<HASH_BRIDGE_NGINX>|$(HASH_BRIDGE_NGINX)|g'
+            -e 's|<HASH_BRIDGE_NGINX>|$(HASH_BRIDGE_NGINX)|g' \
+            -e 's|<HASH_BRIDGE_EAB>|$(HASH_BRIDGE_EAB)|g' \
+            -e 's|<HASH_BRIDGE_EAB_NGINX>|$(HASH_BRIDGE_EAB_NGINX)|g'
 
 .PHONY: postgrest nginx apex app-backend app-ui app-nginx prometheus smd bridge bridge-nginx history local-auth
 
@@ -201,6 +207,26 @@ bridge-nginx:
 		echo "bridge-nginx up to date"; \
 	fi
 
+bridge-eab:
+	@if $(call image_missing,$(REPO_AWS_ECR_URL)bridge-eab:$(VERSION)-$(HASH_BRIDGE_EAB)); then \
+		echo "Building bridge-eab ($(VERSION)-$(HASH_BRIDGE_EAB))..."; \
+		docker build -f app/services/bridge-eab/Dockerfile -t $(REPO_AWS_ECR_URL)bridge-eab:$(VERSION)-$(HASH_BRIDGE_EAB) ./app && \
+		docker tag $(REPO_AWS_ECR_URL)bridge-eab:$(VERSION)-$(HASH_BRIDGE_EAB) $(REPO_GHCR_URL)bridge-eab:$(VERSION)-$(HASH_BRIDGE_EAB); \
+	else \
+		echo "bridge-eab up to date"; \
+		docker tag $(REPO_AWS_ECR_URL)bridge-eab:$(VERSION)-$(HASH_BRIDGE_EAB) $(REPO_GHCR_URL)bridge-eab:$(VERSION)-$(HASH_BRIDGE_EAB); \
+	fi
+
+bridge-eab-nginx:
+	@if $(call image_missing,$(REPO_AWS_ECR_URL)bridge-eab-nginx:$(VERSION)-$(HASH_BRIDGE_EAB_NGINX)); then \
+		echo "Building bridge-eab-nginx ($(VERSION)-$(HASH_BRIDGE_EAB_NGINX))..."; \
+		docker build --add-host=openresty.org:3.125.51.27 -t $(REPO_AWS_ECR_URL)bridge-eab-nginx:$(VERSION)-$(HASH_BRIDGE_EAB_NGINX) ./app/services/bridge-eab/nginx && \
+		docker tag $(REPO_AWS_ECR_URL)bridge-eab-nginx:$(VERSION)-$(HASH_BRIDGE_EAB_NGINX) $(REPO_GHCR_URL)bridge-eab-nginx:$(VERSION)-$(HASH_BRIDGE_EAB_NGINX); \
+	else \
+		echo "bridge-eab-nginx up to date"; \
+		docker tag $(REPO_AWS_ECR_URL)bridge-eab-nginx:$(VERSION)-$(HASH_BRIDGE_EAB_NGINX) $(REPO_GHCR_URL)bridge-eab-nginx:$(VERSION)-$(HASH_BRIDGE_EAB_NGINX); \
+	fi
+
 # The app history service (phase 7): its own Postgres, fed by the bus and a
 # Cirrus poller, serving chart series under /history-api.
 history:
@@ -280,6 +306,16 @@ bridge-force:
 bridge-nginx-force:
 	@echo Now building bridge-nginx...
 	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_AWS_ECR_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ./app/services/bridge/nginx
+
+bridge-eab-force:
+	@echo Now building bridge-eab...
+	docker build -f app/services/bridge-eab/Dockerfile -t ${REPO_AWS_ECR_URL}bridge-eab:${VERSION}-${HASH_BRIDGE_EAB} ./app
+	docker tag ${REPO_AWS_ECR_URL}bridge-eab:${VERSION}-${HASH_BRIDGE_EAB} ${REPO_GHCR_URL}bridge-eab:${VERSION}-${HASH_BRIDGE_EAB}
+
+bridge-eab-nginx-force:
+	@echo Now building bridge-eab-nginx...
+	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_AWS_ECR_URL}bridge-eab-nginx:${VERSION}-${HASH_BRIDGE_EAB_NGINX} ./app/services/bridge-eab/nginx
+	docker tag ${REPO_AWS_ECR_URL}bridge-eab-nginx:${VERSION}-${HASH_BRIDGE_EAB_NGINX} ${REPO_GHCR_URL}bridge-eab-nginx:${VERSION}-${HASH_BRIDGE_EAB_NGINX}
 
 local-auth:
 	@if $(call image_missing,$(REPO_GHCR_URL)local-auth:$(VERSION)-$(HASH_LOCAL_AUTH)); then \
@@ -461,16 +497,19 @@ vault-nginx:
 	DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
 docker-compose:
-	@echo Generating vault, highway, bridge, api, app compose files...
+	@echo Generating vault, highway, bridge, bridge-eab, api, app compose files...
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.yml
+	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge-eab.tpl.yml > docker-compose.bridge-eab.push.yml
+	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge-signer.tpl.yml > docker-compose.bridge-signer.yml
 	sed -e 's|<REPO_URL>|$(REPO_GHCR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.api.tpl.yml > docker-compose.api.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_GHCR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.app.tpl.yml > docker-compose.app.push.yml
 
 	awk '/build: ./{getline} 1' docker-compose.vault.push.yml > docker-compose.vault.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.yml > docker-compose.highway.yml
 	awk '/build: ./{getline} 1' docker-compose.bridge.push.yml > docker-compose.bridge.yml
+	awk '/build: ./{getline} 1' docker-compose.bridge-eab.push.yml > docker-compose.bridge-eab.yml
 	awk '/build: ./{getline} 1' docker-compose.api.push.yml > docker-compose.api.yml
 	awk '/build: ./{getline} 1' docker-compose.app.push.yml > docker-compose.app.yml
 
@@ -478,7 +517,7 @@ docker-compose:
 # with push-node-images; images a build did not make are skipped. The strato
 # image also gets a plain <ver> alias: bin/strato-up --prebuilt resolves it
 # from the VERSION file, and strato-setup inside it knows the other tags from
-# its BUILD_METADATA. The ECR services (vault, highway, bridge) are pushed
+# its BUILD_METADATA. The ECR services (vault, highway, bridge, bridge-eab) are pushed
 # from their compose files with scripts/docker-push-ecr.sh.
 NODE_IMAGES = strato:$(VERSION)-$(HASH_STRATO) nginx:$(VERSION)-$(HASH_NGINX) apex:$(VERSION)-$(HASH_APEX) postgrest:$(VERSION)-$(HASH_POSTGREST) prometheus:$(VERSION)-$(HASH_PROMETHEUS) smd:$(VERSION)-$(HASH_SMD) local-auth:$(VERSION)-$(HASH_LOCAL_AUTH) app-backend:$(VERSION)-$(HASH_APP_BACKEND) app-ui:$(VERSION)-$(HASH_APP_UI) app-nginx:$(VERSION)-$(HASH_APP_NGINX) history:$(VERSION)-$(HASH_HISTORY)
 
@@ -562,3 +601,16 @@ uninstall:
 	@rm -f $(HOME)/.local/bin/strato-setup
 	@rm -f $(HOME)/.local/bin/convoke
 	@echo "Done"
+
+.PHONY: bridge-eab bridge-eab-nginx bridge-eab-force bridge-eab-nginx-force docker-compose-bridge-eab push-bridge-eab-images
+
+# The EAB bridge images reach ECR from docker-compose.bridge-eab.push.yml like
+# the other ECR services; CI pushes their GitHub registry tags with this target.
+BRIDGE_EAB_IMAGES = bridge-eab:$(VERSION)-$(HASH_BRIDGE_EAB) bridge-eab-nginx:$(VERSION)-$(HASH_BRIDGE_EAB_NGINX)
+
+push-bridge-eab-images:
+	./scripts/docker-push-ecr.sh --registry-glob '$(REPO_GHCR_URL)*' $(addprefix $(REPO_GHCR_URL),$(BRIDGE_EAB_IMAGES))
+
+docker-compose-bridge-eab:
+	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge-eab.tpl.yml | awk '/build: ./{getline} 1' > docker-compose.bridge-eab.yml
+	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge-signer.tpl.yml > docker-compose.bridge-signer.yml

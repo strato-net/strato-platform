@@ -67,6 +67,7 @@ type TokenContextType = {
   usdstBalance: string;
   voucherBalance: string;
   loadingUsdstBalance: boolean;
+  usdstBalanceError: string | null;
   fetchUsdstBalance: (signal?: AbortSignal) => Promise<void>;
   // Net balance (current snapshot)
   netBalance: number;
@@ -104,6 +105,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [usdstBalance, setUsdstBalance] = useState("0");
   const [voucherBalance, setVoucherBalance] = useState("0");
   const [loadingUsdstBalance, setLoadingUsdstBalance] = useState(false);
+  const [usdstBalanceError, setUsdstBalanceError] = useState<string | null>(null);
 
   // Balance history caches
   const [netBalanceHistoryCache, setNetBalanceHistoryCacheState] = useState<Record<string, BalanceSnapshot[]>>({});
@@ -233,10 +235,12 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
 
       setUsdstBalance(usdstResponse?.data?.[0]?.balance || "0");
       setVoucherBalance(voucherResponse?.data?.balance || "0");
+      setUsdstBalanceError(null);
     } catch (err) {
       if (signal?.aborted) return;
       setUsdstBalance("0");
       setVoucherBalance("0");
+      setUsdstBalanceError("Fee balances unavailable. Retrying…");
     } finally {
       if (!signal?.aborted) {
         setLoadingUsdstBalance(false);
@@ -557,6 +561,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         usdstBalance,
         voucherBalance,
         loadingUsdstBalance,
+        usdstBalanceError,
         fetchUsdstBalance,
         netBalance,
         totalBorrowed,
