@@ -46,7 +46,7 @@ require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
 const { rest, util } = require('blockapps-rest');
-const { getIssueId, saveCallListTXDataAsFile } = require('./util');
+const { getIssueId, governedCallArgs, saveCallListTXDataAsFile } = require('./util');
 
 const DEFAULT_NODE_URL = 'https://app.strato.nexus';
 const POLL_INTERVAL_MS = 10000;
@@ -157,7 +157,7 @@ async function callAsync(tokenObj, callArgs, baseOptions) {
 // The receipt does not reliably carry the Solidity return value for user-contract-routed
 // calls (see upgrade.js), so read the governance outcome from the AdminRegistry events
 // emitted in the same transaction: IssueExecuted means it ran, IssueVoted means it is
-// waiting for the other admin, neither means the caller was the direct owner.
+// waiting for the other admin, neither means Cirrus has not indexed the events yet.
 async function classifyByRegistryEvents(nodeUrl, tokenObj, txHash) {
   const deadline = Date.now() + ISSUE_LOOKUP_TIMEOUT_MS;
   const params = { transaction_hash: `eq.${txHash}`, select: 'issueId,target,func', limit: '5' };
@@ -264,12 +264,12 @@ async function main() {
   const results = [];
   for (const batch of selected) {
     console.log(`Submitting batch ${batch.index}/${batches.length} as ${process.env.GLOBAL_ADMIN_NAME}...`);
-    const receipt = await callAsync(tokenObj, {
+    const receipt = await callAsync(tokenObj, await governedCallArgs(tokenObj, {
       contract: { address: vault, name: 'Vault' },
       method: 'redeemAllFor',
       args: { holders: batch.holders },
       txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
-    }, { config, cacheNonce: true });
+    }, nodeUrl), { config, cacheNonce: true });
 
     const value = getIssueId(receipt);
     const message = receipt.txResult && receipt.txResult.message;
@@ -283,7 +283,7 @@ async function main() {
     } else if (outcome.state === 'executed') {
       console.log(`  vote threshold already met; issue ${outcome.issueId} executed in this transaction`);
     } else {
-      console.log(`  no AdminRegistry event found for this tx${value ? ` (return value ${value})` : ''}; if ${process.env.GLOBAL_ADMIN_NAME} is the direct vault owner the sweep already ran`);
+      console.log(`  no AdminRegistry event found for this tx yet${value ? ` (vote recorded on issue ${value})` : ''}; check Cirrus before re-running`);
     }
     results.push({ batch: batch.index, holders: batch.holders, txHash: receipt.hash, status: receipt.status, outcome: outcome.state, issueId: outcome.issueId, returnValue: value });
   }

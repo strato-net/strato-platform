@@ -4,7 +4,7 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
-const { getCreatedAddress, getIssueId, pollForCreateIssueExecution } = require('./util');
+const { getCreatedAddress, getIssueId, governedCallArgs, pollForCreateIssueExecution } = require('./util');
 const { rest, importer, util } = require('blockapps-rest');
 const fs = require('fs-extra');
 const path = require('path');
@@ -389,7 +389,7 @@ async function main() {
       console.log(`Upgrading proxy at ${proxyAddress}...`);
       console.log(`New implementation: ${implementationAddress}`);
 
-      const callArgs = {
+      const callArgs = await governedCallArgs(tokenObj, {
         contract: { address: proxyAddress, name: 'Proxy' },
         method: 'setLogicContract',
         args: { _logicContract: implementationAddress },
@@ -397,7 +397,7 @@ async function main() {
           gasPrice: config.gasPrice,
           gasLimit: config.gasLimit,
         },
-      };
+      });
 
       const callOptions = {
         config,

@@ -10,6 +10,7 @@ require("dotenv").config();
 const config = require("./config");
 const auth = require("./auth");
 const { rest } = require("blockapps-rest");
+const { ADMIN_REGISTRY, governedCallArgs } = require("./util");
 
 // Targets to initialize.
 // Pattern: { address: "<proxy-or-contract-address>", contractName: "<ContractName>" }
@@ -109,9 +110,10 @@ function getInitializeArgs(target, stateSnapshot) {
   return buildInitializeArgsFromState(target, stateSnapshot);
 }
 
-async function initializeTarget(tokenObj, target, initializeArgs) {
+// initialize() is onlyOwner: an AdminRegistry-owned target is initialized through castVoteOnIssue
+async function initializeTarget(tokenObj, target, initializeArgs, owner) {
   const { address, contractName } = target;
-  const callArgs = {
+  const directCallArgs = {
     contract: { address, name: contractName },
     method: "initialize",
     args: initializeArgs,
@@ -120,6 +122,9 @@ async function initializeTarget(tokenObj, target, initializeArgs) {
       gasLimit: config.gasLimit,
     },
   };
+  const callArgs = String(owner || "").toLowerCase() === ADMIN_REGISTRY
+    ? await governedCallArgs(tokenObj, directCallArgs)
+    : directCallArgs;
   const callOptions = {
     config,
     cacheNonce: true,
@@ -193,7 +198,7 @@ async function main() {
       console.log("initializeArgs:", JSON.stringify(initializeArgs, null, 2));
 
       // 3) Call initialize()
-      const initialized = await initializeTarget(tokenObj, target, initializeArgs);
+      const initialized = await initializeTarget(tokenObj, target, initializeArgs, pulledState.stateSnapshot._owner);
       console.log(`initialize() submitted for ${address}\n`);
 
       results.push({

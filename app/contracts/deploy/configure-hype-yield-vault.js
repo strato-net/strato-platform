@@ -93,15 +93,15 @@ function buildPlan(args) {
   return { vaultAddress, whype, khype, strategy, rewardDistributor, calls };
 }
 
-async function callVault(rest, config, tokenObj, vaultAddress, call) {
+async function callVault(rest, config, governedCallArgs, tokenObj, vaultAddress, call) {
   return rest.call(
     tokenObj,
-    {
+    await governedCallArgs(tokenObj, {
       contract: { address: vaultAddress, name: 'YieldVault' },
       method: call.method,
       args: call.args,
       txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
-    },
+    }),
     { config, cacheNonce: true }
   );
 }
@@ -133,6 +133,7 @@ async function main() {
   const config = require('./config');
   const auth = require('./auth');
   const { rest } = require('blockapps-rest');
+  const { governedCallArgs } = require('./util');
   const username = process.env.GLOBAL_ADMIN_NAME;
   const password = process.env.GLOBAL_ADMIN_PASSWORD;
   if (!username || !password) {
@@ -143,7 +144,7 @@ async function main() {
   const tokenObj = { token };
   for (const call of plan.calls) {
     console.log(`\nCalling YieldVault(${plan.vaultAddress}).${call.method}...`);
-    const result = await callVault(rest, config, tokenObj, plan.vaultAddress, call);
+    const result = await callVault(rest, config, governedCallArgs, tokenObj, plan.vaultAddress, call);
     console.log(`${call.method} result:`, result);
   }
   console.log(`\nHYPE Yield Vault configured: ${plan.vaultAddress}`);

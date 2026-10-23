@@ -10,7 +10,7 @@ const config = require('./config');
 const auth = require('./auth');
 const fs = require('fs');
 const { rest, util } = require('blockapps-rest');
-const { getCreatedAddress, getIssueId, pollForCreateIssueExecution } = require('./util');
+const { getCreatedAddress, getIssueId, governedCallArgs, pollForCreateIssueExecution } = require('./util');
 
 const GOVERNANCE_PROXY = '0000000000000000000000000000000000000100';
 
@@ -47,12 +47,12 @@ async function poll(tokenObj, hashes) {
   console.log(`${user} create: ${final && final.status} | impl: ${impl || '(awaiting second vote)'}`);
   if (!impl) return;
 
-  const up = await rest.call(tokenObj, {
+  const up = await rest.call(tokenObj, await governedCallArgs(tokenObj, {
     contract: { address: GOVERNANCE_PROXY, name: 'Proxy' },
     method: 'setLogicContract',
     args: { _logicContract: impl },
     txParams: { gasPrice: 10, gasLimit: 5000000 },
-  }, { config, isAsync: true, cacheNonce: true });
+  }), { config, isAsync: true, cacheNonce: true });
   const uf = await poll(tokenObj, (Array.isArray(up) ? up : [up]).map(r => r && r.hash).filter(Boolean));
   console.log(`${user} setLogicContract: ${uf && uf.status}`);
 })().catch(e => { console.error(process.env.GLOBAL_ADMIN_NAME, 'FAILED:', e.message.slice(0, 200)); process.exit(1); });

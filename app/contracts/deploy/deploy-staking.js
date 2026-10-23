@@ -101,7 +101,7 @@ async function poll(tokenObj, hashes) {
   }
 
   const auth = require('./auth');
-  const { getCreatedAddress, getIssueId, pollForCreateIssueExecution } = require('./util');
+  const { getCreatedAddress, getIssueId, governedCallArgs, pollForCreateIssueExecution } = require('./util');
   const source = fs.readFileSync(option(args, 'source') || `${key}-source.txt`, 'utf8');
   const user = process.env.GLOBAL_ADMIN_NAME;
   const token = await auth.getUserToken(user, process.env.GLOBAL_ADMIN_PASSWORD);
@@ -127,12 +127,12 @@ async function poll(tokenObj, hashes) {
   console.log(`${user} create ${target.name}: ${final && final.status} | logic: ${impl || '(awaiting another vote)'}`);
   if (!impl) return;
 
-  const up = await rest.call(tokenObj, {
+  const up = await rest.call(tokenObj, await governedCallArgs(tokenObj, {
     contract: { address: target.proxy, name: 'Proxy' },
     method: 'setLogicContract',
     args: { _logicContract: impl },
     txParams: { gasPrice: 10, gasLimit: 5000000 },
-  }, { config, isAsync: true, cacheNonce: true });
+  }), { config, isAsync: true, cacheNonce: true });
   const uf = await poll(tokenObj, (Array.isArray(up) ? up : [up]).map(r => r && r.hash).filter(Boolean));
   console.log(`${user} setLogicContract(${target.proxy} -> ${impl}): ${uf && uf.status}`);
 })().catch(e => { console.error(process.env.GLOBAL_ADMIN_NAME || '', 'FAILED:', e.message.slice(0, 300)); process.exit(1); });

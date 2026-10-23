@@ -294,7 +294,8 @@ function saveState(env, nodeUrl, state) {
 
 /** A 64-hex return value from an AdminRegistry-owned call is the vote-issue id. */
 function issueIdFromReceipt(final) {
-  const v = final && final.txResult && final.txResult.response && final.txResult.response.v;
+  const vote = require('./util').getVoteResult(final);
+  const v = vote ? (vote.executed ? null : vote.value) : final && final.txResult && final.txResult.response && final.txResult.response.v;
   const value = Array.isArray(v) ? v[0] : v;
   return typeof value === 'string' && /^[0-9a-fA-F]{64}$/.test(value) ? value : null;
 }
@@ -340,8 +341,7 @@ async function submitImplementationDeploy(chain, impl, source) {
   const hashes = responseArray.map((r) => r && r.hash).filter(Boolean);
   if (hashes.length === 0) throw new Error('rest.createContract returned no tx hash: ' + JSON.stringify(response));
   const final = await awaitReceipt(chain, hashes, `${impl.name} implementation deployment`);
-  const created = final.txResult && final.txResult.contractsCreated;
-  const address = Array.isArray(created) ? created[0] : created;
+  const address = require('./util').getCreatedAddress(final);
   if (address) return { address: normalizeAddr(address) };
   const issueId = issueIdFromReceipt(final);
   if (issueId) return { issueId };
@@ -434,12 +434,12 @@ async function waitForEffect(checkFn, timeoutMs, label) {
 }
 
 async function repointProxy(chain, cirrus, label, proxyAddress, targetImpl, pollTimeoutMs) {
-  const receipt = await callContract(
-    chain,
-    { address: proxyAddress, name: 'Proxy' },
-    'setLogicContract',
-    { _logicContract: targetImpl }
-  );
+  const governed = await require('./util').governedCallArgs(chain.tokenObj, {
+    contract: { address: proxyAddress, name: 'Proxy' },
+    method: 'setLogicContract',
+    args: { _logicContract: targetImpl },
+  }, chain.nodeUrl);
+  const receipt = await callContract(chain, governed.contract, governed.method, governed.args);
   const issue = issueIdFromReceipt(receipt);
   if (issue) console.log(`  ${label}: governance vote issue ${issue}`);
   return waitForEffect(async () => {
