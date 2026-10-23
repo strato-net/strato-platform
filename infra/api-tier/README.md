@@ -176,6 +176,12 @@ cell's security group (`coreSecurityGroupId`) opens that port to the tasks, and
 the required health jobs leave out core-api (strato-api runs in this task).
 Without it apex reports health, consensus data and the node address as unknown.
 
+The task has no Redis, so apex is started with `redis_host=none` and reads the
+last block and the validator list from the Aurora mirror the writer cell
+maintains (`block_data_ref`, `node_status`). Without that setting apex tries
+the node's Redis first and every `/health` and `/status` waits out its 2 s
+connect timeout before falling back to the same tables.
+
 ## API docs
 
 The task runs Swagger UI (`swaggerapi/swagger-ui`) as the `docs` container on
