@@ -14,13 +14,20 @@
 // None of these can live in storage — payFees is DELEGATECALLed and SolidVM storage
 // is name-keyed, so a state read there resolves against the signer, not the router.
 //
-//   node gen-feerouter-source.js [helium|upquark] --pool <poolAddress> [--activate <block>] [contractName]
+//   node gen-feerouter-source.js [helium|upquark] --pool <poolAddress> [--activate <block>] [--min-liquidity <L>] [contractName]
 //   node gen-feerouter-source.js <stakingAddress> --pool <poolAddress> [contractName]   (helium STRATO)
 //
 // --activate: the block from which the router burns STRATO and pays rewards; before
 // it the router charges the legacy fee (voucher, else 0.01 USDST to FeeCollector)
 // and can be installed early. It must equal that network's `stratoGasForkBlock`
 // (strato-conf Model.hs), so fees and the native token switch at the same block.
+//
+// --min-liquidity: the pool liquidity (PoolV3 `liquidity()`, about sqrt(STRATO wei x
+// USDST wei) for a full-range position) below which the router stops pricing and the
+// last quote ages out after the grace period. Required for upquark: without a floor
+// an emptied pool still serves its last tick from the observation ring, so the
+// router would quote a stale price forever (seen live on helium 2026-10-23). Read the
+// seeded pool's liquidity from `strato-gas-helium.js status` and pass a fraction of it.
 //
 // Before installing, check the pool prices: once the router is deployed, read
 // stratoFeeQuote() after a block has run payBlockRewards; `valid` stays false until
@@ -56,8 +63,14 @@ if (activateIdx >= 0 && !/^[0-9]+$/.test(activate)) {
   console.error('FAILED: --activate <block> takes a block number');
   process.exit(1);
 }
-const flagValues = [poolIdx, activateIdx].filter(i => i >= 0).map(i => i + 1);
-const positional = argv.filter((a, i) => !['--pool', '--activate'].includes(a) && !flagValues.includes(i));
+const minLiquidityIdx = argv.indexOf('--min-liquidity');
+const minLiquidity = minLiquidityIdx >= 0 ? argv[minLiquidityIdx + 1] : '';
+if (minLiquidityIdx >= 0 && !/^[1-9][0-9]*$/.test(minLiquidity)) {
+  console.error('FAILED: --min-liquidity <L> takes a positive pool liquidity');
+  process.exit(1);
+}
+const flagValues = [poolIdx, activateIdx, minLiquidityIdx].filter(i => i >= 0).map(i => i + 1);
+const positional = argv.filter((a, i) => !['--pool', '--activate', '--min-liquidity'].includes(a) && !flagValues.includes(i));
 
 const arg = (positional[0] || 'helium').replace(/^0x/, '');
 let network;
@@ -70,6 +83,10 @@ if (NETWORKS[arg]) {
   process.exit(1);
 }
 const NAME = positional[1] || network.name;
+if (network.label === 'upquark' && !minLiquidity) {
+  console.error('FAILED: upquark needs --min-liquidity <L>: an unfloored router keeps quoting a drained pool');
+  process.exit(1);
+}
 
 const base = fs.readFileSync(
   path.join(__dirname, '../concrete/Staking/FeeRouter.sol'),
@@ -92,6 +109,14 @@ const activationOverride = activate ? `
     }
 ` : '';
 
+const liquidityOverride = minLiquidity ? `
+    // Below this pool liquidity the router stops pricing; the last quote then
+    // ages out after the grace period and only vouchers pay until the pool refills.
+    function _minPoolLiquidity() internal view override returns (uint) {
+        return ${minLiquidity};
+    }
+` : '';
+
 const subclass = `
 // Deployment wiring for ${network.label}. Installed with
 // DeciderState(0xDEC1DE02).updatePayFeeContract.
@@ -105,9 +130,9 @@ contract record ${NAME} is FeeRouter {
     function _pool() internal view override returns (address) {
         return address(0x${pool});
     }
-${stakingOverride}${activationOverride}}
+${stakingOverride}${activationOverride}${liquidityOverride}}
 `;
 
 fs.writeFileSync(OUT, base.trimEnd() + '\n' + subclass);
 console.log(`${OUT} written: ${fs.statSync(OUT).size} bytes | ${network.label} | contract ${NAME} | ` +
-  `STRATO ${network.strato} | pool ${pool} | staking ${network.staking || '(governance only)'} | activation ${activate || 'genesis'}`);
+  `STRATO ${network.strato} | pool ${pool} | staking ${network.staking || '(governance only)'} | activation ${activate || 'genesis'} | liquidity floor ${minLiquidity || 'none'}`);

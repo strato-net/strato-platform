@@ -5,7 +5,8 @@
 //   node strato-gas-helium.js unpause                      (STRATO.unpause; vote, run per admin)
 //   node strato-gas-helium.js create-pool [usdstPerStrato] (createPoolV3; vote, run per admin)
 //   node strato-gas-helium.js seed-pool <pool> <usdst>     (grow the ring + full-range mint, as a funded account)
-//   node strato-gas-helium.js swap <pool> <usdstIn>        (USDST -> STRATO, writes an observation)
+//   node strato-gas-helium.js swap <pool> <amountIn> [strato] (USDST -> STRATO, or STRATO -> USDST; writes an observation)
+//   node strato-gas-helium.js burn <pool>                  (remove the caller's full-range liquidity; seed-pool restores it)
 //   node strato-gas-helium.js transfer <to> <strato>       (STRATO.transfer)
 //
 // Ownable turns a non-owner call into an AdminRegistry vote and the tx still reports
@@ -122,7 +123,7 @@ async function recentSecondsPerBlock() {
 }
 
 (async () => {
-  const [cmd, a1, a2] = process.argv.slice(2);
+  const [cmd, a1, a2, a3] = process.argv.slice(2);
   if (!cmd || cmd === 'status') return status(a1);
 
   const { tokenObj, key } = await login();
@@ -167,11 +168,24 @@ async function recentSecondsPerBlock() {
     const row = await findPool();
     if (!row || row.address !== pool) throw new Error(`${pool} is not the canonical STRATO/USDST pool`);
     const amountIn = (BigInt(a2) * WAD).toString();
-    await callAsync(tokenObj, token(USDST), 'approve', { spender: pool, value: amountIn });
+    const tokenIn = a3 === 'strato' ? STRATO : USDST;
+    await callAsync(tokenObj, token(tokenIn), 'approve', { spender: pool, value: amountIn });
     await callAsync(tokenObj, { address: pool, name: 'PoolV3' }, 'swap', {
-      recipient: key, zeroForOne: row.token0 === USDST, amountSpecified: amountIn,
+      recipient: key, zeroForOne: row.token0 === tokenIn, amountSpecified: amountIn,
       sqrtPriceLimitX96: 0, amountLimit: 1, deadline: Math.floor(Date.now() / 1000) + 3600,
     });
+    await status();
+  } else if (cmd === 'burn') {
+    const pool = a1.replace(/^0x/, '');
+    const { data: [pos] } = await axios.get(`${cirrusUrl}/BlockApps-PoolV3-positions`, {
+      params: { address: `eq.${pool}`, key: `eq.${key.toLowerCase()}`, key2: `eq.${-FULL_RANGE}`, key3: `eq.${FULL_RANGE}`, select: 'value' }, timeout: 30000,
+    });
+    const liquidity = pos ? pos.value.liquidity : '0';
+    console.log(`Burning liquidity ${liquidity}`);
+    const deadline = Math.floor(Date.now() / 1000) + 3600;
+    await callAsync(tokenObj, { address: pool, name: 'PoolV3' }, 'burn', { tickLower: -FULL_RANGE, tickUpper: FULL_RANGE, amount: liquidity, deadline });
+    const max = (2n ** 128n - 1n).toString();
+    await callAsync(tokenObj, { address: pool, name: 'PoolV3' }, 'collect', { recipient: key, tickLower: -FULL_RANGE, tickUpper: FULL_RANGE, amount0Requested: max, amount1Requested: max });
     await status();
   } else if (cmd === 'transfer') {
     await callAsync(tokenObj, token(STRATO), 'transfer', { to: a1.replace(/^0x/, ''), value: (BigInt(a2) * WAD).toString() });
