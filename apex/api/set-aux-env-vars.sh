@@ -36,7 +36,8 @@ export vaultUrl=$(yq '.urlConfig.vaultUrl' "$ETHCONF_FILE")
 # container reaches by its service name; a host-local address on another port
 # is a Redis running on the docker host, reached through the host gateway
 # like strato-api; anything else is an external Redis, reached as configured.
-# An explicit redis_host (an API-tier task) wins.
+# An explicit redis_host (an API-tier task) wins; "none" tells apex there is
+# no Redis to read, and its block and validator reads go straight to SQL.
 if [ -z "${redis_host:-}" ]; then
   _redis_host=$(yq '.redisBlockDBConfig.redisHost' "$ETHCONF_FILE")
   _redis_port=$(yq '.redisBlockDBConfig.redisPort' "$ETHCONF_FILE")
