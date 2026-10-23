@@ -8,9 +8,15 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
+  - asn1-encoding
+  - asn1-types
+  - base16-bytestring
   - blockapps-vault-wrapper-api
   - composable-monads-base
   - blockapps-vault-wrapper-client
   - bytestring
   - mtl
+  - pem
   - strato-auth
+  - strato-conf
+  - strato-model

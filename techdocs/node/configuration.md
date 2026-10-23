@@ -22,19 +22,20 @@ strato-up mynode --network=helium --sslDir=/path/to/ssl --snapshot
 | `--network` | `upquark` | Network to join: `upquark` (mainnet), `helium` (testnet) or `lithium` (local development, no bootnodes). See [Networks](../platform/networks.md). |
 | `--sslDir` | *(empty)* | Directory holding `server.pem` and `server.key`. Setting it enables HTTPS on 443 and redirects HTTP to HTTPS. |
 | `--localAuth` | `false` | Use the bundled identity provider (Ory Kratos and Hydra) and a node-local Vault instead of external Keycloak and the shared Vault. |
+| `--localKey` | `false` | Validator only: keep the node key in `secrets/node_key.pem` instead of a Vault, so the validator needs no identity service and no `strato-login`. See [Local key](#local-key). |
 | `--httpPort` | `8081` | nginx HTTP port. |
 | `--p2pPort` | `30303` | TCP port `strato-p2p` listens on; `ethereum-discover` advertises it to peers. With `--dockerMode=all` the `strato` container publishes it. |
 | `--discoveryPort` | `30303` | UDP port `ethereum-discover` listens on, published the same way. |
 | `--nodeHost` | *(the machine's host name)* | The node's public host name. The node URL, the auth cookie domain and, with `--localAuth`, the OpenID discovery URL are built from it. See [Host name](#host-name). |
 | `--dockerMode` | `services` | What runs in Docker. `services`: only the service containers, the node processes run on the host under `convoke`. `all`: the node processes too, in a `strato` container of the generated `docker-compose.yml`; `strato-up` then starts and stops the compose project. See [Run from prebuilt images](prebuilt.md). |
 | `--repoUrl` | *(empty)* | Registry prefix of the node's images in `docker-compose.yml`, for example `ghcr.io/strato-net/strato-platform/`. `strato-up --prebuilt` sets it. |
-| `--vaultUrl` | `https://vault.blockapps.net:8093/strato/v2.3` | Vault that holds the node key and user keys. Ignored with `--localAuth`, which uses the node-local Vault. |
+| `--vaultUrl` | `https://vault.blockapps.net:8093/strato/v2.3` | Vault that holds the node key and user keys. Ignored with `--localAuth`, which uses the node-local Vault, and with `--localKey`, which uses no Vault. |
 | `--vaultTimeoutSec` | `12` | HTTP response timeout, in seconds, for Vault key and signature requests. |
 | `--jsonrpc` | `true` | Run the Ethereum JSON-RPC server (`ethereum-jsonrpc`, port 8545) and expose it at `/rpc`. |
 | `--role` | `node` | What the directory runs: `node` (everything), `core`, `api`, `validator` (a lite validator with only the chain processes, their stores and apex) or `api-node` (a full node without the app, SMD and Swagger docs). See [Validator mode](#validator-mode) and [API node](#api-node). |
 | `--monitoring` | `true` | API node only: `false` drops the `prometheus` and `apex` containers, and with them `/health`. Refused with any other `--role`. See [API node](#api-node). |
 | `--publicStratoRpc` | `false` | Allow the `strato_*` simulation and trace methods on the public `/rpc` endpoint. |
-| `--generateKey` | `true` | During setup, create a node key in the Vault if none exists. When `false`, setup waits for the key to be inserted manually. |
+| `--generateKey` | `true` | During setup, create a node key in the Vault if none exists. When `false`, setup waits for the key to be inserted manually. Ignored with `--localKey`. |
 
 ### Snapshot flags
 
@@ -82,7 +83,7 @@ Main sections:
 | Section | Contains |
 |---|---|
 | `networkConfig` | `network`, `role` (what the directory was set up as, `node` unless `--role` was given), `networkID`, `chainId`, `httpPort`, `txSizeLimit`, `gasLimit`, `blockPeriodMs`, `roundPeriodS`, and the staking activation settings |
-| `urlConfig` | `nodeUrl` (from the host name), `vaultUrl`, `vaultTimeoutSec`, `cookieRealm` |
+| `urlConfig` | `nodeUrl` (from the host name), `vaultUrl`, `vaultTimeoutSec`, `cookieRealm`; on a validator with `--localKey`, `nodeKeyFile` |
 | `p2pConfig`, `discoveryConfig` | Peer limits and timeouts |
 | `quarryConfig` | Block building: `maxTxsPerBlock`, `mempoolLivenessCutoff` |
 | `sqlConfig`, `cirrusConfig`, `redisBlockDBConfig` | Database connections |
@@ -94,7 +95,7 @@ Main sections:
 | Path | Contents |
 |---|---|
 | `.ethereumH/` | `ethconf.yaml` and the node's chain databases |
-| `secrets/` | `postgres_password`, `oauth_credentials.yaml`, `ssl/` (copied certificate and key); with `--localAuth`, also `vault_password` and the local-auth secrets |
+| `secrets/` | `postgres_password`, `oauth_credentials.yaml`, `ssl/` (copied certificate and key); with `--localAuth`, also `vault_password` and the local-auth secrets; with `--localKey`, `node_key.pem` and `node_address` instead of `oauth_credentials.yaml` |
 | `docker-compose.yml` | The generated container definitions, pinned to the image tags of the build that created the node |
 | `commands.txt` | The node processes `convoke` runs, with their runtime flags |
 | `genesis.json` | The genesis block |
@@ -119,6 +120,7 @@ All environment variables are optional.
 | `STRATO_SNAPSHOT_DOWNLOAD_DIR` | `strato-snapshot` | Download cache (default `./.snapshot-downloads`). |
 | `LOCAL_AUTH_ADMIN_USERNAME` | `strato-up`, `strato-user-add` | First admin username with `--localAuth` (default `admin`). |
 | `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET` | `strato-setup` | With `--localAuth` only: fixed client credentials for the local identity provider. Random values are generated otherwise. |
+| `STRATO_NODE_KEY` | `strato-setup` | With `--localKey` only: the node key to import, as PEM text or 64 hex characters. A new key is generated otherwise. See [Local key](#local-key). |
 
 Where these variables take effect:
 
@@ -165,12 +167,32 @@ What runs:
 
 What doesn't: the app, SMD, nginx, PostgREST, Swagger docs, `slipstream` (so no `cirrus` database, which is most of a full node's disk), `strato-api` and `ethereum-jsonrpc`. The indexer keeps only the Redis block index that `strato-p2p` serves peers from, so the `eth` database holds nothing but the peer tables. `vm-runner` neither mirrors state into SQL nor publishes the `vmevents` stream: nothing would read it, and JLog only trims what a reader has passed.
 
-- **Identity.** The node key still comes from the Vault, so [store your OAuth credentials](install.md#4-store-your-oauth-credentials) first. `--localAuth` is refused.
+- **Identity.** By default the node key comes from the Vault, so [store your OAuth credentials](install.md#4-store-your-oauth-credentials) first; with `--localKey` it is a file in the node directory and no identity service is involved (see [Local key](#local-key)). `--localAuth` is refused.
 - **Snapshots.** `--snapshot` restores the chain state, Redis and JLog only; the eth and cirrus dumps are skipped (`strato-snapshot restore --skip-databases`).
 - **Monitoring.** apex serves `/health` and `/status` on port 80 over plain HTTP, so the network monitor can watch the validator: register it there as protocol `http` with host `<host>`. Port 80 is one of the few a CDN such as Cloudflare proxies, so the endpoint can sit behind one. There is no nginx and no TLS on a validator, and port 80 serves apex alone: `/health`, `/status`, `/_ping` and the Prometheus `/metrics`. apex registers neither its `/user` key endpoint nor the SMD socket rooms on a validator, and there is no `/rpc`. `/health` carries only public data (block, PBFT view, node address, health flags), but restrict the port to the monitor's address all the same. `strato-ps` shows the sync position locally.
 - **Ports.** 30303 (TCP and UDP) for peers, or `--p2pPort` and `--discoveryPort`, and 80 for the monitor.
 - **Resources.** The host still needs the validator minimum of 8 GB of RAM. What you save is Cirrus's disk and the app's memory.
 - **Changing your mind.** The role is fixed when the directory is created, like every other flag. To turn a validator into a full node, create a new directory.
+
+### Local key
+
+`--localKey` keeps the validator's node key in the node directory, so the validator depends on no identity service: no Keycloak, no shared Vault, no `strato-login`. Only `--role=validator` accepts it; every other role that holds a node key also signs user transactions through the Vault and keeps the identity stack.
+
+```bash
+strato-up myvalidator --role=validator --localKey --network=helium --snapshot
+```
+
+- **The key file.** `secrets/node_key.pem` is an unencrypted secp256k1 key in the standard `EC PRIVATE KEY` PEM form, mode `0600`, the same kind of file as `secrets/ssl/server.key`. `openssl ec -in secrets/node_key.pem -text -noout` shows it. `secrets/node_address` holds the node's address as 40 hex characters without `0x` (the form the `pbft_node_identity` metric and the staking contracts use), and `ethconf.yaml` points at the key with `urlConfig.nodeKeyFile`. The three processes that sign (`ethereum-discover`, `strato-p2p`, `strato-sequencer`) load the key once at startup and sign in-process; signatures and handshakes are the same as with a Vault-held key, so peers see no difference. A missing or unusable key file stops those processes at startup with a message naming the file.
+- **A new validator** gets a freshly generated key. Back up `secrets/node_key.pem`: it is the only copy of the validator's identity, and snapshots never include `secrets/`. Give the address to whoever manages the validator set; until it is added the node syncs and follows the chain but does not propose.
+- **Restoring or moving a validator.** Either place the file at `<dir>/secrets/node_key.pem` before running `strato-up`, or pass the key in the environment, as PEM text or 64 hex characters:
+
+    ```bash
+    STRATO_NODE_KEY="$(cat node_key.pem)" strato-up myvalidator --role=validator --localKey --network=helium --snapshot
+    ```
+
+    A key file already in the directory is kept (and set to mode `0600` if it was copied in more openly); `STRATO_NODE_KEY` may then only repeat the same key. `strato-up` passes the variable to `strato-setup` (into the setup container with `--prebuilt`) and unsets it before starting anything else, so set it for that one run only. Keys made elsewhere work as long as they are secp256k1 with the curve named (`openssl ecparam -name secp256k1 -genkey -noout -out node_key.pem`; the `EC PARAMETERS` block openssl writes without `-noout` is skipped); PKCS#8 `PRIVATE KEY` PEM is accepted too. Keys with explicit curve parameters, keys that do not name their curve, and passphrase-protected PEM are refused: the validator restarts unattended, so there is nobody to type a passphrase.
+- **No passphrase.** Anyone who can read `secrets/` has the key, as with `--localAuth`, whose keys sit in the node's own Postgres next to `secrets/vault_password`. Keep the directory on a host only the operator can log in to.
+- **Changing mode.** `--regenerate` keeps the key file. A Vault-keyed validator regenerated with `--localKey` needs the key brought along (`STRATO_NODE_KEY`, or the file in place); setup refuses to generate one, since that would be a new identity. Dropping `--localKey` from a local-key validator is refused too: moving a file key into the Vault is not supported.
 
 ## API node
 

@@ -53,7 +53,7 @@ If `~/.local/bin` is not on your `PATH`, `make` prints a note. Run `source ~/.pr
 
 ## 4. Store your OAuth credentials
 
-Skip this step if you will run the node with `--localAuth`.
+Skip this step if you will run the node with `--localAuth`, or a validator with `--localKey`.
 
 Run `strato-login` once:
 

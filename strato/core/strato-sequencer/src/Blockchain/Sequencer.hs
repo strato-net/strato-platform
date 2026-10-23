@@ -21,7 +21,6 @@ module Blockchain.Sequencer (
 
 import BlockApps.Logging
 import Blockchain.Blockstanbul
-import Blockchain.EthConf (ethConf, urlConfig, vaultUrl)
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
@@ -39,14 +38,13 @@ import Blockchain.Strato.Model.Class as BDB
 import Blockchain.Strato.Model.Keccak256
 import Conduit
 import Control.Concurrent hiding (yield)
-import qualified Control.Exception as E
 import Control.Monad (forever, forM, unless, void, when)
 import qualified Data.ByteString as B
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Base (runEff)
 import Control.Monad.Composable.Streaming
-import Control.Monad.Composable.Vault (runVaultM, getPub)
+import Control.Monad.Catch (MonadCatch, SomeException, try)
+import Control.Monad.Composable.Vault (HasVault, getPub)
 import Data.Foldable
 import Data.Maybe
 import Data.Proxy
@@ -89,29 +87,30 @@ logFF str = $logInfoS str . T.pack
 -- replace with this when debugging tests
 --logFF str msg = void . return $! traceShowId $! trace (T.unpack str) msg
 
+-- | The node's own address, from the key backend this monad already carries
+-- (the Vault, or a --localKey validator's key loaded at startup). A Vault that
+-- is not reachable yet is retried on the next call.
 tryResolveSelfAddr ::
-  (MonadIO m, MonadLogger m, HasBlockstanbulContext m) =>
+  (MonadCatch m, MonadLogger m, HasBlockstanbulContext m, HasVault m) =>
   m (Maybe Address)
 tryResolveSelfAddr = do
   ctx <- getBlockstanbulContext
   case _selfAddr ctx of
     Just addr -> return (Just addr)
     Nothing -> do
-      let vaultUrl' = vaultUrl . urlConfig $ ethConf
-      result <- liftIO $ E.try @E.SomeException $ runEff $ runLogging $ runVaultM vaultUrl' $ do
-        pubKey <- getPub
-        return $ fromPublicKey pubKey
+      result <- try (fromPublicKey <$> getPub)
       case result of
         Right addr -> do
           $logInfoS "sequencer" $ "Node identity resolved: " <> T.pack (format addr)
           putBlockstanbulContext ctx { _selfAddr = Just addr }
           return (Just addr)
-        Left _err -> do
-          $logDebugS "sequencer" "Node identity not available from Vault yet"
+        Left (_err :: SomeException) -> do
+          $logDebugS "sequencer" "Node identity not available yet"
           return Nothing
 
 type MonadSequencer m =
-  ( MonadLogger m,
+  ( MonadCatch m,
+    MonadLogger m,
     MonadMonitor m,
     MonadBlockstanbul m,
     (Keccak256 `A.Alters` DependentBlockEntry) m,

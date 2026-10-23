@@ -36,7 +36,7 @@ import Data.Text (Text)
 import GHC.Stack
 import SQLM
 import Servant.Client (ClientM)
-import Strato.Auth.Client (runWithAuth, runWithUserToken)
+import Strato.Auth.Client (AuthEnv, runWithAuth, runWithUserToken)
 import UnliftIO hiding (Handler (..))
 
 data Should a = Don't a | Do a
@@ -71,7 +71,7 @@ blocVaultWrapper ::
   m x
 blocVaultWrapper client' = do
   logInfoCS callStack "Querying Vault"
-  env <- access Proxy
+  env <- remoteVaultEnv =<< access Proxy
   resultEither <- liftIO $ runWithAuth env client'
   either (blocError . VaultWrapperError) return resultEither
 
@@ -82,9 +82,16 @@ blocVaultWrapperWithUserToken ::
   m x
 blocVaultWrapperWithUserToken userToken client' = do
   logInfoCS callStack "Querying Vault with user token"
-  env <- access Proxy
+  env <- remoteVaultEnv =<< access Proxy
   resultEither <- liftIO $ runWithUserToken env userToken client'
   either (blocError . VaultWrapperError) return resultEither
+
+-- | Bloc signs user transactions through the Vault. A node whose key is a
+-- local file (a --localKey validator) runs no Bloc, so the other case never
+-- occurs at runtime.
+remoteVaultEnv :: MonadIO m => VaultData -> m AuthEnv
+remoteVaultEnv (RemoteVault env) = return env
+remoteVaultEnv (LocalKey _) = throwIO $ CouldNotFind "a Vault: this node holds a local node key"
 
 blocMaybe :: MonadIO m => Text -> Maybe x -> m x
 blocMaybe msg = maybe (throwIO (CouldNotFind msg)) return

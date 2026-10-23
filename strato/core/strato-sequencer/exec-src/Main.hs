@@ -63,8 +63,9 @@ main = do
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
   putStrLn $ "strato-sequencer network: " ++ show (Conf.network (networkConfig ethConf))
   putStrLn $ "strato-sequencer validators: " ++ show validators
-  let vaultUrl' = vaultUrl . urlConfig $ ethConf
-  putStrLn $ "strato-sequencer vault URL: " ++ vaultUrl'
+  putStrLn $ case nodeKeyFile (urlConfig ethConf) of
+    Just keyFile -> "strato-sequencer node key: " ++ keyFile ++ " (local)"
+    Nothing -> "strato-sequencer vault URL: " ++ vaultUrl (urlConfig ethConf)
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
 
   pkg <- atomically newCablePackage
@@ -111,6 +112,6 @@ main = do
             kafkaClientId = fromString flags_kafkaclientid,
             redisConn = RBDB.RedisConnection conn
           }
-  race_ (runEff . runLogging $ runSequencerM vaultUrl' seqCfg ctx sequencer)
+  race_ (runEff . runLogging $ runSequencerM ethConf seqCfg ctx sequencer)
     . runSettings (setHost (fromString $ Conf.apiListenAddress $ Conf.apiConfig ethConf) $ setPort 8050 defaultSettings)
     $ metricsApp

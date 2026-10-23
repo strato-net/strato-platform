@@ -67,7 +67,7 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base (AccessibleEnv, Eff, InternalState, Logger, ReaderEnv, StateCell, evalStateEff, withReaderEnv, withResources)
 import Control.Monad.Composable.Streaming
-import Control.Monad.Composable.Vault (HasVault, VaultData, runVaultM)
+import Control.Monad.Composable.Vault (HasVault, VaultData, runNodeKeyM)
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Conduit.TMChan
@@ -229,10 +229,12 @@ commitSequencerState = do
       Right _ -> pendingBestSequencedBlock .= Nothing)
 
 
-runSequencerM :: String -> SequencerConfig -> BlockstanbulContext -> SequencerM a -> Eff '[Logger] a
-runSequencerM vaultUrl' c bc m = do
+-- | The node key comes from wherever the configuration says: the Vault, or
+-- the key file of a --localKey validator.
+runSequencerM :: EthConf -> SequencerConfig -> BlockstanbulContext -> SequencerM a -> Eff '[Logger] a
+runSequencerM conf c bc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  runVaultM vaultUrl' . withResources . runStreamMConfigured (kafkaClientId c) $ do
+  runNodeKeyM conf . withResources . runStreamMConfigured (kafkaClientId c) $ do
     let dbCS = depBlockDBCacheSize c
         dbPath = depBlockDBPath c
         stxSize = seenTransactionDBSize c

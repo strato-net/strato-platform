@@ -24,6 +24,7 @@ module Blockchain.Init.Role
     roleIndexesSql,
     roleRunsLocalAuth,
     roleAllowsMonitoringOff,
+    roleAllowsLocalKey,
   )
 where
 
@@ -82,3 +83,11 @@ roleRunsLocalAuth role = role `elem` [RoleNode, RoleApiNode]
 -- Anywhere else the flag would be a silent no-op, so setup refuses it.
 roleAllowsMonitoringOff :: Role -> Bool
 roleAllowsMonitoringOff = (== RoleApiNode)
+
+-- | May keep its node key in a file in the node directory (@--localKey@)
+-- instead of a Vault: only a validator, whose processes sign nothing but
+-- consensus messages, handshakes and discovery packets with that one key.
+-- Every other role that holds a node key also signs user transactions
+-- through the Vault (strato-api, Bloc), so it keeps the identity stack.
+roleAllowsLocalKey :: Role -> Bool
+roleAllowsLocalKey = (== RoleValidator)

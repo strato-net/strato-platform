@@ -24,6 +24,7 @@ library
       Blockchain.Init.BuildMetadata
       Blockchain.Init.BuildMetadata.TH
       Blockchain.Init.Monad
+      Blockchain.Init.NodeKey
       Blockchain.Init.Options
       Blockchain.Init.Role
       Blockchain.Init.RtsFlags
@@ -70,6 +71,7 @@ library
     , turtle
     , unix
     , unliftio
+    , vault-monad
     , yaml
   default-language: Haskell2010
 
@@ -112,7 +114,18 @@ test-suite strato-init-test
       test/
   ghc-options: -Wall -O2 -threaded -Wall -threaded
   build-depends:
-      base
+      asn1-encoding
+    , asn1-types
+    , base
+    , base16-bytestring
+    , bytestring
+    , composable-monads-base
+    , filepath
     , hspec
+    , pem
     , strato-init
+    , strato-model
+    , temporary
+    , unix
+    , vault-monad
   default-language: Haskell2010
