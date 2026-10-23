@@ -57,6 +57,26 @@ export function useAdminRegistryLogic() {
   return { logic: q.data ?? "", ...q };
 }
 
+/**
+ * A contract's owner when that owner is a governance registry (the AdminRegistry
+ * or a multisig wallet, both of which keep a voting threshold): the contract's
+ * owner-only methods must be voted through `owner.castVoteOnIssue`. "" otherwise.
+ */
+export function useGovernanceOwner(contractAddress?: string | null) {
+  const q = useQuery({
+    queryKey: ["governance-owner", contractAddress],
+    enabled: !!contractAddress,
+    staleTime: 60_000,
+    queryFn: async (): Promise<string> => {
+      const owner = strip0x(String((await fetchStorageData(contractAddress!))["_owner"] ?? ""));
+      if (!owner || isZeroAddr(owner)) return "";
+      const ownerData = await fetchStorageData(owner);
+      return ownerData["defaultVotingThresholdBps"] !== undefined ? owner : "";
+    },
+  });
+  return { owner: q.data ?? "", ...q };
+}
+
 export interface MultisigConfig {
   /** logic contract the wallet currently delegates to (empty/zero if none). */
   logicContract: string;

@@ -4,6 +4,7 @@ import { Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AddressInput } from "@/components/AddressInput";
 import { WalletSelect } from "@/components/contracts/WalletSelect";
 import {
@@ -20,6 +21,7 @@ import { SimulateButton } from "@/components/simulation/SimulateButton";
 import { SimulationResultPanel } from "@/components/simulation/SimulationResultPanel";
 import { useUser } from "@/context/UserContext";
 import type { FuncArg } from "@/services/contracts";
+import { useGovernanceOwner } from "@/services/multisig";
 
 interface MethodCallerProps {
   contractName: string;
@@ -51,6 +53,11 @@ export function MethodCaller({
   // "" = call directly from the connected account; otherwise route the call through
   // this User wallet (the node wraps it as wallet.callContract).
   const [walletUsername, setWalletUsername] = useState("");
+  // Owner-only methods of a registry-owned contract only run when voted through
+  // the owner, so offer proposing the call as owner.castVoteOnIssue instead.
+  const { owner: govOwner } = useGovernanceOwner(open ? contractAddress : null);
+  const [viaOwner, setViaOwner] = useState(false);
+  const governed = !!govOwner && viaOwner;
   const [showSource, setShowSource] = useState(false);
   const [value, setValue] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
@@ -64,15 +71,20 @@ export function MethodCaller({
   const simReset = sim.reset;
   useEffect(() => {
     simReset();
-  }, [simReset, values, resolvedAddrs, walletUsername, value, open]);
+  }, [simReset, values, resolvedAddrs, walletUsername, value, open, governed]);
+
+  // Address params may have been entered as a username — use the resolution.
+  const rawArg = (a: FuncArg) =>
+    isPlainAddressType(a.type) ? resolvedAddrs[a.name] || values[a.name] : values[a.name];
+  // castVoteOnIssue takes the args positionally, so none may be left out.
+  const missingArg = governed && args.some((a) => !rawArg(a));
 
   // Build the FUNCTION payload once, so Simulate and Call submit identical data.
   const buildFunctionPayload = (): Record<string, unknown> => {
     const parsed: Record<string, unknown> = {};
     for (const a of args) {
       const isAddressArg = isPlainAddressType(a.type);
-      // Address params may have been entered as a username — use the resolution.
-      const raw = isAddressArg ? resolvedAddrs[a.name] || values[a.name] : values[a.name];
+      const raw = rawArg(a);
       if (raw === undefined || raw === "") continue;
       // Keep string- and address-typed params verbatim ("123" stays a string;
       // an all-digit address must not become a number); everything else gets a
@@ -85,6 +97,16 @@ export function MethodCaller({
       // Wrap with the declared Solidity type so bloc doesn't have to guess
       // (e.g. "0x64" is an address, not the number 100).
       parsed[a.name] = a.type ? { type: a.type, value: parsedValue } : parsedValue;
+    }
+    if (governed) {
+      return {
+        contractName: "AdminRegistry",
+        contractAddress: govOwner,
+        value: 0,
+        method: "castVoteOnIssue",
+        args: { _target: contractAddress, _func: method, _args: args.map((a) => parsed[a.name]) },
+        metadata: {},
+      };
     }
     return {
       contractName,
@@ -107,7 +129,9 @@ export function MethodCaller({
         walletUsername ? { username: walletUsername } : undefined
       );
       setResult(res);
-      toast.success(`Called ${method}`);
+      // castVoteOnIssue returns (executed, result-or-issueId).
+      const voted = governed && res?.data?.contents?.[0] === false;
+      toast.success(voted ? `Vote recorded for ${method}` : `Called ${method}`);
     } catch (err: any) {
       const msg = typeof err === "string" ? err : String(err?.message || err);
       setError(msg);
@@ -151,6 +175,17 @@ export function MethodCaller({
             <Field label="Wallet">
               <WalletSelect value={walletUsername} onChange={setWalletUsername} />
             </Field>
+
+            {govOwner ? (
+              <Field label="Governance">
+                <label className="flex items-center gap-2 text-xs">
+                  <Checkbox checked={viaOwner} onCheckedChange={(c) => setViaOwner(c === true)} />
+                  <span>
+                    Vote through owner <span className="font-mono">{govOwner}</span> (castVoteOnIssue)
+                  </span>
+                </label>
+              </Field>
+            ) : null}
 
             {signature ? (
               <div>
@@ -268,10 +303,10 @@ export function MethodCaller({
               Cancel
             </Button>
             {sim.canSimulate ? (
-              <SimulateButton onClick={simulate} pending={sim.pending} disabled={!canSubmit} />
+              <SimulateButton onClick={simulate} pending={sim.pending} disabled={!canSubmit || missingArg} />
             ) : null}
-            <Button onClick={submit} disabled={pending || !canSubmit}>
-              {pending ? "Calling…" : "Call Method"}
+            <Button onClick={submit} disabled={pending || !canSubmit || missingArg}>
+              {pending ? "Calling…" : governed ? "Propose" : "Call Method"}
             </Button>
           </DialogFooter>
         </DialogContent>
