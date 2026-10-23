@@ -292,7 +292,9 @@ export MALLOC_ARENA_MAX=2
 # "-p", drops an output it can no longer write (the gone terminal, a closed
 # pipe) instead of exiting: a dead tee leaves convoke's pipe without a reader.
 : > logs/convoke.log
-nohup convoke > >(trap '' HUP; tee -a -p logs/convoke.log >/dev/null) 2> >(trap '' HUP; tee -a -p logs/convoke.log >&2) &
+# BSD tee (macOS) has no "-p"; there a closed output ends that tee as before.
+TEE_P=""; tee -p </dev/null >/dev/null 2>&1 && TEE_P="-p"
+nohup convoke > >(trap '' HUP; tee -a $TEE_P logs/convoke.log >/dev/null) 2> >(trap '' HUP; tee -a $TEE_P logs/convoke.log >&2) &
 CONVOKE_PID=$!
 echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
 

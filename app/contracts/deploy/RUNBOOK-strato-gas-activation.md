@@ -75,7 +75,7 @@ and then charges vouchers only until pricing returns.
 |---|---|---|
 | Identical results across validators | audit *nodes agree* | 5 of 5 at the same height, one hash (node5 still on the pre-step-4 build, so mixed builds agree before the fork) |
 | Quote and reward exactly once per block, in the same block | contract `it_pays_block_rewards_at_most_once_per_block`, `it_prices_and_rewards_in_the_same_block`; audit *one STRATO quote per block*, *one block reward per block* | 24,918 of each over 24,918 blocks |
-| Replay from genesis across the router install | **owed**: `strato-up --network=helium` from genesis (or a snapshot older than 803253) on the release build must reach the tip with the validators' hash. The Jenkins Deploy stage does not sync to tip, so it is not evidence |
+| Replay from genesis across the router install | `strato-up --network=helium` from genesis on the release build must reach the tip with the validators' hash. The Jenkins Deploy stage does not sync to tip, so it is not evidence | PASS 2026-10-23: build 19.6-bfede46 synced from genesis in 4 h (16:39Z to 20:39Z) and at 838918 matched all 5 validators on hash `5754d0c2…6fc3`, stateRoot, receiptsRoot and transactionsRoot (a matching tip hash covers every ancestor, including the 803253 install and the 836440 manipulation blocks). No mismatch, fatal or missing-root line in the runner or sequencer logs |
 
 ### 6. Activation rules stay reproducible
 
@@ -128,7 +128,7 @@ after A keeps STRATO as gas.
 
 - Redeploy the runner fix for FeePaid logs in receipts, then re-run the audit (gate 1).
 - Oracle-recovery live run needs a router with a liquidity floor (gate 3).
-- Replay from genesis on the release build, before and after helium 900000 (gates 5, 6).
+- Replay from genesis on the release build after helium 900000 (gate 6); the pre-fork replay passed 2026-10-23 (gate 5).
 - `_minPoolLiquidity` floor for upquark (gate 3): required, an unfloored router quotes a stale price forever once the pool is drained.
 - Block-reward funding source (router runway on helium ≈ 21 days on 2026-10-22).
 - Upquark values: A, pool seed size, router funding, service funding.
