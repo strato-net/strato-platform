@@ -83,6 +83,8 @@ instance {-# OVERLAPPING #-} (MemPeerDBEnv :> es) => HasPeerDB (Eff es) where
     peerMap <- readIORef . stringPPeerMap =<< accessEnv
     return . filter f $ M.elems peerMap
 
+  getAnyBondedPeersForUDP = getBondedPeersForUDP
+
   getUnbondedPeers = do
     currentTime <- liftIO getCurrentTime
     host <- accessEnvVar p2pMyIPAddress
@@ -167,6 +169,7 @@ instance (MonadTrans t, Monad m, HasPeerDB m) => HasPeerDB (t m) where
   getPeerBondingState a b = lift $ getPeerBondingState a b
   getBondedPeers = lift getBondedPeers
   getBondedPeersForUDP = lift getBondedPeersForUDP
+  getAnyBondedPeersForUDP = lift getAnyBondedPeersForUDP
   getUnbondedPeers = lift getUnbondedPeers
   getClosestPeers a b = lift $ getClosestPeers a b
   updateUdpEnableTime a b = lift $ updateUdpEnableTime a b
