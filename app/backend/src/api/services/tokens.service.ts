@@ -19,7 +19,6 @@ const {
   tokenFactory,
   TokenFactory,
   CDPEngine,
-  Voucher,
   CollateralVault,
   YieldVault,
   SaveUSDSTVault,
@@ -587,27 +586,6 @@ export const setTokenStatus = async (
   } catch (error) {
     throw error;
   }
-};
-
-export const getVoucherBalance = async (
-  accessToken: string,
-  userAddress: string
-): Promise<string> => {
-  const response = await cirrus.get(accessToken, `/${Voucher}-_balances`, {
-    params: {
-      address: `eq.${constants.voucher}`,
-      key: `eq.${userAddress}`,
-      select: "balance:value::text",
-    },
-  });
-
-  if (response.status !== 200) {
-    throw new Error(`Error fetching voucher balance: ${response.statusText}`);
-  }
-
-  const rawValue = response.data?.[0]?.balance ?? "0";
-  const voucherAsUsdstWei = (BigInt(rawValue) * 100n).toString();
-  return voucherAsUsdstWei;
 };
 
 /**

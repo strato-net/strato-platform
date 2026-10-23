@@ -4,6 +4,13 @@ pragma solidity ^0.8.30;
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/Tokens/TokenFactory.sol";
 
+// A plain holder: no ownership, no allowance, just its own balance.
+contract Holder {
+    function burnOwn(address token, uint256 amount) public {
+        Token(token).burn(amount);
+    }
+}
+
 contract Describe_Token {
     Token token;
     TokenFactory factory;
@@ -45,6 +52,75 @@ contract Describe_Token {
         token.burn(owner, burnAmount);
         require(ERC20(token).balanceOf(owner) == 1000000e18 - burnAmount, "Burn should update balance");
         require(ERC20(token).totalSupply() == 1000000e18 - burnAmount, "Burn should update total supply");
+    }
+
+    // ---- holder-only burn: how STRATO gas is paid ----
+
+    function it_token_holder_can_burn_own_tokens() {
+        Holder holder = new Holder();
+        token.mint(address(holder), 1000e18);
+        uint256 supply = ERC20(token).totalSupply();
+
+        holder.burnOwn(address(token), 400e18);
+        require(ERC20(token).balanceOf(address(holder)) == 600e18, "Holder burned its own tokens");
+        require(ERC20(token).totalSupply() == supply - 400e18, "Supply fell by the burn");
+    }
+
+    function it_token_holder_cannot_burn_more_than_it_holds() {
+        Holder holder = new Holder();
+        token.mint(address(holder), 1e18);
+
+        bool reverted = false;
+        try holder.burnOwn(address(token), 1e18 + 1) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Burning past the balance reverts");
+        require(ERC20(token).balanceOf(address(holder)) == 1e18, "Nothing burned");
+    }
+
+    function it_token_holder_burn_touches_no_other_balance() {
+        Holder holder = new Holder();
+        token.mint(address(holder), 1e18);
+        uint256 ownerBalance = ERC20(token).balanceOf(owner);
+
+        holder.burnOwn(address(token), 1e18);
+        require(ERC20(token).balanceOf(owner) == ownerBalance, "Only the caller's balance moves");
+        require(ERC20(token).balanceOf(address(holder)) == 0, "Caller's balance burned");
+    }
+
+    // Pausing transfers must not stop holders paying gas.
+    function it_token_holder_can_burn_while_paused() {
+        Holder holder = new Holder();
+        token.mint(address(holder), 1e18);
+        token.pause();
+
+        holder.burnOwn(address(token), 1e18);
+        require(ERC20(token).balanceOf(address(holder)) == 0, "Burned while paused");
+    }
+
+    // The owner-only burn(address, uint256) still resolves next to the new overload.
+    function it_token_owner_burn_still_targets_any_account() {
+        Holder holder = new Holder();
+        token.mint(address(holder), 1e18);
+
+        token.burn(address(holder), 1e18);
+        require(ERC20(token).balanceOf(address(holder)) == 0, "Owner burned the holder's tokens");
+    }
+
+    // The rollout path for a live token: swap the proxy's logic, keep every balance.
+    function it_token_holder_burn_arrives_with_a_logic_upgrade() {
+        Holder holder = new Holder();
+        token.mint(address(holder), 1e18);
+        uint256 supply = ERC20(token).totalSupply();
+
+        Proxy(address(token)).setLogicContract(address(new Token(owner)));
+        require(ERC20(token).balanceOf(address(holder)) == 1e18, "Balances survive the upgrade");
+        require(ERC20(token).totalSupply() == supply, "Supply survives the upgrade");
+
+        holder.burnOwn(address(token), 1e18);
+        require(ERC20(token).balanceOf(address(holder)) == 0, "Holder burn works through the upgraded proxy");
+        require(ERC20(token).totalSupply() == supply - 1e18, "Supply accounting intact");
     }
 
     function it_token_can_mint_to_multiple_addresses() {

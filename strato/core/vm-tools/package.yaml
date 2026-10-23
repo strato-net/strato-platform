@@ -103,6 +103,7 @@ tests:
       - ethereum-rlp
       - strato-model
       - vm-tools
+      - strato-conf
       - base16-bytestring
       - blockapps-data
       - blockapps-datadefs

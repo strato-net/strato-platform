@@ -23,6 +23,7 @@ module Blockchain.Forks
     isOperatorPrecedenceForkActive,
     isReplayProtectionForkActive,
     replayProtectionForkBlock,
+    isStratoGasForkActive,
     forkNotScheduled
   )
 where
@@ -151,3 +152,11 @@ replayProtectionForkBlock net
 isReplayProtectionForkActive :: Integer -> Bool
 isReplayProtectionForkActive blockNum =
   blockNum >= replayProtectionForkBlock (Conf.networkID $ networkConfig ethConf)
+
+-- | STRATO is the native currency from this block, and a native-value
+-- transfer must arrive in a type-2 envelope (see envelopeRejection in
+-- Blockchain.Bagger.Transactions). The height lives in strato-conf
+-- (stratoGasForkBlock) because the RPC resolves the native token from it too.
+isStratoGasForkActive :: Integer -> Bool
+isStratoGasForkActive blockNum =
+  blockNum >= Conf.stratoGasForkBlock (Conf.network $ networkConfig ethConf)

@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Token } from "@/interface";
-import { TRANSFER_FEE } from "@/lib/constants";
+import NetworkFee from "@/components/NetworkFee";
 import {
   Dialog,
   DialogContent,
@@ -57,13 +57,13 @@ const TransferConfirmationModal = ({
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Transaction Fee</span>
               <span className="font-medium">
-                {TRANSFER_FEE} USDST ({parseFloat(TRANSFER_FEE) * 100} voucher)
+                <NetworkFee />
               </span>
             </div>
             <div className="flex justify-between text-sm font-medium border-t pt-2">
               <span>Total</span>
               <span>
-                {fromAmount} {fromAsset?.token?._symbol || fromAsset?.token?._name} + {TRANSFER_FEE} USDST ({parseFloat(TRANSFER_FEE) * 100} voucher) fee
+                {fromAmount} {fromAsset?.token?._symbol || fromAsset?.token?._name} + <NetworkFee /> fee
               </span>
             </div>
           </div>

@@ -51,7 +51,7 @@ import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
-import Blockchain.Forks (isReceiptsRootForkActive, isReplayProtectionForkActive)
+import Blockchain.Forks (isReceiptsRootForkActive, isReplayProtectionForkActive, isStratoGasForkActive)
 import qualified Blockchain.Verification as V
 import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
@@ -79,7 +79,7 @@ import Control.Monad.Composable.NodeDB (tickNodeDB)
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
-import Blockchain.EthConf (ethConf, networkConfig, contractsConfig, nativeTokenAddress, vmConfig)
+import Blockchain.EthConf (ethConf, networkConfig, nativeTokenAt, vmConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Verifier
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -429,12 +429,16 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   let bt = otBaseTx t
   let maxGas = fromIntegral (maxBound :: Int)
   acctNonce <- addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
+  -- This block's quote: payBlockRewards froze it before any transaction ran.
+  quote <- if isStratoGasForkActive (number b) then quotedStratoFee else return 0
 
   let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t
       sizeLimit = toInteger (Conf.txSizeLimit (networkConfig ethConf))
       expectedChainId = Conf.chainId $ networkConfig ethConf
       precheck
         | isReplayProtectionForkActive (number b) && not (transactionChainIdValid expectedChainId bt) = Left $ TFIncorrectChainId expectedChainId t
+        | Just why <- envelopeRejection (isStratoGasForkActive (number b)) bt = Left $ TFInvalidEnvelope why t
+        | Just (q, bound) <- feeBoundRejection quote bt = Left $ TFFeeBoundExceeded q bound t
         | TD.gasLimit bt > min remainingBlockGas maxGas = Left $ TFBlockGasLimitExceeded (TD.gasLimit bt) remainingBlockGas t
         | not nonceValid = Left $ TFNonceMismatch (TD.nonce bt) acctNonce t
         | txSize >= sizeLimit = Left $ TFTXSizeLimitExceeded txSize sizeLimit t
@@ -452,6 +456,9 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
               { erAction = combineA (\era ->
                     (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era))
                   . (events %~ (_events era Seq.><))
+                  -- The fee DELEGATECALL's record too, or Cirrus never learns the
+                  -- router's code ran at the payer and receipts cannot resolve FeePaid.
+                  . (delegatecalls %~ (_delegatecalls era Seq.><))
                 ) (erAction feeResult) $ erAction er
               , erTrace = erTrace feeResult ++ erTrace er
               , erLogs = erLogs feeResult ++ erLogs er
@@ -526,7 +533,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
    in case ut of
         TD.EthereumTX {TD.ethTo = Just toAddr, TD.value = val, TD.txData = callData}
           | B.null callData && val > 0 -> do
-            let nativeAddr = nativeTokenAddress (contractsConfig ethConf)
+            let nativeAddr = nativeTokenAt ethConf (number b)
                 recipientArg = T.pack $ "0x" ++ formatAddressWithoutColor toAddr
                 amountArg = T.pack $ show val
             $logInfoS "runCodeForTransaction" $ T.pack $

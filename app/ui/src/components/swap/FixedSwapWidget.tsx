@@ -9,7 +9,7 @@ import { useLendingContext } from "@/context/LendingContext";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
-import { usdstAddress, SWAP_FEE } from "@/lib/constants";
+import { SWAP_CALLS } from "@/lib/constants";
 import { safeParseUnits, formatBalance, formatAmount, formatUnits } from "@/utils/numberUtils";
 import {
   Dialog,
@@ -22,6 +22,7 @@ import {
 import { usePoolPolling } from "@/hooks/useSmartPolling";
 import { calculateSwapOutput, calculateSwapInput, calculateImpact } from "@/helpers/swapCalculations";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
+import { feeBalanceLow, feeCurrencySpend } from "@/utils/feeUtils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 // ============================================================================
@@ -334,7 +335,7 @@ const FixedSwapWidget = ({ fromAsset, toAsset, initialFromAmount, onSwapSuccess 
   const { swap, getPoolByTokenPair, refreshSwapHistory, refetchSwappableTokens } = useSwapContext();
   const { userAddress } = useUser();
   const { fetchTokens } = useUserTokens();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
+  const { feeQuote, fetchUsdstBalance } = useTokenContext();
   const { refreshLoans, refreshCollateral } = useLendingContext();
   const { toast } = useToast();
 
@@ -384,15 +385,8 @@ const FixedSwapWidget = ({ fromAsset, toAsset, initialFromAmount, onSwapSuccess 
   // Memoized available balance for fromAsset
   const fromAssetAvailableBalance = useMemo(() => {
     if (!fromAsset) return "0";
-    return computeMaxTransferable(
-      fromAsset.balance || "0",
-      fromAsset.address === usdstAddress,
-      voucherBalance,
-      usdstBalance,
-      safeParseUnits(SWAP_FEE).toString(),
-      setMaxTransferableError
-    );
-  }, [fromAsset, voucherBalance, usdstBalance]);
+    return computeMaxTransferable(fromAsset.balance || "0", fromAsset.address, SWAP_CALLS, feeQuote, setMaxTransferableError);
+  }, [fromAsset, feeQuote]);
 
   // ========================================================================
   // REFS & CUSTOM HOOKS
@@ -422,19 +416,11 @@ const FixedSwapWidget = ({ fromAsset, toAsset, initialFromAmount, onSwapSuccess 
   // ========================================================================
   // FEE & WARNING LOGIC
   // ========================================================================
-  const feeWei = safeParseUnits(SWAP_FEE);
   const fromAmtWei = safeParseUnits(fromAmount || "0");
-  const usdstWei = BigInt(usdstBalance || "0");
-  const lowThreshWei = safeParseUnits("0.10");
-
-  const canSubtract = usdstWei >= fromAmtWei + feeWei;
-  const remaining = canSubtract ? usdstWei - fromAmtWei - feeWei : 0n;
-
   const isLowBalanceWarning =
-    fromAsset?.address === usdstAddress &&
+    !!feeQuote &&
     fromAmtWei > 0n &&
-    canSubtract &&
-    remaining <= lowThreshWei;
+    feeBalanceLow(feeQuote, SWAP_CALLS, feeCurrencySpend(feeQuote, fromAsset?.address, fromAmtWei));
 
   // ========================================================================
   // EFFECTS

@@ -48,6 +48,7 @@ import qualified ActionEncodeSpec
 import qualified CrossLangFixtureSpec
 import qualified ReplayProtectionSpec
 import qualified ReceiptSpec
+import qualified StratoGasEnvelopeSpec
 import qualified TypedArgConversionSpec
 import Test.Hspec (Spec, describe, hspec, it, shouldBe, shouldSatisfy)
 import Test.QuickCheck (arbitrary, forAll)
@@ -84,6 +85,7 @@ spec = do
   ActionEncodeSpec.spec
   ReplayProtectionSpec.spec
   ReceiptSpec.spec
+  StratoGasEnvelopeSpec.spec
   TypedArgConversionSpec.spec
   CrossLangFixtureSpec.spec
   callTraceSpec
