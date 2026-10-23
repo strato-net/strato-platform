@@ -266,9 +266,17 @@ const isDuplicateDepositError = (error: unknown): boolean => {
   );
 };
 
+const isDepositCompleted = async (deposit: DepositArgs): Promise<boolean> =>
+  await getDepositStatusByIdentity(
+    deposit.externalChainId,
+    deposit.depositRouter,
+    deposit.depositId,
+  ) === "4";
+
 export const settleDeposit = async (
   deposit: DepositArgs | ActionDepositArgs,
 ): Promise<string | null> => {
+  if (await isDepositCompleted(deposit)) return null;
   await attestDepositSettlement(deposit);
   return submitDepositSettlement(deposit);
 };
@@ -331,6 +339,7 @@ const submitDepositSettlement = async (
 export const settleRoutedDeposit = async (
   deposit: RouteDepositArgs,
 ): Promise<string | null> => {
+  if (await isDepositCompleted(deposit)) return null;
   try {
     const fallbackOnly = await attestDepositSettlement(deposit);
     if (fallbackOnly) return await submitDepositSettlement(deposit);

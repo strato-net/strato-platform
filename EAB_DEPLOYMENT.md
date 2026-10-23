@@ -406,6 +406,21 @@ An `eab-only` package omits native Runtime variables and native verifier policy.
 
 Infra then returns the deployed image revisions and confirms that the URLs and identities match `services.json`. Do not activate routes yet; the Coordinator runs step 5 first.
 
+### Rewards poller readiness
+
+Before activating a route that should earn rewards, deploy a rewards-poller release that supports ExternalAssetBridge and TokenRouter events. Configure the poller with:
+
+```bash
+EXTERNAL_ASSET_BRIDGE_ADDRESS=<EAB_PROXY>
+TOKEN_ROUTER=<TOKEN_ROUTER_PROXY>
+```
+
+For a combined or native rollout, also set `STRATO_NATIVE_BRIDGE=<STRATO_NATIVE_BRIDGE_PROXY>`. Preserve the poller's existing state and cursor when restarting it.
+
+If the legacy MercataBridge remains active in parallel, keep its existing rewards activity and mapping; adding ExternalAssetBridge does not replace it. Verify that the intended EAB and routed-trade activities are configured in the Rewards contract, then confirm the poller is healthy before route activation or the first canary.
+
+Do not let the poller process reward-eligible EAB or TokenRouter events with missing or incorrect addresses. Skipped events advance the poller cursor and are not recovered automatically. If rewards are intentionally excluded from a limited test, record that decision and do not expect those test transactions to receive rewards retroactively.
+
 ## 5. Verify
 
 ```bash

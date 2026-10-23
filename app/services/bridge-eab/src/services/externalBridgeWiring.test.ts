@@ -254,9 +254,11 @@ test.before(async () => {
 
 test("atomically settles non-native deposits on ExternalAssetBridge", async () => {
   const stratoHelper = await import("../utils/stratoHelper");
+  const { cirrus } = await import("../utils/api");
   const settlementAttestationService = await import(
     "./settlementAttestationService"
   );
+  (cirrus as any).get = async () => [];
   const operatorCalls: any[] = [];
   const relayerCalls: any[] = [];
   (settlementAttestationService as any).attestDepositSettlement =
@@ -400,6 +402,29 @@ test("treats a duplicate identity as settled only when Cirrus confirms completio
 
   (cirrus as any).get = async () => [{ status: "4" }];
   assert.equal(await settleDeposit(deposit), null);
+});
+
+test("skips attestation and submission for deposits already completed on STRATO", async (t) => {
+  const stratoHelper = await import("../utils/stratoHelper");
+  const settlementAttestationService = await import("./settlementAttestationService");
+  const { cirrus } = await import("../utils/api");
+  const fail = async (): Promise<any> => assert.fail("completed deposit must not be attested or resubmitted");
+  t.mock.method(settlementAttestationService, "attestDepositSettlement", fail);
+  t.mock.method(stratoHelper, "execute", fail);
+  t.mock.method(stratoHelper, "executeAsRelayer", fail);
+  t.mock.method(cirrus, "get", async () => [{ status: "4" }]);
+  const deposit = {
+    externalChainId: 1, depositRouter: "router", depositId: "7", externalSender: "sender",
+    externalToken: "external-token", externalTokenAmount: "100", observedExternalTokenAmount: "100",
+    externalTxHash: "transaction", externalBlockHash: "block", externalBlockNumber: 10,
+    externalBlockTimestamp: 1, externalLogIndex: 2, detectedAt: 1,
+    stratoRecipient: "recipient", targetStratoToken: "strato-token",
+  };
+  const { settleDeposit, settleRoutedDeposit } = await import("./bridgeService");
+  assert.equal(await settleDeposit(deposit), null);
+  assert.equal(await settleRoutedDeposit({
+    ...deposit, action: "4", actionToken: "output", minFinalOut: "90", steps: [],
+  } as any), null);
 });
 
 test("confirms reviewed deposits through the bridge operator", async (t) => {
