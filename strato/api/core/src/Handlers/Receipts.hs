@@ -41,7 +41,7 @@ import Blockchain.Data.BlockHeader (BlockHeader, clearBlockSignatures, getBlockS
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP (RLPObject (..), RLPSerializable (..), rlpDecode, rlpDeserialize, rlpEncode, rlpSerialize)
 import Blockchain.Data.ReceiptRef (receiptRefsForBlock)
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Model.JsonBlock (blockDataRefToBlock)
 import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)

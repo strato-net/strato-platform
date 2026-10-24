@@ -36,6 +36,7 @@ library
     , data-default
     , debugger
     , exceptions
+    , hedis
     , http-client
     , http-client-tls
     , http-types
@@ -48,11 +49,13 @@ library
     , persistent-postgresql
     , postgresql-simple
     , prometheus-client
+    , redis-monad
     , resource-pool
     , resourcet
     , seqevents
     , solid-vm-model
     , sql-monad
+    , statedb-monad
     , stm
     , strato-conf
     , strato-model

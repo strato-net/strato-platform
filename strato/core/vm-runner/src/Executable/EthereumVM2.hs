@@ -29,7 +29,7 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ProposalFacts
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Event hiding (selfAddress)
 import Blockchain.TraceReplay (runJsonRpcCommandTraced)
 import Blockchain.Model.WrappedBlock
@@ -66,11 +66,10 @@ microtimeCutoff = secondsToMicrotime (Conf.mempoolLivenessCutoff (quarryConfig e
 handleVmTasks :: VmInEventBatch -> ContextM [BlockVerificationFailure]
 handleVmTasks InBatch {..} = do
   mpResps <- for mpNodesReqs $ \(o, srs) -> do
-    nds <- catMaybes <$> traverse (A.lookup (A.Proxy @MP.NodeData)) srs
+    nds <- catMaybes <$> traverse MP.lookupNode srs
     pure $! OutMPNodesResponse o nds
   mapM_ emitOut mpResps
-  let toSR = MP.StateRoot . Keccak256.keccak256ToByteString . Keccak256.rlpHash
-  for_ mpNodesResps $ A.insertMany (A.Proxy @MP.NodeData) . M.fromList . map (toSR &&& id)
+  for_ (concat mpNodesResps) MP.insertNode
 
   rpcResps <- do
     bbHash <- do

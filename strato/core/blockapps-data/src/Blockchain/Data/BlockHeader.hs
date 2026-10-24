@@ -40,7 +40,7 @@ module Blockchain.Data.BlockHeader
 where
 
 import Blockchain.Data.RLP
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class

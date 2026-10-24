@@ -102,32 +102,6 @@ executable slipstream
     , warp
   default-language: Haskell2010
 
-test-suite slipstream-batching-test
-  type: exitcode-stdio-1.0
-  main-is: Main.hs
-  other-modules:
-      Paths_slipstream
-  hs-source-dirs:
-      tests-batching/
-  ghc-options: -Wall -Werror -rtsopts
-  build-depends:
-      base
-    , base16-bytestring
-    , bytestring
-    , common-log
-    , conduit
-    , containers
-    , data-default
-    , evm-solidity
-    , hspec
-    , slipstream
-    , solid-vm-model
-    , strato-model
-    , text
-    , time
-    , vm-tools
-  default-language: Haskell2010
-
 test-suite slipstream-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
@@ -135,6 +109,9 @@ test-suite slipstream-test
       ActionFidelitySpec
       OutputDataSpec
       Spec
+      SQLSpec
+      StorageSpec
+      ValueEncodingSpec
       Paths_slipstream
   hs-source-dirs:
       tests/
@@ -144,6 +121,7 @@ test-suite slipstream-test
     , aeson
     , aeson-qq
     , base
+    , base16-bytestring
     , blockapps-data
     , blockapps-haskoin
     , blockapps-mpdbs

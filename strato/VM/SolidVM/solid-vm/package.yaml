@@ -48,7 +48,8 @@ library:
   - format
   - lens
   - memory
-  - merkle-patricia-db
+  - accountdb-monad
+  - statedb-monad
   - monad-alter
   - nibblestring
   - ordered-containers
@@ -87,6 +88,27 @@ executables:
       - text
 
 tests:
+  solid-vm-native-check:
+    source-dirs: tests/native
+    other-modules: []
+    main: NativeCheck.hs
+    ghc-options: -O2 -threaded -rtsopts
+    dependencies:
+      - blockapps-data
+      - common-log
+      - composable-monads-base
+      - hflags
+      - lens
+      - monad-alter
+      - prometheus-client
+      - solid-vm
+      - solid-vm-model
+      - strato-model
+      - text
+      - time
+      - unliftio
+      - vector
+      - vm-tools
   solid-vm-spec:
     source-dirs: tests/
     main: Main.hs
@@ -113,7 +135,7 @@ tests:
       - hspec-expectations-lifted
       - labeled-error
       - lens
-      - merkle-patricia-db
+      - statedb-monad
       - monad-alter
       - pairing
       - raw-strings-qq

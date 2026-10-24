@@ -53,20 +53,19 @@ library
     , evm-solidity
     , format
     , lens
-    , merkle-patricia-db
     , monad-alter
-    , nodedb-monad
     , ordered-containers
     , prometheus-client
+    , redis-monad
     , seqevents
     , solid-vm
     , solid-vm-compiler
     , solid-vm-model
+    , statedb-monad
     , strato-conf
     , strato-genesis
     , strato-index
     , strato-model
-    , strato-redis-blockdb
     , strato-statediff
     , strato-tracing
     , streaming
@@ -96,11 +95,12 @@ executable vm-replay
     , conduit
     , ethereum-rlp
     , hflags
-    , merkle-patricia-db
     , process-monitor
     , prometheus-client
+    , redis-monad
     , resourcet
     , seqevents
+    , statedb-monad
     , strato-conf
     , strato-genesis
     , strato-model
@@ -125,6 +125,7 @@ executable vm-runner
     , composable-monads-base
     , hflags
     , process-monitor
+    , redis-monad
     , strato-conf
     , strato-model
     , strato-tracing
@@ -155,8 +156,8 @@ test-suite ethereum-vm-test
     , hspec
     , hspec-expectations-lifted
     , labeled-error
-    , merkle-patricia-db
     , monad-alter
+    , statedb-monad
     , strato-model
     , vm-runner
     , vm-tools
