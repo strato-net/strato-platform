@@ -19,7 +19,6 @@
 module Blockchain.Forks
   ( isReceiptsRootForkActive,
     isBlockRewardReceiptForkActive,
-    isConstructorCallForkActive,
     isEmitArgForkActive,
     isOperatorPrecedenceForkActive,
     isReplayProtectionForkActive,
@@ -139,25 +138,6 @@ isOperatorPrecedenceForkActive blockNum =
    in not $ (net == upquarkNetworkID  && blockNum < upquarkOperatorPrecedenceForkBlock)
          || (net == heliumNetworkID   && blockNum < heliumOperatorPrecedenceForkBlock)
          || (net == forktestNetworkID && blockNum < forktestOperatorPrecedenceForkBlock)
-
--- | Block from which SolidVM rejects a call named "<constructor>".
---
--- Before it, 'call'' resolved that name to the contract's constructor, so any
--- caller could re-run a deployed contract's constructor body in its storage
--- (e.g. repointing a Proxy's logicContract). Upquark already has blocks that
--- did this, so they must replay as they ran.
-heliumConstructorCallForkBlock :: Integer
-heliumConstructorCallForkBlock = 850000
-
-upquarkConstructorCallForkBlock :: Integer
-upquarkConstructorCallForkBlock = 862891
-
-isConstructorCallForkActive :: Integer -> Bool
-isConstructorCallForkActive blockNum =
-  let net = Conf.networkID $ networkConfig ethConf
-   in not $ (net == upquarkNetworkID  && blockNum < upquarkConstructorCallForkBlock)
-         || (net == heliumNetworkID   && blockNum < heliumConstructorCallForkBlock)
-         || (net == forktestNetworkID && blockNum < forktestForkBlock)
 
 -- | Require signed chain binding from this height. Public networks
 -- remain unscheduled until the upgrade is coordinated.
