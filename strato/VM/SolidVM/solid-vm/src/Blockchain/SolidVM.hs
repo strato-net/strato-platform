@@ -40,7 +40,7 @@ import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import Blockchain.Data.Util (integer2Bytes)
 import qualified Control.Monad.Composable.StateDB as MP
-import Blockchain.Forks (isConstructorCallForkActive, isEmitArgForkActive)
+import Blockchain.Forks (isEmitArgForkActive)
 import BlockApps.Solidity.ABI.Bridge (encodeEventToLogValues)
 import BlockApps.Solidity.ABI.Codec (abiDecode)
 import qualified Blockchain.SolidVM.Builtins as Builtins
@@ -476,32 +476,7 @@ call' from to' fnCalltype functionName valList = do
   unless (maybe False ((storageAddress ==) . currentAddress) currentCall) $
     initializeAction storageAddress
 
-  -- Consensus-visible: see 'isConstructorCallForkActive'. Before it, a call
-  -- named "<constructor>" re-ran the constructor body on a deployed contract.
-  constructorCallFork <- isConstructorCallForkActive . BlockHeader.number . Env.blockHeader <$> getEnv
-
-  let lookupFunction name
-        | name == "<constructor>" = if constructorCallFork then Nothing else Just $ fromMaybe emptyFunction (contract ^. CC.constructor)
-        | otherwise = M.lookup name (contract ^. CC.functions)
-        where
-          emptyFunction = CC.Func [] [] Nothing (Just []) Nothing False Nothing M.empty [] dummyAnnotation False []
-          dummyAnnotation :: SourceAnnotation ()
-          dummyAnnotation =
-            SourceAnnotation
-              { _sourceAnnotationStart =
-                  SourcePosition
-                    { _sourcePositionName = "",
-                      _sourcePositionLine = 0,
-                      _sourcePositionColumn = 0
-                    },
-                _sourceAnnotationEnd =
-                  SourcePosition
-                    { _sourcePositionName = "",
-                      _sourcePositionLine = 0,
-                      _sourcePositionColumn = 0
-                    },
-                _sourceAnnotationAnnotation = ()
-              }
+  let lookupFunction name = M.lookup name (contract ^. CC.functions)
 
   let functionName' =
         case fnCalltype of
@@ -529,7 +504,7 @@ call' from to' fnCalltype functionName valList = do
         | otherwise     = pure args
 
   let isConstructorName n = T.strip (T.takeWhile (/= '(') (labelToText n)) == "<constructor>"
-  when (constructorCallFork && any isConstructorName [functionName, functionName']) $
+  when (any isConstructorName [functionName, functionName']) $
     unknownFunction "constructor cannot be called on a deployed contract" (functionName, valList)
 
   f <- (nullifyRefs =<<) <$> case (lookupFunction functionName', fnCalltype) of
