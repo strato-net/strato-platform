@@ -6,7 +6,7 @@ import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.DB.SQLDB (sqlQueryWriter)
 import Blockchain.Data.WriterLease
-import Blockchain.Strato.Indexer.ApiIndexer (p2pIndexerLoop, retireSqlConsumerGroup, seedSqlConsumerGroup, sqlIndexerLoop)
+import Blockchain.Strato.Indexer.ApiIndexer (indexerMainLoop, p2pIndexerLoop, retireSqlConsumerGroup)
 import Blockchain.Strato.Indexer.Bootstrap
 import Blockchain.NodeStatusMirror (nodeStatusMirrorLoop)
 import Control.Concurrent (forkIO)
@@ -21,7 +21,6 @@ import HFlags
 import Instrumentation
 import Network.Wai.Handler.Warp (run)
 import Network.Wai.Middleware.Prometheus (metricsApp)
-import UnliftIO.Async (concurrently_)
 
 import Wiring ()
 
@@ -84,20 +83,7 @@ main = do
         mirrorDb <- createSQLDB 2
         _ <- liftIO . forkIO . runEff . runLogging $ runSQLMWith mirrorDb (nodeStatusMirrorLoop cell)
 
-        runStreamMConfigured "strato-indexer-sql" seedSqlConsumerGroup
-
-        -- Two consumer loops, each under its own group: the Redis side for
-        -- strato-p2p, and the SQL side that writes (or trails) Postgres. Either
-        -- one ending, including a writer that lost its lease mid-batch, ends the
-        -- process so the supervisor restarts it and the startup claim runs again.
-        concurrently_
-          ( runStreamMConfigured "strato-indexer" $
-              runSQLM $
-                runRedisM lookupRedisBlockDBConfig $
-                  p2pIndexerLoop
-          )
-          ( runStreamMConfigured "strato-indexer-sql" $
-              runSQLM $
-                runRedisM lookupRedisBlockDBConfig $
-                  sqlIndexerLoop cell
-          )
+        runStreamMConfigured "strato-indexer" $
+          runSQLM $
+            runRedisM lookupRedisBlockDBConfig $
+              indexerMainLoop cell

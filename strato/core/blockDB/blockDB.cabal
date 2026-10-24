@@ -11,6 +11,7 @@ build-type:     Simple
 library
   exposed-modules:
       Blockchain.BlockDB
+      Blockchain.BlockStream
       Blockchain.ChainMetrics
       Blockchain.Data.NodeStatus
       Blockchain.DB.Witnessable

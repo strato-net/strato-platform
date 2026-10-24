@@ -48,7 +48,7 @@ import Blockchain.Data.ExecResults
 import Blockchain.Data.Transaction
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResultStatus
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
 import Blockchain.Forks (isReceiptsRootForkActive, isReplayProtectionForkActive)
@@ -75,7 +75,7 @@ import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, Rever
 import Blockchain.VMContext
 import Blockchain.VMOut
 import Blockchain.Wiring ()
-import Control.Monad.Composable.NodeDB (tickNodeDB)
+import Control.Monad.Composable.StateDB (tickNodeDB)
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions

@@ -1,0 +1,54 @@
+name: merkle-patricia-db-baremetal
+version: 0.0.1
+license: Apache-2.0
+
+dependencies:
+  - base
+  - bytestring
+  - binary
+  - common-log
+  - data-default
+  - ethereum-rlp
+  - fastMP
+  - leveldb-haskell
+  - merkle-patricia-db
+  - monad-alter
+  - nibblestring
+  - strato-model
+  - transformers
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - BatchMerge
+    - Blockchain.Database.MerklePatricia
+    - Blockchain.Database.MerklePatricia.Diff
+    - Blockchain.Database.MerklePatricia.Map
+    - Blockchain.Database.MerklePatriciaNative
+  reexported-modules:
+    - merkle-patricia-db:Blockchain.Database.MerklePatricia.Internal
+    - merkle-patricia-db:Blockchain.Database.MerklePatricia.ForEach
+    - merkle-patricia-db:Blockchain.Database.MerklePatricia.MPDB
+    - merkle-patricia-db:Blockchain.Database.MerklePatricia.NodeData
+    - merkle-patricia-db:Blockchain.Database.MerklePatricia.StateRoot
+  c-sources:
+    - cbits/mp_trie.c
+  cc-options: -std=c11 -O2 -Wall
+  include-dirs: cbits
+  extra-libraries: leveldb
+  ghc-options: -Wall -O2
+
+tests:
+  test-merkle-patricia-db-baremetal:
+    source-dirs: test
+    main: Spec.hs
+    ghc-options: -dynamic
+    dependencies:
+      - base16-bytestring
+      - containers
+      - hspec
+      - merkle-patricia-db
+      - merkle-patricia-db-baremetal
+      - mtl
+      - strato-model
+      - directory

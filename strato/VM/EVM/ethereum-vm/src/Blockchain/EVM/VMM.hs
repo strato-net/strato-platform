@@ -58,6 +58,7 @@ import Blockchain.DB.CodeDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.ModifyStateDB
 import Blockchain.DB.RawStorageDB
+import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
@@ -151,8 +152,7 @@ instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alte
 instance
   ( MonadIO m,
     MonadLogger m,
-    (Maybe Word256 `A.Alters` MP.StateRoot) m,
-    (MP.StateRoot `A.Alters` MP.NodeData) m,
+    HasStateDB m,
     (N.NibbleString `A.Alters` N.NibbleString) m
   ) =>
   (Address `A.Alters` AddressState) (VMM m)
@@ -199,8 +199,7 @@ instance MonadIO m => HasMemRawStorageDB (VMM m) where
 instance
   ( MonadIO m,
     MonadLogger m,
-    (Maybe Word256 `A.Alters` MP.StateRoot) m,
-    (MP.StateRoot `A.Alters` MP.NodeData) m,
+    HasStateDB m,
     (N.NibbleString `A.Alters` N.NibbleString) m
   ) =>
   (RawStorageKey `A.Alters` RawStorageValue) (VMM m)

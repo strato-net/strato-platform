@@ -8,12 +8,10 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.Strato.Indexer.ApiIndexer
-  ( p2pIndexerLoop,
-    sqlIndexerLoop,
-    seedSqlConsumerGroup,
+  ( indexerMainLoop,
+    p2pIndexerLoop,
     retireSqlConsumerGroup,
     p2pConsumerGroup,
-    sqlConsumerGroup,
     indexAPI,
     indexP2P,
     kafkaClientIds,
@@ -30,7 +28,7 @@ import Blockchain.Data.WriterLease (LostWriterLease (..), fenceWriterLeaseSql, h
 import qualified Blockchain.Data.BlockHeader as BH
 import Blockchain.ChainMetrics (setBestBlockTimestamp)
 import Blockchain.Data.ReceiptRef (putReceiptRefsSql)
-import Blockchain.Data.Transaction (insertTX')
+import Blockchain.Data.Transaction (insertTX', transactionHash)
 import Blockchain.DBM (DebugMode (..))
 import Blockchain.DB.MemAddressStateDB (AddressStateModification(..))
 import Blockchain.DB.SQLDB
@@ -65,12 +63,6 @@ import Text.Format
 p2pConsumerGroup :: ConsumerGroup
 p2pConsumerGroup = "strato-indexer"
 
--- | The SQL side's own consumer group, so a standby core can trail the
--- writer's progress without holding up its Redis side, and a promoted core
--- resumes exactly where its trailing left off.
-sqlConsumerGroup :: ConsumerGroup
-sqlConsumerGroup = "strato-indexer-sql"
-
 p2pIndexerLoop :: ( MonadLogger m,
                     HasStreaming m,
                     (Keccak256 `A.Alters` P2P OutputBlock) m,
@@ -79,36 +71,29 @@ p2pIndexerLoop :: ( MonadLogger m,
                   m ()
 p2pIndexerLoop = consume p2pConsumerGroup targetTopicName indexP2P
 
--- | The SQL side. Writes only while this cell holds the writer lease;
--- otherwise it follows the writer through @indexer_progress@, committing
--- each batch's offset once the writer has that batch's blocks, so promotion
--- picks up within seconds of where the writer stopped.
-sqlIndexerLoop :: ( MonadLogger m,
-                    HasStreaming m,
-                    HasSQLDB m
-                  ) =>
-                  Text ->
-                  m ()
-sqlIndexerLoop cell = consume sqlConsumerGroup targetTopicName (indexAPIGated cell)
+-- | One consumer commits its offset only after both SQL and Redis indexing
+-- finish. SQL retains the writer-lease checks and standby progress tracking.
+indexerMainLoop :: ( MonadLogger m,
+                     HasStreaming m,
+                     HasSQLDB m,
+                     (Keccak256 `A.Alters` P2P OutputBlock) m,
+                     Mod.Modifiable (P2P BestBlock) m
+                   ) =>
+                   Text ->
+                   m ()
+indexerMainLoop cell =
+  consume p2pConsumerGroup targetTopicName $ \idxEvents -> do
+    indexAPIGated cell idxEvents
+    indexP2P idxEvents
 
--- | On the first run after the SQL side got its own group, start it from the
--- combined group's offset rather than from the beginning of retention.
-seedSqlConsumerGroup :: HasStreaming m => m ()
-seedSqlConsumerGroup = void $ seedConsumerGroupFrom sqlConsumerGroup p2pConsumerGroup targetTopicName
-
--- | A node with no SQL index (--sql=false) runs no SQL consumer, so the SQL
--- group's checkpoint must not stay on the topic: JLog keeps every segment
--- until all subscribers have passed it, and this one never would. A full
--- node's snapshot carries that checkpoint, so a validator restored from one
--- would otherwise accumulate index events for good. 'seedSqlConsumerGroup'
--- recreates the group from the Redis side's position if the node is ever
--- switched back to SQL indexing.
+-- | A snapshot may carry the old SQL group's checkpoint. With no SQL
+-- consumer, retire it so it cannot pin the log on a Redis-only node.
 retireSqlConsumerGroup :: (MonadLogger m, HasStreaming m) => m ()
 retireSqlConsumerGroup = do
-  removed <- removeConsumerGroup sqlConsumerGroup targetTopicName
+  removed <- removeConsumerGroup "strato-indexer-sql" targetTopicName
   when removed $
     $logInfoS "retireSqlConsumerGroup" . T.pack $
-      "retired the " ++ T.unpack sqlConsumerGroup ++ " consumer group on " ++ T.unpack (unTopicName targetTopicName) ++ ": no SQL side runs here"
+      "retired the strato-indexer-sql consumer group on " ++ T.unpack (unTopicName targetTopicName) ++ ": no SQL side runs here"
 
 -- | The highest block number a batch carries, if it carries any.
 batchTip :: [IndexEvent] -> Maybe Integer
@@ -206,6 +191,8 @@ indexAPI cell allEvents = do
     $logInfoS "apiIndexer" . T.pack $
       "skipping " ++ show skipped ++ " events at or below indexer_progress " ++ maybe "unset" show progress
   let (txs, blocks, receiptRefs, stateDiffs, asmUpdates) = filterHelper idxEvents
+      signers = M.fromList
+        [(transactionHash tx, signer) | block <- blocks, OutputTx {otBaseTx = tx, otSigner = signer} <- obReceiptTransactions block]
       insertCount = length blocks
       -- vm-runner yields NewBestBlock only after a batch's RanBlocks and
       -- their state diffs (BlockChain.addBlocks), so the highest one in this
@@ -241,7 +228,7 @@ indexAPI cell allEvents = do
       -- API-submitted transactions already have a row (block_number -1,
       -- written by strato-api); insertTX' skips those by hash.
       forM_ txs $ \OutputTx {..} -> insertTX' Fail otOrigin Nothing now [otBaseTx]
-      unless (null blocks) . void $ putBlocksSql (outputBlockToBlockRetainPayloads <$> blocks) False
+      unless (null blocks) . void $ putBlocksSql signers (outputBlockToBlockRetainPayloads <$> blocks) False
       putReceiptRefsSql receiptRefs
       mapM_ commitSqlDiffsSql stateDiffs
       mapM_ (updateSQLBalanceAndNonceSql . addressStateUpdates) asmUpdates

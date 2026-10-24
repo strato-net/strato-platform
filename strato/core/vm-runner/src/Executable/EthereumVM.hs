@@ -33,8 +33,7 @@ import Blockchain.Data.AddressStateDB ()
 import Blockchain.Data.GenesisBlock (genesisInfoToBlock)
 import Blockchain.Data.GenesisInfo (stateRoot, getGenesisInfo)
 import Blockchain.Bootstrap
-import Blockchain.Database.MerklePatricia.NodeData ()
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Event
 import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
@@ -44,7 +43,6 @@ import Blockchain.StateRootMismatch
 import Blockchain.Strato.Model.Address ()
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.StateRoot ()
-import Blockchain.Strato.RedisBlockDB
 import Blockchain.Strato.StateDiff          (stateDiff')
 import Blockchain.SyncDB
 import Blockchain.Timing
@@ -52,8 +50,8 @@ import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Wiring
 import Control.Monad
-import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.NodeDB (flushNodeDB)
+import Control.Monad.Composable.Redis (execRedis)
+import Control.Monad.Composable.StateDB (flushNodeDB)
 import Control.Monad.Composable.Streaming
 import Data.Foldable hiding (fold)
 import Data.List
@@ -109,7 +107,7 @@ ethereumVM = do
             ++ ": the block header says " ++ format _inBlock ++ ", running the block gave " ++ format _derived
       $logErrorS "ethereumVM/StateRootMismatch" $ T.pack story
       -- Our side of the comparison was just computed; it can only be missing through a bug of ours.
-      haveDerived <- isJust <$> A.lookup (A.Proxy @MP.NodeData) _derived
+      haveDerived <- MP.hasStateRoot _derived
       unless haveDerived . error $ story ++ "\nOur own derived stateRoot is missing from the local node DB. This is a bug, not a peer problem."
       -- The block's side comes from peers; fetchMPNode stops with the story if none reply.
       withFetchMissingNodes $ do
@@ -162,11 +160,11 @@ bootstrapIfFirstRun = do
 
 initializeBestBlock :: ContextM ()
 initializeBestBlock = do
-  maybeRedisBestBlockHash <- fmap (fmap bestBlockHash) (withRedisBlockDB getBestBlockInfo)
+  maybeRedisBestBlockHash <- fmap (fmap bestBlockHash) (execRedis getBestBlockInfo)
   maybeRedisBestBlock <-
     case maybeRedisBestBlockHash of
       Nothing -> error "no best block hash in redisdb"
-      Just hash -> withRedisBlockDB $ getBlock hash
+      Just hash -> execRedis $ getBlock hash
 
   case maybeRedisBestBlock of
     Nothing -> error "no best block in redisdb"

@@ -10,7 +10,7 @@ import Blockchain.Bagger.Transactions
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.ExecResults (ExecResults)
 import qualified Blockchain.Data.TransactionDef as TD
-import Blockchain.Database.MerklePatricia (StateRoot (..), blankStateRoot)
+import Control.Monad.Composable.StateDB (StateRoot (..), blankStateRoot)
 import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256

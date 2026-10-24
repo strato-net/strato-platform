@@ -77,6 +77,8 @@ defineFlag "monitoring" (True :: Bool) "Run the prometheus and apex containers, 
 
 defineFlag "repoUrl" ("" :: String) "Registry prefix of the node's images in docker-compose.yml, e.g. 'ghcr.io/strato-net/strato-platform/' (bin/strato-up --prebuilt sets it); images built locally have none"
 
+defineFlag "syncFromFile" ("" :: String) "Sync a new node from saved blocks, then continue syncing from peers"
+
 -- P2P config flags
 -- The ethconf.yaml flag migration silently raised these from 20/30 to
 -- 1000/3600, which is what turned fresh syncs from minutes into hours.
