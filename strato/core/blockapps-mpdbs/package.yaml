@@ -27,7 +27,7 @@ library:
   - data-default
   - deepseq
   - ethereum-rlp
-  - fastMP
+  - merkle-patricia-db-baremetal
   - format
   - hashable
   - leveldb-haskell

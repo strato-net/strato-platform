@@ -42,10 +42,10 @@ library
     , data-default
     , deepseq
     , ethereum-rlp
-    , fastMP
     , format
     , hashable
     , leveldb-haskell
+    , merkle-patricia-db-baremetal
     , monad-alter
     , monad-logger
     , monad-loops
