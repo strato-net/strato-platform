@@ -27,7 +27,7 @@ library
     , ethereum-rlp
     , kv-cache
     , leveldb-haskell
-    , merkle-patricia-db
+    , merkle-patricia-db-baremetal
     , monad-alter
     , strato-model
   default-language: Haskell2010
