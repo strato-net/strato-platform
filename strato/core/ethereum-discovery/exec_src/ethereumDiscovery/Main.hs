@@ -4,7 +4,7 @@
 import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.EthConf
-import Blockchain.Network (getParams, webAddress)
+import qualified Blockchain.Network as Network
 import Blockchain.Strato.Discovery.ContextLite
 import Blockchain.Strato.Discovery.Data.Peer (UDPPort(..), TCPPort(..))
 import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
@@ -13,6 +13,7 @@ import Control.Monad.Composable.Base
 import Control.Monad.Composable.Vault (runVaultM)
 import Control.Monad.IO.Class
 import Control.Monad.Reader
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Executable.EthDiscoverySetup (setup)
 import Executable.EthereumDiscovery
@@ -34,10 +35,15 @@ main = do
 
   let networkName = network . networkConfig $ ethConf
   putStrLn $ "ethereum-discover: Network is " ++ networkName
-  maybeParams <- getParams networkName
+  maybeParams <- Network.getParams networkName
   let bootnodes = case maybeParams of
         Nothing -> []
-        Just params -> map webAddress params
+        Just params -> map bootnode params
+      bootnode p =
+        ( Network.webAddress p
+        , UDPPort . fromMaybe 30303 $ Network.udpPort p
+        , TCPPort . fromMaybe 30303 $ Network.tcpPort p
+        )
   putStrLn $ "ethereum-discover: Using bootnodes: " ++ show bootnodes
 
   -- Peer counts (disc_num_peers) and RTS stats for the collectors.
@@ -52,7 +58,7 @@ main = do
         $logInfoS "ethereumDiscovery" $ T.pack $ CL.green $ "Talking to vault at " ++ vaultUrl'
         let port' = discoveryPort $ discoveryConfig ethConf
             udpPort = UDPPort port'
-            tcpPort = TCPPort port' -- TODO: where do we get the TCP port from?
+            tcpPort = TCPPort . listenPort $ p2pConfig ethConf
             minPeers = minAvailablePeers (discoveryConfig ethConf)
         cxt <- initContextLite udpPort tcpPort
         runVaultM vaultUrl' . withResources . runDiscoveryM cxt $

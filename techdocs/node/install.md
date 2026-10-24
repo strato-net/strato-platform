@@ -1,6 +1,6 @@
 # Install a Node
 
-This guide builds STRATO from source and starts a node with `strato-up`. Check the [requirements](requirements.md) first.
+This guide builds STRATO from source and starts a node with `strato-up`. Check the [requirements](requirements.md) first. To run a release without building, see [Run from prebuilt images](prebuilt.md).
 
 ## 1. Clone the repository
 
@@ -44,6 +44,10 @@ For a Nix-based build, use `NIX=true make` instead.
 1. It compiles the STRATO executables, including `strato-setup`, `convoke` and the node processes. It installs them and the `strato-*` scripts to `~/.local/bin`.
 2. It installs a BIP-39 word list to `~/.local/share/strato/`.
 3. It builds the node's Docker images: nginx, apex, smd, postgrest, prometheus, app-backend, app-ui, local-auth, bridge and tracking.
+
+For a validator (`--role=validator`), `make validator` builds the executables and only the two images a validator runs, apex and prometheus, and skips the rest.
+
+For an API node (`--role=api-node`), `make api-node` builds the executables and the four images it runs: nginx, apex, prometheus and postgrest. With `--localAuth`, run `make api-node local-auth`.
 
 If `~/.local/bin` is not on your `PATH`, `make` prints a note. Run `source ~/.profile` or open a new terminal.
 

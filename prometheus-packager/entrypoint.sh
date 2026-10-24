@@ -1,6 +1,7 @@
 #!/bin/sh
 NODE_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
-STRATO_HOSTNAME=host.docker.internal
+# Host-side STRATO processes, aliased by docker-compose; a --dockerMode=all node names its strato service instead.
+STRATO_HOSTNAME=${STRATO_HOSTNAME:-host.docker.internal}
 NODE_HOST=$(echo "$NODE_URL" | sed 's|https\?://||')
 cp /etc/prometheus/strato_prometheus.tpl.yml /tmp/strato_prometheus.yml
 sed -i "s;__NODE_HOST_MARKER__;${NODE_HOST:-localhost};" /tmp/strato_prometheus.yml

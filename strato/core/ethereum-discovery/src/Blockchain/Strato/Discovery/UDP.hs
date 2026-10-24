@@ -6,8 +6,6 @@
 module Blockchain.Strato.Discovery.UDP
   ( dataToPacket,
     sendPacket,
-    processDataStream',
-    getServerPubKey,
     ndPacketToRLP,
     NodeDiscoveryPacket (..),
     Endpoint (..),
@@ -31,12 +29,9 @@ import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Control.Error                         (note)
-import           Control.Exception                     hiding (try)
 import           Control.Monad                         (forM_)
 import qualified Control.Monad.Change.Alter            as A
 import           Control.Monad.Composable.Vault
-import           Control.Monad.IO.Class
-import           Crypto.Types.PubKey.ECC
 import           Data.Binary
 import           Data.Bits
 import qualified Data.ByteString                       as B
@@ -44,25 +39,25 @@ import qualified Data.ByteString.Char8                 as BC
 import           Data.List.Split
 import           Data.Maybe
 import qualified Data.Text                             as T
-import           Data.Time.Clock.POSIX
 import           Network.Socket
 import qualified Network.URI                           as URI
 import           Numeric
 import           System.Endian
 import qualified Text.Colors                           as CL
 import           Text.Format
-import           UnliftIO
 
 data NodeDiscoveryPacket
   = Ping Integer Endpoint Endpoint Integer
-  | Pong Endpoint Integer Integer
+  | -- | The last field is the sender's TCP port, which nodes from before it
+    -- was added neither send nor accept.
+    Pong Endpoint Integer Integer (Maybe TCPPort)
   | FindNeighbors NodeID Integer
   | Neighbors [Neighbor] Integer
   deriving (Show, Read, Eq)
 
 instance Format NodeDiscoveryPacket where
   format (Ping _ from to _) = CL.blue "Ping" ++ " " ++ format from ++ " to: " ++ format to
-  format (Pong to _ _) = CL.blue "Pong" ++ " to: " ++ format to
+  format (Pong to _ _ senderTcpPort) = CL.blue "Pong" ++ " to: " ++ format to ++ maybe "" (\(TCPPort p) -> " tcp: " ++ show p) senderTcpPort
   format (FindNeighbors nodeID _) = CL.blue "FindNeighbors " ++ format nodeID
   format (Neighbors neighbors _) = CL.blue "Neighbors" ++ ": \n" ++ unlines (map (("    " ++) . format) neighbors)
 
@@ -186,9 +181,9 @@ ndPacketToRLP
           rlpEncode expiration
         ]
     )
-ndPacketToRLP (Pong (Endpoint ipFrom (UDPPort udpPortFrom) (TCPPort tcpPortFrom)) tok expiration) =
+ndPacketToRLP (Pong (Endpoint ipFrom (UDPPort udpPortFrom) (TCPPort tcpPortFrom)) tok expiration senderTcpPort) =
   ( 2,
-    RLPArray
+    RLPArray $
       [ RLPArray
           [ rlpEncode ipFrom,
             rlpEncode $ toInteger udpPortFrom,
@@ -197,6 +192,7 @@ ndPacketToRLP (Pong (Endpoint ipFrom (UDPPort udpPortFrom) (TCPPort tcpPortFrom)
         rlpEncode tok,
         rlpEncode expiration
       ]
+        ++ [rlpEncode $ toInteger p | Just (TCPPort p) <- [senderTcpPort]]
   )
 ndPacketToRLP (FindNeighbors target expiration) = (3, RLPArray [rlpEncode target, rlpEncode expiration])
 ndPacketToRLP (Neighbors neighbors expiration) = (4, RLPArray [RLPArray $ map rlpEncode neighbors, rlpEncode expiration])
@@ -220,7 +216,8 @@ dataToPacket msg = do
   where
     typeToPacket :: Word8 -> RLPObject -> Either DiscoverException NodeDiscoveryPacket
     typeToPacket 1 (RLPArray [version, from, to, timestamp]) = Right $ Ping (rlpDecode version) (rlpDecode from) (rlpDecode to) (rlpDecode timestamp)
-    typeToPacket 2 (RLPArray [to, echo, timestamp]) = Right $ Pong (rlpDecode to) (rlpDecode echo) (rlpDecode timestamp)
+    typeToPacket 2 (RLPArray (to : echo : timestamp : rest)) =
+      Right $ Pong (rlpDecode to) (rlpDecode echo) (rlpDecode timestamp) (TCPPort . fromInteger . rlpDecode <$> listToMaybe rest)
     typeToPacket 3 (RLPArray [target, timestamp]) = Right $ FindNeighbors (rlpDecode target) (rlpDecode timestamp)
     typeToPacket 4 (RLPArray [RLPArray neighbors, timestamp]) = Right $ Neighbors (map rlpDecode neighbors) (rlpDecode timestamp)
     typeToPacket x y = Left $ MalformedUDPException $ "Unsupported case called in typeToPacket: " ++ show x ++ ", " ++ show y
@@ -256,55 +253,3 @@ sendPacket thePeer packet = do
        FindNeighbors{} -> "FindNeighbors"
        Neighbors{}     -> "Neighbors"
 
-processDataStream' :: B.ByteString -> PublicKey
-processDataStream' bs | B.length bs < 98 = error "processDataStream' called with too few bytes"
-processDataStream' bs =
-  let (hs, bs') = B.splitAt 32 bs
-      (sigBS, bs'') = B.splitAt 65 bs'
-      (vtype, rest) = B.splitAt 1 bs''
-      theType = B.index vtype 0
-      theHash = bytesToWord256 hs
-      eSignature = importSignature sigBS
-   in case eSignature of
-        Left err -> error err
-        Right signature ->
-          let (rlp, _) = rlpSplit rest
-              messageHash = hash $ B.singleton theType <> rlpSerialize rlp
-              publicKey = recoverPub signature $ keccak256ToByteString messageHash
-              theHash' = hash $ sigBS <> B.singleton theType <> rlpSerialize rlp
-           in if theHash /= keccak256ToWord256 theHash'
-                then error "bad UDP data sent from peer, the hash isn't correct"
-                else fromMaybe (error "malformed signature in call to processDataStream") publicKey
-
-data UDPException = UDPTimeout deriving (Show)
-
-instance Exception UDPException
-
-getServerPubKey ::
-  ( HasVault m,
-    MonadUnliftIO m,
-    A.Selectable (Host, UDPPort, BC.ByteString) Point m
-  ) =>
-  PPeer ->
-  m (Either SomeException Point)
-getServerPubKey peer = do
-  timestamp <- liftIO $ fmap round getPOSIXTime
-  let domain = pPeerHost peer
-      udpPort = UDPPort $ pPeerUdpPort peer
-      tcpPort = TCPPort $ pPeerTcpPort peer
-      (theType, theRLP) =
-        ndPacketToRLP $
-          Ping 4 (Endpoint (stringToIAddr "127.0.0.1") udpPort tcpPort) (Endpoint (stringToIAddr . hostToString $ pPeerHost peer) udpPort tcpPort) (timestamp + 50)
-      theData = rlpSerialize theRLP
-      theMsgHash = keccak256ToByteString $ hash $ B.singleton theType <> theData
-
-  sig <- sign theMsgHash
-  let sigBS = exportSignature sig
-      theHash = keccak256ToByteString $ hash $ sigBS <> B.singleton theType <> theData
-      theMsg = theHash <> sigBS <> B.singleton theType <> theData
-
-  pubKey <- try $ A.select (A.Proxy @Point) (domain, udpPort, theMsg)
-  case pubKey of
-    Right Nothing  -> return $ Left $ SomeException UDPTimeout
-    Left x         -> return $ Left x
-    Right (Just x) -> return $ Right x

@@ -3,6 +3,8 @@
 // Pure stall check logic - needs no database or Prometheus:
 //   npx mocha test/stall-check.test.js
 const assert = require('chai').assert;
+const http = require('http');
+const models = require('../models');
 const stallCheckJs = require('../daemons/stall-check-utils');
 
 describe('Tests - Stall check', function () {
@@ -57,5 +59,45 @@ describe('Tests - Stall check', function () {
     assert.isUndefined(stallCheckJs.toCount(''));
     assert.isUndefined(stallCheckJs.toCount(null));
     assert.isUndefined(stallCheckJs.toCount(undefined));
+  });
+
+  it('compares with its own previous check, not with the latest row another apex wrote', async function () {
+    // Prometheus is a local server and the database calls are stubbed: the
+    // latest StallStat rows are another apex instance's, written seconds ago
+    // with the same counts.
+    const counts = { valid: '715092', pending: '2' };
+    const prometheus = http.createServer((req, res) => {
+      const query = new URL(req.url, 'http://prometheus').searchParams.get('query');
+      const result = query === 'vm_blocks_valid'
+        ? [{ metric: {}, value: [Date.now() / 1000, counts.valid] }]
+        : [{ metric: { group: 'pending' }, value: [Date.now() / 1000, counts.pending] }];
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ status: 'success', data: { resultType: 'vector', result } }));
+    });
+    await new Promise((resolve) => prometheus.listen(0, '127.0.0.1', resolve));
+    const statuses = [];
+    const saved = {
+      host: process.env.PROMETHEUS_HOST,
+      findOne: models.StallStat.findOne,
+      create: models.StallStat.create,
+      update: models.CurrentHealth.update,
+    };
+    process.env.PROMETHEUS_HOST = `127.0.0.1:${prometheus.address().port}`;
+    models.StallStat.findOne = async ({ where }) => ({ dataValues: { blockCount: where.blockType === 'Valid' ? 715092 : 2 } });
+    models.StallStat.create = async () => ({});
+    models.CurrentHealth.update = async (values) => { statuses.push(values.latestHealthStatus); return [1]; };
+    try {
+      await stallCheckJs.singleCheck(); // this process's first check: nothing to compare with
+      await stallCheckJs.singleCheck(); // no new valid block since its previous check: stalled
+      counts.valid = '715093';
+      await stallCheckJs.singleCheck();
+    } finally {
+      if (saved.host === undefined) delete process.env.PROMETHEUS_HOST; else process.env.PROMETHEUS_HOST = saved.host;
+      models.StallStat.findOne = saved.findOne;
+      models.StallStat.create = saved.create;
+      models.CurrentHealth.update = saved.update;
+      prometheus.close();
+    }
+    assert.deepEqual(statuses, [true, false, true]);
   });
 });

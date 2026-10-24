@@ -11,6 +11,7 @@ module Blockchain.Strato.Indexer.ApiIndexer
   ( p2pIndexerLoop,
     sqlIndexerLoop,
     seedSqlConsumerGroup,
+    retireSqlConsumerGroup,
     p2pConsumerGroup,
     sqlConsumerGroup,
     indexAPI,
@@ -94,6 +95,20 @@ sqlIndexerLoop cell = consume sqlConsumerGroup targetTopicName (indexAPIGated ce
 -- combined group's offset rather than from the beginning of retention.
 seedSqlConsumerGroup :: HasStreaming m => m ()
 seedSqlConsumerGroup = void $ seedConsumerGroupFrom sqlConsumerGroup p2pConsumerGroup targetTopicName
+
+-- | A node with no SQL index (--sql=false) runs no SQL consumer, so the SQL
+-- group's checkpoint must not stay on the topic: JLog keeps every segment
+-- until all subscribers have passed it, and this one never would. A full
+-- node's snapshot carries that checkpoint, so a validator restored from one
+-- would otherwise accumulate index events for good. 'seedSqlConsumerGroup'
+-- recreates the group from the Redis side's position if the node is ever
+-- switched back to SQL indexing.
+retireSqlConsumerGroup :: (MonadLogger m, HasStreaming m) => m ()
+retireSqlConsumerGroup = do
+  removed <- removeConsumerGroup sqlConsumerGroup targetTopicName
+  when removed $
+    $logInfoS "retireSqlConsumerGroup" . T.pack $
+      "retired the " ++ T.unpack sqlConsumerGroup ++ " consumer group on " ++ T.unpack (unTopicName targetTopicName) ++ ": no SQL side runs here"
 
 -- | The highest block number a batch carries, if it carries any.
 batchTip :: [IndexEvent] -> Maybe Integer

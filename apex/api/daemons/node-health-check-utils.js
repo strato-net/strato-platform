@@ -8,6 +8,7 @@ const si = require("systeminformation");
 const config = require("../config/app.config");
 const getPbftData = require("../controllers/health")["getPbftData"];
 const findView = require("../controllers/health")["findView"];
+const redisBlockDB = require("../lib/redis-block-db");
 const os = require('os');
 
 // TODO: do the mass-refactoring of the daemon. Use the OOP! Really, don't even try refactoring this without the main Object (SingleCheck object with methods and shared params). Don't change any db data formats.
@@ -100,20 +101,12 @@ async function checkNodeSyncStallStatus(syncStat) {
 
   let isStalled = false;
 
-  const { number: currVmBlockNum = 0 } = await BlockDataRef.findOne({
-    where: {
-      pow_verified: true,
-      is_confirmed: true,
-    },
-    order: [["number", "DESC"]],
-    attributes: ["number"],
-    raw: true,
-  });
+  const currVmBlockNum = await getIndexedBlockNumber();
 
   const pbftInfo = await getPbftData();
   const { sequence_number: currSeqBlockNum = 0 } = findView(pbftInfo);
 
-  const { isSynced = false} = await getStratoMetadata();
+  const isSynced = await getIsSynced();
 
   try {
     if (isSynced) {
@@ -173,6 +166,52 @@ async function checkNodeSyncStallStatus(syncStat) {
   };
 
   return [isSynced, additionalSyncInfo];
+}
+
+// The last indexed block number: Redis first (the block cache strato-indexer
+// keeps, the same source as /health), block_data_ref as the fallback where
+// there is no Redis block cache. A lite validator has no block_data_ref.
+async function getIndexedBlockNumber() {
+  try {
+    const number = await redisBlockDB.getBestBlockNumber();
+    if (number !== null) return number;
+  } catch (err) {
+    winston.debug(`No Redis block cache here, reading the indexed block number from SQL: ${err.message}`);
+  }
+  try {
+    const row = await BlockDataRef.findOne({
+      where: {
+        pow_verified: true,
+        is_confirmed: true,
+      },
+      order: [["number", "DESC"]],
+      attributes: ["number"],
+      raw: true,
+    });
+    return row ? row.number : 0;
+  } catch (err) {
+    winston.warn(`Unable to read the indexed block number: ${err.message}`);
+    return 0;
+  }
+}
+
+// Whether the node considers itself synced. /eth/v1.2/metadata's isSynced is
+// the verdict wherever strato-api runs: it is the Redis sync flag AND Cirrus
+// caught up to the node's best block, and health must not report synced
+// while slipstream is still behind. A lite validator runs no strato-api and
+// no slipstream, so there the Redis flag alone is the answer.
+async function getIsSynced() {
+  if (process.env.APEX_ROLE === "validator") {
+    try {
+      const status = await redisBlockDB.getSyncStatus();
+      if (status !== null) return status;
+    } catch (err) {
+      winston.debug(`No Redis sync status here: ${err.message}`);
+    }
+    return false;
+  }
+  const { isSynced = false } = await getStratoMetadata();
+  return isSynced;
 }
 
 async function getStratoMetadata() {
