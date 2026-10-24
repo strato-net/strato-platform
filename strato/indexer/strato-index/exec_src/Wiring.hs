@@ -9,7 +9,6 @@
 
 module Wiring where
 
-import Blockchain.BlockDB
 import Blockchain.DBM
 import Blockchain.Data.BlockDB
 import Blockchain.Data.Transaction (insertTXWithSigners)
@@ -52,13 +51,3 @@ instance (MonadIO m, HasRedis m) => Mod.Modifiable (P2P BestBlock) m where
     case result of
       Right _ -> pure ()
       Left err -> error $ "Failed to update best block in Redis: " ++ show err
-
-instance (MonadIO m, HasRedis m) => (Keccak256 `A.Alters` P2P OutputBlock) m where
-  lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "OutputBlock"
-  delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "OutputBlock"
-  insert _ _ =
-    void
-      . execRedis
-      . putBlock
-      . unP2P
-

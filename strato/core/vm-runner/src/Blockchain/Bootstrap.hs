@@ -27,6 +27,7 @@ import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
 import Blockchain.Model.SyncState
 import Blockchain.VMContext (ContextM, startFromStateRoot)
+import Blockchain.VMOptions (flags_disableSqlIndexing, flags_disableCirrusIndexing)
 import Blockchain.Wiring ()
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Blockchain.SolidVM.CodeCollectionDB
@@ -66,9 +67,6 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
   createTopicAndWait "vmevents"
   createTopicAndWait "jsonrpcresponse"
   createTopicAndWait "vm_tasks"
-  let pub sd vmes = do
-        for_ sd $ \diff -> IdxKafka.produceIndexEvents [IdxModel.StateDiffEntry diff]
-        void $ produceVMEvents vmes
   let sr = GI.stateRoot genesisInfo
 
   mSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
@@ -78,35 +76,40 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
       events' = GI.events genesisInfo
       delegatecalls' = GI.delegatecalls genesisInfo
 
-  ccas <-
-    fmap catMaybes . for (GI.codeInfo genesisInfo) $ \(GI.CodeInfo src mName) -> for mName $ \_ -> do
-      let srcHash = hash $ T.encodeUtf8 src
-      cc <- codeCollectionFromHash False True srcHash
-      pure $ CodeCollectionAdded (() <$ cc) "BlockApps" srcHash
+  unless flags_disableCirrusIndexing $ do
+    ccas <-
+      fmap catMaybes . for (GI.codeInfo genesisInfo) $ \(GI.CodeInfo src mName) -> for mName $ \_ -> do
+        let srcHash = hash $ T.encodeUtf8 src
+        cc <- codeCollectionFromHash False True srcHash
+        pure $ CodeCollectionAdded (() <$ cc) "BlockApps" srcHash
 
-  pub Nothing ccas
+    void $ produceVMEvents ccas
 
-  for_ addresses $ \address -> do
-    addressState <- A.lookupWithDefault (A.Proxy @AddressState) address
+  when (not flags_disableSqlIndexing || not flags_disableCirrusIndexing) $
+    for_ addresses $ \address -> do
+      addressState <- A.lookupWithDefault (A.Proxy @AddressState) address
 
-    $logInfoS "initgen" $ T.pack $
-      "##################### writing to DBs: " ++ format address
+      $logInfoS "initgen" $ T.pack $
+        "##################### writing to DBs: " ++ format address
 
-    let addrStateMap = Map.fromList [(address, addressState)]
-        squashMap f = mapM (uncurry f) . Map.toList
+      let addrStateMap = Map.fromList [(address, addressState)]
+          squashMap f = mapM (uncurry f) . Map.toList
 
-    accountDiffs <- mapM eventualAccountState addrStateMap
-    let addressEvents = Map.findWithDefault S.empty address  events'
-        dc = case addressStateCodeHash addressState of
-          ExternallyOwned{} -> S.empty
-          SolidVMCode name ch -> S.singleton $ A.Delegatecall
-            { A._delegatecallStorageAddress = address
-            , A._delegatecallCodeHash = ch
-            , A._delegatecallContractName = T.pack name
-            }
-    let addressDelegatecalls = dc S.>< Map.findWithDefault S.empty address delegatecalls'
-    vmEvents <- squashMap (toAction addressEvents addressDelegatecalls) accountDiffs
-    pub (Just $ mkStateDiff accountDiffs) vmEvents
+      accountDiffs <- mapM eventualAccountState addrStateMap
+      unless flags_disableSqlIndexing $
+        void $ IdxKafka.produceIndexEvents [IdxModel.StateDiffEntry $ mkStateDiff accountDiffs]
+      unless flags_disableCirrusIndexing $ do
+        let addressEvents = Map.findWithDefault S.empty address  events'
+            dc = case addressStateCodeHash addressState of
+              ExternallyOwned{} -> S.empty
+              SolidVMCode name ch -> S.singleton $ A.Delegatecall
+                { A._delegatecallStorageAddress = address
+                , A._delegatecallCodeHash = ch
+                , A._delegatecallContractName = T.pack name
+                }
+        let addressDelegatecalls = dc S.>< Map.findWithDefault S.empty address delegatecalls'
+        vmEvents <- squashMap (toAction addressEvents addressDelegatecalls) accountDiffs
+        void $ produceVMEvents vmEvents
 
   for_ mSR startFromStateRoot
 

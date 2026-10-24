@@ -40,6 +40,7 @@ import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.VMContext
 import Blockchain.VMOut
+import Blockchain.VMOptions (flags_disableSqlIndexing)
 import Blockchain.Wiring ()
 import Blockchain.VMMetrics
 import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
@@ -242,7 +243,9 @@ getNumPoolable txPairs = do
   return $ length poolableNewTxs
 
 outputTransactions :: [(Timestamp, OutputTx)] -> [VmOutEvent]
-outputTransactions = map $ OutIndexEvent . uncurry IndexTransaction
+outputTransactions
+  | flags_disableSqlIndexing = const []
+  | otherwise = map $ OutIndexEvent . uncurry IndexTransaction
 
 writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
 writeBlockSummary block = do
