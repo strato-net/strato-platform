@@ -73,7 +73,6 @@ p2pIndexerLoop = consume p2pConsumerGroup targetTopicName indexP2P
 indexerMainLoop :: ( MonadLogger m,
                      HasStreaming m,
                      HasSQLDB m,
-                     (Keccak256 `A.Alters` P2P OutputBlock) m,
                      Mod.Modifiable (P2P BestBlock) m
                    ) =>
                    Text ->
