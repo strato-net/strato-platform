@@ -479,8 +479,6 @@ call' from to' fnCalltype functionName valList = do
   -- Consensus-visible: see 'isConstructorCallForkActive'. Before it, a call
   -- named "<constructor>" re-ran the constructor body on a deployed contract.
   constructorCallFork <- isConstructorCallForkActive . BlockHeader.number . Env.blockHeader <$> getEnv
-  when (constructorCallFork && functionName == "<constructor>") $
-    unknownFunction "constructor cannot be called on a deployed contract" (functionName, valList)
 
   let lookupFunction name
         | name == "<constructor>" = if constructorCallFork then Nothing else Just $ fromMaybe emptyFunction (contract ^. CC.constructor)
@@ -529,6 +527,10 @@ call' from to' fnCalltype functionName valList = do
       resolveArgs shouldResolve theFunction args
         | shouldResolve = resolveArgRefs from contract cc (CC._funcArgs theFunction) args
         | otherwise     = pure args
+
+  let isConstructorName n = T.strip (T.takeWhile (/= '(') (labelToText n)) == "<constructor>"
+  when (constructorCallFork && any isConstructorName [functionName, functionName']) $
+    unknownFunction "constructor cannot be called on a deployed contract" (functionName, valList)
 
   f <- (nullifyRefs =<<) <$> case (lookupFunction functionName', fnCalltype) of
       -- Standard contract call
