@@ -36,7 +36,7 @@ import qualified Data.ByteString.Char8                   as BC
 import           Data.Default                            (def)
 import           Data.Either.Combinators
 import           Data.Foldable                           (for_)
-import           Data.Maybe                              (catMaybes)
+import           Data.Maybe                              (catMaybes, fromMaybe)
 import qualified Data.Text                               as T
 import           Data.Time.Clock.POSIX
 import           Network.Socket
@@ -96,7 +96,12 @@ addPeersIfNeeded minPeers = do
   numAvailablePeers <- getNumAvailablePeers
   $logInfoS "addPeersIfNeeded" . T.pack $ "Number of available peers: " ++ show numAvailablePeers ++ " / " ++ show minPeers
   when (numAvailablePeers < minPeers) $ do
-    eBondedPeers <- getBondedPeersForUDP
+    -- Only a peer that completed an ETH handshake is proven to be on this
+    -- network, but a joining node has none: until a bootnode admits it, it
+    -- must ask the peers it does know, or it never learns of any other node.
+    eBondedPeers <- getBondedPeersForUDP >>= \case
+      Right [] -> getAnyBondedPeersForUDP
+      other    -> pure other
     case eBondedPeers of
       Left err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to find peers: " ++ show err
       Right [] -> $logInfoS "addPeersIfNeeded" "no peers available to bootstrap from, will try again soon."
@@ -179,25 +184,28 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
         Just p' -> do
           setPeerPubkey p' otherPubKey
           updateUdpPort p' otherUdpPort
+          updateTcpPort p' otherTcpPort
           return $ Just p'
     case mPeer' of
       Nothing -> pure ()
       Just peer -> do
         let (UDPPort up') = otherUdpPort
-        sendPacket peer{pPeerUdpPort = up'} $ Pong ep 4 (time + 50)
+        ownTcpPort <- Mod.access (Mod.Proxy @TCPPort)
+        sendPacket peer{pPeerUdpPort = up'} $ Pong ep 4 (time + 50) (Just ownTcpPort)
         eErr' <- setPeerBondingState (pPeerHost peer) otherPubKey 2
         whenLeft eErr' $ \err -> do
           $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
           throwM err
-  Pong {} -> do
+  Pong _ _ _ mOtherTcpPort -> do
     mPeer <- getPeerByIP' ip
     mPeer' <-
       case mPeer of
         Nothing -> do
-          addPeer' otherUdpPort (TCPPort 30303)
+          addPeer' otherUdpPort (fromMaybe (TCPPort 30303) mOtherTcpPort)
           getPeerByIP' ip
         Just p' -> do
           setPeerPubkey p' otherPubKey
+          for_ mOtherTcpPort $ updateTcpPort p'
           return $ Just p'
     for_ mPeer' $ \peer -> do
       setPeerPubkey peer otherPubKey

@@ -5,8 +5,27 @@ local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_
 local unique_name = ''
 local user_access_token = ''
 
+-- Local auth: Hydra advertises its endpoints under the node's public URL,
+-- which nginx cannot resolve from inside the container when that name is
+-- only known from /etc/hosts (the resolver directive does pure DNS). The
+-- endpoints nginx calls itself are pointed back at the local-auth container,
+-- which serves them at the root of what nginx proxies under /auth/; the
+-- issuer and the browser-facing endpoints keep the public URL, so the iss
+-- of the tokens still matches.
+local discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>"
+local local_auth = discovery:match("^(https?://local%-auth[^/]*)")
+if local_auth then
+  local doc = openidc.get_discovery_doc({ discovery = discovery })
+  if doc then
+    for _, endpoint in ipairs({ "jwks_uri", "token_endpoint", "revocation_endpoint", "userinfo_endpoint" }) do
+      doc[endpoint] = local_auth .. doc[endpoint]:sub(#doc.issuer + 1)
+    end
+    discovery = doc
+  end
+end
+
 local verify_opts = {
-  discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
+  discovery = discovery,
   ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
   accept_none_alg = false,
   accept_unsupported_alg = false
@@ -34,7 +53,7 @@ end
 
 local authenticate_opts = {
   redirect_uri = "/auth/openidc/return",
-  discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
+  discovery = discovery,
   client_id = "<CLIENT_ID_PLACEHOLDER>",
   client_secret = "<CLIENT_SECRET_PLACEHOLDER>",
   scope = "<OAUTH_SCOPE_PLACEHOLDER>",
@@ -82,8 +101,7 @@ local wallet_auth_route_prefixes = {
   "/api/swap-pools/",
   "/api/tokens/",
   "/api/trade/",
-  "/api/user/admin/",
-  "/api/vault/"
+  "/api/user/admin/"
 }
 
 local wallet_auth_methods = {

@@ -7,6 +7,7 @@ module.exports = {
   passwordSaltRounds: 10,
   webSockets: {
     dbPollFrequency: 1 * 1000,
+    countPollFrequency: 60 * 1000, // full-table counts (user, contract) are too expensive to run every second
   },
   healthCheck: {
     requestTimeout: 3 * 1000,

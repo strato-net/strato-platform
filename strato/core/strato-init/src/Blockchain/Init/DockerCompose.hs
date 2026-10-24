@@ -8,8 +8,9 @@ import Blockchain.EthConf (ethConf)
 import Blockchain.EthConf.Model (apiConfig, apiPort, jsonRpcPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
+import Blockchain.Init.EthConf (containerMode, nodeHostname)
 import Blockchain.Init.Role
-import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_jsonrpc, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
+import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_discoveryPort, flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_p2pPort, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_monitoring, flags_publicStratoRpc, flags_repoUrl, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -17,14 +18,29 @@ import Data.List (intercalate)
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
 import System.Posix.User (getEffectiveUserID, getEffectiveGroupID)
-import System.Process (readProcess)
 
--- | Which of the node's containers a role runs. A core keeps the stores the
--- chain processes write; an API tier keeps what fronts strato-api.
-roleHasService :: Role -> String -> Bool
-roleHasService RoleNode _ = True
-roleHasService RoleCore name = name `elem` ["postgres", "redis", "streaming", "prometheus"]
-roleHasService RoleApi name = name `elem` ["nginx", "postgrest", "docs"]
+-- | The host port a validator publishes apex (/health, /status) on for the
+-- network monitor: plain HTTP on 80, because a CDN such as Cloudflare only
+-- proxies 80, 8080, 443 and 8443. Inside its container apex listens on 3009.
+apexPort :: Int
+apexPort = 80
+
+-- | Which of the node's containers a role runs, given whether Prometheus and
+-- apex are wanted (@--monitoring@, meaningful on an api-node only). A core
+-- keeps the stores the chain processes write; an API tier keeps what fronts
+-- strato-api.
+roleHasService :: Bool -> Role -> String -> Bool
+roleHasService _ RoleNode _ = True
+roleHasService _ RoleCore name = name `elem` ["postgres", "redis", "streaming", "prometheus"]
+roleHasService _ RoleApi name = name `elem` ["nginx", "postgrest", "docs"]
+-- A validator keeps its stores and Prometheus, plus apex: the network monitor
+-- polls its /health, published directly since there is no nginx.
+roleHasService _ RoleValidator name = name `elem` ["postgres", "redis", "streaming", "prometheus", "apex"]
+-- An api-node keeps everything the APIs need and drops what only serves
+-- people: no docs, smd or app-*. Prometheus and apex produce /health for the
+-- network monitor and stay unless --monitoring=false; local-auth is in the
+-- service list only with --localAuth, as on a node.
+roleHasService monitoring RoleApiNode name = name `elem` (["postgres", "redis", "streaming", "nginx", "postgrest", "local-auth"] ++ [ svc | monitoring, svc <- ["prometheus", "apex"] ])
 
 generateDockerCompose :: Role -> IO ()
 generateDockerCompose role = do
@@ -34,8 +50,12 @@ generateDockerCompose role = do
       -- The SMD rides along too, unless it is served from its own deployment.
       bundledSmd = role == RoleNode && flags_bundledSmd
       -- PostgREST (Cirrus at /cirrus) too, unless the API tier serves Cirrus.
-      -- An API directory always runs it.
-      bundledPostgrest = role /= RoleNode || flags_bundledPostgrest
+      -- A node or an api-node honours the flag; an API directory always runs it.
+      bundledPostgrest = role `notElem` [RoleNode, RoleApiNode] || flags_bundledPostgrest
+      -- Prometheus and apex, which produce /health. Only an api-node may turn
+      -- them off (the Generator refuses --monitoring=false elsewhere).
+      monitoring = flags_monitoring
+      hasService = roleHasService monitoring role
       -- A remote --pghost (a managed cluster) replaces the postgres container:
       -- containers reach it by that name instead of the service name.
       externalPostgres = flags_pghost `notElem` ["localhost", "127.0.0.1"]
@@ -50,7 +70,7 @@ generateDockerCompose role = do
   uid <- show <$> getEffectiveUserID
   gid <- show <$> getEffectiveGroupID
   
-  localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
+  localHostname <- nodeHostname
 
   let conf = ethConf
       ssl = not $ null flags_sslDir
@@ -58,6 +78,14 @@ generateDockerCompose role = do
       rpcPort = show jsonRpcPort
       stratoApiPort = show $ apiPort (apiConfig conf)
       userGid = uid ++ ":" ++ gid
+      -- The BlockApps images: built locally, or pulled with the --repoUrl
+      -- prefix (bin/strato-up --prebuilt).
+      imageRef name hash = flags_repoUrl ++ name ++ ":" ++ stratoVersionTag ++ "-" ++ hash
+      -- Settings only the containers of a --dockerMode=all node get.
+      containerOnly xs = [ x | containerMode, x <- xs ]
+      -- Ports published on the loopback for the host-side processes; a
+      -- --dockerMode=all node reaches its stores by service name instead.
+      publish ps = if containerMode then Nothing else Just ps
       -- Containers reach host-side processes as host.docker.internal (Docker
       -- Desktop defines it natively, Linux needs the host-gateway alias). The
       -- machine hostname stays aliased too: in --localAuth mode the nodeUrl-based
@@ -71,7 +99,7 @@ generateDockerCompose role = do
         }
 
   let appBackend = def
-        { image = "app-backend:" ++ stratoVersionTag ++ "-" ++ hashAppBackend
+        { image = imageRef "app-backend" hashAppBackend
         , user = Just userGid
         , depends_on = Just $ DependsOnList (withPostgres (["postgres"] ++ [ "postgrest" | bundledPostgrest ]))
         , init = Just True
@@ -82,7 +110,7 @@ generateDockerCompose role = do
             , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
             , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
             ]
-        , environment = Just $ Map.fromList
+        , environment = Just $ Map.fromList $
             [ ("RPC_URL_MAINNET", "${RPC_URL_MAINNET:-}")
             , ("RPC_URL_MAINNET_FALLBACK", "${RPC_URL_MAINNET_FALLBACK:-}")
             , ("RPC_URL_SEPOLIA", "${RPC_URL_SEPOLIA:-}")
@@ -111,6 +139,7 @@ generateDockerCompose role = do
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
             ]
+            ++ containerOnly [("STRATO_HOSTNAME", "strato")]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/app-backend.log 2>&1"]
         , restart = Just "unless-stopped"
@@ -118,7 +147,7 @@ generateDockerCompose role = do
         }
 
   let appUi = def
-        { image = "app-ui:" ++ stratoVersionTag ++ "-" ++ hashAppUi
+        { image = imageRef "app-ui" hashAppUi
         , user = Just userGid
         , depends_on = Just $ DependsOnList ["app-backend"]
         , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
@@ -134,11 +163,12 @@ generateDockerCompose role = do
         }
 
   let smd = def
-        { image = "smd:" ++ stratoVersionTag ++ "-" ++ hashSmd
+        { image = imageRef "smd" hashSmd
         , user = Just userGid
         , depends_on = Just $ DependsOnList (["apex"] ++ [ "postgrest" | bundledPostgrest ] ++ ["prometheus"])
         , extra_hosts = hostGateway
         , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
+        , environment = Just $ Map.fromList [("WAGMI_PROJECT_ID", "${WAGMI_PROJECT_ID:-}")]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh /usr/src/app/docker-run.sh >> /logs/smd.log 2>&1"]
         , restart = Just "unless-stopped"
@@ -146,15 +176,24 @@ generateDockerCompose role = do
         }
 
   let apex = def
-        { image = "apex:" ++ stratoVersionTag ++ "-" ++ hashApex
+        { image = imageRef "apex" hashApex
         , user = Just userGid
-        , depends_on = Just $ DependsOnList (withPostgres ["postgres", "prometheus"])
+        , depends_on = Just $ DependsOnList (withPostgres ["postgres", "prometheus"] ++ [ "redis" | hasService "redis" ])
         , extra_hosts = hostGateway
-        , environment = Just $ Map.fromList
+        , environment = Just $ Map.fromList $
             [ ("postgres_host", pgWriterHost)
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
             ]
+            -- apex reads the last block and validators from Redis wherever the
+            -- node has one, so it starts after Redis. On a validator it requires
+            -- only the Prometheus jobs the node runs, serves the health routes
+            -- alone (no /user, no SMD socket rooms), and is published for the
+            -- network monitor on apexPort.
+            ++ [ ("HEALTH_CHECK_JOBS", "strato_p2p=strato-p2p,vm_main=vm-runner,seq_main=strato-sequencer") | role == RoleValidator ]
+            ++ [ ("APEX_ROLE", "validator") | role == RoleValidator ]
+            ++ containerOnly [("APEX_STRATO_API_HOST", "strato")]
+        , ports = if role == RoleValidator then Just [show apexPort ++ ":3009"] else Nothing
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
@@ -190,11 +229,11 @@ generateDockerCompose role = do
             }
         , logging = noLogging
         , volumes = Just ["./logs:/logs", "./redis:/data"]
-        , ports = Just ["127.0.0.1:6379:6379"]
+        , ports = publish ["127.0.0.1:6379:6379"]
         }
 
   let postgrest = def
-        { image = "postgrest:" ++ stratoVersionTag ++ "-" ++ hashPostgrest
+        { image = imageRef "postgrest" hashPostgrest
         , user = Just userGid
         , depends_on = Just $ DependsOnList (withPostgres ["postgres"])
         , environment = Just $ Map.fromList
@@ -242,12 +281,12 @@ generateDockerCompose role = do
             , start_period = Just "90s"
             }
         , logging = noLogging
-        , ports = Just ["127.0.0.1:5432:5432"]
+        , ports = publish ["127.0.0.1:5432:5432"]
         }
 
 
   let nginx = def
-        { image = "nginx:" ++ stratoVersionTag ++ "-" ++ hashNginx
+        { image = imageRef "nginx" hashNginx
         , extra_hosts = hostGateway
         , depends_on = Just $
             if flags_localAuth
@@ -275,7 +314,12 @@ generateDockerCompose role = do
             , ("BUNDLED_APP", if bundledApp then "true" else "false")
             , ("APP_URL", flags_appUrl)
             , ("ssl", if ssl then "true" else "false")
+            -- Extra set_real_ip_from CIDRs, taken from the host environment
+            -- at compose up; empty by default.
+            , ("NGINX_TRUST_PROXY_CIDRS", "${NGINX_TRUST_PROXY_CIDRS:-}")
             ]
+            -- The node processes answer by service name, not on the host.
+            ++ containerOnly [("API_UPSTREAM_HOST", "strato")]
             -- An SMD served from its own deployment: nginx drops the SMD
             -- locations and redirects /smd there. Absent in the bundled default.
             ++ [ kv | role == RoleNode && not bundledSmd, kv <- [("BUNDLED_SMD", "false"), ("SMD_URL", flags_smdUrl)] ]
@@ -350,23 +394,25 @@ generateDockerCompose role = do
             }
         , volumes = Just (bcVolumes bc)
         , logging = noLogging
-        , ports = Just ["127.0.0.1:" ++ show (bcPort bc) ++ ":" ++ show (bcPort bc)]
+        , ports = publish ["127.0.0.1:" ++ show (bcPort bc) ++ ":" ++ show (bcPort bc)]
         }
 
   -- Scrape jobs whose process this node does not run. Kept in step with
   -- Generator.hs's commands.txt and roleHasService above: strato-api (the
-  -- "core-api" job) only with roleRunsApi, apex and nginx only on RoleNode,
-  -- strato-ingest only on a core cell. Without this their targets sit DOWN
-  -- forever.
+  -- "core-api" job) only with roleRunsApi, apex and nginx only where
+  -- roleHasService has them, strato-ingest only on a core cell. Without this
+  -- their targets sit DOWN forever.
   let prometheusSkipJobs =
         [ "core-api" | not (roleRunsApi role) ]
-        ++ [ j | not (roleHasService role "nginx"), j <- ["nginx", "apex"] ]
+        ++ [ "nginx" | not (hasService "nginx") ]
+        ++ [ "apex" | not (hasService "apex") ]
+        ++ [ "slipstream" | not (roleIndexesSql role) ]
         ++ [ "strato-ingest" | role /= RoleCore ]
 
   let prometheus = def
-        { image = "prometheus:" ++ stratoVersionTag ++ "-" ++ hashPrometheus
+        { image = imageRef "prometheus" hashPrometheus
         , user = Just userGid
-        , environment = Just $ Map.fromList [("PROMETHEUS_SKIP_JOBS", intercalate "," prometheusSkipJobs)]
+        , environment = Just $ Map.fromList $ ("PROMETHEUS_SKIP_JOBS", intercalate "," prometheusSkipJobs) : containerOnly [("STRATO_HOSTNAME", "strato")]
         , extra_hosts = hostGateway
         , volumes = Just
             [ "./logs:/logs"
@@ -380,7 +426,7 @@ generateDockerCompose role = do
         }
 
   let localAuth = def
-        { image = "local-auth:" ++ stratoVersionTag ++ "-" ++ hashLocalAuth
+        { image = imageRef "local-auth" hashLocalAuth
         , depends_on = Just $ DependsOnList (withPostgres ["postgres"])
         , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
@@ -403,7 +449,7 @@ generateDockerCompose role = do
         -- chmod so the host user's strato-logrotate can rotate (truncate) the
         -- log: this container runs as root, not as the host uid.
         , command = Just ["touch /logs/local-auth.log && chmod 666 /logs/local-auth.log || true; exec /entrypoint.sh >> /logs/local-auth.log 2>&1"]
-        , ports = Just ["127.0.0.1:4444:4444"]
+        , ports = publish ["127.0.0.1:4444:4444"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
@@ -438,19 +484,93 @@ generateDockerCompose role = do
             , ("PROMETHEUS_HOST", "127.0.0.1:1")
             ]) <$> environment nginx
         }
+      -- An api-node's nginx fronts the APIs alone. BUNDLED_APP and APP_URL
+      -- are already set above (the app is never bundled off a full node); the
+      -- SMD is treated the same, so / and /smd answer 404, or redirect when
+      -- --appUrl or --smdUrl names them elsewhere. There are no Swagger docs
+      -- (/docs answers 502), and without --monitoring no apex or Prometheus
+      -- either (/health and /apex-api answer 502). With --localAuth it waits
+      -- for a healthy local-auth like the node's nginx: it fetches the OpenID
+      -- discovery document from there at startup.
+      apiNodeUpstreams = [ svc | monitoring, svc <- ["apex", "prometheus"] ] ++ [ "postgrest" | bundledPostgrest ]
+      apiNodeNginx = nginx
+        { depends_on = Just $
+            if flags_localAuth
+              then DependsOnMap $ Map.fromList $
+                ("local-auth", DependsOnCondition "service_healthy")
+                  : [ (svc, DependsOnCondition "service_started") | svc <- apiNodeUpstreams ]
+              else DependsOnList apiNodeUpstreams
+        , environment = Map.union (Map.fromList $
+            [ ("BUNDLED_SMD", "false")
+            , ("SMD_URL", flags_smdUrl)
+            , ("DOCS_HOST", "127.0.0.1:1")
+            ] ++ [ kv | not monitoring, kv <- [("APEX_HOST", "127.0.0.1:1"), ("PROMETHEUS_HOST", "127.0.0.1:1")] ]
+            ) <$> environment nginx
+        }
+      roleNginx = case role of
+        RoleApi -> apiOnlyNginx
+        RoleApiNode -> apiNodeNginx
+        _ -> nginx
       roleServices =
-        [ (name, if role == RoleApi && name == "nginx" then apiOnlyNginx else svc)
+        [ (name, if name == "nginx" then roleNginx else svc)
         | (name, svc) <- allServices
-        , roleHasService role name
+        , hasService name
         , bundledApp || name `notElem` ["app-backend", "app-ui"]
         , bundledSmd || name /= "smd"
         , bundledPostgrest || name /= "postgrest"
         , not (externalPostgres && name == "postgres")
         ]
 
+  -- --dockerMode=all: the node processes run in the strato image too, from the
+  -- node directory bind-mounted at /var/lib/strato, where convoke --no-docker
+  -- supervises commands.txt (see entrypoint.sh in the image). strato-up sets
+  -- the directory up and starts the project. nginx waits for the strato
+  -- container, which it resolves when it loads its configuration.
+  let strato = def
+        { image = imageRef "strato" hashStrato
+        , user = Just userGid
+        , init = Just True
+        , depends_on = Just $ DependsOnMap $ Map.fromList
+            [ (svc, DependsOnCondition "service_healthy")
+            | svc <- withPostgres ["postgres"] ++ [ "redis" | hasService "redis" ] ++ [ "local-auth" | flags_localAuth ] ]
+        , extra_hosts = hostGateway
+        -- strato-logrotate reads its thresholds from the environment: on a host
+        -- it inherits strato-up's, here compose passes them through from the
+        -- environment of every strato-up, like the app's RPC_URL_* variables.
+        , environment = Just $ Map.fromList [ (v, "${" ++ v ++ ":-}") | v <- ["STRATO_LOGROTATE_INTERVAL_SEC", "STRATO_LOGROTATE_MAX_SIZE", "STRATO_LOGROTATE_MIN_SIZE", "STRATO_LOGROTATE_RETENTION_DAYS"] ]
+        -- The peer ports ethconf names (--p2pPort, --discoveryPort), published
+        -- one to one: ethereum-discover advertises them to the peers. A core cell
+        -- also publishes its transaction ingress (--ingressPort) for the API
+        -- tier, on the address --ingressListen names and nowhere else: the
+        -- ingress has no authentication (setup refuses a core cell without it).
+        , ports = Just $ [show flags_p2pPort ++ ":" ++ show flags_p2pPort, show flags_discoveryPort ++ ":" ++ show flags_discoveryPort ++ "/udp"]
+            ++ [ flags_ingressListen ++ ":" ++ show flags_ingressPort ++ ":" ++ show flags_ingressPort | role == RoleCore ]
+        , volumes = Just [".:/var/lib/strato"]
+        , restart = Just "unless-stopped"
+        -- convoke's shutdown is SIGTERM to the children, five seconds, then
+        -- SIGKILL; the default ten seconds would cut it short.
+        , stop_grace_period = Just "30s"
+        -- What runs in the container depends on the role; the image's own
+        -- check assumes a full node.
+        , healthcheck = Just Healthcheck
+            { test = ["CMD-SHELL", intercalate " && " [ "pgrep " ++ p | p <- [ "vm-runner" | roleRunsCore role ] ++ [ "strato-api" | roleRunsApi role ] ]]
+            , interval = Just "5s"
+            , timeout = Just "2s"
+            , retries = Nothing
+            , start_period = Just "60s"
+            }
+        -- convoke's output is the container log; the processes write ./logs.
+        , logging = Just Logging { driver = "json-file", options = Just LoggingOptions { max_size = Just "100m", max_file = Just "3" } }
+        }
+      dependsOnMap Nothing = Map.empty
+      dependsOnMap (Just (DependsOnList svcs)) = Map.fromList [ (svc, DependsOnCondition "service_started") | svc <- svcs ]
+      dependsOnMap (Just (DependsOnMap m)) = m
+      afterStrato svc = svc { depends_on = Just $ DependsOnMap $ Map.insert "strato" (DependsOnCondition "service_started") (dependsOnMap (depends_on svc)) }
+      containerServices = ("strato", strato) : [ (name, if name == "nginx" then afterStrato svc else svc) | (name, svc) <- roleServices ]
+
   let composeFile = ComposeFile
         { namedVolumes = Nothing
-        , services = Map.fromList roleServices
+        , services = Map.fromList (if containerMode then containerServices else roleServices)
         }
 
   Yaml.encodeFile "docker-compose.yml" composeFile

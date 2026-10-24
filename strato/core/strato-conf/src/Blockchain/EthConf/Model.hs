@@ -146,8 +146,21 @@ data P2PConf = P2PConf
   , maxReturnedHeaders :: Int
   , averageTxsPerBlock :: Int
   , maxHeadersTxsLens :: Int
+  , listenPort :: Int
   }
-  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+  deriving (Show, Eq, Generic, ToJSON)
+
+-- listenPort (the TCP port strato-p2p listens on and ethereum-discover
+-- advertises) is optional so ethconf.yaml files written before it existed
+-- still parse.
+instance FromJSON P2PConf where
+  parseJSON = withObject "P2PConf" $ \v -> P2PConf
+    <$> v .: "maxConnections"
+    <*> v .: "connectionTimeout"
+    <*> v .: "maxReturnedHeaders"
+    <*> v .: "averageTxsPerBlock"
+    <*> v .: "maxHeadersTxsLens"
+    <*> v .:? "listenPort" .!= 30303
 
 data SqlConf = SqlConf
   { user :: String,
@@ -249,6 +262,11 @@ instance FromJSON UrlConfig where
 
 data NetworkConf = NetworkConf
   { network :: String
+  -- | What strato-setup set this directory up as (its @--role@: node, core,
+  -- api, api-node or validator). Written for every directory and only read
+  -- back, by strato-ps; no process acts on it. Absent from files written
+  -- before it existed, which reads as node.
+  , role :: String
   , networkID :: Integer
   , chainId :: Integer
   , httpPort :: Int
@@ -277,7 +295,8 @@ instance FromJSON NetworkConf where
   parseJSON = withObject "NetworkConf" $ \v -> do
     net <- v .:? "network" .!= "upquark"
     NetworkConf net
-      <$> v .:? "networkID" .!= (-1)
+      <$> v .:? "role" .!= "node"
+      <*> v .:? "networkID" .!= (-1)
       <*> v .:? "chainId" .!= computeChainId net
       <*> v .:? "httpPort" .!= 8081
       <*> v .:? "txSizeLimit" .!= 2097152
@@ -354,6 +373,11 @@ data DebugConfig = DebugConfig
 data VmConf = VmConf
   { sqlDiff :: Bool
   , diffPublish :: Bool
+  -- | Publish transaction results, actions and code collections on the
+  -- @vmevents@ stream for slipstream. Off on a node that runs no slipstream
+  -- (a lite validator): JLog only trims a topic as its readers advance, so a
+  -- stream nobody reads would grow for good.
+  , publishVmEvents :: Bool
   -- | Ceiling on concurrent in-flight simulations; excess are shed (503) so
   -- simulations can't starve block processing on the shared VM. Default 8.
   , simMaxConcurrent :: Int
@@ -375,6 +399,7 @@ instance FromJSON VmConf where
   parseJSON = withObject "VmConf" $ \v -> VmConf
     <$> v .:? "sqlDiff" .!= True
     <*> v .:? "diffPublish" .!= True
+    <*> v .:? "publishVmEvents" .!= True
     <*> v .:? "simMaxConcurrent" .!= 8
     <*> ((\single many -> maybe [] pure single ++ many) <$> v .:? "vmQueryUrl" <*> v .:? "vmQueryUrls" .!= [])
     <*> v .:? "vmQueryOnly" .!= False
@@ -435,6 +460,7 @@ instance Default P2PConf where
     , maxReturnedHeaders = 500
     , averageTxsPerBlock = 40
     , maxHeadersTxsLens = 2500
+    , listenPort = 30303
     }
 
 instance Default ApiConfig where
@@ -452,6 +478,7 @@ instance Default VmConf where
   def = VmConf
     { sqlDiff = True
     , diffPublish = True
+    , publishVmEvents = True
     , simMaxConcurrent = 8
     , vmQueryUrls = []
     , vmQueryOnly = False
@@ -478,6 +505,7 @@ instance Default UrlConfig where
 instance Default NetworkConf where
   def = NetworkConf
     { network = "upquark"
+    , role = "node"
     , networkID = -1  -- will be computed from network name
     , chainId = computeChainId "upquark"
     , httpPort = 8081

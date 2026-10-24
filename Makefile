@@ -1,13 +1,14 @@
-REPO_URL ?= 
-ifeq ($(REPO),dev)
-  REPO_URL=registry-aws.blockapps.net:5000/blockapps/
-endif
-ifeq ($(REPO),release)
-  REPO_URL=registry-aws.blockapps.net:5000/blockapps-repo/
-endif
-$(info REPO_URL is "${REPO_URL}" (REPO: "${REPO}"))
-REPO_AWS_ECR_URL=406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/
-$(info REPO_AWS_ECR_URL is "${REPO_AWS_ECR_URL}")
+# Registries. The STRATO node images (strato, nginx, apex, postgrest, prometheus,
+# smd, local-auth and the app images) are published to the public GitHub
+# registry; the services BlockApps runs itself (vault, highway, bridge) stay in
+# the private AWS ECR. Every image is built once, under the name it is pushed
+# with; the node images also get a bare local tag (apex:<tag>) because the
+# docker-compose.yml of a local node refers to them that way. The alias is
+# set even when the registry image is already present (pulled by a
+# strato-up --prebuilt, say), not only after a build.
+REPO_GHCR_URL ?= ghcr.io/strato-net/strato-platform/
+REPO_AWS_ECR_URL ?= 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/
+$(info REPO_GHCR_URL is "${REPO_GHCR_URL}", REPO_AWS_ECR_URL is "${REPO_AWS_ECR_URL}" (REPO: "${REPO}"))
 
 STACK_RESOLVER=$(shell cat strato/stack.yaml | grep "resolver:" | awk '{print $$2}')
 FAKEROOT=$(shell pwd)/.docker-work
@@ -105,36 +106,40 @@ HASH_SUBS = -e 's|<HASH_STRATO>|$(HASH_STRATO)|g' \
 .PHONY: postgrest nginx apex app-backend app-ui app-nginx prometheus smd bridge bridge-nginx history local-auth
 
 postgrest:
-	@if $(call image_missing,$(REPO_URL)postgrest:$(VERSION)-$(HASH_POSTGREST)); then \
+	@if $(call image_missing,$(REPO_GHCR_URL)postgrest:$(VERSION)-$(HASH_POSTGREST)); then \
 		echo "Building postgrest ($(VERSION)-$(HASH_POSTGREST))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)postgrest:$(VERSION)-$(HASH_POSTGREST) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)postgrest:$(VERSION)-$(HASH_POSTGREST) $(MAKE) --directory=postgrest-packager/; \
+		DOCKER_TAG=$(REPO_GHCR_URL)postgrest:$(VERSION)-$(HASH_POSTGREST) DOCKER_TAG_ALIAS=postgrest:$(VERSION)-$(HASH_POSTGREST) $(MAKE) --directory=postgrest-packager/; \
 	else \
 		echo "postgrest up to date"; \
+		docker tag $(REPO_GHCR_URL)postgrest:$(VERSION)-$(HASH_POSTGREST) postgrest:$(VERSION)-$(HASH_POSTGREST); \
 	fi
 
 nginx:
-	@if $(call image_missing,$(REPO_URL)nginx:$(VERSION)-$(HASH_NGINX)); then \
+	@if $(call image_missing,$(REPO_GHCR_URL)nginx:$(VERSION)-$(HASH_NGINX)); then \
 		echo "Building nginx ($(VERSION)-$(HASH_NGINX))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)nginx:$(VERSION)-$(HASH_NGINX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)nginx:$(VERSION)-$(HASH_NGINX) $(MAKE) --directory=nginx-packager/; \
+		DOCKER_TAG=$(REPO_GHCR_URL)nginx:$(VERSION)-$(HASH_NGINX) DOCKER_TAG_ALIAS=nginx:$(VERSION)-$(HASH_NGINX) $(MAKE) --directory=nginx-packager/; \
 	else \
 		echo "nginx up to date"; \
+		docker tag $(REPO_GHCR_URL)nginx:$(VERSION)-$(HASH_NGINX) nginx:$(VERSION)-$(HASH_NGINX); \
 	fi
 
 apex:
-	@if $(call image_missing,$(REPO_URL)apex:$(VERSION)-$(HASH_APEX)); then \
+	@if $(call image_missing,$(REPO_GHCR_URL)apex:$(VERSION)-$(HASH_APEX)); then \
 		echo "Building apex ($(VERSION)-$(HASH_APEX))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)apex:$(VERSION)-$(HASH_APEX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)apex:$(VERSION)-$(HASH_APEX) STRATO_VERSION=$(VERSION) $(MAKE) --directory=apex/; \
+		DOCKER_TAG=$(REPO_GHCR_URL)apex:$(VERSION)-$(HASH_APEX) DOCKER_TAG_ALIAS=apex:$(VERSION)-$(HASH_APEX) STRATO_VERSION=$(VERSION) $(MAKE) --directory=apex/; \
 	else \
 		echo "apex up to date"; \
+		docker tag $(REPO_GHCR_URL)apex:$(VERSION)-$(HASH_APEX) apex:$(VERSION)-$(HASH_APEX); \
 	fi
 
 app-backend:
-	@if $(call image_missing,$(REPO_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND)); then \
+	@if $(call image_missing,$(REPO_GHCR_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND)); then \
 		echo "Building app-backend ($(VERSION)-$(HASH_APP_BACKEND))..."; \
-		docker build -t $(REPO_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) -f ./app/backend/Dockerfile ./app && \
-		docker tag $(REPO_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) $(REPO_AWS_ECR_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND); \
+		docker build -t $(REPO_GHCR_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) -f ./app/backend/Dockerfile ./app && \
+		docker tag $(REPO_GHCR_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) app-backend:$(VERSION)-$(HASH_APP_BACKEND); \
 	else \
 		echo "app-backend up to date"; \
+		docker tag $(REPO_GHCR_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) app-backend:$(VERSION)-$(HASH_APP_BACKEND); \
 	fi
 
 # The app tier's nginx shares its OpenID and CSRF Lua with the node's nginx;
@@ -143,53 +148,55 @@ app-backend:
 # `docker compose build` in app/ works too).
 app-nginx:
 	cp nginx-packager/openid.tpl.lua nginx-packager/csrf.lua nginx-packager/tracing.lua app/nginx/
-	@if $(call image_missing,$(REPO_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX)); then \
+	@if $(call image_missing,$(REPO_GHCR_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX)); then \
 		echo "Building app-nginx ($(VERSION)-$(HASH_APP_NGINX))..."; \
-		docker build -t $(REPO_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX) ./app/nginx && \
-		docker tag $(REPO_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX) $(REPO_AWS_ECR_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX); \
+		docker build -t $(REPO_GHCR_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX) ./app/nginx && \
+		docker tag $(REPO_GHCR_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX) app-nginx:$(VERSION)-$(HASH_APP_NGINX); \
 	else \
 		echo "app-nginx up to date"; \
+		docker tag $(REPO_GHCR_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX) app-nginx:$(VERSION)-$(HASH_APP_NGINX); \
 	fi
 
 app-ui:
-	@if $(call image_missing,$(REPO_URL)app-ui:$(VERSION)-$(HASH_APP_UI)); then \
+	@if $(call image_missing,$(REPO_GHCR_URL)app-ui:$(VERSION)-$(HASH_APP_UI)); then \
 		echo "Building app-ui ($(VERSION)-$(HASH_APP_UI))..."; \
-		docker build -t $(REPO_URL)app-ui:$(VERSION)-$(HASH_APP_UI) -f ./app/ui/Dockerfile ./app && \
-		docker tag $(REPO_URL)app-ui:$(VERSION)-$(HASH_APP_UI) $(REPO_AWS_ECR_URL)app-ui:$(VERSION)-$(HASH_APP_UI); \
+		docker build -t $(REPO_GHCR_URL)app-ui:$(VERSION)-$(HASH_APP_UI) -f ./app/ui/Dockerfile ./app && \
+		docker tag $(REPO_GHCR_URL)app-ui:$(VERSION)-$(HASH_APP_UI) app-ui:$(VERSION)-$(HASH_APP_UI); \
 	else \
 		echo "app-ui up to date"; \
+		docker tag $(REPO_GHCR_URL)app-ui:$(VERSION)-$(HASH_APP_UI) app-ui:$(VERSION)-$(HASH_APP_UI); \
 	fi
 
 prometheus:
-	@if $(call image_missing,$(REPO_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS)); then \
+	@if $(call image_missing,$(REPO_GHCR_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS)); then \
 		echo "Building prometheus ($(VERSION)-$(HASH_PROMETHEUS))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS) $(MAKE) --directory=prometheus-packager/; \
+		DOCKER_TAG=$(REPO_GHCR_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS) DOCKER_TAG_ALIAS=prometheus:$(VERSION)-$(HASH_PROMETHEUS) $(MAKE) --directory=prometheus-packager/; \
 	else \
 		echo "prometheus up to date"; \
+		docker tag $(REPO_GHCR_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS) prometheus:$(VERSION)-$(HASH_PROMETHEUS); \
 	fi
 
 smd:
-	@if $(call image_missing,$(REPO_URL)smd:$(VERSION)-$(HASH_SMD)); then \
+	@if $(call image_missing,$(REPO_GHCR_URL)smd:$(VERSION)-$(HASH_SMD)); then \
 		echo "Building smd ($(VERSION)-$(HASH_SMD))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)smd:$(VERSION)-$(HASH_SMD) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)smd:$(VERSION)-$(HASH_SMD) STRATO_VERSION=$(VERSION) $(MAKE) --directory=smd-ui/; \
+		DOCKER_TAG=$(REPO_GHCR_URL)smd:$(VERSION)-$(HASH_SMD) DOCKER_TAG_ALIAS=smd:$(VERSION)-$(HASH_SMD) STRATO_VERSION=$(VERSION) $(MAKE) --directory=smd-ui/; \
 	else \
 		echo "smd up to date"; \
+		docker tag $(REPO_GHCR_URL)smd:$(VERSION)-$(HASH_SMD) smd:$(VERSION)-$(HASH_SMD); \
 	fi
 
 bridge:
-	@if $(call image_missing,$(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE)); then \
+	@if $(call image_missing,$(REPO_AWS_ECR_URL)bridge:$(VERSION)-$(HASH_BRIDGE)); then \
 		echo "Building bridge ($(VERSION)-$(HASH_BRIDGE))..."; \
-		docker build -t $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) ./app/services/bridge && \
-		docker tag $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) $(REPO_AWS_ECR_URL)bridge:$(VERSION)-$(HASH_BRIDGE); \
+		docker build -t $(REPO_AWS_ECR_URL)bridge:$(VERSION)-$(HASH_BRIDGE) ./app/services/bridge; \
 	else \
 		echo "bridge up to date"; \
 	fi
 
 bridge-nginx:
-	@if $(call image_missing,$(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX)); then \
+	@if $(call image_missing,$(REPO_AWS_ECR_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX)); then \
 		echo "Building bridge-nginx ($(VERSION)-$(HASH_BRIDGE_NGINX))..."; \
-		docker build --add-host=openresty.org:3.125.51.27 -t $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) ./app/services/bridge/nginx && \
-		docker tag $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) $(REPO_AWS_ECR_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX); \
+		docker build --add-host=openresty.org:3.125.51.27 -t $(REPO_AWS_ECR_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) ./app/services/bridge/nginx; \
 	else \
 		echo "bridge-nginx up to date"; \
 	fi
@@ -197,78 +204,91 @@ bridge-nginx:
 # The app history service (phase 7): its own Postgres, fed by the bus and a
 # Cirrus poller, serving chart series under /history-api.
 history:
-	@if $(call image_missing,$(REPO_URL)history:$(VERSION)-$(HASH_HISTORY)); then \
+	@if $(call image_missing,$(REPO_GHCR_URL)history:$(VERSION)-$(HASH_HISTORY)); then \
 		echo "Building history ($(VERSION)-$(HASH_HISTORY))..."; \
-		docker build -t $(REPO_URL)history:$(VERSION)-$(HASH_HISTORY) ./app/services/history && \
-		docker tag $(REPO_URL)history:$(VERSION)-$(HASH_HISTORY) $(REPO_AWS_ECR_URL)history:$(VERSION)-$(HASH_HISTORY); \
+		docker build -t $(REPO_GHCR_URL)history:$(VERSION)-$(HASH_HISTORY) ./app/services/history && \
+		docker tag $(REPO_GHCR_URL)history:$(VERSION)-$(HASH_HISTORY) history:$(VERSION)-$(HASH_HISTORY); \
 	else \
 		echo "history up to date"; \
+		docker tag $(REPO_GHCR_URL)history:$(VERSION)-$(HASH_HISTORY) history:$(VERSION)-$(HASH_HISTORY); \
 	fi
 
 all: local
 
 local: build_common apex nginx postgrest prometheus smd app-backend app-ui bridge bridge-nginx oracle local-auth
 
-docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle docker-compose
+# What a --role=validator directory runs: the binaries plus the two images it
+# starts (postgres and redis are stock images, pulled by compose). No app, SMD,
+# nginx, PostgREST, bridge, oracle or local-auth builds.
+validator: build_common apex prometheus
+
+# What a --role=api-node directory runs: the binaries plus the four images it
+# starts (postgres and redis are stock images, pulled by compose). With
+# --monitoring=false the apex and prometheus images go unused; with
+# --localAuth add the local-auth image (make api-node local-auth). No app,
+# SMD, bridge or oracle builds.
+api-node: build_common nginx apex prometheus postgrest
+
+docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle local-auth docker-compose
 
 all_develop: build_develop docker-compose
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle local-auth
 
-.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force app-backend-force app-ui-force bridge-force bridge-nginx-force app
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose push-node-images push-release-alias highway highway-nginx local validator api-node oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force app-backend-force app-ui-force bridge-force bridge-nginx-force app
 
 app: app-backend app-ui
 	@echo ""
 	@echo "Both app images built. To patch a running node:"
-	@echo "  strato-patch-app <node-dir> $(REPO_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) $(REPO_URL)app-ui:$(VERSION)-$(HASH_APP_UI)"
+	@echo "  strato-patch-app <node-dir> app-backend:$(VERSION)-$(HASH_APP_BACKEND) app-ui:$(VERSION)-$(HASH_APP_UI)"
 
 # Force rebuild targets (unconditional)
 apex-force:
 	@echo Now building apex...
-	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION}-${HASH_APEX} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}apex:${VERSION}-${HASH_APEX} STRATO_VERSION=${VERSION}-${HASH_APEX} make --directory=apex/
+	DOCKER_TAG=${REPO_GHCR_URL}apex:${VERSION}-${HASH_APEX} DOCKER_TAG_ALIAS=apex:${VERSION}-${HASH_APEX} STRATO_VERSION=${VERSION}-${HASH_APEX} make --directory=apex/
 
 nginx-force:
 	@echo Now building nginx...
-	BASIL_DOCKER_TAG=${REPO_URL}nginx:${VERSION}-${HASH_NGINX} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}nginx:${VERSION}-${HASH_NGINX} make --directory=nginx-packager/
+	DOCKER_TAG=${REPO_GHCR_URL}nginx:${VERSION}-${HASH_NGINX} DOCKER_TAG_ALIAS=nginx:${VERSION}-${HASH_NGINX} make --directory=nginx-packager/
 
 postgrest-force:
 	@echo Now building postgrest...
-	BASIL_DOCKER_TAG=$(REPO_URL)postgrest:${VERSION}-${HASH_POSTGREST} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}postgrest:${VERSION}-${HASH_POSTGREST} make --directory=postgrest-packager/
+	DOCKER_TAG=${REPO_GHCR_URL}postgrest:${VERSION}-${HASH_POSTGREST} DOCKER_TAG_ALIAS=postgrest:${VERSION}-${HASH_POSTGREST} make --directory=postgrest-packager/
 
 prometheus-force:
 	@echo Now building prometheus...
-	BASIL_DOCKER_TAG=$(REPO_URL)prometheus:${VERSION}-${HASH_PROMETHEUS} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}prometheus:${VERSION}-${HASH_PROMETHEUS} make --directory=prometheus-packager/
+	DOCKER_TAG=${REPO_GHCR_URL}prometheus:${VERSION}-${HASH_PROMETHEUS} DOCKER_TAG_ALIAS=prometheus:${VERSION}-${HASH_PROMETHEUS} make --directory=prometheus-packager/
 
 smd-force:
 	@echo building smd...
-	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION}-${HASH_SMD} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}smd:${VERSION}-${HASH_SMD} STRATO_VERSION=${VERSION}-${HASH_SMD} make --directory=smd-ui/
+	DOCKER_TAG=${REPO_GHCR_URL}smd:${VERSION}-${HASH_SMD} DOCKER_TAG_ALIAS=smd:${VERSION}-${HASH_SMD} STRATO_VERSION=${VERSION}-${HASH_SMD} make --directory=smd-ui/
 
 app-backend-force:
 	@echo Now building app-backend...
-	docker build -t ${REPO_URL}app-backend:${VERSION}-${HASH_APP_BACKEND} -f ./app/backend/Dockerfile ./app
-	docker tag ${REPO_URL}app-backend:${VERSION}-${HASH_APP_BACKEND} ${REPO_AWS_ECR_URL}app-backend:${VERSION}-${HASH_APP_BACKEND}
+	docker build -t ${REPO_GHCR_URL}app-backend:${VERSION}-${HASH_APP_BACKEND} -f ./app/backend/Dockerfile ./app
+	docker tag ${REPO_GHCR_URL}app-backend:${VERSION}-${HASH_APP_BACKEND} app-backend:${VERSION}-${HASH_APP_BACKEND}
 
 app-ui-force:
 	@echo Now building app-ui...
-	docker build -t ${REPO_URL}app-ui:${VERSION}-${HASH_APP_UI} -f ./app/ui/Dockerfile ./app
-	docker tag ${REPO_URL}app-ui:${VERSION}-${HASH_APP_UI} ${REPO_AWS_ECR_URL}app-ui:${VERSION}-${HASH_APP_UI}
+	docker build -t ${REPO_GHCR_URL}app-ui:${VERSION}-${HASH_APP_UI} -f ./app/ui/Dockerfile ./app
+	docker tag ${REPO_GHCR_URL}app-ui:${VERSION}-${HASH_APP_UI} app-ui:${VERSION}-${HASH_APP_UI}
 
 bridge-force:
 	@echo Now building bridge...
-	docker build -t ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ./app/services/bridge
-	docker tag ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ${REPO_AWS_ECR_URL}bridge:${VERSION}-${HASH_BRIDGE}
+	docker build -t ${REPO_AWS_ECR_URL}bridge:${VERSION}-${HASH_BRIDGE} ./app/services/bridge
 
 bridge-nginx-force:
 	@echo Now building bridge-nginx...
-	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ./app/services/bridge/nginx
-	docker tag ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ${REPO_AWS_ECR_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX}
+	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_AWS_ECR_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ./app/services/bridge/nginx
 
 local-auth:
-	@if $(call image_missing,local-auth:$(VERSION)-$(HASH_LOCAL_AUTH)); then \
+	@if $(call image_missing,$(REPO_GHCR_URL)local-auth:$(VERSION)-$(HASH_LOCAL_AUTH)); then \
 		echo "Building local-auth ($(VERSION)-$(HASH_LOCAL_AUTH))..."; \
-		docker build -t local-auth:$(VERSION)-$(HASH_LOCAL_AUTH) ./local-auth; \
+		docker build -t $(REPO_GHCR_URL)local-auth:$(VERSION)-$(HASH_LOCAL_AUTH) ./local-auth && \
+		docker tag $(REPO_GHCR_URL)local-auth:$(VERSION)-$(HASH_LOCAL_AUTH) local-auth:$(VERSION)-$(HASH_LOCAL_AUTH); \
 	else \
 		echo "local-auth up to date"; \
+		docker tag $(REPO_GHCR_URL)local-auth:$(VERSION)-$(HASH_LOCAL_AUTH) local-auth:$(VERSION)-$(HASH_LOCAL_AUTH); \
 	fi
 
 oracle:
@@ -376,46 +396,44 @@ hoogle: hoogle_generate hoogle_serve
 highway: build_common_docker
 	@echo Now building highway...
 	cp strato/highway/doit.sh ${HIGHWAYDIR}
-	docker build --target highway --tag ${REPO_URL}highway:${VERSION} --file Dockerfile.multi ${FAKEROOT}
-	docker tag ${REPO_URL}highway:${VERSION} ${REPO_AWS_ECR_URL}highway:${VERSION}
+	docker build --target highway --tag ${REPO_AWS_ECR_URL}highway:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 
 highway-nginx:
 	@echo Now building highway-nginx...
-	BASIL_DOCKER_TAG=${REPO_URL}highway-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}highway-nginx:${VERSION} make --directory=highway-nginx/
+	DOCKER_TAG=${REPO_AWS_ECR_URL}highway-nginx:${VERSION} make --directory=highway-nginx/
 
 strato: build_common
 	@echo Now building core-strato...
 	cp -fr strato/extraFiles/* ${STRATODIR}
 	mkdir -p ${FAKEROOT}/usr/local/bin && install -m 755 bin/strato-logrotate ${FAKEROOT}/usr/local/bin/
-	docker build --target strato --tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
-	docker tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} ${REPO_AWS_ECR_URL}strato:${VERSION}-${HASH_STRATO}
+	docker build --target strato --tag ${REPO_GHCR_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_GHCR_URL}strato:${VERSION}-${HASH_STRATO} strato:${VERSION}-${HASH_STRATO}
 
 strato_docker: build_common_docker
 	@echo Now building core-strato for docker...
 	cp -fr strato/extraFiles/* ${STRATODIR}
 	mkdir -p ${FAKEROOT}/usr/local/bin && install -m 755 bin/strato-logrotate ${FAKEROOT}/usr/local/bin/
-	docker build --target strato --tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
-	docker tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} ${REPO_AWS_ECR_URL}strato:${VERSION}-${HASH_STRATO}
+	docker build --target strato --tag ${REPO_GHCR_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_GHCR_URL}strato:${VERSION}-${HASH_STRATO} strato:${VERSION}-${HASH_STRATO}
 
 develop: build_common_fast
 	@echo Now building core-strato using --fast...
 	cp -fr strato/extraFiles/* ${STRATODIR}
 	mkdir -p ${FAKEROOT}/usr/local/bin && install -m 755 bin/strato-logrotate ${FAKEROOT}/usr/local/bin/
-	docker build --target strato --tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
-	docker tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} ${REPO_AWS_ECR_URL}strato:${VERSION}-${HASH_STRATO}
+	docker build --target strato --tag ${REPO_GHCR_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_GHCR_URL}strato:${VERSION}-${HASH_STRATO} strato:${VERSION}-${HASH_STRATO}
 
 profile: build_common_profiled
 	@echo Now building core-strato using --profile...
 	cp -fr strato/extraFiles/* ${STRATODIR}
 	mkdir -p ${FAKEROOT}/usr/local/bin && install -m 755 bin/strato-logrotate ${FAKEROOT}/usr/local/bin/
-	docker build --target strato --tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
-	docker tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} ${REPO_AWS_ECR_URL}strato:${VERSION}-${HASH_STRATO}
+	docker build --target strato --tag ${REPO_GHCR_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_GHCR_URL}strato:${VERSION}-${HASH_STRATO} strato:${VERSION}-${HASH_STRATO}
 
 vault-wrapper: build_common_docker
 	@echo Now building vault-wrapper...
 	cp strato/vault/doit.sh ${VAULTDIR}
-	docker build --target vault-wrapper --tag ${REPO_URL}vault-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
-	docker tag ${REPO_URL}vault-wrapper:${VERSION} ${REPO_AWS_ECR_URL}vault-wrapper:${VERSION}
+	docker build --target vault-wrapper --tag ${REPO_AWS_ECR_URL}vault-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 
 # Builds the migrate-key admin tool on the host and installs it to ~/.local/bin.
 # See strato/vault/vault-runner/README.md ("Migrating a single key between Vaults")
@@ -441,36 +459,48 @@ change-vault-password:
 
 vault-nginx:
 	@echo Now building vault-nginx...
-	BASIL_DOCKER_TAG=${REPO_URL}vault-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
+	DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
 docker-compose:
-	@echo Generating vault, highway, bridge, api compose files...
-	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
-	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.ecr.yml
-	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
-	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.ecr.yml
-	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.yml
-	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.ecr.yml
-	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.api.tpl.yml > docker-compose.api.push.yml
-	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.api.tpl.yml > docker-compose.api.push.ecr.yml
-	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.app.tpl.yml > docker-compose.app.push.yml
-	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.app.tpl.yml > docker-compose.app.push.ecr.yml
+	@echo Generating vault, highway, bridge, api, app compose files...
+	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
+	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
+	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.yml
+	sed -e 's|<REPO_URL>|$(REPO_GHCR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.api.tpl.yml > docker-compose.api.push.yml
+	sed -e 's|<REPO_URL>|$(REPO_GHCR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.app.tpl.yml > docker-compose.app.push.yml
 
 	awk '/build: ./{getline} 1' docker-compose.vault.push.yml > docker-compose.vault.yml
-	awk '/build: ./{getline} 1' docker-compose.vault.push.ecr.yml > docker-compose.vault.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.yml > docker-compose.highway.yml
-	awk '/build: ./{getline} 1' docker-compose.highway.push.ecr.yml > docker-compose.highway.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.bridge.push.yml > docker-compose.bridge.yml
-	awk '/build: ./{getline} 1' docker-compose.bridge.push.ecr.yml > docker-compose.bridge.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.api.push.yml > docker-compose.api.yml
-	awk '/build: ./{getline} 1' docker-compose.api.push.ecr.yml > docker-compose.api.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.app.push.yml > docker-compose.app.yml
-	awk '/build: ./{getline} 1' docker-compose.app.push.ecr.yml > docker-compose.app.ecr.yml
+
+# The node images of this build, by their GitHub registry name. CI pushes them
+# with push-node-images; images a build did not make are skipped. The strato
+# image also gets a plain <ver> alias: bin/strato-up --prebuilt resolves it
+# from the VERSION file, and strato-setup inside it knows the other tags from
+# its BUILD_METADATA. The ECR services (vault, highway, bridge) are pushed
+# from their compose files with scripts/docker-push-ecr.sh.
+NODE_IMAGES = strato:$(VERSION)-$(HASH_STRATO) nginx:$(VERSION)-$(HASH_NGINX) apex:$(VERSION)-$(HASH_APEX) postgrest:$(VERSION)-$(HASH_POSTGREST) prometheus:$(VERSION)-$(HASH_PROMETHEUS) smd:$(VERSION)-$(HASH_SMD) local-auth:$(VERSION)-$(HASH_LOCAL_AUTH) app-backend:$(VERSION)-$(HASH_APP_BACKEND) app-ui:$(VERSION)-$(HASH_APP_UI) app-nginx:$(VERSION)-$(HASH_APP_NGINX) history:$(VERSION)-$(HASH_HISTORY)
+
+push-node-images:
+	./scripts/docker-push-ecr.sh --registry-glob '$(REPO_GHCR_URL)*' $(addprefix $(REPO_GHCR_URL),$(NODE_IMAGES))
+	docker tag $(REPO_GHCR_URL)strato:$(VERSION)-$(HASH_STRATO) $(REPO_GHCR_URL)strato:$(VERSION)
+	docker push $(REPO_GHCR_URL)strato:$(VERSION)
+
+# A release or release-candidate tag build (RELEASE_TAG=19.5, 19.5-rc0) also
+# publishes the strato image under the tag itself, which a release checkout
+# without git history and `strato-up --prebuilt=<tag>` resolve.
+push-release-alias:
+	@test -n "$(RELEASE_TAG)" || { echo "RELEASE_TAG is not set"; exit 1; }
+	docker tag $(REPO_GHCR_URL)strato:$(VERSION)-$(HASH_STRATO) $(REPO_GHCR_URL)strato:$(RELEASE_TAG)
+	docker push $(REPO_GHCR_URL)strato:$(RELEASE_TAG)
 
 docker-build:
 	cp -fr strato/extraFiles/* ${STRATODIR}
 	mkdir -p ${FAKEROOT}/usr/local/bin && install -m 755 bin/strato-logrotate ${FAKEROOT}/usr/local/bin/
-	docker build --target strato --tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
+	docker build --target strato --tag ${REPO_GHCR_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_GHCR_URL}strato:${VERSION}-${HASH_STRATO} strato:${VERSION}-${HASH_STRATO}
 
 test:
 	@echo ${VERSION}

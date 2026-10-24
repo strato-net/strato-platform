@@ -96,19 +96,21 @@ export function useMultisigConfig(walletAddress?: string | null) {
 /**
  * Whether a User wallet is running as a multisig (it delegates to the AdminRegistry
  * logic). `fullyEnabled` additionally requires the wallet to own itself and be
- * initialized — the state in which signer votes can actually execute.
+ * initialized — the state in which signer votes can actually execute. A fully enabled
+ * wallet keeps the logic it was enabled with, which may predate an AdminRegistry
+ * upgrade, so that state doesn't require matching the current logic.
  */
 export function useIsMultisig(walletAddress?: string | null) {
   const { logic: adminLogic } = useAdminRegistryLogic();
   const { config, isLoading, refetch } = useMultisigConfig(walletAddress);
+  const hasLogic = !isZeroAddr(config.logicContract);
   const delegatesToAdmin =
-    !isZeroAddr(config.logicContract) &&
-    !!adminLogic &&
-    strip0x(config.logicContract) === strip0x(adminLogic);
+    hasLogic && !!adminLogic && strip0x(config.logicContract) === strip0x(adminLogic);
   const selfOwned = !!walletAddress && strip0x(config.owner) === strip0x(walletAddress);
+  const fullyEnabled = hasLogic && selfOwned && config.initialized;
   return {
-    isMultisig: delegatesToAdmin,
-    fullyEnabled: delegatesToAdmin && selfOwned && config.initialized,
+    isMultisig: delegatesToAdmin || fullyEnabled,
+    fullyEnabled,
     selfOwned,
     initialized: config.initialized,
     config,
