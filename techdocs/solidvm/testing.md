@@ -142,7 +142,3 @@ These builtins are accepted only under `solid-vm-cli test`. Anywhere else they f
 - Tests parse with Solidity operator precedence, which upquark and helium don't use yet. See [Operator precedence](differences.md#operator-precedence).
 - Block values such as `block.number`, `block.proposer` and `block.chainid` don't match any real network.
 - Tests start from an empty in-memory state without the genesis contracts. The app suites deploy what they need in `beforeAll`, for example `new Mercata()`.
-
-## Editor support
-
-The VS Code extension in `strato-vscode/` (package name `strato-mercata`) runs `solid-vm-cli compile` and `solid-vm-cli analyze` to show diagnostics, and runs `~/.local/bin/solid-vm-cli` for debugging.
