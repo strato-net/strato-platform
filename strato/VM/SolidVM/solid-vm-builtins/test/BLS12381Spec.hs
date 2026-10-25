@@ -23,7 +23,7 @@ import Blockchain.SolidVM.BLS12381.HashToCurve.G2
     simplifiedSwuG2Iso,
   )
 import Blockchain.SolidVM.BLS12381.HashToCurve.HashToField (hashToFieldFp, hashToFieldFp2)
-import Blockchain.SolidVM.Builtins
+import Blockchain.SolidVM.Builtins.Crypto
   ( bls12381G1Add,
     bls12381G1AddInts,
     bls12381G1Msm,
@@ -574,7 +574,6 @@ validationSpec = do
       g2BadYc0 = 3690720871793337241455685075743049883097434000553861439128973496444191283866836383567731089800858963424329464681674
       g2BadYc1 = 122693191027751655510194168700308213538794246775313976814212532628791625595109057816964505439501482194282347419502
       g2Bad = encodeFp2 (g2BadXc0, g2BadXc1) <> encodeFp2 (g2BadYc0, g2BadYc1)
-      isLeft = either (const True) (const False)
 
   describe "F_p canonicity" $ do
     it "accepts p - 1 as a coordinate value" $

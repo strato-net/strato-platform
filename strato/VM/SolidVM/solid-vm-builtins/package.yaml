@@ -1,0 +1,43 @@
+name: solid-vm-builtins
+license: Apache-2.0
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src/
+  ghc-options: -Wall -O2 -fexpose-all-unfoldings -fspecialise-aggressively
+  dependencies:
+    - base16-bytestring
+    - base64-bytestring
+    - blockapps-secp256k1-haskell
+    - bytestring
+    - cryptohash
+    - crypton
+    - Decimal
+    - elliptic-curve
+    - ethereum-rlp
+    - memory
+    - pairing
+    - poseidon-hash
+    - solid-vm-model
+    - strato-model
+    - text
+    - time
+    - transformers
+
+tests:
+  solid-vm-builtins-spec:
+    source-dirs: test/
+    main: Main.hs
+    dependencies:
+      - solid-vm-builtins
+      - base16-bytestring
+      - bytestring
+      - Decimal
+      - elliptic-curve
+      - hspec
+      - pairing
+      - solid-vm-model
+      - strato-model
+      - time

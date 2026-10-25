@@ -36,14 +36,13 @@ import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.VmTrace
 import Blockchain.Data.ExecResults
-import Blockchain.Data.RLP
-import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
-import Blockchain.Data.Util (integer2Bytes)
 import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Forks (isConstructorCallForkActive, isEmitArgForkActive)
 import BlockApps.Solidity.ABI.Bridge (encodeEventToLogValues)
 import BlockApps.Solidity.ABI.Codec (abiDecode)
 import qualified Blockchain.SolidVM.Builtins as Builtins
+import qualified Blockchain.SolidVM.Builtins.Functions as Builtin
+import Blockchain.SolidVM.Builtins.Gas
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
@@ -60,7 +59,6 @@ import SolidVM.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Util (byteString2Integer)
 import Blockchain.Stream.Action (Action)
 import Blockchain.VMContext
 import Blockchain.EthConf (ethConf)
@@ -75,19 +73,10 @@ import qualified Control.Monad.Catch as EUnsafe
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Class
-import Crypto.ECC (Curve_P256R1)
-import Crypto.Error
-import qualified Crypto.PubKey.ECC.P256 as P256
-import Crypto.PubKey.ECDSA (signatureFromIntegers, verifyDigest)
-import "crypton" Crypto.Hash (SHA256, digestFromByteString)
-import qualified Crypto.Hash.RIPEMD160 as RIPEMD160
-import qualified Crypto.Hash.SHA256 as SHA256
 import Data.Bits
 import Data.Bool (bool)
 import qualified Data.ByteString        as B
 import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Base64 as B64
-import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Char8 as BC
 import Data.Decimal
 import Data.Char (isDigit)
@@ -103,7 +92,6 @@ import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as DT
-import Data.Time.Clock
 import Data.Time.Clock.POSIX
 import Data.Traversable
 import qualified Data.Vector as V
@@ -115,7 +103,6 @@ import Blockchain.Data.ProposalFacts
 --import Blockchain.DB.MemAddressStateDB
 
 import Network.Haskoin.Crypto.BigWord ()
-import qualified Numeric (showHex)
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
@@ -129,7 +116,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import qualified Text.Colors as C
 import Text.Format
 import Text.Printf
-import Text.Read (readEither, readMaybe)
+import Text.Read (readMaybe)
 import Text.Tools
 import UnliftIO hiding (assert)
 
@@ -1883,8 +1870,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                     )
                     $ typeError "string concat" $ show argVals
                   let strs = (\x -> case x of (SString s) -> s; _ -> "") <$> argVals
-                  deductGasForOp . fromIntegral . sum $ length <$> strs
-                  return $ Constant $ SString $ concat strs
+                  Constant . SString <$> Builtin.stringConcat (deductGasForOp . fromIntegral) strs
             Constant SHexDecodeAndTrim ->
               case argVals of
                 -- bytes should already be hex decoded when appropriate
@@ -1892,7 +1878,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                 _ -> typeError "bytes32ToString with incorrect arguments" $ show argVals
             Constant SAddressToAscii ->
               case argVals of
-                [SAddress a _] -> return . Constant . SString $ show a
+                [SAddress a _] -> return . Constant . SString $ Builtin.stringFromAddress a
                 _ -> typeError "addressToAsciiString with incorrect arguments" $ show argVals
             -- It would be nice to reinterpret two element paths as a function.
             -- How can we get a to resolve to a local variable instead of a path?
@@ -2264,12 +2250,12 @@ binopAssign oper lhs rhs gasFormula = do
 intBuiltin :: Bool -> Maybe Int -> [Value] -> Value
 intBuiltin _ _ [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
 intBuiltin _ _ [SInteger n] = SInteger n
-intBuiltin _ _ [SDecimal v] = SInteger (decimalMantissa $ roundTo 0 v)
-intBuiltin _ _ [SString hex] = integerToValue $ parseBaseInt hex 16
-intBuiltin _ _ [SString hex, SInteger 16] = integerToValue $ parseBaseInt hex 16
-intBuiltin _ _ [SString dec, SInteger 10] = integerToValue $ parseBaseInt dec 10
-intBuiltin _ _ [SBytes bs] = SInteger $ byteString2Integer bs  -- bytes32 -> uint256 cast
-intBuiltin _ _ [SAddress a _] = SInteger $ fromIntegral $ unAddress a  -- address -> int cast
+intBuiltin _ _ [SDecimal v] = SInteger (Builtin.integerFromDecimal v)
+intBuiltin _ _ [SString hex] = integerToValue $ Builtin.parseBaseInt hex 16
+intBuiltin _ _ [SString hex, SInteger 16] = integerToValue $ Builtin.parseBaseInt hex 16
+intBuiltin _ _ [SString dec, SInteger 10] = integerToValue $ Builtin.parseBaseInt dec 10
+intBuiltin _ _ [SBytes bs] = SInteger $ Builtin.integerFromBytes bs  -- bytes32 -> uint256 cast
+intBuiltin _ _ [SAddress a _] = SInteger $ Builtin.integerFromAddress a  -- address -> int cast
 intBuiltin _ _ [SNULL] = SInteger 0
 intBuiltin _ _ [SReference{}] = SInteger 0
 intBuiltin signed mSize [] = typeError (funcName ++ " called with no arguments") ""
@@ -2285,9 +2271,9 @@ integerToValue (Right n) = SInteger n
 integerToValue (Left err) = typeError err ("" :: String)
 
 decimalBuiltin :: [Value] -> Value
-decimalBuiltin [SInteger n] = SDecimal $ Decimal 0 n
+decimalBuiltin [SInteger n] = SDecimal $ Builtin.decimalFromInteger n
 decimalBuiltin [SString str] =
-  let stringToDecimal = (readEither str :: Either String Decimal)
+  let stringToDecimal = Builtin.decimalFromString str
   in case stringToDecimal of
     Right deci -> SDecimal deci
     Left e -> typeError e str
@@ -2295,20 +2281,6 @@ decimalBuiltin [SDecimal v] = SDecimal v
 decimalBuiltin [SNULL] = SDecimal $ Decimal 0 0
 decimalBuiltin [SReference{}] = SDecimal $ Decimal 0 0
 decimalBuiltin args = typeError "decimal cast - invalid args" $ show args
-
-parseBaseInt :: String -> Integer -> Either String Integer
-parseBaseInt s n =
-  case n of
-    10 -> readEither s
-    16 ->
-      let s' = case s of
-                 '0':'x':rest -> rest
-                 _ -> s
-          prefix' = bool "0" "" . even $ length s'
-       in case B16.decode (BC.pack $ prefix' ++ s') of
-            Right l -> Right $ byteString2Integer l
-            _ -> Left $ "numeric cast - not a hex string " <> s
-    _ -> Left $ "Cannot convert string " <> s <> " to base " <> show n
 
 callBuiltinFunction :: MonadSM m => SolidString -> [Value] -> m Value
 callBuiltinFunction n args' = do
@@ -2395,63 +2367,6 @@ chunksOf6 (a : b : c : d : e : f : rest) =
   (((a, b), ((c, d), (e, f))) :) <$> chunksOf6 rest
 chunksOf6 _ = Nothing
 
--- Gas schedule for the cryptographic builtins.
---
--- Unlike the rest of SolidVM's gas -- a coarse counter of statements and
--- expression nodes -- these operations do unbounded-cost work in a single
--- node. Left unmetered they were effectively free: a contract could buy
--- hundreds of milliseconds of pairing arithmetic for 5 gas, stalling block
--- production (PBFT's round-change cliff is 120s) for the price of a
--- function call.
---
--- The constants below are calibrated so that one gas unit is roughly one
--- microsecond of measured wall-clock on the current implementations, which
--- puts the 400k per-transaction budget at a few hundred milliseconds of
--- crypto. Reassuringly, that calibration lands close to Ethereum's own
--- schedule for the same primitives: the BN254 pairing works out to
--- 45000 + 17000k against EIP-197's 45000 + 34000k.
---
--- Costs are charged BEFORE the operation runs, sized from the input, so
--- an oversized input is rejected rather than paid for after the fact.
--- Because pairing is charged per pair, gas also serves as the input cap:
--- the budget admits roughly 20 pairs in a single call.
-gasEcAdd, gasEcMul, gasEcPairingBase, gasEcPairingPerPair :: Gas
-gasEcAdd = 50
-gasEcMul = 300
-gasEcPairingBase = 45000 -- the shared final exponentiation
-gasEcPairingPerPair = 17000 -- one Miller loop
-
-gasPoseidonBase, gasPoseidonPerInput :: Gas
-gasPoseidonBase = 100
-gasPoseidonPerInput = 100
-
-gasModExp :: Gas
-gasModExp = 100
-
--- | Parametrized Poseidon2: charged per PERMUTATION of the selected
--- instance. The Goldilocks width-12 permutation is ~740 field
--- multiplications in the current Integer-backed implementation (~60-100 µs);
--- BN254 t=2 keeps the poseidon2 schedule (100 + 100 per absorbed input).
-gasPoseidon2GLBase, gasPoseidon2GLPerPerm :: Gas
-gasPoseidon2GLBase = 100
-gasPoseidon2GLPerPerm = 100
-
-gasBlsG1Add, gasBlsG1MsmPerTerm, gasBlsG2Add, gasBlsG2MsmPerTerm :: Gas
-gasBlsG1Add = 4000
-gasBlsG1MsmPerTerm = 2500
-gasBlsG2Add = 9000
-gasBlsG2MsmPerTerm = 9000
-
-gasBlsPairingBase, gasBlsPairingPerPair :: Gas
-gasBlsPairingBase = 50000
-gasBlsPairingPerPair = 20000
-
-gasBlsMapFpToG1, gasBlsMapFp2ToG2, gasBlsDecompressG1, gasBlsDecompressG2 :: Gas
-gasBlsMapFpToG1 = 5000
-gasBlsMapFp2ToG2 = 20000
-gasBlsDecompressG1 = 5000
-gasBlsDecompressG2 = 20000
-
 -- | Charge for an operation whose cost scales with the number of input
 -- terms, given the flat count of integer arguments and the arity of one
 -- term. Rounds up so a malformed (non-multiple) input still pays for the
@@ -2508,76 +2423,68 @@ poseidon2HashBytesMetered p d n = do
   pure . intsArray $! Builtins.poseidon2ParamHashBytes inst nOut d
 
 callBuiltin :: MonadSM m => SolidString -> [Value] -> m Value
-callBuiltin "variadic" [SVariadic vs] = pure $ SVariadic vs
-callBuiltin "variadic" vs = pure $ SVariadic vs
+callBuiltin "variadic" [SVariadic vs] = pure $ SVariadic $ Builtin.variadic vs
+callBuiltin "variadic" vs = pure $ SVariadic $ Builtin.variadic vs
 callBuiltin "string" [SString s] = return $ SString s
-callBuiltin "string" [SAddress a _] = return . SString $ show a
-callBuiltin "string" [SInteger i] = return . SString $ show i
-callBuiltin "string" [SInteger i, SInteger 10] = return . SString $ show i
-callBuiltin "string" [SInteger i, SInteger 16] = return . SString $ "0x" ++ Numeric.showHex i ""
-callBuiltin "string" [SInteger i, SInteger 16, SInteger bytes] = return . SString $ printf ("0x%0" ++ show (2*bytes) ++ "x") i
-callBuiltin "string" [SBool b] = return . SString $ bool "false" "true" b
-callBuiltin "string" [SBytes bs] = pure . SString $ case DT.decodeUtf8' bs of
-  Left _ -> BC.unpack bs
-  Right t -> T.unpack t
-callBuiltin "string" [SBytes bs, SString "utf-8"] = pure . SString $ case DT.decodeUtf8' bs of
-  Left _ -> malformedData "bytestring is not UTF-8 encoded" bs
-  Right t -> T.unpack t
-callBuiltin "string" [SBytes bs, SString "raw"] = pure . SString $ BC.unpack bs
+callBuiltin "string" [SAddress a _] = return . SString $ Builtin.stringFromAddress a
+callBuiltin "string" [SInteger i] = return . SString $ Builtin.stringFromInteger i 10 Nothing
+callBuiltin "string" [SInteger i, SInteger 10] = return . SString $ Builtin.stringFromInteger i 10 Nothing
+callBuiltin "string" [SInteger i, SInteger 16] = return . SString $ Builtin.stringFromInteger i 16 Nothing
+callBuiltin "string" [SInteger i, SInteger 16, SInteger bytes] = return . SString $ Builtin.stringFromInteger i 16 (Just bytes)
+callBuiltin "string" [SBool b] = return . SString $ Builtin.stringFromBool b
+callBuiltin "string" [SBytes bs] = pure . SString $ Builtin.stringFromBytes bs
+callBuiltin "string" [SBytes bs, SString "utf-8"] = pure . SString $ Builtin.stringFromUtf8 bs
+callBuiltin "string" [SBytes bs, SString "raw"] = pure . SString $ Builtin.stringFromRawBytes bs
 callBuiltin "string" [SNULL] = return $ SString ""
 callBuiltin "string" [SReference{}] = return $ SString ""
 callBuiltin "string" vs = typeError "string cast" $ show vs
-callBuiltin "address" [SInteger a] = return . ((flip SAddress) False) $ fromIntegral a
+callBuiltin "address" [SInteger a] = return . ((flip SAddress) False) $ Builtin.addressFromInteger a
 callBuiltin "address" [SAddress na b] = return $ SAddress na b
 callBuiltin "address" [SContract _ a] = return $ SAddress a False
 callBuiltin "address" [ss@(SString s)] =
   maybe
     (typeError "address cast" $ show ss)
     (return . flip SAddress False)
-    $ readMaybe s
-callBuiltin "address" [SBytes bs] = pure . flip SAddress False . Address . bytesToWord160 $ B.unpack bs
+    $ Builtin.addressFromString s
+callBuiltin "address" [SBytes bs] = pure . flip SAddress False $ Builtin.addressFromBytes bs
 callBuiltin "address" [SNULL] = return $ SAddress 0 False
 callBuiltin "address" [SReference{}] = return $ SAddress 0 False
 callBuiltin "address" vs = typeError "address cast" $ show vs
 callBuiltin ("addmod") [a', b', c'] = do
   (a,b,c) <- (,,) <$> int a' <*> int b' <*> int c'
-  return . SInteger $ (a + b) `mod` c
+  return . SInteger $ Builtin.addmod a b c
 callBuiltin ("mulmod") [a', b', c'] = do
   (a,b,c) <- (,,) <$> int a' <*> int b' <*> int c'
-  return . SInteger $ (a * b) `mod` c
+  return . SInteger $ Builtin.mulmod a b c
 callBuiltin ("blockhash") [bNum] = do
   blockNum <- int bNum
-  when (blockNum < 0) $ invalidArguments "blockhash() only accepts arguments greater than or equal to 0" [blockNum]
-  env' <- getEnv
-  let curBlock = Env.blockHeader env'
-  maybeTheHash <- getBlockHashWithNumber blockNum (BlockHeader.parentHash curBlock)
-  maybe (invalidArguments "the block number given does not exist" [blockNum]) (return . SString . BC.unpack . keccak256ToByteString) maybeTheHash
+  SString <$> Builtin.blockhash (\n -> do
+    env' <- getEnv
+    fmap keccak256ToByteString <$> getBlockHashWithNumber n (BlockHeader.parentHash $ Env.blockHeader env')) blockNum
 callBuiltin ("selfdestruct") [a'] = do
   a <- getAddressVal a'
-  contract' <- getCurrentAddress
-  contractBalance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) contract'
-  _destroyRes <- A.adjustWithDefault_ (A.Proxy @AddressState) contract' $ \newAddressState ->
-    pure newAddressState {addressStateCodeHash = SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0}
-  sendRes <- pay "selfdestruct function" contract' a contractBalance
-  _purgeRes <- purgeStorageMap contract'
-  return $ SBool sendRes
+  SBool <$> Builtin.selfdestruct getCurrentAddress
+    (\contract' -> addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) contract')
+    (\contract' -> void $ A.adjustWithDefault_ (A.Proxy @AddressState) contract' $ \newAddressState ->
+      pure newAddressState {addressStateCodeHash = SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0})
+    (pay "selfdestruct function")
+    (void . purgeStorageMap) a
 callBuiltin "account" vs = typeError "account cast" $ show vs
 callBuiltin "bool" [SBool b] = return $ SBool b
-callBuiltin "bool" [SString "true"] = return $ SBool True
-callBuiltin "bool" [SString "false"] = return $ SBool False
+callBuiltin "bool" [SString str] | Just b <- Builtin.boolFromString str = return $ SBool b
 callBuiltin "bool" [SNULL] = return $ SBool False
 callBuiltin "bool" [SReference _] = return $ SBool False
 callBuiltin "bool" vs = typeError "bool cast" $ show vs
-callBuiltin "byte" [SInteger n] = return $ SInteger (n .&. 0xff)
+callBuiltin "byte" [SInteger n] = return $ SInteger (Builtin.byte n)
 callBuiltin "byte" [SNULL] = return $ SInteger 0
 callBuiltin "byte" [SReference _] = return $ SInteger 0
 callBuiltin "byte" vs = typeError "byte cast" $ show vs
-callBuiltin "bytes" [SInteger i] = pure . SBytes $ integer2Bytes i
-callBuiltin "bytes" [SString s] = pure . SBytes . DT.encodeUtf8 $ T.pack s
+callBuiltin "bytes" [SInteger i] = pure . SBytes $ Builtin.bytesFromInteger i
+callBuiltin "bytes" [SString s] = pure . SBytes $ Builtin.bytesFromString s
 callBuiltin "bytes" [SBytes bs] = pure $ SBytes bs
-callBuiltin "bytes" [SString s, SString "utf-8"] = pure . SBytes . DT.encodeUtf8 $ T.pack s
-callBuiltin "bytes" [SString s, SString "raw"] = pure . SBytes $ BC.pack s
-callBuiltin "bytes" [SAddress a _] = pure . SBytes . B.pack . word160ToBytes $ unAddress a
+callBuiltin "bytes" [SString s, SString "utf-8"] = pure . SBytes $ Builtin.bytesFromString s
+callBuiltin "bytes" [SString s, SString "raw"] = pure . SBytes $ Builtin.bytesFromRawString s
+callBuiltin "bytes" [SAddress a _] = pure . SBytes $ Builtin.bytesFromAddress a
 callBuiltin "bytes" [SNULL] = pure $ SBytes B.empty
 callBuiltin "bytes" [SReference _] = pure $ SBytes B.empty
 callBuiltin "uint" args = return $ intBuiltin False Nothing args
@@ -2594,94 +2501,61 @@ callBuiltin name [arg]
        in case arg of
             SInteger i ->
               let size = fromMaybe 32 mSize
-                  sizeMask = (2 ^ (8 * size)) - 1
-                  maskedInt = i .&. sizeMask
-                  bytes = integer2Bytes maskedInt
-                  -- Pad with leading zeros to ensure correct size (e.g., bytes32 = 32 bytes)
-                  paddedBytes = B.replicate (size - B.length bytes) 0 <> bytes
-              in return $ SBytes paddedBytes
-            SString s -> return $ SBytes $ DT.encodeUtf8 $ T.pack $ maybe s (flip take s) mSize
-            SBytes s -> return $ SBytes $ maybe s (flip B.take s) mSize
+              in return $ SBytes $ Builtin.sizedBytesFromInteger size i
+            SString s -> return $ SBytes $ Builtin.sizedBytesFromString mSize s
+            SBytes s -> return $ SBytes $ Builtin.sizedBytesFromBytes mSize s
             _ -> invalidArguments ("Could not convert to " ++ labelToString name) arg
 callBuiltin "decimal" args = return $ decimalBuiltin args
-callBuiltin "identity" [v] = return v
+callBuiltin "identity" [v] = return $ Builtin.identity v
 callBuiltin "__solidvm_b16encode" [SBytes input] =
-  pure . SBytes $ B16.encode input
+  pure . SBytes $ Builtin.b16encode input
 callBuiltin "__solidvm_b16encode" args = typeError "b16encode" $ show args
 callBuiltin "__solidvm_b16decode" [SBytes input] =
-  let padded = if odd (B.length input) then B.cons 48 input else input
-   in case B16.decode padded of
-        Right decoded -> pure $ SBytes decoded
-        Left _ -> invalidArguments "b16decode: invalid hex string" input
+  pure . SBytes $ Builtin.b16decode input
 callBuiltin "__solidvm_b16decode" args = typeError "b16decode" $ show args
 callBuiltin "__solidvm_normalizeHex" [SString input] =
-  let hexPart = case input of
-        '0' : 'x' : rest -> rest
-        _ -> input
-      encoded = DT.encodeUtf8 $ T.pack hexPart
-      padded = if odd (B.length encoded) then B.cons 48 encoded else encoded
-   in case B16.decode padded of
-        Right decoded -> pure . SString $ "0x" ++ BC.unpack (B16.encode decoded)
-        Left _ -> invalidArguments "normalizeHex: invalid hex string" input
+  pure . SString $ Builtin.normalizeHex input
 callBuiltin "__solidvm_normalizeHex" args = typeError "normalizeHex" $ show args
-callBuiltin "log" args = SNULL <$ traverse (liftIO . putStrLn <=< showSM) args
-callBuiltin "keccak256" [SBytes bs] = pure . SBytes . keccak256ToByteString $ hash bs
-callBuiltin "keccak256" args = pure . SString . keccak256ToHex . hash . rlpSerialize $ rlpEncodeValues args
+callBuiltin "log" args = SNULL <$ Builtin.log (liftIO . putStrLn <=< showSM) args
+callBuiltin "keccak256" [SBytes bs] = pure . SBytes $ Builtin.keccak256 bs
+callBuiltin "keccak256" args = pure . SString . Builtin.keccak256Hex $ rlpEncodeValues args
 callBuiltin "ecrecover" [h', v', r', s'] = do
     bytestringHash <- getBytesVal h'
     v <- int v'
     rIntHash <- case r' of
       SInteger r -> pure r
-      SString r -> case parseBaseInt r 16 of
+      SString r -> case Builtin.parseBaseInt r 16 of
         Right x -> return x
         _ -> invalidArguments "parseHex: error parsing r: " r
       _ -> invalidArguments "ecrecover: r must be a hex string or an integer" r'
     sIntHash <- case s' of
       SInteger s -> pure s
-      SString s -> case parseBaseInt s 16 of
+      SString s -> case Builtin.parseBaseInt s 16 of
         Right y -> return y
         _ -> invalidArguments "parseHex: error parsing s: " s
       _ -> invalidArguments "ecrecover: s must be a hex string or an integer" s'
-    let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) rIntHash sIntHash v
-    let theZero :: Integer
-        theZero = 0
-    case theSignerAddress of
-      Nothing -> return . ((flip SAddress) False) $ fromIntegral theZero
-      Just theAddress -> return . ((flip SAddress) False) $ theAddress
-callBuiltin "verifyP256" (h' : r' : s' : p') = getBytesVal h' >>= \h -> case digestFromByteString @SHA256 h of
-  Nothing -> invalidArguments "Could not decode hash from string" h
-  Just digest -> do
-    pub <- case p' of
-      [x', y'] -> P256.pointFromIntegers <$> ((,) <$> int x' <*> int y')
-      [pub'] -> do
-        pubBS' <- case pub' of
-          SBytes bs -> pure bs
-          SString s -> case B16.decode $ DT.encodeUtf8 $ T.pack s of
-            Left e -> invalidArguments "Could not decode public key from string: invalid hex" (s, e)
-            Right b -> pure b
-          _ -> invalidArguments "Could not decode public key: invalid value" pub'
-        pubBS <- case B.length pubBS' of
-          65 -> pure $ B.drop 1 pubBS'
-          64 -> pure pubBS'
-          _ -> invalidArguments "Could not decode public key from bytestring: invalid length" pubBS'
-        case P256.pointFromBinary pubBS of
-          CryptoPassed p -> pure p
-          CryptoFailed e -> invalidArguments "Could not decode public key from bytestring" (pubBS', e)
+    pure $ SAddress (Builtin.ecrecover bytestringHash v rIntHash sIntHash) False
+callBuiltin "verifyP256" (h' : r' : s' : p') = do
+  h <- getBytesVal h'
+  SBool <$> Builtin.verifyP256 h publicKey ((,) <$> int r' <*> int s')
+  where
+    publicKey = case p' of
+      [x', y'] -> Left <$> ((,) <$> int x' <*> int y')
+      [pub'] -> Right <$> case pub' of
+        SBytes bs -> pure bs
+        SString s -> case B16.decode $ DT.encodeUtf8 $ T.pack s of
+          Left e -> invalidArguments "Could not decode public key from string: invalid hex" (s, e)
+          Right b -> pure b
+        _ -> invalidArguments "Could not decode public key: invalid value" pub'
       _ -> invalidArguments "Invalid arguments for P-256 public key" p'
-    (r,s) <- (,) <$> int r' <*> int s'
-    sig <- case signatureFromIntegers (Mod.Proxy @Curve_P256R1) (r, s) of
-      CryptoPassed sig' -> pure sig'
-      CryptoFailed e -> invalidArguments "Invalid P256 signature" e
-    let !isValidSig = verifyDigest (Mod.Proxy @Curve_P256R1) pub sig digest
-    pure $ SBool isValidSig
-callBuiltin "sha256" [SBytes bs] = pure . SBytes $ SHA256.hash bs
-callBuiltin "sha256" args = pure . SString . BC.unpack . B16.encode . SHA256.hash . rlpSerialize $ rlpEncodeValues args
-callBuiltin "ripemd160" [SBytes bs] = pure . SBytes $ RIPEMD160.hash bs
-callBuiltin "ripemd160" args = pure . SString . BC.unpack . B16.encode . RIPEMD160.hash . rlpSerialize $ rlpEncodeValues args
-callBuiltin "base64encode" [SBytes bs] = pure . SBytes $ B64.encode bs
-callBuiltin "base64encode" [SString s] = pure . SString . BC.unpack . B64.encode . DT.encodeUtf8 $ T.pack s
-callBuiltin "base64urlencode" [SBytes bs] = pure . SBytes . BC.takeWhile (/= '=') $ B64URL.encode bs
-callBuiltin "base64urlencode" [SString s] = pure . SString . BC.unpack . BC.takeWhile (/= '=') . B64URL.encode . DT.encodeUtf8 $ T.pack s
+callBuiltin "sha256" [SBytes bs] = pure . SBytes $ Builtin.sha256 bs
+callBuiltin "sha256" args = pure . SString . Builtin.hashHex Builtin.sha256 $ rlpEncodeValues args
+callBuiltin "ripemd160" [SBytes bs] = pure . SBytes $ Builtin.ripemd160 bs
+callBuiltin "ripemd160" args = pure . SString . Builtin.hashHex Builtin.ripemd160 $ rlpEncodeValues args
+callBuiltin "base64encode" [SBytes bs] = pure . SBytes $ Builtin.base64encode bs
+callBuiltin "base64encode" [SString s] = pure . SString $ Builtin.base64String Builtin.base64encode s
+callBuiltin "base64urlencode" [SBytes bs] = pure . SBytes $ Builtin.base64urlencode bs
+callBuiltin "base64urlencode" [SString s] = pure . SString $ Builtin.base64String Builtin.base64urlencode s
 callBuiltin "modExp" [b, e, m] = do
   decrementGas gasModExp
   (b', e', m') <- (,,) <$> int b <*> int e <*> int m
@@ -2816,68 +2690,72 @@ callBuiltin ("payable") [a] = flip SAddress True <$> getAddressVal a
 callBuiltin "require" (condVar : msg) = do
   cond <- getBoolVal condVar
   case msg of
-    [] -> require cond Nothing
-    (SString s : _) -> require cond (Just s)
-    (m : _) -> require cond (Just $ show m)
+    [] -> Builtin.require cond Nothing
+    (SString s : _) -> Builtin.require cond (Just s)
+    (m : _) -> Builtin.require cond (Just $ show m)
   return SNULL
-callBuiltin "assert" [cond] = pure . const SNULL =<< assert =<< getBoolVal cond
+callBuiltin "assert" [cond] = pure . const SNULL =<< Builtin.assert =<< getBoolVal cond
 
 callBuiltin "create" args@(cName : src : argVals) = do
   (contractName', contractSrc) <- (,) <$> getStringVal cName <*> getStringVal src
-  when (contractName' == "" || contractSrc == "") $
-    invalidArguments "The contract name and src arguments for the create function should not be empty" args
+  let reject = invalidArguments "The contract name and src arguments for the create function should not be empty" args
+      compile = do
+        creator <- getCurrentAddress
 
-  creator <- getCurrentAddress
+        -- Because of the current testnet stateroot problem with contracts using an older version of
+        -- create/create2 with incomplete codeptrs, this pragma will allow new contract using the
+        -- create/create2 features to work correctly but unfortunately, even without the pragma, the contracts
+        -- will still work but will have incorrect codeptrs.
+        -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
+        -- testnet won't exist anymore and the stateroot mismatches will be fixed.
+        isRunningTests <- Env.runningTests <$> getEnv
+        opts <- parseOptionsForCurrentBlock
+        (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 $ T.pack contractSrc
+        addNewCodeCollection hsh cc
+        pure (creator, hsh, cc)
+      allocateAddress (creator, _, _) = getNewAddress creator
+      execute newAddress (creator, hsh, cc) = do
+        execResults <- create' creator newAddress hsh cc (stringToLabel contractName') argVals
 
-  -- Because of the current testnet stateroot problem with contracts using an older version of
-  -- create/create2 with incomplete codeptrs, this pragma will allow new contract using the
-  -- create/create2 features to work correctly but unfortunately, even without the pragma, the contracts
-  -- will still work but will have incorrect codeptrs.
-  -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
-  -- testnet won't exist anymore and the stateroot mismatches will be fixed.
-  isRunningTests <- Env.runningTests <$> getEnv
-  opts <- parseOptionsForCurrentBlock
-  (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 $ T.pack contractSrc
-  addNewCodeCollection hsh cc
-  newAddress <- getNewAddress creator
-  execResults <- create' creator newAddress hsh cc (stringToLabel contractName') argVals
+        --Need to check that this is a UserRegistry contract before creating cirrus table!  Add this code
 
-  --Need to check that this is a UserRegistry contract before creating cirrus table!  Add this code
-
-  case erNewContractAddress execResults of
-    Just nca -> pure $ ((flip SAddress) False) nca
-    Nothing -> internalError "a call to create did not create an address" execResults
+        case erNewContractAddress execResults of
+          Just nca -> pure $ ((flip SAddress) False) nca
+          Nothing -> internalError "a call to create did not create an address" execResults
+  Builtin.create reject compile allocateAddress execute contractName' contractSrc
 callBuiltin "create2" args@(salt : n : src : argVals) = do
   (contractName', contractSrc) <- (,) <$> getStringVal n <*> getStringVal src
-  when (contractName' == "" || contractSrc == "") $
-    invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
+  let reject = invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
+      compile = do
+        creator <- getCurrentAddress
 
-  creator <- getCurrentAddress
+        -- Because of the current testnet stateroot problem with contracts using an older version of
+        -- create/create2 with incomplete codeptrs, this pragma will allow new contract using the
+        -- create/create2 features to work correctly but unfortunately, even without the pragma, the contracts
+        -- will still work but will have incorrect codeptrs.
+        -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
+        -- testnet won't exist anymore and the stateroot mismatches will be fixed.
+        isRunningTests <- Env.runningTests <$> getEnv
+        opts <- parseOptionsForCurrentBlock
+        (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 $ T.pack contractSrc
+        addNewCodeCollection hsh cc
+        pure (creator, hsh, cc)
+      allocateAddress (creator, hsh, _) = getNewAddressWithSalt creator salt hsh $ n:argVals
+      execute newAddress (creator, hsh, cc) = do
+        execResults <- create' creator newAddress hsh cc (stringToLabel contractName') argVals
 
-  -- Because of the current testnet stateroot problem with contracts using an older version of
-  -- create/create2 with incomplete codeptrs, this pragma will allow new contract using the
-  -- create/create2 features to work correctly but unfortunately, even without the pragma, the contracts
-  -- will still work but will have incorrect codeptrs.
-  -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
-  -- testnet won't exist anymore and the stateroot mismatches will be fixed.
-  isRunningTests <- Env.runningTests <$> getEnv
-  opts <- parseOptionsForCurrentBlock
-  (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 $ T.pack contractSrc
-  addNewCodeCollection hsh cc
-  newAddress <- getNewAddressWithSalt creator salt hsh $ n:argVals
-  execResults <- create' creator newAddress hsh cc (stringToLabel contractName') argVals
-  case erNewContractAddress execResults of
-    Just nca -> pure $ ((flip SAddress) False) nca
-    Nothing -> internalError "a call to create did not create an address" execResults
+        case erNewContractAddress execResults of
+          Just nca -> pure $ ((flip SAddress) False) nca
+          Nothing -> internalError "a call to create did not create an address" execResults
+  Builtin.create2 reject compile allocateAddress execute contractName' contractSrc
 callBuiltin "setBlockContext" [proposer', prevProposer', prevIntended', prevRound'] = do
   env' <- getEnv
-  unless (Env.runningTests env') $
-    invalidArguments "setBlockContext can only be called during testing" [proposer', prevProposer', prevIntended', prevRound']
-  proposer'' <- getAddressVal proposer'
-  facts <- ProposalFacts <$> getAddressVal prevProposer' <*> getAddressVal prevIntended' <*> int prevRound'
-  Mod.modify_ (Mod.Proxy @Env.Environment) $ \env ->
-    pure $ env { Env.proposer = proposer'', Env.prevBlock = Just facts }
-  return SNULL
+  SNULL <$ Builtin.setBlockContext (Env.runningTests env')
+    (invalidArguments "setBlockContext can only be called during testing" [proposer', prevProposer', prevIntended', prevRound'])
+    (getAddressVal proposer')
+    (ProposalFacts <$> getAddressVal prevProposer' <*> getAddressVal prevIntended' <*> int prevRound')
+    (\proposer'' facts -> Mod.modify_ (Mod.Proxy @Env.Environment) $ \env ->
+      pure $ env { Env.proposer = proposer'', Env.prevBlock = Just facts })
 callBuiltin "fastForward" (secs : mBlocks) = do
   seconds <- int secs
   blocks <- case mBlocks of
@@ -2885,19 +2763,16 @@ callBuiltin "fastForward" (secs : mBlocks) = do
     (blks : _) -> int blks
   -- Only allow fastForward during testing
   env' <- getEnv
-  if not (Env.runningTests env')
-    then invalidArguments "fastForward can only be called during testing" [SInteger seconds]
-    else do
-      -- Get current timestamp and add seconds
-      let currentTimestamp = BlockHeader.timestamp $ Env.blockHeader env'
-          newTimestamp = addUTCTime (max 1 $ fromIntegral seconds) currentTimestamp
-          currentBlockNumber = BlockHeader.number $ Env.blockHeader env'
-          newBlockNumber = currentBlockNumber + blocks
-          updatedBlockHeader = (Env.blockHeader env') { BlockHeader.timestamp = newTimestamp, BlockHeader.number = newBlockNumber }
+  -- Get current timestamp and add seconds
+  let currentTimestamp = BlockHeader.timestamp $ Env.blockHeader env'
+      currentBlockNumber = BlockHeader.number $ Env.blockHeader env'
+  SNULL <$ Builtin.fastForward (Env.runningTests env')
+    (invalidArguments "fastForward can only be called during testing" [SInteger seconds])
+    currentTimestamp currentBlockNumber seconds blocks (\newTimestamp newBlockNumber -> do
+      let updatedBlockHeader = (Env.blockHeader env') { BlockHeader.timestamp = newTimestamp, BlockHeader.number = newBlockNumber }
       -- Update the environment with new block header
       Mod.modify_ (Mod.Proxy @Env.Environment) $ \env ->
-        pure $ env { Env.blockHeader = updatedBlockHeader }
-      return SNULL
+        pure $ env { Env.blockHeader = updatedBlockHeader })
 
 callBuiltin "abiEncode" args = SBytes <$> Builtins.abiEncode args
 callBuiltin "abiEncodePacked" args = SBytes <$> Builtins.abiEncodePacked args

@@ -1,0 +1,72 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           solid-vm-builtins
+version:        0.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.SolidVM.BLS12381
+      Blockchain.SolidVM.BLS12381.Compress
+      Blockchain.SolidVM.BLS12381.HashToCurve
+      Blockchain.SolidVM.BLS12381.HashToCurve.G1
+      Blockchain.SolidVM.BLS12381.HashToCurve.G2
+      Blockchain.SolidVM.BLS12381.HashToCurve.HashToField
+      Blockchain.SolidVM.Builtins.ABI
+      Blockchain.SolidVM.Builtins.Crypto
+      Blockchain.SolidVM.Builtins.Functions
+      Blockchain.SolidVM.Builtins.Gas
+  other-modules:
+      Paths_solid_vm_builtins
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -O2 -fexpose-all-unfoldings -fspecialise-aggressively
+  build-depends:
+      Decimal
+    , base
+    , base16-bytestring
+    , base64-bytestring
+    , blockapps-secp256k1-haskell
+    , bytestring
+    , cryptohash
+    , crypton
+    , elliptic-curve
+    , ethereum-rlp
+    , memory
+    , pairing
+    , poseidon-hash
+    , solid-vm-model
+    , strato-model
+    , text
+    , time
+    , transformers
+  default-language: Haskell2010
+
+test-suite solid-vm-builtins-spec
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      BLS12381Spec
+      BuiltinsSpec
+      FunctionsSpec
+      Paths_solid_vm_builtins
+  hs-source-dirs:
+      test/
+  build-depends:
+      Decimal
+    , base
+    , base16-bytestring
+    , bytestring
+    , elliptic-curve
+    , hspec
+    , pairing
+    , solid-vm-builtins
+    , solid-vm-model
+    , strato-model
+    , time
+  default-language: Haskell2010

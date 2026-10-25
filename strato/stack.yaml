@@ -99,6 +99,7 @@ packages:
 - VM/evm-solidity
 - VM/SolidVM/debugger
 - VM/SolidVM/solid-vm
+- VM/SolidVM/solid-vm-builtins
 - VM/SolidVM/solid-vm-compiler
 - VM/SolidVM/solid-vm-fuzzer
 - VM/SolidVM/solid-vm-model

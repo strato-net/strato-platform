@@ -13,20 +13,20 @@ library:
     - Blockchain.SolidVM.GasInfo
     - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
-    # BLS12-381 internal modules. Exposed so the test target (and anyone
-    # cross-checking against RFC 9380 vectors) can drive the pipeline
-    # stages directly. Stable public API for bridge contracts is via the
-    # byte builtins re-exported from Builtins.
-    - Blockchain.SolidVM.BLS12381
-    - Blockchain.SolidVM.BLS12381.Compress
-    - Blockchain.SolidVM.BLS12381.HashToCurve
-    - Blockchain.SolidVM.BLS12381.HashToCurve.G1
-    - Blockchain.SolidVM.BLS12381.HashToCurve.G2
-    - Blockchain.SolidVM.BLS12381.HashToCurve.HashToField
+  # BLS12-381 internal modules. Exposed so the test target (and anyone
+  # cross-checking against RFC 9380 vectors) can drive the pipeline
+  # stages directly. Stable public API for bridge contracts is via the
+  # byte builtins re-exported from Builtins.
+  reexported-modules:
+    - solid-vm-builtins:Blockchain.SolidVM.BLS12381
+    - solid-vm-builtins:Blockchain.SolidVM.BLS12381.Compress
+    - solid-vm-builtins:Blockchain.SolidVM.BLS12381.HashToCurve
+    - solid-vm-builtins:Blockchain.SolidVM.BLS12381.HashToCurve.G1
+    - solid-vm-builtins:Blockchain.SolidVM.BLS12381.HashToCurve.G2
+    - solid-vm-builtins:Blockchain.SolidVM.BLS12381.HashToCurve.HashToField
   ghc-options: -Wall -O2 -fexpose-all-unfoldings -fspecialise-aggressively -fdicts-cheap -fsolve-constant-dicts
   dependencies:
   - base16-bytestring
-  - base64-bytestring
   - blockapps-data
   - composable-monads-base
   - blockapps-datadefs
@@ -35,27 +35,22 @@ library:
   - bytestring
   - common-log
   - containers
-  - cryptohash
-  - crypton
   - data-default
   - debugger
   - Decimal
   - deepseq
-  - elliptic-curve
   - ethereum-rlp
   - evm-solidity
   - exceptions
   - format
   - lens
-  - memory
   - accountdb-monad
   - statedb-monad
   - monad-alter
   - nibblestring
   - ordered-containers
-  - pairing
   - parsec
-  - poseidon-hash
+  - solid-vm-builtins
   - solid-vm-compiler
   - solid-vm-model
   - solid-vm-parser

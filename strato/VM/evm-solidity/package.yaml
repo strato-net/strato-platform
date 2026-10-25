@@ -23,6 +23,7 @@ dependencies:
   - parsec
   - QuickCheck
   - scientific
+  - solid-vm-builtins
   - solid-vm-model
   - strato-model
   - text

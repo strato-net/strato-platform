@@ -1,6 +1,6 @@
 module BuiltinsSpec where
 
-import qualified Blockchain.SolidVM.Builtins as B
+import qualified Blockchain.SolidVM.Builtins.Crypto as B
 import Blockchain.VM.SolidException (SolidException (..))
 import Control.Exception (evaluate)
 import qualified Data.ByteString as BS
@@ -121,7 +121,7 @@ spec = do
   describe "ecPairing vs. the pairing library (single final exponentiation)" $ do
     let ref :: [((Integer, Integer), [Integer])] -> Bool
         ref ps =
-          mconcat [refPairing g1 g2 | (g1, g2) <- ps] == (mempty :: GT')
+          mconcat [refPairing first second | (first, second) <- ps] == (mempty :: GT')
         refPairing (x, y) [xi', xr, yi', yr] =
           pairing
             (A (fromInteger x :: Fq) (fromInteger y :: Fq))
