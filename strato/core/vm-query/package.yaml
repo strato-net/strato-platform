@@ -35,6 +35,9 @@ library:
     - blockDB
     - bytestring
     - composable-monads-base
+    - redis-monad
+    - hedis
+    - statedb-monad
     - containers
     - data-default
     - debugger

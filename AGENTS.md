@@ -20,6 +20,12 @@
 - The only valid restart sequence is: `strato-down` → remove/rename `mynode` → `strato-up`. Confirm the prior node is down before starting a new one.
 - Rationale: partial restarts / reused `mynode` leave half-broken state (e.g. a stray second `strato-p2p`) and make test results untrustworthy; a full teardown is the only way to guarantee a clean, reproducible run.
 
+## Building (STRICT)
+
+- Build ONLY with `make` from the repo root. No per-package `stack build`/`stack install`/`stack test` as the build step, and never `--force-dirty` (it unregisters every dependent package and leaves the next `make` re-registering/rebuilding dozens of packages). `stack test <pkg>` leaves the package configured with tests, which forces `make` to reconfigure and recompile it and its dependents.
+- Watch what rebuilds. A warm `make` is well under a minute; ~4 min or more means something is wrong unless the reason is known (fresh clone, deliberate compiler-flag experiment). If packages or docker images rebuild that have no changed inputs, tell the user — do not just wait it out.
+- Known Makefile behaviour: docker image tags embed the commit SHA (`VERSION-HASH`), so every new HEAD rebuilds every image even when its content hash is unchanged.
+
 ## Learned Workspace Facts
 
 - STRATO network IDs exceed JS `Number.MAX_SAFE_INTEGER`; must guard with `Number.isSafeInteger()` before passing to viem/wagmi; MetaMask crashes on oversized chain IDs (`initProvider` → `numberToHex`)

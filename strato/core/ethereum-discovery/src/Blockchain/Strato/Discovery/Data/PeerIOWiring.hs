@@ -53,7 +53,13 @@ instance MonadIO m => HasPeerDB m where
     currentTime <- getCurrentTime
     try $ fmap (map SQL.entityVal) $
       flip runSqlPool sqldb $
-        SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime, PPeerLastBestBlockHash SQL.!=. zeroHash] []
+        SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
+
+  getAnyBondedPeersForUDP = liftIO $ withGlobalSQLPool $ \sqldb -> do
+    currentTime <- getCurrentTime
+    try $ fmap (map SQL.entityVal) $
+      flip runSqlPool sqldb $
+        SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
 
   getUnbondedPeers = liftIO $ withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime

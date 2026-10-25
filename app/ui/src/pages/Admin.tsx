@@ -19,7 +19,6 @@ import VoteTab from '@/components/admin/VoteTab';
 import BridgeTransactionsPage from '@/components/dashboard/BridgeTransactionsPage';
 import BridgeReviewQueue from '@/components/admin/BridgeReviewQueue';
 import BridgePolicies from '@/components/admin/BridgePolicies';
-import VaultAdminTab from '@/components/admin/VaultAdminTab';
 import YieldVaultAdminTab from '@/components/admin/YieldVaultAdminTab';
 import StakingAdminTab from '@/components/admin/StakingAdminTab';
 
@@ -261,18 +260,6 @@ const Admin = () => {
               </CardHeader>
               <CardContent>
                 <YieldVaultAdminTab />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Diversified Vault</CardTitle>
-                <CardDescription>
-                  Admin tools for the diversified multi-asset vault.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <VaultAdminTab />
               </CardContent>
             </Card>
           </TabsContent>

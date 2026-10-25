@@ -96,7 +96,12 @@ addPeersIfNeeded minPeers = do
   numAvailablePeers <- getNumAvailablePeers
   $logInfoS "addPeersIfNeeded" . T.pack $ "Number of available peers: " ++ show numAvailablePeers ++ " / " ++ show minPeers
   when (numAvailablePeers < minPeers) $ do
-    eBondedPeers <- getBondedPeersForUDP
+    -- Only a peer that completed an ETH handshake is proven to be on this
+    -- network, but a joining node has none: until a bootnode admits it, it
+    -- must ask the peers it does know, or it never learns of any other node.
+    eBondedPeers <- getBondedPeersForUDP >>= \case
+      Right [] -> getAnyBondedPeersForUDP
+      other    -> pure other
     case eBondedPeers of
       Left err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to find peers: " ++ show err
       Right [] -> $logInfoS "addPeersIfNeeded" "no peers available to bootstrap from, will try again soon."
