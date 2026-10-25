@@ -67,6 +67,8 @@ These flags are handled by `strato-up` itself and are not passed to `strato-setu
 | `--stakingActivationBlock` | `-1` | Block from which stake-weighted proposer selection applies. `-1` means the network default. Every node of a network must agree, so don't override it on a public network. |
 | `--svmTrace` | `false` | Verbose SolidVM logging. |
 | `--sqlDiff` | `true` | Write account state and storage to the SQL database. |
+| `--disableSqlIndexing` | `false` | Skip constructing SQL indexing messages in vm-runner, including state diffs, pending transactions, balance/nonce updates and receipt indexing payloads. Keep blocks and best-block updates for Redis. |
+| `--disableCirrusIndexing` | `false` | Skip constructing Cirrus actions and code-collection messages in vm-runner. Keep transaction results. |
 
 For how the consensus settings are used, see [Consensus](../platform/consensus.md).
 

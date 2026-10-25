@@ -38,7 +38,9 @@ const NODE_URL = (process.env.NODE_URL || '').replace(/\/$/, '');
 const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
 
 const WAD = 10n ** 18n;
+const RAY = 10n ** 27n;
 const ZERO = '0'.repeat(40);
+const PRICE_ORACLE = '0000000000000000000000000000000000001002';
 const CHAINS = { 1: 'Ethereum', 10: 'Optimism', 56: 'BNB', 137: 'Polygon',
   8453: 'Base', 42161: 'Arbitrum' };
 const chainName = (id) => CHAINS[id] ? `${CHAINS[id]} (${id})` : `chain ${id}`;
@@ -49,7 +51,8 @@ const GENERIC = new Set(['Context', 'Ownable', 'Proxy', 'Pausable', 'ERC20',
 const PROTOCOL = new Set(['MercataBridge', 'StablePool', 'Pool', 'CDPEngine',
   'YieldVault', 'SaveUSDSTVault', 'LendingPool', 'LiquidityPool', 'Rewards',
   'Vault', 'Escrow', 'MetalForge', 'PoolFactory', 'TokenFactory',
-  'SafetyModule', 'StratoNativeBridge', 'VaultFactory']);
+  'SafetyModule', 'StratoNativeBridge', 'VaultFactory', 'PoolV3', 'DirectMintPSM',
+  'Market', 'Offer', 'Bid']);
 const VERBS = {
   approve: 'approve', swap: 'swap on {t}', exchange: 'swap (stable) on {t}',
   deposit: 'deposit into {t}', depositLiquidity: 'supply liquidity to {t}',
@@ -65,6 +68,15 @@ const VERBS = {
   mint: 'borrow / mint against {t}', repay: 'repay debt to {t}',
   repayAll: 'repay all debt to {t}',
   requestWithdrawal: 'BRIDGE-OUT request via {t}',
+};
+
+const CONTRACT_VERBS = {
+  Market: { redeem: 'Prediction-market payout', split: 'Buy paired prediction tokens',
+    merge: 'Redeem paired prediction tokens' },
+  Offer: { fill: 'Buy prediction tokens' },
+  Bid: { fill: 'Sell prediction tokens' },
+  CDPEngine: { mint: 'Borrow from {t}' },
+  DirectMintPSM: { mint: 'Convert via {t}', redeem: 'Convert via {t}' },
 };
 
 // -------------------------------------------------------------------- colors
@@ -138,6 +150,14 @@ function getOwnTxs(addr) {
     .map(([n, ts, fn, to, blk, hash, st]) =>
       ({ nonce: Number(n), ts, func: fn, to, block: Number(blk), hash, status: st }));
 }
+function getTxCalls(hashes) {
+  const calls = [];
+  for (let i = 0; i < hashes.length; i += 500)
+    calls.push(...ethSql('select tx_hash,func_name,to_address from raw_transaction where tx_hash in (' +
+      hashes.slice(i, i + 500).map((h) => `'${h}'`).join(',') + ')')
+      .map(([hash, func, to]) => ({ hash, func, to })));
+  return calls;
+}
 const latestBlock = () => { const r = ethSql('select max(number) from block_data_ref'); return r.length ? r[0][0] : '?'; };
 
 // parse the Haskell "Success" / "Failure {...}" status string
@@ -156,25 +176,82 @@ function parseStatus(s) {
 // -------------------------------------------------------------------- labels
 async function buildLabels(addrs) {
   const list = [...addrs].filter((a) => a && a !== ZERO).sort();
-  if (!list.length) return {};
+  if (!list.length) return { labels: {}, vaultShares: new Map() };
   const inlist = `in.(${list.join(',')})`;
   const labels = {};
-  for (const r of await cirrus('BlockApps-Token', { address: inlist, select: 'address,_name,_symbol' }))
-    labels[r.address] = r._symbol || r._name;
+  for (const resource of ['BlockApps-ERC20', 'BlockApps-Token'])
+    for (const r of await cirrus(resource, { address: inlist, select: 'address,_name,_symbol' }))
+      labels[r.address] = r._symbol || r._name;
   const names = {};
   for (const r of await cirrus('contract', { address: inlist, select: 'address,contract_name' }))
     (names[r.address] || (names[r.address] = new Set())).add(r.contract_name);
+  const vaultShares = new Map();
   for (const [addr, set] of Object.entries(names)) {
+    if (set.has('SaveUSDSTVault') || set.has('YieldVault') || set.has('ERC4626')) {
+      vaultShares.set(addr, labels[addr] || 'vault shares');
+      labels[addr] = set.has('SaveUSDSTVault') ? 'SaveUSDSTVault' : set.has('YieldVault') ? 'YieldVault' : 'ERC4626';
+    }
     if (labels[addr]) continue;
     const pick = ([...set].filter((n) => PROTOCOL.has(n)).sort()[0])
       || ([...set].filter((n) => !GENERIC.has(n)).sort()[0]);
-    labels[addr] = pick || 'contract';
+    if (pick || [...set].some((n) => n !== 'Decider' && n !== 'DeciderState'))
+      labels[addr] = pick || 'contract';
   }
-  return labels;
+  return { labels, vaultShares };
 }
-const senderKind = (addr, labels) =>
-  addr === ZERO ? 'mint' : (PROTOCOL.has(labels[addr]) ? 'protocol' : 'wallet');
 
+async function buildPrices(tokens) {
+  const rows = await cirrus('BlockApps-PriceOracle-prices',
+    { address: `eq.${PRICE_ORACLE}`, select: 'key,value::text' });
+  const prices = new Map((Array.isArray(rows) ? rows : [])
+    .filter((r) => big(r.value) > 0n).map((r) => [r.key, big(r.value)]));
+  const missing = [...tokens].filter((token) => !prices.has(token));
+  if (missing.length) {
+    const pools = await cirrus('BlockApps-Pool', {
+      lpToken: `in.(${missing.join(',')})`,
+      select: 'tokenA,tokenB,tokenABalance::text,tokenBBalance::text,lpToken:lpToken_fkey(address,_totalSupply::text)',
+    });
+    for (const pool of Array.isArray(pools) ? pools : []) {
+      const supply = big(pool.lpToken?._totalSupply);
+      const priceA = prices.get(pool.tokenA), priceB = prices.get(pool.tokenB);
+      if (supply > 0n && priceA && priceB) {
+        const value = (big(pool.tokenABalance) * priceA + big(pool.tokenBBalance) * priceB) / WAD;
+        prices.set(pool.lpToken.address, value * WAD / supply);
+      }
+    }
+  }
+  return prices;
+}
+
+async function getPositions(addr) {
+  const vaults = (await cirrus('BlockApps-CDPEngine-vaults',
+    { key: `eq.${addr}`, select: 'address,key2,value' }))
+    .filter((r) => big(r.value.collateral) > 0n || big(r.value.scaledDebt) > 0n);
+  const rates = vaults.length ? await cirrus('BlockApps-CDPEngine-collateralGlobalStates', {
+    address: `in.(${[...new Set(vaults.map((r) => r.address))].join(',')})`,
+    key: `in.(${[...new Set(vaults.map((r) => r.key2))].join(',')})`,
+    select: 'address,key,value',
+  }) : [];
+  const balances = (await cirrus('strato-predict-OutcomeToken-balanceOf',
+    { key: `eq.${addr}`, select: 'address,value::text' })).filter((r) => big(r.value) > 0n);
+  const tokens = balances.length ? await cirrus('strato-predict-OutcomeToken', {
+    address: `in.(${balances.map((r) => r.address).join(',')})`, select: 'address,symbol,market,isYes',
+  }) : [];
+  const markets = tokens.length ? await cirrus('strato-predict-Market', {
+    address: `in.(${[...new Set(tokens.map((r) => r.market))].join(',')})`, select: 'address,status,expiry,claimsOpenAt',
+  }) : [];
+  const stakes = (await cirrus('BlockApps-StratoStaking-delegatedStake',
+    { key: `eq.${addr}`, select: 'address,key2,value::text' })).filter((r) => big(r.value) > 0n);
+  const unbonding = (await cirrus('BlockApps-StratoStaking-unbondingQueue',
+    { key: `eq.${addr}`, select: 'address,key2,value' }))
+    .filter((r) => !r.value.claimed && big(r.value.amount) > 0n);
+  const stakingAddresses = [...new Set([...stakes, ...unbonding].map((r) => r.address))];
+  const staking = stakingAddresses.length ? await cirrus('BlockApps-StratoStaking',
+    { address: `in.(${stakingAddresses.join(',')})`, select: 'address,stratoToken' }) : [];
+  return { vaults, rates: new Map(rates.map((r) => [`${r.address}|${r.key}`, big(r.value.rateAccumulator)])),
+    balances, tokens: new Map(tokens.map((r) => [r.address, r])), markets: new Map(markets.map((r) => [r.address, r])),
+    stakes, unbonding, stakingTokens: new Map(staking.map((r) => [r.address, r.stratoToken])) };
+}
 // ------------------------------------------------------------------ movements
 function renderMoves(moves, labels) {
   const lbl = (a) => labels[a] || a.slice(0, 8) + '…';
@@ -185,7 +262,7 @@ function renderMoves(moves, labels) {
   }
   if (outs.length && ins.length) return `${outs.join(' + ')} ${dim('→')} ${ins.join(' + ')}`;
   if (ins.length) return green('+') + ins.join(' + ');
-  if (outs.length) return red('-') + outs.join(' + ');
+  if (outs.length) return outs.map((v) => red('-') + v).join(' ');
   return '';
 }
 
@@ -204,34 +281,65 @@ async function main() {
   const deps = await cirrus('BlockApps-MercataBridge-DepositCompleted',
     { stratoRecipient: `eq.${addr}`, order: 'block_number',
       select: 'transaction_hash,block_timestamp,externalChainId,stratoToken,stratoTokenAmount::text' });
+  const autoSaved = await cirrus('BlockApps-MercataBridge-AutoSavedUSDST',
+    { recipient: `eq.${addr}`, order: 'block_number',
+      select: 'transaction_hash,block_timestamp,block_number,externalChainId,sourceToken,sourceAmount::text,usdstAmount::text,saveToken,shares::text' });
+  const savingVaults = autoSaved.length ? await cirrus('BlockApps-SaveUSDSTVault',
+    { address: `in.(${[...new Set(autoSaved.map((s) => s.saveToken))].join(',')})`, select: 'address,assetToken' }) : [];
+  const savingAssets = new Map(savingVaults.map((v) => [v.address, v.assetToken]));
   const xfers = await cirrus('BlockApps-Token-Transfer',
     { or: `(to.eq.${addr},from.eq.${addr})`, order: 'block_number',
       select: 'transaction_hash,block_number,block_timestamp,from,to,address,value::text' });
-  const bals = await cirrus('BlockApps-Token-_balances', { key: `eq.${addr}`, value: 'gt.0', select: 'address,value::text' });
-  const wreq = await cirrus('BlockApps-MercataBridge-WithdrawalRequested',
+  const balanceRows = await cirrus('BlockApps-Token-_balances', { key: `eq.${addr}`, value: 'gt.0', select: 'address,value::text' });
+  const erc20Rows = await cirrus('BlockApps-ERC20-_balances', { key: `eq.${addr}`, value: 'gt.0', select: 'address,value::text' });
+  const bals = [...new Map([...balanceRows, ...erc20Rows].map((r) => [r.address, r])).values()].filter((r) => big(r.value) > 0n);
+  const positions = await getPositions(addr);
+  const bridgeRequests = await cirrus('BlockApps-MercataBridge-WithdrawalRequested',
     { user: `eq.${addr}`, order: 'withdrawalId',
-      select: 'transaction_hash,withdrawalId,block_timestamp,destChainId,token,stratoTokenAmount::text' });
-  const setOf = async (ev) => new Set((await cirrus(`BlockApps-MercataBridge-${ev}`, { select: 'withdrawalId' })).map((r) => r.withdrawalId));
-  const done = await setOf('WithdrawalCompleted'), abort = await setOf('WithdrawalAborted'), pend = await setOf('WithdrawalPending');
+      select: 'address,transaction_hash,withdrawalId,block_timestamp,destChainId,token,stratoTokenAmount::text' });
+  const nativeRequests = await cirrus('BlockApps-StratoNativeBridge-NativeWithdrawalRequested',
+    { stratoSender: `eq.${addr}`, order: 'withdrawalId',
+      select: 'address,transaction_hash,withdrawalId,block_timestamp,externalChainId,stratoToken,stratoTokenAmount::text' });
+  const wreq = [...bridgeRequests, ...nativeRequests.map((w) =>
+    ({ ...w, native: true, destChainId: w.externalChainId, token: w.stratoToken }))]
+    .sort((a, b) => a.block_timestamp.localeCompare(b.block_timestamp));
+  const withdrawalKey = (w) => `${w.address}:${w.withdrawalId}`;
+  const withdrawalLabel = (w) => `#${w.withdrawalId}${w.native ? ' (native)' : ''}`;
+  const setOf = async (ev) => {
+    const rows = await cirrus(`BlockApps-MercataBridge-Withdrawal${ev}`, { select: 'address,withdrawalId' });
+    if (nativeRequests.length) rows.push(...await cirrus(`BlockApps-StratoNativeBridge-NativeWithdrawal${ev}`,
+      { select: 'address,withdrawalId' }));
+    return new Set(rows.map(withdrawalKey));
+  };
+  const done = await setOf('Completed'), abort = await setOf('Aborted'), pend = await setOf('Pending');
 
   // A receive-only account has no native-state row (nonceRaw null); that's fine as
   // long as it shows up somewhere. Only bail if there's genuinely no activity.
-  if (nonceRaw === null && !ownTxs.length && !deps.length && !xfers.length && !bals.length) {
+  if (nonceRaw === null && !ownTxs.length && !deps.length && !xfers.length && !bals.length && !positions.vaults.length && !positions.balances.length && !positions.stakes.length && !positions.unbonding.length) {
     console.error(`address ${addr} not found (no txs, transfers, deposits, or balances)`);
     process.exit(1);
   }
   const nonce = nonceRaw ?? 0n, gas = gasRaw ?? 0n;
-  const wStatus = (id) =>
-    done.has(id) ? { text: 'COMPLETED', color: green }
-    : abort.has(id) ? { text: 'ABORTED', color: dim }
-    : pend.has(id) ? { text: 'PENDING', color: yellow }
+  const wStatus = (w) =>
+    done.has(withdrawalKey(w)) ? { text: 'COMPLETED', color: green }
+    : abort.has(withdrawalKey(w)) ? { text: 'ABORTED', color: dim }
+    : pend.has(withdrawalKey(w)) ? { text: 'PENDING', color: yellow }
     : { text: 'REQUESTED', color: yellow };
   const wreqByTx = new Map(wreq.map((w) => [w.transaction_hash, w]));
+  const ownTxByHash = new Map(ownTxs.map((t) => [t.hash, t]));
+  const externalCalls = getTxCalls([...new Set(xfers.map((x) => x.transaction_hash))]
+    .filter((hash) => !ownTxByHash.has(hash)));
+  const callsByHash = new Map([...ownTxs, ...externalCalls].map((t) => [t.hash, t]));
 
   const refs = new Set([...ownTxs.map((t) => t.to), ...deps.map((d) => d.stratoToken),
+    ...autoSaved.flatMap((s) => [s.sourceToken, s.saveToken]), ...savingAssets.values(),
+    ...externalCalls.map((t) => t.to), ...positions.stakingTokens.values(),
     ...xfers.map((x) => x.from), ...xfers.map((x) => x.to), ...xfers.map((x) => x.address),
-    ...bals.map((b) => b.address), ...wreq.map((w) => w.token)]);
-  const labels = await buildLabels(refs);
+    ...bals.map((b) => b.address), ...wreq.map((w) => w.token), ...positions.vaults.map((r) => r.key2)]);
+  const { labels, vaultShares } = await buildLabels(refs);
+  const prices = await buildPrices(new Set([...xfers.map((x) => x.address), ...bals.map((b) => b.address),
+    ...positions.vaults.map((v) => v.key2), ...positions.stakingTokens.values(),
+    ...autoSaved.map((s) => s.sourceToken), ...savingAssets.values()]));
   const lbl = (a) => (!a || a === ZERO) ? '0x0' : (labels[a] || a.slice(0, 10) + '…');
   const pad = (s, n) => String(s).padStart(n);
 
@@ -241,35 +349,108 @@ async function main() {
   console.log(`txs sent ${nonce}    gas ${fmt(gas, 6)}    latest block ${latest}\n${'='.repeat(72)}`);
 
   // ---- 2. origins summary
-  console.log(bold('\n[ ORIGINS OF FUNDS ]'));
-  if (deps.length) {
-    console.log('  bridge-ins:');
-    for (const d of deps)
-      console.log(`    ${dim(d.block_timestamp.slice(0, 10))}  ${pad(amt(big(d.stratoTokenAmount)), 14)} ${cyan(lbl(d.stratoToken).padEnd(10))} from ${chainName(d.externalChainId)}`);
-  }
-  const origins = new Map(), mints = new Map();
-  for (const x of xfers) {
-    if (x.to !== addr) continue;
-    const kind = senderKind(x.from, labels);
-    const bucket = kind === 'wallet' ? origins : kind === 'mint' ? mints : null;
-    if (!bucket) continue;
-    const key = kind === 'wallet' ? `${x.from}|${x.address}` : x.address;
-    const cur = bucket.get(key) || [0n, 0];
-    bucket.set(key, [cur[0] + big(x.value), cur[1] + 1]);
-  }
-  if (origins.size) {
-    console.log('  transfers in from other wallets:');
-    for (const [k, [t, n]] of [...origins].sort((a, b) => b[1][0] > a[1][0] ? 1 : -1)) {
-      const [src, tok] = k.split('|');
-      console.log(`    ${pad(amt(t), 14)} ${cyan(lbl(tok).padEnd(10))} from ${src.slice(0, 10)}… (${n}x)`);
+  const depositsByTx = new Map(deps.map((d) => [d.transaction_hash, d]));
+  const sections = new Map([['FUNDING', new Map()], ['BORROWING (must be repaid)', new Map()],
+    ['ACTIVITY AND RESULTS', new Map()], ['BRIDGE-OUTS', new Map()]]);
+  const formatAmount = (token, amount, showToken = true, symbol = lbl(token)) => {
+    const price = prices.get(token);
+    const usd = price === undefined ? '(USD unavailable)' : `($${fmt(amount * price / WAD, 2)})`;
+    return `${amt(amount)}${showToken ? ` ${symbol}` : ''} ${usd}`;
+  };
+  const addFlow = (section, purpose, token, direction, amount) => {
+    const groups = sections.get(section);
+    let group = groups.get(purpose);
+    if (!group) { group = { tokens: new Map() }; groups.set(purpose, group); }
+    const amounts = group.tokens.get(token) || { received: 0n, spent: 0n };
+    amounts[direction] += amount;
+    group.tokens.set(token, amounts);
+  };
+  for (const x of xfers.sort((a, b) => Number(a.block_number) - Number(b.block_number))) {
+    if (x.from === x.to || big(x.value) === 0n) continue;
+    const incoming = x.to === addr;
+    const other = incoming ? x.from : x.to;
+    const tx = callsByHash.get(x.transaction_hash);
+    const deposit = depositsByTx.get(x.transaction_hash);
+    const withdrawal = wreqByTx.get(x.transaction_hash);
+    let section = 'ACTIVITY AND RESULTS', purpose;
+    if (labels[other] === 'FeeCollector') purpose = 'Network transaction fees';
+    else if (deposit) { section = 'FUNDING'; purpose = `Bridged in from ${chainName(deposit.externalChainId)}`; }
+    else if (withdrawal) {
+      section = 'BRIDGE-OUTS';
+      purpose = `${withdrawalLabel(withdrawal)} to ${chainName(withdrawal.destChainId)} [${wStatus(withdrawal).text}]`;
+    } else if (labels[other] === 'MercataBridge' || labels[other] === 'StratoNativeBridge') {
+      section = 'BRIDGE-OUTS'; purpose = 'Other bridge transfers';
+    } else if (incoming && tx && labels[tx.to] === 'CDPEngine' && tx.func === 'mint') {
+      section = 'BORROWING (must be repaid)'; purpose = 'Borrowed from CDPEngine (debt, not earnings)';
+    } else if (incoming && !ownTxByHash.has(x.transaction_hash) && other !== ZERO && !labels[other]
+        && (!tx || tx.to === x.address)) {
+      section = 'FUNDING'; purpose = `Transfer from ${other}`;
+    } else {
+      const contract = labels[tx?.to] || labels[other];
+      if (contract === 'Market' || contract === 'Offer' || contract === 'Bid' || contract === 'OrderBook') purpose = 'Prediction markets';
+      else if (tx && (tx.func === 'swap' || tx.func === 'exchange' || contract === 'DirectMintPSM')) purpose = 'Swaps and conversions';
+      else if (contract === 'Pool' || contract === 'StablePool' || contract === 'PoolV3') purpose = 'Liquidity pools';
+      else if (contract === 'CDPEngine') purpose = 'CDP collateral and repayments';
+      else if (contract) purpose = contract;
+      else if (other === ZERO) purpose = 'Token issuance (source unidentified)';
+      else purpose = `${incoming ? 'Transfer from' : 'Transfer to'} ${other}`;
     }
+    addFlow(section, purpose, x.address, incoming ? 'received' : 'spent', big(x.value));
   }
-  if (mints.size) {
-    console.log('  minted (bridge / reward / LP receipts):');
-    for (const [tok, [t, n]] of mints)
-      console.log(`    ${pad(amt(t), 14)} ${cyan(lbl(tok).padEnd(10))} (${n}x)`);
+  for (const s of autoSaved) {
+    const asset = savingAssets.get(s.saveToken);
+    if (!asset) throw new Error(`Underlying asset unavailable for savings vault ${s.saveToken}`);
+    addFlow('FUNDING', `Bridged in from ${chainName(s.externalChainId)}`, s.sourceToken, 'received', big(s.sourceAmount));
+    if (s.sourceToken !== asset) {
+      addFlow('ACTIVITY AND RESULTS', 'Swaps and conversions', s.sourceToken, 'spent', big(s.sourceAmount));
+      addFlow('ACTIVITY AND RESULTS', 'Swaps and conversions', asset, 'received', big(s.usdstAmount));
+    }
+    addFlow('ACTIVITY AND RESULTS', lbl(s.saveToken), asset, 'spent', big(s.usdstAmount));
   }
-  if (!deps.length && !origins.size && !mints.size) console.log('  (none)');
+  for (const [heading, groups] of sections) {
+    console.log(bold(`\n[ ${heading} - USD equivalents at current prices ]`));
+    const row = (value, description) => console.log(`  ${value.padEnd(42)} ${description}`);
+    if (heading === 'ACTIVITY AND RESULTS') {
+      console.log('  Cumulative flows, including reinvestment; net cash flow is not profit on open positions.');
+      const activityRow = (spent, received, net, description) =>
+        console.log(`  ${spent.padStart(24)}  ${received.padStart(24)}  ${net.padStart(25)}  ${description}`);
+      activityRow('Spent', 'Received', 'Net (+ gained / − spent)', 'Activity / token');
+      for (const [purpose, group] of groups) {
+        const description = purpose === 'Prediction markets' ? 'Prediction-market bets / payouts' : purpose;
+        let spentUSD = 0n, receivedUSD = 0n;
+        const priced = [...group.tokens.keys()].every((token) => prices.has(token));
+        for (const [token, amounts] of group.tokens) {
+          const value = (amount) => formatAmount(token, amount, false);
+          const net = amounts.received - amounts.spent;
+          activityRow(amounts.spent ? value(amounts.spent) : '—',
+            amounts.received ? value(amounts.received) : '—',
+            `${net < 0n ? '−' : '+'}${value(net < 0n ? -net : net)}`, `${description} / ${lbl(token)}`);
+          if (priced) {
+            spentUSD += amounts.spent * prices.get(token) / WAD;
+            receivedUSD += amounts.received * prices.get(token) / WAD;
+          }
+        }
+        if (group.tokens.size > 1) {
+          const net = receivedUSD - spentUSD;
+          activityRow(priced ? `$${fmt(spentUSD, 2)}` : 'USD unavailable',
+            priced ? `$${fmt(receivedUSD, 2)}` : 'USD unavailable',
+            priced ? `${net < 0n ? '−' : '+'}$${fmt(net < 0n ? -net : net, 2)}` : 'USD unavailable',
+            `${description} / total at current prices`);
+        }
+      }
+    } else {
+      for (const [purpose, group] of groups) {
+        for (const [token, amounts] of group.tokens) {
+          if (amounts.spent) row(formatAmount(token, amounts.spent),
+            heading === 'BRIDGE-OUTS' && purpose.startsWith('#') ? `Sent to bridge escrow — ${purpose}`
+            : `Spent on ${purpose}`);
+          if (amounts.received) row(formatAmount(token, amounts.received),
+            heading === 'FUNDING' || heading === 'BORROWING (must be repaid)' ? purpose : `Received from ${purpose}`);
+        }
+      }
+    }
+    if (!groups.size) console.log('  (none)');
+  }
 
   // ---- 3. activity timeline (everything touching the address)
   const byTx = new Map();
@@ -293,6 +474,10 @@ async function main() {
     if (x.from === ZERO && x.to === addr) e.hasMint = true;
   }
   for (const d of deps) { const e = byTx.get(d.transaction_hash); if (e) e.bridgeChain = d.externalChainId; }
+  for (const s of autoSaved) {
+    const e = entry(s.transaction_hash, s.block_timestamp, Number(s.block_number));
+    e.autoSaved = s;
+  }
 
   console.log(bold('\n[ ACTIVITY (chronological - everything touching the address) ]'));
   let shown = 0;
@@ -303,14 +488,17 @@ async function main() {
     const when = dim((e.ts || '').slice(0, 16));
     const tag = e.own ? dim(`#${String(e.nonce).padEnd(3)}`) : dim('  ↦ ');
     let label, wOverride;
-    if (e.own) {
-      label = (VERBS[e.func] || e.func).replace('{t}', lbl(e.to));
+    if (e.autoSaved) label = `BRIDGE-IN from ${chainName(e.autoSaved.externalChainId)} → savings`;
+    else if (e.own) {
+      label = (CONTRACT_VERBS[labels[e.to]]?.[e.func] || VERBS[e.func] || e.func).replace('{t}', lbl(e.to));
       const w = wreqByTx.get(e.hash);   // matched bridge-out: link to its withdrawal
-      if (w) { label = `BRIDGE-OUT #${w.withdrawalId} → ${chainName(w.destChainId)}`; wOverride = wStatus(w.withdrawalId); }
+      if (w) { label = `BRIDGE-OUT ${withdrawalLabel(w)} → ${chainName(w.destChainId)}`; wOverride = wStatus(w); }
     }
     else if (e.hasMint) label = e.bridgeChain ? `BRIDGE-IN from ${chainName(e.bridgeChain)}` : 'mint';
     else label = `transfer in from ${lbl([...e.sources][0] || '')}`;
-    const moves = renderMoves(e.moves, labels);
+    const moves = e.autoSaved
+      ? `${amt(big(e.autoSaved.sourceAmount))} ${lbl(e.autoSaved.sourceToken)} → ${amt(big(e.autoSaved.shares))} ${vaultShares.get(e.autoSaved.saveToken) || lbl(e.autoSaved.saveToken)} shares`
+      : renderMoves(e.moves, labels);
     let status;
     if (e.own && e.ok === false) status = red(`[FAILED: ${e.reason || 'reverted'}]`);
     else if (wOverride) status = wOverride.color(`[${wOverride.text}]`);
@@ -324,22 +512,61 @@ async function main() {
 
   // ---- 4. holdings
   console.log(bold('\n[ CURRENT HOLDINGS ]'));
+  const holdingRow = (value, description) => console.log(`  ${value.padEnd(42)} ${description}`);
   for (const b of bals.sort((a, c2) => big(c2.value) > big(a.value) ? 1 : -1))
-    console.log(`    ${pad(amt(big(b.value)), 16)} ${cyan(lbl(b.address))}`);
-  console.log(`    ${pad(fmt(gas, 6), 16)} gas (native)`);
+    holdingRow(formatAmount(b.address, big(b.value), true, vaultShares.get(b.address) || lbl(b.address)),
+      vaultShares.has(b.address) ? 'Savings / vault shares' : 'Wallet balance');
+  holdingRow(`${fmt(gas, 6)} gas`, 'Native gas balance');
+  if (positions.vaults.length) {
+    for (const v of positions.vaults) {
+      const scaledDebt = big(v.value.scaledDebt), rate = positions.rates.get(`${v.address}|${v.key2}`);
+      const debt = scaledDebt === 0n ? '0.00 USDST' : rate ? `${amt(scaledDebt * rate / RAY)} USDST` : 'unavailable';
+      holdingRow(formatAmount(v.key2, big(v.value.collateral)), 'Locked CDP collateral (still owned)');
+      holdingRow(debt, `CDP debt owed against ${lbl(v.key2)} (subtract from assets)`);
+    }
+  }
+  for (const s of positions.stakes)
+    holdingRow(formatAmount(positions.stakingTokens.get(s.address), big(s.value)), 'Staked (still owned)');
+  for (const u of positions.unbonding) {
+    const release = new Date(Number(u.value.releaseTime) * 1000);
+    holdingRow(formatAmount(positions.stakingTokens.get(u.address), big(u.value.amount)),
+      release.getTime() <= Date.now() ? 'Unstaked; ready to withdraw'
+      : `Unstaking; available ${release.toISOString().slice(0, 10)}`);
+  }
+  const predictionHoldings = positions.balances.filter((b) => {
+    const token = positions.tokens.get(b.address), market = positions.markets.get(token?.market);
+    const status = Number(market?.status);
+    return (status !== 2 && status !== 3) || typeof token?.isYes !== 'boolean' || token.isYes === (status === 2);
+  });
+  if (predictionHoldings.length) {
+    console.log('  Prediction tokens:');
+    for (const b of predictionHoldings) {
+      const token = positions.tokens.get(b.address), market = positions.markets.get(token?.market);
+      const status = Number(market?.status), balance = big(b.value);
+      let detail = 'payout unknown';
+      if (status === 1) detail = 'unresolved; payout unknown';
+      else if (status === 2 || status === 3) {
+        detail = typeof token?.isYes !== 'boolean' ? 'payout unknown' : `winning; payout ${amt(balance)} USDST`;
+      } else if (status === 4) detail = `voided; payout ${amt(balance / 2n)} USDST`;
+      if (status >= 2 && status <= 4 && Number(market.claimsOpenAt) * 1000 > Date.now()) detail += '; claims not open yet';
+      const expiry = market?.expiry ? ` (${new Date(Number(market.expiry) * 1000).toISOString().slice(0, 10)})` : '';
+      console.log(`    ${amt(balance)} ${token?.symbol || b.address}${expiry}: ${detail}`);
+    }
+  }
 
   // ---- 5. asking for
   console.log(bold('\n[ ASKING FOR - bridge-out withdrawals ]'));
   if (wreq.length) {
-    let outstanding = 0n;
+    const outstanding = new Map();
     for (const w of wreq) {
-      const id = w.withdrawalId;
-      const ws = wStatus(id);
-      if (!done.has(id) && !abort.has(id)) outstanding += big(w.stratoTokenAmount);
-      console.log(`    #${String(id).padEnd(4)} ${dim(w.block_timestamp.slice(0, 10))}  ` +
+      const ws = wStatus(w);
+      if (ws.text !== 'COMPLETED' && ws.text !== 'ABORTED')
+        outstanding.set(w.token, (outstanding.get(w.token) || 0n) + big(w.stratoTokenAmount));
+      console.log(`    ${withdrawalLabel(w).padEnd(5)} ${dim(w.block_timestamp.slice(0, 10))}  ` +
         `${pad(amt(big(w.stratoTokenAmount)), 12)} ${cyan(lbl(w.token).padEnd(8))} -> ${chainName(w.destChainId)}  ${ws.color(`[${ws.text}]`)}`);
     }
-    console.log(`    outstanding (not yet completed): ${outstanding > 0n ? yellow(amt(outstanding)) : amt(outstanding)}`);
+    console.log(`    outstanding (not yet completed): ${outstanding.size
+      ? [...outstanding].map(([token, amount]) => `${yellow(amt(amount))} ${lbl(token)}`).join(' + ') : '0.0000'}`);
   } else console.log('    (none)');
   console.log();
 }

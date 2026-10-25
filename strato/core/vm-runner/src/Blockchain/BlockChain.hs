@@ -48,7 +48,7 @@ import Blockchain.Data.ExecResults
 import Blockchain.Data.Transaction
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResultStatus
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
 import Blockchain.Forks (isReceiptsRootForkActive, isReplayProtectionForkActive, isStratoGasForkActive)
@@ -75,7 +75,7 @@ import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, Rever
 import Blockchain.VMContext
 import Blockchain.VMOut
 import Blockchain.Wiring ()
-import Control.Monad.Composable.NodeDB (tickNodeDB)
+import Control.Monad.Composable.StateDB (tickNodeDB)
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
@@ -176,7 +176,7 @@ addBlocks unfiltered = do
           when didReplaceBest' $ do
             $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
             nbb <- readIORef replacedBest
-            when (Conf.sqlDiff $ vmConfig ethConf) $
+            when (not flags_disableSqlIndexing && Conf.sqlDiff (vmConfig ethConf)) $
               timeit "calculateAndEmitStateDiffs" timerToUse $
                 calculateAndEmitStateDiffs srLog oldHeader
             emitOut . OutIndexEvent $ NewBestBlock nbb
@@ -247,7 +247,7 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             -- the header's receiptsRoot.
             let blockNum = number $ obBlockData b
             receiptsBytes <-
-              if isReceiptsRootForkActive blockNum
+              if not flags_disableSqlIndexing && isReceiptsRootForkActive blockNum
                 then traverse (fmap (rlpSerialize . rlpEncode) . txRunResultToReceipt) trrs
                 else pure []
             emitOut . OutIndexEvent $ RanBlock b receiptsBytes
@@ -312,7 +312,8 @@ addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = tr
 
   runPatches bd
 
-  emitOut . OutVMEvents =<< sendNewActionMessage b trrs
+  unless flags_disableCirrusIndexing $
+    emitOut . OutVMEvents =<< sendNewActionMessage b trrs
 
   timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   resetAddressStateTxDBMap
@@ -358,7 +359,8 @@ addTransactions blockData txs proposer =
     rewardResult <- payBlockRewards blockData proposer
     trrs <- Bagger.attachBlockRewards blockData rewardResult <$> go (getBlockGasLimit blockData) txs DL.empty
     mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
-    emitOut . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
+    unless flags_disableSqlIndexing $
+      emitOut . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
     pure trrs
   where
     go :: VMBase m =>
@@ -783,7 +785,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
           transactionResultDeletedStorage = "",
           transactionResultStatus = Just txrStatus
         }
-  emitOut . OutVMEvents . (txr:) $ if not (Conf.diffPublish $ vmConfig ethConf)
+  emitOut . OutVMEvents . (txr:) $ if flags_disableCirrusIndexing || not (Conf.diffPublish $ vmConfig ethConf)
     then []
     else case erAction <$> result of
       Right (Just act) -> extractCodeCollectionAddedMessages act

@@ -12,9 +12,11 @@ module Blockchain.Data.Transaction
   ( Transaction (..),
     isMessageTX,
     txAndTime2RawTX,
+    txAndTime2RawTXWithSigner,
     tx2RawTXAndTime,
     rawTX2TX,
     insertTX,
+    insertTXWithSigners,
     insertTX',
     insertTXIfNew,
     insertTXIfNew',
@@ -170,6 +172,10 @@ rawTX2TX rt = error $ "rawTX2TX: " ++ show rt
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
 txAndTime2RawTX origin tx blkNum time =
+  txAndTime2RawTXWithSigner (fromMaybe (Address (-1)) $ whoSignedThisTransaction tx) origin tx blkNum time
+
+txAndTime2RawTXWithSigner :: Address -> TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
+txAndTime2RawTXWithSigner signer origin tx blkNum time =
   case tx of
     MessageTX{..} ->
       RawTransaction time signer nonce gasLimit (Just to) (Just funcName) Nothing args network Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing txVersion (if B.null attribution then Nothing else Just attribution) Nothing
@@ -177,8 +183,6 @@ txAndTime2RawTX origin tx blkNum time =
       RawTransaction time signer nonce gasLimit Nothing Nothing (Just contractName) args network (Just code) chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing txVersion Nothing Nothing
     EthereumTX{..} ->
       RawTransaction time signer nonce gasLimit ethTo Nothing Nothing [] "" Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin (Just gasPrice) (Just value) (Just txData) txVersion Nothing (Just maxPriorityFeePerGas)
-  where
-    signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 
 tx2RawTXAndTime :: (MonadIO m) => TXOrigin -> Transaction -> m RawTransaction
 tx2RawTXAndTime origin tx = do
@@ -197,6 +201,12 @@ insertTX mode origin blockNum txs = do
   afterECRecover <- rawTXs `deepseq` liftIO (getTime Realtime)
   insertRawTX mode rawTXs
   return $ toNanoSecs $ afterECRecover - beforeECRecover
+
+insertTXWithSigners :: HasSQLDB m => DebugMode -> TXOrigin -> Maybe Integer -> [(Address, Transaction)] -> m ()
+insertTXWithSigners mode origin blockNum txs = do
+  time <- liftIO getCurrentTime
+  insertRawTX mode
+    [txAndTime2RawTXWithSigner signer origin tx (fromMaybe (-1) blockNum) time | (signer, tx) <- txs]
 
 insertTXIfNew' ::
   MonadUnliftIO m =>

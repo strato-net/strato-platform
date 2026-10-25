@@ -25,7 +25,7 @@ import qualified Blockchain.Data.DataDefs as DD
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResult ()
-import Blockchain.Database.MerklePatricia (StateRoot (..))
+import Blockchain.Strato.Model.StateRoot (StateRoot (..))
 import Blockchain.Model.WrappedBlock (OutputBlock (..), OutputTx (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class

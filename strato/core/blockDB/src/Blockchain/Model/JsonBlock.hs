@@ -15,6 +15,8 @@ module Blockchain.Model.JsonBlock (
   rtToRtPrime,
   rtToRtPrime',
   blockDataRefToBlock,
+  getBlocksSql,
+  getBlockSql,
   asrToAsrPrime
   ) where
 
@@ -23,6 +25,7 @@ import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
+import           Control.Monad.IO.Class (MonadIO)
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class        (blockHeaderHash)
 import           Blockchain.Strato.Model.ExtendedWord (word256ToBytes)
@@ -36,6 +39,9 @@ import           Data.Aeson
 import           Data.Aeson.Types                     (Parser)
 import qualified Data.ByteString                      as B
 import           Data.Maybe
+import qualified Data.Map.Strict as M
+import qualified Database.Esqueleto.Legacy as E
+import qualified Database.Persist.Sql as SQL
 import           Control.Lens.Operators ((&), (.~), (?~))
 import           Data.OpenApi                         hiding (format)
 import           Data.Proxy
@@ -752,3 +758,33 @@ transactionSemantics _ = Contract
 rawTransactionSemantics :: RawTransaction -> TransactionType
 rawTransactionSemantics RawTransaction{..} | isJust rawTransactionCode = Contract
 rawTransactionSemantics _ = FunctionCall
+
+getBlockSql :: MonadIO m => Keccak256 -> SQL.SqlPersistT m (Maybe Block)
+getBlockSql sha = listToMaybe <$> getBlocksSql [BlockDataRefHash SQL.==. sha]
+
+getBlocksSql :: MonadIO m => [SQL.Filter BlockDataRef] -> SQL.SqlPersistT m [Block]
+getBlocksSql filters = do
+  blocks <- SQL.selectList filters [SQL.Asc BlockDataRefNumber, SQL.Asc BlockDataRefId]
+  let ids = map SQL.entityKey blocks
+      groupByBlock key = M.fromListWith (flip (++)) . map (\row -> (key (SQL.entityVal row), [SQL.entityVal row]))
+      rowsFor key rows = M.findWithDefault [] key rows
+  if null blocks then return [] else do
+    validators <- groupByBlock blockValidatorRefBlockDataRefId <$> SQL.selectList
+      [BlockValidatorRefBlockDataRefId SQL.<-. ids] [SQL.Asc BlockValidatorRefId]
+    deltas <- groupByBlock validatorDeltaRefBlockDataRefId <$> SQL.selectList
+      [ValidatorDeltaRefBlockDataRefId SQL.<-. ids] [SQL.Asc ValidatorDeltaRefId]
+    proposals <- groupByBlock proposalSignatureRefBlockDataRefId <$> SQL.selectList
+      [ProposalSignatureRefBlockDataRefId SQL.<-. ids] [SQL.Asc ProposalSignatureRefId]
+    signatures <- groupByBlock commitmentSignatureRefBlockDataRefId <$> SQL.selectList
+      [CommitmentSignatureRefBlockDataRefId SQL.<-. ids] [SQL.Asc CommitmentSignatureRefId]
+    stakes <- groupByBlock blockStakeRefBlockDataRefId <$> SQL.selectList
+      [BlockStakeRefBlockDataRefId SQL.<-. ids] [SQL.Asc BlockStakeRefId]
+    txRows <- E.select $ E.from $ \(btx `E.InnerJoin` tx) -> do
+      E.on (tx E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction)
+      E.where_ $ btx E.^. BlockTransactionBlockDataRefId `E.in_` E.valList ids
+      E.orderBy [E.asc (btx E.^. BlockTransactionId)]
+      return (btx E.^. BlockTransactionBlockDataRefId, tx)
+    let txs = M.fromListWith (flip (++)) [(E.unValue key, [rawTX2TX (SQL.entityVal tx)]) | (key, tx) <- txRows]
+    return [blockDataRefToBlock (SQL.entityVal row) (rowsFor key validators) (rowsFor key deltas)
+              (rowsFor key proposals) (rowsFor key signatures) (rowsFor key stakes) (rowsFor key txs)
+           | row <- blocks, let key = SQL.entityKey row]

@@ -23,7 +23,6 @@ import rewardsRoutes from "./routes/rewards.routes";
 import protocolFeeRoutes from "./routes/protocolFee.routes";
 import rpcRoutes from "./routes/rpc.routes";
 import referRoutes from "./routes/refer.routes";
-import vaultRoutes from "./routes/vault.routes";
 import onrampRoutes from "./routes/onramp.routes";
 import metalForgeRoutes from "./routes/metalForge.routes";
 import earnRoutes from "./routes/earn.routes";
@@ -93,7 +92,6 @@ router.use("/protocol-fees", protocolFeeRoutes);
 router.use("/refer", referRoutes);
 
 // ----- Vault Routes -----
-router.use("/vault", vaultRoutes);
 
 // ----- Onramp Routes -----
 router.use("/onramp", onrampRoutes);

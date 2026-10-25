@@ -42,7 +42,8 @@ library
       src/
   ghc-options: -Wall -O2 -fexpose-all-unfoldings -fspecialise-aggressively
   build-depends:
-      aeson
+      accountdb-monad
+    , aeson
     , base
     , binary
     , binary-instances
@@ -71,22 +72,20 @@ library
     , lens
     , leveldb-haskell
     , lrucache
-    , merkle-patricia-db
     , monad-alter
     , mtl
     , nibblestring
-    , nodedb-monad
     , ordered-containers
-    , persistent-sqlite
     , prometheus-client
     , quickcheck-instances
+    , redis-monad
     , resourcet
     , seqevents
     , solid-vm-model
+    , statedb-monad
     , store
     , strato-conf
     , strato-model
-    , strato-redis-blockdb
     , strato-statediff
     , streaming
     , text
@@ -124,10 +123,10 @@ test-suite contextm-test
     , ethereum-rlp
     , hflags
     , hspec
-    , merkle-patricia-db
     , ordered-containers
     , quickcheck-instances
     , solid-vm-model
+    , statedb-monad
     , strato-conf
     , strato-model
     , text

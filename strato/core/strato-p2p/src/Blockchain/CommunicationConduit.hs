@@ -82,7 +82,7 @@ handleMsgClientConduit ::
 handleMsgClientConduit myId peer = do
   $logDebugS "handleMsgClientConduit" "<waving hand emoji>"
 
-  lift $ clearAllSyncTasks $ pPeerHost peer
+  lift clearAllSyncTasks
 
   yield $
     Right
@@ -136,7 +136,7 @@ handleMsgServerConduit ::
 handleMsgServerConduit myPubkey peer = do
   $logDebugS "handleMsgServerConduit" "about to parse message"
 
-  lift $ clearAllSyncTasks $ pPeerHost peer
+  lift clearAllSyncTasks
 
   -- This connection is past its handshake and counted, so the limit is the
   -- number of established peers.
@@ -226,7 +226,7 @@ startSyncTask peer peerBest = do
         then syncFetchTask syncTask fetchNumber
         else do
           $logInfoS "startSyncTask" $ T.pack $ "sync task chiliad higher than world highest block (#" ++ show peerBest ++ "), marking the new chiliad as 'NotReady'"
-          lift $ setSyncTaskNotReady (pPeerHost peer)
+          lift setSyncTaskNotReady
 
 assertHandshake ::
   (MonadLogger m, MonadIO m) =>

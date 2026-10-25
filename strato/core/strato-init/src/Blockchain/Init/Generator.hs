@@ -16,7 +16,7 @@ import Blockchain.Init.DockerCompose
 import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer)
+import Blockchain.Init.Options (flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer, flags_disableSqlIndexing, flags_disableCirrusIndexing, flags_syncFromFile)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -140,6 +140,8 @@ createCommandsFile role = do
       , restartable "strato-p2p +RTS -T -RTS"
       , "strato-sequencer " ++ sequencerRts ++ followerFlag
       , "vm-runner " ++ vmRunnerRts
+          ++ (if flags_disableSqlIndexing then " --disableSqlIndexing" else "")
+          ++ (if flags_disableCirrusIndexing then " --disableCirrusIndexing" else "")
       , restartable ("strato-indexer" ++ indexerFlags)
       ]
       -- Cirrus serves the API; a validator has none to serve.
@@ -181,6 +183,11 @@ rtsWithOverride envVar computed = do
 mkFilesAndGenesis :: (MonadUnliftIO m, MonadFail m) =>
                      FilePath -> Bool -> String -> m ()
 mkFilesAndGenesis nodeDir hasFlags network = do
+  replaySource <- liftIO $ if null flags_syncFromFile
+    then pure Nothing
+    else do
+      source <- canonicalizePath flags_syncFromFile
+      pure $ Just source
   -- Create node directory and cd to it
   liftIO $ do
     createDirectoryIfMissing True nodeDir
@@ -210,6 +217,10 @@ mkFilesAndGenesis nodeDir hasFlags network = do
   unless (nodeExists && not flags_regenerate) $ do
     let role = currentRole
     liftIO $ putStrLn $ "Setting up STRATO " ++ roleName role ++ ": " ++ nodeDir
+    unless nodeExists $ liftIO $ mapM_ (\source -> do
+      exists <- doesFileExist source
+      unless exists $ fail $ "Replay block file not found: " ++ source
+      createFileLink source "replay.blocks") replaySource
     liftIO $ putStrLn $ "  Network: " ++ network
 
     when (role == RoleValidator && flags_localAuth) $ liftIO $

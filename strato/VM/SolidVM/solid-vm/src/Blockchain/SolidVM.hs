@@ -39,7 +39,7 @@ import Blockchain.Data.ExecResults
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import Blockchain.Data.Util (integer2Bytes)
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Forks (isEmitArgForkActive)
 import BlockApps.Solidity.ABI.Bridge (encodeEventToLogValues)
 import BlockApps.Solidity.ABI.Codec (abiDecode)
@@ -476,28 +476,7 @@ call' from to' fnCalltype functionName valList = do
   unless (maybe False ((storageAddress ==) . currentAddress) currentCall) $
     initializeAction storageAddress
 
-  let lookupFunction name
-        | name == "<constructor>" = Just $ fromMaybe emptyFunction (contract ^. CC.constructor)
-        | otherwise = M.lookup name (contract ^. CC.functions)
-        where
-          emptyFunction = CC.Func [] [] Nothing (Just []) Nothing False Nothing M.empty [] dummyAnnotation False []
-          dummyAnnotation :: SourceAnnotation ()
-          dummyAnnotation =
-            SourceAnnotation
-              { _sourceAnnotationStart =
-                  SourcePosition
-                    { _sourcePositionName = "",
-                      _sourcePositionLine = 0,
-                      _sourcePositionColumn = 0
-                    },
-                _sourceAnnotationEnd =
-                  SourcePosition
-                    { _sourcePositionName = "",
-                      _sourcePositionLine = 0,
-                      _sourcePositionColumn = 0
-                    },
-                _sourceAnnotationAnnotation = ()
-              }
+  let lookupFunction name = M.lookup name (contract ^. CC.functions)
 
   let functionName' =
         case fnCalltype of
@@ -523,6 +502,10 @@ call' from to' fnCalltype functionName valList = do
       resolveArgs shouldResolve theFunction args
         | shouldResolve = resolveArgRefs from contract cc (CC._funcArgs theFunction) args
         | otherwise     = pure args
+
+  let isConstructorName n = T.strip (T.takeWhile (/= '(') (labelToText n)) == "<constructor>"
+  when (any isConstructorName [functionName, functionName']) $
+    unknownFunction "constructor cannot be called on a deployed contract" (functionName, valList)
 
   f <- (nullifyRefs =<<) <$> case (lookupFunction functionName', fnCalltype) of
       -- Standard contract call

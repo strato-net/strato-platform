@@ -7,11 +7,9 @@
 module BlockApps.Tools.FRawMP where
 
 import Blockchain.Data.RLP
-import qualified Blockchain.Database.MerklePatricia as MP
-import qualified Blockchain.Database.MerklePatricia.Map as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Control.Monad (void)
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader
 import qualified Database.LevelDB as DB
 import SolidVM.Model.Storable
 import Text.Format
@@ -19,7 +17,7 @@ import Text.Format
 doit :: String -> MP.StateRoot -> IO ()
 doit filename sr = void . DB.runResourceT $ do
   sdb <- DB.open filename DB.defaultOptions {DB.cacheSize = 1024}
-  runReaderT (MP.map f sr) sdb
+  MP.runStateDBOn sdb (MP.forEachKeyVal f sr)
   where
     --f k v = liftIO $ putStrLn $ displayS (renderPretty 1.0 200 $ formatKV k v) ""
     f k v = liftIO $ putStrLn $ formatKV k v

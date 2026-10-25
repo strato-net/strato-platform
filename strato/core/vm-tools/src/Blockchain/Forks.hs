@@ -76,7 +76,7 @@ heliumStakingForkBlock :: Integer
 heliumStakingForkBlock = 300000
 
 upquarkStakingForkBlock :: Integer
-upquarkStakingForkBlock = 1000000
+upquarkStakingForkBlock = 2000000
 
 isBlockRewardReceiptForkActive :: Integer -> Bool
 isBlockRewardReceiptForkActive blockNum =
