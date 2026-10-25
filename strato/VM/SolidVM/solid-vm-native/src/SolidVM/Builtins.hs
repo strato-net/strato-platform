@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, OverloadedStrings, LambdaCase, CPP #-}
+{-# LANGUAGE GADTs, OverloadedStrings, LambdaCase, CPP, DataKinds, TypeOperators #-}
 -- Builtins are ordinary actions. Selection happens while compiling the call.
 module SolidVM.Builtins where
 
@@ -6,11 +6,16 @@ import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import Blockchain.Data.Util (integer2Bytes)
 import qualified Blockchain.SolidVM.Exception as E
+import qualified Blockchain.SolidVM.Builtins as Crypto
+import Blockchain.SolidVM.GasInfo
+import Blockchain.Strato.Model.Gas (Gas (..))
 import Blockchain.Strato.Model.Address (Address (..), unAddress)
 import Blockchain.Strato.Model.ExtendedWord (word160ToBytes)
 import Blockchain.Strato.Model.Keccak256
 import Control.Exception (throwIO)
 import Control.Monad.Reader
+import qualified Crypto.Hash.SHA256 as SHA256
+import qualified Crypto.Hash.RIPEMD160 as RIPEMD160
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
@@ -161,6 +166,127 @@ keccak :: [Dyn] -> M Dyn
 keccak ds = case flatten ds of
   [Dyn TBytes bs] -> pure (Dyn TBytes (keccak256ToByteString (hash bs)))
   xs -> pure (Dyn TStr (T.pack (keccak256ToHex (hash (rlpSerialize (encodeValues xs))))))
+
+digest :: (B.ByteString -> B.ByteString) -> [Dyn] -> M Dyn
+digest hashBytes ds = pure $ case flatten ds of
+  [Dyn TBytes bs] -> Dyn TBytes (hashBytes bs)
+  xs -> Dyn TStr (TE.decodeUtf8 (B16.encode (hashBytes (rlpSerialize (encodeValues xs)))))
+
+sha256, ripemd160 :: [Dyn] -> M Dyn
+sha256 = digest SHA256.hash
+ripemd160 = digest RIPEMD160.hash
+
+cryptoResult :: Ty a -> T.Text -> [Dyn] -> Either String a -> M Dyn
+cryptoResult ty name ds = either (\message -> bad (name <> ": " <> T.pack message) ds) (pure . Dyn ty)
+
+chargeCrypto :: Gas -> M ()
+chargeCrypto (Gas amount) = chargeGas amount
+
+chargeCryptoBlocks :: Gas -> Gas -> Int -> Int -> M ()
+chargeCryptoBlocks base perBlock blockSize size =
+  chargeCrypto (base + perBlock * fromIntegral ((size + blockSize - 1) `div` blockSize))
+
+cryptoBytes :: T.Text -> Gas -> (B.ByteString -> Either String B.ByteString) -> [Dyn] -> M Dyn
+cryptoBytes name gas action ds = case flatten ds of
+  [Dyn TBytes bs] -> chargeCrypto gas >> cryptoResult TBytes name ds (action bs)
+  xs -> bad name xs
+
+blsDecompressG1, blsDecompressG2, blsMapFpToG1, blsMapFp2ToG2 :: [Dyn] -> M Dyn
+blsDecompressG1 = cryptoBytes "bls12381DecompressG1" gasBlsDecompressG1 Crypto.decompressG1
+blsDecompressG2 = cryptoBytes "bls12381DecompressG2" gasBlsDecompressG2 Crypto.decompressG2
+blsMapFpToG1 = cryptoBytes "bls12381MapFpToG1" gasBlsMapFpToG1 Crypto.mapFpToG1
+blsMapFp2ToG2 = cryptoBytes "bls12381MapFp2ToG2" gasBlsMapFp2ToG2 Crypto.mapFp2ToG2
+
+blsHashToCurve :: T.Text -> Gas -> (B.ByteString -> B.ByteString -> Either String B.ByteString) -> [Dyn] -> M Dyn
+blsHashToCurve name gas action ds = case flatten ds of
+  [Dyn TBytes message, Dyn TBytes dst] -> do
+    chargeCryptoBlocks (2 * gas) 100 32 (B.length message)
+    cryptoResult TBytes name ds (action message dst)
+  xs -> bad name xs
+
+blsHashToCurveG1, blsHashToCurveG2 :: [Dyn] -> M Dyn
+blsHashToCurveG1 = blsHashToCurve "bls12381HashToCurveG1" gasBlsMapFpToG1 Crypto.hashToCurveG1
+blsHashToCurveG2 = blsHashToCurve "bls12381HashToCurveG2" gasBlsMapFp2ToG2 Crypto.hashToCurveG2
+
+integerValues :: [Dyn] -> [Dyn]
+integerValues [Dyn (TArr ty) xs] = map (Dyn ty) (toList xs)
+integerValues [Dyn TWireArray xs] = xs
+integerValues ds = flatten ds
+
+integerArgs :: [Dyn] -> M [Integer]
+integerArgs = traverse value . integerValues
+  where
+    value :: Dyn -> M Integer
+    value (Dyn TInt n) = pure n
+    value (Dyn TUnit ()) = pure 0
+    value (Dyn (TRef _) _) = pure 0
+    value d = bad "expected an integer" [d]
+
+pointG1 :: (Integer, Integer) -> Dyn
+pointG1 (x, y) = Dyn (TTuple (FCons "" TInt (FCons "" TInt FNil))) (x :* y :* HNil)
+
+pointG2 :: ((Integer, Integer), (Integer, Integer)) -> Dyn
+pointG2 ((xc0, xc1), (yc0, yc1)) =
+  Dyn (TTuple (FCons "" TInt (FCons "" TInt (FCons "" TInt (FCons "" TInt FNil))))) (xc0 :* xc1 :* yc0 :* yc1 :* HNil)
+
+blsG1Add, blsG2Add :: [Dyn] -> M Dyn
+blsG1Add ds = case flatten ds of
+  [Dyn TBytes _] -> cryptoBytes "bls12381G1Add" gasBlsG1Add Crypto.bls12381G1Add ds
+  xs -> do
+    chargeCrypto gasBlsG1Add
+    values <- integerArgs xs
+    case values of
+      [x1, y1, x2, y2] -> pure $ pointG1 (Crypto.bls12381G1AddInts (x1, y1) (x2, y2))
+      _ -> bad "bls12381G1Add expects four integers" xs
+blsG2Add ds = case flatten ds of
+  [Dyn TBytes _] -> cryptoBytes "bls12381G2Add" gasBlsG2Add Crypto.bls12381G2Add ds
+  xs -> do
+    chargeCrypto gasBlsG2Add
+    values <- integerArgs xs
+    case values of
+      [a, b, c, d, e, f, g, h] -> pure $ pointG2 (Crypto.bls12381G2AddInts ((a, b), (c, d)) ((e, f), (g, h)))
+      _ -> bad "bls12381G2Add expects eight integers" xs
+
+blsG1Msm, blsG2Msm, blsPairing :: [Dyn] -> M Dyn
+blsG1Msm ds = case flatten ds of
+  [Dyn TBytes bs] -> do
+    chargeCryptoBlocks 0 gasBlsG1MsmPerTerm 160 (B.length bs)
+    cryptoResult TBytes "bls12381G1Msm" ds (Crypto.bls12381G1Msm bs)
+  xs -> do
+    chargeCryptoBlocks 0 gasBlsG1MsmPerTerm 3 (length (integerValues xs))
+    values <- integerArgs xs
+    terms <- triples values
+    pure $ pointG1 (Crypto.bls12381G1MsmInts terms)
+  where
+    triples [] = pure []
+    triples (x:y:k:rest) = ((x, y, k) :) <$> triples rest
+    triples _ = bad "bls12381G1Msm expects triples" ds
+blsG2Msm ds = case flatten ds of
+  [Dyn TBytes bs] -> do
+    chargeCryptoBlocks 0 gasBlsG2MsmPerTerm 288 (B.length bs)
+    cryptoResult TBytes "bls12381G2Msm" ds (Crypto.bls12381G2Msm bs)
+  xs -> do
+    chargeCryptoBlocks 0 gasBlsG2MsmPerTerm 5 (length (integerValues xs))
+    values <- integerArgs xs
+    terms <- quintuples values
+    pure $ pointG2 (Crypto.bls12381G2MsmInts terms)
+  where
+    quintuples [] = pure []
+    quintuples (a:b:c:d:k:rest) = ((((a, b), (c, d)), k) :) <$> quintuples rest
+    quintuples _ = bad "bls12381G2Msm expects groups of five integers" ds
+blsPairing ds = case flatten ds of
+  [Dyn TBytes bs] -> do
+    chargeCryptoBlocks gasBlsPairingBase gasBlsPairingPerPair 384 (B.length bs)
+    cryptoResult TBool "bls12381Pairing" ds (Crypto.bls12381Pairing bs)
+  xs -> do
+    chargeCryptoBlocks gasBlsPairingBase gasBlsPairingPerPair 6 (length (integerValues xs))
+    values <- integerArgs xs
+    terms <- pairs values
+    pure $ Dyn TBool (Crypto.bls12381PairingInts terms)
+  where
+    pairs [] = pure []
+    pairs (a:b:c:d:e:f:rest) = (((a, b), ((c, d), (e, f))) :) <$> pairs rest
+    pairs _ = bad "bls12381Pairing expects groups of six integers" ds
 
 encodeValues :: [Dyn] -> RLPObject
 encodeValues [d] = encodeValue d

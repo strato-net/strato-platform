@@ -95,6 +95,8 @@ tests:
     ghc-options: -O2 -threaded -rtsopts
     dependencies:
       - blockapps-data
+      - bytestring
+      - cryptohash
       - common-log
       - composable-monads-base
       - hflags

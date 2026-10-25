@@ -1396,6 +1396,15 @@ compileCall sc callee args = case callee of
       EMIT_BEGIN (fmap (keccak256ToByteString . hash) . compiled_0)
       EMIT_END)
     _ -> builtinCall TStr "keccak256"
+  S.Variable _ n | n `elem` ["sha256", "ripemd160"] -> case args of
+    [x] | Right (CE TBytes _) <- compileE sc x -> builtinCall TBytes n
+    _ -> builtinCall TStr n
+  S.Variable _ n | n `elem` ["bls12381DecompressG1", "bls12381DecompressG2", "bls12381MapFpToG1", "bls12381MapFp2ToG2", "bls12381HashToCurveG1", "bls12381HashToCurveG2"] -> builtinCall TBytes n
+  S.Variable _ n | n `elem` ["bls12381G1Add", "bls12381G1Msm", "bls12381G2Add", "bls12381G2Msm"] -> case args of
+    [x] | Right (CE TBytes _) <- compileE sc x -> builtinCall TBytes n
+    _ | n `elem` ["bls12381G1Add", "bls12381G1Msm"] -> builtinCall (TTuple (FCons "" TInt (FCons "" TInt FNil))) n
+      | otherwise -> builtinCall (TTuple (FCons "" TInt (FCons "" TInt (FCons "" TInt (FCons "" TInt FNil))))) n
+  S.Variable _ "bls12381Pairing" -> builtinCall TBool "bls12381Pairing"
   S.Variable _ n | n `elem` ["create", "create2", "ecrecover"] -> builtinCall TAddr n
   S.Variable _ n | n `elem` ["addmod", "mulmod"] -> builtinCall TInt n
   S.Variable _ "selfdestruct" -> builtinCall TBool "selfdestruct"

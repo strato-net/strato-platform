@@ -14,6 +14,9 @@ import Blockchain.VMOptions ()
 import Blockchain.Strato.Model.Options ()
 import Blockchain.Wiring ()
 import Control.Lens
+import qualified Data.ByteString as B
+import qualified Crypto.Hash.SHA256 as SHA256
+import qualified Crypto.Hash.RIPEMD160 as RIPEMD160
 import Control.Monad
 import Control.Monad.Composable.Base (runEff)
 import Control.Monad.IO.Class
@@ -229,6 +232,27 @@ source = T.unlines
   , "}"
   , "contract NativeEventBase { event ParentEvent(uint value); function hook() internal virtual returns (uint) { return 3; } function parentCall() internal returns (uint) { uint value = hook(); emit ParentEvent(value); return value; } function parentMetadata(uint value) internal returns (string) { return keccak256(msg.sig, msg.data); } }"
   , "contract NativeEventDerived is NativeEventBase { function hook() internal override returns (uint) { return 5; } function runParent() public returns (uint) { return super.parentCall(); } function runMetadata(uint value) public returns (string) { return super.parentMetadata(value + 1); } }"
+  , "contract NativeCryptoProbe {"
+  , " function decompressG1(bytes input) public returns (bytes) { return bls12381DecompressG1(input); }"
+  , " function decompressG2(bytes input) public returns (bytes) { return bls12381DecompressG2(input); }"
+  , " function sha(bytes input) public returns (bytes) { return sha256(input); }"
+  , " function ripemd(bytes input) public returns (bytes) { return ripemd160(input); }"
+  , " function shaString() public returns (string) { return sha256(\"abc\", uint(7)); }"
+  , " function addG1(bytes input) public returns (bytes) { return bls12381G1Add(input); }"
+  , " function addG2(bytes input) public returns (bytes) { return bls12381G2Add(input); }"
+  , " function msmG1(bytes input) public returns (bytes) { return bls12381G1Msm(input); }"
+  , " function msmG2(bytes input) public returns (bytes) { return bls12381G2Msm(input); }"
+  , " function pairing(bytes input) public returns (bool) { return bls12381Pairing(input); }"
+  , " function mapG1(bytes input) public returns (bytes) { return bls12381MapFpToG1(input); }"
+  , " function mapG2(bytes input) public returns (bytes) { return bls12381MapFp2ToG2(input); }"
+  , " function hashG1(bytes input, bytes dst) public returns (bytes) { return bls12381HashToCurveG1(input, dst); }"
+  , " function hashG2(bytes input, bytes dst) public returns (bytes) { return bls12381HashToCurveG2(input, dst); }"
+  , " function addG1Ints() public returns (variadic) { return bls12381G1Add(0,0,0,0); }"
+  , " function addG2Ints() public returns (variadic) { return bls12381G2Add(0,0,0,0,0,0,0,0); }"
+  , " function msmG1Ints() public returns (variadic) { return bls12381G1Msm([0,0,1]); }"
+  , " function msmG2Ints() public returns (variadic) { return bls12381G2Msm([0,0,0,0,1]); }"
+  , " function pairingInts() public returns (bool) { return bls12381Pairing([0,0,0,0,0,0]); }"
+  , "}"
   , "contract NativeVaultAsset { mapping(address => uint) public balanceOf; constructor() { balanceOf[address(0xabc)] = 1000; } function transfer(address to, uint amount) public returns (bool) { balanceOf[msg.sender] -= amount; balanceOf[to] += amount; return true; } function transferFrom(address from, address to, uint amount) public returns (bool) { balanceOf[from] -= amount; balanceOf[to] += amount; return true; } }"
   ]
 
@@ -267,7 +291,7 @@ main = do
   vaultSource <- traverse T.readFile =<< lookupEnv "SOLIDVM_VAULT_SOURCE"
   rewardsSource <- traverse T.readFile =<< lookupEnv "SOLIDVM_REWARDS_SOURCE"
   void $ runEff . runLogging . runMemContextM (const $ pure Nothing) Nothing $ do
-    forM_ [(0x2000, "NativeProbe"), (0x2001, "NativeDelegateProbe"), (0x2002, "FallbackProbe"), (0x2003, "NativeStore"), (0x2004, "NativeProxy"), (0x2005, "NativeNamedCaller"), (0x2006, "CN4"), (0x2007, "Exploit2"), (0x2008, "NativeLegacyProbe")] $ \(addr, name) -> do
+    forM_ [(0x2000, "NativeProbe"), (0x2001, "NativeDelegateProbe"), (0x2002, "FallbackProbe"), (0x2003, "NativeStore"), (0x2004, "NativeProxy"), (0x2005, "NativeNamedCaller"), (0x2006, "CN4"), (0x2007, "Exploit2"), (0x2008, "NativeLegacyProbe"), (0x200a, "NativeCryptoProbe")] $ \(addr, name) -> do
       let ctorArgs = if name == "NativeProxy" then ["0x0000000000000000000000000000000000002000"] else []
       result <- create $ def & createNewAddress .~ addr & createContractName .~ name & createCode .~ Code source & createArgs . argsArgs .~ ctorArgs
       liftIO $ check result
@@ -286,6 +310,33 @@ main = do
         expect addr name args value = do
           result <- invoke addr name args
           observe name (Just value) result
+    let zeroBytes count = "hex\"" <> T.replicate count "00" <> "\""
+        infinity count = "hex\"c0" <> T.replicate (count - 1) "00" <> "\""
+        zeroPoint count = SBytes (B.replicate count 0)
+    expect 0x200a "decompressG1" [infinity 48] (zeroPoint 128)
+    expect 0x200a "decompressG2" [infinity 96] (zeroPoint 256)
+    expect 0x200a "sha" ["hex\"616263\""] (SBytes (SHA256.hash "abc"))
+    expect 0x200a "ripemd" ["hex\"616263\""] (SBytes (RIPEMD160.hash "abc"))
+    expect 0x200a "shaString" [] (SString "f97826e7dd376e553808f9edc7d8cf250868d420e33e75d67b4a377db37efaf9")
+    forM_ [("addG1", 256, 128), ("addG2", 512, 256), ("msmG1", 160, 128), ("msmG2", 288, 256)] $ \(name, inputSize, outputSize) ->
+      expect 0x200a name [zeroBytes inputSize] (zeroPoint outputSize)
+    expect 0x200a "pairing" [zeroBytes 384] (SBool True)
+    expect 0x200a "pairingInts" [] (SBool True)
+    forM_ [("addG1Ints", 2), ("addG2Ints", 4), ("msmG1Ints", 2), ("msmG2Ints", 4)] $ \(name, count) ->
+      expect 0x200a name [] (STuple $ fromList (replicate count (Constant $ SInteger 0)))
+    forM_ [("mapG1", [zeroBytes 64], 128), ("mapG2", [zeroBytes 128], 256), ("hashG1", ["hex\"616263\"", "hex\"445354\""], 128), ("hashG2", ["hex\"616263\"", "hex\"445354\""], 256)] $ \(name, args, size) -> do
+      result <- invoke 0x200a name args
+      case erReturnVal result of
+        Just (SBytes bytes) | B.length bytes == size && B.any (/= 0) bytes -> pure ()
+        _ -> liftIO $ throwIO $ userError ("invalid curve result from " ++ T.unpack name)
+    forM_ [("decompressG1", "hex\"00\""), ("decompressG2", "hex\"00\""), ("msmG1", zeroBytes 159), ("msmG2", zeroBytes 287), ("pairing", zeroBytes 383)] $ \(name, input) -> do
+      result <- call $ def & callCodeAddress .~ 0x200a & callFuncName .~ name & callArgs . argsArgs .~ [input]
+      when (erException result == Nothing) $ liftIO $ throwIO $ userError ("expected rejection from " ++ T.unpack name)
+    forM_ [(4999, False), (10000, True)] $ \(limit, succeeds) -> do
+      Mod.put (Mod.Proxy :: Mod.Proxy GasCap) (GasCap (Gas limit))
+      result <- call $ def & callCodeAddress .~ 0x200a & callFuncName .~ "decompressG1" & callArgs . argsArgs .~ [infinity 48]
+      unless ((erException result == Nothing) == succeeds) $ liftIO $ throwIO $ userError "decompression gas limit was not enforced"
+    Mod.put (Mod.Proxy :: Mod.Proxy GasCap) (GasCap (Gas 100000000))
     expect 0x2000 "sum" ["10"] (SInteger 45)
     expect 0x2000 "nested" ["10"] (SInteger 45)
     expect 0x2000 "named" [] (SInteger 17)

@@ -53,6 +53,7 @@ library
     , bytestring
     , common-log
     , containers
+    , cryptohash
     , data-default
     , ethereum-rlp
     , evm-solidity
@@ -111,8 +112,10 @@ test-suite solid-vm-native-check
   build-depends:
       base
     , blockapps-data
+    , bytestring
     , common-log
     , composable-monads-base
+    , cryptohash
     , hflags
     , lens
     , monad-alter
