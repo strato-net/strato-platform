@@ -406,7 +406,7 @@ generateDockerCompose role = do
         [ "core-api" | not (roleRunsApi role) ]
         ++ [ "nginx" | not (hasService "nginx") ]
         ++ [ "apex" | not (hasService "apex") ]
-        ++ [ "slipstream" | not (roleIndexesSql role) ]
+        ++ [ "slipstream" | not (roleRunsCirrus role) ]
         ++ [ "strato-ingest" | role /= RoleCore ]
 
   let prometheus = def

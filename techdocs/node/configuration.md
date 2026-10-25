@@ -163,15 +163,15 @@ What runs:
 
 | Host processes | Containers |
 |---|---|
-| `ethereum-discover`, `strato-p2p`, `strato-sequencer`, `vm-runner`, `strato-indexer --sql=false`, `strato-network-monitor`, `strato-logrotate` | `postgres`, `redis`, `prometheus`, `apex` |
+| `ethereum-discover`, `strato-p2p`, `strato-sequencer`, `vm-runner`, `strato-indexer`, `strato-network-monitor`, `strato-logrotate` | `postgres`, `redis`, `prometheus`, `apex` |
 
-What doesn't: the app, SMD, nginx, PostgREST, Swagger docs, `slipstream` (so no `cirrus` database, which is most of a full node's disk), `strato-api` and `ethereum-jsonrpc`. The indexer keeps only the Redis block index that `strato-p2p` serves peers from, so the `eth` database holds nothing but the peer tables. `vm-runner` neither mirrors state into SQL nor publishes the `vmevents` stream: nothing would read it, and JLog only trims what a reader has passed.
+What doesn't: the app, SMD, nginx, PostgREST, Swagger docs, `slipstream` (so no `cirrus` database, which is most of a full node's disk), `strato-api` and `ethereum-jsonrpc`. The indexer keeps the SQL block index, the block and transaction tables of the `eth` database that `strato-p2p` serves peers from and `vm-runner` starts from, and no state mirror. `vm-runner` neither mirrors state into SQL nor publishes the `vmevents` stream: nothing would read it, and JLog only trims what a reader has passed.
 
 - **Identity.** The node key still comes from the Vault, so [store your OAuth credentials](install.md#4-store-your-oauth-credentials) first. `--localAuth` is refused.
-- **Snapshots.** `--snapshot` restores the chain state, Redis and JLog only; the eth and cirrus dumps are skipped (`strato-snapshot restore --skip-databases`).
+- **Snapshots.** `--snapshot` restores the chain state, Redis, JLog and the `eth` database; only the cirrus dump is skipped (`strato-snapshot restore --databases eth`).
 - **Monitoring.** apex serves `/health` and `/status` on port 80 over plain HTTP, so the network monitor can watch the validator: register it there as protocol `http` with host `<host>`. Port 80 is one of the few a CDN such as Cloudflare proxies, so the endpoint can sit behind one. There is no nginx and no TLS on a validator, and port 80 serves apex alone: `/health`, `/status`, `/_ping` and the Prometheus `/metrics`. apex registers neither its `/user` key endpoint nor the SMD socket rooms on a validator, and there is no `/rpc`. `/health` carries only public data (block, PBFT view, node address, health flags), but restrict the port to the monitor's address all the same. `strato-ps` shows the sync position locally.
 - **Ports.** 30303 (TCP and UDP) for peers, or `--p2pPort` and `--discoveryPort`, and 80 for the monitor.
-- **Resources.** The host still needs the validator minimum of 8 GB of RAM. What you save is Cirrus's disk and the app's memory.
+- **Resources.** The host still needs the validator minimum of 8 GB of RAM. What you save is Cirrus's disk and the app's memory; the `eth` block tables (a few GB) stay.
 - **Changing your mind.** The role is fixed when the directory is created, like every other flag. To turn a validator into a full node, create a new directory.
 
 ## API node

@@ -9,7 +9,6 @@
 
 module Blockchain.Strato.Indexer.ApiIndexer
   ( indexerMainLoop,
-    p2pIndexerLoop,
     retireSqlConsumerGroup,
     p2pConsumerGroup,
     indexAPI,
@@ -55,18 +54,11 @@ import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Text.Format
 
--- | The Redis side, per cell, under the consumer group the combined indexer
--- always used. strato-p2p serves blocks from this Redis, so it runs on every
--- core whether or not the core writes Postgres.
+-- | The one consumer group on the index events topic, the name the combined
+-- indexer always used: one subscriber per cell writes the SQL side and then
+-- the Redis best-block pointer, on every role that runs the chain.
 p2pConsumerGroup :: ConsumerGroup
 p2pConsumerGroup = "strato-indexer"
-
-p2pIndexerLoop :: ( MonadLogger m,
-                    HasStreaming m,
-                    Mod.Modifiable (P2P BestBlock) m
-                  ) =>
-                  m ()
-p2pIndexerLoop = consume p2pConsumerGroup targetTopicName indexP2P
 
 -- | One consumer commits its offset only after both SQL and Redis indexing
 -- finish. SQL retains the writer-lease checks and standby progress tracking.
@@ -82,14 +74,18 @@ indexerMainLoop cell =
     indexAPIGated cell idxEvents
     indexP2P idxEvents
 
--- | A snapshot may carry the old SQL group's checkpoint. With no SQL
--- consumer, retire it so it cannot pin the log on a Redis-only node.
+-- | Before the consumer groups were reunified, the SQL side consumed under
+-- its own group, @strato-indexer-sql@. A node upgraded in place, or restored
+-- from a snapshot of that era (snapshots ship the whole jlog/ directory),
+-- still carries that group's checkpoint, which nothing advances any more;
+-- JLog deletes a segment only once every subscriber has passed it, so the
+-- topic would grow for good. Retire it; a no-op when there is none.
 retireSqlConsumerGroup :: (MonadLogger m, HasStreaming m) => m ()
 retireSqlConsumerGroup = do
   removed <- removeConsumerGroup "strato-indexer-sql" targetTopicName
   when removed $
     $logInfoS "retireSqlConsumerGroup" . T.pack $
-      "retired the strato-indexer-sql consumer group on " ++ T.unpack (unTopicName targetTopicName) ++ ": no SQL side runs here"
+      "retired the obsolete strato-indexer-sql consumer group on " ++ T.unpack (unTopicName targetTopicName) ++ " (the SQL side consumes under strato-indexer)"
 
 -- | The highest block number a batch carries, if it carries any.
 batchTip :: [IndexEvent] -> Maybe Integer
