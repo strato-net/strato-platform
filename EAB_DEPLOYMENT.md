@@ -59,6 +59,14 @@ printf 'TARGET_NETWORK=%s\nTARGET_CHAIN_ID=%s\nTARGET_RPC_ENV=%s\nVERIFIERS=%s/%
 The tooling loads `app/contracts/.env` and `app/ethereum/.env` directly.
 The `eval` command is silent. Confirm the printed network, chain ID, RPC variable, and verifier threshold/count match the intended deployment before continuing.
 
+Before `init`, set the approved STRATO node URL in `app/contracts/.env`:
+
+```dotenv
+NODE_URL=https://<STRATO_NODE_HOST>
+```
+
+Use the target STRATO environment's node: production Upquark for a production rollout or Helium for testnet. `NODE_URL` is not the external target-chain RPC; configure that separately in `app/ethereum/.env` using the printed `TARGET_RPC_ENV`.
+
 The target Safe must already exist. Set its chain-scoped address in `app/ethereum/.env` before init:
 
 ```dotenv
@@ -79,6 +87,8 @@ npm run external:rollout -- init \
 Set `include`, target Safe/Permit2/role addresses, deployment and finality confirmations, route limits, and known public identities. For a first STRATO EAB deployment, leave `target.externalAssetBridge` and `target.tokenRouter` as `DEPLOY_REQUIRED` until step 2. Leave Infra-created verifier URLs, authorization signers, Runtime health URL, proposer, and executor values as `REVIEW_REQUIRED` until step 3.
 
 Choose `scope: "combined"` (default EAB + native) or `"eab-only"`.
+
+The guardian is a governance identity, not a Runtime service identity. If it is an EOA, provision an approved interactive access path (a STRATO/Keycloak account or the MetaMask-only app flow) and fund it with STRATO fee vouchers when it must submit transactions. A contract guardian is also valid when its governance flow can call the required guardian functions.
 
 Every included `eabRoutes` item must explicitly contain:
 
@@ -138,13 +148,6 @@ For combined scope, `init` also writes each native route's current `nativePolicy
 
 Review `discovery.target.nativeConfig.attestationThreshold` and `maxAttestationValiditySeconds` as well. Source-native values are visibly prefilled from `StratoNativeBridge`; target-only destination controls remain `REVIEW_REQUIRED`. Excluded native routes may retain review values.
 
-### Funding checkpoints
-
-- Before step 2, fund the target-chain contract deployer with the target chain's native gas token.
-- Before executing generated batches, fund every STRATO admin with STRATO fee vouchers and fund the Safe transaction executor with the target chain's native gas token.
-- After Infra returns the service identities and before startup, fund the Runtime EAB executor and, for combined deployments, the native mint executor with the target chain's native gas token. Fund the Runtime bridge-operator account and every verifier settlement-attestor account with STRATO fee vouchers.
-- Check every distinct address separately. The Safe, authorization signers, and Safe proposer need no balance unless the same address also submits transactions.
-
 For a later native extension, reuse the existing schema-version-1 EAB `deployment.json`; do not run `init` or create a schema-version-0 draft. Set `"scope": "native-extension"` and add both `inputs.nativeRoutes` and `inputs.nativeConfig` in the generated shapes:
 
 ```json
@@ -192,6 +195,12 @@ For a later native extension, reuse the existing schema-version-1 EAB `deploymen
 ## 2. Deploy or upgrade contracts
 
 **Who:** STRATO admins for STRATO; Coordinator for target-chain contracts.
+
+Before this step:
+
+- fund each target-chain contract deployer with that target chain's native gas token;
+- fund every STRATO admin executing a deploy or upgrade command with STRATO fee vouchers;
+- when a target-chain upgrade requires a Safe transaction, fund its transaction executor with the target chain's native gas token.
 
 STRATO admins use the existing `$REPO_ROOT/app/contracts/.env`. Before running the commands, confirm it contains:
 
@@ -333,6 +342,8 @@ Generation fails if EAB and native use different Safes. It never emits activatio
 
 When a preactivation Safe file is generated, Safe owners execute it before any STRATO admin approval:
 
+Before execution, fund the Safe transaction executor with the target chain's native gas token. A Safe owner that only signs does not need gas.
+
 ```bash
 export SAFE_JSON=<ABSOLUTE_PREACTIVATION_SAFE_JSON>
 export SAFE=<SAFE_ADDRESS>
@@ -367,6 +378,8 @@ npm run external:rollout -- generate --manifest "$ROLLOUT_DIR/deployment.json"
 
 If no preactivation Safe file was generated, no rerun is required. STRATO admins then use the current `preactivation-admin.json` and the same existing `app/contracts/.env` from step 2:
 
+Before approval, fund every participating STRATO admin with STRATO fee vouchers.
+
 ```bash
 export ADMIN_APPROVAL_FILE=<ABSOLUTE_CURRENT_ADMIN_JSON_FROM_COORDINATOR>
 cd "$REPO_ROOT/app/ethereum"
@@ -378,6 +391,18 @@ npm run external:rollout -- approve \
 ### Infra handoff and service startup
 
 **Who:** Coordinator hands off the final generated package; Infra starts the provisioned services.
+
+After Infra has returned the service identities and before starting services:
+
+- for `eab-only` and `combined`, fund the Runtime EAB executor with the target chain's native gas token;
+- for `combined` and `native-extension`, fund the native mint executor with the target chain's native gas token;
+- fund the Runtime bridge-operator STRATO account, the distinct Runtime relayer STRATO account, and each included verifier settlement-attestor STRATO account with STRATO fee vouchers.
+
+Check every distinct address separately. The Safe, authorization signers, attestation signers, and Safe proposer need no balance unless the same address also submits transactions.
+
+The relayer must be different from the bridge operator and every settlement attestor. The current Runtime requires separate relayer STRATO/Keycloak credentials and will not start without them. It submits `settleDeposit`, `confirmReviewedDeposit`, `finalizeWithdrawal`, and refund-finalization transactions.
+
+Each verifier operator must control its own settlement-attestor credentials. After account handover, each operator must set its own password. A shared Keycloak realm administrator can still reset those credentials; governance must explicitly accept or mitigate that administrative trust.
 
 The Coordinator gives Infra:
 
@@ -437,6 +462,8 @@ npm run external:rollout -- activate --manifest "$ROLLOUT_DIR/deployment.json"
 
 This re-runs verify gates and replaces `.deployment/current/` with activation-only handoffs. The Coordinator gives the STRATO admin the absolute `activation-admin.json` path. The admin confirms that `app/contracts/.env` contains their credentials and a current `OAUTH_TOTP` when required, then runs:
 
+Before approval, fund every participating STRATO admin with STRATO fee vouchers. Before executing the generated activation Safe batch, fund the Safe transaction executor with the target chain's native gas token.
+
 ```bash
 export REPO_ROOT=<ABSOLUTE_REPOSITORY_PATH>
 export ADMIN_APPROVAL_FILE=<ABSOLUTE_ACTIVATION_ADMIN_JSON_FROM_COORDINATOR>
@@ -449,7 +476,9 @@ npm run external:rollout -- approve \
 
 Execute `activation-safe-<safe>.json` with `safe:batch`. Activation is never included in preactivation.
 
-After both activation handoffs execute, run the final read-only verification:
+After both activation handoffs execute, restart the Runtime using the same merged canonical template and preserved data volume, journals, and polling cursors. Confirm `LastStart` reports `started <time>, ready`; this forces the startup checks to validate the newly activated chain.
+
+Then run the final read-only verification:
 
 ```bash
 npm run external:rollout -- verify --manifest "$ROLLOUT_DIR/deployment.json"
