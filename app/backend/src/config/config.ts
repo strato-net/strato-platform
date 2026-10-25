@@ -108,11 +108,11 @@ export const defaultBridgeServiceFor: Record<string, string> = {
 // Populate with verified proxy addresses after deployment, before releasing the backend.
 export const defaultExternalAssetBridgeFor: Record<string, string> = {
   "114784819836269": "394d276e3b6109d6c58444653c26996bf3ae3eda", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet
+  "33056204878082667": "242a604448e8862cd4576cc522e64a2167d14e02", // Upquark mainnet
 };
 export const defaultTokenRouterFor: Record<string, string> = {
   "114784819836269": "ed37a83d3b1f7b49e44f0ca9ea342fe0e11cc1d6", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet
+  "33056204878082667": "cfd8b046064f5c20a26f14d2c8b3573b987fe952", // Upquark mainnet
 };
 export const defaultRewardsAddressFor: Record<string, string> = {
   "114784819836269": "170147f58738c9f46112a874030420b823901f3b", // Helium testnet
