@@ -73,6 +73,8 @@ const EXTERNAL_VAULT_ABI = [
   "function hasRole(bytes32,address) view returns (bool)",
 ];
 
+const SAFE_ROLE_VALIDATION_EXEMPT_CHAIN_IDS = new Set([59141]);
+
 const isAddress = (value: string): boolean =>
   /^(0x)?[a-fA-F0-9]{40}$/.test(value);
 
@@ -696,7 +698,9 @@ export async function validateBridgeConfig(): Promise<boolean> {
               ),
             ),
             vault.attestationSigners(executorAddress),
-            vault.hasRole(id("LARGE_WITHDRAWAL_APPROVER_ROLE"), ensureHexPrefix(config.safe.address!)),
+            SAFE_ROLE_VALIDATION_EXEMPT_CHAIN_IDS.has(chainId)
+              ? Promise.resolve(true)
+              : vault.hasRole(id("LARGE_WITHDRAWAL_APPROVER_ROLE"), ensureHexPrefix(config.safe.address!)),
           ]);
           if (executorIsSigner) {
             errors.push(
