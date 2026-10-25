@@ -2436,22 +2436,6 @@ gasPoseidon2GLBase, gasPoseidon2GLPerPerm :: Gas
 gasPoseidon2GLBase = 100
 gasPoseidon2GLPerPerm = 100
 
-gasBlsG1Add, gasBlsG1MsmPerTerm, gasBlsG2Add, gasBlsG2MsmPerTerm :: Gas
-gasBlsG1Add = 4000
-gasBlsG1MsmPerTerm = 2500
-gasBlsG2Add = 9000
-gasBlsG2MsmPerTerm = 9000
-
-gasBlsPairingBase, gasBlsPairingPerPair :: Gas
-gasBlsPairingBase = 50000
-gasBlsPairingPerPair = 20000
-
-gasBlsMapFpToG1, gasBlsMapFp2ToG2, gasBlsDecompressG1, gasBlsDecompressG2 :: Gas
-gasBlsMapFpToG1 = 5000
-gasBlsMapFp2ToG2 = 20000
-gasBlsDecompressG1 = 5000
-gasBlsDecompressG2 = 20000
-
 -- | Charge for an operation whose cost scales with the number of input
 -- terms, given the flat count of integer arguments and the arity of one
 -- term. Rounds up so a malformed (non-multiple) input still pays for the
