@@ -187,6 +187,8 @@ pipeline {
                 export DOCKER_CONFIG=$(mktemp -d)
                 echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
                 make push-node-images 2>&1
+                # The EAB bridge images go to ECR (the stage above) and here as well.
+                make push-bridge-eab-images 2>&1
                 # A release or rc tag build also publishes strato:<tag>, the alias a
                 # release checkout and strato-up --prebuilt=<tag> resolve.
                 if [[ -n "${TAG_NAME:-}" ]]; then make push-release-alias RELEASE_TAG="$TAG_NAME" 2>&1; fi
