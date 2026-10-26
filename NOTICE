@@ -284,19 +284,16 @@ https://www.npmjs.com/package/@aws/lambda-invoke-store
 @babel/code-frame
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:40.
 https://www.npmjs.com/package/@babel/code-frame
 
 @babel/helper-validator-identifier
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:50.
 https://www.npmjs.com/package/@babel/helper-validator-identifier
 
 @babel/highlight
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:60.
 https://www.npmjs.com/package/@babel/highlight
 
 @babel/polyfill
@@ -926,7 +923,6 @@ https://www.npmjs.com/package/@humanfs/node
 @humanwhocodes/config-array
 Copyright information is provided by the upstream package authors.
 Licensed under the Apache-2.0 License (per package-lock metadata).
-See strato-vscode/package-lock.json:220.
 https://www.npmjs.com/package/@humanwhocodes/config-array
 
 @humanwhocodes/module-importer
@@ -938,7 +934,6 @@ https://www.npmjs.com/package/@humanwhocodes/module-importer
 @humanwhocodes/object-schema
 Copyright information is provided by the upstream package authors.
 Licensed under the BSD-3-Clause License (per package-lock metadata).
-See strato-vscode/package-lock.json:236.
 https://www.npmjs.com/package/@humanwhocodes/object-schema
 
 @humanwhocodes/retry
@@ -3128,7 +3123,6 @@ https://www.npmjs.com/package/@timer/detect-port
 @tootallnate/once
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:291.
 https://www.npmjs.com/package/@tootallnate/once
 
 @tsconfig/node10
@@ -3470,7 +3464,6 @@ https://www.npmjs.com/package/@types/http-errors
 @types/js-yaml
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:319.
 https://www.npmjs.com/package/@types/js-yaml
 
 @types/json-bigint
@@ -3698,7 +3691,6 @@ https://www.npmjs.com/package/@types/uuid
 @types/vscode
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:377.
 https://www.npmjs.com/package/@types/vscode
 
 @types/winston
@@ -3722,7 +3714,6 @@ https://www.npmjs.com/package/@typescript-eslint/eslint-plugin
 @typescript-eslint/experimental-utils
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:427.
 https://www.npmjs.com/package/@typescript-eslint/experimental-utils
 
 @typescript-eslint/parser
@@ -3782,7 +3773,6 @@ https://www.npmjs.com/package/@typescript-eslint/visitor-keys
 @ungap/promise-all-settled
 Copyright information is provided by the upstream package authors.
 Licensed under the ISC License (per package-lock metadata).
-See strato-vscode/package-lock.json:558.
 https://www.npmjs.com/package/@ungap/promise-all-settled
 
 @vanilla-extract/css
@@ -3818,13 +3808,11 @@ https://www.npmjs.com/package/@vitejs/plugin-react-swc
 @vscode/debugadapter
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:565.
 https://www.npmjs.com/package/@vscode/debugadapter
 
 @vscode/debugprotocol
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:577.
 https://www.npmjs.com/package/@vscode/debugprotocol
 
 @wagmi/connectors
@@ -4466,7 +4454,6 @@ https://www.npmjs.com/package/available-typed-arrays
 await-notify
 Copyright information is provided by the upstream package authors.
 Licensed under the ISC License (per package-lock metadata).
-See strato-vscode/package-lock.json:768.
 https://www.npmjs.com/package/await-notify
 
 aws-sign2
@@ -5144,7 +5131,6 @@ https://www.npmjs.com/package/bin-links
 binary
 Copyright (c) Lennart Kolmodin
 Licensed under the BSD License.
-See strato-vscode/package-lock.json:831.
 https://hackage.haskell.org/package/binary
 
 binary-extensions
@@ -5378,7 +5364,6 @@ https://www.npmjs.com/package/buffer-from
 buffer-indexof-polyfill
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:1076.
 https://www.npmjs.com/package/buffer-indexof-polyfill
 
 buffer-shims
@@ -5402,7 +5387,6 @@ https://www.npmjs.com/package/buffer-xor
 buffers
 Copyright information is provided by the upstream package authors.
 Licensed under terms in the referenced metadata.
-See strato-vscode/package-lock.json:1086.
 https://www.npmjs.com/package/buffers
 
 bufferutil
@@ -5606,7 +5590,6 @@ https://www.npmjs.com/package/chain-function
 chainsaw
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT/X11 License (per package-lock metadata).
-See strato-vscode/package-lock.json:1180.
 https://www.npmjs.com/package/chainsaw
 
 chalk
@@ -6866,7 +6849,6 @@ https://www.npmjs.com/package/duplexer
 duplexer2
 Copyright information is provided by the upstream package authors.
 Licensed under the BSD-3-Clause License (per package-lock metadata).
-See strato-vscode/package-lock.json:1521.
 https://www.npmjs.com/package/duplexer2
 
 duplexer3
@@ -7316,7 +7298,6 @@ https://www.npmjs.com/package/eslint-scope
 eslint-utils
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:1798.
 https://www.npmjs.com/package/eslint-utils
 
 eslint-visitor-keys
@@ -7970,7 +7951,6 @@ https://www.npmjs.com/package/function.prototype.name
 functional-red-black-tree
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:2386.
 https://www.npmjs.com/package/functional-red-black-tree
 
 gauge
@@ -9854,7 +9834,6 @@ https://www.npmjs.com/package/lines-and-columns
 listenercount
 Copyright information is provided by the upstream package authors.
 Licensed under the ISC License (per package-lock metadata).
-See strato-vscode/package-lock.json:3029.
 https://www.npmjs.com/package/listenercount
 
 lit
@@ -12812,7 +12791,6 @@ https://www.npmjs.com/package/regexp.prototype.flags
 regexpp
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:3832.
 https://www.npmjs.com/package/regexpp
 
 regexpu-core
@@ -14342,7 +14320,6 @@ https://hackage.haskell.org/package/transformers
 traverse
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT/X11 License (per package-lock metadata).
-See strato-vscode/package-lock.json:4436.
 https://www.npmjs.com/package/traverse
 
 tree-kill
@@ -14432,7 +14409,6 @@ https://www.npmjs.com/package/tsort
 tsutils
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:4453.
 https://www.npmjs.com/package/tsutils
 
 tty-browserify
@@ -14720,7 +14696,6 @@ https://www.npmjs.com/package/unzip-response
 unzipper
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:4560.
 https://www.npmjs.com/package/unzipper
 
 upath
@@ -14882,7 +14857,6 @@ https://www.npmjs.com/package/uws
 v8-compile-cache
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:4612.
 https://www.npmjs.com/package/v8-compile-cache
 
 v8-compile-cache-lib
@@ -14990,7 +14964,6 @@ https://www.npmjs.com/package/vscode
 vscode-test
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
-See strato-vscode/package-lock.json:4628.
 https://www.npmjs.com/package/vscode-test
 
 wagmi
