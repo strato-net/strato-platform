@@ -18,6 +18,7 @@ library
       Blockchain.SolidVM.BLS12381.HashToCurve.G2
       Blockchain.SolidVM.BLS12381.HashToCurve.HashToField
       Blockchain.SolidVM.Builtins.ABI
+      Blockchain.SolidVM.Builtins.Casts
       Blockchain.SolidVM.Builtins.Crypto
       Blockchain.SolidVM.Builtins.Functions
       Blockchain.SolidVM.Builtins.Gas
@@ -38,6 +39,7 @@ library
     , elliptic-curve
     , ethereum-rlp
     , memory
+    , mtl
     , pairing
     , poseidon-hash
     , solid-vm-model
@@ -53,6 +55,7 @@ test-suite solid-vm-builtins-spec
   other-modules:
       BLS12381Spec
       BuiltinsSpec
+      CastsSpec
       FunctionsSpec
       Paths_solid_vm_builtins
   hs-source-dirs:
@@ -68,5 +71,6 @@ test-suite solid-vm-builtins-spec
     , solid-vm-builtins
     , solid-vm-model
     , strato-model
+    , text
     , time
   default-language: Haskell2010

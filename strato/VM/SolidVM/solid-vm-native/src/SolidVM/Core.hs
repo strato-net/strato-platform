@@ -120,12 +120,15 @@ enumValue n = EnumValue n False
 data Dyn = forall t. Dyn (Ty t) t
 
 showDyn :: Dyn -> T.Text
-showDyn (Dyn t v) = case t of
+showDyn (Dyn t v) = formatValue t v
+
+formatValue :: Ty t -> t -> T.Text
+formatValue t v = case t of
   TDecimal -> T.pack (show v)
   TInt -> T.pack (show v); TBool -> T.pack (show v); TAddr -> T.pack (show v); TStr -> T.pack (show v)
   TBytes -> T.pack (show v); TEnum n ns -> let i = enumNumber v in n <> "." <> (if i >= 0 && fromIntegral i < length ns then ns !! fromIntegral i else T.pack (show i))
   TContract n -> n <> "(" <> T.pack (show v) <> ")"; TUnit -> "()"
-  TArr et -> "[" <> T.intercalate "," (map (showDyn . Dyn et) (F.toList v)) <> "]"
+  TArr et -> "[" <> T.intercalate "," (map (formatValue et) (F.toList v)) <> "]"
   TStruct n fs -> n <> "{" <> T.intercalate "," (showFields fs v) <> "}"
   TTuple fs -> "(" <> T.intercalate "," (showFields fs v) <> ")"
   TVariadic -> "[" <> T.intercalate "," (map showDyn v) <> "]"; TMaybe _ -> "<maybe>"; TRef _ -> T.pack (show v)
@@ -136,7 +139,7 @@ showDyn (Dyn t v) = case t of
   where
     showFields :: Fields ts -> HL ts -> [T.Text]
     showFields FNil HNil = []
-    showFields (FCons n ft rest) (x :* xs) = (if T.null n then "" else n <> "=") <> showDyn (Dyn ft x) : showFields rest xs
+    showFields (FCons n ft rest) (x :* xs) = (if T.null n then "" else n <> "=") <> formatValue ft x : showFields rest xs
 
 defaultOf :: Ty t -> t
 defaultOf = \case
@@ -454,6 +457,13 @@ applyLast action HNil = action
 
 applyNext :: (Fn args r -> HL args -> M r) -> (a -> Fn args r) -> HL (a ': args) -> M r
 applyNext next f (value :* values) = next (f value) values
+
+-- Prepare currying once; execution applies values without traversing the signature.
+curryArguments :: Sig args r -> (HL args -> M r) -> Fn args r
+curryArguments (SigNil _) = \body -> body HNil
+curryArguments (SigCons _ rest) =
+  let next = curryArguments rest
+  in next `seq` \body -> body `seq` \value -> next (\values -> body (value :* values))
 
 -- A compiled function: its exact signature and the Haskell action of exactly that type.
 data Fun = forall args r. Fun T.Text (Sig args r) (Fn args r)

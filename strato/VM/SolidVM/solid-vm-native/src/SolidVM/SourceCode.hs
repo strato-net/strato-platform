@@ -4,7 +4,6 @@ module SolidVM.SourceCode where
 
 import SolidVM.Core hiding (Fun(..))
 import qualified SolidVM.Core as Core
-import qualified SolidVM.BuiltinSource as BuiltinSource
 import Data.Char (ord, isAscii, isAlphaNum)
 import Numeric (showHex)
 import Language.Haskell.TH hiding (Code)
@@ -409,12 +408,8 @@ instance (ToSource a, ToSource b) => ToSource (Either a b) where
   toSource (Left a) = app 'Left [toSource a]
   toSource (Right b) = app 'Right [toSource b]
 
-builtinCode :: T.Text -> ([Dyn] -> M Dyn) -> Code ([Dyn] -> M Dyn)
-builtinCode n f = Code f expression Nothing Nothing Ordinary
-  where
-    expression = case BuiltinSource.lookupActionSource n of
-      Just action -> action
-      Nothing -> error "unknown compiler builtin"
+builtinBinding :: Code a -> Code a
+builtinBinding = id
 
 haskellType :: Ty a -> Type
 haskellType = \case

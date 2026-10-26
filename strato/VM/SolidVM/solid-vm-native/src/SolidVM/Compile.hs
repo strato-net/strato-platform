@@ -34,6 +34,8 @@ import qualified SolidVM.Model.Type as Ty
 import SolidVM.Core
 import SolidVM.Code
 import qualified SolidVM.Builtins as Builtins
+import qualified Blockchain.SolidVM.Builtins.Casts as Casts
+import qualified Blockchain.SolidVM.Builtins.Functions as Shared
 
 makeFun :: T.Text -> Sig args r -> Code (Fn args r) -> Fun
 makeFun name sig action = withCode action (Fun name sig)
@@ -54,9 +56,9 @@ namedCode _ a = a
 namedFunction :: T.Text -> Func -> a -> a
 namedFunction _ _ a = a
 {-# INLINE namedFunction #-}
-builtinCode :: T.Text -> a -> Code a
-builtinCode _ a = plainCode a
-{-# INLINE builtinCode #-}
+builtinBinding :: Code a -> Code a
+builtinBinding code = withCode code $ \function -> function `seq` code
+{-# INLINE builtinBinding #-}
 
 typedCode :: [EnvTy] -> Ty r -> a -> a
 typedCode _ _ a = a

@@ -39,6 +39,8 @@ import SolidVM.Core hiding (Fun(..))
 import SolidVM.SourceCode
 import qualified SolidVM.SourceTemplate as SourceTemplate
 import qualified SolidVM.Builtins as Builtins
+import qualified Blockchain.SolidVM.Builtins.Casts as Casts
+import qualified Blockchain.SolidVM.Builtins.Functions as Shared
 import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.Exts as Haskell
 import qualified Language.Haskell.TH.Syntax as TH (NameSpace(..))
@@ -279,6 +281,7 @@ publicModule modul name = case modul of
   "Data.Text.Internal" -> "Data.Text"
   "Data.Sequence.Internal" -> "Data.Sequence"
   "GHC.IORef" -> "Data.IORef"
+  "GHC.Prim" | name == "seq" -> "Prelude"
   "GHC.IO" | name /= "IO" -> "Control.Exception"
   "GHC.Base" | name `elem` ["when", "unless", "join", "ap", "liftM"] -> "Control.Monad"
   _ | modul `elem` ["GHC.Base", "GHC.Classes", "GHC.Types", "GHC.Maybe", "GHC.Num", "GHC.Num.Integer", "GHC.Real", "GHC.Show", "GHC.List", "GHC.IO"] -> "Prelude"

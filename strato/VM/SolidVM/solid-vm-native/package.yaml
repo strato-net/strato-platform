@@ -3,6 +3,7 @@ license: Apache-2.0
 extra-source-files:
   - src/SolidVM/Compiler.inc
   - src/SolidVM/BuiltinActions.inc
+  - src/SolidVM/BuiltinCalls.inc
   - src/SolidVM/HelperActions.inc
   - src/SolidVM/ActionCode.inc
   - src/SolidVM/IntegerActions.inc
@@ -39,6 +40,7 @@ library:
     - containers
     - lens
     - mtl
+    - solid-vm-builtins
     - solid-vm-model
     - source-tools
     - strato-model
@@ -90,6 +92,25 @@ tests:
     - unliftio
     - vector
     - vm-tools
+
+  solid-vm-typed-builtins-check:
+    source-dirs: test/
+    other-modules: []
+    main: TypedBuiltinCheck.hs
+    dependencies:
+      - blockapps-data
+      - bytestring
+      - common-log
+      - composable-monads-base
+      - containers
+      - hflags
+      - lens
+      - solid-vm-compiler
+      - solid-vm-native
+      - solid-vm-model
+      - strato-model
+      - text
+      - vm-tools
 
 executables:
   solid-vm-source:

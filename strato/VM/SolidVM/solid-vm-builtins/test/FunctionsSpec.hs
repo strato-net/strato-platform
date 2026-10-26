@@ -6,7 +6,9 @@ import qualified Blockchain.SolidVM.Builtins.ABI as ABI
 import qualified Blockchain.SolidVM.Builtins.Functions as B
 import Blockchain.VM.SolidException (SolidException (..))
 import Control.Exception (evaluate)
+import Blockchain.Strato.Model.Address (Address)
 import qualified Data.ByteString as BS
+import qualified Data.Text as T
 import Data.IORef
 import Data.Time.Clock
 import Data.Time.Calendar (fromGregorian)
@@ -20,23 +22,20 @@ spec = do
       B.normalizeHex "0xAbC" `shouldBe` "0x0abc"
     it "preserves the invalid hex error payload" $
       evaluate (B.b16decode "zz") `shouldThrow` (== InvalidArguments "b16decode: invalid hex string" "\"zz\"")
-    it "preserves hex-default and explicit decimal integer parsing" $ do
-      B.parseBaseInt "10" 16 `shouldBe` Right 16
-      B.parseBaseInt "10" 10 `shouldBe` Right 10
-      B.parseBaseInt "0xabc" 16 `shouldBe` Right 2748
-    it "preserves integer string padding and fixed-size bytes truncation" $ do
-      B.stringFromInteger 10 16 (Just 2) `shouldBe` "0x000a"
-      B.sizedBytesFromInteger 2 65537 `shouldBe` BS.pack [0, 1]
-      B.sizedBytesFromString (Just 1) "abc" `shouldBe` "a"
-    it "keeps UTF-8 and raw byte conversion distinct" $ do
-      B.bytesFromString "\233" `shouldBe` BS.pack [195, 169]
-      B.bytesFromRawString "\233" `shouldBe` BS.pack [233]
-      B.stringFromBytes (BS.pack [255]) `shouldBe` "\255"
     it "preserves base64 padding and URL-safe unpadded output" $ do
       B.base64encode (BS.pack [251, 255]) `shouldBe` "+/8="
       B.base64urlencode (BS.pack [251, 255]) `shouldBe` "-_8"
     it "preserves the SHA-256 digest" $
       B.b16encode (B.sha256 "abc") `shouldBe` "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+
+  describe "ecrecover hash inputs" $ do
+    it "preserves the existing byte representation of each input type" $ do
+      let recover input = B.ecrecover input 27 1 1
+      recover (T.replicate 64 "0") `shouldBe` recover (BS.replicate 32 0)
+      recover (T.replicate 32 "z") `shouldBe` recover (BS.replicate 32 122)
+      recover (1 :: Integer) `shouldBe` recover (BS.singleton 1)
+      recover (1 :: Address) `shouldBe` recover (BS.replicate 19 0 <> BS.singleton 1)
+      recover () `shouldBe` recover BS.empty
 
   describe "ABI layout and malformed data" $ do
     it "preserves head offsets, byte lengths, and right padding" $ do

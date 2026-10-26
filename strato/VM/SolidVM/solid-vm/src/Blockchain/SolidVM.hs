@@ -41,6 +41,7 @@ import Blockchain.Forks (isConstructorCallForkActive, isEmitArgForkActive)
 import BlockApps.Solidity.ABI.Bridge (encodeEventToLogValues)
 import BlockApps.Solidity.ABI.Codec (abiDecode)
 import qualified Blockchain.SolidVM.Builtins as Builtins
+import qualified Blockchain.SolidVM.Builtins.Casts as Casts
 import qualified Blockchain.SolidVM.Builtins.Functions as Builtin
 import Blockchain.SolidVM.Builtins.Gas
 import Blockchain.SolidVM.CodeCollectionDB
@@ -1878,7 +1879,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                 _ -> typeError "bytes32ToString with incorrect arguments" $ show argVals
             Constant SAddressToAscii ->
               case argVals of
-                [SAddress a _] -> return . Constant . SString $ Builtin.stringFromAddress a
+                [SAddress a _] -> return . Constant $ stringCast a
                 _ -> typeError "addressToAsciiString with incorrect arguments" $ show argVals
             -- It would be nice to reinterpret two element paths as a function.
             -- How can we get a to resolve to a local variable instead of a path?
@@ -2248,16 +2249,16 @@ binopAssign oper lhs rhs gasFormula = do
 -- we discourage fixed-size integer types in SolidVM but support this function for
 -- backwards compatibility with existing Solidity contracts.
 intBuiltin :: Bool -> Maybe Int -> [Value] -> Value
-intBuiltin _ _ [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
-intBuiltin _ _ [SInteger n] = SInteger n
-intBuiltin _ _ [SDecimal v] = SInteger (Builtin.integerFromDecimal v)
-intBuiltin _ _ [SString hex] = integerToValue $ Builtin.parseBaseInt hex 16
-intBuiltin _ _ [SString hex, SInteger 16] = integerToValue $ Builtin.parseBaseInt hex 16
-intBuiltin _ _ [SString dec, SInteger 10] = integerToValue $ Builtin.parseBaseInt dec 10
-intBuiltin _ _ [SBytes bs] = SInteger $ Builtin.integerFromBytes bs  -- bytes32 -> uint256 cast
-intBuiltin _ _ [SAddress a _] = SInteger $ Builtin.integerFromAddress a  -- address -> int cast
-intBuiltin _ _ [SNULL] = SInteger 0
-intBuiltin _ _ [SReference{}] = SInteger 0
+intBuiltin _ _ [SEnumVal _ _ enumNum] = intCast (fromIntegral enumNum :: Integer)
+intBuiltin _ _ [SInteger n] = intCast n
+intBuiltin _ _ [SDecimal v] = intCast v
+intBuiltin _ _ [SString hex] = intCast hex
+intBuiltin _ _ [SString hex, SInteger 16] = intCast (hex, 16 :: Integer)
+intBuiltin _ _ [SString dec, SInteger 10] = intCast (dec, 10 :: Integer)
+intBuiltin _ _ [SBytes bs] = intCast bs  -- bytes32 -> uint256 cast
+intBuiltin _ _ [SAddress a _] = intCast a  -- address -> int cast
+intBuiltin _ _ [SNULL] = intCast ()
+intBuiltin _ _ [SReference{}] = intCast ()
 intBuiltin signed mSize [] = typeError (funcName ++ " called with no arguments") ""
   where
     funcName = (if signed then "int" else "uint") ++ maybe "" show mSize
@@ -2266,20 +2267,34 @@ intBuiltin signed mSize (arg:_) = typeError (funcName ++ " cannot convert " ++ v
   where
     funcName = (if signed then "int" else "uint") ++ maybe "" show mSize
 
+intCast :: Casts.SolidInt a => a -> Value
+intCast value = integerToValue $ either (Left . fst) Right (Casts.int value)
+
+decimalCast :: Casts.SolidDecimal a => String -> a -> Value
+decimalCast detail value = either (\(message, _) -> typeError message detail) SDecimal (Casts.decimal value)
+
+stringCast :: Casts.SolidString a => a -> Value
+stringCast value = either (\(message, details) -> typeError message (show details)) (SString . T.unpack) (Casts.string value)
+
+addressCast :: Casts.SolidAddress a => a -> Value
+addressCast value = either (\(message, details) -> typeError message (show details)) (flip SAddress False) (Casts.address value)
+
+boolCast :: Casts.SolidBool a => a -> Value
+boolCast value = either (\(message, details) -> typeError message (show details)) SBool (Casts.bool value)
+
+bytesCast :: Casts.SolidBytes a => a -> Value
+bytesCast value = either (\(message, details) -> typeError message (show details)) SBytes (Casts.bytes value)
+
 integerToValue :: Either String Integer -> Value
 integerToValue (Right n) = SInteger n
 integerToValue (Left err) = typeError err ("" :: String)
 
 decimalBuiltin :: [Value] -> Value
-decimalBuiltin [SInteger n] = SDecimal $ Builtin.decimalFromInteger n
-decimalBuiltin [SString str] =
-  let stringToDecimal = Builtin.decimalFromString str
-  in case stringToDecimal of
-    Right deci -> SDecimal deci
-    Left e -> typeError e str
-decimalBuiltin [SDecimal v] = SDecimal v
-decimalBuiltin [SNULL] = SDecimal $ Decimal 0 0
-decimalBuiltin [SReference{}] = SDecimal $ Decimal 0 0
+decimalBuiltin [SInteger n] = decimalCast "" n
+decimalBuiltin [SString str] = decimalCast str str
+decimalBuiltin [SDecimal v] = decimalCast "" v
+decimalBuiltin [SNULL] = decimalCast "" ()
+decimalBuiltin [SReference{}] = decimalCast "" ()
 decimalBuiltin args = typeError "decimal cast - invalid args" $ show args
 
 callBuiltinFunction :: MonadSM m => SolidString -> [Value] -> m Value
@@ -2426,29 +2441,28 @@ callBuiltin :: MonadSM m => SolidString -> [Value] -> m Value
 callBuiltin "variadic" [SVariadic vs] = pure $ SVariadic $ Builtin.variadic vs
 callBuiltin "variadic" vs = pure $ SVariadic $ Builtin.variadic vs
 callBuiltin "string" [SString s] = return $ SString s
-callBuiltin "string" [SAddress a _] = return . SString $ Builtin.stringFromAddress a
-callBuiltin "string" [SInteger i] = return . SString $ Builtin.stringFromInteger i 10 Nothing
-callBuiltin "string" [SInteger i, SInteger 10] = return . SString $ Builtin.stringFromInteger i 10 Nothing
-callBuiltin "string" [SInteger i, SInteger 16] = return . SString $ Builtin.stringFromInteger i 16 Nothing
-callBuiltin "string" [SInteger i, SInteger 16, SInteger bytes] = return . SString $ Builtin.stringFromInteger i 16 (Just bytes)
-callBuiltin "string" [SBool b] = return . SString $ Builtin.stringFromBool b
-callBuiltin "string" [SBytes bs] = pure . SString $ Builtin.stringFromBytes bs
-callBuiltin "string" [SBytes bs, SString "utf-8"] = pure . SString $ Builtin.stringFromUtf8 bs
-callBuiltin "string" [SBytes bs, SString "raw"] = pure . SString $ Builtin.stringFromRawBytes bs
-callBuiltin "string" [SNULL] = return $ SString ""
-callBuiltin "string" [SReference{}] = return $ SString ""
+callBuiltin "string" [SAddress a _] = pure $ stringCast a
+callBuiltin "string" [SInteger i] = pure $ stringCast i
+callBuiltin "string" [SInteger i, SInteger 10] = pure $ stringCast (i, 10 :: Integer)
+callBuiltin "string" [SInteger i, SInteger 16] = pure $ stringCast (i, 16 :: Integer)
+callBuiltin "string" [SInteger i, SInteger 16, SInteger bytes] = pure $ stringCast (i, 16 :: Integer, bytes)
+callBuiltin "string" [SBool b] = pure $ stringCast b
+callBuiltin "string" [SBytes bs] = pure $ stringCast bs
+callBuiltin "string" [SBytes bs, SString "utf-8"] =
+  either (const $ malformedData "bytestring is not UTF-8 encoded" bs) (pure . SString . T.unpack)
+    (Casts.string (bs, "utf-8" :: String))
+callBuiltin "string" [SBytes bs, SString "raw"] = pure $ stringCast (bs, "raw" :: String)
+callBuiltin "string" [SNULL] = pure $ stringCast ()
+callBuiltin "string" [SReference{}] = pure $ stringCast ()
 callBuiltin "string" vs = typeError "string cast" $ show vs
-callBuiltin "address" [SInteger a] = return . ((flip SAddress) False) $ Builtin.addressFromInteger a
+callBuiltin "address" [SInteger a] = pure $ addressCast a
 callBuiltin "address" [SAddress na b] = return $ SAddress na b
-callBuiltin "address" [SContract _ a] = return $ SAddress a False
+callBuiltin "address" [SContract _ a] = pure $ addressCast a
 callBuiltin "address" [ss@(SString s)] =
-  maybe
-    (typeError "address cast" $ show ss)
-    (return . flip SAddress False)
-    $ Builtin.addressFromString s
-callBuiltin "address" [SBytes bs] = pure . flip SAddress False $ Builtin.addressFromBytes bs
-callBuiltin "address" [SNULL] = return $ SAddress 0 False
-callBuiltin "address" [SReference{}] = return $ SAddress 0 False
+  either (const $ typeError "address cast" $ show ss) (pure . flip SAddress False) (Casts.address s)
+callBuiltin "address" [SBytes bs] = pure $ addressCast bs
+callBuiltin "address" [SNULL] = pure $ addressCast ()
+callBuiltin "address" [SReference{}] = pure $ addressCast ()
 callBuiltin "address" vs = typeError "address cast" $ show vs
 callBuiltin ("addmod") [a', b', c'] = do
   (a,b,c) <- (,,) <$> int a' <*> int b' <*> int c'
@@ -2470,23 +2484,24 @@ callBuiltin ("selfdestruct") [a'] = do
     (pay "selfdestruct function")
     (void . purgeStorageMap) a
 callBuiltin "account" vs = typeError "account cast" $ show vs
-callBuiltin "bool" [SBool b] = return $ SBool b
-callBuiltin "bool" [SString str] | Just b <- Builtin.boolFromString str = return $ SBool b
-callBuiltin "bool" [SNULL] = return $ SBool False
-callBuiltin "bool" [SReference _] = return $ SBool False
+callBuiltin "bool" [SBool b] = pure $ boolCast b
+callBuiltin "bool" [v@(SString str)] =
+  either (const $ typeError "bool cast" $ show [v]) (pure . SBool) (Casts.bool str)
+callBuiltin "bool" [SNULL] = pure $ boolCast ()
+callBuiltin "bool" [SReference _] = pure $ boolCast ()
 callBuiltin "bool" vs = typeError "bool cast" $ show vs
 callBuiltin "byte" [SInteger n] = return $ SInteger (Builtin.byte n)
 callBuiltin "byte" [SNULL] = return $ SInteger 0
 callBuiltin "byte" [SReference _] = return $ SInteger 0
 callBuiltin "byte" vs = typeError "byte cast" $ show vs
-callBuiltin "bytes" [SInteger i] = pure . SBytes $ Builtin.bytesFromInteger i
-callBuiltin "bytes" [SString s] = pure . SBytes $ Builtin.bytesFromString s
-callBuiltin "bytes" [SBytes bs] = pure $ SBytes bs
-callBuiltin "bytes" [SString s, SString "utf-8"] = pure . SBytes $ Builtin.bytesFromString s
-callBuiltin "bytes" [SString s, SString "raw"] = pure . SBytes $ Builtin.bytesFromRawString s
-callBuiltin "bytes" [SAddress a _] = pure . SBytes $ Builtin.bytesFromAddress a
-callBuiltin "bytes" [SNULL] = pure $ SBytes B.empty
-callBuiltin "bytes" [SReference _] = pure $ SBytes B.empty
+callBuiltin "bytes" [SInteger i] = pure $ bytesCast i
+callBuiltin "bytes" [SString s] = pure $ bytesCast s
+callBuiltin "bytes" [SBytes bs] = pure $ bytesCast bs
+callBuiltin "bytes" [SString s, SString "utf-8"] = pure $ bytesCast s
+callBuiltin "bytes" [SString s, SString "raw"] = pure $ bytesCast (s, "raw" :: String)
+callBuiltin "bytes" [SAddress a _] = pure $ bytesCast a
+callBuiltin "bytes" [SNULL] = pure $ bytesCast ()
+callBuiltin "bytes" [SReference _] = pure $ bytesCast ()
 callBuiltin "uint" args = return $ intBuiltin False Nothing args
 callBuiltin "int" args = return $ intBuiltin True Nothing args
 -- Handle sized integer type casts (uint256, uint128, uint120, int256, etc.)
@@ -2501,9 +2516,9 @@ callBuiltin name [arg]
        in case arg of
             SInteger i ->
               let size = fromMaybe 32 mSize
-              in return $ SBytes $ Builtin.sizedBytesFromInteger size i
-            SString s -> return $ SBytes $ Builtin.sizedBytesFromString mSize s
-            SBytes s -> return $ SBytes $ Builtin.sizedBytesFromBytes mSize s
+              in return $ bytesCast (size, i)
+            SString s -> return $ bytesCast (mSize, s)
+            SBytes s -> return $ bytesCast (mSize, s)
             _ -> invalidArguments ("Could not convert to " ++ labelToString name) arg
 callBuiltin "decimal" args = return $ decimalBuiltin args
 callBuiltin "identity" [v] = return $ Builtin.identity v
@@ -2524,13 +2539,13 @@ callBuiltin "ecrecover" [h', v', r', s'] = do
     v <- int v'
     rIntHash <- case r' of
       SInteger r -> pure r
-      SString r -> case Builtin.parseBaseInt r 16 of
+      SString r -> case Casts.int (r, 16 :: Integer) of
         Right x -> return x
         _ -> invalidArguments "parseHex: error parsing r: " r
       _ -> invalidArguments "ecrecover: r must be a hex string or an integer" r'
     sIntHash <- case s' of
       SInteger s -> pure s
-      SString s -> case Builtin.parseBaseInt s 16 of
+      SString s -> case Casts.int (s, 16 :: Integer) of
         Right y -> return y
         _ -> invalidArguments "parseHex: error parsing s: " s
       _ -> invalidArguments "ecrecover: s must be a hex string or an integer" s'

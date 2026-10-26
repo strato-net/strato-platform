@@ -45,6 +45,8 @@ data SomeFields = forall ts. SomeFields (Fields ts)
 
 data SomeSig = forall args r. SomeSig (Sig args r)
 
+data SomeFunction = forall args r. SomeFunction (Sig args r) (Code (Fn args r))
+
 data FunEntry = FunEntry (C SomeSig) (C Fun)
 
 data CCtx = CCtx
@@ -1396,14 +1398,12 @@ compileCall sc callee args = case callee of
       EMIT_BEGIN (fmap (keccak256ToByteString . hash) . compiled_0)
       EMIT_END)
     _ -> builtinCall TStr "keccak256"
-  S.Variable _ n | n `elem` ["create", "create2", "ecrecover"] -> builtinCall TAddr n
-  S.Variable _ n | n `elem` ["addmod", "mulmod"] -> builtinCall TInt n
-  S.Variable _ "selfdestruct" -> builtinCall TBool "selfdestruct"
-  S.MemberAccess _ (S.Variable _ "abi") "encodePacked" -> builtinCall TBytes "abiEncodePacked"
-  S.MemberAccess _ (S.Variable _ "abi") "encode" -> builtinCall TBytes "abiEncode"
+  S.MemberAccess _ (S.Variable _ "abi") member ->
+    fromMaybe (unknown ("builtin abi." <> member)) (lookupBuiltinCall sc True ("abi." <> member) args)
   S.MemberAccess _ target "derive" -> deriveCall target
   S.Variable _ "derive" -> deriveCall (S.Variable (S.extractExpression callee) "this")
   S.Variable _ n | Just k <- castTarget n -> cast k
+  S.Variable _ n | Just call <- lookupBuiltinCall sc False n args -> call
   S.Variable _ n | Just names <- lookupEnum c n -> case args of
     [x] -> do f <- compileAs sc TInt x
               pure $ CE (TEnum n names) $ (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (\env_1 -> do {v_2 <- compiled_0 env_1;
@@ -1639,14 +1639,11 @@ compileCall sc callee args = case callee of
 
     builtinCall :: Ty t -> T.Text -> C (CE ls)
     builtinCall t name = do
-      selected <- maybe (unknown ("builtin " <> name)) pure (Builtins.lookupAction name)
-      let action = builtinCode name selected
-          abiMember = case callee of S.MemberAccess _ (S.Variable _ "abi") _ -> True; _ -> False
-      f <- dynArgs args
-      pure $ CE t $ (CAPTURE2 f action $ \compiled_0 compiled_1 -> EMIT_BEGIN (\env_2 -> do {ds_3 <- compiled_0 env_2;
-        when abiMember $ (chargeGas 1 >> chargeGas 1);
-        compiled_1 ds_3 >>= fromDyn t})
-        EMIT_END)
+      let abiMember = case callee of S.MemberAccess _ (S.Variable _ "abi") _ -> True; _ -> False
+      selected <- maybe (unknown ("builtin " <> name)) pure (lookupBuiltinCall sc abiMember name args)
+      CE actual action <- selected
+      Refl <- sameTy t actual
+      pure $ CE t action
 
     lowLevel :: CallKind -> Expression -> C (CE ls)
     lowLevel kind target = do
@@ -1701,6 +1698,8 @@ compileCall sc callee args = case callee of
     typedArgs = compileTypedArgs sc
 
     dynArgs = compileDynArgs sc
+
+#include "BuiltinCalls.inc"
 
 compileTypedArgs :: Scope ls r -> Sig args r' -> [Expression] -> C (Code (Env ls -> M [Dyn]))
 compileTypedArgs _ (SigNil _) [] = pure (constantFunction (pureAction (primitiveCode EmptyListPrimitive)))
