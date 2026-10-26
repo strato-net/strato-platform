@@ -87,6 +87,7 @@ tests:
     - composable-monads-base
     - directory
     - filepath
+    - hflags
     - hspec
     - strato-index
     - strato-model

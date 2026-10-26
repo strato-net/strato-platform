@@ -114,6 +114,7 @@ test-suite strato-index-test
     , composable-monads-base
     , directory
     , filepath
+    , hflags
     , hspec
     , strato-index
     , strato-model
