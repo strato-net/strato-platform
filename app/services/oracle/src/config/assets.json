@@ -389,6 +389,17 @@
             "XAG": "silver"
           }
         },
+        "MetalsAPI": {
+          "url": "https://metals-api.com/api/latest",
+          "params": "access_key,base=USD,symbols",
+          "parse": "rates.USD{symbol}",
+          "timestamp": "timestamp",
+          "apiKeyEnvVar": "METALS_API_API_KEY",
+          "assets": [
+            "XAU",
+            "XAG"
+          ]
+        },
         "Pure": {
           "url": "https://api.collectpure.com/marketplace/get-spot-price/v1",
           "headers": "x-api-key",
@@ -455,6 +466,32 @@
             "DOGE": "dogecoin",
             "CBDOGE": "coinbase-wrapped-doge",
             "BOOE": "book-of-ethereum"
+          }
+        },
+        "CoinAPI": {
+          "url": "https://rest.coinapi.io/v1/assets",
+          "params": "filter_asset_id",
+          "headers": "X-CoinAPI-Key",
+          "parse": "assets",
+          "timestamp": "data_quote_start",
+          "apiKeyEnvVar": "COINAPI_API_KEY",
+          "assets": [
+            "ETH",
+            "WBTC",
+            "PAXG",
+            "XAUT",
+            "USDC",
+            "USDT",
+            "TSLAX",
+            "SPY",
+            "SPYX",
+            "WEETH",
+            "WHYPE",
+            "KHYPE",
+            "DOGE"
+          ],
+          "symbolMapping": {
+            "WHYPE": "HYPE"
           }
         },
         "Kraken": {
@@ -1033,6 +1070,17 @@
             "XAG": "silver"
           }
         },
+        "MetalsAPI": {
+          "url": "https://metals-api.com/api/latest",
+          "params": "access_key,base=USD,symbols",
+          "parse": "rates.USD{symbol}",
+          "timestamp": "timestamp",
+          "apiKeyEnvVar": "METALS_API_API_KEY",
+          "assets": [
+            "XAU",
+            "XAG"
+          ]
+        },
         "Pure": {
           "url": "https://api.collectpure.com/marketplace/get-spot-price/v1",
           "headers": "x-api-key",
@@ -1099,6 +1147,32 @@
             "DOGE": "dogecoin",
             "CBDOGE": "coinbase-wrapped-doge",
             "BOOE": "book-of-ethereum"
+          }
+        },
+        "CoinAPI": {
+          "url": "https://rest.coinapi.io/v1/assets",
+          "params": "filter_asset_id",
+          "headers": "X-CoinAPI-Key",
+          "parse": "assets",
+          "timestamp": "data_quote_start",
+          "apiKeyEnvVar": "COINAPI_API_KEY",
+          "assets": [
+            "ETH",
+            "WBTC",
+            "PAXG",
+            "XAUT",
+            "USDC",
+            "USDT",
+            "TSLAX",
+            "SPY",
+            "SPYX",
+            "WEETH",
+            "WHYPE",
+            "KHYPE",
+            "DOGE"
+          ],
+          "symbolMapping": {
+            "WHYPE": "HYPE"
           }
         },
         "Kraken": {

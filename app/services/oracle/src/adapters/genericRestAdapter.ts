@@ -193,6 +193,17 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
         
+    // CoinAPI: assets array
+    } else if (parsePattern === 'assets' && Array.isArray(data)) {
+        symbols.forEach(symbol => {
+            const assetId = sourceConfig.symbolMapping?.[symbol] || symbol;
+            const assetData = data.find((a: any) => a.asset_id === assetId);
+            if (assetData?.price_usd) {
+                const price = Math.floor(parseFloat(assetData.price_usd) * 1e18);
+                if (isValidPrice(price)) result[symbol] = { price, feedTimestamp: assetData.data_quote_start || new Date().toISOString() };
+            }
+        });
+        
     // DefiLlama: coins.{coinId}.price
     } else if (parsePattern === 'defiLlama' && data.coins) {
         symbols.forEach(symbol => {
@@ -221,12 +232,20 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
         
-    // Metals.dev
-    } else if (parsePattern.includes('metals.{metal}')) {
+    // Metals.dev / MetalsAPI
+    } else if (parsePattern.includes('metals.{metal}') || parsePattern.includes('rates.USD{symbol}')) {
         symbols.forEach(symbol => {
-            const metalKey = sourceConfig.symbolMapping?.[symbol] || symbol;
-            const priceUSD = parseFloat(data.metals[metalKey]);
-            const ts = data.timestamps?.metal || new Date().toISOString();
+            let priceUSD: number;
+            let ts: string;
+            
+            if (parsePattern.includes('metals.{metal}')) {
+                const metalKey = sourceConfig.symbolMapping?.[symbol] || symbol;
+                priceUSD = parseFloat(data.metals[metalKey]);
+                ts = data.timestamps?.metal || new Date().toISOString();
+            } else {
+                priceUSD = parseFloat(data.rates[`USD${symbol}`]);
+                ts = data.timestamp ? new Date(data.timestamp * 1000).toISOString() : new Date().toISOString();
+            }
             
             if (!isNaN(priceUSD) && priceUSD > 0) {
                 const price = Math.floor(priceUSD * 1e18);
