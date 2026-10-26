@@ -53,7 +53,7 @@ import Data.Foldable (for_)
 import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Time.Clock (getCurrentTime)
-import UnliftIO (MonadIO, MonadUnliftIO, liftIO, throwIO)
+import UnliftIO (MonadIO, liftIO, throwIO)
 import UnliftIO.Exception (tryIO)
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
@@ -119,7 +119,7 @@ data SqlGroupReconciliation
 -- would lose the backlog for good. A backlog that cannot be read is kept
 -- the same way, and the node goes on without it: a drain that throws would
 -- otherwise take strato-indexer down on every start.
-reconcileSqlConsumerGroup :: (MonadLogger m, MonadUnliftIO m, HasStreaming m, HasSQLDB m) => Text -> m SqlGroupReconciliation
+reconcileSqlConsumerGroup :: (MonadLogger m, HasStreaming m, HasSQLDB m) => Text -> m SqlGroupReconciliation
 reconcileSqlConsumerGroup cell = reconcileSqlConsumerGroupWith (holdsWriterLease cell) (indexAPI cell)
 
 -- | 'reconcileSqlConsumerGroup' with the lease check and the SQL writer
@@ -159,7 +159,7 @@ reconcileSqlConsumerGroupWith holdsLease writeSql = do
 -- (@--writer=false@) does not wait at all, its SQL is the writer's. Either
 -- way, not holding the lease at the end keeps the group and everything it
 -- pins, logged once, until the cell is next started as the writer.
-awaitLeaseAndReconcile :: (MonadLogger m, MonadUnliftIO m, HasStreaming m, HasSQLDB m) => Bool -> Text -> m SqlGroupReconciliation
+awaitLeaseAndReconcile :: (MonadLogger m, HasStreaming m, HasSQLDB m) => Bool -> Text -> m SqlGroupReconciliation
 awaitLeaseAndReconcile writer cell =
   awaitLeaseAndReconcileWith (if writer then 60 else 0) 1000000 (holdsWriterLease cell) whoHolds (indexAPI cell)
   where
