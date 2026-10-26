@@ -459,7 +459,7 @@
           "url": "https://api.kraken.com/0/public/Trades",
           "params": "pair,assetVersion=1,count=1",
           "parse": "kraken",
-          "comment": "Public, no API key. Fetches the latest trade and its timestamp separately for each pair. assetVersion=1 uses display names (ETH/USD, BTC/USD); WHYPE is priced as native HYPE. Any failed pair fails this source for the cycle.",
+          "comment": "Public, no API key. Fetches the latest trade and its timestamp separately for each pair. assetVersion=1 uses display names (ETH/USD, BTC/USD); WHYPE is priced as native HYPE. A failed pair drops only that asset for the cycle.",
           "assets": [
             "ETH",
             "WBTC",
@@ -1105,7 +1105,7 @@
           "url": "https://api.kraken.com/0/public/Trades",
           "params": "pair,assetVersion=1,count=1",
           "parse": "kraken",
-          "comment": "Public, no API key. Fetches the latest trade and its timestamp separately for each pair. assetVersion=1 uses display names (ETH/USD, BTC/USD); WHYPE is priced as native HYPE. Any failed pair fails this source for the cycle.",
+          "comment": "Public, no API key. Fetches the latest trade and its timestamp separately for each pair. assetVersion=1 uses display names (ETH/USD, BTC/USD); WHYPE is priced as native HYPE. A failed pair drops only that asset for the cycle.",
           "assets": [
             "ETH",
             "WBTC",

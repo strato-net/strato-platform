@@ -55,16 +55,30 @@ test('Kraken rejects a quote without a valid trade timestamp instead of substitu
     assert.equal(logError.mock.callCount(), 10);
 });
 
-test('Kraken preserves provider error reporting when one pair fails', async t => {
-    const logError = t.mock.method(logger, 'logError', () => {});
-    t.mock.method(apiClient, 'apiRequest', async (request: { url: string }) => ({
-        data: new URL(request.url).searchParams.get('pair') === 'ETH/USD'
-            ? { error: [], result: { 'ETH/USD': [quotes[0].trade] } }
-            : { error: ['EQuery:Unknown asset pair'], result: {} },
-    }));
+for (const [failure, wbtcResponse, logged] of [
+    ['provider error', { error: ['EQuery:Unknown asset pair'], result: {} }, /Kraken: EQuery:Unknown asset pair/],
+    ['parse miss', { error: [], result: { 'WBTC/USD': [] } }, /no prices parsed for \[WBTC\]/],
+] as const) {
+    test(`Kraken drops and logs only the pair with a ${failure}`, async t => {
+        const logError = t.mock.method(logger, 'logError', () => {});
+        t.mock.method(apiClient, 'apiRequest', async (request: { url: string }) => ({
+            data: new URL(request.url).searchParams.get('pair') === 'ETH/USD'
+                ? { error: [], result: { 'ETH/USD': [quotes[0].trade] } }
+                : wbtcResponse,
+        }));
 
-    await assert.rejects(fetchPrices({ ...kraken, assets: ['ETH', 'WBTC'] }), /Kraken: EQuery:Unknown asset pair/);
-    assert.equal(logError.mock.callCount(), 1);
+        const prices = await fetchPrices({ ...kraken, assets: ['ETH', 'WBTC'] });
+        assert.deepEqual(prices, { ETH: { price: quotes[0].price, feedTimestamp: quotes[0].feedTimestamp } });
+        assert.equal(logError.mock.callCount(), 1);
+        assert.match(logError.mock.calls[0].arguments[1]!.message, logged);
+    });
+}
+
+test('Kraken fails the source when every pair fails', async t => {
+    const logError = t.mock.method(logger, 'logError', () => {});
+    t.mock.method(apiClient, 'apiRequest', async () => ({ data: { error: [], result: {} } }));
+    await assert.rejects(fetchPrices({ ...kraken, assets: ['ETH', 'WBTC'] }), /no prices parsed for \[ETH\]/);
+    assert.equal(logError.mock.callCount(), 2);
 });
 
 test('Kraken rejects an empty trade response', async t => {

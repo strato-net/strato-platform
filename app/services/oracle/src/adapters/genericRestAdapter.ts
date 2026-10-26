@@ -32,12 +32,15 @@ export function generateConstantPrices(assetKeys: string[], assets: Record<strin
 
 // Main fetch function - uses sourceConfig directly
 export async function fetchPrices(sourceConfig: SourceConfig): Promise<BatchPriceResult> {
-    // Kraken Trades accepts one pair per request.
+    // Kraken Trades accepts one pair per request. A failed pair is already logged and drops only that asset;
+    // the source fails only when every pair fails.
     if (sourceConfig.parse === 'kraken' && sourceConfig.assets.length > 1) {
-        const results = await Promise.all(sourceConfig.assets.map(symbol =>
+        const results = await Promise.allSettled(sourceConfig.assets.map(symbol =>
             fetchPrices({ ...sourceConfig, assets: [symbol] })
         ));
-        return Object.assign({}, ...results);
+        const prices = results.flatMap(r => r.status === 'fulfilled' ? [r.value] : []);
+        if (prices.length === 0) throw (results[0] as PromiseRejectedResult).reason;
+        return Object.assign({}, ...prices);
     }
 
     const url = buildUrl(sourceConfig);
