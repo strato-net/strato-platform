@@ -22,9 +22,7 @@ module Blockchain.SyncDB
     getSyncStatus,
     getSyncStatusNow,
     getCirrusBestBlockNumber,
-    updateCirrusBestBlockNumber,
-    getVmBestBlockNumber,
-    updateVmBestBlockNumber
+    updateCirrusBestBlockNumber
   )
 where
 
@@ -36,16 +34,20 @@ import           Blockchain.Model.SyncTask
 import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.RedisBlockDB.Models as Models
-import           Control.Concurrent                    (threadDelay)
+import           Control.Concurrent                    (myThreadId, threadDelay)
 import           Control.Monad
 import           Control.Monad.Composable.Base         (Eff, Logger, runEff)
-import           Control.Monad.Composable.SQL
+import           Control.Monad.Reader                  (ask)
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
 import qualified Data.Text                             as T
 import           Data.Time
+import qualified Data.UUID                             as UUID
+import qualified Data.UUID.V4                          as UUID
+import           System.IO.Unsafe                      (unsafePerformIO)
 import           Database.Esqueleto.Legacy
 import qualified Database.Persist.Sql                  as SQL
+import           Database.Persist.SqlBackend           (getRDBMS)
 import           Database.Redis                        (Redis, RedisCtx)
 import qualified Database.Redis                        as REDIS
 import           System.Random                         (randomIO)
@@ -57,26 +59,6 @@ newtype SyncStatus = SyncStatus { unSyncStatus :: Bool }
 
 liftLog :: MonadIO m => Eff '[Logger] a -> m a
 liftLog = liftIO . runEff . runLogging
-
-inNamespace ::
-  RedisDBKeyable k =>
-  BlockDBNamespace ->
-  k ->
-  S8.ByteString
-inNamespace ns k = ns' `S8.append` toKey k
-  where
-    ns' = namespaceToKeyPrefix ns
-
-namespaceToKeyPrefix :: BlockDBNamespace -> S8.ByteString
-namespaceToKeyPrefix ns = case ns of
-  Headers            -> "h:"
-  Transactions       -> "t:"
-  Numbers            -> "n:"
-  Uncles             -> "u:"
-  Parent             -> "p:"
-  Children           -> "c:"
-  Canonical          -> "q:"
-  Validators         -> "validators"
 
 bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"
@@ -91,27 +73,9 @@ putBestBlockInfo ::
   Integer ->
   Redis (Either REDIS.Reply REDIS.Status)
 putBestBlockInfo newSha newNumber = do
-  --liftIO . putStrLn . ("New args" ++) $ show (keccak256ToHex newSha, newNumber, newTDiff)
-  oldBBI' <- getBestBlockInfo
-  case oldBBI' of
-    Nothing -> return (Left $ REDIS.SingleLine "Got no block from getBetstBlockInfo")
-    Just (BestBlock oldSha oldNumber) -> do
-      --liftIO . putStrLn . ("Old args" ++) $ show (keccak256ToHex oldSha, oldNumber, oldTDiff)
-      helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
-      case helper' of
-        Left err -> error $ "god save the queen! " ++ show err
-        Right (updates, deletions) -> do
-          --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (keccak256ToHex x, y)) <$> updates)
-          --liftIO . putStrLn $ "Deletions: \n" ++ show deletions
-          res <- REDIS.multiExec $ do
-            forM_ updates $ \(sha, num) -> REDIS.set (inNamespace Canonical num) (toValue sha)
-            unless (null deletions) . void . REDIS.del $ inNamespace Canonical . toKey <$> deletions
-            forceBestBlockInfo newSha newNumber
-          checkAndUpdateSyncStatus
-          case res of
-            REDIS.TxSuccess _ -> return $ Right REDIS.Ok
-            REDIS.TxAborted -> return . Left $ REDIS.SingleLine (S8.pack "Aborted")
-            REDIS.TxError e -> return . Left $ REDIS.SingleLine (S8.pack e)
+  result <- forceBestBlockInfo newSha newNumber
+  checkAndUpdateSyncStatus
+  return result
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> m (f REDIS.Status)
@@ -330,27 +294,6 @@ updateCirrusBestBlockNumber n = do
   current <- getCirrusBestBlockNumber
   when (maybe True (< n) current) . void $ REDIS.set cirrusBestBlockNumberKey (toValue n)
 
-vmBestBlockNumberKey :: S8.ByteString
-vmBestBlockNumberKey = "<vm_best>"
-{-# INLINE vmBestBlockNumberKey #-}
-
--- | Highest block number the vm-runner has finished executing. Written by the
--- vm-runner after each block, so it moves in real time; the indexer-written
--- @<best>@ only advances once per vm-runner batch after the indexer has
--- committed that batch to SQL.
-getVmBestBlockNumber :: Redis (Maybe Integer)
-getVmBestBlockNumber = fmap fromValue . eitherToMaybe <$> REDIS.get vmBestBlockNumberKey
-  where
-    eitherToMaybe :: Either a (Maybe b) -> Maybe b
-    eitherToMaybe (Left _)  = Nothing
-    eitherToMaybe (Right a) = a
-
--- | Monotonic, like 'updateCirrusBestBlockNumber'.
-updateVmBestBlockNumber :: Integer -> Redis ()
-updateVmBestBlockNumber n = do
-  current <- getVmBestBlockNumber
-  when (maybe True (< n) current) . void $ REDIS.set vmBestBlockNumberKey (toValue n)
-
 getSyncStatus :: Redis (Maybe Bool)
 getSyncStatus = fmap fromValue . eitherToMaybe <$> REDIS.get syncStatusKey
   where
@@ -362,27 +305,43 @@ putSyncStatus :: RedisCtx m f => Bool -> m (f REDIS.Status)
 putSyncStatus status = REDIS.set syncStatusKey $ toValue status
 
 class HasSyncDB m where
-  clearAllSyncTasks :: Host -> m ()
-  getCurrentSyncTask :: Host -> m (Maybe SyncTask)
+  clearAllSyncTasks :: m ()
+  getCurrentSyncTask :: m (Maybe SyncTask)
   getNewSyncTask :: Host -> Integer -> m (Maybe SyncTask)
-  setSyncTaskFinished :: Host -> m ()
-  setSyncTaskNotReady :: Host -> m ()
+  setSyncTaskFinished :: SyncTask -> m ()
+  setSyncTaskNotReady :: m ()
+  reopenSyncTask :: Integer -> m ()
 
-instance HasSQL m => HasSyncDB m where
-  clearAllSyncTasks host = sqlQuery $ do
+-- Each handler has its own thread; the process namespace prevents ID reuse
+-- after a restart, without passing a connection ID through the P2P monad.
+{-# NOINLINE syncProcessId #-}
+syncProcessId :: UUID.UUID
+syncProcessId = unsafePerformIO UUID.nextRandom
+
+syncConnectionId :: IO T.Text
+syncConnectionId = do
+  thread <- myThreadId
+  return $ UUID.toText syncProcessId <> ":" <> T.pack (show thread)
+
+-- Sync tasks live in the peer store, which on a cell is not the eth
+-- database (see "Blockchain.DBM").
+instance HasPeerStore m => HasSyncDB m where
+  clearAllSyncTasks = peerQuery $ do
+    connectionId <- liftIO syncConnectionId
     rawExecute
         [r|
             UPDATE "sync_task"
-            SET "host" = ''
-            WHERE "host" = ?
+            SET "connection_id" = NULL
+            WHERE "connection_id" = ?
         |]
-        [toPersistValue host]
+        [toPersistValue connectionId]
 
-  getCurrentSyncTask host = sqlQuery $ do
+  getCurrentSyncTask = peerQuery $ do
+    connectionId <- liftIO syncConnectionId
     vals <-
         select $ from $ \syncTask -> do
           where_ (
-            (syncTask^.SyncTaskHost ==. val host)
+            (syncTask^.SyncTaskConnectionId ==. val (Just connectionId))
             &&.
             (syncTask ^. SyncTaskStatus ==. val Assigned)
             )
@@ -398,14 +357,37 @@ instance HasSQL m => HasSyncDB m where
       _ -> error $ CL.red $ "multiple sync tasks found in call to getCurrentSyncTask:\n" ++ unlines (map (format . entityVal) vals)
 
   getNewSyncTask "127.0.0.1" _ = return Nothing -- empirically, I've observed a lot of wasted time trying to sync from the loopback....  Probably should just stop self-connect from even happening, but for now I'll just filter it out here
-  getNewSyncTask host highestBlockNum = sqlQuery $ do
+  getNewSyncTask host highestBlockNum = peerQuery $ do
+    connectionId <- liftIO syncConnectionId
     now <- liftIO getCurrentTime
     let oneMinuteAgo = addUTCTime (-60) now
+    rdbms <- getRDBMS <$> ask
 
-    result <- rawSql
+    -- The SQLite peer store has no row locks (a writer holds the whole file
+    -- for its transaction, which serialises the two processes as FOR UPDATE
+    -- SKIP LOCKED does on Postgres), no sequences (the insert numbers the
+    -- new chiliad from the highest one present, which is what the chiliad
+    -- sequence yields on a table that only ever grows) and no now().
+    result <- if rdbms == "sqlite"
+      then rawSql
         [r|
             UPDATE "sync_task"
-            SET "host" = ?, "assignment_time" = ?, "status" = 'Assigned'
+            SET "host" = ?, "assignment_time" = ?, "status" = 'Assigned', "connection_id" = ?
+            WHERE "id" = (
+                SELECT "id"
+                FROM "sync_task"
+                WHERE "assignment_time" < ?
+                  AND "status" != 'Finished'
+                ORDER BY "assignment_time" ASC
+                LIMIT 1
+            )
+            RETURNING ??
+        |]
+        [toPersistValue host, toPersistValue now, toPersistValue connectionId, toPersistValue oneMinuteAgo]
+      else rawSql
+        [r|
+            UPDATE "sync_task"
+            SET "host" = ?, "assignment_time" = ?, "status" = 'Assigned', "connection_id" = ?
             WHERE "id" = (
                 SELECT "id"
                 FROM "sync_task"
@@ -415,43 +397,81 @@ instance HasSQL m => HasSyncDB m where
                 LIMIT 1
                 FOR UPDATE SKIP LOCKED
             )
-            RETURNING
+            RETURNING ??
         |]
-        [toPersistValue host, toPersistValue now, toPersistValue oneMinuteAgo]
+        [toPersistValue host, toPersistValue now, toPersistValue connectionId, toPersistValue oneMinuteAgo]
 
     case result of
       oneTask:_ -> return $ Just $ entityVal oneTask
       [] -> do
-        --No existing task, make a new one
-        results <- SQL.rawSql
-          [r|
-            INSERT INTO sync_task (host)
-            SELECT ?
-            WHERE (select count(*) from "sync_task") < ?
-            RETURNING
-          |] [toPersistValue host, toPersistValue $ 1 + highestBlockNum `div` 1000]
+        -- No existing task, make a new one, unless the chiliad it would get
+        -- lies beyond the peer's tip. The bound is the chiliad about to be
+        -- allocated (MAX + 1 on SQLite, the sequence's next value on
+        -- Postgres), not the row count: a task table seeded at the chiliad of
+        -- the Redis best block (see strato-p2p's initConfig) is sparse, and a
+        -- row count would let tasks past the tip through.
+        results <- if rdbms == "sqlite"
+          then SQL.rawSql
+            [r|
+              INSERT INTO "sync_task" ("chiliad", "assignment_time", "host", "status", "connection_id")
+              SELECT (SELECT COALESCE(MAX("chiliad") + 1, 0) FROM "sync_task"), ?, ?, 'Assigned', ?
+              WHERE (SELECT COALESCE(MAX("chiliad") + 1, 0) FROM "sync_task") < ?
+              RETURNING ??
+            |] [toPersistValue now, toPersistValue host, toPersistValue connectionId, toPersistValue $ 1 + highestBlockNum `div` 1000]
+          else SQL.rawSql
+            [r|
+              INSERT INTO sync_task (host, connection_id)
+              SELECT ?, ?
+              WHERE (SELECT CASE WHEN is_called THEN last_value + 1 ELSE last_value END FROM chiliad) < ?
+              RETURNING ??
+            |] [toPersistValue host, toPersistValue connectionId, toPersistValue $ 1 + highestBlockNum `div` 1000]
 
         case results of
           [v] -> return $ Just $ SQL.entityVal v
           []  -> return Nothing
           _   -> error "this seems impossible, getNewSyncTask tried to create one new task, but multiple were created.  Internal error"
 
-  setSyncTaskFinished host = sqlQuery $ do
+  setSyncTaskFinished task = peerQuery $ do
+    connectionId <- liftIO syncConnectionId
     update $ \syncTask -> do
       set syncTask [SyncTaskStatus =. val Finished]
       where_ (
-        (syncTask^.SyncTaskHost ==. val host)
+        (syncTask^.SyncTaskConnectionId ==. val (Just connectionId))
+        &&.
+        (syncTask^.SyncTaskHost ==. val (syncTaskHost task))
+        &&.
+        (syncTask^.SyncTaskChiliad ==. val (syncTaskChiliad task))
         &&.
         (syncTask^.SyncTaskStatus ==. val Assigned)
         )
     return ()
 
-  setSyncTaskNotReady host = sqlQuery $ do
+  setSyncTaskNotReady = peerQuery $ do
+    connectionId <- liftIO syncConnectionId
     update $ \syncTask -> do
       set syncTask [SyncTaskStatus =. val NotReady]
       where_ (
-        (syncTask^.SyncTaskHost ==. val host)
+        (syncTask^.SyncTaskConnectionId ==. val (Just connectionId))
         &&.
         (syncTask^.SyncTaskStatus ==. val Assigned)
+        )
+    return ()
+
+  -- A chiliad is marked finished once its bodies are downloaded, not once
+  -- they are sequenced, so a block the sequencer drops (e.g. one on the
+  -- malformed-block blacklist) leaves a finished chiliad nothing will ever
+  -- fetch again. Make it assignable, with the epoch as its assignment time so
+  -- 'getNewSyncTask' hands it out before anything else.
+  reopenSyncTask chiliad = peerQuery $ do
+    update $ \syncTask -> do
+      set syncTask
+        [ SyncTaskStatus =. val NotReady,
+          SyncTaskAssignmentTime =. val (UTCTime (fromGregorian 1970 1 1) 0),
+          SyncTaskConnectionId =. val Nothing
+        ]
+      where_ (
+        (syncTask^.SyncTaskChiliad ==. val (fromIntegral chiliad))
+        &&.
+        (syncTask^.SyncTaskStatus ==. val Finished)
         )
     return ()

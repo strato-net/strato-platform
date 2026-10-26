@@ -59,7 +59,6 @@ library
     , http-client
     , http-types
     , lens
-    , merkle-patricia-db
     , monad-alter
     , mtl
     , openapi3
@@ -71,9 +70,11 @@ library
     , solid-vm-model
     , source-tools
     , sql-monad
+    , statedb-monad
     , strato-conf
     , strato-model
     , strato-redis-blockdb
+    , strato-tracing
     , template-haskell
     , text
     , time

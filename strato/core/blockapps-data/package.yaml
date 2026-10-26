@@ -40,11 +40,13 @@ library:
   - generic-random
   - labeled-error
   - lens
-  - merkle-patricia-db
+  - statedb-monad
   - monad-logger
   - network
   - persistent
   - persistent-postgresql
+  - persistent-sqlite
+  - postgresql-simple
   - quickcheck-instances
   - regex-compat
   - resourcet
@@ -56,6 +58,7 @@ library:
   - text
   - time
   - transformers
+  - unix
   - unliftio
   - unliftio-core
 
@@ -67,3 +70,5 @@ tests:
       - blockapps-data
       - bytestring
       - hspec
+      - ethereum-rlp
+      - strato-model

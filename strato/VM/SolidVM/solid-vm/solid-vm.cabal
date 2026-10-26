@@ -32,6 +32,7 @@ library
   ghc-options: -Wall -O2 -fexpose-all-unfoldings -fspecialise-aggressively -fdicts-cheap -fsolve-constant-dicts
   build-depends:
       Decimal
+    , accountdb-monad
     , base
     , base16-bytestring
     , base64-bytestring
@@ -55,7 +56,6 @@ library
     , format
     , lens
     , memory
-    , merkle-patricia-db
     , monad-alter
     , nibblestring
     , ordered-containers
@@ -67,6 +67,7 @@ library
     , solid-vm-parser
     , solid-vm-static-analysis
     , source-tools
+    , statedb-monad
     , strato-conf
     , strato-model
     , text
@@ -90,6 +91,31 @@ executable exprs-needed
     , solid-vm-parser
     , solid-vm-static-analysis
     , text
+  default-language: Haskell2010
+
+test-suite solid-vm-native-check
+  type: exitcode-stdio-1.0
+  main-is: NativeCheck.hs
+  hs-source-dirs:
+      tests/native
+  ghc-options: -O2 -threaded -rtsopts
+  build-depends:
+      base
+    , blockapps-data
+    , common-log
+    , composable-monads-base
+    , hflags
+    , lens
+    , monad-alter
+    , prometheus-client
+    , solid-vm
+    , solid-vm-model
+    , strato-model
+    , text
+    , time
+    , unliftio
+    , vector
+    , vm-tools
   default-language: Haskell2010
 
 test-suite solid-vm-spec
@@ -130,7 +156,6 @@ test-suite solid-vm-spec
     , hspec-expectations-lifted
     , labeled-error
     , lens
-    , merkle-patricia-db
     , monad-alter
     , ordered-containers
     , pairing
@@ -142,6 +167,7 @@ test-suite solid-vm-spec
     , solid-vm-parser
     , solid-vm-static-analysis
     , source-tools
+    , statedb-monad
     , strato-genesis
     , strato-init
     , strato-model

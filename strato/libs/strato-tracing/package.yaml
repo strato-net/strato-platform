@@ -1,0 +1,44 @@
+name:                strato-tracing
+version:             0.1.0.0
+synopsis:            Minimal OpenTelemetry tracing for STRATO processes
+description:         W3C trace context propagation, request spans for WAI apps, and after-the-fact spans for transaction stages, exported as OTLP/JSON to a local collector (the ADOT sidecar or a cell collector). No-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set.
+
+dependencies:
+  - base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - Strato.Tracing
+    - Strato.Tracing.Wai
+  dependencies:
+    - aeson
+    - base16-bytestring
+    - bytestring
+    - containers
+    - http-client
+    - http-types
+    - random
+    - stm
+    - text
+    - time
+    - wai
+  ghc-options:
+    - -Wall
+    - -Werror
+
+benchmarks:
+  tracing-bench:
+    main: TracingBench.hs
+    source-dirs: bench
+    ghc-options: -O2 -threaded -rtsopts "-with-rtsopts=-N2"
+    dependencies:
+      - aeson
+      - bytestring
+      - criterion
+      - http-types
+      - stm
+      - strato-tracing
+      - text
+      - wai
+      - warp

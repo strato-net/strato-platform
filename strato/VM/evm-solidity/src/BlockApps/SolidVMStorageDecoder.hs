@@ -63,8 +63,9 @@ decodeCacheValues = map (first (snd . NE.head)) . decodeCacheValuesWith (const .
         isBasic (StoragePath [Field _, Field fieldBS]) = C8.unpack fieldBS /= "length"
         isBasic _ = False
 
-decodeCacheValuesForCollections :: M.Map StoragePath BasicValue -> [(NE.NonEmpty (Bool, T.Text), Value)]
-decodeCacheValuesForCollections = decodeCacheValuesWith (\_ _ -> True)
+-- Keep collection keys binary until the indexer can apply the declared key type.
+decodeCacheValuesForCollections :: M.Map StoragePath BasicValue -> [(NE.NonEmpty (Bool, B.ByteString), Value)]
+decodeCacheValuesForCollections = HM.toList . synthesizeFlat . M.toList
 
 bsToText :: B.ByteString -> Either String T.Text
 bsToText = first show . decodeUtf8'

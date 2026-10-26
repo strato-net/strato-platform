@@ -76,7 +76,7 @@ getDeltasFromEvents = foldr go mempty
               SAddress a _ -> Just (Validator a)
               -- Fallback for legacy/JSON-derived events whose typed Value was
               -- lost on parse: re-parse the rendered string form.
-              SNULL -> case reads (T.unpack $ eventArgValueString arg) of
+              SString s -> case reads s of
                 [(addr, "")] -> Just (Validator addr)
                 _ -> Nothing
               _ -> Nothing

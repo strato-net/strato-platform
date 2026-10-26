@@ -42,7 +42,8 @@ library
       src/
   ghc-options: -Wall -O2 -fexpose-all-unfoldings -fspecialise-aggressively
   build-depends:
-      aeson
+      accountdb-monad
+    , aeson
     , base
     , binary
     , binary-instances
@@ -71,21 +72,20 @@ library
     , lens
     , leveldb-haskell
     , lrucache
-    , merkle-patricia-db
     , monad-alter
     , mtl
     , nibblestring
-    , nodedb-monad
     , ordered-containers
-    , persistent-sqlite
     , prometheus-client
     , quickcheck-instances
+    , redis-monad
     , resourcet
     , seqevents
     , solid-vm-model
+    , statedb-monad
+    , store
     , strato-conf
     , strato-model
-    , strato-redis-blockdb
     , strato-statediff
     , streaming
     , text
@@ -99,17 +99,21 @@ test-suite contextm-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      ActionEncodeSpec
       CrossLangFixtureSpec
       ReceiptSpec
+      ReplayProtectionSpec
       TypedArgConversionSpec
       Paths_vm_tools
   hs-source-dirs:
       test/
   ghc-options: -Wall -O2 -dynamic
   build-depends:
-      QuickCheck
+      Decimal
+    , QuickCheck
     , base
     , base16-bytestring
+    , binary
     , blockDB
     , blockapps-data
     , blockapps-datadefs
@@ -118,9 +122,12 @@ test-suite contextm-test
     , ethereum-rlp
     , hflags
     , hspec
-    , merkle-patricia-db
+    , ordered-containers
+    , quickcheck-instances
     , solid-vm-model
+    , statedb-monad
     , strato-model
+    , text
     , vector
     , vm-tools
   default-language: Haskell2010

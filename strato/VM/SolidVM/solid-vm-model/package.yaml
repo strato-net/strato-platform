@@ -37,6 +37,7 @@ library:
   - servant-server
   - source-tools
   - store
+  - store-core
   - strato-model
   - openapi3
   - text
@@ -53,6 +54,8 @@ tests:
       - StorageTest
       - ValueBinaryTest
     dependencies:
+      - aeson
+      - base16-bytestring
       - binary
       - bytestring
       - containers
@@ -60,8 +63,10 @@ tests:
       - format
       - hspec
       - persistent
+      - servant-server
       - solid-vm-model
       - strato-model
+      - text
       - unliftio
       - vector
 

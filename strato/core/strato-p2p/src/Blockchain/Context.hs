@@ -48,6 +48,7 @@ module Blockchain.Context
     , getActionTimestamp
     , clearActionTimestamp
     , getPeerByIP
+    , getPeersByIP
     , setPeerAddrIfUnset
     , shouldSendToPeer
     , withActivePeer
@@ -55,7 +56,7 @@ module Blockchain.Context
 
 import           Conduit
 import           Control.Applicative
-import           Control.Exception                       hiding (bracket, catch)
+import           Control.Exception                       hiding (bracket, catch, throwIO)
 import           Control.Lens                            hiding (Context)
 import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.Change.Modify             as Mod
@@ -68,7 +69,6 @@ import qualified Data.ByteString.Char8                   as BC
 import           Data.Conduit.Network
 import           Data.Foldable                           (toList)
 import qualified Data.Kind                               as DK
-import qualified Data.Map.Strict                         as M
 import           Data.Maybe
 import           Data.Proxy
 import qualified Data.Set.Ordered                        as S
@@ -79,9 +79,8 @@ import           GHC.Exts                                (Constraint)
 
 import           BlockApps.Logging
 
-import           Blockchain.BlockDB
+import           Blockchain.BlockDB                     (getCanonical, getHashesByNumber)
 import           Blockchain.Blockstanbul                 (WireMessage)
-import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader
 import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
@@ -90,7 +89,6 @@ import           Blockchain.EthConf
 import qualified Blockchain.EthConf.Model as Conf
 import           Blockchain.Model.SyncState
 import qualified Blockchain.Model.SyncTask               as SYNCTASK
-import           Blockchain.Model.WrappedBlock
 import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka              as SK
@@ -107,11 +105,13 @@ import           Blockchain.Strato.Model.Keccak256
 
 import qualified Blockchain.Strato.RedisBlockDB          as RBDB
 import           Blockchain.SyncDB
-import           Control.Monad                           (void)
+import           Control.Monad                           (unless, void)
 import           Control.Monad.Composable.Base
+import           Control.Monad.Composable.BlockDB (BlockDBEnv, HasBlockDB, runBlockDB)
 import qualified Database.Persist.Sql                    as SQL
 import qualified Database.Redis                          as Redis
 import           Network.Wai.Handler.Warp.Internal       (setSocketCloseOnExec)
+import           Text.Read                               (readMaybe)
 import           UnliftIO
 
 -- TODO: These type families should be exposed by monad-alter, not defined here
@@ -138,6 +138,8 @@ newtype Outbound a = Outbound {unOutbound :: a}
 
 data Config = Config
   { configSQLDB                    :: SQLDB,
+    -- | Peers and sync tasks; the eth pool itself on a monolith.
+    configPeerDB                   :: SQLDB,
     configRedisBlockDB             :: RBDB.RedisConnection,
     configContext                  :: IORef Context,
     configBlockstanbulWireMessages :: IORef (S.OSet Keccak256),
@@ -181,10 +183,11 @@ makeLenses ''Context
 
 newtype GenesisBlockHash = GenesisBlockHash {unGenesisBlockHash :: Keccak256}
 
-type ContextRow = '[ReaderEnv Config, InternalState, VaultData, Logger]
+type ContextRow = '[BlockDBEnv, ReaderEnv Config, InternalState, VaultData, Logger]
 
 newtype ContextM a = ContextM {unContextM :: Eff ContextRow a}
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadReader Config, MonadLogger, MonadLoggerIO, MonadResource, HasVault)
+  deriving newtype (AccessibleEnv BlockDBEnv)
 
 data P2pConduits m = P2pConduits
   { _peerSource :: ConduitM () B.ByteString m (),
@@ -212,13 +215,18 @@ instance RunsClient ContextM where
       let pSource = appSource app
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
+      -- Logged here, where the address is known, and rethrown so the client
+      -- loop's handler can disable the peer: swallowed, every failure was
+      -- followed by a fresh dial five seconds later.
       catch
         (handler conduits)
-        (\(e :: SomeException) -> $logErrorS "runClientConnection/Exception" . T.pack $ show e)
+        (\(e :: SomeException) -> do
+          $logErrorS "runClientConnection/Exception" . T.pack $ show e
+          throwIO e)
 
 instance RunsServer ContextM where
-  runServer (TCPPort listenPort) runner handler = do
-    let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
+  runServer (TCPPort listenPort') runner handler = do
+    let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort' "*"
     runGeneralTCPServer settings $ \app -> runner $ \sSource -> do
       let pSource = appSource app
           pSink = appSink app
@@ -228,17 +236,6 @@ instance RunsServer ContextM where
       catch
         (handler conduits ip pn)
         (\(e :: SomeException) -> $logErrorS "runServer/Exception" . T.pack $ show e)
-
-instance (Keccak256 `A.Alters` BlockHeader) ContextM where
-  lookup _ = RBDB.withRedisBlockDB . getHeader
-  insert _ k v = void . RBDB.withRedisBlockDB $ insertHeader k v
-  delete _ = void . RBDB.withRedisBlockDB . deleteHeader
-  lookupMany _ =
-    fmap (M.fromList . mapMaybe sequenceA)
-      . RBDB.withRedisBlockDB
-      . getHeaders
-  insertMany _ = void . RBDB.withRedisBlockDB . insertHeaders
-  deleteMany _ = void . RBDB.withRedisBlockDB . deleteHeaders
 
 instance Mod.Modifiable WorldBestBlock ContextM where
   get _ =
@@ -272,20 +269,6 @@ instance Mod.Modifiable BestSequencedBlock ContextM where
     RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case
       Left err -> error $ "Failed to update best sequenced block in Redis: " ++ show err
       Right _ -> return ()
-
-instance A.Selectable Integer (Canonical BlockHeader) ContextM where
-  select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ getCanonicalHeader i
-
-instance (Keccak256 `A.Alters` OutputBlock) ContextM where
-  lookup _ = RBDB.withRedisBlockDB . getBlock
-  insert _ k v = void . RBDB.withRedisBlockDB $ insertBlock k v
-  delete _ = void . RBDB.withRedisBlockDB . deleteBlock
-  lookupMany _ =
-    fmap (M.fromList . mapMaybe sequenceA)
-      . RBDB.withRedisBlockDB
-      . getBlocks
-  insertMany _ = void . RBDB.withRedisBlockDB . insertBlocks
-  deleteMany _ = void . RBDB.withRedisBlockDB . deleteBlocks
 
 instance (Keccak256 `A.Alters` Proxy (Inbound WireMessage)) ContextM where
   lookup _ k = do
@@ -334,8 +317,20 @@ instance ((Host, Keccak256) `A.Alters` Proxy (Outbound WireMessage)) ContextM wh
     Mod.modifyStatefully_ (Mod.Proxy @Context) $
       outboundWireMessages %= S.delete k
 
+-- | The genesis hash for the handshake, from Redis so a node without the SQL
+-- block index (strato-indexer --sql=false, a lite validator) can answer: the
+-- canonical entry q:0 when the node has one, else the single hash recorded
+-- under block number 0. The second form is what a node syncing from genesis
+-- has: the canonical map is only written from the first NewBestBlock, and the
+-- genesis bootstrap emits none. The SQL row is the last resort.
 instance Mod.Accessible GenesisBlockHash ContextM where
-  access _ = GenesisBlockHash <$> getGenesisBlockHash
+  access _ =
+    RBDB.withRedisBlockDB (getCanonical 0) >>= \case
+      Just sha -> return $ GenesisBlockHash sha
+      Nothing ->
+        RBDB.withRedisBlockDB (getHashesByNumber 0) >>= \case
+          [sha] -> return $ GenesisBlockHash sha
+          _ -> GenesisBlockHash <$> getGenesisBlockHash
 
 instance Mod.Modifiable Context ContextM where
   get _ = readIORef =<< asks configContext
@@ -433,17 +428,26 @@ instance Mod.Accessible RBDB.RedisConnection ContextM where
 instance AccessibleEnv SQLDB ContextM where
   accessEnv = asks configSQLDB
 
+instance AccessibleEnv PeerStore ContextM where
+  accessEnv = asks (PeerStore . configPeerDB)
+
+-- | Every stored record for a host: a peer can be stored under a DNS name
+-- (with its resolved address in pPeerIp) as well as under the address itself.
+peersByHost :: Host -> ContextM [PPeer]
+peersByHost host' = map SQL.entityVal <$> peerQuery (SQL.selectList filters [])
+  where
+    byHost = [PPeerHost SQL.==. host']
+    filters = maybe byHost (\ip -> byHost SQL.||. [PPeerIp SQL.==. Just ip]) (readMaybe $ hostToString host')
+
 instance A.Selectable Host PPeer ContextM where
-  select _ host' =
-    sqlQuery actions >>= \case
-      [] -> return Nothing
-      (x:_) -> return . Just $ SQL.entityVal x
-    where
-      actions = SQL.selectList [PPeerHost SQL.==. host'] []
+  select _ = fmap listToMaybe . peersByHost
+
+instance A.Selectable Host [PPeer] ContextM where
+  select _ = fmap Just . peersByHost
 
 instance A.Selectable Point PPeer ContextM where
   select _ pk =
-    sqlQuery actions >>= \case
+    peerQuery actions >>= \case
       [] -> return Nothing
       (x:_) -> return . Just $ SQL.entityVal x
     where
@@ -461,6 +465,7 @@ type MonadP2P m =
     MonadResource m,
     MonadUnliftIO m,
     HasVault m,
+    HasBlockDB m,
     HasSyncDB m,
     HasPeerDB m,
     m `Mod.Outputs` [IngestEvent],
@@ -486,16 +491,13 @@ type MonadP2P m =
       m,
     All2
       '[A.Selectable]
-      '[ '(Integer, Canonical BlockHeader),
-         '((Host, UDPPort, B.ByteString), Point),
-         '(Host, PPeer)
+      '[ '(Host, PPeer),
+         '(Host, [PPeer])
        ]
       m,
     All2
       '[A.Alters]
-      '[ '(Keccak256, BlockHeader),
-         '(Keccak256, OutputBlock),
-         '(Keccak256, Proxy (Inbound WireMessage)),
+      '[ '(Keccak256, Proxy (Inbound WireMessage)),
          '((Host, Keccak256), Proxy (Outbound WireMessage))
        ]
       m
@@ -527,16 +529,53 @@ clearActionTimestamp :: Mod.Modifiable ActionTimestamp m => m ()
 clearActionTimestamp = Mod.put (Proxy @ActionTimestamp) emptyActionTimestamp
 
 runContextM :: Config -> ContextM a -> Eff '[VaultData, Logger] ()
-runContextM r (ContextM m) = void . withResources $ withReaderEnv r m
+runContextM r (ContextM m) = void . withResources $ withReaderEnv r $ runBlockDB (configSQLDB r) m
 
 initConfig :: (MonadLogger m, MonadUnliftIO m) => IORef (S.OSet Keccak256) -> m Config
 initConfig wireMessagesRef = do
   dbs <- openDBs
 
-  runSqlPool (SQL.rawExecute "CREATE SEQUENCE IF NOT EXISTS chiliad MINVALUE 0 START 0;" []) $ sqlDB' dbs
-  runSqlPool (SQL.runMigration SYNCTASK.migrateAll) $ sqlDB' dbs
+  -- The chiliad sequence numbers sync tasks on Postgres; the SQLite peer
+  -- store numbers them in the insert itself (see "Blockchain.SyncDB").
+  unless peerStoreIsSqlite $
+    runSqlPool (SQL.rawExecute "CREATE SEQUENCE IF NOT EXISTS chiliad MINVALUE 0 START 0;" []) $ peerDB' dbs
+  runSqlPool (runPeerStoreMigration SYNCTASK.migrateAll) $ peerDB' dbs
 
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+
+  -- Sync tasks are numbered by chiliad: from a Postgres sequence, or on SQLite
+  -- from the highest task present. A node restored from a snapshot without
+  -- its databases, or with a fresh peer store, starts both at 0 and would set
+  -- out to download the whole chain in 1000-block tasks before reaching the
+  -- blocks it misses; a node that kept up by gossip for a long time has a
+  -- sequence far behind its chain. Start the next task at the chiliad of the
+  -- best block Redis holds, and retire unfinished tasks below it: those
+  -- blocks are already here. This runs on every role; cores sharing a peer
+  -- database may run it at the same time, which is harmless: the UPDATE is
+  -- idempotent and GREATEST keeps the sequence monotonic.
+  bestBlock <- liftIO $ Redis.runRedis redisBDBPool getBestBlockInfo
+  case bestBlock of
+    Just (BestBlock _ n) | n >= 1000 -> do
+      let chiliad = n `div` 1000
+          chiliadV = SQL.PersistInt64 (fromIntegral chiliad)
+      $logInfoS "initConfig/syncTasks" . T.pack $
+        "Redis best block is #" ++ show n ++ ": sync tasks start at chiliad " ++ show chiliad ++ ", unfinished tasks below it are retired"
+      runSqlPool (SQL.rawExecute "UPDATE sync_task SET status = 'Finished' WHERE chiliad < ? AND status != 'Finished'" [chiliadV]) $ peerDB' dbs
+      if peerStoreIsSqlite
+        then do
+          -- The SQLite insert numbers a new task from MAX(chiliad) + 1, so a
+          -- finished placeholder one below the target makes the next task the target.
+          now <- liftIO getCurrentTime
+          let placeholder = SQL.PersistInt64 (fromIntegral (chiliad - 1))
+          runSqlPool
+            (SQL.rawExecute "INSERT INTO sync_task (chiliad, assignment_time, host, status) SELECT ?, ?, '', 'Finished' WHERE (SELECT COALESCE(MAX(chiliad), -1) FROM sync_task) < ?" [placeholder, SQL.toPersistValue now, placeholder])
+            $ peerDB' dbs
+        else do
+          (_ :: [SQL.Single Int]) <-
+            runSqlPool (SQL.rawSql "SELECT setval('chiliad', GREATEST((SELECT COALESCE(MAX(chiliad), -1) + 1 FROM sync_task), ?), false)" [chiliadV]) $ peerDB' dbs
+          return ()
+    _ -> return ()
+
   initState <- initContext
   initStateF <- newIORef initState
   let k = Conf.streamingConfig ethConf
@@ -545,6 +584,7 @@ initConfig wireMessagesRef = do
   lastResyncRef <- newIORef $ LastResync Nothing
   return $ Config
     { configSQLDB = sqlDB' dbs
+    , configPeerDB = peerDB' dbs
     , configRedisBlockDB = RBDB.RedisConnection redisBDBPool
     , configContext = initStateF
     , configBlockstanbulWireMessages = wireMessagesRef
@@ -567,6 +607,12 @@ getPeerByIP ::
   Host ->
   m (Maybe PPeer)
 getPeerByIP = A.select (Proxy @PPeer)
+
+getPeersByIP ::
+  A.Selectable Host [PPeer] m =>
+  Host ->
+  m [PPeer]
+getPeersByIP = fmap (fromMaybe []) . A.select (Proxy @[PPeer])
 
 setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => Address -> m ()
 setPeerAddrIfUnset addr = Mod.modify_ (Proxy @PeerAddress) $ pure . withPeerAddress (<|> Just addr)

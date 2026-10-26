@@ -10,6 +10,8 @@ const config = require('../config/app.config');
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
+// This process's previous check: {validBlocksCount, pendingTxsCount}, none before the first.
+let previousCheck;
 
 async function singleCheck() {
     try {
@@ -28,22 +30,25 @@ function executeCheck() {
             const validBlocksCount_current = await getVmBlocksValid();
             const pendingTxsCount_current = await getBaggerPending();
 
-            // Get the previous block counts from DB
-            const validBlocksCount_prev_fromDB = await models.StallStat.findOne({
-                where: {blockType: 'Valid'},
-                order: [ [ 'createdAt', 'DESC' ]],
-            });
-            const pendingTxsCount_prev_fromDB = await models.StallStat.findOne({
-                where: {blockType: 'Pending'},
-                order: [ [ 'createdAt', 'DESC' ]],
-            })
-
-            // If executing for the very first time - no previous data exists in database, so using current values as previous.
-            const validBlocksCount_prev = (validBlocksCount_prev_fromDB) ? validBlocksCount_prev_fromDB.dataValues.blockCount : validBlocksCount_current;
-            const pendingTxsCount_prev = (pendingTxsCount_prev_fromDB) ? pendingTxsCount_prev_fromDB.dataValues.blockCount : pendingTxsCount_current;
+            // The previous counts are this process's own previous check, not the
+            // latest StallStat row: several apex instances can share one database
+            // (one per task of an HA API tier), and that row was then usually
+            // another instance's, written seconds earlier. "No new valid block
+            // since" held for such short windows, and a healthy node flickered
+            // to stalled every few minutes.
+            // On the very first check there is no previous data to compare with.
+            // The valid count is taken as unchanged, and the pending count as 0:
+            // with the current count used as previous, a transaction that happened
+            // to be pending at that moment reported the node as stalled for the
+            // whole first interval after every apex start.
+            const validBlocksCount_prev = previousCheck ? previousCheck.validBlocksCount : validBlocksCount_current;
+            const pendingTxsCount_prev = previousCheck ? previousCheck.pendingTxsCount : 0;
             await createStallStats(validBlocksCount_current, pendingTxsCount_current);
             const currentStallHealthData = await getCurrentHealth(pendingTxsCount_prev, pendingTxsCount_current, validBlocksCount_prev, validBlocksCount_current);
             await updateCurrentStallStat(currentStallHealthData);
+            // Kept once the verdict is stored: the retry after a database error
+            // compares with the same previous check, not one taken seconds before.
+            previousCheck = {validBlocksCount: validBlocksCount_current, pendingTxsCount: pendingTxsCount_current};
             return resolve();
 
         } catch (error) {
@@ -83,7 +88,7 @@ async function getVmBlocksValid() {
         return 0;
     }
     try {
-        return response.data.result[0].value[1];
+        return toCount(response.data.result[0].value[1]);
     } catch (error) {
         winston.warn(`Error ${error.message ? error.message : ''} occurred while querying vm blocks valid`);
     }
@@ -109,16 +114,47 @@ async function getBaggerPending() {
         return 0;
     }
     try {
-        return response.data.result[0].value[1];   //to confirm if pending is at index 0 always
+        return toCount(pendingSeries(response.data.result).value[1]);
     } catch (error) {
         winston.warn(`Error ${error.message ? error.message : ''} occurred while querying vm blocks pending`);
     }
 }
 
+/**
+ * vm_bagger_txs has one series per bagger group: "pending" (ready to be put in
+ * a block), "queued" (waiting for an earlier nonce - these can stay for good)
+ * and "seen". Prometheus does not guarantee the series order, so pick the
+ * pending one by its label; a vm-runner without the group label reports a
+ * single series.
+ */
+function pendingSeries(result) {
+    return result.find((series) => series.metric && series.metric.group === 'pending') || result[0];
+}
+
+/**
+ * Prometheus returns sample values as strings ("715092") while the previous
+ * counts come back from the StallStat INTEGER column as numbers - compare
+ * numbers only, or the "no new valid blocks" check (===) never matches and a
+ * stalled node is reported healthy. Undefined for a missing or non-numeric
+ * value (NaN would make every comparison false as well).
+ */
+function toCount(value) {
+    if (value === null || value === undefined || value === '') {
+        return undefined;
+    }
+    const count = Number(value);
+    return Number.isFinite(count) ? count : undefined;
+}
+
 async function getCurrentHealth(pendingTxsCount_prev, pendingTxsCount_current, validBlocksCount_prev, validBlocksCount_current){
+    pendingTxsCount_prev = toCount(pendingTxsCount_prev);
+    pendingTxsCount_current = toCount(pendingTxsCount_current);
+    validBlocksCount_prev = toCount(validBlocksCount_prev);
+    validBlocksCount_current = toCount(validBlocksCount_current);
     // If previous check had pending transactions and the current check has the same number of valid blocks as the previous node - the network is considered stalled
     // TODO: Potential flaw - what if the prev pending transaction got discarded and the current pending transactions are just new pending to be processed?
-    const stallHealthStatus = ! (pendingTxsCount_prev > 0 && pendingTxsCount_current > 0 && validBlocksCount_current === validBlocksCount_prev);
+    // An unreadable block count (undefined) is no evidence of a stall
+    const stallHealthStatus = ! (pendingTxsCount_prev > 0 && pendingTxsCount_current > 0 && validBlocksCount_current !== undefined && validBlocksCount_current === validBlocksCount_prev);
     const validBlocksCountIncreased = validBlocksCount_current > validBlocksCount_prev;
     const hasPendingTxs = pendingTxsCount_current > 0
     return {stallHealthStatus, validBlocksCountIncreased, hasPendingTxs}
@@ -172,4 +208,6 @@ module.exports = {
     singleCheck,
     getCurrentHealth,
     updateCurrentStallStat,
+    pendingSeries,
+    toCount,
 }

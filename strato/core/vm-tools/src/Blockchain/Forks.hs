@@ -19,7 +19,10 @@
 module Blockchain.Forks
   ( isReceiptsRootForkActive,
     isBlockRewardReceiptForkActive,
+    isEmitArgForkActive,
     isOperatorPrecedenceForkActive,
+    isReplayProtectionForkActive,
+    replayProtectionForkBlock,
     forkNotScheduled
   )
 where
@@ -72,7 +75,7 @@ heliumStakingForkBlock :: Integer
 heliumStakingForkBlock = 300000
 
 upquarkStakingForkBlock :: Integer
-upquarkStakingForkBlock = 1000000
+upquarkStakingForkBlock = 2000000
 
 isBlockRewardReceiptForkActive :: Integer -> Bool
 isBlockRewardReceiptForkActive blockNum =
@@ -83,6 +86,24 @@ isBlockRewardReceiptForkActive blockNum =
         -- 'Nothing' means staking is live from genesis, so the fork is too.
         | otherwise = maybe 0 id (Conf.stakingActivationBlock conf)
    in blockNum >= switchAt
+
+-- | Block from which SolidVM emits fully evaluated event args, with an arg that
+-- was never written replaced by its declared type's default.
+--
+-- Before it, an emit kept each arg as read: storage references unresolved and
+-- unwritten args as SReference/SNULL. Those have no TypedArg, so the receipt
+-- log left them out; afterwards they are real values and appear in it. That
+-- moves the receipts root, so the change needs a height on any network that
+-- already checks receipts roots. Upquark switches with its staking fork.
+heliumEmitArgForkBlock :: Integer
+heliumEmitArgForkBlock = 750000
+
+isEmitArgForkActive :: Integer -> Bool
+isEmitArgForkActive blockNum =
+  let net = Conf.networkID $ networkConfig ethConf
+   in not $ (net == upquarkNetworkID  && blockNum < upquarkStakingForkBlock)
+         || (net == heliumNetworkID   && blockNum < heliumEmitArgForkBlock)
+         || (net == forktestNetworkID && blockNum < forktestForkBlock)
 
 -- | Sentinel height for a fork that a live network has not scheduled yet: the
 -- old behaviour holds for every block a node will actually see. Replace it with
@@ -117,3 +138,16 @@ isOperatorPrecedenceForkActive blockNum =
    in not $ (net == upquarkNetworkID  && blockNum < upquarkOperatorPrecedenceForkBlock)
          || (net == heliumNetworkID   && blockNum < heliumOperatorPrecedenceForkBlock)
          || (net == forktestNetworkID && blockNum < forktestOperatorPrecedenceForkBlock)
+
+-- | Require signed chain binding from this height. Public networks
+-- remain unscheduled until the upgrade is coordinated.
+replayProtectionForkBlock :: Integer -> Integer
+replayProtectionForkBlock net
+  | net == heliumNetworkID = forkNotScheduled
+  | net == upquarkNetworkID = forkNotScheduled
+  | net == forktestNetworkID = forktestForkBlock
+  | otherwise = 0
+
+isReplayProtectionForkActive :: Integer -> Bool
+isReplayProtectionForkActive blockNum =
+  blockNum >= replayProtectionForkBlock (Conf.networkID $ networkConfig ethConf)

@@ -68,6 +68,7 @@ library
     , servant-server
     , source-tools
     , store
+    , store-core
     , strato-model
     , text
     , utf8-string
@@ -88,7 +89,9 @@ test-suite storage-test
       OverloadedStrings
   ghc-options: -dynamic
   build-depends:
-      base
+      aeson
+    , base
+    , base16-bytestring
     , binary
     , bytestring
     , containers
@@ -96,8 +99,10 @@ test-suite storage-test
     , format
     , hspec
     , persistent
+    , servant-server
     , solid-vm-model
     , strato-model
+    , text
     , unliftio
     , vector
   default-language: Haskell2010

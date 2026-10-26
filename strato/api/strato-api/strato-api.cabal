@@ -53,7 +53,9 @@ executable strato-api
     , strato-conf
     , strato-model
     , strato-redis-blockdb
+    , strato-tracing
     , text
+    , time
     , transformers
     , unliftio
     , wai

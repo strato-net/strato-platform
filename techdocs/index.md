@@ -112,6 +112,7 @@ How the chain itself works:
 - **[Run a Node](node/index.md)** - Overview
 - **[Requirements](node/requirements.md)** - Hardware, OS, ports
 - **[Install](node/install.md)** - Build from source, `strato-login`, `strato-up`
+- **[Run from Prebuilt Images](node/prebuilt.md)** - `strato-up --dockerMode=all --prebuilt`, nothing to build
 - **[Configuration](node/configuration.md)** - Flags and `ethconf.yaml`
 - **[Operations](node/operations.md)** - Status, logs, snapshots, upgrades, troubleshooting
 

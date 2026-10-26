@@ -44,6 +44,9 @@ theme:
 extra_css:
   - stylesheets/extra.css
 
+extra_javascript:
+  - javascripts/add-network.js
+
 extra:
   social:
     - icon: fontawesome/brands/telegram
@@ -96,6 +99,7 @@ nav:
   # === GETTING STARTED ===
   - Getting Started:
       - First-Time User: scenarios/first-time-user.md
+      - Add STRATO to MetaMask: guides/metamask.md
   
   # === USER GUIDES ===
   - User Guides:
@@ -125,6 +129,7 @@ nav:
       - Overview: node/index.md
       - Requirements: node/requirements.md
       - Install & Run: node/install.md
+      - Run from Prebuilt Images: node/prebuilt.md
       - Configuration: node/configuration.md
       - Operations: node/operations.md
 

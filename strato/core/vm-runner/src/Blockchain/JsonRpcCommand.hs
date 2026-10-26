@@ -27,7 +27,7 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.RLP (rlpDecode, rlpDeserialize, rlpSerialize)
 import Blockchain.Data.VmTrace (CallFrame, TraceLog (..), VmTracer, newVmTracer, takeTraceRoots)
 import Blockchain.Data.ExecResults (ExecResults (..))
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.VMContext (ContextM, evalSandboxedContextM)
 import Blockchain.Wiring ()
 import Blockchain.Sequencer.CallSpec (CallSpec (..), TraceOptions (..), TxCreateObject (..), TxFuncCallObject (..))
@@ -76,7 +76,7 @@ import SolidVM.Model.CodeCollection.Visibility (Visibility (..))
 import SolidVM.Model.SolidString (SolidString, labelToText, stringToLabel)
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
 import qualified SolidVM.Model.Type as SVMType
-import SolidVM.Model.Value (Variable(..), forceLoadVar)
+import SolidVM.Model.Value (Variable(..), forceLoadVar, renderValue)
 import Numeric (showHex)
 import Text.Format (format)
 
@@ -174,9 +174,9 @@ runJsonRpcCommand' c@(JRCSimulate simBlocks mHeader id) = do
 runJsonRpcCommand' c@(JRCGetProof sr@(MP.StateRoot srBytes) address keys id) = do
   $logInfoS "JRCGetProof" . T.pack $ format c
   let trieKey = keccak256ToByteString . hash
-  A.lookup (A.Proxy @MP.NodeData) sr >>= \case
-    Nothing -> return . Error id $ "state root not available on this node: " ++ BC.unpack (B16.encode srBytes)
-    Just _ -> do
+  MP.hasStateRoot sr >>= \case
+    False -> return . Error id $ "state root not available on this node: " ++ BC.unpack (B16.encode srBytes)
+    True -> do
       (mAccount, accountProof) <- MP.getProof sr . byteString2NibbleString . trieKey $ addressToByteString address
       -- The account leaf holds an RLP string wrapping the account's RLP.
       let accountLeaf = rlpDecode <$> mAccount
@@ -211,7 +211,7 @@ simulateOne header spec = do
         [ TraceLog
             (evContractAddress ev)
             (evName ev)
-            [(n, v) | (n, _, v, _) <- evArgs ev]
+            [(n, renderValue v) | (n, v) <- evArgs ev]
           | ev <- maybe [] erEvents mEr
         ]
       hex n = "0x" ++ showHex n ""

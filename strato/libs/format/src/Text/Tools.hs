@@ -61,9 +61,11 @@ multilineDebugLog ::
   T.Text ->
   String ->
   m ()
-multilineDebugLog source theLines = do
-  forM_ (lines theLines) $ \theLine ->
-    $logDebugS source $ T.pack theLine
+multilineDebugLog source theLines =
+  -- skip entirely when filtered, so the string is never rendered or scanned for newlines
+  when (flags_minLogLevel <= LevelDebug) $
+    forM_ (lines theLines) $ \theLine ->
+      $logDebugS source $ T.pack theLine
 
 
 boringBox :: [String] -> String

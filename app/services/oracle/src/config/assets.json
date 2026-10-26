@@ -369,7 +369,9 @@
             "KHYPE",
             "NVDA",
             "SPY",
-            "DOGE"
+            "DOGE",
+            "LIT",
+            "CBDOGE"
           ]
         },
         "Metals.dev": {
@@ -552,17 +554,13 @@
           "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum', 'base' or 'hyperevm' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
           "assets": [
             "SUSDS",
-            "LIT",
             "BOOE",
-            "CBDOGE",
             "WEETH",
             "KHYPE"
           ],
           "symbolMapping": {
             "SUSDS": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
-            "LIT": "0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2",
             "BOOE": "0x289ff00235d2b98b0145ff5d4435d3e92f9540a6",
-            "CBDOGE": "0xcbd06e5a2b0c65597161de254aa074e489deb510",
             "WEETH": "0xcd5fe23c85820f7b72d0926fc9b05b43e359b7ee",
             "KHYPE": "0xfd739d4e423301ce9385c1fb8850539d657c296d"
           }
@@ -1015,7 +1013,9 @@
             "KHYPE",
             "NVDA",
             "SPY",
-            "DOGE"
+            "DOGE",
+            "LIT",
+            "CBDOGE"
           ]
         },
         "Metals.dev": {
@@ -1198,17 +1198,13 @@
           "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum', 'base' or 'hyperevm' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
           "assets": [
             "SUSDS",
-            "LIT",
             "BOOE",
-            "CBDOGE",
             "WEETH",
             "KHYPE"
           ],
           "symbolMapping": {
             "SUSDS": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
-            "LIT": "0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2",
             "BOOE": "0x289ff00235d2b98b0145ff5d4435d3e92f9540a6",
-            "CBDOGE": "0xcbd06e5a2b0c65597161de254aa074e489deb510",
             "WEETH": "0xcd5fe23c85820f7b72d0926fc9b05b43e359b7ee",
             "KHYPE": "0xfd739d4e423301ce9385c1fb8850539d657c296d"
           }

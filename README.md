@@ -2,7 +2,24 @@
 
 # STRATO Platform
 
-## Build and Run STRATO
+## Run a Node from Prebuilt Images
+
+Nothing to build: the images of every commit and release are published on BlockApps' registry, `ghcr.io/strato-net/strato-platform`. You need Docker Engine with the Compose plugin, `git`, `python3`, `curl` and `zstd` (for `--snapshot`), as a user in the `docker` group or as root.
+
+```
+git clone https://github.com/strato-net/strato-platform
+cd strato-platform
+./bin/strato-up mynode --localAuth --sslDir=/path/to/ssl --dockerMode=all --prebuilt
+```
+
+- `--dockerMode=all` runs the node processes in a `strato` container next to the service containers; `strato-up` then manages the node as one compose project.
+- `--prebuilt` pulls the images of the checked-out commit (`strato:<VERSION>-<commit>`); `--prebuilt=<tag>` names an image explicitly. Images appear a few minutes after a commit is pushed.
+- `--localAuth` makes the node its own identity provider, so `strato-login` is not needed. Without `--sslDir`, nginx serves plain HTTP on 8081 and the host name must be a single label, e.g. `--nodeHost=stratonode`.
+- Every other flag works as on a built node: `--network=helium`, `--snapshot`, `--role=api-node` or `--role=validator`, `--p2pPort` and `--discoveryPort` (default 30303).
+
+Afterwards `./bin/strato-ps mynode`, `./bin/strato-down mynode` and `./bin/strato-up mynode` (no flags; data is kept) work from the checkout. Full guide: [techdocs/node/prebuilt.md](techdocs/node/prebuilt.md).
+
+## Build and Run STRATO from Source
 
 ### 1. Install Dependencies
 
@@ -82,6 +99,7 @@ Start the node:
 - `/path/to/ssl` should contain `server.pem` and `server.key` directly (no subdirectories), with read permissions for all users (`chmod 444 server.*`).
 - Do not include OAUTH variables in env vars. You can include app-related variables if needed (e.g., RPC URLs, etc.).
 - Use `--network=helium` for testnet or `--network=upquark` for mainnet (default).
+- Add `--localAuth` to make the node its own identity provider; `strato-login` is then not needed. Every flag, including `--role`, `--p2pPort`, `--discoveryPort` and `--dockerMode`, is described in [techdocs/node/configuration.md](techdocs/node/configuration.md).
 
 ### 4. Stop and Wipe
 
@@ -149,7 +167,7 @@ strato-snapshot restore mynode --snapshot --network helium
 
 # An explicit local file or S3 URI:
 strato-snapshot restore mynode \
-  --source s3://strato-snapshots/helium/v2/latest.tar.zst \
+  --source s3://strato-snapshots/helium/latest.tar.zst \
   --network helium
 
 strato-up mynode
@@ -162,4 +180,4 @@ strato-snapshot pull mynode
 strato-down mynode && rm -rf mynode && strato-up mynode --network=helium --snapshot
 ```
 
-Snapshot artifacts are cold copies of `.ethereumH`, Postgres, Redis, and jlog streaming state. They are published per snapshot version under `s3://strato-snapshots/<network>/<version>/`; `v2` (jlog) is current, and the unversioned `<network>/` root holds the frozen v1 (Kafka-era) snapshots. See `design-documents/node-snapshot-tool-README.md` for the full CLI and `design-documents/node-snapshot-dev-loop.md` for the create/restore contract and safety checks.
+Snapshot artifacts are cold copies of `.ethereumH`, Postgres, Redis and JLog state. They are published per snapshot version: `develop` builds the JLog streaming backend and uses `v2`, published under `s3://strato-snapshots/<network>/v2/`; `v1` (Kafka) snapshots stay at the unversioned root for older builds. See `design-documents/node-snapshot-tool-README.md` for the full CLI and `design-documents/node-snapshot-dev-loop.md` for the create/restore contract and safety checks.

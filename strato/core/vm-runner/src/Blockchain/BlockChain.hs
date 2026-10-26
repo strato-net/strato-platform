@@ -48,10 +48,10 @@ import Blockchain.Data.ExecResults
 import Blockchain.Data.Transaction
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResultStatus
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
-import Blockchain.Forks (isReceiptsRootForkActive)
+import Blockchain.Forks (isReceiptsRootForkActive, isReplayProtectionForkActive)
 import qualified Blockchain.Verification as V
 import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
@@ -60,8 +60,6 @@ import qualified SolidVM.Model.Storable as MS
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import Blockchain.SyncDB (updateVmBestBlockNumber)
 import SolidVM.Model.Delta
 import SolidVM.Model.Value (Value (SAddress))
 import Blockchain.Strato.Model.ExtendedWord
@@ -77,14 +75,14 @@ import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, Rever
 import Blockchain.VMContext
 import Blockchain.VMOut
 import Blockchain.Wiring ()
-import Control.Monad.Composable.NodeDB (tickNodeDB)
+import Control.Monad.Composable.StateDB (tickNodeDB)
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
 import Blockchain.EthConf (ethConf, networkConfig, contractsConfig, nativeTokenAddress, vmConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Verifier
-import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Applicative ((<|>))
 import Control.Lens hiding (filtered)
 import Control.Monad
@@ -103,6 +101,7 @@ import Data.Proxy
 import qualified Data.Sequence as Seq
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Strato.Tracing as Tr
 import Data.Time.Clock
 import Prometheus as P
 import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
@@ -155,7 +154,7 @@ addBlocks unfiltered = do
               failures <- addBlock block
               if null failures
                 then do
-                  RBDB.withRedisBlockDB $ updateVmBestBlockNumber blockNo
+                  P.setGauge vmBestBlock (fromIntegral blockNo)
                   (didReplaceThisTime, replacedBits@(hsh, num)) <- replaceBestIfBetter block
                   if didReplaceThisTime
                     then do
@@ -177,7 +176,7 @@ addBlocks unfiltered = do
           when didReplaceBest' $ do
             $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
             nbb <- readIORef replacedBest
-            when (Conf.sqlDiff $ vmConfig ethConf) $
+            when (not flags_disableSqlIndexing && Conf.sqlDiff (vmConfig ethConf)) $
               timeit "calculateAndEmitStateDiffs" timerToUse $
                 calculateAndEmitStateDiffs srLog oldHeader
             emitOut . OutIndexEvent $ NewBestBlock nbb
@@ -248,7 +247,7 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             -- the header's receiptsRoot.
             let blockNum = number $ obBlockData b
             receiptsBytes <-
-              if isReceiptsRootForkActive blockNum
+              if not flags_disableSqlIndexing && isReceiptsRootForkActive blockNum
                 then traverse (fmap (rlpSerialize . rlpEncode) . txRunResultToReceipt) trrs
                 else pure []
             emitOut . OutIndexEvent $ RanBlock b receiptsBytes
@@ -313,7 +312,8 @@ addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = tr
 
   runPatches bd
 
-  emitOut . OutVMEvents =<< sendNewActionMessage b trrs
+  unless flags_disableCirrusIndexing $
+    emitOut . OutVMEvents =<< sendNewActionMessage b trrs
 
   timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   resetAddressStateTxDBMap
@@ -359,7 +359,8 @@ addTransactions blockData txs proposer =
     rewardResult <- payBlockRewards blockData proposer
     trrs <- Bagger.attachBlockRewards blockData rewardResult <$> go (getBlockGasLimit blockData) txs DL.empty
     mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
-    emitOut . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
+    unless flags_disableSqlIndexing $
+      emitOut . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
     pure trrs
   where
     go :: VMBase m =>
@@ -433,7 +434,9 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
 
   let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t
       sizeLimit = toInteger (Conf.txSizeLimit (networkConfig ethConf))
+      expectedChainId = Conf.chainId $ networkConfig ethConf
       precheck
+        | isReplayProtectionForkActive (number b) && not (transactionChainIdValid expectedChainId bt) = Left $ TFIncorrectChainId expectedChainId t
         | TD.gasLimit bt > min remainingBlockGas maxGas = Left $ TFBlockGasLimitExceeded (TD.gasLimit bt) remainingBlockGas t
         | not nonceValid = Left $ TFNonceMismatch (TD.nonce bt) acctNonce t
         | txSize >= sizeLimit = Left $ TFTXSizeLimitExceeded txSize sizeLimit t
@@ -474,8 +477,10 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
               let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
               P.incCounter txTypeCounter
 
+              started <- liftIO Tr.nowNanos
               execResults <- runCodeForTransaction b availableGas tAddr t proposer
               P.incCounter vmTxsProcessed
+              liftIO $ recordExecuteSpan started b t (fromIntegral availableGas) execResults
 
               case erException execResults of
                 Just e -> do
@@ -488,6 +493,27 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
                     A.delete (Proxy @AddressState) address'
                   P.incCounter vmTxsSuccessful
               pure execResults
+
+-- | "tx.execute" in the transaction's trace (Strato.Tracing: the trace id
+-- derives from the hash): the VM's part, with the gas it used and any
+-- exception as the span's error. Costs one queue write when tracing is
+-- enabled and an IORef read otherwise.
+recordExecuteSpan :: Integer -> BlockHeader -> OutputTx -> Integer -> ExecResults -> IO ()
+recordExecuteSpan started b t availableGas er = do
+  enabled <- Tr.tracingEnabled
+  when enabled $ do
+    end <- Tr.nowNanos
+    let h = otHash t
+    Tr.recordSpan (Tr.traceIdFromHash (keccak256ToByteString h)) Nothing "tx.execute" Tr.Internal started end
+      ( [ Tr.attrText "strato.tx_hash" (T.pack (keccak256ToHex h)),
+          Tr.attrText "strato.stage" "vm-runner",
+          Tr.attrInt "strato.block_number" (number b),
+          Tr.attrInt "strato.gas_used" (availableGas - erRemainingTxGas er)
+        ]
+          ++ maybe [] (\a -> [Tr.attrText "strato.contract_created" (T.pack (format a))]) (erNewContractAddress er)
+      )
+      []
+      (T.pack . show <$> erException er)
 
 runCodeForTransaction ::
   (VMBase m) =>
@@ -514,7 +540,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
               proposer
               (fromIntegral availableGas)
               tAddr
-              (txHash ut)
+              (otHash t)
               "transfer"
               [recipientArg, amountArg]
               Nothing
@@ -538,7 +564,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
                   proposer
                   (fromIntegral availableGas)
                   tAddr
-                  (txHash ut)
+                  (otHash t)
                   (labelToText fName)
                   argTexts
                   Nothing
@@ -561,7 +587,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
             availableGas
             newAddress
             (TD.code ut)
-            (txHash ut)
+            (otHash t)
             (fromJust $ txContractName ut)
             (txArgs ut)
 
@@ -575,7 +601,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
                 proposer -- proposer
                 (fromIntegral availableGas) -- availableGas
                 tAddr -- origin
-                (txHash ut) -- txHash
+                (otHash t) -- txHash
                 (TD.funcName ut)
                 (TD.args ut)
                 Nothing
@@ -752,7 +778,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
           transactionResultDeletedStorage = "",
           transactionResultStatus = Just txrStatus
         }
-  emitOut . OutVMEvents . (txr:) $ if not (Conf.diffPublish $ vmConfig ethConf)
+  emitOut . OutVMEvents . (txr:) $ if flags_disableCirrusIndexing || not (Conf.diffPublish $ vmConfig ethConf)
     then []
     else case erAction <$> result of
       Right (Just act) -> extractCodeCollectionAddedMessages act
@@ -776,7 +802,7 @@ printTransactionMessage ::
   m ()
 printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left errMsg) deltaT = do
   let tNonce = TD.nonce $ otBaseTx ot
-  multilineLog "printTx/err" $
+  multilineDebugLog "printTx/err" $
     boringBox
       [ "Adding transaction signed by: " ++ format tAddr,
         "Tx hash:  " ++ format theHash,
@@ -792,7 +818,7 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right 
           then ""
           else fromMaybe (CL.blink "<failed>") $ fmap format $ erNewContractAddress results
 
-  multilineLog "printTx/ok" $
+  multilineDebugLog "printTx/ok" $
     boringBox
       [ "Adding transaction signed by: " ++ format tAddr,
         "Tx hash:  " ++ format theHash,
