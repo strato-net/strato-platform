@@ -43,6 +43,8 @@ module Control.Monad.Composable.Streaming.JLog (
   consumeBroadcast,
   runConsume,
   consumeFromLatest,
+  drainConsumerGroup,
+  hasConsumerGroup,
   seedConsumerGroupFrom,
   removeConsumerGroup,
   -- Topics
@@ -293,92 +295,140 @@ runConsume consumerGroup topicName f = do
       let items = map (decode . LBS.fromStrict) msgs
       f items
     
-    -- Read up to maxBatchMessages or maxBatchBytes, whichever comes first
-    -- Returns Nothing if no messages available
-    -- Returns Just (messages, lastId) with the ID of last message read
-    readBatchNoCheckpoint topicPath subscriber = 
-      withCString topicPath $ \cpath ->
-        withCString subscriber $ \csub -> do
-          ctx <- jlog_new cpath
-          if ctx == nullPtr
-            then return Nothing
-            else do
-              rc <- jlog_ctx_open_reader ctx csub
-              if rc /= 0
-                then do
-                  jlog_ctx_close ctx
-                  return Nothing
-                else 
-                  alloca $ \startPtr ->
-                    alloca $ \endPtr -> do
-                      poke startPtr (JLogId 0 0)
-                      poke endPtr (JLogId 0 0)
-                      count <- jlog_ctx_read_interval ctx startPtr endPtr
-                      if count <= 0
-                        then do
-                          jlog_ctx_close ctx
-                          return Nothing
-                        else do
-                          startId <- peek startPtr
-                          readMessagesWithAdvance ctx startPtr endPtr [] 0 0 startId
-    
-    -- Read messages using advance_id to iterate without checkpointing
-    -- lastReadId tracks the last message we successfully read (for correct checkpointing)
-    readMessagesWithAdvance ctx curPtr endPtr acc msgCount totalBytes lastReadId
-      | msgCount >= maxBatchMessages = finishBatch ctx lastReadId acc
-      | totalBytes >= maxBatchBytes  = finishBatch ctx lastReadId acc
-      | otherwise = do
-          curId <- peek curPtr
-          endId <- peek endPtr
-          if curId `idGreaterThan` endId
-            then finishBatch ctx lastReadId acc
-            else do
-              alloca $ \msgStructPtr -> do
-                readRc <- jlog_ctx_read_message ctx curPtr msgStructPtr
-                if readRc /= 0
+
+-- | Hand a consumer group everything it has not consumed yet, batch by batch
+-- (the usual batch limits), checkpointing each batch once the handler has
+-- returned, until a read finds nothing more; the number of messages handed
+-- over. Unlike 'consume' this returns. It is for a group about to be
+-- retired: what it alone had not passed is applied first, so retiring it
+-- loses nothing. Nothing happens for a group the topic does not have.
+drainConsumerGroup :: (Binary a, HasStreaming m) =>
+                      ConsumerGroup -> TopicName -> ([a] -> m ()) -> m Int
+drainConsumerGroup consumerGroup topicName f = do
+  env <- getStreamEnv
+  let topicPath = seBasePath env </> T.unpack (unTopicName topicName)
+      subscriber = T.unpack consumerGroup
+  go topicPath subscriber 0
+  where
+    go topicPath subscriber n = do
+      result <- liftIO $ readBatchNoCheckpoint topicPath subscriber
+      case result of
+        Nothing -> return n
+        Just (msgs, lastId) -> do
+          f (map (decode . LBS.fromStrict) msgs)
+          liftIO $ checkpointTo topicPath subscriber lastId
+          go topicPath subscriber (n + length msgs)
+
+-- | Whether the topic has a checkpoint for this consumer group.
+hasConsumerGroup :: HasStreaming m => ConsumerGroup -> TopicName -> m Bool
+hasConsumerGroup consumerGroup topicName = do
+  env <- getStreamEnv
+  let topicPath = seBasePath env </> T.unpack (unTopicName topicName)
+  liftIO $
+    withCString topicPath $ \cpath -> withCString (T.unpack consumerGroup) $ \csub -> do
+      ctx <- jlog_new cpath
+      if ctx == nullPtr
+        then return False
+        else do
+          -- A reader opens only for a subscriber that exists.
+          rc <- jlog_ctx_open_reader ctx csub
+          jlog_ctx_close ctx
+          return (rc == 0)
+
+-- The batch reader and checkpoint writer shared by 'runConsume' and
+-- 'drainConsumerGroup'.
+
+-- Read up to maxBatchMessages or maxBatchBytes, whichever comes first
+-- Returns Nothing if no messages available
+-- Returns Just (messages, lastId) with the ID of last message read
+readBatchNoCheckpoint :: FilePath -> String -> IO (Maybe ([BS.ByteString], JLogId))
+readBatchNoCheckpoint topicPath subscriber =
+  withCString topicPath $ \cpath ->
+    withCString subscriber $ \csub -> do
+      ctx <- jlog_new cpath
+      if ctx == nullPtr
+        then return Nothing
+        else do
+          rc <- jlog_ctx_open_reader ctx csub
+          if rc /= 0
+            then do
+              jlog_ctx_close ctx
+              return Nothing
+            else 
+              alloca $ \startPtr ->
+                alloca $ \endPtr -> do
+                  poke startPtr (JLogId 0 0)
+                  poke endPtr (JLogId 0 0)
+                  count <- jlog_ctx_read_interval ctx startPtr endPtr
+                  if count <= 0
+                    then do
+                      jlog_ctx_close ctx
+                      return Nothing
+                    else do
+                      startId <- peek startPtr
+                      readMessagesWithAdvance ctx startPtr endPtr [] 0 0 startId
+
+-- Read messages using advance_id to iterate without checkpointing
+-- lastReadId tracks the last message we successfully read (for correct checkpointing)
+readMessagesWithAdvance :: Ptr JLogCtx -> Ptr JLogId -> Ptr JLogId -> [BS.ByteString] -> Int -> Int -> JLogId -> IO (Maybe ([BS.ByteString], JLogId))
+readMessagesWithAdvance ctx curPtr endPtr acc msgCount totalBytes lastReadId
+  | msgCount >= maxBatchMessages = finishBatch ctx lastReadId acc
+  | totalBytes >= maxBatchBytes  = finishBatch ctx lastReadId acc
+  | otherwise = do
+      curId <- peek curPtr
+      endId <- peek endPtr
+      if curId `idGreaterThan` endId
+        then finishBatch ctx lastReadId acc
+        else do
+          alloca $ \msgStructPtr -> do
+            readRc <- jlog_ctx_read_message ctx curPtr msgStructPtr
+            if readRc /= 0
+              then finishBatch ctx lastReadId acc
+              else do
+                msg <- peek msgStructPtr
+                let msgLen = jlogMsgLen msg
+                    msgDataPtr = jlogMsgData msg
+                if msgDataPtr == nullPtr || msgLen == 0
                   then finishBatch ctx lastReadId acc
                   else do
-                    msg <- peek msgStructPtr
-                    let msgLen = jlogMsgLen msg
-                        msgDataPtr = jlogMsgData msg
-                    if msgDataPtr == nullPtr || msgLen == 0
-                      then finishBatch ctx lastReadId acc
+                    msgBytes <- BS.packCStringLen (castPtr msgDataPtr, fromIntegral msgLen)
+                    let newTotal = totalBytes + BS.length msgBytes
+                    -- If we just read the last message (cur == end), stop here
+                    if curId == endId
+                      then finishBatch ctx curId (msgBytes : acc)
                       else do
-                        msgBytes <- BS.packCStringLen (castPtr msgDataPtr, fromIntegral msgLen)
-                        let newTotal = totalBytes + BS.length msgBytes
-                        -- If we just read the last message (cur == end), stop here
-                        if curId == endId
-                          then finishBatch ctx curId (msgBytes : acc)
-                          else do
-                            -- Advance to next message
-                            alloca $ \nextPtr -> do
-                              poke nextPtr =<< peek curPtr  -- Copy cur to next first
-                              advRc <- jlog_ctx_advance_id ctx curPtr nextPtr endPtr
-                              if advRc /= 0
-                                then finishBatch ctx curId (msgBytes : acc)
-                                else readMessagesWithAdvance ctx nextPtr endPtr (msgBytes : acc) (msgCount + 1) newTotal curId
-    
-    idGreaterThan (JLogId l1 m1) (JLogId l2 m2) =
-      l1 > l2 || (l1 == l2 && m1 > m2)
-    
-    finishBatch ctx lastId acc = do
-      jlog_ctx_close ctx
-      if null acc
-        then return Nothing
-        else return $ Just (reverse acc, lastId)
-    
-    -- Checkpoint to a specific ID (single fsync for entire batch)
-    checkpointTo topicPath subscriber lastId =
-      withCString topicPath $ \cpath ->
-        withCString subscriber $ \csub -> do
-          ctx <- jlog_new cpath
-          when (ctx /= nullPtr) $ do
-            rc <- jlog_ctx_open_reader ctx csub
-            when (rc == 0) $
-              alloca $ \idPtr -> do
-                poke idPtr lastId
-                void $ jlog_ctx_read_checkpoint ctx idPtr
-            jlog_ctx_close ctx
+                        -- Advance to next message
+                        alloca $ \nextPtr -> do
+                          poke nextPtr =<< peek curPtr  -- Copy cur to next first
+                          advRc <- jlog_ctx_advance_id ctx curPtr nextPtr endPtr
+                          if advRc /= 0
+                            then finishBatch ctx curId (msgBytes : acc)
+                            else readMessagesWithAdvance ctx nextPtr endPtr (msgBytes : acc) (msgCount + 1) newTotal curId
+
+idGreaterThan :: JLogId -> JLogId -> Bool
+idGreaterThan (JLogId l1 m1) (JLogId l2 m2) =
+  l1 > l2 || (l1 == l2 && m1 > m2)
+
+finishBatch :: Ptr JLogCtx -> JLogId -> [BS.ByteString] -> IO (Maybe ([BS.ByteString], JLogId))
+finishBatch ctx lastId acc = do
+  jlog_ctx_close ctx
+  if null acc
+    then return Nothing
+    else return $ Just (reverse acc, lastId)
+
+-- Checkpoint to a specific ID (single fsync for entire batch)
+checkpointTo :: FilePath -> String -> JLogId -> IO ()
+checkpointTo topicPath subscriber lastId =
+  withCString topicPath $ \cpath ->
+    withCString subscriber $ \csub -> do
+      ctx <- jlog_new cpath
+      when (ctx /= nullPtr) $ do
+        rc <- jlog_ctx_open_reader ctx csub
+        when (rc == 0) $
+          alloca $ \idPtr -> do
+            poke idPtr lastId
+            void $ jlog_ctx_read_checkpoint ctx idPtr
+        jlog_ctx_close ctx
 
 -- | Give a consumer group that does not exist yet the checkpoint of another
 -- one on the same topic, so a group split off an existing consumer resumes
@@ -397,9 +447,14 @@ seedConsumerGroupFrom new old topicName = do
         then return False
         else do
           _ <- jlog_ctx_init ctx
-          -- A reader opens only for a subscriber that exists.
-          exists <- (== 0) <$> jlog_ctx_open_reader ctx cnew
           jlog_ctx_close ctx
+          -- A reader opens only for a subscriber that exists, and only on a
+          -- context that has not been through jlog_ctx_init: that leaves the
+          -- context in its init mode whatever it returned, and the reader
+          -- then refuses to open for any subscriber at all.
+          ctxR <- jlog_new cpath
+          exists <- (== 0) <$> jlog_ctx_open_reader ctxR cnew
+          jlog_ctx_close ctxR
           if exists
             then return False
             else do

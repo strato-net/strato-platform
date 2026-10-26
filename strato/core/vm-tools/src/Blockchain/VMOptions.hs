@@ -9,6 +9,7 @@ module Blockchain.VMOptions
     flags_diffPublish,
     flags_disableSqlIndexing,
     flags_disableCirrusIndexing,
+    flags_publishAddressState,
     flags_queryBlocks,
   )
 where
@@ -28,6 +29,7 @@ defineFlag "sqlDiff" True "runs sqlDiff and updates account state and storage in
 defineFlag "diffPublish" False "publishes all state changes to kafka"
 defineFlag "disableSqlIndexing" False "Skip SQL indexing messages; keep blocks and best-block updates for Redis"
 defineFlag "disableCirrusIndexing" False "Skip Cirrus indexing messages; keep transaction results"
+defineFlag "publishAddressState" True "Where the SQL state mirror is off (sqlDiff=false), publish each block's balance and nonce changes to the indexer in its place, so address_state_ref stays current. --publishAddressState=false for a node that keeps no account state in SQL at all (strato-setup --role=validator)"
 defineFlag "queryBlocks" (10000 :: Int) "Number of blocks to query from SQL to process in one batch"
 defineFlag "svmDev" (False :: Bool) "Whether to crash on SolidVM exceptions"
 defineFlag "svmTrace" (False :: Bool) "Whether to have verbose logging in SolidVM"

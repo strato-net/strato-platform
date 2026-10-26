@@ -29,3 +29,17 @@ library:
   - stm
   - text
   - transformers
+
+tests:
+  streaming-jlog-test:
+    main: Main.hs
+    source-dirs: test
+    ghc-options: -Wall -threaded
+    dependencies:
+    - binary
+    - bytestring
+    - composable-monads-base
+    - directory
+    - filepath
+    - hspec
+    - streaming-jlog

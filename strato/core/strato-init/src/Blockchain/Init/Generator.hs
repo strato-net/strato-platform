@@ -142,6 +142,10 @@ createCommandsFile role = do
       , "vm-runner " ++ vmRunnerRts
           ++ (if flags_disableSqlIndexing then " --disableSqlIndexing" else "")
           ++ (if flags_disableCirrusIndexing then " --disableCirrusIndexing" else "")
+          -- A validator keeps no account state in SQL: not the state mirror
+          -- (sqlDiff, off through roleRunsCirrus in ethconf) and not the
+          -- balance and nonce updates the VM publishes in its place.
+          ++ (if roleRunsCirrus role then "" else " --publishAddressState=false")
       , restartable ("strato-indexer" ++ indexerFlags)
       ]
       -- Cirrus serves the API; a validator has none to serve.

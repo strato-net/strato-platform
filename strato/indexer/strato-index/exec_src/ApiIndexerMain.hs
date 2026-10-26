@@ -6,7 +6,7 @@ import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.DB.SQLDB (sqlQueryWriter)
 import Blockchain.Data.WriterLease
-import Blockchain.Strato.Indexer.ApiIndexer (indexerMainLoop, retireSqlConsumerGroup)
+import Blockchain.Strato.Indexer.ApiIndexer (indexerMainLoop, reconcileSqlConsumerGroup)
 import Blockchain.Strato.Indexer.Bootstrap
 import Blockchain.NodeStatusMirror (nodeStatusMirrorLoop)
 import Control.Concurrent (forkIO)
@@ -42,12 +42,6 @@ main = do
   runEff . runLogging $ do
     bootstrapIndexer
 
-    -- A node upgraded in place, or restored from a snapshot taken when the
-    -- SQL side still consumed under its own group, carries a checkpoint that
-    -- nothing advances any more and that keeps JLog from trimming the topic.
-    -- Retire it before the consumer starts; a no-op on every other node.
-    runStreamMConfigured "strato-indexer-sql" retireSqlConsumerGroup
-
     -- The writer lease decides whether this cell's SQL side writes. A
     -- configured writer claims it unless another cell holds a fresh one;
     -- a standby only reports it.
@@ -68,6 +62,15 @@ main = do
               void . liftIO . forkIO . runEff . runLogging $ runSQLMWith leaseDb (claimWriterLeaseUntilHeld cell)
         else $logInfoS "main" . T.pack $ "cell " ++ T.unpack cell ++ " is a standby: it follows the chain and writes nothing until promoted"
     _ <- liftIO . forkIO . runEff . runLogging $ runSQLMWith leaseDb (heartbeatWriterLease cell)
+
+    -- A node upgraded from 19.6, or restored from a 19.6 snapshot, carries the
+    -- checkpoint of the SQL side's old consumer group, usually behind this
+    -- group's. Replay its backlog into SQL and retire it before the consumer
+    -- starts; a no-op on every other node. After the lease: only the writer
+    -- replays.
+    runStreamMConfigured "strato-indexer-sql" $
+      runSQLM $
+        reconcileSqlConsumerGroup cell
 
     -- Mirror the Redis sync scalars into node_status so the API tier reads
     -- Postgres instead of Redis. Its own small pool: the main loop's pool is

@@ -165,7 +165,7 @@ What runs:
 |---|---|
 | `ethereum-discover`, `strato-p2p`, `strato-sequencer`, `vm-runner`, `strato-indexer`, `strato-network-monitor`, `strato-logrotate` | `postgres`, `redis`, `prometheus`, `apex` |
 
-What doesn't: the app, SMD, nginx, PostgREST, Swagger docs, `slipstream` (so no `cirrus` database, which is most of a full node's disk), `strato-api` and `ethereum-jsonrpc`. The indexer keeps the SQL block index, the block and transaction tables of the `eth` database that `strato-p2p` serves peers from and `vm-runner` starts from, and no state mirror. `vm-runner` neither mirrors state into SQL nor publishes the `vmevents` stream: nothing would read it, and JLog only trims what a reader has passed.
+What doesn't: the app, SMD, nginx, PostgREST, Swagger docs, `slipstream` (so no `cirrus` database, which is most of a full node's disk), `strato-api` and `ethereum-jsonrpc`. The indexer keeps the SQL block index, the block and transaction tables of the `eth` database that `strato-p2p` serves peers from and `vm-runner` starts from, and no account state: `vm-runner` neither mirrors state into SQL nor publishes the balance and nonce updates that stand in for the mirror elsewhere (`--publishAddressState=false`), so `address_state_ref` stays empty. It does not publish the `vmevents` stream either: nothing would read it, and JLog only trims what a reader has passed.
 
 - **Identity.** The node key still comes from the Vault, so [store your OAuth credentials](install.md#4-store-your-oauth-credentials) first. `--localAuth` is refused.
 - **Snapshots.** `--snapshot` restores the chain state, Redis, JLog and the `eth` database; only the cirrus dump is skipped (`strato-snapshot restore --databases eth`).

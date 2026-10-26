@@ -9,8 +9,10 @@
 
 module Blockchain.Strato.Indexer.ApiIndexer
   ( indexerMainLoop,
+    reconcileSqlConsumerGroup,
     retireSqlConsumerGroup,
     p2pConsumerGroup,
+    sqlConsumerGroup,
     indexAPI,
     indexP2P,
     kafkaClientIds,
@@ -60,6 +62,11 @@ import Text.Format
 p2pConsumerGroup :: ConsumerGroup
 p2pConsumerGroup = "strato-indexer"
 
+-- | The group the SQL side consumed under while the two sides were split
+-- (19.6). Nothing consumes under it any more; see 'reconcileSqlConsumerGroup'.
+sqlConsumerGroup :: ConsumerGroup
+sqlConsumerGroup = "strato-indexer-sql"
+
 -- | One consumer commits its offset only after both SQL and Redis indexing
 -- finish. SQL retains the writer-lease checks and standby progress tracking.
 indexerMainLoop :: ( MonadLogger m,
@@ -74,18 +81,51 @@ indexerMainLoop cell =
     indexAPIGated cell idxEvents
     indexP2P idxEvents
 
--- | Before the consumer groups were reunified, the SQL side consumed under
--- its own group, @strato-indexer-sql@. A node upgraded in place, or restored
--- from a snapshot of that era (snapshots ship the whole jlog/ directory),
--- still carries that group's checkpoint, which nothing advances any more;
--- JLog deletes a segment only once every subscriber has passed it, so the
--- topic would grow for good. Retire it; a no-op when there is none.
+-- | In 19.6 the SQL side consumed under its own group, 'sqlConsumerGroup',
+-- and trailed the Redis side's 'p2pConsumerGroup' by whatever SQL had not
+-- committed yet. A node upgraded in place, or restored from a snapshot of
+-- that era (snapshots ship the whole jlog/ directory), still carries both
+-- checkpoints. The unified consumer resumes from 'p2pConsumerGroup', so what
+-- only the SQL group had not passed would never reach SQL: the block Redis
+-- names as best would be missing from @block_data_ref@ and vm-runner would
+-- wait for it for good. So, in this order: replay the SQL group's backlog
+-- through the SQL side alone (its writes are idempotent and the skip filter
+-- drops what @indexer_progress@ already covers; Redis is not touched, its
+-- best-block pointer must never move back); give 'p2pConsumerGroup' the SQL
+-- group's checkpoint if it has none; then retire the SQL group, which also
+-- sweeps the segments it alone was pinning and nothing would ever trim
+-- otherwise. A no-op where there is no SQL group. The replay runs only on
+-- the cell that holds the writer lease: a standby's SQL is the writer's.
+reconcileSqlConsumerGroup :: (MonadLogger m, HasStreaming m, HasSQLDB m) => Text -> m ()
+reconcileSqlConsumerGroup cell = do
+  present <- hasConsumerGroup sqlConsumerGroup targetTopicName
+  when present $ do
+    holds <- holdsWriterLease cell
+    if holds
+      then do
+        $logInfoS "reconcileSqlConsumerGroup" . T.pack $
+          "replaying what the obsolete " ++ T.unpack sqlConsumerGroup ++ " group had not consumed into SQL before retiring it"
+        n <- drainConsumerGroup sqlConsumerGroup targetTopicName (indexAPI cell)
+        $logInfoS "reconcileSqlConsumerGroup" . T.pack $
+          "replayed " ++ show n ++ " index events from the " ++ T.unpack sqlConsumerGroup ++ " backlog into SQL"
+      else
+        $logWarnS "reconcileSqlConsumerGroup" . T.pack $
+          "cell " ++ T.unpack cell ++ " does not hold the writer lease: not replaying the " ++ T.unpack sqlConsumerGroup ++ " backlog (the writer's SQL is authoritative)"
+    seeded <- seedConsumerGroupFrom p2pConsumerGroup sqlConsumerGroup targetTopicName
+    when seeded $
+      $logInfoS "reconcileSqlConsumerGroup" . T.pack $
+        T.unpack p2pConsumerGroup ++ " had no checkpoint; it starts where " ++ T.unpack sqlConsumerGroup ++ " ended"
+    retireSqlConsumerGroup
+
+-- | Drop the obsolete SQL group's checkpoint, and the segments it alone was
+-- pinning. Only after 'reconcileSqlConsumerGroup' has replayed its backlog:
+-- JLog sweeps what no remaining subscriber needs.
 retireSqlConsumerGroup :: (MonadLogger m, HasStreaming m) => m ()
 retireSqlConsumerGroup = do
-  removed <- removeConsumerGroup "strato-indexer-sql" targetTopicName
+  removed <- removeConsumerGroup sqlConsumerGroup targetTopicName
   when removed $
     $logInfoS "retireSqlConsumerGroup" . T.pack $
-      "retired the obsolete strato-indexer-sql consumer group on " ++ T.unpack (unTopicName targetTopicName) ++ " (the SQL side consumes under strato-indexer)"
+      "retired the obsolete " ++ T.unpack sqlConsumerGroup ++ " consumer group on " ++ T.unpack (unTopicName targetTopicName) ++ " (the SQL side consumes under " ++ T.unpack p2pConsumerGroup ++ ")"
 
 -- | The highest block number a batch carries, if it carries any.
 batchTip :: [IndexEvent] -> Maybe Integer
