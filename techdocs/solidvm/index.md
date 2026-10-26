@@ -55,7 +55,6 @@ A few earlier helium-only switches, all below block 33,918, only matter when rep
 ## Tools
 
 - `solid-vm-cli` parses, typechecks, analyzes and tests contracts locally. See [Testing with solid-vm-cli](testing.md).
-- The VS Code extension in `strato-vscode/` uses `solid-vm-cli` for diagnostics and debugging.
 
 ## In this section
 
