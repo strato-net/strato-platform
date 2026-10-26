@@ -15,7 +15,7 @@ import Blockchain.Strato.Indexer.ApiIndexer
 import Blockchain.Strato.Indexer.IContext (targetTopicName)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Keccak256 (hash)
-import Control.Exception (bracket)
+import Control.Exception (IOException, bracket, try)
 import Control.Monad (void)
 import Control.Monad.Composable.Base (Logger, runEff)
 import Control.Monad.Composable.Streaming
@@ -79,7 +79,7 @@ main = do
           written <- liftIO $ newIORef []
           let writeSql es = liftIO $ modifyIORef' written (++ blockNumbers es)
           -- Three polls, never held: a fresh lease owned by the previous container.
-          kept <- awaitLeaseAndReconcileWith 3 1000 (return False) writeSql
+          kept <- awaitLeaseAndReconcileWith 3 1000 (return False) (return "held by the previous container") writeSql
           liftIO $ kept `shouldBe` SqlGroupKept
           stillThere <- hasConsumerGroup sqlConsumerGroup targetTopicName
           liftIO $ stillThere `shouldBe` True
@@ -87,7 +87,7 @@ main = do
           -- The claim succeeds on the third poll: the backlog is replayed, in order, then the group goes.
           polls <- liftIO $ newIORef (0 :: Int)
           let holds = liftIO $ atomicModifyIORef' polls (\k -> (k + 1, k + 1 >= 3))
-          retired <- awaitLeaseAndReconcileWith 10 1000 holds writeSql
+          retired <- awaitLeaseAndReconcileWith 10 1000 holds (return "held by the previous container") writeSql
           liftIO $ retired `shouldBe` SqlGroupRetired (total - sqlFirst)
           liftIO $ readIORef written >>= (`shouldBe` [sqlFirst + 1 .. total])
           gone <- hasConsumerGroup sqlConsumerGroup targetTopicName
@@ -98,22 +98,38 @@ main = do
       it "a standby (no retries) keeps the group without waiting" $
         withTopicDir $ \dir -> inStream dir $ do
           void splitEraTopic
-          outcome <- awaitLeaseAndReconcileWith 0 1000 (return False) (\_ -> return ())
+          outcome <- awaitLeaseAndReconcileWith 0 1000 (return False) (return "held by the writer") (\_ -> return ())
           liftIO $ outcome `shouldBe` SqlGroupKept
           stillThere <- hasConsumerGroup sqlConsumerGroup targetTopicName
           liftIO $ stillThere `shouldBe` True
+      it "keeps the group and reports it when the backlog cannot be read, instead of throwing" $
+        withTopicDir $ \dir -> do
+          firstSeg <- inStream dir $ do
+            void splitEraTopic
+            segs <- liftIO $ listDirectory (dir </> "indexevents")
+            return $ dir </> "indexevents" </> minimum [f | f <- segs, length f == 8]
+          origPerms <- getPermissions firstSeg
+          setPermissions firstSeg emptyPermissions
+          stillReadable <- either (const False) (const True) <$> (try (BC.readFile firstSeg) :: IO (Either IOException BC.ByteString))
+          if stillReadable
+            then setPermissions firstSeg origPerms >> pendingWith "file permissions are not enforced for this user (root?)"
+            else do
+              outcome <- inStream dir $ awaitLeaseAndReconcileWith 3 1000 (return True) (return "unheld") (\_ -> return ())
+              setPermissions firstSeg origPerms
+              outcome `shouldSatisfy` (\o -> case o of SqlGroupUnreadable _ -> True; _ -> False)
+              inStream dir (hasConsumerGroup sqlConsumerGroup targetTopicName) >>= (`shouldBe` True)
       it "does nothing on a topic without the old group" $
         withTopicDir $ \dir -> inStream dir $ do
           createTopicAndWait targetTopicName
           void $ produceItems targetTopicName (map event [1 .. 3])
-          outcome <- awaitLeaseAndReconcileWith 3 1000 (return True) (\_ -> return ())
+          outcome <- awaitLeaseAndReconcileWith 3 1000 (return True) (return "unheld") (\_ -> return ())
           liftIO $ outcome `shouldBe` NoSqlGroup
       it "seeds a missing unified group from the SQL group before anything else, without deleting" $
         withTopicDir $ \dir -> inStream dir $ do
           createTopicAndWait targetTopicName
           void $ produceItems targetTopicName (map event [1 .. total])
           void $ runConsume sqlConsumerGroup targetTopicName $ \es -> return (Just (length (es :: [IndexEvent])))
-          outcome <- awaitLeaseAndReconcileWith 0 1000 (return False) (\_ -> return ())
+          outcome <- awaitLeaseAndReconcileWith 0 1000 (return False) (return "held by the writer") (\_ -> return ())
           liftIO $ outcome `shouldBe` SqlGroupKept
           seeded <- hasConsumerGroup p2pConsumerGroup targetTopicName
           liftIO $ seeded `shouldBe` True

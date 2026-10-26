@@ -29,7 +29,7 @@ import Blockchain.Data.AddressStateRef (updateSQLBalanceAndNonceSql)
 import Blockchain.Data.DataDefs (ReceiptRef (..))
 import Blockchain.Data.BlockDB (putBlocksSql)
 import Blockchain.Data.IndexerProgress (getIndexerProgress, setIndexerProgressSql)
-import Blockchain.Data.WriterLease (LostWriterLease (..), fenceWriterLeaseSql, holdsWriterLease)
+import Blockchain.Data.WriterLease (LostWriterLease (..), describeLease, fenceWriterLeaseSql, getWriterLeaseSql, holdsWriterLease)
 import qualified Blockchain.Data.BlockHeader as BH
 import Blockchain.ChainMetrics (setBestBlockTimestamp)
 import Blockchain.Data.ReceiptRef (putReceiptRefsSql)
@@ -53,7 +53,8 @@ import Data.Foldable (for_)
 import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Time.Clock (getCurrentTime)
-import UnliftIO (MonadIO, liftIO, throwIO)
+import UnliftIO (MonadIO, MonadUnliftIO, liftIO, throwIO)
+import UnliftIO.Exception (tryIO)
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
 import qualified Data.Map.Strict as M
@@ -95,6 +96,9 @@ data SqlGroupReconciliation
   | -- | The group's backlog (this many events) was replayed into SQL and the
     -- group retired.
     SqlGroupRetired Int
+  | -- | The backlog could not be read (this error); the group and its
+    -- segments stay, and the node goes on without them.
+    SqlGroupUnreadable String
   deriving (Eq, Show)
 
 -- | In 19.6 the SQL side consumed under its own group, 'sqlConsumerGroup',
@@ -112,14 +116,15 @@ data SqlGroupReconciliation
 -- best-block pointer must never move back) and retire the group, which also
 -- sweeps the segments it alone was pinning. Without the lease nothing is
 -- deleted: the checkpoint and its segments wait, since retiring them first
--- would lose the backlog for good. The replay itself throws, and the group
--- stays, if a segment cannot be read.
-reconcileSqlConsumerGroup :: (MonadLogger m, HasStreaming m, HasSQLDB m) => Text -> m SqlGroupReconciliation
+-- would lose the backlog for good. A backlog that cannot be read is kept
+-- the same way, and the node goes on without it: a drain that throws would
+-- otherwise take strato-indexer down on every start.
+reconcileSqlConsumerGroup :: (MonadLogger m, MonadUnliftIO m, HasStreaming m, HasSQLDB m) => Text -> m SqlGroupReconciliation
 reconcileSqlConsumerGroup cell = reconcileSqlConsumerGroupWith (holdsWriterLease cell) (indexAPI cell)
 
 -- | 'reconcileSqlConsumerGroup' with the lease check and the SQL writer
 -- abstracted, so the decision can be exercised without Postgres.
-reconcileSqlConsumerGroupWith :: (MonadLogger m, HasStreaming m) => m Bool -> ([IndexEvent] -> m ()) -> m SqlGroupReconciliation
+reconcileSqlConsumerGroupWith :: (MonadLogger m, MonadUnliftIO m, HasStreaming m) => m Bool -> ([IndexEvent] -> m ()) -> m SqlGroupReconciliation
 reconcileSqlConsumerGroupWith holdsLease writeSql = do
   present <- hasConsumerGroup sqlConsumerGroup targetTopicName
   if not present
@@ -135,11 +140,17 @@ reconcileSqlConsumerGroupWith holdsLease writeSql = do
         else do
           $logInfoS "reconcileSqlConsumerGroup" . T.pack $
             "replaying what the obsolete " ++ T.unpack sqlConsumerGroup ++ " group had not consumed into SQL before retiring it"
-          n <- drainConsumerGroup sqlConsumerGroup targetTopicName writeSql
-          $logInfoS "reconcileSqlConsumerGroup" . T.pack $
-            "replayed " ++ show n ++ " index events from the " ++ T.unpack sqlConsumerGroup ++ " backlog into SQL"
-          retireSqlConsumerGroup
-          return (SqlGroupRetired n)
+          drained <- tryIO $ drainConsumerGroup sqlConsumerGroup targetTopicName writeSql
+          case drained of
+            Left err -> do
+              $logWarnS "reconcileSqlConsumerGroup" . T.pack $
+                "could not read the " ++ T.unpack sqlConsumerGroup ++ " backlog; keeping its checkpoint and the segments it pins: " ++ show err
+              return (SqlGroupUnreadable (show err))
+            Right n -> do
+              $logInfoS "reconcileSqlConsumerGroup" . T.pack $
+                "replayed " ++ show n ++ " index events from the " ++ T.unpack sqlConsumerGroup ++ " backlog into SQL"
+              retireSqlConsumerGroup
+              return (SqlGroupRetired n)
 
 -- | 'reconcileSqlConsumerGroup', waiting for the writer lease first when a
 -- previous process of this node still holds a fresh one (a container
@@ -148,28 +159,36 @@ reconcileSqlConsumerGroupWith holdsLease writeSql = do
 -- (@--writer=false@) does not wait at all, its SQL is the writer's. Either
 -- way, not holding the lease at the end keeps the group and everything it
 -- pins, logged once, until the cell is next started as the writer.
-awaitLeaseAndReconcile :: (MonadLogger m, HasStreaming m, HasSQLDB m) => Bool -> Text -> m SqlGroupReconciliation
+awaitLeaseAndReconcile :: (MonadLogger m, MonadUnliftIO m, HasStreaming m, HasSQLDB m) => Bool -> Text -> m SqlGroupReconciliation
 awaitLeaseAndReconcile writer cell =
-  awaitLeaseAndReconcileWith (if writer then 60 else 0) 1000000 (holdsWriterLease cell) (indexAPI cell)
+  awaitLeaseAndReconcileWith (if writer then 60 else 0) 1000000 (holdsWriterLease cell) whoHolds (indexAPI cell)
+  where
+    whoHolds = do
+      lease <- sqlQueryWriter getWriterLeaseSql
+      now <- liftIO getCurrentTime
+      return (describeLease now lease)
 
 -- | 'awaitLeaseAndReconcile' with the number of retries, their spacing (in
--- microseconds), the lease check and the SQL writer abstracted.
-awaitLeaseAndReconcileWith :: (MonadLogger m, HasStreaming m) => Int -> Int -> m Bool -> ([IndexEvent] -> m ()) -> m SqlGroupReconciliation
-awaitLeaseAndReconcileWith retries intervalMicros holdsLease writeSql = go retries False
+-- microseconds), the lease check, a description of the lease for the log,
+-- and the SQL writer abstracted.
+awaitLeaseAndReconcileWith :: (MonadLogger m, MonadUnliftIO m, HasStreaming m) => Int -> Int -> m Bool -> m String -> ([IndexEvent] -> m ()) -> m SqlGroupReconciliation
+awaitLeaseAndReconcileWith retries intervalMicros holdsLease describeHolder writeSql = go retries False
   where
     go left announced = do
       outcome <- reconcileSqlConsumerGroupWith holdsLease writeSql
       case outcome of
         SqlGroupKept
           | left > 0 -> do
-              unless announced $
+              unless announced $ do
+                holder <- describeHolder
                 $logInfoS "reconcileSqlConsumerGroup" . T.pack $
-                  "this cell does not hold the writer lease yet; waiting for it before replaying the " ++ T.unpack sqlConsumerGroup ++ " backlog"
+                  "this cell does not hold the writer lease yet (" ++ holder ++ "); waiting for it before replaying the " ++ T.unpack sqlConsumerGroup ++ " backlog"
               liftIO $ threadDelay intervalMicros
               go (left - 1) True
           | otherwise -> do
+              holder <- describeHolder
               $logWarnS "reconcileSqlConsumerGroup" . T.pack $
-                "this cell does not hold the writer lease: keeping the " ++ T.unpack sqlConsumerGroup
+                "this cell does not hold the writer lease (" ++ holder ++ "): keeping the " ++ T.unpack sqlConsumerGroup
                   ++ " checkpoint and the segments it pins until it is started as the writer (its backlog is not in SQL yet)"
               return outcome
         _ -> return outcome

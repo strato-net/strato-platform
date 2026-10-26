@@ -1892,7 +1892,7 @@ selected_databases() {
     printf '%s\n' "${SNAPSHOT_PG_DATABASES[@]}"
     return 0
   fi
-  local want db found known
+  local want db found known named=0
   IFS=',' read -ra want <<< "$SNAPSHOT_DATABASES"
   for db in "${want[@]}"; do
     db="$(printf '%s' "$db" | tr -d '[:space:]')"
@@ -1901,7 +1901,9 @@ selected_databases() {
     for known in "${SNAPSHOT_PG_DATABASES[@]}"; do [[ "$known" == "$db" ]] && found=true; done
     [[ "$found" == true ]] || die "--databases: '$db' is not one of: ${SNAPSHOT_PG_DATABASES[*]}"
     printf '%s\n' "$db"
+    named=$((named + 1))
   done
+  (( named > 0 )) || die "--databases names no database; expected some of: ${SNAPSHOT_PG_DATABASES[*]}"
 }
 
 # Clear a database on the shared cluster before reloading it. Restoring over a
