@@ -26,12 +26,11 @@ const finality = {
   },
 };
 
-test("requires exact canonical receipt evidence at or below the finalized head", async () => {
-  let finalizedBlock = 9;
+test("requires exact canonical receipt evidence after the configured confirmations", async () => {
+  let head = 14;
   let canonicalHash = blockHash;
   const provider = {
-    getBlockNumber: async () => 20,
-    getFinalizedBlockNumber: async () => finalizedBlock,
+    getBlockNumber: async () => head,
     assertCanonicalBlock: async (_blockNumber: number, expectedHash: string) => {
       if (expectedHash !== canonicalHash) throw new Error("Receipt block is not canonical");
     },
@@ -41,7 +40,7 @@ test("requires exact canonical receipt evidence at or below the finalized head",
     validateReceiptFinality(provider, { blockNumber: 10, blockHash }, 5, pending),
     WithdrawalReleasePendingError,
   );
-  finalizedBlock = 10;
+  head = 20;
   await validateReceiptFinality(provider, { blockNumber: 10, blockHash }, 5, pending);
   canonicalHash = txHash;
   await assert.rejects(

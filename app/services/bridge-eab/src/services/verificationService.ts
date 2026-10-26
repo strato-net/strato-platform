@@ -7,7 +7,6 @@ import {
   WAD,
 } from "../config";
 import {
-  getFinalizedBlockNumber,
   getTransactionReceiptsBatch,
   getInternalTransactionsBatch,
   getVerifiedBlockHash,
@@ -293,7 +292,6 @@ export const verifyDetectedDepositsBatch = async (
       ).values(),
     ];
     const receipts = await getTransactionReceiptsBatch(chainId, txHashes);
-    const finalizedBlock = await getFinalizedBlockNumber(chainId);
     const confirmations = getDepositConfirmationPolicy(chainId);
     const routers = new Set(chainDeposits.map((deposit) => normalizeAddress(deposit.depositRouter)));
     const canonicalHashes = new Map<number, string>();
@@ -304,7 +302,7 @@ export const verifyDetectedDepositsBatch = async (
           !/^0x[0-9a-f]+$/i.test(receipt.blockNumber || "")) continue;
       const blockNumber = Number(BigInt(receipt.blockNumber));
       if (!Number.isSafeInteger(blockNumber) ||
-          latestBlock - blockNumber < confirmations || blockNumber > finalizedBlock) continue;
+          latestBlock - blockNumber < confirmations) continue;
       matureBlocks.add(blockNumber);
     }
     const blocks = [...matureBlocks];
@@ -330,7 +328,7 @@ export const verifyDetectedDepositsBatch = async (
       const blockNumber = Number(BigInt(receipt.blockNumber));
       if (canonicalHashes.get(blockNumber)?.toLowerCase() !==
           String(receipt.blockHash || "").toLowerCase()) return false;
-      if (latestBlock - blockNumber < confirmations || blockNumber > finalizedBlock) return false;
+      if (latestBlock - blockNumber < confirmations) return false;
       try {
         const parsed = parseReceiptDeposits(receipt, chainId, routers);
         return parsed.deposits.some((deposit) => deposit.externalToken === ZERO_ADDRESS);
@@ -398,8 +396,7 @@ export const verifyDetectedDepositsBatch = async (
           });
           continue;
         }
-        if (latestBlock - receiptBlock < confirmations ||
-            receiptBlock > finalizedBlock) {
+        if (latestBlock - receiptBlock < confirmations) {
           setTransactionState(transactionDeposits, { state: "confirming" });
           continue;
         }

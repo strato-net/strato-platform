@@ -60,22 +60,18 @@ export const validateReceiptFinality = async (
       !/^0x[0-9a-f]{64}$/i.test(receipt.blockHash || "")) {
     throw new Error("Receipt block evidence is invalid");
   }
-  if (typeof provider.getFinalizedBlockNumber !== "function" ||
-      typeof provider.assertCanonicalBlock !== "function") {
-    throw new Error("Finalized receipt validation is unavailable");
+  if (typeof provider.assertCanonicalBlock !== "function") {
+    throw new Error("Canonical receipt validation is unavailable");
   }
   await provider.assertCanonicalBlock(receipt.blockNumber, receipt.blockHash);
-  const [latestBlock, finalizedBlock] = await Promise.all([
-    provider.getBlockNumber(),
-    provider.getFinalizedBlockNumber(),
-  ]);
+  const latestBlock = await provider.getBlockNumber();
   const observedConfirmations = Math.max(0, latestBlock - receipt.blockNumber);
-  if (observedConfirmations < confirmations || receipt.blockNumber > finalizedBlock) {
-    throw pendingError("Transaction is awaiting finalized confirmation", {
+  // Confirmation depth only. The finalized tag waits on the external ZK proof.
+  if (observedConfirmations < confirmations) {
+    throw pendingError("Transaction is awaiting confirmation", {
       observedConfirmations: String(observedConfirmations),
       requiredConfirmations: String(confirmations),
       receiptBlock: String(receipt.blockNumber),
-      finalizedBlock: String(finalizedBlock),
     });
   }
 };

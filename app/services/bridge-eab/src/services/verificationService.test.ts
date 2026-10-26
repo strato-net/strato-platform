@@ -666,8 +666,6 @@ test("uses the lowest finalized head and requires a common canonical checkpoint"
 
 test("waits for confirmations before tracing, then requires both RPCs on retry", async (t) => {
   const rpc = await import("./rpcService");
-  let finalizedBlock = 15;
-  t.mock.method(rpc, "getFinalizedBlockNumber", async () => finalizedBlock);
   t.mock.method(rpc, "getVerifiedBlockHash", async () => `0x${"cd".repeat(32)}`);
   const rpcEnv = [`CHAIN_${chainId}_RPC_URL`, `CHAIN_${chainId}_VERIFICATION_RPC_URLS`, `CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS`];
   const original = rpcEnv.map((key) => process.env[key]);
@@ -692,10 +690,6 @@ test("waits for confirmations before tracing, then requires both RPCs on retry",
   const confirming = await verifyDetectedDepositsBatch([value], 27, custodyAddress);
   assert.equal(confirming.get(depositIdentity(value))?.state, "confirming");
   assert.deepEqual(traceUrls, []);
-  const awaitingFinality = await verifyDetectedDepositsBatch([value], 28, custodyAddress);
-  assert.equal(awaitingFinality.get(depositIdentity(value))?.state, "confirming");
-  assert.deepEqual(traceUrls, []);
-  finalizedBlock = 16;
   const unavailableResult = (await verifyDetectedDepositsBatch([value], 28, custodyAddress)).get(depositIdentity(value));
   assert.equal(unavailableResult?.state, "missing");
   assert.match(unavailableResult?.state === "missing" ? unavailableResult.error?.message || "" : "", /provider=secondary-rpc.*Trace not yet available/);
