@@ -19,6 +19,7 @@ module Main where
 import Bloc.API
 -- hiding (handleRuntimeError)
 import Bloc.Monad
+import Bloc.NonceStore (ensureNonceCounterTable)
 import Bloc.Server
 import BlockApps.Init
 import BlockApps.Logging
@@ -31,13 +32,13 @@ import Blockchain.Data.DataDefs
 import Blockchain.EthConf
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Model.JsonBlock
-import Blockchain.Model.SyncState (BestBlock, WorldBestBlock(..))
+import Blockchain.Data.NodeStatus (CirrusTip, getNodeBestBlock, getNodeBestSequencedBlock, getNodeCirrusTip, getNodeSyncStatus, getNodeWorldBestBlock)
+import Blockchain.Model.SyncState (BestBlock, BestSequencedBlock, WorldBestBlock)
 import Blockchain.Sequencer.Event (IngestEvent)
 import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.RedisBlockDB
-import Blockchain.SyncDB
+import Blockchain.SyncDB (SyncStatus (..))
 import Control.Lens.Operators
 import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify
@@ -49,7 +50,6 @@ import Core.API
 import Data.Aeson ()
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
-import qualified Data.Cache as Cache
 import qualified Data.HashMap.Strict.InsOrd as H
 import Data.Map (fromList, traverseWithKey)
 import Data.Maybe (listToMaybe)
@@ -71,12 +71,13 @@ import Data.String (fromString)
 import Network.Wai.Middleware.Cors
 import Network.Wai.Middleware.Prometheus
 import Network.Wai.Middleware.RequestLogger
+import Strato.Tracing (initTracing)
+import Strato.Tracing.Wai (tracingMiddleware)
 import SQLM
 import Servant
 import Servant.Multipart
 import Servant.OpenApi
 import Servant.Swagger.UI
-import System.Clock
 import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
@@ -152,14 +153,22 @@ instance Selectable Address AddressState ApiM where
         codePtr
         (Just 0)
 
-instance {-# OVERLAPPABLE #-} MonadIO m => Accessible (Maybe SyncStatus) m where
-  access _ = liftIO $ fmap SyncStatus <$> runStratoRedisIO getSyncStatus
+-- The sync scalars come from the node_status table (mirrored from the core's
+-- Redis by strato-indexer), so the API needs no Redis connection at all.
+instance Accessible (Maybe SyncStatus) ApiM where
+  access _ = fmap SyncStatus <$> getNodeSyncStatus
 
-instance {-# OVERLAPPABLE #-} MonadIO m => Accessible (Maybe BestBlock) m where
-  access _ = liftIO $ runStratoRedisIO getBestBlockInfo
+instance Accessible (Maybe BestBlock) ApiM where
+  access _ = getNodeBestBlock
 
-instance {-# OVERLAPPABLE #-} MonadIO m => Accessible (Maybe WorldBestBlock) m where
-  access _ = liftIO $ fmap WorldBestBlock <$> runStratoRedisIO getWorldBestBlockInfo
+instance Accessible (Maybe WorldBestBlock) ApiM where
+  access _ = getNodeWorldBestBlock
+
+instance Accessible (Maybe BestSequencedBlock) ApiM where
+  access _ = getNodeBestSequencedBlock
+
+instance Accessible (Maybe CirrusTip) ApiM where
+  access _ = getNodeCirrusTip
 
 type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 
@@ -168,8 +177,13 @@ fullServer = coreApiServer :<|> bloc
 
 ----------------
 
-hoistCoreServer :: BlocEnv -> UrlMap -> Servant.Server FullAPI
-hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErrors fullServer
+-- | The eth and cirrus pools are created once in 'main' and shared by every
+-- request. Until 2026-09 each request built (and tore down) its own
+-- 20-connection pool per database, which Postgres tolerated over loopback
+-- but which multiplies into thousands of connections once several API
+-- instances sit in front of a managed cluster.
+hoistCoreServer :: SQLDB -> CirrusDB -> BlocEnv -> UrlMap -> Servant.Server FullAPI
+hoistCoreServer sqlDb cirrusDb blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErrors fullServer
   where
     convertErrors :: ApiM a -> Handler a
     convertErrors x = Handler $ do
@@ -177,8 +191,8 @@ hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErr
         . try
         . runEff
         . runLogging
-        . runSQLM
-        . runCirrusM
+        . runSQLMWith sqlDb
+        . runCirrusMWith cirrusDb
         . provide blocEnv
         . provide urlMap
         . unApiM
@@ -226,29 +240,51 @@ main = do
   runInstrumentation "strato-api"
 
   let stateFetchLimit' = 100
+      -- Seconds a reserved nonce counter stays valid; long enough to cover a
+      -- transaction's trip to the indexer under load.
       nonceCounterTimeout = 10
 
-  nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
   simCounter <- newTVarIO 0
+
+  sqlDb <- runEff . runLogging $ createSQLDB sqlPoolSize
+  cirrusDb <- runEff . runLogging $ createCirrusDB sqlPoolSize
+  -- Per-address nonce counters shared by every API instance live in the
+  -- writer (Bloc.NonceStore); make sure the table exists.
+  ensureNonceCounterTable sqlDb
 
   let bindHost' = Conf.apiListenAddress (Conf.apiConfig ethConf)
       bindPort = Conf.apiPort (Conf.apiConfig ethConf)
+      -- The JSON-RPC server binds where this one does. A wildcard bind (the
+      -- API tier's container listens on every interface for its nginx
+      -- sidecar) is not an address to connect to, so reach it on loopback.
+      rpcHost
+        | bindHost' `elem` ["0.0.0.0", "::", "*", "*4", "*6"] = "127.0.0.1"
+        | otherwise = bindHost'
   let env =
         BlocEnv
           { Bloc.Monad.txSizeLimit = Conf.txSizeLimit (networkConfig ethConf),
             Bloc.Monad.gasLimit = Conf.gasLimit (networkConfig ethConf),
             Bloc.Monad.stateFetchLimit = stateFetchLimit',
-            Bloc.Monad.globalNonceCounter = nonceCache,
-            Bloc.Monad.vmJsonRpcUrl = "http://" ++ bindHost' ++ ":" ++ show Conf.jsonRpcPort,
+            Bloc.Monad.nonceTtlSeconds = nonceCounterTimeout,
+            Bloc.Monad.vmJsonRpcUrl = "http://" ++ rpcHost ++ ":" ++ show Conf.jsonRpcPort,
             Bloc.Monad.simInFlight = simCounter,
             Bloc.Monad.simMaxConcurrent = Conf.simMaxConcurrent (Conf.vmConfig ethConf)
           }
   putStrLn $ "Starting strato-api on " ++ bindHost' ++ ":" ++ show bindPort
   let settings = setPort bindPort $ setHost (fromString bindHost') defaultSettings
-  runSettings settings $ app env theDoc urlMap
+  -- Request traces: one server span per request, continuing nginx's
+  -- traceparent; enabled by OTEL_EXPORTER_OTLP_ENDPOINT.
+  initTracing "strato-api"
+  runSettings settings . tracingMiddleware "strato-api" $ app sqlDb cirrusDb env theDoc urlMap
 
-app :: BlocEnv -> OpenApi -> UrlMap -> Application
-app blocEnv theDoc urlMap =
+-- | Connections per database for the whole process. Twenty matches the
+-- per-request pool size this replaced; -N4 workers rarely hold more than a
+-- handful at once.
+sqlPoolSize :: Int
+sqlPoolSize = 20
+
+app :: SQLDB -> CirrusDB -> BlocEnv -> OpenApi -> UrlMap -> Application
+app sqlDb cirrusDb blocEnv theDoc urlMap =
   prometheus def {prometheusInstrumentApp = False} $
     instrumentApp "core-api" $
       logStdoutDev $
@@ -257,7 +293,7 @@ app blocEnv theDoc urlMap =
         $
           addPathsTo404 $
             serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "openapi-ui" "openapi.json")) $
-              hoistCoreServer blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
+              hoistCoreServer sqlDb cirrusDb blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
 
 addPathsTo404 :: Middleware
 addPathsTo404 baseApp req respond' =
@@ -336,3 +372,4 @@ instance HasOpenApi a => HasOpenApi (MultipartForm Mem (MultipartData Mem) :> a)
   toOpenApi _ = toOpenApi (Proxy :: Proxy a)
 
 -----------
+

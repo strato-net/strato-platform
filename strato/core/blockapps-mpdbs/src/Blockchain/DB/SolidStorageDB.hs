@@ -17,14 +17,13 @@ module Blockchain.DB.SolidStorageDB
 where
 
 import BlockApps.Logging
+import Blockchain.DB.AddressStateDB (HasAccountDB)
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB
-import Blockchain.Data.AddressStateDB
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Strato.Model.Address
-import Control.Monad.Change.Alter (Alters)
 import Data.Bifunctor (second)
 import SolidVM.Model.Storable
 
@@ -38,7 +37,7 @@ type FullSolidStorage m =
     HasMemSolidStorageDB m,
     HasStateDB m,
     HasHashDB m,
-    (Address `Alters` AddressState) m
+    HasAccountDB m
   )
 
 toKey :: Address -> StoragePath -> RawStorageKey

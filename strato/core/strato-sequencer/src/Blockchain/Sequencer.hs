@@ -53,6 +53,8 @@ import Data.Proxy
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Blockchain.Strato.Model.MicroTime (Microtime (..))
+import qualified Strato.Tracing as Tr
 import Data.Time.Clock
 import Prometheus as P
 import Text.Format
@@ -387,6 +389,7 @@ blockstanbulSend' msg = do
       $logWarnS "seq/pbft/send" . T.pack $
         "Rejected " ++ show droppedCount ++ " committed block(s) with unrecoverable transaction signatures"
     committedBlocks <- catMaybes <$> traverse insertEmitted rBlocks
+    liftIO $ recordSequencedSpans committedBlocks
     let (vms, p2ps) = vmEvenP2pCheckptFilterHelper resp
 
     let vmevs =
@@ -434,7 +437,8 @@ blockstanbulSend' msg = do
     vmEvenP2pCheckptFilterHelper [] = ([], [])
 
 transformFullTransactions ::
-  ( MonadLogger m,
+  ( MonadIO m,
+    MonadLogger m,
     MonadMonitor m,
     (Keccak256 `A.Alters` ()) m
   ) =>
@@ -459,6 +463,7 @@ transformFullTransactions pairs = do
 
 
   let txs = catMaybes mOtxs
+  lift . liftIO $ recordReceivedSpans txs
   lift . logF $ "Sending " ++ show (length txs) ++ " public transactions to P2P and the VM"
   yieldToVm $ map pairToVmTx txs
   yieldToP2p $ map (P2pTx . snd) txs
@@ -521,7 +526,13 @@ runConsensus sb = do
     then emitOrCacheHistoricBlock sb
     -- Blockstanbul will check that the seals and validators match up before
     -- announcing it to the network or forwarding to the EVM.
-    else void . blockstanbulSend' $ UnannouncedBlock blk
+    else case sbOrigin sb of
+      TO.Quarry -> void . blockstanbulSend' $ UnannouncedBlock blk
+      -- Only this node's own VM builds candidates. An unsealed block from anywhere
+      -- else would be stamped, sealed and proposed as ours.
+      origin ->
+        $logWarnS "runConsensus" . T.pack $
+          "Ignoring unsealed " ++ shortDescription sb ++ " from " ++ format origin ++ ": not a candidate built by this node"
 
 transformBlocks ::
   ( MonadLogger m,
@@ -541,8 +552,9 @@ transformBlocks ibs = do
           "Rejecting " ++ prettyIBlock ib
           ++ " - could not recover signer for tx(s): " ++ unwords failedTxHashes
         lift $ P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
-      Just sb -> do
-        runConsensus sb
+      Just sb
+        | not (isMalformedBlock sb) -> runConsensus sb
+        | otherwise -> pure ()
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock {ibOrigin = o, ibBlockData = bd, ibReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
@@ -559,3 +571,42 @@ prettyTx IngestTx {itOrigin = o, itTransaction = t} = prefix t ++ " via " ++ sho
 
     shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
     shortOrigin x = format x
+
+-- | Transaction-trace spans (see Strato.Tracing: the trace id derives from
+-- the hash, so these land in the same trace as the API's submit span and
+-- the VM's execute span with nothing propagated).
+--
+-- "tx.received": from the API's submit timestamp (carried on the ingest
+-- event) to the sequencer taking the transaction, so the span's length is
+-- the submit-to-sequencer latency itself.
+recordReceivedSpans :: [(Timestamp, OutputTx)] -> IO ()
+recordReceivedSpans txs = do
+  enabled <- Tr.tracingEnabled
+  when enabled $ do
+    now <- Tr.nowNanos
+    forM_ txs $ \(Microtime micros, otx) ->
+      Tr.recordSpan (Tr.traceIdFromHash (keccak256ToByteString (otHash otx))) Nothing "tx.received" Tr.Consumer (micros * 1000) now
+        [ Tr.attrText "strato.tx_hash" (T.pack (keccak256ToHex (otHash otx))),
+          Tr.attrText "strato.stage" "sequencer",
+          Tr.attrText "strato.origin" (T.pack (show (otOrigin otx)))
+        ]
+        []
+        Nothing
+
+-- | "tx.sequenced": the instant a committed block carrying the transaction
+-- leaves the sequencer for the VM and the peers.
+recordSequencedSpans :: [OutputBlock] -> IO ()
+recordSequencedSpans blocks = do
+  enabled <- Tr.tracingEnabled
+  when enabled $ do
+    now <- Tr.nowNanos
+    forM_ blocks $ \ob ->
+      forM_ (obReceiptTransactions ob) $ \otx ->
+        Tr.recordSpan (Tr.traceIdFromHash (keccak256ToByteString (otHash otx))) Nothing "tx.sequenced" Tr.Internal now now
+          [ Tr.attrText "strato.tx_hash" (T.pack (keccak256ToHex (otHash otx))),
+            Tr.attrText "strato.stage" "sequencer",
+            Tr.attrInt "strato.block_number" (number (obBlockData ob)),
+            Tr.attrText "strato.block_hash" (T.pack (keccak256ToHex (blockHeaderHash (obBlockData ob))))
+          ]
+          []
+          Nothing

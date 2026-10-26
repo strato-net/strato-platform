@@ -23,9 +23,16 @@ strato-up mynode --network=helium --sslDir=/path/to/ssl --snapshot
 | `--sslDir` | *(empty)* | Directory holding `server.pem` and `server.key`. Setting it enables HTTPS on 443 and redirects HTTP to HTTPS. |
 | `--localAuth` | `false` | Use the bundled identity provider (Ory Kratos and Hydra) and a node-local Vault instead of external Keycloak and the shared Vault. |
 | `--httpPort` | `8081` | nginx HTTP port. |
+| `--p2pPort` | `30303` | TCP port `strato-p2p` listens on; `ethereum-discover` advertises it to peers. With `--dockerMode=all` the `strato` container publishes it. |
+| `--discoveryPort` | `30303` | UDP port `ethereum-discover` listens on, published the same way. |
+| `--nodeHost` | *(the machine's host name)* | The node's public host name. The node URL, the auth cookie domain and, with `--localAuth`, the OpenID discovery URL are built from it. See [Host name](#host-name). |
+| `--dockerMode` | `services` | What runs in Docker. `services`: only the service containers, the node processes run on the host under `convoke`. `all`: the node processes too, in a `strato` container of the generated `docker-compose.yml`; `strato-up` then starts and stops the compose project. See [Run from prebuilt images](prebuilt.md). |
+| `--repoUrl` | *(empty)* | Registry prefix of the node's images in `docker-compose.yml`, for example `ghcr.io/strato-net/strato-platform/`. `strato-up --prebuilt` sets it. |
 | `--vaultUrl` | `https://vault.blockapps.net:8093/strato/v2.3` | Vault that holds the node key and user keys. Ignored with `--localAuth`, which uses the node-local Vault. |
 | `--vaultTimeoutSec` | `12` | HTTP response timeout, in seconds, for Vault key and signature requests. |
 | `--jsonrpc` | `true` | Run the Ethereum JSON-RPC server (`ethereum-jsonrpc`, port 8545) and expose it at `/rpc`. |
+| `--role` | `node` | What the directory runs: `node` (everything), `core`, `api`, `validator` (a lite validator with only the chain processes, their stores and apex) or `api-node` (a full node without the app, SMD and Swagger docs). See [Validator mode](#validator-mode) and [API node](#api-node). |
+| `--monitoring` | `true` | API node only: `false` drops the `prometheus` and `apex` containers, and with them `/health`. Refused with any other `--role`. See [API node](#api-node). |
 | `--publicStratoRpc` | `false` | Allow the `strato_*` simulation and trace methods on the public `/rpc` endpoint. |
 | `--generateKey` | `true` | During setup, create a node key in the Vault if none exists. When `false`, setup waits for the key to be inserted manually. |
 
@@ -61,6 +68,8 @@ These flags are handled by `strato-up` itself and are not passed to `strato-setu
 | `--stakingActivationBlock` | `-1` | Block from which stake-weighted proposer selection applies. `-1` means the network default. Every node of a network must agree, so don't override it on a public network. |
 | `--svmTrace` | `false` | Verbose SolidVM logging. |
 | `--sqlDiff` | `true` | Write account state and storage to the SQL database. |
+| `--disableSqlIndexing` | `false` | Skip constructing SQL indexing messages in vm-runner, including state diffs, pending transactions, balance/nonce updates and receipt indexing payloads. Keep blocks and best-block updates for Redis. |
+| `--disableCirrusIndexing` | `false` | Skip constructing Cirrus actions and code-collection messages in vm-runner. Keep transaction results. |
 
 For how the consensus settings are used, see [Consensus](../platform/consensus.md).
 
@@ -75,7 +84,7 @@ Main sections:
 
 | Section | Contains |
 |---|---|
-| `networkConfig` | `network`, `networkID`, `chainId`, `httpPort`, `txSizeLimit`, `gasLimit`, `blockPeriodMs`, `roundPeriodS`, `maxTimestampDriftS`, and the staking activation settings |
+| `networkConfig` | `network`, `role` (what the directory was set up as, `node` unless `--role` was given), `networkID`, `chainId`, `httpPort`, `txSizeLimit`, `gasLimit`, `blockPeriodMs`, `roundPeriodS`, `maxTimestampDriftS`, and the staking activation settings |
 | `urlConfig` | `nodeUrl` (from the host name), `vaultUrl`, `vaultTimeoutSec`, `cookieRealm` |
 | `p2pConfig`, `discoveryConfig` | Peer limits and timeouts |
 | `quarryConfig` | Block building: `maxTxsPerBlock`, `mempoolLivenessCutoff` |
@@ -117,8 +126,15 @@ All environment variables are optional.
 Where these variables take effect:
 
 - **`strato-setup` variables** matter only when a node directory is created.
-- **`strato-logrotate` variables** are read at runtime, so set them in the environment you run `strato-up` from.
+- **`strato-logrotate` variables** are read at runtime, so set them in the environment you run `strato-up` from. With `--dockerMode=all` they reach the `strato` container the way the app variables do below, so give them on every `strato-up`.
 - **App variables:** the generated `docker-compose.yml` also passes app settings through from your environment, such as the `RPC_URL_*` external-chain RPC endpoints. Docker Compose substitutes them each time the containers start, so pass the same variables on every `strato-up`.
+
+## Host name
+
+`strato-setup` builds the node URL (`urlConfig.nodeUrl`), the auth cookie domain (`urlConfig.cookieRealm`) and, with `--localAuth`, the OpenID discovery URL from one host name: `--nodeHost`, or the machine's `hostname` when the flag is not given. The name has to meet two rules:
+
+- **Without `--sslDir`, no dot.** The node processes accept a plain-HTTP discovery URL only for `localhost` or a single-label name such as `stratonode`. A dotted name such as `node.example.com` needs `--sslDir` and a certificate the browsers and the node processes trust.
+- **Resolvable from the host and the browsers.** The name must resolve to the machine on the machine itself (DNS or `/etc/hosts`) and from every browser that uses the node. The containers need no DNS for it: the generated `docker-compose.yml` aliases it to the Docker host gateway, so they reach nginx through the host's published port.
 
 ## Local auth mode
 
@@ -130,8 +146,64 @@ Where these variables take effect:
 - **First admin.** On the first `strato-up`, the admin user and the node's operator key are created together from a BIP-39 recovery phrase.
 - **More users.** Add users with `strato-user-add` (see [Operations](operations.md#add-users-local-auth)).
 
+Without `--sslDir`, the machine's host name must be a single label (no dot): the node processes accept a plain-HTTP discovery URL only for `localhost` or an unqualified name. That name must resolve to the host on the machine itself and from the browsers that use the node, through DNS or an `/etc/hosts` entry; inside the containers, nginx reaches the identity provider by its container name, so the name does not need to resolve there. With a dotted name, `--sslDir` and a certificate the browsers and the node processes trust are required.
+
 !!! warning "Local-auth keys live only in the node directory"
     With `--localAuth`, the node key and user keys are stored in the node's own Postgres `oauth` database. Snapshots never include that database, so removing the node directory deletes the keys. To recover them, keep the recovery phrases.
+
+## Validator mode
+
+`--role=validator` sets up a lite validator: a node that takes part in consensus and does nothing else.
+
+```bash
+make validator   # the executables plus the apex and prometheus images, nothing else
+strato-up myvalidator --role=validator --network=helium --snapshot
+```
+
+What runs:
+
+| Host processes | Containers |
+|---|---|
+| `ethereum-discover`, `strato-p2p`, `strato-sequencer`, `vm-runner`, `strato-indexer --sql=false`, `strato-network-monitor`, `strato-logrotate` | `postgres`, `redis`, `prometheus`, `apex` |
+
+What doesn't: the app, SMD, nginx, PostgREST, Swagger docs, `slipstream` (so no `cirrus` database, which is most of a full node's disk), `strato-api` and `ethereum-jsonrpc`. The indexer keeps only the Redis block index that `strato-p2p` serves peers from, so the `eth` database holds nothing but the peer tables. `vm-runner` neither mirrors state into SQL nor publishes the `vmevents` stream: nothing would read it, and JLog only trims what a reader has passed.
+
+- **Identity.** The node key still comes from the Vault, so [store your OAuth credentials](install.md#4-store-your-oauth-credentials) first. `--localAuth` is refused.
+- **Snapshots.** `--snapshot` restores the chain state, Redis and JLog only; the eth and cirrus dumps are skipped (`strato-snapshot restore --skip-databases`).
+- **Monitoring.** apex serves `/health` and `/status` on port 80 over plain HTTP, so the network monitor can watch the validator: register it there as protocol `http` with host `<host>`. Port 80 is one of the few a CDN such as Cloudflare proxies, so the endpoint can sit behind one. There is no nginx and no TLS on a validator, and port 80 serves apex alone: `/health`, `/status`, `/_ping` and the Prometheus `/metrics`. apex registers neither its `/user` key endpoint nor the SMD socket rooms on a validator, and there is no `/rpc`. `/health` carries only public data (block, PBFT view, node address, health flags), but restrict the port to the monitor's address all the same. `strato-ps` shows the sync position locally.
+- **Ports.** 30303 (TCP and UDP) for peers, or `--p2pPort` and `--discoveryPort`, and 80 for the monitor.
+- **Resources.** The host still needs the validator minimum of 8 GB of RAM. What you save is Cirrus's disk and the app's memory.
+- **Changing your mind.** The role is fixed when the directory is created, like every other flag. To turn a validator into a full node, create a new directory.
+
+## API node
+
+`--role=api-node` sets up a full node without the services that only serve people. It syncs and serves the chain and every API, and runs no app, SMD or Swagger docs.
+
+```bash
+make api-node    # the executables plus the nginx, apex, prometheus and postgrest images; add local-auth for --localAuth
+strato-up myapinode --role=api-node --network=helium --sslDir=/path/to/ssl --snapshot
+```
+
+What runs:
+
+| Host processes | Containers |
+|---|---|
+| The same as a full node: `ethereum-discover`, `strato-p2p`, `strato-sequencer`, `vm-runner`, `strato-indexer`, `slipstream`, `strato-api`, `ethereum-jsonrpc`, `strato-network-monitor`, `strato-logrotate` | `postgres`, `redis`, `nginx`, `postgrest`, `prometheus`, `apex` |
+
+What doesn't: `app-backend`, `app-ui`, `smd` and `docs`. Everything the APIs depend on stays. `slipstream` and PostgREST stay because transaction results, `eth_getLogs` and `/cirrus/search` come from Cirrus. nginx stays because it terminates TLS, checks the caller's token on every API route, rate-limits and guards `/rpc`. `prometheus` and `apex` stay because they produce `/health`.
+
+What answers:
+
+| Path | Response |
+|---|---|
+| `/strato-api/`, `/bloc/v2.2/`, `/rpc`, `/cirrus/search/`, `/health`, `/apex-api/`, `/metrics` | As on a full node |
+| `/` (after its usual redirect to `/dashboard/`), `/smd/` | 404, or a redirect when `--appUrl` or `--smdUrl` is given |
+| `/docs/` | 502 (a browser is sent through the login first, as on a full node) |
+
+- **`--monitoring=false`** drops `prometheus` and `apex`, for operators who scrape the node processes themselves. `/health` and `/apex-api/` then answer 502, and the network monitor cannot watch the node. The flag is refused with any other `--role`.
+- **Identity, snapshots, ports.** As on a full node: the node key comes from the Vault, `--snapshot` restores the chain state and the `eth` and `cirrus` databases, and the node listens on the peer ports (30303, or `--p2pPort` and `--discoveryPort`), `--httpPort` and 443.
+- **`--localAuth`** works as on a full node: the `local-auth` container and the node-local Vault are added, nginx serves `/auth/` and `/vault/`, and the first `strato-up` creates the admin user. The login pages come from the `local-auth` container, so they do not need the app; after a browser login the user lands on `/`, which answers 404 unless `--appUrl` is set. See [Local auth mode](#local-auth-mode).
+- **Resources.** An API node needs the same host as a full node. On a testnet node, the app, SMD and docs containers use about 170 MB of memory between them and prometheus and apex about 350 MB more, while Postgres, Redis, `vm-runner` and `strato-p2p` use several GB and Cirrus is the disk. What you get is a faster build and fewer containers, not a smaller machine.
 
 ## JSON-RPC and the STRATO RPC extensions
 

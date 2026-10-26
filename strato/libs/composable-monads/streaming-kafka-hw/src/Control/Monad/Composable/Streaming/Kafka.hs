@@ -28,6 +28,8 @@ module Control.Monad.Composable.Streaming.Kafka (
   runStreamM,
   runStreamMUsingEnv,
   createStreamEnv,
+  createStreamEnvWith,
+  closeStreamEnv,
   getStreamEnv,
   -- Producing
   produceItems,
@@ -38,6 +40,7 @@ module Control.Monad.Composable.Streaming.Kafka (
   consumeBroadcast,
   runConsume,
   consumeFromLatest,
+  consumeFromLatestRaw,
   -- Topics
   createTopicAndWait,
   createBroadcastTopic,
@@ -61,7 +64,7 @@ module Control.Monad.Composable.Streaming.Kafka (
 import Conduit
 import Control.Concurrent (threadDelay)
 import Control.Exception (bracket)
-import Control.Monad (forM_, void)
+import Control.Monad (forM_, void, when)
 import Control.Monad.Composable.Base
 import qualified Data.Aeson as JSON
 import Data.Binary
@@ -75,6 +78,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import System.Random (randomRIO)
 import qualified Kafka.Consumer as KC
+import qualified Kafka.Metadata as KM
 import qualified Kafka.Producer as KP
 import Kafka.Types (BrokerAddress(..), TopicName(..), KafkaLogLevel(..))
 
@@ -124,18 +128,34 @@ data StreamEnv = StreamEnv
   { seProducer    :: KP.KafkaProducer
   , seBroker      :: Text
   , seClientId    :: Text
+    -- | librdkafka properties applied to every producer and consumer made
+    -- from this environment: security.protocol, sasl.* for a cluster.
+  , seExtraProps  :: Map.Map Text Text
   }
 
 createStreamEnv :: MonadIO m => ClientId -> StreamAddress -> m StreamEnv
-createStreamEnv clientId (host, port) = do
+createStreamEnv clientId addr = createStreamEnvWith clientId addr Map.empty
+
+-- | An environment for a cluster that needs more than a broker address:
+-- TLS ("security.protocol" = "SSL"), or SASL/SCRAM over TLS
+-- ("security.protocol" = "SASL_SSL", "sasl.mechanisms" = "SCRAM-SHA-512",
+-- "sasl.username", "sasl.password"). The map is passed through to librdkafka.
+createStreamEnvWith :: MonadIO m => ClientId -> StreamAddress -> Map.Map Text Text -> m StreamEnv
+createStreamEnvWith clientId (host, port) extra = do
   let broker = T.pack host <> ":" <> T.pack (show port)
       props = KP.brokersList [BrokerAddress broker]
            <> KP.logLevel KafkaLogErr
-           <> KP.extraProps (Map.singleton "client.id" clientId)
+           <> KP.extraProps (Map.insert "client.id" clientId extra)
   result <- liftIO $ KP.newProducer props
   case result of
     Left err -> error $ "Failed to create Kafka producer: " ++ show err
-    Right prod -> return $ StreamEnv prod broker clientId
+    Right prod -> return $ StreamEnv prod broker clientId extra
+
+-- | Release the environment's librdkafka producer. For an environment a
+-- caller gives up on (a connection attempt that failed its topic check and
+-- will be retried with a fresh one); the long-lived ones are never closed.
+closeStreamEnv :: MonadIO m => StreamEnv -> m ()
+closeStreamEnv = KP.closeProducer . seProducer
 
 -- Deprecated alias
 createKafkaEnv :: MonadIO m => KafkaClientId -> KafkaAddress -> m StreamEnv
@@ -179,16 +199,35 @@ mkRecord topic val = KP.ProducerRecord
   , KP.prHeaders = mempty
   }
 
+-- | Enqueue the records, flush, and fail if any of them was not delivered.
+-- 'flushProducer' only waits for the queue to drain; each record carries
+-- its own delivery callback, so this call sees exactly its own failures
+-- (the producer is shared by every caller in the process).
+produceRecords :: StreamEnv -> [KP.ProducerRecord] -> IO ()
+produceRecords env records = do
+  let producer = seProducer env
+  failures <- newIORef (0 :: Int)
+  let onReport = \case
+        KP.DeliverySuccess _ _ -> pure ()
+        KP.DeliveryFailure _ err -> failed err
+        KP.NoMessageError err -> failed err
+      failed err = do
+        atomicModifyIORef' failures (\n -> (n + 1, ()))
+        putStrLn $ "Kafka delivery failure (" ++ T.unpack (seClientId env) ++ "): " ++ show err
+  forM_ records $ \r -> do
+    res <- KP.produceMessage' producer r onReport
+    case res of
+      Left err -> error $ "Kafka produce error: " ++ show err
+      Right () -> return ()
+  KP.flushProducer producer
+  n <- readIORef failures
+  when (n > 0) $
+    error $ "Kafka delivery failed for " ++ show n ++ " of " ++ show (length records) ++ " message(s) on " ++ T.unpack (seBroker env)
+
 produceItems :: (Binary a, HasStreaming m) => TopicName -> [a] -> m [ProduceResponse]
 produceItems topicName events = do
   env <- getStreamEnv
-  let producer = seProducer env
-  forM_ events $ \e -> do
-    mErr <- liftIO $ KP.produceMessage producer (mkRecord topicName (Just . BL.toStrict $ encode e))
-    case mErr of
-      Just err -> error $ "Kafka produce error: " ++ show err
-      Nothing -> return ()
-  liftIO $ KP.flushProducer producer
+  liftIO $ produceRecords env [mkRecord topicName (Just . BL.toStrict $ encode e) | e <- events]
   return [ProduceResponse]
 
 -- | Produce already-encoded payloads to several topics, flushing once.
@@ -202,26 +241,13 @@ produceItems topicName events = do
 produceToTopics :: HasStreaming m => [(TopicName, [B.ByteString])] -> m [ProduceResponse]
 produceToTopics groups = do
   env <- getStreamEnv
-  let producer = seProducer env
-  forM_ groups $ \(topicName, raws) ->
-    forM_ raws $ \raw -> do
-      mErr <- liftIO $ KP.produceMessage producer (mkRecord topicName (Just raw))
-      case mErr of
-        Just err -> error $ "Kafka produce error: " ++ show err
-        Nothing -> return ()
-  liftIO $ KP.flushProducer producer
+  liftIO $ produceRecords env [mkRecord topicName (Just raw) | (topicName, raws) <- groups, raw <- raws]
   return [ProduceResponse]
 
 produceItemsAsJSON :: (JSON.ToJSON a, HasStreaming m) => TopicName -> [a] -> m [ProduceResponse]
 produceItemsAsJSON topicName events = do
   env <- getStreamEnv
-  let producer = seProducer env
-  forM_ events $ \e -> do
-    mErr <- liftIO $ KP.produceMessage producer (mkRecord topicName (Just . BL.toStrict $ JSON.encode e))
-    case mErr of
-      Just err -> error $ "Kafka produce error: " ++ show err
-      Nothing -> return ()
-  liftIO $ KP.flushProducer producer
+  liftIO $ produceRecords env [mkRecord topicName (Just . BL.toStrict $ JSON.encode e) | e <- events]
   return [ProduceResponse]
 
 ----------------------
@@ -234,12 +260,12 @@ mkConsumerProps env grpId =
   <> KC.groupId (KC.ConsumerGroupId grpId)
   <> KC.noAutoCommit
   <> KC.logLevel KafkaLogErr
-  <> KC.extraProps (Map.fromList
+  <> KC.extraProps (Map.union (Map.fromList
        [ ("enable.partition.eof", "true")
        , ("client.id", seClientId env <> "-" <> grpId)
        , ("fetch.wait.max.ms", "50000")
        , ("fetch.min.bytes", "1")
-       ])
+       ]) (seExtraProps env))
 
 uniqueGroupId :: Text -> IO Text
 uniqueGroupId prefix = do
@@ -249,6 +275,11 @@ uniqueGroupId prefix = do
 mkConsumerSub :: TopicName -> KC.Subscription
 mkConsumerSub topic = KC.topics [topic] <> KC.offsetReset KC.Earliest
 
+-- | Every consumer here is assigned partition 0 only (as the node's own
+-- broker client always was), so a topic this backend reads must have a
+-- single partition: on a managed cluster that auto-creates topics with
+-- several, create the bus topics by hand with one partition, or the other
+-- partitions' messages are never read.
 newConsumerAt :: StreamEnv -> Text -> TopicName -> Offset -> IO KC.KafkaConsumer
 newConsumerAt env grpId topicName (Offset ofs) = do
   result <- KC.newConsumer (mkConsumerProps env grpId) (mkConsumerSub topicName)
@@ -358,6 +389,29 @@ consumeFromLatest topicName initAction f = do
     extractPayload (Left _) = Nothing
     extractPayload (Right cr) = KC.crValue cr
 
+-- | 'consumeFromLatest' for topics carrying an encoding other than
+-- 'Binary' (the bus's JSON topics): hands the raw payloads over.
+consumeFromLatestRaw :: HasStreaming m =>
+                        TopicName -> ([B.ByteString] -> m (Maybe b)) -> m b
+consumeFromLatestRaw topicName f = do
+  startOffset <- getLatestOffset topicName
+  env <- getStreamEnv
+  kc <- liftIO $ newConsumerAt env (seClientId env <> "-latest-raw") topicName startOffset
+  consumeLoop kc
+  where
+    consumeLoop kc = do
+      msgs <- liftIO $ KC.pollMessageBatch kc (KC.Timeout 50000) (KC.BatchSize 500)
+      let payloads = mapMaybe extractPayload msgs
+      result <- if null payloads then pure Nothing else f payloads
+      case result of
+        Just val -> do
+          liftIO $ void $ KC.closeConsumer kc
+          return val
+        Nothing -> consumeLoop kc
+
+    extractPayload (Left _) = Nothing
+    extractPayload (Right cr) = KC.crValue cr
+
 getLatestOffset :: HasStreaming m => TopicName -> m Offset
 getLatestOffset topicName = do
   env <- getStreamEnv
@@ -407,12 +461,13 @@ conduitBatchSource clientId streamAddress topicName = do
 --  Topic creation  --
 ----------------------
 
+-- | Auto-create the topic by producing a null record to it. Delivery is
+-- checked like any other produce, so an unreachable cluster fails here
+-- instead of after a flush that merely waited out the message timeout.
 createTopic :: HasStreaming m => TopicName -> m ()
 createTopic topicName = do
   env <- getStreamEnv
-  let producer = seProducer env
-  _ <- liftIO $ KP.produceMessage producer (mkRecord topicName Nothing)
-  liftIO $ KP.flushProducer producer
+  liftIO $ produceRecords env [mkRecord topicName Nothing]
 
 createTopicAndWait :: HasStreaming m => TopicName -> m ()
 createTopicAndWait topicName = do
@@ -433,14 +488,14 @@ createTopicAndWait topicName = do
 createBroadcastTopic :: HasStreaming m => TopicName -> m ()
 createBroadcastTopic = createTopicAndWait
 
+-- | Whether the broker serves the topic: a watermark query, which goes to
+-- the broker with a timeout (an assignment would be a local operation in
+-- librdkafka and succeed with the cluster down).
 checkTopicReady :: StreamEnv -> TopicName -> IO Bool
 checkTopicReady env topicName =
   bracket mkC (void . KC.closeConsumer) $ \kc -> do
-    let tp = KC.TopicPartition topicName (KC.PartitionId 0) KC.PartitionOffsetEnd
-    mErr <- KC.assign kc [tp]
-    case mErr of
-      Nothing -> return True
-      Just _ -> return False
+    marks <- KM.watermarkOffsets kc (KC.Timeout 5000) topicName
+    return $ not (null marks) && all (either (const False) (const True)) marks
   where
     mkC = do
       gid <- uniqueGroupId (seClientId env <> "-topic-check")

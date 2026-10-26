@@ -21,6 +21,8 @@ module Blockchain.Forks
     isBlockRewardReceiptForkActive,
     isEmitArgForkActive,
     isOperatorPrecedenceForkActive,
+    isReplayProtectionForkActive,
+    replayProtectionForkBlock,
     forkNotScheduled
   )
 where
@@ -73,7 +75,7 @@ heliumStakingForkBlock :: Integer
 heliumStakingForkBlock = 300000
 
 upquarkStakingForkBlock :: Integer
-upquarkStakingForkBlock = 1000000
+upquarkStakingForkBlock = 2000000
 
 isBlockRewardReceiptForkActive :: Integer -> Bool
 isBlockRewardReceiptForkActive blockNum =
@@ -136,3 +138,16 @@ isOperatorPrecedenceForkActive blockNum =
    in not $ (net == upquarkNetworkID  && blockNum < upquarkOperatorPrecedenceForkBlock)
          || (net == heliumNetworkID   && blockNum < heliumOperatorPrecedenceForkBlock)
          || (net == forktestNetworkID && blockNum < forktestOperatorPrecedenceForkBlock)
+
+-- | Require signed chain binding from this height. Public networks
+-- remain unscheduled until the upgrade is coordinated.
+replayProtectionForkBlock :: Integer -> Integer
+replayProtectionForkBlock net
+  | net == heliumNetworkID = forkNotScheduled
+  | net == upquarkNetworkID = forkNotScheduled
+  | net == forktestNetworkID = forktestForkBlock
+  | otherwise = 0
+
+isReplayProtectionForkActive :: Integer -> Bool
+isReplayProtectionForkActive blockNum =
+  blockNum >= replayProtectionForkBlock (Conf.networkID $ networkConfig ethConf)

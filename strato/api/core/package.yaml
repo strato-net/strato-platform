@@ -16,7 +16,7 @@ library:
     - base16-bytestring
     - binary
     - ethereum-rlp
-    - merkle-patricia-db
+    - statedb-monad
     - blockapps-data
     - blockapps-datadefs
     - blockDB
@@ -51,3 +51,4 @@ library:
     - unliftio
     - unordered-containers
     - strato-redis-blockdb
+    - strato-tracing

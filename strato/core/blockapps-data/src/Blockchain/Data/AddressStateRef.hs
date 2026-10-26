@@ -8,13 +8,13 @@ module Blockchain.Data.AddressStateRef where
 
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
 import Control.Monad
-import Control.Monad.Composable.Base
 import qualified Database.Persist.Postgresql as SQL hiding (Update, get)
+import UnliftIO (MonadUnliftIO)
 
 addressStateRefCodePtr :: AddressStateRef -> Maybe CodePtr
 addressStateRefCodePtr AddressStateRef {..} = case addressStateRefContractName of
@@ -25,9 +25,15 @@ updateSQLBalanceAndNonce ::
   HasSQLDB m =>
   [(Address, (Integer, Integer))] ->
   m ()
-updateSQLBalanceAndNonce vals = do
-  pool <- unSQLDB <$> accessEnv
-  flip SQL.runSqlPool pool $ do
+updateSQLBalanceAndNonce = sqlQueryWriter . updateSQLBalanceAndNonceSql
+
+-- | The upserts as one 'SQL.SqlPersistT' action, for a caller that commits
+-- them inside a larger transaction (the indexer's fenced batch).
+updateSQLBalanceAndNonceSql ::
+  MonadUnliftIO m =>
+  [(Address, (Integer, Integer))] ->
+  SQL.SqlPersistT m ()
+updateSQLBalanceAndNonceSql vals =
     forM_ vals $ \(a, (v, n)) -> do
       let asr =
             AddressStateRef

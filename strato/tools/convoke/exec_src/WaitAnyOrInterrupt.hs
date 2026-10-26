@@ -10,11 +10,8 @@ import System.Posix.Signals (installHandler, sigTERM, sigINT, Handler(CatchOnce)
 
 -- | Make SIGTERM and SIGINT throw UserInterrupt to the calling thread.
 --
--- Separate from the wait so a supervisor that waits repeatedly installs the
--- handler once, before its loop. Reinstalling it on every iteration would leave
--- a window -- between CatchOnce firing and the next install -- in which a
--- signal takes the default action and kills convoke outright, orphaning every
--- child it was supervising.
+-- Install before launching children so shutdown signals are handled before
+-- the first wait.
 installInterruptHandler :: IO ()
 installInterruptHandler = do
   mainThread <- myThreadId

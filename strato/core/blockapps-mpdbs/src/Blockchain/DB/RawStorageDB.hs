@@ -14,6 +14,8 @@ module Blockchain.DB.RawStorageDB
     HasMemRawStorageDB (..),
     --FullRawStorage,
     genericLookupRawStorageDB,
+    genericLookupRawStorageDBWith,
+    getRawStorageKeyValDBMaybe,
     genericInsertRawStorageDB,
     genericInsertManyRawStorageDB,
     genericDeleteRawStorageDB,
@@ -28,13 +30,13 @@ where
 
 import BatchMerge
 import BlockApps.Logging
+import Blockchain.DB.AddressStateDB (HasAccountDB)
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.RLP
-import qualified Blockchain.Database.MerklePatricia as MP
-import qualified Blockchain.Database.MerklePatricia.Internal as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Strato.Model.Address
 import Control.Arrow ((***))
 import Control.Monad (forM_, join, unless)
@@ -69,7 +71,7 @@ type FullRawStorage m =
     HasMemRawStorageDB m,
     HasStateDB m,
     HasHashDB m,
-    (Address `A.Alters` AddressState) m
+    HasAccountDB m
   )
 
 putRawStorageKeyVal' :: HasRawStorageDB m => RawStorageKey -> RawStorageValue -> m ()
@@ -97,24 +99,34 @@ deleteRawStorageKeyMC = A.delete (A.Proxy @RawStorageValue)
 
 genericLookupRawStorageDB ::
   ( HasMemRawStorageDB m,
-    (Address `A.Alters` AddressState) m,
-    (MP.StateRoot `A.Alters` MP.NodeData) m
+    HasAccountDB m,
+    HasStateDB m
   ) =>
   RawStorageKey ->
   m (Maybe RawStorageValue)
-genericLookupRawStorageDB key = do
+genericLookupRawStorageDB = genericLookupRawStorageDBWith getRawStorageKeyValDBMaybe
+
+-- | The block map first; on a miss, ask @onMiss@ (the trie, or whatever else
+-- holds the state) and remember its answer in the block map.
+genericLookupRawStorageDBWith ::
+  HasMemRawStorageDB m =>
+  (RawStorageKey -> m (Maybe RawStorageValue)) ->
+  RawStorageKey ->
+  m (Maybe RawStorageValue)
+genericLookupRawStorageDBWith onMiss key = do
   theBMap <- getMemRawStorageBlockDB
   case lookupBlockMap key theBMap of
     Just known -> return known
     Nothing -> do
-      mVal <- getRawStorageKeyValDBMaybe key
+      mVal <- onMiss key
       putMemRawStorageBlockMap $ insertReadBlockMap key mVal theBMap
       return mVal
+{-# INLINE genericLookupRawStorageDBWith #-}
 
 genericLookupWithDefaultRawStorageDB ::
   ( HasMemRawStorageDB m,
-    (Address `A.Alters` AddressState) m,
-    (MP.StateRoot `A.Alters` MP.NodeData) m
+    HasAccountDB m,
+    HasStateDB m
   ) =>
   RawStorageKey ->
   m RawStorageValue
@@ -207,16 +219,16 @@ putAllKeyValForStateRoot sr changes = do
 
   pure sr''
 
-deleteManyKeyVal :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> [MP.Key] -> m MP.StateRoot
+deleteManyKeyVal :: HasStateDB m => MP.StateRoot -> [MP.Key] -> m MP.StateRoot
 deleteManyKeyVal sr listOfDeletes =
   concatM (map (flip deleteRawStorageKeyValDB) listOfDeletes) sr
 
-deleteRawStorageKeyValDB :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> MP.Key -> m MP.StateRoot
+deleteRawStorageKeyValDB :: HasStateDB m => MP.StateRoot -> MP.Key -> m MP.StateRoot
 deleteRawStorageKeyValDB sr key = MP.deleteKey sr key
 
 getRawStorageKeyValDBMaybe ::
-  ( (Address `A.Alters` AddressState) m,
-    (MP.StateRoot `A.Alters` MP.NodeData) m
+  ( HasAccountDB m,
+    HasStateDB m
   ) =>
   RawStorageKey ->
   m (Maybe RawStorageValue)

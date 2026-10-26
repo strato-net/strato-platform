@@ -48,6 +48,7 @@ import Executable.EVMFlags ()
 import HFlags
 import qualified ActionEncodeSpec
 import qualified CrossLangFixtureSpec
+import qualified ReplayProtectionSpec
 import qualified ReceiptSpec
 import qualified TypedArgConversionSpec
 import Test.Hspec (Spec, describe, hspec, it, shouldBe, shouldSatisfy)
@@ -83,6 +84,7 @@ spec :: Spec
 spec = do
   describe "VMContext" $ pure ()
   ActionEncodeSpec.spec
+  ReplayProtectionSpec.spec
   ReceiptSpec.spec
   TypedArgConversionSpec.spec
   CrossLangFixtureSpec.spec

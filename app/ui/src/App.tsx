@@ -39,7 +39,6 @@ import CommunityRewardsOnePager from "./pages/CommunityRewardsOnePager";
 import PriceTracking from "./pages/PriceTracking";
 import Earn from "./pages/Earn";
 import EarnSave from "./pages/EarnSave";
-import EarnVault from "./pages/EarnVault";
 import EarnLending from "./pages/EarnLending";
 import EarnPools from "./pages/EarnPools";
 import EarnYieldVault from "./pages/EarnYieldVault";
@@ -72,7 +71,6 @@ import { LendingProvider } from "@/context/LendingContext";
 import { CDPProvider } from "@/context/CDPContext";
 import { SwapProvider } from "@/context/SwapContext";
 import { NetworkProvider } from "@/context/NetworkContext";
-import { VaultProvider } from "@/context/VaultContext";
 import { SaveUsdstProvider } from "@/context/SaveUsdstContext";
 import { YieldVaultProvider } from "@/context/YieldVaultContext";
 import Borrow from "./pages/Borrow";
@@ -248,7 +246,6 @@ const App = () => {
                               <CDPProvider>
                                 <BridgeProvider>
                                   <EarnProvider>
-                                    <VaultProvider>
                                       <SaveUsdstProvider>
                                         <YieldVaultProvider>
                                           <TooltipProvider>
@@ -343,18 +340,6 @@ const App = () => {
                                                   element={
                                                     <GuestAccessibleRoute>
                                                       <V3PositionPage />
-                                                    </GuestAccessibleRoute>
-                                                  }
-                                                />
-                                                <Route
-                                                  path="/dashboard/vault"
-                                                  element={<Navigate to="/dashboard/advanced?tab=vault" replace />}
-                                                />
-                                                <Route
-                                                  path="/dashboard/earn-vault"
-                                                  element={
-                                                    <GuestAccessibleRoute>
-                                                      <EarnVault />
                                                     </GuestAccessibleRoute>
                                                   }
                                                 />
@@ -519,7 +504,6 @@ const App = () => {
                                           </TooltipProvider>
                                         </YieldVaultProvider>
                                       </SaveUsdstProvider>
-                                    </VaultProvider>
                                   </EarnProvider>
                                 </BridgeProvider>
                               </CDPProvider>

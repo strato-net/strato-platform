@@ -13,7 +13,8 @@ enum ActivityType {
 enum ActionType {
     Deposit,   // Increase stake (Position activities only)
     Withdraw,  // Decrease stake (Position activities only)
-    Occurred   // One-time action (OneTime activities only)
+    Occurred,  // One-time action (OneTime activities only)
+    Transfer   // Move stake between users (Position activities only)
 }
 
 struct Action {
@@ -457,7 +458,8 @@ contract record Rewards is Ownable {
         for (uint256 typeIdx = 0; typeIdx < newActionableEvents.length; typeIdx++) {
             require(
                 newActionableEvents[typeIdx].actionType == ActionType.Deposit ||
-                newActionableEvents[typeIdx].actionType == ActionType.Withdraw,
+                newActionableEvents[typeIdx].actionType == ActionType.Withdraw ||
+                newActionableEvents[typeIdx].actionType == ActionType.Transfer,
                 "Position activity cannot use Occurred action type"
             );
         }
@@ -700,6 +702,71 @@ contract record Rewards is Ownable {
         }
     }
 
+    /**
+     * @dev Move stake between two users of a Position activity (e.g. a share transfer)
+     * @param sourceContract The source contract this event originated from
+     * @param eventName The event name that triggered this action (registered with ActionType.Transfer)
+     * @param sender The user whose stake decreases
+     * @param recipient The user whose stake increases
+     * @param amount The amount of stake moved
+     * @param blockNumber Block number this event originated from (for idempotency)
+     * @param eventIndex Event index within the block (for idempotency)
+     */
+    function handleTransfer(
+        address sourceContract,
+        string calldata eventName,
+        address sender,
+        address recipient,
+        uint256 amount,
+        uint256 blockNumber,
+        uint256 eventIndex
+    ) external onlyOwner {
+        _handleTransfer(sourceContract, eventName, sender, recipient, amount, blockNumber, eventIndex);
+    }
+
+    /**
+     * @dev Process multiple transfers in a single call
+     * @param sourceContracts Array of source contracts
+     * @param eventNames Array of event names
+     * @param senders Array of users whose stake decreases
+     * @param recipients Array of users whose stake increases
+     * @param amounts Array of amounts
+     * @param blockNumbers Array of block numbers
+     * @param eventIndexes Array of event indexes
+     */
+    function batchHandleTransfer(
+        address[] calldata sourceContracts,
+        string[] calldata eventNames,
+        address[] calldata senders,
+        address[] calldata recipients,
+        uint256[] calldata amounts,
+        uint256[] calldata blockNumbers,
+        uint256[] calldata eventIndexes
+    ) external onlyOwner {
+        // Workaround for SolidVM bug: initialize if zero
+        if (maxBatchSize == 0) {
+            maxBatchSize = 100;
+        }
+        require(sourceContracts.length <= maxBatchSize, "Batch too large");
+        require(
+            sourceContracts.length == eventNames.length &&
+            eventNames.length == senders.length &&
+            senders.length == recipients.length &&
+            recipients.length == amounts.length &&
+            amounts.length == blockNumbers.length &&
+            blockNumbers.length == eventIndexes.length,
+            "Array length mismatch"
+        );
+
+        for (uint256 i = 0; i < sourceContracts.length; i++) {
+            try {
+                _handleTransfer(sourceContracts[i], eventNames[i], senders[i], recipients[i], amounts[i], blockNumbers[i], eventIndexes[i]);
+            } catch {
+                emit ActionFailed(sourceContracts[i], senders[i], eventNames[i], blockNumbers[i], eventIndexes[i], "Transfer failed");
+            }
+        }
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     // INTERNAL FUNCTIONS
     // ═════════════════════════════════════════════════════════════════════════
@@ -734,7 +801,8 @@ contract record Rewards is Ownable {
             for (uint256 posIdx = 0; posIdx < actionableEvents.length; posIdx++) {
                 require(
                     actionableEvents[posIdx].actionType == ActionType.Deposit ||
-                    actionableEvents[posIdx].actionType == ActionType.Withdraw,
+                    actionableEvents[posIdx].actionType == ActionType.Withdraw ||
+                    actionableEvents[posIdx].actionType == ActionType.Transfer,
                     "Position activity cannot use Occurred action type"
                 );
             }
@@ -811,6 +879,7 @@ contract record Rewards is Ownable {
         // Service passes raw event data, contract does the lookup
         EventInfo storage eventInfo = sourceEventInfo[action.sourceContract][action.eventName];
         require(eventInfo.activityId != 0, "Activity not found for source/event");
+        require(eventInfo.actionType != ActionType.Transfer, "Use handleTransfer for transfer events");
 
         uint256 activityId = eventInfo.activityId;
         ActionType actionType = eventInfo.actionType;
@@ -956,6 +1025,87 @@ contract record Rewards is Ownable {
         state.totalStake = state.totalStake + newStake - oldStake;
 
         emit UserStakeUpdated(activityId, action.user, oldStake, newStake, pendingRewards);
+    }
+
+    /**
+     * @dev Internal function to move stake between two users with idempotency
+     *
+     * Both users' pending rewards are settled at the same index, then
+     * min(sender stake, amount) moves from sender to recipient so totalStake is
+     * unchanged (untracked pre-launch shares never earn, mirroring Withdraw).
+     * The source event's keccak256(blockNumber, eventIndex) is the single
+     * idempotency key for the transfer.
+     */
+    function _handleTransfer(
+        address sourceContract,
+        string eventName,
+        address sender,
+        address recipient,
+        uint256 amount,
+        uint256 blockNumber,
+        uint256 eventIndex
+    ) internal {
+        EventInfo storage eventInfo = sourceEventInfo[sourceContract][eventName];
+        require(eventInfo.activityId != 0, "Activity not found for source/event");
+        require(eventInfo.actionType == ActionType.Transfer, "Not a transfer event");
+
+        uint256 activityId = eventInfo.activityId;
+        Activity storage activity = activities[activityId];      // Config
+        ActivityState storage state = activityStates[activityId]; // State
+
+        // Mints and burns are the activity's Deposit/Withdraw events, never transfers
+        require(sender != address(0) && recipient != address(0), "Invalid user");
+
+        string eventHash = keccak256(blockNumber, eventIndex);
+        if (processedEvents[eventHash]) {
+            // Already processed - silently ignore (idempotency)
+            return;
+        }
+        processedEvents[eventHash] = true;
+
+        if (blockNumber > highestBlockSeen) {
+            highestBlockSeen = blockNumber;
+        }
+
+        // Zero-amount, self and below-threshold transfers change no stake (still marked as processed)
+        if (amount == 0 || sender == recipient) {
+            return;
+        }
+        if (activity.minAmount > 0 && amount < activity.minAmount) {
+            return;
+        }
+
+        emit ActionProcessed(
+            activityId,
+            sender,
+            sourceContract,
+            eventName,
+            ActionType.Transfer,
+            amount,
+            blockNumber,
+            eventIndex
+        );
+
+        // 1) Update the global index and settle both users at that same index
+        uint256 senderUnclaimedBefore = unclaimedRewards[sender];
+        uint256 recipientUnclaimedBefore = unclaimedRewards[recipient];
+        _settlePendingRewards(activityId, sender);
+        _settlePendingRewards(activityId, recipient);
+
+        // 2) Move at most the sender's tracked stake (totalStake unchanged)
+        RewardsUserInfo storage senderState = userInfo[sender][activityId];
+        RewardsUserInfo storage recipientState = userInfo[recipient][activityId];
+        uint256 oldSenderStake = senderState.stake;
+        uint256 oldRecipientStake = recipientState.stake;
+        uint256 moved = amount < oldSenderStake ? amount : oldSenderStake;
+
+        senderState.stake = oldSenderStake - moved;
+        senderState.userIndex = state.accRewardPerStake;
+        recipientState.stake = oldRecipientStake + moved;
+        recipientState.userIndex = state.accRewardPerStake;
+
+        emit UserStakeUpdated(activityId, sender, oldSenderStake, senderState.stake, unclaimedRewards[sender] - senderUnclaimedBefore);
+        emit UserStakeUpdated(activityId, recipient, oldRecipientStake, recipientState.stake, unclaimedRewards[recipient] - recipientUnclaimedBefore);
     }
 
     /**

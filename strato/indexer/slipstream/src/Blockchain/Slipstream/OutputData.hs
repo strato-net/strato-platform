@@ -21,6 +21,8 @@ module Blockchain.Slipstream.OutputData (
   OnConflict(..),
   SlipstreamQuery(..),
   slipstreamQueryPostgres,
+  batchStateQueries,
+  stateKind,
   slipstreamQueryText,
   dedupC,
   ProcessedCollectionRow(..),
@@ -1401,6 +1403,14 @@ genericBaseTableIndexesSQL = T.unlines
   [ "CREATE INDEX IF NOT EXISTS history_mapping_lookup_idx"
   , "  ON \"history@mapping\" (address, collection_name, ((key->>'key')), valid_from, valid_to);"
   , ""
+    -- Value-at-date lookups (valid_from <= d AND valid_to >= d) need valid_to
+    -- first: with valid_from leading, the scan visits every version of the key
+    -- up to d (tens of thousands for an oracle price) before valid_to filters
+    -- them to one. With valid_to leading only the versions still valid at d
+    -- are visited, which is one plus the future ones.
+  , "CREATE INDEX IF NOT EXISTS history_mapping_valid_to_idx"
+  , "  ON \"history@mapping\" (address, collection_name, ((key->>'key')), valid_to, valid_from);"
+  , ""
   , "CREATE INDEX IF NOT EXISTS mapping_collection_key_address_idx"
   , "  ON mapping (collection_name, ((key->>'key')), address);"
   , ""
@@ -1431,6 +1441,9 @@ genericBaseTableIndexesSQL = T.unlines
   , ""
   , "CREATE INDEX IF NOT EXISTS event_timestamp_idx"
   , "  ON event (block_timestamp DESC);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_block_number_idx"
+  , "  ON event ((block_number::numeric), event_index);"
   ]
 
 jsonbMergeDeepSQL :: Text
@@ -1545,3 +1558,80 @@ jsonbObjToArraySQL = T.unlines
   , "SELECT COALESCE((SELECT jsonb_agg(val ORDER BY idx::int) FROM jsonb_each(obj) AS e(idx, val) WHERE idx != '_length'), '[]'::jsonb);"
   , "$fn$ LANGUAGE sql IMMUTABLE;"
   ]
+
+-- Batch only the standard storage/mapping upserts. DDL, events and unknown
+-- conflict policies remain barriers. Intermediate versions go directly to
+-- history; the final current-state writes retain the existing history triggers.
+batchStateQueries :: [SlipstreamQuery] -> [SlipstreamQuery]
+batchStateQueries = go
+  where
+    go [] = []
+    go queries@(q : rest)
+      | Just _ <- stateKind q =
+          let (state, following) = span (maybe False (const True) . stateKind) queries
+              storage = filter ((== Just False) . stateKind) state
+              mapping = filter ((== Just True) . stateKind) state
+          in batch False storage ++ batch True mapping ++ go following
+      | otherwise = q : go rest
+    batch _ [] = []
+    batch isMapping rows
+      | length rows < 2 = rows
+      | otherwise = [RawSQL $ bulkStateSQL isMapping rows]
+
+stateKind :: SlipstreamQuery -> Maybe Bool
+stateKind InsertTable {tableName = name, tableColumns = cols, values = rows,
+                       onConflict = Just (OnConflict keys updates extra condition)}
+  | name == storageTableName, cols == baseColumns ++ [("data", SqlJsonb)],
+    keys == ["address"], updates == (fst <$> baseColumns),
+    extra == Just (jsonbUpdateClause table "data"), condition == Just (newerBlockClause table),
+    validRows && all (all (/= Nothing)) rows = Just False
+  | name == mappingTableName,
+    cols == baseMappingColumns ++ [("key", SqlJsonb), ("path", SqlText), ("value", SqlJsonb)],
+    keys == ["address", "path"], updates == (fst <$> baseMappingColumns),
+    extra `elem` [Just (jsonbUpdateClause table "value"), Just "value = COALESCE(excluded.value, \"mapping\".value)"],
+    condition == Just (newerBlockClause table), validRows && all (all (/= Nothing) . take 6) rows = Just True
+  where
+    table = tableNameToDoubleQuoteText name
+    positions = map (\key -> fromMaybe (-1) $ lookup key $ zip (fst <$> cols) [0..]) keys
+    rowKeys = map (\row -> map (row !!) positions) rows
+    validRows = all ((== length cols) . length) rows && all (all (/= Nothing)) rowKeys
+      && Set.size (Set.fromList rowKeys) == length rows
+stateKind _ = Nothing
+
+bulkStateSQL :: Bool -> [SlipstreamQuery] -> Text
+bulkStateSQL isMapping queries = T.concat
+  [ "CREATE TEMP TABLE IF NOT EXISTS ", tmp, " (LIKE ", table, ", _rank bigint, _last bigint, _until timestamp);"
+  , "TRUNCATE ", tmp, ";"
+  , "DO $batch$ BEGIN IF to_regprocedure('pg_temp.slip_fold(jsonb,jsonb,boolean)') IS NULL THEN "
+  , "EXECUTE $fn$ CREATE FUNCTION pg_temp.slip_fold(old jsonb, new jsonb, merge boolean) RETURNS jsonb LANGUAGE sql IMMUTABLE AS 'SELECT CASE WHEN new IS NULL THEN old WHEN merge AND jsonb_typeof(old) = ''object'' AND jsonb_typeof(new) = ''object'' THEN public.jsonb_merge_deep(old,new) ELSE new END' $fn$;"
+  , "EXECUTE 'CREATE AGGREGATE pg_temp.slip_merge(jsonb,boolean) (SFUNC=pg_temp.slip_fold, STYPE=jsonb)'; END IF; END $batch$;"
+  , "INSERT INTO ", tmp, " WITH incoming(", names, ",_ordinal,_merge) AS (VALUES ", T.intercalate "," incoming, "),"
+  , "eligible AS (SELECT i.* FROM (SELECT *,max(block_number::bigint) OVER (PARTITION BY ", keys, " ORDER BY _ordinal ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS _previous FROM incoming) i LEFT JOIN ", table, " old USING (", keys, ") WHERE (i._previous IS NULL OR i.block_number::bigint > i._previous) AND (old.address IS NULL OR i.block_number::bigint > old.block_number::bigint)),"
+  , "ranked AS (SELECT ", names, ",_merge,row_number() OVER (PARTITION BY ", keys, " ORDER BY _ordinal) AS _rank FROM eligible),"
+  , "seeded AS (SELECT ", names, ",_merge,_rank FROM ranked UNION ALL SELECT ", seedCols, ",false,0::bigint FROM (SELECT * FROM ranked WHERE _rank=1) k LEFT JOIN ", table, " old USING (", keys, ")),"
+  , "merged AS (SELECT ", stateCols, ",_rank,max(_rank) OVER (PARTITION BY ", keys, ") AS _last,lead(block_timestamp::timestamp,1,'infinity'::timestamp) OVER (PARTITION BY ", keys, " ORDER BY _rank) AS _until FROM seeded) SELECT * FROM merged WHERE _rank > 0;"
+  , "UPDATE ", history, " h SET valid_to=t.block_timestamp::timestamp FROM ", tmp, " t WHERE t._rank=1 AND ", joinKeys "h" "t", " AND h.valid_to='infinity'::timestamp;"
+  , "INSERT INTO ", history, " (", names, ",valid_from,valid_to) SELECT ", names, ",block_timestamp::timestamp,_until FROM ", tmp, " WHERE _rank<_last;"
+  , "INSERT INTO ", table, " (", names, ") SELECT ", names, " FROM ", tmp, " WHERE _rank=_last ON CONFLICT (", keys, ") DO UPDATE SET ", T.intercalate "," [c <> "=excluded." <> c | c <- cols, c /= "key", c /= "path"], " WHERE ", newerBlockClause table, ";"
+  ]
+  where
+    table = if isMapping then "\"mapping\"" else "\"storage\""
+    history = if isMapping then "\"history@mapping\"" else "\"history@storage\""
+    tmp = if isMapping then "pg_temp.slip_mapping" else "pg_temp.slip_storage"
+    cols = if isMapping then ["address","block_hash","block_timestamp","block_number","collection_name","collection_type","key","path","value"] else ["address","block_hash","block_timestamp","block_number","data"]
+    names = T.intercalate "," $ map wrapEscapeDouble cols
+    keyCols = if isMapping then ["address","path"] else ["address"]
+    keys = T.intercalate "," keyCols
+    payload = if isMapping then "value" else "data"
+    partition = "PARTITION BY " <> keys <> " ORDER BY _rank ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"
+    stateCols = T.intercalate "," [if c == payload then "pg_temp.slip_merge(" <> c <> ",_merge) OVER (" <> partition <> ")" else if c == "key" then "first_value(key) OVER (" <> partition <> ")" else wrapEscapeDouble c | c <- cols]
+    seedCols = T.intercalate "," [if c `elem` keyCols then "k." <> c else if c == "key" then "CASE WHEN old.address IS NULL THEN k.key ELSE old.key END" else "old." <> wrapEscapeDouble c | c <- cols]
+    joinKeys a b = T.intercalate " AND " [a <> "." <> c <> "=" <> b <> "." <> c | c <- keyCols]
+    incoming = concat $ zipWith render [1 :: Int ..] [(q,row) | q@InsertTable {values = rows} <- queries, row <- rows]
+    render ordinal (InsertTable {tableColumns = columns, onConflict = policy}, row) =
+      let merge = case policy of
+            Just OnConflict {extraSQL = Just extra} -> extra == jsonbUpdateClause table payload
+            _ -> False
+          fields = [fromMaybe "NULL" (valueToSQLText typ =<< val) <> "::" <> sqlTypePostgres typ | ((_,typ),val) <- zip columns row]
+      in ["(" <> T.intercalate "," (fields ++ [tshow ordinal, if merge then "true" else "false"]) <> ")"]
+    render _ _ = []

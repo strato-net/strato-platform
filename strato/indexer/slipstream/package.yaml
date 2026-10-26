@@ -27,6 +27,7 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockDB
+    - composable-monads-base
     - conduit
     - containers
     - deepseq
@@ -47,6 +48,7 @@ library:
     - strato-conf
     - strato-model
     - strato-redis-blockdb
+    - strato-tracing
     - text
     - time
     - transformers
@@ -77,31 +79,13 @@ executables:
       - warp
 
 tests:
-  slipstream-batching-test:
-    main: Main.hs
-    source-dirs: tests-batching/
-    dependencies:
-      - base
-      - base16-bytestring
-      - bytestring
-      - conduit
-      - containers
-      - data-default
-      - evm-solidity
-      - hspec
-      - slipstream
-      - solid-vm-model
-      - strato-model
-      - text
-      - time
-      - vm-tools
-
   slipstream-test:
     main: Main.hs
     source-dirs: tests/
     ghc-options: -dynamic
     dependencies:
       - base
+      - base16-bytestring
       - aeson
       - aeson-qq
       - bytestring

@@ -1,10 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Blockchain.Init.EthConf (genEthConf, preferIPv4Loopback) where
+module Blockchain.Init.EthConf (genEthConf, containerMode, nodeHostname, preferIPv4Loopback, storeHost, runtimeConfig, flagsNetworkIdentity) where
 
 import Blockchain.EthConf
 import Blockchain.Init.Options hiding (flags_localAuth)
+import Blockchain.Init.Role
 import Control.Monad.Composable.Streaming.DockerConfig (brokerConfig, bcHost, bcPort)
 import qualified Blockchain.Init.Options as Opts
 import Blockchain.Strato.Model.Address
@@ -20,22 +21,54 @@ import System.Info (os)
 import System.Process (readProcess)
 import Text.ShortDescription
 
--- | Address strato-api binds its socket to
+-- | Address strato-api binds its socket to: @--apiIPAddress@ when given,
+-- otherwise every interface of the strato container with --dockerMode=all (nginx
+-- reaches it by service name), the docker bridge on Linux (so the nginx
+-- container reaches the host process) and loopback elsewhere.
 getApiListenAddress :: String
 getApiListenAddress
+  | not (null flags_apiIPAddress) = flags_apiIPAddress
+  | containerMode = "0.0.0.0"
   | os == "linux" = "172.17.0.1"
   | otherwise = "127.0.0.1"
 
--- | In local mode the generated docker-compose.yml publishes Postgres/Redis only
+-- | With --dockerMode=services the generated docker-compose.yml publishes Postgres/Redis only
 -- on IPv4 (127.0.0.1:PORT). macOS resolves "localhost" to IPv6 (::1) first, so
 -- local STRATO processes fail to connect ("connection to server at \"localhost\"
 -- (::1) ... Connection refused"). Pin the default "localhost" to the IPv4 loopback
 -- the ports are actually bound to. On Linux "localhost" already resolves to
--- 127.0.0.1, so this is a no-op there. Explicit non-localhost hosts (e.g. the
--- "postgres" docker service name used in allDocker mode) are left untouched.
+-- 127.0.0.1, so this is a no-op there. Explicit non-localhost hosts (e.g. a
+-- managed cluster's endpoint) are left untouched.
 preferIPv4Loopback :: String -> String
 preferIPv4Loopback "localhost" = "127.0.0.1"
 preferIPv4Loopback h = h
+
+-- | @--dockerMode@: what runs in Docker. With @services@ the node processes run
+-- on the host under convoke and only the services in containers; with @all@
+-- they run in a strato container too, started from the same compose file.
+containerMode :: Bool
+containerMode = case flags_dockerMode of
+  "services" -> False
+  "all" -> True
+  other -> error $ "Unknown --dockerMode " ++ show other ++ "; expected services or all"
+
+-- | Where a node process finds one of the node's stores: the loopback the
+-- services-mode containers publish on or, with --dockerMode=all, the store's service
+-- name. A remote host (a managed cluster) is left alone.
+storeHost :: String -> String -> String
+storeHost service h
+  | containerMode && h `elem` ["localhost", "127.0.0.1"] = service
+  | otherwise = preferIPv4Loopback h
+
+-- | The node's public host name: @--nodeHost@ when given, otherwise the
+-- machine's @hostname@. The node URL, the auth cookie domain and the
+-- local-auth discovery URL are built from it, and the containers alias it to
+-- the host gateway. strato-up --prebuilt runs strato-setup in a container
+-- with the host's name, so the default holds there too.
+nodeHostname :: IO String
+nodeHostname
+  | null flags_nodeHost = filter (/= '\n') <$> readProcess "hostname" [] ""
+  | otherwise = return flags_nodeHost
 
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
@@ -55,7 +88,7 @@ runtimeConfig = def
   { sqlConfig = def { host = "postgres" }
   , cirrusConfig = def { host = "postgres", database = "cirrus" }
   , redisBlockDBConfig = def
-      { redisHost = preferIPv4Loopback flags_redisHost
+      { redisHost = storeHost "redis" flags_redisHost
       , redisPort = flags_redisPort
       , redisDBNumber = flags_redisDBNumber
       }
@@ -63,13 +96,14 @@ runtimeConfig = def
       { streamingHost = bcHost brokerConfig
       , streamingPort = bcPort brokerConfig
       }
-  , discoveryConfig = def { minAvailablePeers = flags_minPeers }
+  , discoveryConfig = def { discoveryPort = flags_discoveryPort, minAvailablePeers = flags_minPeers }
   , p2pConfig = def
       { maxConnections = flags_maxConn
       , connectionTimeout = flags_connectionTimeout
       , maxReturnedHeaders = flags_maxReturnedHeaders
       , averageTxsPerBlock = flags_averageTxsPerBlock
       , maxHeadersTxsLens = flags_maxHeadersTxsLens
+      , listenPort = flags_p2pPort
       }
   , apiConfig = def
       { apiListenAddress = getApiListenAddress
@@ -77,6 +111,7 @@ runtimeConfig = def
   , contractsConfig = ContractsConf
       { railgunProxy = getRailgunProxyForNetwork flags_network
       , nativeTokenAddress = getNativeTokenForNetwork flags_network
+      , nativeTokenBalancesField = Nothing
       }
   , debugConfig = def { svmTrace = flags_svmTrace }
   , vmConfig = def { sqlDiff = flags_sqlDiff, diffPublish = flags_diffPublish }
@@ -118,39 +153,77 @@ waitOnVault env request = do
       waitOnVault env request
     Right val -> return val
 
-genEthConf :: IO EthConf
-genEthConf = do
+-- | The network identity the current flags describe, exactly as 'genEthConf'
+-- writes it: (network name, network id, chain id).
+flagsNetworkIdentity :: (String, Integer, Integer)
+flagsNetworkIdentity = (flags_network, computeNetworkID, computeChainId flags_network)
+
+genEthConf :: Role -> IO EthConf
+genEthConf nodeRole = do
   pgPass <- filter (/= '\n') <$> readFile "secrets/postgres_password"
 
-  localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
+  localHostname <- nodeHostname
 
   let ssl = not $ null flags_sslDir
       !nodeBaseUrl = (if ssl then "https://" else "http://")
         ++ localHostname
         ++ if ssl then "" else ":" ++ show flags_httpPort
 
-  -- For local auth mode, skip vault during setup (vault-wrapper starts later)
+  -- For local auth mode, skip vault during setup (vault-wrapper starts later).
+  -- An API-only directory has no node identity: it signs nothing.
   if Opts.flags_localAuth
     then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node key will be provisioned during first admin setup"
-    else do
-      (pub, _addr) <- getNodeKey
-      putStrLn $ "  ✓ Node key: " ++ shortDescription pub
+    else if not (roleRunsCore nodeRole)
+      then putStrLn "  ✓ API role: no node key needed"
+      else do
+        (pub, _addr) <- getNodeKey
+        putStrLn $ "  ✓ Node key: " ++ shortDescription pub
 
-  return runtimeConfig
-    { sqlConfig = (sqlConfig runtimeConfig)
+  -- An API-only directory reads through the replica endpoint when one is
+  -- given; its writes (and consistency-sensitive reads) stay on --pghost.
+  let readerHost = if null flags_pgReaderHost || nodeRole /= RoleApi then Nothing else Just flags_pgReaderHost
+      writerSql = (sqlConfig runtimeConfig)
         { user = flags_pguser
-        , host = preferIPv4Loopback flags_pghost
+        , host = storeHost "postgres" flags_pghost
         , password = pgPass
         }
+
+  let commaList = words . map (\c -> if c == ',' then ' ' else c)
+
+  return runtimeConfig
+    { ingressUrls = commaList flags_ingressUrls
+    , vmConfig = (vmConfig runtimeConfig)
+        { vmQueryUrls = ["http://127.0.0.1:8546" | flags_vmQuery] ++ commaList flags_vmQueryUrls
+        -- An API directory runs no vm-runner: the mirror answers or nobody does.
+        , vmQueryOnly = nodeRole == RoleApi
+        -- A validator serves no API and runs no slipstream: no SQL state mirror
+        -- (sqlDiff), no state diffs on the VM event stream (diffPublish), and no
+        -- VM event stream at all (publishVmEvents): with nobody reading it, JLog
+        -- would never trim it.
+        , sqlDiff = flags_sqlDiff && roleIndexesSql nodeRole
+        , diffPublish = flags_diffPublish && roleIndexesSql nodeRole
+        , publishVmEvents = roleIndexesSql nodeRole
+        }
+    , cellId = if null flags_cellId then Nothing else Just flags_cellId
+    , peerDbConfig = if null flags_peerDatabase then Nothing else Just writerSql { database = flags_peerDatabase }
+    , peerSqlitePath = case flags_peerStore of
+        "postgres" -> Nothing
+        "sqlite" -> Just "peers.sqlite"
+        other -> error $ "--peerStore must be 'postgres' or 'sqlite', not '" ++ other ++ "'"
+    , sqlConfig = writerSql
+    , sqlReaderConfig = (\h -> writerSql { host = h }) <$> readerHost
     , cirrusConfig = (cirrusConfig runtimeConfig)
         { user = flags_pguser
-        , host = preferIPv4Loopback flags_pghost
+        , host = maybe (storeHost "postgres" flags_pghost) id readerHost
         , password = pgPass
         }
     , streamingConfig = (streamingConfig runtimeConfig)
         { streamingHost = if flags_kafkahost == "localhost"
                           then bcHost brokerConfig
                           else flags_kafkahost 
+        , streamingPort = if flags_kafkahost == "localhost"
+                          then bcPort brokerConfig
+                          else flags_kafkaport
         }
     , levelDBConfig = def
         { cacheSize = flags_ldbCacheSize
@@ -174,6 +247,7 @@ genEthConf = do
         }
     , networkConfig = def
         { network = flags_network
+        , role = roleName nodeRole
         , networkID = computeNetworkID
         , chainId = computeChainId flags_network
         , httpPort = flags_httpPort

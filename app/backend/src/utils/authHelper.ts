@@ -1,5 +1,5 @@
 import axios from "axios";
-import { clientSecret, clientId, openIdTokenEndpoint, openIdJwks } from "../config/config";
+import { clientSecret, clientId, hasClientCredentials, openIdTokenEndpoint, openIdJwks } from "../config/config";
 import { createLocalJWKSet, jwtVerify, JWTPayload, JSONWebKeySet } from "jose";
 import { strato } from "./appApiHelper";
 import { TokenCache, StratoKeyResponse } from "../types/types";
@@ -7,7 +7,16 @@ import { StratoPaths } from "../config/constants";
 
 const CACHED_TOKEN: TokenCache = {};
 
+/**
+ * Token for requests the backend makes on behalf of anonymous users. Without
+ * client credentials there is none: the node's read APIs and unsigned-tx
+ * endpoints are open, and the API clients send no Authorization header for an
+ * empty token.
+ */
 export const getServiceToken = async (): Promise<string> => {
+  if (!hasClientCredentials) {
+    return "";
+  }
   if (
     CACHED_TOKEN.serviceToken &&
     CACHED_TOKEN.expiresAt &&

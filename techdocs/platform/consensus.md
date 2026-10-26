@@ -39,6 +39,10 @@ Rounds persist across heights: committing a block advances the sequence number b
 
 ### Block timestamps
 
+This is a one-second minimum, not a guaranteed average block time. Consensus round changes and node load can increase the interval. Measure an average from consecutive block timestamps over a stated block range when reporting it to a wallet provider.
+
+A mainnet sample spanning blocks **638,173–638,273**, timestamped **2026-10-12 03:00:32–03:17:02 UTC**, averaged **9.90 seconds** per block: 990 seconds across 100 consecutive intervals. This is an observed sample, not a fixed network setting or an uptime commitment.
+
 The proposer stamps a block with its own clock, and `block.timestamp` in contracts reads that header field. The stamp is checked in three places:
 
 - **Proposer.** A block is never stamped before its parent, even when the parent's proposer ran ahead of the local clock.

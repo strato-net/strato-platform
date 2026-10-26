@@ -16,7 +16,7 @@ import Blockchain.Verifier (checkTimestampMonotonic)
 --import Blockchain.Data.AddressStateDB
 --import qualified Blockchain.Data.Block as BDB
 --import Blockchain.Data.ExecResults
---import Blockchain.Database.MerklePatricia as MP
+import Control.Monad.Composable.StateDB as MP
 --import Blockchain.EVM
 --import qualified Blockchain.EVM.MutableStack as MS
 --import Blockchain.EVM.Opcodes

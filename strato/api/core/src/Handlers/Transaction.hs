@@ -14,7 +14,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Handlers.Transaction
-  ( TxsFilterParams (..),
+  (
+    TxsFilterParams (..),
     txsFilterParams,
     API,
     postTxClient,
@@ -32,17 +33,23 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (Transaction, rawTX2TX, transactionHash)
-import Blockchain.EthConf (runStreamMConfigured)
+import Blockchain.EthConf (ethConf, runStreamMPooled)
+import Blockchain.EthConf.Model (ingressUrls)
+import Data.Foldable (for_)
+import Network.HTTP.Client (Manager, RequestBody (..), defaultManagerSettings, httpLbs, method, newManager, parseRequest, requestBody, requestHeaders, responseBody, responseStatus, responseTimeout, responseTimeoutMicro)
+import Network.HTTP.Types (statusCode)
+import System.IO.Unsafe (unsafePerformIO)
 import Blockchain.Model.JsonBlock
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event (IngestEvent (IETx), Timestamp)
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
+import qualified Strato.Tracing as Tr
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
 import Control.DeepSeq
 import qualified Control.Exception as E
-import Control.Monad (unless, when)
+import Control.Monad (forM_, unless, when)
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Modify as Mod
 import qualified Control.Monad.Composable.Base as Base
@@ -52,12 +59,13 @@ import Data.Aeson
 import qualified Data.Binary as Bin
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as BL8
 import Data.Conduit
 import Data.Conduit.Combinators (yieldMany)
 import Data.List
 import Data.Maybe
-import Data.Time.Clock (UTCTime)
 import qualified Data.Text as T
+import Data.Time.Clock (UTCTime)
 import qualified Database.Esqueleto.Internal.Internal as E
 import qualified Database.Esqueleto.Legacy as E
 import Numeric.Natural
@@ -216,11 +224,71 @@ instance (SQLDB Base.:> es) => Selectable TxsFilterParams [RawTransaction] (Base
 
       return . Just $ nub txs
 
+-- | Where submitted transactions go. On a node, straight into its own
+-- stream (the historical path). On the API tier, 'ingressUrls' names the
+-- core cells' strato-ingest endpoints and the batch is posted to every one
+-- of them, so each cell's sequencer holds it in its mempool and a standby
+-- promoted later already has it (the copies dedup by hash). The submit
+-- succeeds once at least one cell has accepted it.
 instance (Base.Logger Base.:> es) => (Base.Eff es) `Mod.Outputs` [IngestEvent] where
   output txs = do
-    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " tx(s) to unseqevents"
-    resps <- runStreamMConfigured "strato-api" $ writeUnseqEvents txs
-    $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
+    started <- liftIO Tr.nowNanos
+    let urls = ingressUrls ethConf
+        mode = if null urls then "local" else "ingress"
+    if null urls then submitLocally else submitToIngress urls
+    liftIO $ recordSubmitSpans started mode
+    where
+      -- One "tx.submit" span per transaction, in the transaction's own trace
+      -- (its id derives from the hash), linked to the request trace it
+      -- arrived in. strato-ingest and slipstream add the later stages.
+      recordSubmitSpans started mode = do
+        enabled <- Tr.tracingEnabled
+        when enabled $ do
+          end <- Tr.nowNanos
+          request <- Tr.currentRequestContext
+          for_ [(ts, itTransaction it) | IETx ts it <- txs] $ \(_, tx) -> do
+            let h = transactionHash tx
+            Tr.recordSpan (Tr.traceIdFromHash (keccak256ToByteString h)) Nothing "tx.submit" Tr.Producer started end
+              [ Tr.attrText "strato.tx_hash" (T.pack (keccak256ToHex h)),
+                Tr.attrText "strato.submit_mode" (T.pack mode),
+                Tr.attrText "strato.stage" "api"
+              ]
+              (maybe [] pure request)
+              Nothing
+      submitLocally = do
+        $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " tx(s) to unseqevents"
+        resps <- runStreamMPooled "strato-api" $ writeUnseqEvents txs
+        $logDebug $ T.pack $ "writeUnseqEventsEnd commit: " ++ show resps
+      submitToIngress urls = do
+        $logDebugS "writeIngestTxBegin" . T.pack $ "Posting " ++ show (length txs) ++ " tx(s) to " ++ show (length urls) ++ " core cell(s)"
+        ctx <- liftIO Tr.currentRequestContext
+        results <- liftIO $ mapConcurrently (\u -> (,) u <$> try (postIngest ctx u txs)) urls
+        let failures = [(u, e) | (u, Left (e :: SomeException)) <- results]
+            accepted = length results - length failures
+        forM_ failures $ \(u, e) ->
+          $logWarnS "writeIngestTx" . T.pack $ "core cell " ++ u ++ " did not accept the batch: " ++ show e
+        when (accepted == 0) . liftIO . throwIO . userError $
+          "no core cell accepted the transaction batch (" ++ show (length urls) ++ " tried)"
+
+-- | POST a batch to one cell's ingress, as the bytes the stream carries.
+postIngest :: Maybe Tr.TraceContext -> String -> [IngestEvent] -> IO ()
+postIngest ctx url txs = do
+  initial <- parseRequest (url ++ "/ingest")
+  let req =
+        initial
+          { method = "POST",
+            requestHeaders = [("Content-Type", "application/octet-stream")] ++ maybe [] (\t -> [("traceparent", Tr.renderTraceparent t)]) ctx,
+            requestBody = RequestBodyLBS (Bin.encode txs),
+            responseTimeout = responseTimeoutMicro 10000000
+          }
+  resp <- httpLbs req ingressManager
+  let code = statusCode (responseStatus resp)
+  unless (code >= 200 && code < 300) . throwIO . userError $
+    "HTTP " ++ show code ++ " from " ++ url ++ ": " ++ take 200 (BL8.unpack (responseBody resp))
+
+{-# NOINLINE ingressManager #-}
+ingressManager :: Manager
+ingressManager = unsafePerformIO $ newManager defaultManagerSettings
 
 postTransactionC :: (MonadIO m, MonadLogger m) => Maybe Int -> RawTransaction' -> ConduitT a IngestEvent m Keccak256
 postTransactionC limit (RawTransaction' raw) = do

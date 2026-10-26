@@ -4,6 +4,7 @@ const BlockDataRef = require('../../models/strato/eth/blockDataRef');
 const BlockTransaction = require('../../models/strato/eth/blockTransaction');
 const config = require('../../config/app.config');
 const db = require('../../models/strato/eth/connection');
+const { hasBlockIndex } = require('../../lib/strato-db-data/block-index');
 const moment = require('moment');
 const bigInt = require('big-integer');
 
@@ -13,7 +14,8 @@ let propagationDelay = [];
 let lastBlockNumber = bigInt();
 let globalBlocks = [];
 
-function getBlocks() {
+async function getBlocks() {
+  if (!(await hasBlockIndex())) return;
   BlockDataRef
     .findAll(
       {

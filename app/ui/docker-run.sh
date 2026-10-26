@@ -1,17 +1,24 @@
 #!/bin/sh
 set -e
 
-# Read chainId and networkName from ethconf.yaml
-CHAIN_ID=$(grep "^  chainId:" /config/ethconf.yaml | awk '{print $2}')
-NETWORK_NAME=$(grep "^  network:" /config/ethconf.yaml | awk '{print $2}' | tr -d '"')
+# Read chainId and networkName from ethconf.yaml when a node's config is
+# mounted (bundled deployment); otherwise take them from the environment
+# (standalone app tier, which has no node directory).
+if [ -f /config/ethconf.yaml ]; then
+  CHAIN_ID=$(grep "^  chainId:" /config/ethconf.yaml | awk '{print $2}')
+  NETWORK_NAME=$(grep "^  network:" /config/ethconf.yaml | awk '{print $2}' | tr -d '"')
+else
+  CHAIN_ID=${CHAIN_ID:-}
+  NETWORK_NAME=${NETWORK_NAME:-}
+fi
 
 if [ -z "$CHAIN_ID" ]; then
-  echo "ERROR: Could not read chainId from /config/ethconf.yaml" >&2
+  echo "ERROR: chainId not found: mount /config/ethconf.yaml or set CHAIN_ID" >&2
   exit 1
 fi
 
 if [ -z "$NETWORK_NAME" ]; then
-  echo "ERROR: Could not read network name from /config/ethconf.yaml" >&2
+  echo "ERROR: network name not found: mount /config/ethconf.yaml or set NETWORK_NAME" >&2
   exit 1
 fi
 

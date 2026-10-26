@@ -12,9 +12,11 @@ module Blockchain.Data.Transaction
   ( Transaction (..),
     isMessageTX,
     txAndTime2RawTX,
+    txAndTime2RawTXWithSigner,
     tx2RawTXAndTime,
     rawTX2TX,
     insertTX,
+    insertTXWithSigners,
     insertTX',
     insertTXIfNew,
     insertTXIfNew',
@@ -69,7 +71,7 @@ import System.Clock
 
 instance TransactionLike Transaction where
   txHash = hash . rlpSerialize . rlpEncode
-  txPartialHash = hash . rlpSerialize . partialRLPEncode
+  txPartialHash = partialTransactionHash
   txChainHash = error "Transaction.txChainHash: Not a private transaction"
   txSigner = whoSignedThisTransaction
   txNonce = nonce
@@ -164,6 +166,10 @@ rawTX2TX rt = error $ "rawTX2TX: " ++ show rt
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
 txAndTime2RawTX origin tx blkNum time =
+  txAndTime2RawTXWithSigner (fromMaybe (Address (-1)) $ whoSignedThisTransaction tx) origin tx blkNum time
+
+txAndTime2RawTXWithSigner :: Address -> TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
+txAndTime2RawTXWithSigner signer origin tx blkNum time =
   case tx of
     MessageTX{..} ->
       RawTransaction time signer nonce gasLimit (Just to) (Just funcName) Nothing args network Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing txVersion (if B.null attribution then Nothing else Just attribution)
@@ -171,8 +177,6 @@ txAndTime2RawTX origin tx blkNum time =
       RawTransaction time signer nonce gasLimit Nothing Nothing (Just contractName) args network (Just code) chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing txVersion Nothing
     EthereumTX{..} ->
       RawTransaction time signer nonce gasLimit ethTo Nothing Nothing [] "" Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin (Just gasPrice) (Just value) (Just txData) 0 Nothing
-  where
-    signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 
 tx2RawTXAndTime :: (MonadIO m) => TXOrigin -> Transaction -> m RawTransaction
 tx2RawTXAndTime origin tx = do
@@ -191,6 +195,12 @@ insertTX mode origin blockNum txs = do
   afterECRecover <- rawTXs `deepseq` liftIO (getTime Realtime)
   insertRawTX mode rawTXs
   return $ toNanoSecs $ afterECRecover - beforeECRecover
+
+insertTXWithSigners :: HasSQLDB m => DebugMode -> TXOrigin -> Maybe Integer -> [(Address, Transaction)] -> m ()
+insertTXWithSigners mode origin blockNum txs = do
+  time <- liftIO getCurrentTime
+  insertRawTX mode
+    [txAndTime2RawTXWithSigner signer origin tx (fromMaybe (-1) blockNum) time | (signer, tx) <- txs]
 
 insertTXIfNew' ::
   MonadUnliftIO m =>
@@ -262,7 +272,10 @@ transactionHash :: Transaction -> Keccak256
 transactionHash = hash . rlpSerialize . rlpEncode
 
 partialTransactionHash :: Transaction -> Keccak256
-partialTransactionHash = hash . rlpSerialize . partialRLPEncode
+partialTransactionHash tx = hash $ rlpSerialize $ case (tx, chainId tx, partialRLPEncode tx) of
+  (EthereumTX {}, _, encoded) -> encoded
+  (_, Just cid, RLPArray items) -> RLPArray $ items ++ [rlpEncode cid, rlpEncode (0::Integer), rlpEncode (0::Integer)]
+  (_, _, encoded) -> encoded
 
 -- EIP-712 support for external wallet signing (MetaMask, etc.)
 
@@ -278,12 +291,14 @@ eip712TxTypeHash = keccak256ToByteString $ hash ("Transaction(address to,string 
 eip712TxTypeHashWithAttribution :: B.ByteString
 eip712TxTypeHashWithAttribution = keccak256ToByteString $ hash ("Transaction(address to,string funcName,string[] args,uint256 nonce,uint256 gasLimit,string network,bytes attribution)" :: B.ByteString)
 
-eip712DomainSeparator :: B.ByteString
-eip712DomainSeparator = keccak256ToByteString $ hash $ B.concat
-  [ eip712DomainTypeHash
+eip712DomainSeparator :: Maybe Integer -> B.ByteString
+eip712DomainSeparator cid = keccak256ToByteString $ hash $ B.concat $
+  [ case cid of
+      Nothing -> eip712DomainTypeHash
+      Just _ -> keccak256ToByteString $ hash ("EIP712Domain(string name,string version,uint256 chainId)" :: B.ByteString)
   , keccak256ToByteString $ hash ("STRATO" :: B.ByteString)
   , keccak256ToByteString $ hash ("1" :: B.ByteString)
-  ]
+  ] ++ maybe [] (\c -> [word256ToBytes $ fromInteger c]) cid
 
 eip712EncodeStringArray :: [T.Text] -> B.ByteString
 eip712EncodeStringArray texts = keccak256ToByteString $ hash $ B.concat
@@ -307,6 +322,6 @@ eip712StructHash _ = error "eip712StructHash: only MessageTX supported"
 eip712SignHash :: Transaction -> B.ByteString
 eip712SignHash tx = keccak256ToByteString $ hash $ B.concat
   [ "\x19\x01"
-  , eip712DomainSeparator
+  , eip712DomainSeparator (chainId tx)
   , eip712StructHash tx
   ]

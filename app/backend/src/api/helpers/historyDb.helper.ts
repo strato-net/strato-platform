@@ -410,7 +410,8 @@ function computeRelevantTokens(
 
 /**
  * Fetch vault config needed for portfolio history directly from cirrus DB.
- * Replaces the 3 HTTP calls in getVaultHistoryConfig (vault.service.ts).
+ * Reads the retired Diversified Vault's share token, executor and asset list so
+ * historical portfolio snapshots that held vault shares still value correctly.
  * Only fetches the fields needed for history: shareToken, botExecutor, supportedAssets.
  */
 export async function fetchVaultHistoryConfig(
