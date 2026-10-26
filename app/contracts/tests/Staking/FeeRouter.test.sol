@@ -66,6 +66,7 @@ contract record FeeRouterHarness is FeeRouter {
     address public poolAddr;
     address public deciderStateAddr;
     uint public minLiquidity;
+    uint public blockReward_ = 1e16;
     uint public swapPremiumBps = 10000;
     uint public activation;
     address public feeCollectorAddr;
@@ -84,6 +85,7 @@ contract record FeeRouterHarness is FeeRouter {
 
     function setStakingFallback(address s) public { stakingFallbackAddr = s; }
     function setMinLiquidity(uint l) public { minLiquidity = l; }
+    function setBlockReward(uint r) public { blockReward_ = r; }
     function setSwapPremium(uint bps) public { swapPremiumBps = bps; }
     function setActivation(uint b, address collector) public { activation = b; feeCollectorAddr = collector; }
 
@@ -95,6 +97,7 @@ contract record FeeRouterHarness is FeeRouter {
     function _strato() internal view override returns (address) { return stratoAddr; }
     function _pool() internal view override returns (address) { return poolAddr; }
     function _minPoolLiquidity() internal view override returns (uint) { return minLiquidity; }
+    function _blockReward() internal view override returns (uint) { return blockReward_; }
     function _maxSwapPremiumBps() internal view override returns (uint) { return swapPremiumBps; }
     function _activationBlock() internal view override returns (uint) { return activation; }
     function _feeCollector() internal view override returns (address) { return feeCollectorAddr; }
@@ -677,6 +680,17 @@ contract Describe_FeeRouter {
     }
 
     // A router that has run dry must not take the chain down with it.
+    function it_pays_no_reward_when_switched_off() public {
+        _rewarding();
+        strato.mint(address(router), 1e18);
+        router.setBlockReward(0);
+
+        router.payBlockRewards();
+        require(staking.rewarded(PROPOSER) == 0, "nothing paid");
+        require(strato.balanceOf(address(router)) == 1e18, "the balance stays put");
+        require(router.lastRewardedBlock() == block.number, "still latched");
+    }
+
     function it_survives_an_unfunded_router() public {
         _rewarding();
 

@@ -141,8 +141,9 @@ contract record FeeRouter {
     // STRATO balance into staking, which splits it between the proposer's operator
     // and its delegators. Fund the router to switch it on: an unfunded router pays
     // nothing rather than stalling the chain. Burning the fee leaves this as the
-    // validators' funding.
-    uint256 constant BLOCK_REWARD = 1e16; // 0.01 STRATO
+    // validators' funding. Zero switches rewards off for good.
+    function _blockReward() internal view virtual returns (uint) { return 1e16; } // 0.01 STRATO
+    function blockReward() external view returns (uint) { return _blockReward(); }
 
     event StratoFeeQuoted(uint256 indexed blockNumber, uint256 fee, uint256 priceVersion);
     event FeePaid(address indexed payer, FeeMethod method, uint256 amount, uint256 priceVersion);
@@ -231,6 +232,8 @@ contract record FeeRouter {
     }
 
     function _payBlockReward() internal {
+        uint reward = _blockReward();
+        if (reward == 0) return;
         address proposer = block.proposer;
         if (proposer == address(0)) return;
 
@@ -252,18 +255,18 @@ contract record FeeRouter {
         // simply stays here.
         bool approved = false;
         try {
-            ERC20_Template(strato).approve(staking, BLOCK_REWARD);
+            ERC20_Template(strato).approve(staking, reward);
             approved = true;
         } catch {
         }
         if (!approved) return;
 
         bool paid = false;
-        try IStakingFeeHook(staking).creditBlockReward(proposer, BLOCK_REWARD) {
+        try IStakingFeeHook(staking).creditBlockReward(proposer, reward) {
             paid = true;
         } catch {
         }
-        if (paid) emit BlockRewardsPaid(block.number, proposer, BLOCK_REWARD);
+        if (paid) emit BlockRewardsPaid(block.number, proposer, reward);
     }
 
     function payFees() external {

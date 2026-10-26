@@ -17,7 +17,6 @@ const DECIDER_STATE = '00000000000000000000000000000000dec1de02';
 const ZERO = '0000000000000000000000000000000000000000';
 const WAD = 10n ** 18n;
 const USD_FEE = 10n ** 16n;
-const BLOCK_REWARD = 10n ** 16n; // FeeRouter.BLOCK_REWARD
 const FEE_PAID_TOPIC = '0x9766415a366eee49dea2373907d50273c3aefcd4207d8c7063a5bb343305a8e0'; // FeePaid(address,uint8,uint256,uint256)
 const Q96 = 2n ** 96n;
 const PAGE = 1000;
@@ -105,9 +104,12 @@ const gate = (status, name, detail) => { results.push({ status, name, detail });
   const rewards = (await page('event', { address: `eq.${router}`, event_name: 'eq.BlockRewardsPaid', select: 'id,block_number,attributes' }))
     .filter(r => Number(r.block_number) <= auditTip);
   const rewardBlocks = new Set(rewards.map(r => Number(r.block_number)));
+  // blockReward() exists from V5; an older router pays the original flat 0.01 STRATO.
+  const BLOCK_REWARD = await rpc(node, 'eth_call', [{ to: `0x${router}`, data: '0x0ac168a1' }, 'latest']).then(BigInt, () => 10n ** 16n);
   gate(dupQuotes === 0 && quotes.length === blocksLive ? 'PASS' : 'FAIL', 'one STRATO quote per block',
     `${quotes.length} quotes over ${blocksLive} blocks since ${installBlock}, ${dupQuotes} duplicate blocks`);
-  gate(rewardBlocks.size === rewards.length && rewards.length === blocksLive ? 'PASS' : 'FAIL', 'one block reward per block',
+  if (BLOCK_REWARD === 0n) gate(rewards.length === 0 ? 'PASS' : 'FAIL', 'block rewards switched off', `${rewards.length} rewards paid`);
+  else gate(rewardBlocks.size === rewards.length && rewards.length === blocksLive ? 'PASS' : 'FAIL', 'one block reward per block',
     `${rewards.length} rewards, ${rewardBlocks.size} distinct blocks, ${rewards.length - rewardBlocks.size} repeats`);
 
   // ---- 2. Every fee charged equals that block's quote (or one whole voucher) ----
@@ -227,8 +229,11 @@ const gate = (status, name, detail) => { results.push({ status, name, detail });
   const tipBlock = await rpc(node, 'eth_getBlockByNumber', ['latest', false]);
   const past = await rpc(node, 'eth_getBlockByNumber', [`0x${(tip - 5000).toString(16)}`, false]);
   const spb = (Number(tipBlock.timestamp) - Number(past.timestamp)) / 5000;
-  const days = Number(balance / BLOCK_REWARD) * spb / 86400;
-  gate(days > 14 ? 'PASS' : 'FAIL', 'router funded for block rewards', `${Number(balance) / 1e18} STRATO = ${balance / BLOCK_REWARD} blocks ≈ ${days.toFixed(1)} days at ${spb.toFixed(2)} s/block`);
+  if (BLOCK_REWARD === 0n) gate('INFO', 'router funded for block rewards', `rewards off; ${Number(balance) / 1e18} STRATO held`);
+  else {
+    const days = Number(balance / BLOCK_REWARD) * spb / 86400;
+    gate(days > 14 ? 'PASS' : 'FAIL', 'router funded for block rewards', `${Number(balance) / 1e18} STRATO = ${balance / BLOCK_REWARD} blocks ≈ ${days.toFixed(1)} days at ${spb.toFixed(2)} s/block`);
+  }
 
   if (opts.json) { console.log(JSON.stringify({ router, installBlock, tip, results }, null, 2)); return; }
   console.log(`Router ${router}, live since block ${installBlock}, tip ${tip}`);

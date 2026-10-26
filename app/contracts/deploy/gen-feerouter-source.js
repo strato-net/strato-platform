@@ -29,6 +29,9 @@
 // router would quote a stale price forever (seen live on helium 2026-10-23). Read the
 // seeded pool's liquidity from `strato-gas-helium.js status` and pass a fraction of it.
 //
+// --block-reward: STRATO wei paid per block to the proposer (default 0.01 STRATO);
+// 0 switches block rewards off.
+//
 // Before installing, check the pool prices: once the router is deployed, read
 // stratoFeeQuote() after a block has run payBlockRewards; `valid` stays false until
 // the pool's observation ring covers the TWAP window.
@@ -69,8 +72,14 @@ if (minLiquidityIdx >= 0 && !/^[1-9][0-9]*$/.test(minLiquidity)) {
   console.error('FAILED: --min-liquidity <L> takes a positive pool liquidity');
   process.exit(1);
 }
-const flagValues = [poolIdx, activateIdx, minLiquidityIdx].filter(i => i >= 0).map(i => i + 1);
-const positional = argv.filter((a, i) => !['--pool', '--activate', '--min-liquidity'].includes(a) && !flagValues.includes(i));
+const blockRewardIdx = argv.indexOf('--block-reward');
+const blockReward = blockRewardIdx >= 0 ? argv[blockRewardIdx + 1] : '';
+if (blockRewardIdx >= 0 && !/^[0-9]+$/.test(blockReward)) {
+  console.error('FAILED: --block-reward <wei> takes a STRATO amount in wei (0 switches rewards off)');
+  process.exit(1);
+}
+const flagValues = [poolIdx, activateIdx, minLiquidityIdx, blockRewardIdx].filter(i => i >= 0).map(i => i + 1);
+const positional = argv.filter((a, i) => !['--pool', '--activate', '--min-liquidity', '--block-reward'].includes(a) && !flagValues.includes(i));
 
 const arg = (positional[0] || 'helium').replace(/^0x/, '');
 let network;
@@ -117,6 +126,14 @@ const liquidityOverride = minLiquidity ? `
     }
 ` : '';
 
+const rewardOverride = blockReward ? `
+    // Flat STRATO reward per block paid from the router's balance; zero switches
+    // block rewards off.
+    function _blockReward() internal view override returns (uint) {
+        return ${blockReward};
+    }
+` : '';
+
 const subclass = `
 // Deployment wiring for ${network.label}. Installed with
 // DeciderState(0xDEC1DE02).updatePayFeeContract.
@@ -130,9 +147,9 @@ contract record ${NAME} is FeeRouter {
     function _pool() internal view override returns (address) {
         return address(0x${pool});
     }
-${stakingOverride}${activationOverride}${liquidityOverride}}
+${stakingOverride}${activationOverride}${liquidityOverride}${rewardOverride}}
 `;
 
 fs.writeFileSync(OUT, base.trimEnd() + '\n' + subclass);
 console.log(`${OUT} written: ${fs.statSync(OUT).size} bytes | ${network.label} | contract ${NAME} | ` +
-  `STRATO ${network.strato} | pool ${pool} | staking ${network.staking || '(governance only)'} | activation ${activate || 'genesis'} | liquidity floor ${minLiquidity || 'none'}`);
+  `STRATO ${network.strato} | pool ${pool} | staking ${network.staking || '(governance only)'} | activation ${activate || 'genesis'} | liquidity floor ${minLiquidity || 'none'} | block reward ${blockReward || '1e16'}`);
