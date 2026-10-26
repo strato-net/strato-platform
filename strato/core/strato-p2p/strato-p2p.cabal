@@ -29,6 +29,7 @@ library
       Blockchain.P2PUtil
       Blockchain.Participation
       Blockchain.PeerClaims
+      Blockchain.Replay
       Blockchain.SeqEventNotify
       Blockchain.Threads
       Blockchain.TimerSource
@@ -58,6 +59,7 @@ library
     , cross-monitoring
     , crypto-pubkey-types
     , data-default
+    , directory
     , dns
     , either
     , ethereum-discovery
@@ -72,7 +74,6 @@ library
     , lens
     , lifted-async
     , lifted-base
-    , merkle-patricia-db
     , monad-alter
     , mtl
     , network
@@ -84,8 +85,10 @@ library
     , servant-client
     , servant-server
     , split
+    , statedb-monad
     , stm-conduit
     , strato-conf
+    , strato-genesis
     , strato-model
     , strato-redis-blockdb
     , strato-version

@@ -46,7 +46,7 @@ where
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import qualified Blockchain.SolidVM as SolidVM
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.Strato.Model.Address

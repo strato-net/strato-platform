@@ -1,8 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Generator
-import Blockchain.Init.Options (flags_composeOnly)
+-- Imported for its flags alone: initHFlags only sees the flags of the modules
+-- this one imports.
+import Blockchain.Init.Options ()
 import Blockchain.Strato.Model.Options (flags_network)
 import HFlags
 import System.Environment (getArgs)
@@ -16,17 +17,14 @@ main = do
   let hasFlags = length origArgs > 1
 
   args <- $initHFlags "strato-setup [node-directory] [flags...]"
-  if flags_composeOnly
-    then generateDockerComposeAllDocker
-    else do
-      nodeDir <- case args of
-        [dir] -> return dir
-        [] -> do
-          hPutStrLn stderr "Error: node directory required"
-          hPutStrLn stderr "Usage: strato-setup <node-directory> [flags...]"
-          exitFailure
-        _ -> do
-          hPutStrLn stderr "Error: too many positional arguments"
-          hPutStrLn stderr "Usage: strato-setup <node-directory> [flags...]"
-          exitFailure
-      mkFilesAndGenesis nodeDir hasFlags flags_network
+  nodeDir <- case args of
+    [dir] -> return dir
+    [] -> do
+      hPutStrLn stderr "Error: node directory required"
+      hPutStrLn stderr "Usage: strato-setup <node-directory> [flags...]"
+      exitFailure
+    _ -> do
+      hPutStrLn stderr "Error: too many positional arguments"
+      hPutStrLn stderr "Usage: strato-setup <node-directory> [flags...]"
+      exitFailure
+  mkFilesAndGenesis nodeDir hasFlags flags_network

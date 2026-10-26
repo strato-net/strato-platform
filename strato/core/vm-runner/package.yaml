@@ -32,7 +32,7 @@ library:
   - bytestring
   - common-log
   - composable-monads-base
-  - nodedb-monad
+  - statedb-monad
   - conduit
   - containers
   - cross-monitoring
@@ -43,7 +43,6 @@ library:
   - format
   - lens
   - streaming
-  - merkle-patricia-db
   - monad-alter
   - prometheus-client
   - seqevents
@@ -54,7 +53,7 @@ library:
   - strato-genesis
   - strato-index
   - strato-model
-  - strato-redis-blockdb
+  - redis-monad
   - strato-statediff
   - strato-tracing
   - text
@@ -76,6 +75,7 @@ executables:
       - composable-monads-base
       - hflags
       - process-monitor
+      - redis-monad
       - strato-conf
       - strato-model
       - strato-tracing
@@ -95,7 +95,7 @@ executables:
       - blockapps-data
       - blockapps-mpdbs
       - blockDB
-      - merkle-patricia-db
+      - statedb-monad
       - strato-genesis
       - bytestring
       - common-log
@@ -105,6 +105,7 @@ executables:
       - hflags
       - process-monitor
       - prometheus-client
+      - redis-monad
       - resourcet
       - seqevents
       - strato-conf
@@ -134,7 +135,7 @@ tests:
       - hspec
       - hspec-expectations-lifted
       - labeled-error
-      - merkle-patricia-db
+      - statedb-monad
       - monad-alter
       - strato-model
       - vm-runner

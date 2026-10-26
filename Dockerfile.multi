@@ -69,7 +69,7 @@ EXPOSE 30303 30303/udp 3000 3001 7065 8013 8050 8051 8052
 HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
   CMD pgrep vm-runner && pgrep slipstream || exit 1
 WORKDIR /var/lib/strato
-ENTRYPOINT ["/strato/doit.sh"]
+ENTRYPOINT ["/strato/entrypoint.sh"]
 
 FROM base as highway
 COPY usr/local/bin/blockapps-highway-server /usr/local/bin/

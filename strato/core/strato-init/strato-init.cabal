@@ -18,7 +18,6 @@ library
   exposed-modules:
       Blockchain.Init.ComposeTypes
       Blockchain.Init.DockerCompose
-      Blockchain.Init.DockerComposeAllDocker
       Blockchain.Init.EthConf
       Blockchain.Init.Generator
       Blockchain.Init.LocalAuth
@@ -26,15 +25,16 @@ library
       Blockchain.Init.BuildMetadata.TH
       Blockchain.Init.Monad
       Blockchain.Init.Options
+      Blockchain.Init.Role
       Blockchain.Init.RtsFlags
   other-modules:
-      Blockchain.Init.Role
       Paths_strato_init
   hs-source-dirs:
       src/
   ghc-options: -Wall -O2 -threaded
   build-depends:
-      aeson
+      accountdb-monad
+    , aeson
     , base
     , blockapps-data
     , blockapps-mpdbs
@@ -53,13 +53,13 @@ library
     , hflags
     , http-types
     , leveldb-haskell
-    , merkle-patricia-db
     , monad-alter
     , nibblestring
     , process
     , resourcet
     , servant-client
     , solid-vm-model
+    , statedb-monad
     , strato-auth
     , strato-conf
     , strato-genesis

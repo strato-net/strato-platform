@@ -4,10 +4,15 @@
 -- sizing, no GC trimmings (-n/-qg1/-qn measured as no-ops). No tier gets an
 -- @-M@ heap cap: the 60%-of-RAM cap aborted 8GB nodes mid-sync (2026-09-29);
 -- the ≤16GB tiers compact the oldest generation (@-c@) instead.
+--
+-- Also pins how strato-setup reads @--role@, and which roles may turn
+-- monitoring off or run local auth.
 module Main (main) where
 
+import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad (forM_)
+import Data.Either (isLeft)
 import Data.List (isPrefixOf)
 import Test.Hspec
 
@@ -82,3 +87,25 @@ main = hspec $ do
         `shouldBe` Just 16000
     it "garbage" $
       parseMemInfoMB "no meminfo here" `shouldBe` Nothing
+
+  describe "parseRole" $ do
+    it "--role names one of the five roles, case-insensitively" $ do
+      parseRole "node" `shouldBe` Right RoleNode
+      parseRole "core" `shouldBe` Right RoleCore
+      parseRole "api" `shouldBe` Right RoleApi
+      parseRole "api-node" `shouldBe` Right RoleApiNode
+      parseRole "API-Node" `shouldBe` Right RoleApiNode
+      parseRole "validator" `shouldBe` Right RoleValidator
+    it "rejects an unknown --role" $ do
+      parseRole "lite" `shouldSatisfy` isLeft
+      parseRole "" `shouldSatisfy` isLeft
+
+  describe "roleRunsLocalAuth" $
+    it "a node or an api-node may run the local identity provider and Vault" $
+      filter roleRunsLocalAuth [RoleNode, RoleCore, RoleApi, RoleValidator, RoleApiNode]
+        `shouldBe` [RoleNode, RoleApiNode]
+
+  describe "roleAllowsMonitoringOff" $
+    it "only an api-node may drop prometheus and apex (--monitoring=false)" $
+      filter roleAllowsMonitoringOff [RoleNode, RoleCore, RoleApi, RoleValidator, RoleApiNode]
+        `shouldBe` [RoleApiNode]

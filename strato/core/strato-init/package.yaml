@@ -19,7 +19,6 @@ library:
   exposed-modules:
     - Blockchain.Init.ComposeTypes
     - Blockchain.Init.DockerCompose
-    - Blockchain.Init.DockerComposeAllDocker
     - Blockchain.Init.EthConf
     - Blockchain.Init.Generator
     - Blockchain.Init.LocalAuth
@@ -27,6 +26,7 @@ library:
     - Blockchain.Init.BuildMetadata.TH
     - Blockchain.Init.Monad
     - Blockchain.Init.Options
+    - Blockchain.Init.Role
     - Blockchain.Init.RtsFlags
   dependencies:
   - aeson
@@ -46,7 +46,6 @@ library:
   - hflags
   - http-types
   - leveldb-haskell
-  - merkle-patricia-db
   - monad-alter
   - nibblestring
   - entropy
@@ -55,6 +54,8 @@ library:
   - servant-client
   - strato-auth
   - solid-vm-model
+  - accountdb-monad
+  - statedb-monad
   - strato-conf
   - strato-genesis
   - strato-model

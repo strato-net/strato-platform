@@ -14,6 +14,7 @@ dependencies:
   - format
   - generic-arbitrary
   - generic-random
+  - integer-conversion
   - labeled-error
   - persistent
   - QuickCheck

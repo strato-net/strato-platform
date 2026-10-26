@@ -77,9 +77,6 @@ export type ApiAction =
   | 'yield_vault_redeem'
   | 'yield_vault_redeem_all'
   | 'yield_vault_claim'
-  | 'basket_vault_deposit'
-  | 'basket_vault_withdraw'
-  | 'basket_vault_withdraw_all'
   // stablecoin / bridge / metals
   | 'psm_mint'
   | 'psm_redeem'
@@ -212,9 +209,6 @@ const API_EVENT_MAP: Record<string, ApiAction> = {
   'POST /earn/yield-vault/*/redeem': 'yield_vault_redeem',
   'POST /earn/yield-vault/*/redeem-all': 'yield_vault_redeem_all',
   'POST /earn/yield-vault/*/claim': 'yield_vault_claim',
-  'POST /vault/deposit': 'basket_vault_deposit',
-  'POST /vault/withdraw': 'basket_vault_withdraw',
-  'POST /vault/withdraw-shares': 'basket_vault_withdraw_all',
 
   // stablecoin / bridge / metals
   'POST /psm/mint': 'psm_mint',
