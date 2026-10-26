@@ -1,18 +1,35 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module FunctionsSpec (spec) where
 
 import qualified Blockchain.SolidVM.Builtins.ABI as ABI
+import qualified Blockchain.SolidVM.Builtins.ABI.Values as Values
+import qualified Blockchain.SolidVM.Builtins.Crypto.Metered as Crypto
 import qualified Blockchain.SolidVM.Builtins.Functions as B
+import Blockchain.SolidVM.Builtins.Gas
+import Blockchain.Strato.Model.Gas (Gas)
 import Blockchain.VM.SolidException (SolidException (..))
 import Control.Exception (evaluate)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
 import Blockchain.Strato.Model.Address (Address)
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
+import qualified Data.Vector as V
 import Data.IORef
 import Data.Time.Clock
 import Data.Time.Calendar (fromGregorian)
 import Test.Hspec
+import SolidVM.Model.Value
+
+newtype Metered a = Metered {runMetered :: ReaderT (IORef [Gas]) IO a}
+  deriving (Functor, Applicative, Monad, MonadIO)
+
+instance MonadBuiltinGas Metered where
+  chargeBuiltinGas amount = Metered $ do
+    charges <- ask
+    liftIO $ modifyIORef' charges (++ [amount])
 
 spec :: Spec
 spec = do
@@ -38,6 +55,17 @@ spec = do
       recover () `shouldBe` recover BS.empty
 
   describe "ABI layout and malformed data" $ do
+    it "encodes and decodes SolidVM dynamic values through the shared package" $ do
+      encoded <- Values.abiEncode [SInteger 7, SString "abc"]
+      encoded `shouldBe` ABI.abiEncode [(False, ABI.encodeUint256 7), (True, ABI.encodeDynamicBytes "abc")]
+      case Values.abiDecode encoded [SString "uint", SString "string"] of
+        STuple values -> traverse weakGetVar (V.toList values) `shouldReturn` [SInteger 7, SString "abc"]
+        value -> expectationFailure $ show value
+    it "dereferences mutable array elements for standard and packed encoding" $ do
+      element <- createVar $ SInteger 7
+      let array = SArray $ V.singleton element
+      Values.abiEncode [array] `shouldReturn` ABI.encodeUint256 32 <> ABI.encodeUint256 1 <> ABI.encodeUint256 7
+      Values.abiEncodePacked [array] `shouldReturn` ABI.encodeUint256 7
     it "preserves head offsets, byte lengths, and right padding" $ do
       ABI.abiEncode [(False, ABI.encodeUint256 7), (True, ABI.encodeDynamicBytes "abc")]
         `shouldBe` ABI.encodeUint256 7 <> ABI.encodeUint256 64 <> ABI.encodeUint256 3 <> "abc" <> BS.replicate 29 0
@@ -49,6 +77,26 @@ spec = do
     it "preserves unknown decode types as the supplied null value" $
       ABI.abiDecode (\_ bs offset -> ABI.decodeUint bs offset) (-1)
         (ABI.encodeUint256 7 <> ABI.encodeUint256 9) [Nothing, Just "uint"] `shouldBe` [-1, 9]
+
+  describe "shared metered crypto builtins" $ do
+    it "charges the modular exponentiation cost and returns the result" $ do
+      charges <- newIORef []
+      runReaderT (runMetered $ Crypto.modExp 2 10 1000) charges `shouldReturn` 24
+      readIORef charges `shouldReturn` [gasModExp]
+    it "charges before forcing malformed integer arguments" $ do
+      charges <- newIORef []
+      runReaderT (runMetered $ Crypto.modExp (error "invalid input") 10 1000) charges `shouldThrow` anyErrorCall
+      readIORef charges `shouldReturn` [gasModExp]
+    it "charges incomplete MSM terms before rejecting their arity" $ do
+      charges <- newIORef []
+      runReaderT (runMetered $ Crypto.bls12381G1MsmInts [1,2]) charges `shouldThrow`
+        (== InvalidArguments "bls12381G1Msm: expected a multiple of 3 integer args (x, y, k per term)" "[1,2]")
+      readIORef charges `shouldReturn` [gasBlsG1MsmPerTerm]
+    it "preserves BLS byte-input validation after charging" $ do
+      charges <- newIORef []
+      runReaderT (runMetered $ Crypto.decompressG1 "x") charges `shouldThrow`
+        (\e -> case e of InvalidArguments message _ -> "bls12381DecompressG1: " `T.isPrefixOf` T.pack message; _ -> False)
+      readIORef charges `shouldReturn` [gasBlsDecompressG1]
 
   describe "stateful builtin operation order" $ do
     it "clears code, pays, and purges storage even when payment returns false" $ do

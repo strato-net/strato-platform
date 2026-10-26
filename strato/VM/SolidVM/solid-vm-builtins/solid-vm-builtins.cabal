@@ -18,8 +18,10 @@ library
       Blockchain.SolidVM.BLS12381.HashToCurve.G2
       Blockchain.SolidVM.BLS12381.HashToCurve.HashToField
       Blockchain.SolidVM.Builtins.ABI
+      Blockchain.SolidVM.Builtins.ABI.Values
       Blockchain.SolidVM.Builtins.Casts
       Blockchain.SolidVM.Builtins.Crypto
+      Blockchain.SolidVM.Builtins.Crypto.Metered
       Blockchain.SolidVM.Builtins.Functions
       Blockchain.SolidVM.Builtins.Gas
   other-modules:
@@ -47,6 +49,7 @@ library
     , text
     , time
     , transformers
+    , vector
   default-language: Haskell2010
 
 test-suite solid-vm-builtins-spec
@@ -73,4 +76,6 @@ test-suite solid-vm-builtins-spec
     , strato-model
     , text
     , time
+    , transformers
+    , vector
   default-language: Haskell2010

@@ -26,6 +26,7 @@ library:
     - text
     - time
     - transformers
+    - vector
 
 tests:
   solid-vm-builtins-spec:
@@ -43,3 +44,5 @@ tests:
       - strato-model
       - text
       - time
+      - transformers
+      - vector

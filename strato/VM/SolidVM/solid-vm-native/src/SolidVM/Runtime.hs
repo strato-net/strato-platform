@@ -5,14 +5,14 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module SolidVM.Runtime (compiledContract, compiledFunction, constructorStage, runAction, Host (..)) where
+module SolidVM.Runtime (compiledContract, compiledFunction, constructorStage, runAction, getCodeAndCollection, Host (..)) where
 
 import Blockchain.DB.SolidStorageDB
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.SolidVM.CodeCollectionDB (ParseOptions (..))
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
-import Blockchain.SolidVM.SM
+import Blockchain.SolidVM.SM hiding (getCodeAndCollection)
 import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Control.Lens ((^.))
@@ -32,7 +32,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import UnliftIO (catch, liftIO, throwIO, try, withRunInIO)
 import SolidVM.Values
 import SolidVM.Storage (getVar, setVar)
-import qualified Blockchain.SolidVM.Builtins as ABI
+import qualified Blockchain.SolidVM.Builtins.ABI.Values as ABI
 import Blockchain.Data.ProposalFacts
 
 data Host = Host
@@ -41,6 +41,9 @@ data Host = Host
   , hostPreviousBlock :: SM ProposalFacts
   , hostDerive :: Address -> T.Text -> T.Text -> ValList -> SM Address
   }
+
+getCodeAndCollection :: Address -> SM (CC.Contract, Keccak256, CC.CodeCollection)
+getCodeAndCollection = getCodeAndCollectionWithTypeCheck False
 
 {-# NOINLINE compilationCache #-}
 compilationCache :: IORef (LRU.LRU (Keccak256, Bool, T.Text) (Either T.Text N.CompiledContract))

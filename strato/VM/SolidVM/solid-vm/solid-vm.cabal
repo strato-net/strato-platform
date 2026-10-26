@@ -13,16 +13,16 @@ library
   exposed-modules:
       Blockchain.SolidVM
       Blockchain.SolidVM.Builtins
-      Blockchain.SolidVM.Environment
-      Blockchain.SolidVM.GasInfo
       Blockchain.SolidVM.Simple
-      Blockchain.SolidVM.SM
   other-modules:
       Blockchain.SolidVM.SetGet
       Blockchain.SolidVM.TraceTools
       Paths_solid_vm
   reexported-modules:
-      solid-vm-builtins:Blockchain.SolidVM.BLS12381
+      solid-vm-runtime:Blockchain.SolidVM.SM
+    , solid-vm-runtime:Blockchain.SolidVM.GasInfo
+    , solid-vm-runtime:Blockchain.SolidVM.Environment
+    , solid-vm-builtins:Blockchain.SolidVM.BLS12381
     , solid-vm-builtins:Blockchain.SolidVM.BLS12381.Compress
     , solid-vm-builtins:Blockchain.SolidVM.BLS12381.HashToCurve
     , solid-vm-builtins:Blockchain.SolidVM.BLS12381.HashToCurve.G1
@@ -60,6 +60,7 @@ library
     , solid-vm-compiler
     , solid-vm-model
     , solid-vm-parser
+    , solid-vm-runtime
     , solid-vm-static-analysis
     , source-tools
     , statedb-monad

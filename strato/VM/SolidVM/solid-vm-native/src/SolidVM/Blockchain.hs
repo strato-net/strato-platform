@@ -167,7 +167,7 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
   fmap (fmap $ either solidvmErrorResults id) . runTransaction (Just code) env' gasInfo' $ do
 
     opts <- parseOptionsForCurrentBlock
-    (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 initCode
+    (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests False $ DT.encodeUtf8 initCode
     addNewCodeCollection hsh cc
     let eArgExps = traverse (Fast.parseArg initialParserState "") argsStrings
         !argExps = either (parseError "create arguments") id eArgExps
@@ -369,7 +369,7 @@ call' from to' fnCalltype functionName valList = do
         else pure to'
   let shouldPushSender = bool False (fnCalltype /= CC.DelegateCall) isExternal
       currentReadOnly = maybe False readOnly currentCall
-  (contract, hsh, cc) <- getCodeAndCollection codeAddress
+  (contract, hsh, cc) <- Runtime.getCodeAndCollection codeAddress
 
   unless (maybe False ((storageAddress ==) . currentAddress) currentCall) $
     initializeAction storageAddress
@@ -708,7 +708,7 @@ createCode salt name source args = do
   creator <- getCurrentAddress
   isRunningTests <- Env.runningTests <$> getEnv
   opts <- parseOptionsForCurrentBlock
-  (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True (DT.encodeUtf8 source)
+  (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests False (DT.encodeUtf8 source)
   addNewCodeCollection hsh cc
   address <- case salt of
     Nothing -> getNewAddress creator
@@ -730,5 +730,5 @@ selfdestruct target = do
 
 derive :: Address -> T.Text -> T.Text -> ValList -> SM Address
 derive address salt name args = do
-  (_, hsh, _) <- getCodeAndCollection address
+  (_, hsh, _) <- Runtime.getCodeAndCollection address
   pure $ getNewAddressWithSalt_unsafe address (T.unpack salt) (keccak256ToByteString hsh) (SString (T.unpack name) : args)

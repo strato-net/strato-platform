@@ -1,6 +1,10 @@
 module Blockchain.SolidVM.Builtins.Gas where
 
 import Blockchain.Strato.Model.Gas
+import Control.Monad.IO.Class (MonadIO)
+
+class MonadIO m => MonadBuiltinGas m where
+  chargeBuiltinGas :: Gas -> m ()
 
 -- Gas schedule for the cryptographic builtins.
 --

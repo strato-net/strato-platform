@@ -29,9 +29,9 @@ library:
     - Blockchain.SolidVM
     - Blockchain.SolidVM.Simple
   reexported-modules:
-    - solid-vm:Blockchain.SolidVM.SM
-    - solid-vm:Blockchain.SolidVM.Environment
-    - solid-vm:Blockchain.SolidVM.GasInfo
+    - solid-vm-runtime:Blockchain.SolidVM.SM
+    - solid-vm-runtime:Blockchain.SolidVM.Environment
+    - solid-vm-runtime:Blockchain.SolidVM.GasInfo
   ghc-options: -O1
   dependencies:
     - Decimal
@@ -48,7 +48,7 @@ library:
     - blockapps-data
     - blockapps-mpdbs
     - evm-solidity
-    - solid-vm
+    - solid-vm-runtime
     - solid-vm-static-analysis
     - unliftio
     - vector

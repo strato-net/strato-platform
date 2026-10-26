@@ -62,6 +62,7 @@ module Blockchain.SolidVM.SM
     addNewCodeCollection,
     getContractNameAndHash,
     getCodeAndCollection,
+    getCodeAndCollectionWithTypeCheck,
     getContractsForParents,
     getAbstractParentsFromContract,
     getMapNamesFromContract,
@@ -89,7 +90,8 @@ import Blockchain.Forks (isOperatorPrecedenceForkActive)
 import Blockchain.SolidVM.Exception
 import Blockchain.Data.VmTrace
 import Blockchain.SolidVM.GasInfo
-import Blockchain.Strato.Model.Gas (Gas (..))
+import qualified Blockchain.SolidVM.Builtins.Gas as BuiltinGas
+import Blockchain.Strato.Model.Gas (Gas (..), getGasValue)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
@@ -436,6 +438,14 @@ instance MonadGas SM where
     writeIORef ref $! ss {_gasInfo = gi'}
     pure gi'
   {-# INLINE chargeGasState #-}
+
+instance BuiltinGas.MonadBuiltinGas SM where
+  chargeBuiltinGas !gas = do
+    gi' <- chargeGasState gas
+    when (gi' ^. gasLeft < Gas 0) $ do
+      let msg = "out of gas: " ++ show (gi' ^. gasLeft) ++ " < " ++ show gas
+      liftIO $ putStrLn $ CL.red msg
+      tooMuchGas (getGasValue $ _gasInitialAllotment gi') (getGasValue $ gi' ^. gasUsed)
 
 instance Mod.Modifiable Action SM where
   get _ = gets _action
@@ -1125,11 +1135,14 @@ parseOptionsForCurrentBlock = do
   pure defaultParseOptions {parseLegacyOperatorPrecedence = not (isOperatorPrecedenceForkActive blockNum)}
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
-getCodeAndCollection address' = do
+getCodeAndCollection = getCodeAndCollectionWithTypeCheck True
+
+getCodeAndCollectionWithTypeCheck :: MonadSM m => Bool -> Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
+getCodeAndCollectionWithTypeCheck typeCheck address' = do
   (contractName', ch) <- getContractNameAndHash address'
   isRunningTests <- Env.runningTests <$> getEnv
   opts <- parseOptionsForCurrentBlock
-  cc <- codeCollectionFromHashWith opts isRunningTests True ch
+  cc <- codeCollectionFromHashWith opts isRunningTests typeCheck ch
   let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
   return (contract', ch, cc)
 

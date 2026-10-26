@@ -130,3 +130,10 @@ main = do
     let contract = (missing ^. CC.contracts) Map.! "Missing"
     liftIO $ unless (isLeft $ Native.compileContractChecked missing contract) $ fail "a missing builtin was enabled"
     liftIO $ putStrLn "TYPED missing builtin remains unavailable"
+    (_, invalid) <- codeCollectionFromSource False False "contract InvalidCall { function take(int value) internal returns (int) { return value; } function run() returns (int) { return take(true); } }"
+    let invalidContract = (invalid ^. CC.contracts) Map.! "InvalidCall"
+    liftIO $ case Native.compileContractChecked invalid invalidContract of
+      Left errors -> do
+        unless (any (T.isInfixOf "expected int, got bool" . Native.showErr . snd) errors) $ fail $ show errors
+        putStrLn "TYPED native compilation rejects mismatched arguments without the frontend typechecker"
+      Right _ -> fail "native compilation accepted mismatched arguments"

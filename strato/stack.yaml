@@ -105,6 +105,7 @@ packages:
 - VM/SolidVM/solid-vm-model
 - VM/SolidVM/solid-vm-native
 - VM/SolidVM/solid-vm-parser
+- VM/SolidVM/solid-vm-runtime
 - VM/SolidVM/solid-vm-static-analysis
 - VM/SolidVM/source-tools
 

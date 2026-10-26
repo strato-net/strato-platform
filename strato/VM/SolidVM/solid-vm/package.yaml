@@ -9,15 +9,15 @@ library:
   exposed-modules:
     - Blockchain.SolidVM
     - Blockchain.SolidVM.Builtins
-    - Blockchain.SolidVM.Environment
-    - Blockchain.SolidVM.GasInfo
     - Blockchain.SolidVM.Simple
-    - Blockchain.SolidVM.SM
   # BLS12-381 internal modules. Exposed so the test target (and anyone
   # cross-checking against RFC 9380 vectors) can drive the pipeline
   # stages directly. Stable public API for bridge contracts is via the
   # byte builtins re-exported from Builtins.
   reexported-modules:
+    - solid-vm-runtime:Blockchain.SolidVM.SM
+    - solid-vm-runtime:Blockchain.SolidVM.GasInfo
+    - solid-vm-runtime:Blockchain.SolidVM.Environment
     - solid-vm-builtins:Blockchain.SolidVM.BLS12381
     - solid-vm-builtins:Blockchain.SolidVM.BLS12381.Compress
     - solid-vm-builtins:Blockchain.SolidVM.BLS12381.HashToCurve
@@ -51,6 +51,7 @@ library:
   - ordered-containers
   - parsec
   - solid-vm-builtins
+  - solid-vm-runtime
   - solid-vm-compiler
   - solid-vm-model
   - solid-vm-parser

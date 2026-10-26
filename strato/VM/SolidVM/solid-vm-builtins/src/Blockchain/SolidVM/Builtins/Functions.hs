@@ -7,9 +7,9 @@ module Blockchain.SolidVM.Builtins.Functions
   ( identity, variadic, byte, addmod, mulmod,
     b16encode, b16decode, normalizeHex,
     keccak256, keccak256Hex, sha256, ripemd160, base64encode, base64urlencode,
-    hashHex, base64String, ecrecover, RecoverHash, verifyP256,
+    hashHex, base64String, ecrecover, RecoverHash, verifyP256, p256PublicKeyFromHex,
     blockhash, selfdestruct, create, create2, setBlockContext, fastForward,
-    log, require, assert, push, stringConcat,
+    log, require, assert, push, stringConcat, payable, bytes32ToString,
   ) where
 
 import Prelude hiding (log)
@@ -143,6 +143,17 @@ verifyP256 h publicKey signature = case digestFromByteString @SHA256 h of
       CryptoFailed e -> invalidArguments "Invalid P256 signature" e
     let !isValidSig = verifyDigest (Proxy @Curve_P256R1) pub sig digest
     pure isValidSig
+
+p256PublicKeyFromHex :: String -> B.ByteString
+p256PublicKeyFromHex value = case B16.decode $ DT.encodeUtf8 $ T.pack value of
+  Left e -> invalidArguments "Could not decode public key from string: invalid hex" (value, e)
+  Right bytes -> bytes
+
+payable :: Address -> (Address, Bool)
+payable address = (address, True)
+
+bytes32ToString :: String -> String
+bytes32ToString = id
 
 blockhash :: Monad m => (Integer -> m (Maybe B.ByteString)) -> Integer -> m String
 blockhash lookupHash blockNum = do
