@@ -10,7 +10,7 @@
 -- @strato-indexer-sql@ checkpoint a 19.6 node or snapshot carries.
 module Main (main) where
 
-import Control.Exception (bracket)
+import Control.Exception (IOException, bracket, try)
 import Control.Monad (void)
 import Control.Monad.Composable.Base (runEff)
 import Control.Monad.Composable.Streaming.JLog
@@ -113,6 +113,36 @@ main = hspec $ do
           liftIO $ seeded `shouldBe` True
           newbieLeft <- drainConsumerGroup "newbie" topic (\(_ :: [(Int, BS.ByteString)]) -> return ())
           liftIO $ newbieLeft `shouldBe` 0
+    it "throws on a segment it cannot read instead of passing it for the end of the backlog" $
+      withTopicDir $ \dir -> do
+        firstSeg <- inStream dir $ do
+          createTopicAndWait topic
+          void $ produceItems topic (map message [1 .. total])
+          void $ runConsume "lag" topic $ \xs -> return (Just (length (xs :: [(Int, BS.ByteString)])))
+          seen <- liftIO $ newIORef (0 :: Int)
+          runConsume "lead" topic $ \xs -> do
+            n <- liftIO $ atomicModifyIORef' seen (\k -> (k + length (xs :: [(Int, BS.ByteString)]), k + length xs))
+            return $ if n >= total then Just () else Nothing
+          segs <- liftIO $ segments dir
+          return $ dir </> "events" </> minimum segs
+        -- The segment lag's backlog starts in becomes unreadable.
+        readable <- getPermissions firstSeg
+        setPermissions firstSeg emptyPermissions
+        stillReadable <- either (const False) (const True) <$> (try (BS.readFile firstSeg) :: IO (Either IOException BS.ByteString))
+        if stillReadable
+          then do
+            setPermissions firstSeg readable
+            pendingWith "file permissions are not enforced for this user (root?)"
+          else do
+            inStream dir (drainConsumerGroup "lag" topic (\(_ :: [(Int, BS.ByteString)]) -> return ()))
+              `shouldThrow` anyIOException
+            setPermissions firstSeg readable
+            inStream dir $ do
+              kept <- hasConsumerGroup "lag" topic
+              liftIO $ kept `shouldBe` True
+              -- Readable again: the whole backlog is still there.
+              n <- drainConsumerGroup "lag" topic (\(_ :: [(Int, BS.ByteString)]) -> return ())
+              liftIO $ n `shouldSatisfy` (> 0)
     it "does nothing for a group the topic does not have" $
       withTopicDir $ \dir ->
         inStream dir $ do

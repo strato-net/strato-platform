@@ -59,7 +59,7 @@ module Control.Monad.Composable.Streaming.JLog (
 
 import Conduit
 import Control.Concurrent (threadDelay)
-import Control.Exception (bracket)
+import Control.Exception (bracket, throwIO)
 import Control.Monad (void, forever, when)
 import Control.Monad.Composable.Base
 import qualified Data.Aeson as JSON
@@ -285,10 +285,13 @@ runConsume consumerGroup topicName f = do
     waitForBatch topicPath subscriber = do
       result <- readBatchNoCheckpoint topicPath subscriber
       case result of
-        Nothing -> do
-          threadDelay 100000  -- 100ms poll if no messages
+        BatchRead msgs lastId -> return (msgs, lastId)
+        -- Nothing to read, or a read that failed: poll again in 100 ms. A
+        -- consumer runs for the life of the process, so a failure is retried
+        -- like an empty log, as it always was.
+        _ -> do
+          threadDelay 100000
           waitForBatch topicPath subscriber
-        Just batch -> return batch
     
     processBatch [] = return Nothing
     processBatch msgs = do
@@ -301,20 +304,28 @@ runConsume consumerGroup topicName f = do
 -- returned, until a read finds nothing more; the number of messages handed
 -- over. Unlike 'consume' this returns. It is for a group about to be
 -- retired: what it alone had not passed is applied first, so retiring it
--- loses nothing. Nothing happens for a group the topic does not have.
+-- loses nothing. A read that fails (a segment that cannot be opened or
+-- read, an interval the library refuses) throws an 'IOError' rather than
+-- passing for the end of the backlog: the caller must not retire the group
+-- on it. Nothing happens for a group the topic does not have.
 drainConsumerGroup :: (Binary a, HasStreaming m) =>
                       ConsumerGroup -> TopicName -> ([a] -> m ()) -> m Int
 drainConsumerGroup consumerGroup topicName f = do
   env <- getStreamEnv
   let topicPath = seBasePath env </> T.unpack (unTopicName topicName)
       subscriber = T.unpack consumerGroup
-  go topicPath subscriber 0
+  present <- hasConsumerGroup consumerGroup topicName
+  if not present then return 0 else go topicPath subscriber 0
   where
     go topicPath subscriber n = do
       result <- liftIO $ readBatchNoCheckpoint topicPath subscriber
       case result of
-        Nothing -> return n
-        Just (msgs, lastId) -> do
+        BatchFailed err ->
+          liftIO . throwIO . userError $
+            "drainConsumerGroup " ++ T.unpack consumerGroup ++ " on " ++ T.unpack (unTopicName topicName)
+              ++ " after " ++ show n ++ " messages: " ++ err
+        BatchEmpty -> return n
+        BatchRead msgs lastId -> do
           f (map (decode . LBS.fromStrict) msgs)
           liftIO $ checkpointTo topicPath subscriber lastId
           go topicPath subscriber (n + length msgs)
@@ -338,39 +349,53 @@ hasConsumerGroup consumerGroup topicName = do
 -- The batch reader and checkpoint writer shared by 'runConsume' and
 -- 'drainConsumerGroup'.
 
--- Read up to maxBatchMessages or maxBatchBytes, whichever comes first
--- Returns Nothing if no messages available
--- Returns Just (messages, lastId) with the ID of last message read
-readBatchNoCheckpoint :: FilePath -> String -> IO (Maybe ([BS.ByteString], JLogId))
+-- | One attempt to read a batch for a subscriber: nothing left to read, a
+-- batch, or a failure (a reader that would not open, an interval the library
+-- refused, a message it could not read). A failure is not "nothing left": a
+-- consumer retries it, a drain must not take it for the end of the backlog.
+data BatchRead
+  = BatchEmpty
+  | BatchRead [BS.ByteString] JLogId
+  | BatchFailed String
+
+-- Read up to maxBatchMessages or maxBatchBytes, whichever comes first.
+readBatchNoCheckpoint :: FilePath -> String -> IO BatchRead
 readBatchNoCheckpoint topicPath subscriber =
   withCString topicPath $ \cpath ->
     withCString subscriber $ \csub -> do
       ctx <- jlog_new cpath
       if ctx == nullPtr
-        then return Nothing
+        then return $ BatchFailed ("jlog_new failed for " ++ topicPath)
         else do
           rc <- jlog_ctx_open_reader ctx csub
           if rc /= 0
-            then do
-              jlog_ctx_close ctx
-              return Nothing
-            else 
+            then failWith ctx ("jlog_ctx_open_reader failed for subscriber " ++ subscriber ++ " on " ++ topicPath)
+            else
               alloca $ \startPtr ->
                 alloca $ \endPtr -> do
                   poke startPtr (JLogId 0 0)
                   poke endPtr (JLogId 0 0)
                   count <- jlog_ctx_read_interval ctx startPtr endPtr
-                  if count <= 0
-                    then do
-                      jlog_ctx_close ctx
-                      return Nothing
-                    else do
-                      startId <- peek startPtr
-                      readMessagesWithAdvance ctx startPtr endPtr [] 0 0 startId
+                  if count < 0
+                    then failWith ctx ("jlog_ctx_read_interval failed for subscriber " ++ subscriber ++ " on " ++ topicPath)
+                    else if count == 0
+                      then do
+                        jlog_ctx_close ctx
+                        return BatchEmpty
+                      else do
+                        startId <- peek startPtr
+                        readMessagesWithAdvance ctx startPtr endPtr [] 0 0 startId
+
+-- | The library's error for the context, then close it.
+failWith :: Ptr JLogCtx -> String -> IO BatchRead
+failWith ctx what = do
+  errStr <- jlog_ctx_err_string ctx >>= peekCString
+  jlog_ctx_close ctx
+  return $ BatchFailed (what ++ ": " ++ errStr)
 
 -- Read messages using advance_id to iterate without checkpointing
 -- lastReadId tracks the last message we successfully read (for correct checkpointing)
-readMessagesWithAdvance :: Ptr JLogCtx -> Ptr JLogId -> Ptr JLogId -> [BS.ByteString] -> Int -> Int -> JLogId -> IO (Maybe ([BS.ByteString], JLogId))
+readMessagesWithAdvance :: Ptr JLogCtx -> Ptr JLogId -> Ptr JLogId -> [BS.ByteString] -> Int -> Int -> JLogId -> IO BatchRead
 readMessagesWithAdvance ctx curPtr endPtr acc msgCount totalBytes lastReadId
   | msgCount >= maxBatchMessages = finishBatch ctx lastReadId acc
   | totalBytes >= maxBatchBytes  = finishBatch ctx lastReadId acc
@@ -383,13 +408,15 @@ readMessagesWithAdvance ctx curPtr endPtr acc msgCount totalBytes lastReadId
           alloca $ \msgStructPtr -> do
             readRc <- jlog_ctx_read_message ctx curPtr msgStructPtr
             if readRc /= 0
-              then finishBatch ctx lastReadId acc
+              -- What was read before the failure is a batch; the failure
+              -- itself surfaces on the next read, which starts right at it.
+              then if null acc then failWith ctx ("jlog_ctx_read_message failed at " ++ show curId) else finishBatch ctx lastReadId acc
               else do
                 msg <- peek msgStructPtr
                 let msgLen = jlogMsgLen msg
                     msgDataPtr = jlogMsgData msg
                 if msgDataPtr == nullPtr || msgLen == 0
-                  then finishBatch ctx lastReadId acc
+                  then if null acc then failWith ctx ("jlog_ctx_read_message returned no data at " ++ show curId) else finishBatch ctx lastReadId acc
                   else do
                     msgBytes <- BS.packCStringLen (castPtr msgDataPtr, fromIntegral msgLen)
                     let newTotal = totalBytes + BS.length msgBytes
@@ -409,12 +436,12 @@ idGreaterThan :: JLogId -> JLogId -> Bool
 idGreaterThan (JLogId l1 m1) (JLogId l2 m2) =
   l1 > l2 || (l1 == l2 && m1 > m2)
 
-finishBatch :: Ptr JLogCtx -> JLogId -> [BS.ByteString] -> IO (Maybe ([BS.ByteString], JLogId))
+finishBatch :: Ptr JLogCtx -> JLogId -> [BS.ByteString] -> IO BatchRead
 finishBatch ctx lastId acc = do
   jlog_ctx_close ctx
   if null acc
-    then return Nothing
-    else return $ Just (reverse acc, lastId)
+    then return BatchEmpty
+    else return $ BatchRead (reverse acc) lastId
 
 -- Checkpoint to a specific ID (single fsync for entire batch)
 checkpointTo :: FilePath -> String -> JLogId -> IO ()

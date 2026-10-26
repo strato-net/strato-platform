@@ -6,7 +6,7 @@ import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.DB.SQLDB (sqlQueryWriter)
 import Blockchain.Data.WriterLease
-import Blockchain.Strato.Indexer.ApiIndexer (indexerMainLoop, reconcileSqlConsumerGroup)
+import Blockchain.Strato.Indexer.ApiIndexer (awaitLeaseAndReconcile, indexerMainLoop)
 import Blockchain.Strato.Indexer.Bootstrap
 import Blockchain.NodeStatusMirror (nodeStatusMirrorLoop)
 import Control.Concurrent (forkIO)
@@ -66,11 +66,12 @@ main = do
     -- A node upgraded from 19.6, or restored from a 19.6 snapshot, carries the
     -- checkpoint of the SQL side's old consumer group, usually behind this
     -- group's. Replay its backlog into SQL and retire it before the consumer
-    -- starts; a no-op on every other node. After the lease: only the writer
-    -- replays.
-    runStreamMConfigured "strato-indexer-sql" $
+    -- starts; a no-op on every other node. Only the writer replays, and a
+    -- writer whose claim is still pending (the previous process's lease is
+    -- fresh) waits for it here: without the lease nothing is retired.
+    _ <- runStreamMConfigured "strato-indexer-sql" $
       runSQLM $
-        reconcileSqlConsumerGroup cell
+        awaitLeaseAndReconcile flags_writer cell
 
     -- Mirror the Redis sync scalars into node_status so the API tier reads
     -- Postgres instead of Redis. Its own small pool: the main loop's pool is
