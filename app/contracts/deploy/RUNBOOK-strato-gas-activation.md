@@ -12,7 +12,7 @@ client, `GLOBAL_ADMIN_NAME` / `GLOBAL_ADMIN_PASSWORD`).
 
 | Piece | Where |
 |---|---|
-| STRATO token, burnable logic, unpaused | proxy `8ee9a339…8b04`, impl `646cdf8e…cb04` |
+| STRATO token, burnable logic, transfers paused (pre-TGE rehearsal) with the pool whitelisted for `transfer` | proxy `8ee9a339…8b04`, impl `646cdf8e…cb04`; pool whitelisted at block 858468, paused at 858475 |
 | Canonical STRATO/USDST PoolV3 (fee 3000, cardinality 500) | `6df32c9b…3165` |
 | HeliumFeeRouterV5 (voucher, else burn STRATO, USDST buys a shortfall; no block reward; quote frozen below the floor) | `7b9caebb…b5ca`, installed at block 858387. V4 `76a6839f…9da9d6` paid 0.01 STRATO per block from 803253 to 858386 and keeps its 1,528 STRATO |
 | Native-token flag day (eth_getBalance, native transfers, envelope rules) | helium block 900000 (`stratoGasForkBlock`) |
@@ -93,8 +93,14 @@ Preconditions, in order. "Vote" = one AdminRegistry issue, run once per admin.
    `strato/core/strato-conf/src/Blockchain/EthConf/Model.hs` (today the unscheduled
    sentinel), release, and upgrade every validator and the app before A. Mixed builds
    agree until A; at A a validator on the old build forks off.
-2. **Token.** Upgrade the STRATO proxy to the burnable logic (`upgrade.js`, vote) and
-   either unpause it (vote) or whitelist the router (`whitelist-feerouter.js`, vote).
+2. **Token.** Upgrade the STRATO proxy to the burnable logic (`upgrade.js`, vote). Transfers
+   stay paused until TGE: `burn(uint256)` is not pause-gated, so fees burn regardless, and
+   whitelisting the pool for `transfer` (`strato-gas-helium.js whitelist-pool <pool>`, vote)
+   lets USDST buy STRATO, including the router's shortfall buy, while `transferFrom` stays
+   blocked so nothing sells STRATO into the pool or mints liquidity. Seed the pool before
+   pausing (mint needs `transferFrom`). Block rewards need the staking proxy whitelisted for
+   `transferFrom`. Verified on helium 2026-10-26: buy swap and fee burns succeed under the
+   pause, a sell swap fails.
 3. **Pool.** Create the canonical STRATO/USDST PoolV3 (vote), seed full-range liquidity,
    grow the observation ring, and let 30 minutes of observations accumulate. Read the
    seeded `liquidity` from `strato-gas-helium.js status` and pick the floor as a fraction

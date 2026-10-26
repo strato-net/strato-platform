@@ -3,6 +3,8 @@
 //
 //   node strato-gas-helium.js status [router]
 //   node strato-gas-helium.js unpause                      (STRATO.unpause; vote, run per admin)
+//   node strato-gas-helium.js pause                        (STRATO.pause; vote, run per admin)
+//   node strato-gas-helium.js whitelist-pool <pool>        (let the paused token leave the pool: AdminRegistry.addWhitelist(STRATO, transfer, pool); vote, run per admin)
 //   node strato-gas-helium.js create-pool [usdstPerStrato] (createPoolV3; vote, run per admin)
 //   node strato-gas-helium.js seed-pool <pool> <usdst>     (grow the ring + full-range mint, as a funded account)
 //   node strato-gas-helium.js swap <pool> <amountIn> [strato] (USDST -> STRATO, or STRATO -> USDST; writes an observation)
@@ -18,6 +20,7 @@ const axios = require('axios');
 const { rest, util } = require('blockapps-rest');
 
 const STRATO = '8ee9a3391e38176feebf5d43cb2c1d6c4f728b04';
+const ADMIN_REGISTRY = '000000000000000000000000000000000000100c';
 const USDST = '937efa7e3a77e20bbdbd7c0d32b6514f368c1010';
 const POOL_V3_FACTORY = 'e6b6f05a88e649e4102a801aade9a6bae02f352d'; // backend defaultPoolV3FactoryFor helium
 const DECIDER_STATE = '00000000000000000000000000000000dec1de02';
@@ -129,9 +132,21 @@ async function recentSecondsPerBlock() {
   const { tokenObj, key } = await login();
   const token = (address) => ({ address, name: 'Token' });
 
-  if (cmd === 'unpause') {
-    await callAsync(tokenObj, token(STRATO), 'unpause', {});
-    console.log(`STRATO paused: ${(await storage(STRATO))._paused}  (stays true until the second admin votes)`);
+  if (cmd === 'unpause' || cmd === 'pause') {
+    await callAsync(tokenObj, token(STRATO), cmd, {});
+    console.log(`STRATO paused: ${(await storage(STRATO))._paused}  (changes once the vote reaches quorum)`);
+  } else if (cmd === 'whitelist-pool') {
+    const pool = a1.replace(/^0x/, '');
+    // While STRATO is paused only whitelisted callers may transfer it. The pool sends
+    // STRATO to a swapper (USDST -> STRATO, including the fee router's shortfall buy)
+    // and to its LP on collect; transferFrom stays blocked, so nothing sells STRATO
+    // into the pool or mints new liquidity. Burning the fee is never gated.
+    await callAsync(tokenObj, { address: ADMIN_REGISTRY, name: 'AdminRegistry' }, 'castVoteOnIssue', {
+      _target: ADMIN_REGISTRY, _func: 'addWhitelist',
+      _args: [{ type: 'address', value: STRATO }, 'transfer', { type: 'address', value: pool }],
+    });
+    const registry = await storage(ADMIN_REGISTRY);
+    console.log(`whitelist[STRATO][transfer][${pool}]: ${registry[`whitelist[${STRATO}][transfer][${pool}]`] || 'not yet (vote pending)'}`);
   } else if (cmd === 'create-pool') {
     const price = BigInt(a1 || ORACLE_STRATO_PRICE);
     const sqrtPriceX96 = isqrt(price * Q96 * Q96 / WAD).toString();
