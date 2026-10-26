@@ -456,10 +456,10 @@
           }
         },
         "Kraken": {
-          "url": "https://api.kraken.com/0/public/Ticker",
-          "params": "pair,assetVersion=1",
+          "url": "https://api.kraken.com/0/public/Trades",
+          "params": "pair,assetVersion=1,count=1",
           "parse": "kraken",
-          "comment": "Public, no API key. assetVersion=1 makes request and response keys the display names (ETH/USD, BTC/USD) instead of legacy XXBTZUSD; WHYPE is priced as native HYPE. Any unknown pair fails the whole request, so a delisting here takes every Kraken price with it for that cycle.",
+          "comment": "Public, no API key. Fetches the latest trade and its timestamp separately for each pair. assetVersion=1 uses display names (ETH/USD, BTC/USD); WHYPE is priced as native HYPE. Any failed pair fails this source for the cycle.",
           "assets": [
             "ETH",
             "WBTC",
@@ -482,8 +482,8 @@
           }
         },
         "Kraken xStocks": {
-          "url": "https://api.kraken.com/0/public/Ticker",
-          "params": "pair,asset_class=tokenized_asset,assetVersion=1",
+          "url": "https://api.kraken.com/0/public/Trades",
+          "params": "pair,asset_class=tokenized_asset,assetVersion=1,count=1",
           "parse": "kraken",
           "comment": "Kraken xStocks (Backed tokenized equities) trade on a separate book: asset_class=tokenized_asset is required and cannot be mixed with spot pairs in one call. Pair names are case-sensitive (TSLAx/USD). SPYx and TSLAx are among the ten flagship xStocks quoted 24/7, so this source also prices weekends when the stock feeds are frozen.",
           "assets": [
@@ -1102,10 +1102,10 @@
           }
         },
         "Kraken": {
-          "url": "https://api.kraken.com/0/public/Ticker",
-          "params": "pair,assetVersion=1",
+          "url": "https://api.kraken.com/0/public/Trades",
+          "params": "pair,assetVersion=1,count=1",
           "parse": "kraken",
-          "comment": "Public, no API key. assetVersion=1 makes request and response keys the display names (ETH/USD, BTC/USD) instead of legacy XXBTZUSD; WHYPE is priced as native HYPE. Any unknown pair fails the whole request, so a delisting here takes every Kraken price with it for that cycle.",
+          "comment": "Public, no API key. Fetches the latest trade and its timestamp separately for each pair. assetVersion=1 uses display names (ETH/USD, BTC/USD); WHYPE is priced as native HYPE. Any failed pair fails this source for the cycle.",
           "assets": [
             "ETH",
             "WBTC",
@@ -1128,8 +1128,8 @@
           }
         },
         "Kraken xStocks": {
-          "url": "https://api.kraken.com/0/public/Ticker",
-          "params": "pair,asset_class=tokenized_asset,assetVersion=1",
+          "url": "https://api.kraken.com/0/public/Trades",
+          "params": "pair,asset_class=tokenized_asset,assetVersion=1,count=1",
           "parse": "kraken",
           "comment": "Kraken xStocks (Backed tokenized equities) trade on a separate book: asset_class=tokenized_asset is required and cannot be mixed with spot pairs in one call. Pair names are case-sensitive (TSLAx/USD). SPYx and TSLAx are among the ten flagship xStocks quoted 24/7, so this source also prices weekends when the stock feeds are frozen.",
           "assets": [

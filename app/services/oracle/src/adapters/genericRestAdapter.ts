@@ -32,6 +32,14 @@ export function generateConstantPrices(assetKeys: string[], assets: Record<strin
 
 // Main fetch function - uses sourceConfig directly
 export async function fetchPrices(sourceConfig: SourceConfig): Promise<BatchPriceResult> {
+    // Kraken Trades accepts one pair per request.
+    if (sourceConfig.parse === 'kraken' && sourceConfig.assets.length > 1) {
+        const results = await Promise.all(sourceConfig.assets.map(symbol =>
+            fetchPrices({ ...sourceConfig, assets: [symbol] })
+        ));
+        return Object.assign({}, ...results);
+    }
+
     const url = buildUrl(sourceConfig);
     const requestOptions = buildRequestOptions(sourceConfig, url);
 
@@ -285,17 +293,21 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
 
-    // Kraken: result.{pair}.c[0] is the last trade price. Requested with assetVersion=1 so keys are display names (ETH/USD, TSLAx/USD).
+    // Kraken: count=1 returns the latest trade as [price, volume, time, ...], with time in Unix seconds.
     // One unknown pair fails the whole request (HTTP 200, error[] set, result{} empty), so surface it as a source failure.
     } else if (parsePattern === 'kraken') {
         const errors = (data.error || []).filter((e: string) => e.startsWith('E'));
         if (errors.length) throw new Error(`Kraken: ${errors.join(', ')}`);
         symbols.forEach(symbol => {
             const pair = sourceConfig.symbolMapping?.[symbol] || symbol;
-            const last = data.result?.[pair]?.c?.[0];
-            if (last) {
-                const price = Math.floor(parseFloat(last) * 1e18);
-                if (isValidPrice(price)) result[symbol] = { price, feedTimestamp: new Date().toISOString() };
+            const trade = data.result?.[pair]?.[0];
+            const timestamp = trade?.[2];
+            if (Array.isArray(trade) && typeof timestamp === 'number' && timestamp > 0) {
+                const price = Math.floor(parseFloat(trade[0]) * 1e18);
+                const feedTimestamp = new Date(timestamp * 1000);
+                if (isValidPrice(price) && Number.isFinite(feedTimestamp.getTime())) {
+                    result[symbol] = { price, feedTimestamp: feedTimestamp.toISOString() };
+                }
             }
         });
 
