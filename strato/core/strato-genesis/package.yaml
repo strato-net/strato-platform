@@ -32,7 +32,7 @@ library:
       - vector
       - aeson
       - bytestring
-      - merkle-patricia-db
+      - statedb-monad
       - strato-model
       - text
       - solid-vm-compiler
@@ -53,7 +53,7 @@ tests:
       - hspec
       - json-stream
       - labeled-error
-      - merkle-patricia-db
+      - statedb-monad
       - strato-genesis
       - strato-model
       - text

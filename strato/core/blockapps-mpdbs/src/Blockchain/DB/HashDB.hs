@@ -17,7 +17,7 @@ module Blockchain.DB.HashDB
   )
 where
 
-import qualified Blockchain.Database.MerklePatricia.Internal as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Strato.Model.Util
 import Control.Arrow ((&&&))
 import Control.DeepSeq

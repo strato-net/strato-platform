@@ -11,13 +11,11 @@ module Blockchain.DB.StorageDB
 where
 
 import BlockApps.Logging
+import Blockchain.DB.AddressStateDB (HasAccountDB)
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB
-import Blockchain.Data.AddressStateDB
-import Blockchain.Strato.Model.Address
-import Control.Monad.Change.Alter (Alters)
 
 -- A thin layer around raw storage db for clients who expect to work on
 -- keys and values of Word256
@@ -31,7 +29,7 @@ type FullStorage m =
     HasMemStorageDB m,
     HasStateDB m,
     HasHashDB m,
-    (Address `Alters` AddressState) m
+    HasAccountDB m
   )
 
 flushMemStorageDB :: (MonadLogger m, FullStorage m) => m ()

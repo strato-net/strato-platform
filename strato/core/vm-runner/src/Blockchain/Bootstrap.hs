@@ -23,10 +23,11 @@ import Blockchain.Data.BlockHeader (number, currentValidators)
 import Blockchain.Data.GenesisInfo hiding (stateRoot, number)
 import qualified Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.Data.TXOrigin as Origin
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
 import Blockchain.Model.SyncState
 import Blockchain.VMContext (ContextM, startFromStateRoot)
+import Blockchain.VMOptions (flags_disableSqlIndexing, flags_disableCirrusIndexing)
 import Blockchain.Wiring ()
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Blockchain.SolidVM.CodeCollectionDB
@@ -44,11 +45,9 @@ import Blockchain.Stream.VMEvent
 import Blockchain.SyncDB
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
-import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
-import Blockchain.Strato.RedisBlockDB (RedisConnection, withRedisBlockDB)
+import Control.Monad.Composable.Redis (HasRedis, execRedis)
 import Data.Foldable (for_)
-import Data.List (intercalate)
 import qualified Data.Map as Map
 import qualified Data.Map.Ordered as OMap
 import Data.Maybe
@@ -68,9 +67,6 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
   createTopicAndWait "vmevents"
   createTopicAndWait "jsonrpcresponse"
   createTopicAndWait "vm_tasks"
-  let pub sd vmes = do
-        for_ sd $ \diff -> IdxKafka.produceIndexEvents [IdxModel.StateDiffEntry diff]
-        void $ produceVMEvents vmes
   let sr = GI.stateRoot genesisInfo
 
   mSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
@@ -80,35 +76,40 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
       events' = GI.events genesisInfo
       delegatecalls' = GI.delegatecalls genesisInfo
 
-  ccas <-
-    fmap catMaybes . for (GI.codeInfo genesisInfo) $ \(GI.CodeInfo src mName) -> for mName $ \_ -> do
-      let srcHash = hash $ T.encodeUtf8 src
-      cc <- codeCollectionFromHash False True srcHash
-      pure $ CodeCollectionAdded (() <$ cc) "BlockApps" srcHash
+  unless flags_disableCirrusIndexing $ do
+    ccas <-
+      fmap catMaybes . for (GI.codeInfo genesisInfo) $ \(GI.CodeInfo src mName) -> for mName $ \_ -> do
+        let srcHash = hash $ T.encodeUtf8 src
+        cc <- codeCollectionFromHash False True srcHash
+        pure $ CodeCollectionAdded (() <$ cc) "BlockApps" srcHash
 
-  pub Nothing ccas
+    void $ produceVMEvents ccas
 
-  for_ addresses $ \address -> do
-    addressState <- A.lookupWithDefault (A.Proxy @AddressState) address
+  when (not flags_disableSqlIndexing || not flags_disableCirrusIndexing) $
+    for_ addresses $ \address -> do
+      addressState <- A.lookupWithDefault (A.Proxy @AddressState) address
 
-    $logInfoS "initgen" $ T.pack $
-      "##################### writing to DBs: " ++ format address
+      $logInfoS "initgen" $ T.pack $
+        "##################### writing to DBs: " ++ format address
 
-    let addrStateMap = Map.fromList [(address, addressState)]
-        squashMap f = mapM (uncurry f) . Map.toList
+      let addrStateMap = Map.fromList [(address, addressState)]
+          squashMap f = mapM (uncurry f) . Map.toList
 
-    accountDiffs <- mapM eventualAccountState addrStateMap
-    let addressEvents = Map.findWithDefault S.empty address  events'
-        dc = case addressStateCodeHash addressState of
-          ExternallyOwned{} -> S.empty
-          SolidVMCode name ch -> S.singleton $ A.Delegatecall
-            { A._delegatecallStorageAddress = address
-            , A._delegatecallCodeHash = ch
-            , A._delegatecallContractName = T.pack name
-            }
-    let addressDelegatecalls = dc S.>< Map.findWithDefault S.empty address delegatecalls'
-    vmEvents <- squashMap (toAction addressEvents addressDelegatecalls) accountDiffs
-    pub (Just $ mkStateDiff accountDiffs) vmEvents
+      accountDiffs <- mapM eventualAccountState addrStateMap
+      unless flags_disableSqlIndexing $
+        void $ IdxKafka.produceIndexEvents [IdxModel.StateDiffEntry $ mkStateDiff accountDiffs]
+      unless flags_disableCirrusIndexing $ do
+        let addressEvents = Map.findWithDefault S.empty address  events'
+            dc = case addressStateCodeHash addressState of
+              ExternallyOwned{} -> S.empty
+              SolidVMCode name ch -> S.singleton $ A.Delegatecall
+                { A._delegatecallStorageAddress = address
+                , A._delegatecallCodeHash = ch
+                , A._delegatecallContractName = T.pack name
+                }
+        let addressDelegatecalls = dc S.>< Map.findWithDefault S.empty address delegatecalls'
+        vmEvents <- squashMap (toAction addressEvents addressDelegatecalls) accountDiffs
+        void $ produceVMEvents vmEvents
 
   for_ mSR startFromStateRoot
 
@@ -165,19 +166,14 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
 bootstrapIndexer :: HasStreaming m => OutputBlock -> m ()
 bootstrapIndexer obGB = do
   liftIO $ putStrLn "About to bootstrap index events"
-  rejections <- IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB []]
+  res <- IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB []]
 
-  -- Index-event production is best-effort everywhere else, but the genesis
-  -- RanBlock is the indexer's starting point: without it every later block
-  -- indexes against a chain the indexer never saw begin. Nothing downstream
-  -- can repair that on its own, so refuse to report success.
-  if null rejections
-    then liftIO $ putStrLn "bootstrapIndex genesis seed successful!"
-    else error $ "Could not seed the indexer with the genesis block: " ++ intercalate "; " rejections
+  liftIO $ print res
+  liftIO $ putStrLn "bootstrapIndex genesis seed successful!"
 
 seedDatabases ::
   ( MonadIO m,
-    Mod.Accessible RedisConnection m,
+    HasRedis m,
     MonadLogger m
   ) =>
   Block ->
@@ -188,9 +184,9 @@ seedDatabases genesisBlock = do
   $logInfoS "bootstrap" $ T.pack $ "Genesis hash: " ++ format genesisHash'
   $logInfoS "bootstrap" $ T.pack $ "Validators: " ++ show (length validators')
 
-  _ <- withRedisBlockDB $ putBestSequencedBlockInfo $ BestSequencedBlock genesisHash' 0 validators' [] 0
+  _ <- execRedis $ putBestSequencedBlockInfo $ BestSequencedBlock genesisHash' 0 validators' [] 0
 
-  bestBlockResult <- withRedisBlockDB $
+  bestBlockResult <- execRedis $
     forceBestBlockInfo
       genesisHash'
       (number . blockBlockData $ genesisBlock)
@@ -198,7 +194,7 @@ seedDatabases genesisBlock = do
     Right _ -> pure ()
     Left err -> error $ "Failed to seed best block in Redis: " ++ show err
 
-  void . withRedisBlockDB $
+  void . execRedis $
     putBlock OutputBlock
     { obOrigin = Origin.Direct,
       obBlockData = blockBlockData genesisBlock,

@@ -26,6 +26,7 @@ packages:
 - core/fast-keccak256
 - core/fastMP
 - core/merkle-patricia-db
+- core/merkle-patricia-db-baremetal
 - core/miner-ethash
 - core/seqevents
 - core/strato-conf
@@ -68,7 +69,8 @@ packages:
 - libs/composable-monads/notification-monad
 - libs/composable-monads/vault-monad
 - libs/composable-monads/codedb-monad
-- libs/composable-monads/nodedb-monad
+- libs/composable-monads/statedb-monad
+- libs/composable-monads/accountdb-monad
 - libs/ethereum-rlp
 - libs/format
 - libs/json-rpc-server
@@ -100,6 +102,7 @@ packages:
 - VM/SolidVM/solid-vm-compiler
 - VM/SolidVM/solid-vm-fuzzer
 - VM/SolidVM/solid-vm-model
+- VM/SolidVM/solid-vm-native
 - VM/SolidVM/solid-vm-parser
 - VM/SolidVM/solid-vm-static-analysis
 - VM/SolidVM/source-tools

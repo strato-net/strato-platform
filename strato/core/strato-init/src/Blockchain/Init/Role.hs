@@ -4,37 +4,56 @@
 -- consensus, VM and indexing processes with their own Postgres, Redis and
 -- broker, and a 'RoleApi' directory runs strato-api and ethereum-jsonrpc
 -- with the nginx sidecar, PostgREST and the edge Redis, pointed at a core's
--- Postgres and broker. The role decides what strato-setup generates: which
--- directories and secrets, which processes go into commands.txt, which
+-- Postgres and broker. A 'RoleValidator' directory is a lite validator: the
+-- chain processes and the Redis block index they need, apex for the network
+-- monitor, and nothing that serves users or APIs (no app, no Cirrus, no SQL
+-- block index). A 'RoleApiNode' directory is a full node without the
+-- services that only serve people: the chain, Cirrus and every API behind
+-- nginx, but no app, SMD or Swagger docs, and with @--monitoring=false@ no
+-- Prometheus or apex either. The role decides what strato-setup generates:
+-- which directories and secrets, which processes go into commands.txt, which
 -- containers go into docker-compose.yml, and whether a genesis trie and a
 -- node key are needed at all.
 module Blockchain.Init.Role
   ( Role (..),
     currentRole,
+    parseRole,
     roleName,
     roleRunsCore,
     roleRunsApi,
+    roleIndexesSql,
+    roleRunsLocalAuth,
+    roleAllowsMonitoringOff,
   )
 where
 
 import Blockchain.Init.Options (flags_role)
 import Data.Char (toLower)
 
-data Role = RoleNode | RoleCore | RoleApi
+data Role = RoleNode | RoleCore | RoleApi | RoleValidator | RoleApiNode
   deriving (Eq, Show)
 
--- | From @--role@; unknown values are a setup error, not a silent default.
+-- | From @--role@; an unknown value is a setup error, not a silent default.
 currentRole :: Role
-currentRole = case map toLower flags_role of
-  "node" -> RoleNode
-  "core" -> RoleCore
-  "api" -> RoleApi
-  other -> error $ "Unknown --role " ++ show other ++ "; expected node, core or api"
+currentRole = either error id $ parseRole flags_role
+
+-- | The role named by @--role@, matched case-insensitively. The flag is the
+-- only way to pick a role: there are no shorthand flags.
+parseRole :: String -> Either String Role
+parseRole roleFlag = case map toLower roleFlag of
+  "node" -> Right RoleNode
+  "core" -> Right RoleCore
+  "api" -> Right RoleApi
+  "api-node" -> Right RoleApiNode
+  "validator" -> Right RoleValidator
+  other -> Left $ "Unknown --role " ++ show other ++ "; expected node, core, api, api-node or validator"
 
 roleName :: Role -> String
 roleName RoleNode = "node"
 roleName RoleCore = "core"
 roleName RoleApi = "api"
+roleName RoleValidator = "validator"
+roleName RoleApiNode = "api-node"
 
 -- | Runs the chain: p2p, sequencer, vm-runner, indexers, and their stores.
 roleRunsCore :: Role -> Bool
@@ -42,4 +61,24 @@ roleRunsCore = (/= RoleApi)
 
 -- | Serves the HTTP API: strato-api, ethereum-jsonrpc, nginx, PostgREST.
 roleRunsApi :: Role -> Bool
-roleRunsApi = (/= RoleCore)
+roleRunsApi role = role `elem` [RoleNode, RoleApi, RoleApiNode]
+
+-- | Keeps the SQL block index and Cirrus: strato-indexer's SQL side,
+-- slipstream, and the state diffs the VM computes for them. A validator
+-- keeps the chain and the Redis block index only.
+roleIndexesSql :: Role -> Bool
+roleIndexesSql = (/= RoleValidator)
+
+-- | May run the bundled identity provider and node-local Vault
+-- (@--localAuth@): the roles that serve the API through nginx and hold a node
+-- key, so the local-auth container, its @/auth/@ and @/vault/@ routes and the
+-- vault-wrapper process all have a home. An API tier has no node key and a
+-- validator no nginx.
+roleRunsLocalAuth :: Role -> Bool
+roleRunsLocalAuth role = role `elem` [RoleNode, RoleApiNode]
+
+-- | May drop Prometheus and apex (@--monitoring=false@), and with them
+-- @/health@: only an api-node, for operators with their own monitoring.
+-- Anywhere else the flag would be a silent no-op, so setup refuses it.
+roleAllowsMonitoringOff :: Role -> Bool
+roleAllowsMonitoringOff = (== RoleApiNode)

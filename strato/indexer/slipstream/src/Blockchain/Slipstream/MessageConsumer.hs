@@ -8,9 +8,7 @@
 {-# OPTIONS -fno-warn-deprecations #-}
 
 module Blockchain.Slipstream.MessageConsumer
-  ( getAndProcessMessages,
-    sinkSlipstreamOutputChunks,
-    slipstreamOutputChunkSize,
+  ( getAndProcessMessages
   )
 where
 
@@ -159,40 +157,27 @@ processBatch cell conn allMessages = timeSlipstreamPhase "batch" $ do
         -- replayed genesis (vm-runner re-bootstraps on some restarts) is
         -- skipped from then on.
         mProgressTip = mTip >>= \tip -> if tip > 0 then Just tip else Nothing
-    -- The progress upsert is appended as the batch's final query, so it
-    -- lands in the last chunk and commits in the same transaction as the
-    -- batch's final Cirrus writes: the marker never claims a block whose
-    -- rows are still uncommitted.
-    (_, ()) <- runConduit $
+    -- The progress upsert commits in the same transaction as the batch's
+    -- Cirrus writes: the marker never claims uncommitted rows.
+    (_, outputs) <- timeSlipstreamPhase "transform" . runConduit $
       ((processTheMessages messages <* for_ mProgressTip (yield . Right . cirrusProgressQuery)) `fuseUpstream` dedupC) `fuseBoth`
-        sinkSlipstreamOutputChunks slipstreamOutputChunkSize (writeOutputChunk cell conn)
+        sinkList
+    let (transactionResults, slipstreamQueries) = partitionEithers outputs
+    -- Cirrus lives in its own database, so the lease cannot be fenced inside
+    -- its transaction (writer_lease is in eth). Recheck before writing the batch.
+    holds <- holdsWriterLease cell
+    unless holds $ throwIO (LostWriterLease cell)
+    recordOutputBatch slipstreamQueries transactionResults
+    timeSlipstreamPhase "cirrus" $ performSlipstreamQueries conn slipstreamQueries
+    unless (null transactionResults) $ do
+      started <- liftIO Tr.nowNanos
+      timeSlipstreamPhase "transaction_results" . void $ putTransactionResults transactionResults
+      liftIO $ recordResultSpans started transactionResults
     recordProcessedKafkaMessages messages
     -- Publish the high-water mark only after the conduit above has committed
     -- the batch's rows, so it never claims blocks Cirrus hasn't indexed yet.
     for_ mTip publishCirrusHighWaterMark
     return ()
-
--- | Cirrus lives in its own database, so unlike strato-indexer's batch the
--- lease cannot be fenced inside the chunk's transaction (writer_lease is in
--- eth). The holder is re-read before every chunk instead, which bounds what
--- a demoted cell can still write to the chunk in flight (256 queries)
--- rather than the rest of a catch-up batch.
-writeOutputChunk ::
-  (MonadLogger m, HasSQL m) =>
-  Text ->
-  PGConnection ->
-  [SlipstreamQuery] ->
-  [TransactionResult] ->
-  m ()
-writeOutputChunk cell conn slipstreamQueries transactionResults = do
-  holds <- holdsWriterLease cell
-  unless holds $ throwIO (LostWriterLease cell)
-  recordOutputBatch slipstreamQueries transactionResults
-  timeSlipstreamPhase "cirrus" $ performSlipstreamQueries conn slipstreamQueries
-  unless (null transactionResults) $ do
-    started <- liftIO Tr.nowNanos
-    timeSlipstreamPhase "transaction_results" . void $ putTransactionResults transactionResults
-    liftIO $ recordResultSpans started transactionResults
 
 -- | One "tx.result" span per result in the transaction's trace (its id
 -- derives from the hash, as in strato-api's submit span): the moment the
@@ -218,32 +203,6 @@ recordResultSpans started results = do
           ]
           []
           failed
-
-sinkSlipstreamOutputChunks ::
-  MonadIO m =>
-  Int ->
-  ([SlipstreamQuery] -> [TransactionResult] -> m ()) ->
-  ConduitM (Either TransactionResult SlipstreamQuery) o m ()
-sinkSlipstreamOutputChunks chunkSize writeChunk = go
-  where
-    go = do
-      outputs <- timeSlipstreamPhase "transform" $ awaitChunk chunkSize
-      unless (null outputs) $ do
-        let (transactionResults, slipstreamQueries) = partitionEithers outputs
-        lift $ writeChunk slipstreamQueries transactionResults
-        go
-
-    awaitChunk size | size <= 0 = error "sinkSlipstreamOutputChunks: chunk size must be positive"
-    awaitChunk size = collect size []
-
-    collect 0 outputs = pure $ reverse outputs
-    collect remaining outputs =
-      await >>= \case
-        Nothing -> pure $ reverse outputs
-        Just output -> collect (remaining - 1) (output : outputs)
-
-slipstreamOutputChunkSize :: Int
-slipstreamOutputChunkSize = 256
 
 -- | The highest block number a batch covers. vm-runner emits exactly one
 -- NewAction per executed block (empty blocks included, see

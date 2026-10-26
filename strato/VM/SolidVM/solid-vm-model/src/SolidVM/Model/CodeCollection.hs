@@ -16,6 +16,8 @@ module SolidVM.Model.CodeCollection (
   contracts,
   getParents,
   getParentsAndUsings,
+  checkInheritance,
+  maxInheritancePaths,
   getInheritedContracts,
   getTopLevelAbstracts,
   getTopLevelAbstractsForContract,
@@ -54,6 +56,7 @@ import Blockchain.SolidVM.Exception
 import Control.Applicative ((<|>))
 import Control.DeepSeq
 import Control.Lens
+import Control.Monad (foldM)
 import Data.Aeson as A
 import Data.Binary
 import Data.Store.TH (makeStore)
@@ -180,6 +183,41 @@ getParentsAndUsings cc c = do
         p' <- toErr (c ^. contractContext) p . M.lookup p $ cc ^. contracts
         (p' :) <$> getParentsAndUsings cc p'
   pure . concat $ ps : us
+
+-- | The most entries any contract's getParentsAndUsings list may have. These
+-- lists keep one entry per inheritance path, so they grow exponentially with
+-- the depth of a diamond-shaped hierarchy, and compiling and typechecking walk
+-- them before any gas is charged.
+maxInheritancePaths :: Integer
+maxInheritancePaths = 256
+
+-- | Fails if getParents or getParentsAndUsings would not terminate on some
+-- contract (an inheritance or using cycle) or would return more than
+-- maxInheritancePaths entries. Linear in the size of the collection.
+checkInheritance :: CodeCollection -> SolidEither ()
+checkInheritance cc = () <$ foldM (\memo c -> snd <$> count S.empty memo (True, c)) M.empty (M.elems $ cc ^. contracts)
+  where
+    -- (False, c) sizes getParents c, (True, c) sizes getParentsAndUsings c
+    count path memo (withUsings, c)
+      | Just n <- M.lookup key memo = Right (n, memo)
+      | key `S.member` path = err "inheritance cycle"
+      | otherwise = do
+          let path' = S.insert key path
+              add (n, m) e = do
+                (n', m') <- count path' m e
+                let n'' = n + 1 + n'
+                if n'' > maxInheritancePaths then err "too many inheritance paths" else Right (n'', m')
+          ps <- traverse (\p -> (,) False <$> find "contract parent does not exist" p) (c ^. parents)
+          us <- traverse (\(Using p _ _ _) -> (,) True <$> find "contract using does not exist" p) (c ^. usings ++ cc ^. flUsings)
+          (n, memo') <-
+            if withUsings
+              then count path' memo (False, c) >>= \acc -> foldM add acc us
+              else foldM add (0, memo) ps
+          Right (n, M.insert key n memo')
+      where
+        key = (withUsings, c ^. contractName)
+        err msg = Left (InternalError msg (labelToString $ c ^. contractName), c ^. contractContext)
+        find msg p = maybe (Left (InternalError msg (labelToString p), c ^. contractContext)) Right . M.lookup p $ cc ^. contracts
 
 getInheritedContracts :: CodeCollection -> SolidString -> SolidEither [Contract]
 getInheritedContracts cc cName = map fst . filter snd <$> traverse go (M.elems $ cc ^. contracts)

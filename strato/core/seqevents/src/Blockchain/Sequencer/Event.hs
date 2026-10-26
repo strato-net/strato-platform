@@ -20,7 +20,7 @@ import qualified Blockchain.Data.Block as BDB
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Data.TransactionDef (Transaction)
-import Blockchain.Database.MerklePatricia.NodeData (NodeData)
+import Control.Monad.Composable.StateDB (TrieNode)
 import Blockchain.Model.WrappedBlock (OutputBlock(..), OutputTx(..), IngestBlock(..), IngestTx(..))
 import Blockchain.Sequencer.CallSpec (CallSpec(..), TraceOptions(..))
 import Blockchain.Sequencer.HexData (HexData(..))
@@ -77,8 +77,8 @@ data IngestEvent
   | IEDeleteDepBlock Keccak256
   | IEGetMPNodes [StateRoot]
   | IEGetMPNodesRequest TO.TXOrigin [StateRoot]
-  | IEMPNodesResponse TO.TXOrigin [NodeData]
-  | IEMPNodesReceived [NodeData]
+  | IEMPNodesResponse TO.TXOrigin [TrieNode]
+  | IEMPNodesReceived [TrieNode]
   | IEPreprepareResponse PBFT.PreprepareDecision
   | IEFlushMempool FlushMempoolRequest
   deriving (Eq, Show, GHCG.Generic)
@@ -169,7 +169,7 @@ data P2pEvent
     P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: Address}
   | P2pPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: Address}
   | P2pGetMPNodes [StateRoot]
-  | P2pMPNodesResponse TO.TXOrigin [NodeData]
+  | P2pMPNodesResponse TO.TXOrigin [TrieNode]
   deriving (Eq, Show, GHCG.Generic)
 
 instance Format P2pEvent where
@@ -194,7 +194,7 @@ data VmTask
   | VmBlock OutputBlock
   | VmJsonRpcCommand JsonRpcCommand
   | VmGetMPNodesRequest TO.TXOrigin [StateRoot]
-  | VmMPNodesReceived [NodeData]
+  | VmMPNodesReceived [TrieNode]
   | VmRunPreprepare BDB.Block
   | VmSelfAddress Address
   | VmFlushMempool FlushMempoolRequest

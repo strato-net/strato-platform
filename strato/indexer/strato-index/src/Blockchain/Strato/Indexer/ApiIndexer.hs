@@ -8,11 +8,10 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.Strato.Indexer.ApiIndexer
-  ( p2pIndexerLoop,
-    sqlIndexerLoop,
-    seedSqlConsumerGroup,
+  ( indexerMainLoop,
+    p2pIndexerLoop,
+    retireSqlConsumerGroup,
     p2pConsumerGroup,
-    sqlConsumerGroup,
     indexAPI,
     indexP2P,
     kafkaClientIds,
@@ -29,7 +28,7 @@ import Blockchain.Data.WriterLease (LostWriterLease (..), fenceWriterLeaseSql, h
 import qualified Blockchain.Data.BlockHeader as BH
 import Blockchain.ChainMetrics (setBestBlockTimestamp)
 import Blockchain.Data.ReceiptRef (putReceiptRefsSql)
-import Blockchain.Data.Transaction (insertTX')
+import Blockchain.Data.Transaction (insertTX', transactionHash)
 import Blockchain.DBM (DebugMode (..))
 import Blockchain.DB.MemAddressStateDB (AddressStateModification(..))
 import Blockchain.DB.SQLDB
@@ -40,7 +39,6 @@ import Blockchain.Strato.Indexer.Kafka
 import Blockchain.Strato.Indexer.Model
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class (blockHash)
-import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff (StateDiff)
 import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffsSql)
@@ -51,7 +49,6 @@ import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Time.Clock (getCurrentTime)
 import UnliftIO (MonadIO, liftIO, throwIO)
-import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
 import qualified Data.Map.Strict as M
@@ -64,36 +61,35 @@ import Text.Format
 p2pConsumerGroup :: ConsumerGroup
 p2pConsumerGroup = "strato-indexer"
 
--- | The SQL side's own consumer group, so a standby core can trail the
--- writer's progress without holding up its Redis side, and a promoted core
--- resumes exactly where its trailing left off.
-sqlConsumerGroup :: ConsumerGroup
-sqlConsumerGroup = "strato-indexer-sql"
-
 p2pIndexerLoop :: ( MonadLogger m,
                     HasStreaming m,
-                    (Keccak256 `A.Alters` P2P OutputBlock) m,
                     Mod.Modifiable (P2P BestBlock) m
                   ) =>
                   m ()
 p2pIndexerLoop = consume p2pConsumerGroup targetTopicName indexP2P
 
--- | The SQL side. Writes only while this cell holds the writer lease;
--- otherwise it follows the writer through @indexer_progress@, committing
--- each batch's offset once the writer has that batch's blocks, so promotion
--- picks up within seconds of where the writer stopped.
-sqlIndexerLoop :: ( MonadLogger m,
-                    HasStreaming m,
-                    HasSQLDB m
-                  ) =>
-                  Text ->
-                  m ()
-sqlIndexerLoop cell = consume sqlConsumerGroup targetTopicName (indexAPIGated cell)
+-- | One consumer commits its offset only after both SQL and Redis indexing
+-- finish. SQL retains the writer-lease checks and standby progress tracking.
+indexerMainLoop :: ( MonadLogger m,
+                     HasStreaming m,
+                     HasSQLDB m,
+                     Mod.Modifiable (P2P BestBlock) m
+                   ) =>
+                   Text ->
+                   m ()
+indexerMainLoop cell =
+  consume p2pConsumerGroup targetTopicName $ \idxEvents -> do
+    indexAPIGated cell idxEvents
+    indexP2P idxEvents
 
--- | On the first run after the SQL side got its own group, start it from the
--- combined group's offset rather than from the beginning of retention.
-seedSqlConsumerGroup :: HasStreaming m => m ()
-seedSqlConsumerGroup = void $ seedConsumerGroupFrom sqlConsumerGroup p2pConsumerGroup targetTopicName
+-- | A snapshot may carry the old SQL group's checkpoint. With no SQL
+-- consumer, retire it so it cannot pin the log on a Redis-only node.
+retireSqlConsumerGroup :: (MonadLogger m, HasStreaming m) => m ()
+retireSqlConsumerGroup = do
+  removed <- removeConsumerGroup "strato-indexer-sql" targetTopicName
+  when removed $
+    $logInfoS "retireSqlConsumerGroup" . T.pack $
+      "retired the strato-indexer-sql consumer group on " ++ T.unpack (unTopicName targetTopicName) ++ ": no SQL side runs here"
 
 -- | The highest block number a batch carries, if it carries any.
 batchTip :: [IndexEvent] -> Maybe Integer
@@ -191,6 +187,8 @@ indexAPI cell allEvents = do
     $logInfoS "apiIndexer" . T.pack $
       "skipping " ++ show skipped ++ " events at or below indexer_progress " ++ maybe "unset" show progress
   let (txs, blocks, receiptRefs, stateDiffs, asmUpdates) = filterHelper idxEvents
+      signers = M.fromList
+        [(transactionHash tx, signer) | block <- blocks, OutputTx {otBaseTx = tx, otSigner = signer} <- obReceiptTransactions block]
       insertCount = length blocks
       -- vm-runner yields NewBestBlock only after a batch's RanBlocks and
       -- their state diffs (BlockChain.addBlocks), so the highest one in this
@@ -226,7 +224,7 @@ indexAPI cell allEvents = do
       -- API-submitted transactions already have a row (block_number -1,
       -- written by strato-api); insertTX' skips those by hash.
       forM_ txs $ \OutputTx {..} -> insertTX' Fail otOrigin Nothing now [otBaseTx]
-      unless (null blocks) . void $ putBlocksSql (outputBlockToBlockRetainPayloads <$> blocks) False
+      unless (null blocks) . void $ putBlocksSql signers (outputBlockToBlockRetainPayloads <$> blocks) False
       putReceiptRefsSql receiptRefs
       mapM_ commitSqlDiffsSql stateDiffs
       mapM_ (updateSQLBalanceAndNonceSql . addressStateUpdates) asmUpdates
@@ -275,16 +273,12 @@ kafkaClientIds = ("strato-api-indexer", "strato-api-indexer")
 indexP2P ::
   ( MonadLogger m,
     MonadIO m,
-    (Keccak256 `A.Alters` P2P OutputBlock) m,
     Mod.Modifiable (P2P BestBlock) m
   ) =>
   [IndexEvent] ->
   m ()
 indexP2P idxEvents = do
   forM_ idxEvents $ \case
-    RanBlock b _receipts -> do
-      $logInfoS "p2pIndexer" . T.pack $ "Inserting Redis block with sha: " ++ format (blockHash b)
-      A.insert (A.Proxy @(P2P OutputBlock)) (blockHash b) $ P2P b
     NewBestBlock (sha, num) -> do
       $logInfoS "p2pIndexer" . T.pack $
         "Updating RedisBestBlock as (" ++ format sha ++ ", " ++ show num ++ ")"

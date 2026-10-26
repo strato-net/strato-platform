@@ -45,6 +45,10 @@ Both submit transactions over the STRATO chain JSON-RPC at `/rpc`.
 - `window.ENV.CHAIN_ID` must be set (via `/smd/config.js`, generated at container
   startup from `ethconf.yaml`) for the STRATO wallet to appear; otherwise only
   external wallets are offered.
+- `WAGMI_PROJECT_ID` must be exported where `docker compose` runs (strato-init passes it
+  to the `smd` service and `docker-run.sh` writes it into `/smd/config.js`); otherwise
+  WalletConnect's relay rejects the placeholder project ID with close code 3000
+  "Project not found" and no QR code is shown.
 
 ## Layout
 

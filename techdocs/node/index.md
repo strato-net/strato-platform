@@ -25,7 +25,7 @@ A STRATO node joins a STRATO network, and it can do so as a regular syncing node
 
 ## Components
 
-`strato-up` runs a node as two groups: host processes and Docker containers.
+`strato-up` runs a node as two groups: host processes and Docker containers. With `--dockerMode=all` the host processes run in a `strato` container instead; see [Run from prebuilt images](prebuilt.md).
 
 ### Host processes
 
@@ -33,8 +33,8 @@ A small supervisor, `convoke`, starts these processes and restarts none of them.
 
 | Process | Role |
 |---|---|
-| `ethereum-discover` | Peer discovery on UDP 30303, seeded from the network's bootnodes |
-| `strato-p2p` | Block and transaction exchange with peers on TCP 30303 |
+| `ethereum-discover` | Peer discovery on UDP 30303 (`--discoveryPort`), seeded from the network's bootnodes |
+| `strato-p2p` | Block and transaction exchange with peers on TCP 30303 (`--p2pPort`) |
 | `strato-sequencer` | Orders transactions and runs PBFT consensus (Blockstanbul) |
 | `vm-runner` | Executes transactions in SolidVM |
 | `strato-indexer` | Writes chain data to Postgres and Redis |
@@ -74,12 +74,17 @@ A node is a validator when its address is in the validator set stored in `Mercat
 
 `/health` reports `pbftData.is_validator` for the local node. Validators need at least 8 GB of RAM.
 
+A validator does not need the app, the APIs or Cirrus. `strato-up --role=validator` runs only the chain processes with Postgres, Redis, Prometheus and apex; see [Validator mode](configuration.md#validator-mode).
+
 For details, see [Consensus](../platform/consensus.md).
+
+**API node.** A node that serves the chain and its APIs without the app, the SMD and the Swagger docs. `strato-up --role=api-node` runs everything else, including Cirrus, nginx and `/health`; see [API node](configuration.md#api-node).
 
 ## In this section
 
 - [Requirements](requirements.md): hardware, operating systems, ports, credentials, TLS and DNS
 - [Install](install.md): build from source and start with `strato-up`
+- [Run from prebuilt images](prebuilt.md): the release images and `strato-up`, nothing to build
 - [Configuration](configuration.md): flags, `ethconf.yaml`, environment variables, local auth, JSON-RPC and SSL
 - [Operations](operations.md): status, logs, restarts, upgrades, snapshots and troubleshooting
 

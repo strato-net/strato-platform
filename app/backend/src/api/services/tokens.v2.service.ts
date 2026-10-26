@@ -15,7 +15,7 @@ import { getHistoryDirect, fetchActiveRequestIds, fetchVaultHistoryConfig, fetch
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
 import { getPositions as getV3Positions, getPoolTokenPairs as getV3PoolTokenPairs } from "./poolV3.service";
 import * as v3Math from "../helpers/poolV3Math.helper";
-import { safeBigInt } from "../helpers/vaultPerformance.helper";
+import { safeBigInt } from "../helpers/safeBigInt.helper";
 
 const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, priceOracle } = constants;
 
@@ -727,7 +727,7 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
         continue;
       }
     } else if (isVaultShare) {
-      // Same NAV formula as box getVaultShareTokenPrice — always derive, never oracle.
+      // Same NAV formula the retired Diversified Vault used for its share price: always derive, never oracle.
       const totalSupply = token?.supply || '0';
       if (totalSupply === '0') continue;
       const supportedAssets: string[] = snapshot.data.vaultConfig?.supportedAssets || [];

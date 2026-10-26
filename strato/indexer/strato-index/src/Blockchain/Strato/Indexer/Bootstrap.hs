@@ -7,6 +7,7 @@
 
 module Blockchain.Strato.Indexer.Bootstrap
   ( bootstrapIndexer,
+    bootstrapIndexerTopic,
   )
 where
 
@@ -23,9 +24,15 @@ import qualified Blockchain.EthConf.Model as EC
 import qualified Text.Colors as CL
 import UnliftIO.Exception (catch, SomeException)
 
+-- | The index events topic, which vm-runner writes and this process reads.
+bootstrapIndexerTopic :: Eff es ()
+bootstrapIndexerTopic =
+  UEC.runStreamMConfigured "strato-api-indexer" $ createTopicAndWait indexEventsTopicName
+
+-- | The topic, then the eth database and its tables.
 bootstrapIndexer :: (Logger :> es) => Eff es ()
 bootstrapIndexer = do
-  UEC.runStreamMConfigured "strato-api-indexer" $ createTopicAndWait indexEventsTopicName
+  bootstrapIndexerTopic
   let ethconf = UEC.ethConf
       pgconf = EC.sqlConfig ethconf
       rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}
