@@ -389,6 +389,9 @@ handleEvents peer = awaitForever $ \case
       shouldFetch <- lift $ getCurrentSyncTask >>= maybe (tryResyncFrom start') (const $ pure False)
       when shouldFetch $ do
         $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start'
+        -- @start@ is the block after our sequenced tip, so its chiliad is
+        -- never really done, whatever the sync_task table says.
+        lift . reopenSyncTask $ start `div` 1000
         assignTaskAndRequestBlocks peer
     P2pPushBlocks start end p -> do
       ss <- lift $ shouldSendToPeer p

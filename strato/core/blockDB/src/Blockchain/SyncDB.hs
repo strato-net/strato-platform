@@ -310,6 +310,7 @@ class HasSyncDB m where
   getNewSyncTask :: Host -> Integer -> m (Maybe SyncTask)
   setSyncTaskFinished :: SyncTask -> m ()
   setSyncTaskNotReady :: m ()
+  reopenSyncTask :: Integer -> m ()
 
 -- Each handler has its own thread; the process namespace prevents ID reuse
 -- after a restart, without passing a connection ID through the P2P monad.
@@ -453,5 +454,24 @@ instance HasPeerStore m => HasSyncDB m where
         (syncTask^.SyncTaskConnectionId ==. val (Just connectionId))
         &&.
         (syncTask^.SyncTaskStatus ==. val Assigned)
+        )
+    return ()
+
+  -- A chiliad is marked finished once its bodies are downloaded, not once
+  -- they are sequenced, so a block the sequencer drops (e.g. one on the
+  -- malformed-block blacklist) leaves a finished chiliad nothing will ever
+  -- fetch again. Make it assignable, with the epoch as its assignment time so
+  -- 'getNewSyncTask' hands it out before anything else.
+  reopenSyncTask chiliad = peerQuery $ do
+    update $ \syncTask -> do
+      set syncTask
+        [ SyncTaskStatus =. val NotReady,
+          SyncTaskAssignmentTime =. val (UTCTime (fromGregorian 1970 1 1) 0),
+          SyncTaskConnectionId =. val Nothing
+        ]
+      where_ (
+        (syncTask^.SyncTaskChiliad ==. val (fromIntegral chiliad))
+        &&.
+        (syncTask^.SyncTaskStatus ==. val Finished)
         )
     return ()
