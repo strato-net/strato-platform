@@ -1524,8 +1524,15 @@ compileCall sc callee args = case callee of
             S.Variable _ n -> M.member n (cStorage c) && not (M.member n (cContract c ^. functions))
             _ -> False
           hasParent = case callee of S.MemberAccess{} -> True; _ -> False
-      let target = pureAction (EMIT_BEGIN (linkWithCharge (not getter) sig efun)
-              EMIT_END)
+      let simple = not getter && scalarSignature sig && case callee of
+            S.Variable _ n -> case M.lookup n (cContract c ^. functions) of
+              Just declaration -> null (declaration ^. funcOverload) && simpleScalarFunction (length args) declaration
+              Nothing -> False
+            _ -> False
+          operation = if simple
+            then EMIT_BEGIN (linkScalar sig efun) EMIT_END
+            else EMIT_BEGIN (linkWithCharge (not getter) sig efun) EMIT_END
+          target = pureAction operation
           linked = if hasParent then beforeAction 2 target else target
       applyCall sc sig (constantFunction linked) args
 
@@ -1847,6 +1854,39 @@ callArguments sc (SigCons t rest) (expression : expressions) = do
   remaining <- callArguments sc rest expressions
   pure $ (functionPair hlistFunction value remaining)
 callArguments _ _ _ = typeErr "argument count mismatch"
+
+scalarSignature :: Sig args r -> Bool
+scalarSignature (SigNil result) = scalarType result
+scalarSignature (SigCons argument rest) = scalarType argument && scalarSignature rest
+
+scalarType :: Ty a -> Bool
+scalarType = \case
+  TInt -> True; TDecimal -> True; TBool -> True; TAddr -> True; TStr -> True; TBytes -> True
+  _ -> False
+
+simpleScalarFunction :: Int -> Func -> Bool
+simpleScalarFunction arity declaration =
+  length (declaration ^. funcArgs) == arity && null (declaration ^. funcModifiers) &&
+  all (maybe True T.null . fst) (declaration ^. funcVals) && case declaration ^. funcContents of
+    Just [S.Return (Just expression) _] -> simple expression
+    _ -> False
+  where
+    parameters = [name | (Just name, _) <- declaration ^. funcArgs]
+    simple = \case
+      S.Variable _ name -> name `elem` parameters
+      S.NumberLiteral{} -> True; S.DecimalLiteral{} -> True; S.BoolLiteral{} -> True
+      S.StringLiteral{} -> True; S.AddressLiteral{} -> True; S.HexaLiteral{} -> True
+      S.Binary _ operator left right -> operator `elem` ["+", "-", "*", "/", "%", "**", "<<", ">>", "&", "|", "^", "==", "!=", "<", ">", "<=", ">=", "&&", "||"] && simple left && simple right
+      S.Unitary _ operator value -> operator `elem` ["!", "-", "~", "+"] && simple value
+      S.Ternary _ condition yes no -> all simple [condition, yes, no]
+      S.InlineBoundsCheck _ _ _ value -> simple value
+      _ -> False
+
+linkScalar :: Sig args r -> C Fun -> Fn args r
+linkScalar sig = \case
+  Right (Fun _ sig' function) | Just Refl <- sigEq sig sig' -> chargeFunction sig (linkedAction function)
+  Right (Fun n _ _) -> throwFn sig ("internal: linked signature mismatch for " <> n)
+  Left e -> throwFn sig ("callee failed to compile: " <> showErr e)
 
 -- Link a call site to the callee once; the signature was already checked against the AST,
 -- so the mismatch branch is unreachable.  A callee that failed to compile throws when called.

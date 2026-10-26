@@ -59,6 +59,21 @@ staticSource = TE.encodeUtf8 $ T.unlines
   , "}"
   ]
 
+simpleSource :: B.ByteString
+simpleSource = TE.encodeUtf8 $ T.unlines
+  [ "contract SimpleCalls {"
+  , "function add(int x,int y) internal returns (int) { return x+y; }"
+  , "function positive(int x) internal returns (bool) { return x>0; }"
+  , "function decimalAdd(decimal x,decimal y) internal returns (decimal) { return x+y; }"
+  , "function echo(string value) internal returns (string) { return value; }"
+  , "function echoBytes(bytes value) internal returns (bytes) { return value; }"
+  , "function echoAddress(address value) internal returns (address) { return value; }"
+  , "function divide(int x,int y) internal returns (int) { return x/y; }"
+  , "function run() returns (bool) { return add(7,5)==12 && positive(1) && !positive(-1) && decimalAdd(decimal(2),decimal(3))==decimal(5) && echo(\"abc\")==\"abc\" && echoBytes(hex\"0102\")==hex\"0102\" && echoAddress(address(1))==address(1); }"
+  , "function errors() returns (bool) { try { divide(1,0); } catch { return true; } return false; }"
+  , "}"
+  ]
+
 main :: IO ()
 main = do
   void $ $initHFlags "typed native builtin binding checks"
@@ -78,6 +93,28 @@ main = do
     liftIO $ case (erException removed, erReturnVal removed) of
       (Nothing, Just (SBool _)) -> putStrLn "TYPED selfdestruct passed"
       _ -> fail $ show (erException removed, erReturnVal removed)
+    simple <- create $ def & createNewAddress .~ 0x3920 & createContractName .~ "SimpleCalls" & createCode .~ Code (TE.decodeUtf8 simpleSource)
+    liftIO $ unless (show (erException simple) == "Nothing") $ fail $ show $ erException simple
+    forM_ ["run", "errors"] $ \function -> do
+      result <- call $ def & callCodeAddress .~ 0x3920 & callFuncName .~ function
+      liftIO $ unless (show (erException result, erReturnVal result) == show (Nothing :: Maybe String, Just $ SBool True)) $
+        fail $ "scalar call " ++ T.unpack function ++ ": " ++ show (erException result, erReturnVal result)
+    (_, simpleCollection) <- codeCollectionFromSource False True simpleSource
+    simpleRendered <- liftIO $ Source.renderContract "SimpleCalls" simpleCollection
+    liftIO $ case simpleRendered of
+      Left errors -> fail $ show errors
+      Right code -> do
+        writeFile "/tmp/strato-simple-typed-calls-generated.hs" $ T.unpack code
+        unless ("linkScalar" `T.isInfixOf` code) $ fail "scalar calls did not use the typed link"
+        let functionCode name = T.unlines $ takeWhile
+              (\line -> not ("simpleCalls_" `T.isPrefixOf` line) || (name <> " ") `T.isPrefixOf` line)
+              (dropWhile (not . T.isPrefixOf (name <> " ::")) (T.lines code))
+        forM_ ["add", "positive", "decimalAdd", "echo", "echoBytes", "echoAddress", "divide", "run"] $ \name -> do
+          let body = functionCode ("simpleCalls_" <> name)
+          unless (not (T.null body) && not ("Dyn" `T.isInfixOf` body)) $ fail $ "scalar function retains Dyn: " ++ T.unpack name
+        forM_ ["internalFrame", "typedReturns", "fromDyn"] $ \helper ->
+          unless (not $ helper `T.isInfixOf` code) $ fail $ "scalar calls retain dynamic machinery: " ++ T.unpack helper
+        putStrLn "TYPED scalar calls use no dynamic arguments or returns"
     (_, collection) <- codeCollectionFromSource False True staticSource
     rendered <- liftIO $ Source.renderContract "TypedStatic" collection
     liftIO $ case rendered of
