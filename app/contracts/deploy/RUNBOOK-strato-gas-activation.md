@@ -14,11 +14,11 @@ client, `GLOBAL_ADMIN_NAME` / `GLOBAL_ADMIN_PASSWORD`).
 |---|---|
 | STRATO token, burnable logic, unpaused | proxy `8ee9a339…8b04`, impl `646cdf8e…cb04` |
 | Canonical STRATO/USDST PoolV3 (fee 3000, cardinality 500) | `6df32c9b…3165` |
-| HeliumFeeRouterV4 (voucher, else burn STRATO, USDST buys a shortfall) | `76a6839f…9da9d6`, installed at block 803253 |
+| HeliumFeeRouterV5 (voucher, else burn STRATO, USDST buys a shortfall; no block reward; quote frozen below the floor) | `7b9caebb…b5ca`, installed at block 858387. V4 `76a6839f…9da9d6` paid 0.01 STRATO per block from 803253 to 858386 and keeps its 1,528 STRATO |
 | Native-token flag day (eth_getBalance, native transfers, envelope rules) | helium block 900000 (`stratoGasForkBlock`) |
 | App (fee quote, send-max, voucher display) | deploy_testnet_app_ha #25, strato-gas 0750d10 |
 
-Status line: `node strato-gas-helium.js status 76a6839f96b8265a0edcbfc141f7cc89b09da9d6`.
+Status line: `node strato-gas-helium.js status 7b9caebbae6b05c15ad2a2804e7a22a96324b5ca`.
 Full audit: `node strato-gas-audit.js --nodes https://node1.testnet.strato.nexus,…,https://node5.testnet.strato.nexus`.
 
 ## Gates
@@ -74,7 +74,7 @@ first quote exists.
 | Case | How | Helium |
 |---|---|---|
 | Identical results across validators | audit *nodes agree* | 5 of 5 at the same height, one hash (node5 still on the pre-step-4 build, so mixed builds agree before the fork) |
-| Quote and reward exactly once per block, in the same block | contract `it_pays_block_rewards_at_most_once_per_block`, `it_prices_and_rewards_in_the_same_block`; audit *one STRATO quote per block*, *one block reward per block* | 24,918 of each over 24,918 blocks |
+| Quote and reward exactly once per block, in the same block | contract `it_pays_block_rewards_at_most_once_per_block`, `it_prices_and_rewards_in_the_same_block`; audit *one STRATO quote per block*, *one block reward per block* | 24,918 of each over 24,918 blocks under V4; V5 pays no reward by design (audit *block rewards switched off*) |
 | Replay from genesis across the router install | `strato-up --network=helium` from genesis on the release build must reach the tip with the validators' hash. The Jenkins Deploy stage does not sync to tip, so it is not evidence | PASS 2026-10-23: build 19.6-bfede46 synced from genesis in 4 h (16:39Z to 20:39Z) and at 838918 matched all 5 validators on hash `5754d0c2…6fc3`, stateRoot, receiptsRoot and transactionsRoot (a matching tip hash covers every ancestor, including the 803253 install and the 836440 manipulation blocks). No mismatch, fatal or missing-root line in the runner or sequencer logs |
 
 ### 6. Activation rules stay reproducible
@@ -102,7 +102,7 @@ Preconditions, in order. "Vote" = one AdminRegistry issue, run once per admin.
    fall below it). Below the floor the router stops quoting and the last quote stays
    frozen until the pool refills.
 4. **Router.** `gen-feerouter-source.js upquark --pool <pool> --activate A --min-liquidity <L>`
-   (the generator refuses upquark without a floor),
+   (the generator refuses upquark without a floor; `--block-reward 0` switches rewards off, as on helium),
    `deploy-feerouter.js` as both admins, fund it with STRATO for block rewards, and
    decide what tops it up: the router pays 0.01 STRATO per block from its own balance
    and nothing refills it. Before A the router charges the legacy fee (one whole
@@ -130,5 +130,6 @@ after A keeps STRATO as gas.
 - Oracle-recovery live run needs a router with a liquidity floor (gate 3).
 - Replay from genesis on the release build after helium 900000 (gate 6); the pre-fork replay passed 2026-10-23 (gate 5).
 - `_minPoolLiquidity` floor for upquark (gate 3): required, an unfloored router quotes a stale price forever once the pool is drained.
-- Block-reward funding source (router runway on helium ≈ 21 days on 2026-10-22).
+- Block-reward funding source for upquark (helium pays no block reward since 858387).
+- Every AdminRegistry step on helium now needs votes beyond the two deploy keys: the admin set grew to 9 on 2026-10-26.
 - Upquark values: A, pool seed size, router funding, service funding.
