@@ -126,17 +126,17 @@ main = hspec $ do
           segs <- liftIO $ segments dir
           return $ dir </> "events" </> minimum segs
         -- The segment lag's backlog starts in becomes unreadable.
-        readable <- getPermissions firstSeg
+        origPerms <- getPermissions firstSeg
         setPermissions firstSeg emptyPermissions
         stillReadable <- either (const False) (const True) <$> (try (BS.readFile firstSeg) :: IO (Either IOException BS.ByteString))
         if stillReadable
           then do
-            setPermissions firstSeg readable
+            setPermissions firstSeg origPerms
             pendingWith "file permissions are not enforced for this user (root?)"
           else do
             inStream dir (drainConsumerGroup "lag" topic (\(_ :: [(Int, BS.ByteString)]) -> return ()))
               `shouldThrow` anyIOException
-            setPermissions firstSeg readable
+            setPermissions firstSeg origPerms
             inStream dir $ do
               kept <- hasConsumerGroup "lag" topic
               liftIO $ kept `shouldBe` True
