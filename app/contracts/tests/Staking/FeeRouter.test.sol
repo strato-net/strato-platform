@@ -114,7 +114,6 @@ contract Describe_FeeRouter {
     address constant PROPOSER = address(0xaaaa);
     uint constant Q192 = 6277101735386680763835789423207666416102355444464034512896;
     uint constant WINDOW = 1800; // FeeRouter._twapWindow
-    uint constant GRACE = 3600;  // FeeRouter._priceGrace
     int constant FULL_RANGE = 887220; // widest tick multiple of the 0.30% tier's spacing
     int constant HALF_PRICE_TICK = -6932; // 1.0001^-6932 = 0.50004
     uint constant BIG = 100000000e18;
@@ -341,22 +340,17 @@ contract Describe_FeeRouter {
         require(_quotedFee() == 1e16, "priced at the floor");
     }
 
-    function it_keeps_the_last_price_through_the_grace_period() public {
+    function it_freezes_the_last_price_until_pricing_recovers() public {
         _pricedPool(0, true);
         router.setMinLiquidity(BIG); // pricing fails from here on
 
-        fastForward(GRACE, 1);
+        fastForward(7 * 86400, 1);
         router.payBlockRewards();
         require(router.priceVersion() == 1, "no new price");
-        require(_quotedFee() == 1e16, "the last price is still chargeable at the edge of the grace period");
+        (uint fee, , bool valid) = router.stratoFeeQuote();
+        require(fee == 1e16 && valid, "the last price stays chargeable however long pricing is down");
         signer.pay(address(router));
         require(strato.balanceOf(address(signer)) == 1e18 - 1e16, "paid at the last price");
-
-        fastForward(1, 1);
-        router.payBlockRewards();
-        (, , bool valid) = router.stratoFeeQuote();
-        require(!valid, "stale past the grace period");
-        require(_paymentReverts(signer), "voucher-only until pricing recovers");
         Signer withVoucher = _signerWithVoucher();
         withVoucher.pay(address(router));
         require(voucher.balances(address(withVoucher)) == 0, "a voucher still pays");

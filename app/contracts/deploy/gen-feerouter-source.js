@@ -23,8 +23,8 @@
 // (strato-conf Model.hs), so fees and the native token switch at the same block.
 //
 // --min-liquidity: the pool liquidity (PoolV3 `liquidity()`, about sqrt(STRATO wei x
-// USDST wei) for a full-range position) below which the router stops pricing and the
-// last quote ages out after the grace period. Required for upquark: without a floor
+// USDST wei) for a full-range position) below which the router stops pricing and
+// freezes the last quote. Required for upquark: without a floor
 // an emptied pool still serves its last tick from the observation ring, so the
 // router would quote a stale price forever (seen live on helium 2026-10-23). Read the
 // seeded pool's liquidity from `strato-gas-helium.js status` and pass a fraction of it.
@@ -110,8 +110,8 @@ const activationOverride = activate ? `
 ` : '';
 
 const liquidityOverride = minLiquidity ? `
-    // Below this pool liquidity the router stops pricing; the last quote then
-    // ages out after the grace period and only vouchers pay until the pool refills.
+    // Below this pool liquidity the router stops pricing and the last quote stays
+    // frozen until the pool refills.
     function _minPoolLiquidity() internal view override returns (uint) {
         return ${minLiquidity};
     }

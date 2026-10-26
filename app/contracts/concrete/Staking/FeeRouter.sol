@@ -95,11 +95,6 @@ contract record FeeRouter {
     // much history, so a fresh pool is inert rather than priced off a single tick.
     function _twapWindow() internal view virtual returns (uint) { return 1800; }
 
-    // How long the last good quote stays chargeable once the pool stops pricing (no
-    // history, liquidity gone, pair changed). Past it, fees are voucher-only until
-    // pricing recovers.
-    function _priceGrace() internal view virtual returns (uint) { return 3600; }
-
     // In-range liquidity below which the pool is not trusted to price. A time average
     // alone does not make a thin pool reliable; set from depth and manipulation cost.
     function _minPoolLiquidity() internal view virtual returns (uint) { return 0; }
@@ -177,8 +172,8 @@ contract record FeeRouter {
         return _priceStratoFee();
     }
 
-    // Pricing that cannot be trusted leaves the previous quote in place; stratoFeeQuote
-    // decides, by age, whether that quote is still chargeable.
+    // Pricing that cannot be trusted (no history, liquidity gone, pair changed) leaves
+    // the previous quote in place, frozen until the pool prices again.
     function _quoteStratoFee() internal {
         uint fee = _priceStratoFee();
         if (fee == 0) return;
@@ -229,11 +224,10 @@ contract record FeeRouter {
         return fee;
     }
 
-    // What a transaction in the current block pays in STRATO. Invalid once the last
-    // good price is older than the grace period; then only a voucher pays.
+    // What a transaction in the current block pays in STRATO. STRATO always pays once
+    // a first price exists; only before it must a voucher pay.
     function stratoFeeQuote() external view returns (uint fee, uint version, bool valid) {
-        bool usable = quotedFee > 0 && block.timestamp <= quotedAt + _priceGrace();
-        return (quotedFee, priceVersion, usable);
+        return (quotedFee, priceVersion, quotedFee > 0);
     }
 
     function _payBlockReward() internal {

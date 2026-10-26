@@ -49,16 +49,16 @@ Legend: **contract** = `app/contracts/tests/Staking/FeeRouter.test.sol` (39 case
 
 ### 3. Oracle
 
-The router prices once per block from the pool's 30-minute TWAP (`_twapWindow` 1800 s),
-keeps the last price for 60 minutes if the pool stops pricing (`_priceGrace` 3600 s),
-and then charges vouchers only until pricing returns.
+The router prices once per block from the pool's 30-minute TWAP (`_twapWindow` 1800 s)
+and freezes the last price if the pool stops pricing, so STRATO always pays once a
+first quote exists.
 
 | Case | How | Helium / owed |
 |---|---|---|
 | Same-block manipulation | contract `it_charges_the_time_weighted_price_not_the_spot`, `it_freezes_one_fee_per_block`; audit *quote moves like a time-weighted price* | largest block-to-block move 0% over 24,918 quotes; quote within 0.01% of spot |
 | Sustained manipulation | **not covered by a test.** Moving the 30-minute average by x% means holding spot moved by about x% for 30 minutes against the pool's depth. Live: swap enough USDST to move spot 10%, hold 35 minutes, confirm the quote moves at most ~10% and recovers after the swap back | PASS helium 2026-10-23: 4,900 USDST in at block 836440 (14:55Z) moved spot +10.0% (tick -997 to -43); the quote fell linearly from 0.011048 to 0.010043 STRATO (-9.09%, the full fee-side value of the move) and only reached it 30 min later; largest block step 0.45%. 5,160 STRATO back at 15:32Z put spot on tick -997 and the quote was back to 0.011048339 exactly by 16:02Z. 35 min of held spot bought nothing beyond the 10% paid to move the pool |
-| Liquidity removal | contract `it_ignores_a_pool_below_the_liquidity_floor`, `it_does_not_price_until_the_pool_has_a_full_window_of_history`, `it_keeps_the_last_price_through_the_grace_period` | **`_minPoolLiquidity` is 0 on helium, so nothing stops pricing**: `liquidity() >= 0` holds for an empty pool, and the observation ring keeps serving the last tick. Verified live 2026-10-23: with the pool fully drained (liquidity 0, blocks 836925-837010) the router still wrote a quote every block, frozen at the last price, `valid` stayed true. Upquark must ship a floor > 0 from mainnet depth |
-| Oracle recovery | contract `it_keeps_the_last_price_through_the_grace_period`; the quote resumes the first block the pool prices again (`_quoteStratoFee`) | **not reachable live on helium**: without a liquidity floor an empty pool never stops pricing (see above), so the grace path only runs in the contract tests. To run it live, deploy a router with a floor (upquark, or a helium V5) and drain the pool below it; expect ≥60 min in which only vouchers pay |
+| Liquidity removal | contract `it_ignores_a_pool_below_the_liquidity_floor`, `it_does_not_price_until_the_pool_has_a_full_window_of_history`, `it_freezes_the_last_price_until_pricing_recovers` | **`_minPoolLiquidity` is 0 on helium, so nothing stops pricing**: `liquidity() >= 0` holds for an empty pool, and the observation ring keeps serving the last tick. Verified live 2026-10-23: with the pool fully drained (liquidity 0, blocks 836925-837010) the router still wrote a quote every block, frozen at the last price, `valid` stayed true. Upquark must ship a floor > 0 from mainnet depth |
+| Oracle recovery | contract `it_freezes_the_last_price_until_pricing_recovers`; the quote resumes the first block the pool prices again (`_quoteStratoFee`) | **not reachable live on helium**: without a liquidity floor an empty pool never stops pricing (see above), so the freeze only runs in the contract tests. To run it live, deploy a router with a floor (upquark, or a helium V5) and drain the pool below it; expect the quote and `priceVersion` to hold at their last values, STRATO still accepted, until the pool refills |
 
 ### 4. Wallet
 
@@ -99,8 +99,8 @@ Preconditions, in order. "Vote" = one AdminRegistry issue, run once per admin.
    grow the observation ring, and let 30 minutes of observations accumulate. Read the
    seeded `liquidity` from `strato-gas-helium.js status` and pick the floor as a fraction
    of it (a tenth keeps ordinary LP churn from stopping pricing; a drained pool must
-   fall below it). Below the floor the router stops quoting, the last quote ages out
-   after 60 minutes and only vouchers pay until the pool refills.
+   fall below it). Below the floor the router stops quoting and the last quote stays
+   frozen until the pool refills.
 4. **Router.** `gen-feerouter-source.js upquark --pool <pool> --activate A --min-liquidity <L>`
    (the generator refuses upquark without a floor),
    `deploy-feerouter.js` as both admins, fund it with STRATO for block rewards, and
