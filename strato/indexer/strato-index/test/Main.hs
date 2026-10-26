@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Pins how strato-indexer treats the @strato-indexer-sql@ checkpoint a
 -- 19.6 node or snapshot carries: its backlog is replayed into SQL and only
