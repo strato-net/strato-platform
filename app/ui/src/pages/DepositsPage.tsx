@@ -10,6 +10,7 @@ import RecentTransactions from '@/components/bridge/RecentTransactions';
 import { useBridgeContext } from '@/context/BridgeContext';
 import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 import { normBridgeAddr } from '@/lib/bridgeLinks';
+import { metalPurchasesEnabled } from '@/lib/constants';
 
 const DepositsPage = () => {
   usePageTitle("Fund");
@@ -20,9 +21,10 @@ const DepositsPage = () => {
   const tab = searchParams.get('tab');
   const tokenParam = searchParams.get('token');
   const metalParam = searchParams.get('metal');
-  const [fundingMode, setFundingMode] = useState<"bridge" | "metals">(() =>
+  const [requestedFundingMode, setFundingMode] = useState<"bridge" | "metals">(() =>
     tokenParam ? 'bridge' : tab === 'metals' || metalParam ? 'metals' : 'bridge'
   );
+  const fundingMode = metalPurchasesEnabled ? requestedFundingMode : 'bridge';
 
   useEffect(() => {
     if (tokenParam) {
