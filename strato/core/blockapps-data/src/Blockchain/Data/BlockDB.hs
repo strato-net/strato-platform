@@ -19,7 +19,7 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
-import Blockchain.Data.Transaction (transactionHash, txAndTime2RawTX)
+import Blockchain.Data.Transaction (transactionHash, txAndTime2RawTX, txAndTime2RawTXWithSigner)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
@@ -92,10 +92,11 @@ getBlock h = do
 
 putBlocks ::
   HasSQLDB m =>
+  M.Map Keccak256 Address ->
   [Block] ->
   Bool ->
   m [Key BlockDataRef]
-putBlocks blockList makeHashOne = sqlQuery $ putBlocksSql blockList makeHashOne
+putBlocks signers blockList makeHashOne = sqlQuery $ putBlocksSql signers blockList makeHashOne
 
 -- | The body of 'putBlocks' as one 'SQL.SqlPersistT' action, so a caller can
 -- commit a batch's blocks together with its receipts, state diffs and
@@ -103,10 +104,11 @@ putBlocks blockList makeHashOne = sqlQuery $ putBlocksSql blockList makeHashOne
 -- already present is skipped and its existing key returned.
 putBlocksSql ::
   MonadUnliftIO m =>
+  M.Map Keccak256 Address ->
   [Block] ->
   Bool ->
   SQL.SqlPersistT m [Key BlockDataRef]
-putBlocksSql blockList makeHashOne = do
+putBlocksSql signers blockList makeHashOne = do
   let blocksWithHashes = (\b -> (b, blockHash b)) <$> blockList
   -- Everything is done per batch, table by table: a fixed handful of
   -- statements however many blocks are in the batch. insertMany returns the
@@ -129,7 +131,10 @@ putBlocksSql blockList makeHashOne = do
     (\n ks -> SQL.updateWhere [RawTransactionId SQL.<-. ks] [RawTransactionBlockNumber SQL.=. fromIntegral n])
     byBlockNumber
   let newTxs = M.elems $ M.fromList
-        [ (transactionHash tx, txAndTime2RawTX (BlockHash hash') tx (number bd) (timestamp bd))
+        [ (transactionHash tx, maybe
+              (txAndTime2RawTX (BlockHash hash') tx (number bd) (timestamp bd))
+              (\signer -> txAndTime2RawTXWithSigner signer (BlockHash hash') tx (number bd) (timestamp bd))
+              (M.lookup (transactionHash tx) signers))
         | (tx, hash', bd) <- txsWithBlock, M.notMember (transactionHash tx) known ]
   newKeys <- SQL.insertMany newTxs
   let txKey = M.union known $ M.fromList (zip (map rawTransactionTxHash newTxs) newKeys)

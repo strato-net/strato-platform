@@ -18,6 +18,7 @@ module Blockchain.Data.GenesisBlock
 where
 
 import BlockApps.Logging
+import Blockchain.DB.AddressStateDB (HasAccountDB)
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
@@ -30,12 +31,11 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.GenesisInfo (GenesisInfo)
 import qualified Blockchain.Data.GenesisInfo as GI
-import Blockchain.Database.MerklePatricia
+import Control.Monad.Composable.StateDB
 import Blockchain.Strato.Model.Address hiding (parseHex)
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Change.Alter (Alters)
 import Control.Monad.Change.Modify
 import Control.Monad.IO.Class
 import Crypto.Util (i2bs_unsized)
@@ -48,11 +48,7 @@ import Numeric
 import SolidVM.Model.Storable
 import Text.Format
 
-initializeBlankStateDB ::
-  ( (Maybe Word256 `A.Alters` StateRoot) m,
-    (StateRoot `A.Alters` NodeData) m
-  ) =>
-  m ()
+initializeBlankStateDB :: HasStateDB m => m ()
 initializeBlankStateDB = initializeBlank >> setStateDBStateRoot Nothing emptyTriePtr
 
 putStorageTrie ::
@@ -62,7 +58,7 @@ putStorageTrie ::
     HasStateDB m,
     HasRawStorageDB m,
     HasMemRawStorageDB m,
-    (Address `A.Alters` AddressState) m
+    HasAccountDB m
   ) =>
   Address ->
   [(StoragePath, BasicValue)] ->
@@ -80,7 +76,7 @@ putAccount ::
     HasStateDB m,
     HasStorageDB m,
     HasMemRawStorageDB m,
-    (Address `A.Alters` AddressState) m
+    HasAccountDB m
   ) =>
   GI.AddressInfo ->
   m ()
@@ -112,7 +108,7 @@ initializeStateDB ::
     HasStateDB m,
     HasStorageDB m,
     HasMemStorageDB m,
-    (Address `A.Alters` AddressState) m
+    HasAccountDB m
   ) =>
   [GI.AddressInfo] ->
   m ()
@@ -143,7 +139,7 @@ genesisInfoToGenesisBlock ::
     HasStateDB m,
     HasStorageDB m,
     HasMemStorageDB m,
-    (Address `A.Alters` AddressState) m
+    HasAccountDB m
   ) =>
   GenesisInfo ->
   m Block
@@ -210,7 +206,7 @@ populateMPTAndWriteGenesis ::
     HasMemStorageDB m,
     MonadIO m,
     MonadLogger m,
-    (Address `Alters` AddressState) m
+    HasAccountDB m
   ) =>
   GenesisInfo ->
   m ()
@@ -234,7 +230,7 @@ populateMPTFromGenesis ::
     HasStorageDB m,
     HasMemStorageDB m,
     MonadLogger m,
-    (Address `Alters` AddressState) m
+    HasAccountDB m
   ) =>
   GenesisInfo ->
   m ()

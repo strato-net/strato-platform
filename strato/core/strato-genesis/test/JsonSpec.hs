@@ -3,7 +3,7 @@
 module JsonSpec where
 
 import Blockchain.Data.GenesisInfo
-import Blockchain.Database.MerklePatricia.StateRoot
+import Blockchain.Strato.Model.StateRoot
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import qualified Data.Map.Strict as M

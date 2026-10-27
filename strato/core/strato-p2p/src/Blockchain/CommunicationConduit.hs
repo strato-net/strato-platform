@@ -82,7 +82,7 @@ handleMsgClientConduit ::
 handleMsgClientConduit myId peer = do
   $logDebugS "handleMsgClientConduit" "<waving hand emoji>"
 
-  lift $ clearAllSyncTasks $ pPeerHost peer
+  lift clearAllSyncTasks
 
   yield $
     Right
@@ -136,9 +136,11 @@ handleMsgServerConduit ::
 handleMsgServerConduit myPubkey peer = do
   $logDebugS "handleMsgServerConduit" "about to parse message"
 
-  lift $ clearAllSyncTasks $ pPeerHost peer
+  lift clearAllSyncTasks
 
-  numActivePeers <- liftIO $ fmap length getPeersByThreads
+  -- This connection is past its handshake and counted, so the limit is the
+  -- number of established peers.
+  numActivePeers <- liftIO countEstablishedPeers
 
   when (numActivePeers > Conf.maxConnections (p2pConfig ethConf)) $ do
     yield $ Right $ Disconnect TooManyPeers
@@ -169,25 +171,29 @@ handleMsgServerConduit myPubkey peer = do
       $logInfoS "serverHandshake/Status{}" "received status"
       -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
       let highestBlockNum' = if ver < 63 then theirHighestBlockNum - 8192 else theirHighestBlockNum
-      yield
-        =<< lift
-          ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock bHash myHighestBlockNum _ _ _) -> do
-              (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
-              when (peerGH /= genHash) $ throwIO WrongGenesisBlock
-              when (networkID' /= Conf.networkID (networkConfig ethConf)) $ throwIO NetworkIDMismatch
+      BestSequencedBlock bHash myHighestBlockNum _ _ _ <- lift $ Mod.get (Mod.Proxy @BestSequencedBlock)
+      GenesisBlockHash genHash <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
+      -- Answer before judging: a peer on another network then fails its own
+      -- genesis check on our Status and bans this address, where a bare close
+      -- looked like a crash and was dialed again a few seconds later.
+      yield $
+        Right
+          Status
+            { protocolVersion = fromIntegral ethVersion,
+              networkID = Conf.networkID (networkConfig ethConf),
+              highestBlockNum = myHighestBlockNum,
+              latestHash = bHash,
+              genesisHash = genHash
+            }
+      when (peerGH /= genHash) $ do
+        yield $ Right $ Disconnect OtherSubprotocolReason
+        throwIO WrongGenesisBlock
+      when (networkID' /= Conf.networkID (networkConfig ethConf)) $ do
+        yield $ Right $ Disconnect OtherSubprotocolReason
+        throwIO NetworkIDMismatch
 
-              updatePeerLastBestBlockHash peer $ PeerLastBestBlockHash peerBestHash
-              Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum'
-              return $
-                Right
-                  Status
-                    { protocolVersion = fromIntegral ethVersion,
-                      networkID = Conf.networkID (networkConfig ethConf),
-                      highestBlockNum = myHighestBlockNum,
-                      latestHash = bHash,
-                      genesisHash = genHash
-                    }
-          )
+      lift . updatePeerLastBestBlockHash peer $ PeerLastBestBlockHash peerBestHash
+      lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum'
       startSyncTask peer highestBlockNum'
 
       lift stampActionTimestamp
@@ -220,7 +226,7 @@ startSyncTask peer peerBest = do
         then syncFetchTask syncTask fetchNumber
         else do
           $logInfoS "startSyncTask" $ T.pack $ "sync task chiliad higher than world highest block (#" ++ show peerBest ++ "), marking the new chiliad as 'NotReady'"
-          lift $ setSyncTaskNotReady (pPeerHost peer)
+          lift setSyncTaskNotReady
 
 assertHandshake ::
   (MonadLogger m, MonadIO m) =>

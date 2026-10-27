@@ -148,16 +148,50 @@ if [[ "$PREBUILT" == "true" ]]; then
             exit 1
         fi
         VERSION_FILE="$(tr -d '[:space:]' < "$SCRIPT_DIR/../VERSION")"
-        COMMIT="$(git -C "$SCRIPT_DIR/.." rev-parse --short=7 HEAD 2>/dev/null || true)"
+        # Under sudo git refuses the checkout, owned by the invoking user (its
+        # SUDO_UID exemption does not survive a nested sudo, as in a wrapper
+        # script); the checkout strato-up itself runs from is trusted.
+        COMMIT="$(git -c safe.directory="$SCRIPT_DIR/.." -C "$SCRIPT_DIR/.." rev-parse --short=7 HEAD 2>/dev/null || true)"
         IMAGE_TAGS=()
         [[ -n "$COMMIT" ]] && IMAGE_TAGS+=("$VERSION_FILE-$COMMIT")
         IMAGE_TAGS+=("$VERSION_FILE")
     fi
     STRATO_IMAGE=""
+    LOOKUP_ERROR=""
     for tag in "${IMAGE_TAGS[@]}"; do
-        if docker image inspect "${REPO_URL}strato:$tag" >/dev/null 2>&1 || docker manifest inspect "${REPO_URL}strato:$tag" >/dev/null 2>&1; then
+        # The plain VERSION tag is the release build of that version, not this
+        # checkout's commit: it can be older than the checkout, and than a
+        # snapshot taken from develop. Falling back to it is the user's call;
+        # only a checkout without git history (a release tarball) takes it as is.
+        if [[ "$tag" == "$VERSION_FILE" && -e "$SCRIPT_DIR/../.git" ]]; then
+            if [[ -n "$COMMIT" ]]; then
+                echo "No prebuilt strato image for this checkout's commit (${REPO_URL}strato:$VERSION_FILE-$COMMIT); CI publishes a commit's images a few minutes after it is pushed."
+            else
+                echo "Could not read this checkout's commit (git -C $SCRIPT_DIR/.. rev-parse HEAD failed), so its prebuilt image could not be looked up."
+            fi
+            echo "${REPO_URL}strato:$VERSION_FILE is the $VERSION_FILE release build, which may be older than this checkout and not match a snapshot taken from develop."
+            read -r -p "Start from ${REPO_URL}strato:$VERSION_FILE anyway? [y/N] " answer || answer=""
+            if [[ "$answer" != [yY] ]]; then
+                echo "Not starting STRATO: pass --prebuilt=<tag> to choose an image, or wait for the commit's build." >&2
+                exit 1
+            fi
+        fi
+        if docker image inspect "${REPO_URL}strato:$tag" >/dev/null 2>&1; then
             STRATO_IMAGE="${REPO_URL}strato:$tag"
             break
+        fi
+        # The registry answers "manifest unknown" for a tag that does not exist.
+        # Anything else (no route to the registry, a proxy only the daemon knows
+        # about, a CLI without `docker manifest`) is a failed lookup, not a
+        # missing image, and is reported as such.
+        if LOOKUP_ERROR="$(docker manifest inspect "${REPO_URL}strato:$tag" 2>&1 >/dev/null)"; then
+            STRATO_IMAGE="${REPO_URL}strato:$tag"
+            break
+        fi
+        if [[ "$LOOKUP_ERROR" != *"manifest unknown"* ]]; then
+            echo "Error: could not look up ${REPO_URL}strato:$tag on the registry: ${LOOKUP_ERROR}" >&2
+            echo "Check that this machine reaches https://ghcr.io (DNS, firewall, proxy settings of the docker CLI, not only of the daemon) and that 'docker manifest inspect' works here; the image itself may well exist." >&2
+            exit 1
         fi
     done
     if [[ -z "$STRATO_IMAGE" ]]; then
@@ -278,7 +312,7 @@ export MALLOC_ARENA_MAX=2
 # "-p", drops an output it can no longer write (the gone terminal, a closed
 # pipe) instead of exiting: a dead tee leaves convoke's pipe without a reader.
 : > logs/convoke.log
-nohup convoke > >(trap '' HUP; tee -a -p logs/convoke.log >/dev/null) 2> >(trap '' HUP; tee -a -p logs/convoke.log >&2) &
+nohup strato-fast-cores convoke > >(trap '' HUP; tee -a -p logs/convoke.log >/dev/null) 2> >(trap '' HUP; tee -a -p logs/convoke.log >&2) &
 CONVOKE_PID=$!
 echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
 

@@ -23,6 +23,7 @@ import           BlockApps.Logging
 import           Blockchain.CommunicationConduit
 import           Blockchain.Context hiding (Inbound, Outbound)
 import           Blockchain.Data.PubKey (secPubKeyToPoint)
+import           Blockchain.Data.Wire (Message (..), TerminationReason (..))
 import           Blockchain.Display (displayMessage, MsgDirection(..))
 import           Blockchain.EthEncryptionException
 import           Blockchain.Event
@@ -30,17 +31,19 @@ import           Blockchain.EventException
 import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
 import           Blockchain.Metrics
-import           Blockchain.EthConf (ethConf, p2pConfig)
+import           Blockchain.EthConf (ethConf, networkConfig, p2pConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import           Blockchain.RLPx
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Keccak256 (Keccak256)
 import           Blockchain.Threads
 import           Blockchain.TimerSource
 import           Control.Concurrent hiding (yield)
 import           Control.Exception.Base (ErrorCall (..))
 import           Control.Lens ((^.))
 import           Control.Monad (forever, forM_, when, void)
+import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.Composable.Vault
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
@@ -99,14 +102,15 @@ runEthClientConduit ::
   String ->
   m (Maybe SomeException)
 runEthClientConduit peer pSource pSink seqSrc peerStr = do
-  changeLabelStatusM $ "CONNECTED"
   myPublic' <- getPub
   let myPublic = secPubKeyToPoint myPublic'
       otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
+  GenesisBlockHash genHash <- Mod.access (Mod.Proxy @GenesisBlockHash)
   mConnectionResult <- timeout 2000000 $ pSource $$+ ethCryptConnect otherPubKey `fuseUpstream` pSink
   case mConnectionResult of
     Nothing                   -> pure $ Just $ toException $ HandshakeException "handshake timed out"
     Just (_, (outCtx, inCtx)) -> do
+      changeLabelStatusM "CONNECTED"
       ret <-
         fmap (either Just (const Nothing)) . try $
         [
@@ -116,6 +120,7 @@ runEthClientConduit peer pSource pSink seqSrc peerStr = do
           .| CL.iterM (recordTraffic Inbound)
           .| bytesToMessages
           .| CL.iterM (displayMessage Inbound peerStr)
+          .| CL.iterM (rejectEarly genHash)
           .| CL.map MsgEvt
         , labelPeerThread peerStr "Sequencer Source" Nothing $
           seqSrc
@@ -140,6 +145,21 @@ runEthClientConduit peer pSource pSink seqSrc peerStr = do
         Just e -> changeLabelStatusM $ "DISCONNECTING: " ++ show e
 
       return ret
+
+-- | Judge a peer's Status and Disconnect in the socket reader, which sees them
+-- before the EOF that follows: the handler races the reader for the event
+-- channel, and when it lost, every such ending surfaced as HeadCipherTooShort,
+-- the signature of a crash, and the peer was dialed again.
+rejectEarly :: MonadIO m => Keccak256 -> Message -> m ()
+rejectEarly genHash = \case
+  Status {genesisHash = peerGH} | peerGH /= genHash -> throwIO WrongGenesisBlock
+  Status {networkID = peerNet} | peerNet /= Conf.networkID (networkConfig ethConf) -> throwIO NetworkIDMismatch
+  Disconnect reason -> throwIO $ RemoteDisconnect reason
+  _ -> pure ()
+
+-- | How long to leave a peer that answered TooManyPeers alone.
+tooManyPeersRetrySeconds :: Int
+tooManyPeersRetrySeconds = 60
 
 runPeerInList ::
   ( MonadP2P m,
@@ -220,6 +240,16 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
             case ioErrType of
               NoSuchThing -> disableException thePeer "ioErrType: NoSuchThing" (Just . fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) True
               i -> disableException thePeer ("ioErrType: " <> show i) Nothing True
+          e' | Just (RemoteDisconnect TooManyPeers) <- fromException e' -> do
+            -- A full peer is healthy: retry in a fixed minute. The exponential
+            -- backoff would grow to hours while every bootnode is full, and
+            -- discovery keeps pinging it, since it still hands out neighbours.
+            disErr <- storeDisableException thePeer "TooManyPeers"
+            whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
+            tcpErr <- disableTCPPeerForSeconds thePeer tooManyPeersRetrySeconds
+            whenLeft tcpErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to disable peer: " ++ show err2
+          e' | Just (RemoteDisconnect reason) <- fromException e' -> do
+            disableException thePeer ("RemoteDisconnect " ++ show reason) (Just . fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) False
           e' | Just HeadCipherTooShort <- fromException e' -> do  -- this is what we get when the remote machine crashes (obviously, it isn't sending us any reason for hangup)
             disableException thePeer "HeadCipherTooShort" Nothing True
           _ -> return ()

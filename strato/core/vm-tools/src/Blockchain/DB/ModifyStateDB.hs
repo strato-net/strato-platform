@@ -10,13 +10,14 @@ module Blockchain.DB.ModifyStateDB
   )
 where
 
+import Blockchain.DB.AddressStateDB (HasAccountDB)
 import Blockchain.Data.AddressStateDB
 import Blockchain.Strato.Model.Address
 import Control.Monad (void)
 import qualified Control.Monad.Change.Alter as A
 
 addToBalance ::
-  ((Address `A.Alters` AddressState) m) =>
+  HasAccountDB m =>
   Address ->
   Integer ->
   m Bool
@@ -28,7 +29,7 @@ addToBalance address val = do
           else True <$ A.insert A.Proxy address addressState {addressStateBalance = newVal}
 
 pay ::
-  ((Address `A.Alters` AddressState) m) =>
+  HasAccountDB m =>
   String ->
   Address ->
   Address ->
