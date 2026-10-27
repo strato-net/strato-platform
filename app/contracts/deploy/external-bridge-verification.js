@@ -180,7 +180,15 @@ function verifyUninitializedProxy(settings, name, targetAddress, proxyRows, logi
   if (!logic || (logic.initialized !== false && logic.initialized !== "false")) {
     throw new Error(`${name} proxy implementation state cannot prove a fresh uninitialized deployment`);
   }
-  return { initialized: false };
+  return name === "ExternalAssetBridge"
+    ? {
+      initialized: false,
+      depositsPaused: false,
+      withdrawalsPaused: false,
+      settlementVerifierCount: 0,
+      settlementVerifierThreshold: 0,
+    }
+    : { initialized: false };
 }
 
 function compareRoutes(settings, state, diagnostics) {

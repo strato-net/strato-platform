@@ -535,6 +535,9 @@ test("missing state is uninitialized only for a verified fresh proxy", () => {
   const logicRows = [{ address: addr("3"), initialized: false }];
   assert.deepEqual(verifyUninitializedProxy(settings, "TokenRouter", addr("2"), proxyRows, logicRows),
     { initialized: false });
+  assert.deepEqual(verifyUninitializedProxy(settings, "ExternalAssetBridge", addr("2"), proxyRows, logicRows),
+    { initialized: false, depositsPaused: false, withdrawalsPaused: false,
+      settlementVerifierCount: 0, settlementVerifierThreshold: 0 });
   assert.throws(() => verifyUninitializedProxy(settings, "TokenRouter", addr("4"), proxyRows, logicRows),
     /proxy was not found/);
   assert.throws(() => verifyUninitializedProxy(settings, "TokenRouter", addr("2"),
@@ -1087,11 +1090,16 @@ test("Safe grouping preserves chain, owner, boundaries and earlier reviewed file
   const pause = groupSafeAction(f.context, f.artifacts, checklist);
   assert.equal(path.basename(pause.path), "pause.safe.json");
   const pauseJson = readJson(pause.path);
-  assert.equal(pauseJson.transactions.length, 2);
+  assert.equal(pauseJson.transactions.length, 3);
+  const { ethers } = require("ethers");
+  const grant = new ethers.Interface(["function grantRole(bytes32,address)"])
+    .decodeFunctionData("grantRole", pauseJson.transactions[1].data);
+  assert.equal(grant[0], ethers.id("PAUSER_ROLE"));
+  assert.equal(grant[1].toLowerCase(), f.context.rollout.vaultConfig.chains[0].safeAddress);
   checklist[0].status = checklist[1].status = "DONE";
   const configure = groupSafeAction(f.context, f.artifacts, checklist);
   assert.equal(path.basename(configure.path), "configure.safe.json");
-  assert.equal(readJson(pause.path).transactions.length, 2);
+  assert.equal(readJson(pause.path).transactions.length, 3);
   checklist[3].status = "UNVERIFIED";
   const partial = groupSafeAction(f.context, f.artifacts, checklist);
   assert.notEqual(partial.path, configure.path);

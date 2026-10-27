@@ -359,11 +359,16 @@ function generate(context, outputDirectory, options = {}) {
   const vaultInterface = new ethers.Interface([
     "function setSourceBridge(uint256,address,bool)", "function setAttestationSigner(address,bool)",
     "function setAttestationThreshold(uint8)", "function setMaxAuthorizationValiditySeconds(uint256)",
-    "function setTokenPolicy(address,bool,uint256,uint256,uint256,uint256)", "function pause()",
+    "function setTokenPolicy(address,bool,uint256,uint256,uint256,uint256)",
+    "function grantRole(bytes32,address)", "function pause()",
   ]);
   const chain = rollout.vaultConfig.chains[0];
   const vaultPausePath = save("vault-pause.json", buildTransactionBuilderBatch(rollout.chainId, chain.safeAddress,
-    [{ to: chain.vaultAddress, value: "0", data: vaultInterface.encodeFunctionData("pause"), operation: 0 }], { name: "Pause external vault" }));
+    [
+      { to: chain.vaultAddress, value: "0",
+        data: vaultInterface.encodeFunctionData("grantRole", [ethers.id("PAUSER_ROLE"), chain.safeAddress]), operation: 0 },
+      { to: chain.vaultAddress, value: "0", data: vaultInterface.encodeFunctionData("pause"), operation: 0 },
+    ], { name: "Authorize Safe and pause external vault" }));
   if (chain.attestationSigners.length === getExternalBridgeNetwork(rollout.chainId).verifierCount) {
     const config = normalizeConfig(rollout.vaultConfig);
     const transactions = buildOperations(config, config.chains[0]).configure.map((operation) => ({
