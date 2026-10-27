@@ -30,6 +30,9 @@ export const WAD = 10n ** 18n;
  */
 export const rewardsEnabled = false;
 
+/** Enable MetalForge purchase controls and bridge-to-metal options in the UI. */
+export const metalPurchasesEnabled = false;
+
 // ============================================
 // Input Validation Patterns
 // ============================================
