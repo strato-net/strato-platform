@@ -20,6 +20,21 @@ const BEST_SEQUENCED_BLOCK_KEY = "<best_sequenced>";
 
 let clientPromise = null;
 
+// `redis_host=none` says this apex has no Redis block cache at all: an API
+// tier task, where Redis lives on the core cells and is not published. The
+// entrypoint leaves an explicit redis_host alone, so this is the operator's
+// word. Nothing is connected and every reader rejects at once, so the
+// callers' SQL fallbacks answer without first waiting out REDIS_TIMEOUT_MS
+// on every request.
+const NO_REDIS = (process.env.redis_host || "").trim().toLowerCase() === "none";
+let noRedisLogged = false;
+
+// After a failed connect, how long readers reject at once instead of each
+// paying REDIS_TIMEOUT_MS again for a Redis that is away (restarting, or not
+// where the configuration says). The first call after that tries again.
+const RETRY_CONNECT_AFTER_MS = 30 * 1000;
+let retryConnectAt = 0;
+
 // How long a Redis call may take before apex gives up on the block cache and
 // reads SQL instead. Left to its defaults, node-redis retries a failed
 // connection for ever (connect() never rejects) and parks commands in an
@@ -39,7 +54,20 @@ function withTimeout(promise, what) {
 }
 
 function getClient() {
+  if (NO_REDIS) {
+    if (!noRedisLogged) {
+      noRedisLogged = true;
+      winston.info("redis_host=none: no Redis block cache here, the last block and validators are read from SQL");
+    }
+    return Promise.reject(new Error("no Redis block cache here (redis_host=none)"));
+  }
   if (clientPromise) return clientPromise;
+  const waitMs = retryConnectAt - Date.now();
+  if (waitMs > 0) {
+    return Promise.reject(
+      new Error(`Redis connect failed recently, not retried for another ${Math.ceil(waitMs / 1000)} s`)
+    );
+  }
 
   const host = process.env.redis_host || "redis";
   const port = parseInt(process.env.redis_port || "6379", 10);
@@ -65,9 +93,14 @@ function getClient() {
   });
 
   const connecting = withTimeout(client.connect(), "connect")
-    .then(() => client)
+    .then(() => {
+      retryConnectAt = 0;
+      return client;
+    })
     .catch((err) => {
-      // Stop the client's own retry loop; the next call starts afresh.
+      // Stop the client's own retry loop. Calls in the next
+      // RETRY_CONNECT_AFTER_MS fail at once; the first one after it starts afresh.
+      retryConnectAt = Date.now() + RETRY_CONNECT_AFTER_MS;
       if (clientPromise === connecting) clientPromise = null;
       client.disconnect().catch(() => {});
       throw err;
