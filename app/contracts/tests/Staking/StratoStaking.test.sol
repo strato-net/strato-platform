@@ -96,7 +96,7 @@ contract Describe_StratoStaking {
         gov = new MercataGovernance(address(this));
         gov.setStakingContract(address(staking));
         staking.setGovernance(address(gov), true);
-        // minStake 1000 of self-bond, 50% proposer fee share, jail after 3 consecutive misses for 100s
+        // minStake 1000 of self-bond, 50% proposer fee share; the jail knobs (3 misses, 100s) are stored but inert
         staking.setValidatorParams(1000e18, 5000, 3, 100);
         // set of 50, generous mutation budget, 100s exit notice / unkick cooldown, no stake cap, joins paused
         staking.setSetParams(50, 50, 500, 10, 100, 100, 0, true);
@@ -169,6 +169,11 @@ contract Describe_StratoStaking {
 
     function _reward(address validator, uint256 amount) internal {
         funder.doSuccessfully(address(staking), "creditBlockReward(address,uint256)", validator, amount);
+    }
+
+    function _commissionOf(address validator) internal returns (uint256) {
+        (,,, uint256 commission,,,,,,,,,,,) = staking.operators(validator);
+        return commission;
     }
 
     function _selfBondOf(address validator) internal returns (uint256) {
@@ -251,7 +256,8 @@ contract Describe_StratoStaking {
 
     // The pre-upgrade contract maintained lastSyncedWeight without ever calling
     // governance, so the cache reported "already synced" while governance held
-    // nothing. Pointing at a fresh governance reproduces that shape.
+    // nothing. A fresh governance that lists the validators but holds no stakes
+    // reproduces that shape.
     function it_republishes_stakes_to_a_governance_that_knows_nothing() public {
         _bondBoth();
         uint256 weightA = gov.validatorStake(VALIDATOR_A);
@@ -259,15 +265,63 @@ contract Describe_StratoStaking {
         require(weightA == 1000e18 && weightB == 2000e18, "published to the original governance");
 
         MercataGovernance fresh = new MercataGovernance(address(this));
+        fresh.setStakingContract(address(this));
+        fresh.addValidatorFromStaking(VALIDATOR_A, 0);
+        fresh.addValidatorFromStaking(VALIDATOR_B, 0);
         fresh.setStakingContract(address(staking));
-        require(fresh.validatorStake(VALIDATOR_A) == 0, "fresh governance knows nothing");
+        require(fresh.validatorStake(VALIDATOR_A) == 0, "fresh governance holds no stakes");
         require(staking.lastSyncedWeight(VALIDATOR_A) == weightA, "local cache still claims synced");
 
         staking.setGovernance(address(fresh), true);
 
         require(fresh.validatorStake(VALIDATOR_A) == weightA, "republished despite the cache");
         require(fresh.validatorStake(VALIDATOR_B) == weightB, "both validators republished");
-        require(fresh.isValidator(VALIDATOR_A), "membership reconciled too");
+    }
+
+    // An admin vote removes a validator in governance without telling staking. A sync
+    // must give the seat up rather than add the validator back: anyone can call one.
+    function it_does_not_readd_a_validator_governance_removed() public {
+        _bondBoth();
+        // what voteToRemoveValidator does, as staking sees it
+        gov.setStakingContract(address(this));
+        require(gov.removeValidatorFromStaking(VALIDATOR_A), "removed in governance");
+        gov.setStakingContract(address(staking));
+        require(staking.isValidator(VALIDATOR_A), "staking has not heard yet");
+
+        fastForward(1, 1);
+        attacker.do(address(staking), "syncValidator(address)", VALIDATOR_A);
+        require(!gov.isValidator(VALIDATOR_A), "the removal stands");
+        require(staking.status(VALIDATOR_A) == 1, "seat given up: Registered");
+        require(staking.validatorCount() == 1, "count updated");
+        require(staking.activeValidatorCount() == 1, "index updated");
+
+        _stake(user1, VALIDATOR_A, 100e18);
+        require(!gov.isValidator(VALIDATOR_A), "staking to it does not bring it back either");
+
+        _activate(VALIDATOR_A);
+        require(gov.isValidator(VALIDATOR_A), "joining again is explicit");
+    }
+
+    // The block header cannot express "removed, then added again" for one validator, so
+    // governance refuses the re-add until the next block.
+    function it_cannot_rejoin_in_the_block_it_left() public {
+        _bondBoth();
+        operatorA.do(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 1e18);
+        require(!gov.isValidator(VALIDATOR_A), "left below minStake");
+        _selfBond(operatorA, VALIDATOR_A, 1e18);
+
+        bool rejected = false;
+        try staking.tryActivate(VALIDATOR_A) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "no re-add in the block of the removal");
+        require(!gov.isValidator(VALIDATOR_A), "still out");
+        require(staking.status(VALIDATOR_A) == 1, "still Registered");
+
+        fastForward(1, 1);
+        _activate(VALIDATOR_A);
+        require(gov.isValidator(VALIDATOR_A), "re-added a block later");
     }
 
     function it_removes_and_readds_validators_around_the_threshold() public {
@@ -286,6 +340,7 @@ contract Describe_StratoStaking {
         _selfBond(operatorA, VALIDATOR_A, 1e18);
         require(staking.isWaiter(VALIDATOR_A), "self-bond does");
         require(!gov.isValidator(VALIDATOR_A), "no implicit re-activation");
+        fastForward(1, 1);
         _activate(VALIDATOR_A);
         require(gov.isValidator(VALIDATOR_A), "re-added on request");
 
@@ -434,6 +489,28 @@ contract Describe_StratoStaking {
             rejected = true;
         }
         require(rejected, "usdst is not a stray token");
+    }
+
+    // A validator the registry has delisted earns no proposer fees, as it earns no block
+    // rewards, even while governance still has it proposing.
+    function it_holds_the_fees_of_a_delisted_proposer() public {
+        registry.removeValidator(VALIDATOR_A);
+        setBlockContext(VALIDATOR_A, address(0), address(0), 0);
+        usdst.mint(address(staking), 10e18);
+        staking.processBlock();
+        require(staking.unattributedFees() == 10e18, "held as unattributed");
+        require(_pendingOperatorFees(VALIDATOR_A) == 0, "nothing credited to the delisted record");
+    }
+
+    // Reward bookkeeping that claims more than the contract holds beyond principal must
+    // fail the payout rather than pay it out of what stakers bonded.
+    function it_never_pays_rewards_out_of_principal() public {
+        _selfBond(operatorA, VALIDATOR_A, 1000e18);
+        _stake(user1, VALIDATOR_A, 1000e18);
+        // 5 owed on the books, nothing held beyond the 2000 of principal
+        staking.seedRetiredCheckpoints(VALIDATOR_A, 0, 0, 5e18);
+        operatorA.doExpectingFailure(address(staking), "claimOperatorRewards(address)", "SS: rewards unavailable", VALIDATOR_A);
+        require(strato.balanceOf(address(staking)) == 2000e18, "principal intact");
     }
 
     // ---- discretionary rewards -----------------------------------------------------------
@@ -809,6 +886,9 @@ contract Describe_StratoStaking {
         _selfBond(operatorB, VALIDATOR_B, 1000e18);
         _registerSelf(validatorC);
         _selfBond(validatorC, address(validatorC), 6000e18);
+        _activate(VALIDATOR_A);
+        _activate(VALIDATOR_B);
+        _activate(address(validatorC));
         // the cap is switched on once the set is bootstrapped (a lone first staker is always 100%)
         staking.setSetParams(50, 50, 500, 10, 100, 100, 3300, true);
 
@@ -819,6 +899,80 @@ contract Describe_StratoStaking {
         operatorA.doExpectingFailure(address(staking), "selfBond(address,uint256)", "SS: above operator stake cap", VALIDATOR_A, 2000e18);
         user1.do(address(staking), "unstake(address,uint256)", VALIDATOR_A, 500e18);
         require(staking.delegatedStake(address(user1), VALIDATOR_A) == 1000e18, "unstaking is never capped");
+    }
+
+    // Stake behind a listed validator outside the set carries no vote, so it gives nobody
+    // room under the cap and does not hide a validator that holds over a third of the vote.
+    function it_measures_the_stake_cap_and_one_third_against_the_consensus_set() public {
+        _bondBoth();
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 6000e18);
+        _stake(user1, VALIDATOR_A, 1000e18);
+        require(staking.consensusWeight() == 4000e18, "A 2000 + B 2000; C is not in the set");
+        require(staking.exceedsOneThird(VALIDATOR_A), "half of the vote, whatever C holds");
+
+        staking.setSetParams(50, 50, 500, 10, 100, 100, 6000, true);
+        user1.doExpectingFailure(address(staking), "stake(address,uint256)", "SS: above operator stake cap", VALIDATOR_A, 2000e18); // 4000 / 6000
+        _stake(user1, VALIDATOR_B, 500e18); // 2500 / 4500
+        // a validator outside the set is measured as if it had joined: 7000 / 11500
+        user1.doExpectingFailure(address(staking), "stake(address,uint256)", "SS: above operator stake cap", address(validatorC), 1000e18);
+    }
+
+    // Leaving is never refused for lack of mutation budget: a validator that should leave
+    // keeps its seat until a later sync, and the call that got there goes through.
+    function it_defers_a_leave_when_the_mutation_budget_is_spent() public {
+        _bondBoth();
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1000e18);
+        _activate(address(validatorC));
+        fastForward(1, 1);
+        staking.setSetParams(50, 50, 500, 1, 100, 100, 0, true);
+
+        // A and C (1000 each) both fall under the new minStake; one mutation is allowed
+        staking.setValidatorParams(1500e18, 5000, 3, 100);
+        require(gov.validatorCount() == 2, "one left in this block");
+        require(staking.validatorCount() == 2, "the other keeps its seat for now");
+
+        fastForward(1, 1);
+        staking.syncValidator(VALIDATOR_A);
+        staking.syncValidator(address(validatorC));
+        require(gov.validatorCount() == 1 && gov.isValidator(VALIDATOR_B), "left on the next sync");
+    }
+
+    function it_gives_notice_before_a_commission_raise() public {
+        operatorA.doSuccessfully(address(staking), "setCommissionBps(address,uint256)", VALIDATOR_A, uint256(300));
+        require(_commissionOf(VALIDATOR_A) == 300, "a cut applies at once");
+
+        operatorA.doSuccessfully(address(staking), "setCommissionBps(address,uint256)", VALIDATOR_A, uint256(900));
+        require(_commissionOf(VALIDATOR_A) == 300, "a raise is only announced");
+        require(staking.announcedCommissionBps(VALIDATOR_A) == 900, "announced");
+        operatorA.doExpectingFailure(address(staking), "setCommissionBps(address,uint256)", "SS: commission notice running", VALIDATOR_A, uint256(900));
+
+        fastForward(101, 1);
+        operatorA.doSuccessfully(address(staking), "setCommissionBps(address,uint256)", VALIDATOR_A, uint256(900));
+        require(_commissionOf(VALIDATOR_A) == 900, "applied after the notice");
+
+        operatorA.doSuccessfully(address(staking), "setCommissionBps(address,uint256)", VALIDATOR_A, uint256(1000));
+        require(_commissionOf(VALIDATOR_A) == 900, "each raise needs its own notice");
+        staking.setValidatorCommissionBps(VALIDATOR_A, 1000);
+        require(_commissionOf(VALIDATOR_A) == 1000, "the owner sets it directly");
+    }
+
+    // Moving is instant; without a lock a delegator could follow each block's proposer.
+    function it_locks_moved_stake_from_moving_on() public {
+        _bondBoth();
+        _stake(user1, VALIDATOR_A, 100e18);
+        user1.doSuccessfully(address(staking), "moveStake(address,address,uint256)", VALIDATOR_A, VALIDATOR_B, 100e18);
+        user1.doExpectingFailure(address(staking), "moveStake(address,address,uint256)", "SS: stake recently moved", VALIDATOR_B, VALIDATOR_A, 100e18);
+        user1.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_B, 10e18);
+
+        fastForward(101, 1);
+        user1.doSuccessfully(address(staking), "moveStake(address,address,uint256)", VALIDATOR_B, VALIDATOR_A, 90e18);
+        require(staking.delegatedStake(address(user1), VALIDATOR_A) == 90e18, "moved after the lock");
+
+        registry.removeValidator(VALIDATOR_A);
+        user1.doSuccessfully(address(staking), "moveStake(address,address,uint256)", VALIDATOR_A, VALIDATOR_B, 90e18);
+        require(staking.delegatedStake(address(user1), VALIDATOR_B) == 90e18, "stake leaves a delisted validator at once");
     }
 
     // ---- liveness ----------------------------------------------------------------------
@@ -847,29 +1001,22 @@ contract Describe_StratoStaking {
         require(staking.missedProposals(VALIDATOR_A) == 1, "history kept");
     }
 
-    function it_jails_after_max_consecutive_misses_and_releases_after_cooldown() public {
+    // Jailing is disabled: maxConsecutiveMisses is 3 here, and missing more than that
+    // neither takes the validator out of the set nor opens a jail window.
+    function it_never_jails_however_many_proposals_are_missed() public {
         _bondBoth();
-        for (uint256 i = 0; i < 3; i++) {
+        for (uint256 i = 0; i < 5; i++) {
             setBlockContext(VALIDATOR_B, VALIDATOR_B, VALIDATOR_A, 1);
             staking.processBlock();
             fastForward(1, 1);
         }
-        require(!gov.isValidator(VALIDATOR_A), "jailed after 3 consecutive misses");
-        require(staking.jailedUntil(VALIDATOR_A) > block.timestamp, "jail window set");
-        require(staking.consecutiveMisses(VALIDATOR_A) == 0, "streak reset on jail");
-        require(_selfBondOf(VALIDATOR_A) == 1000e18, "stake untouched by jail");
-
-        _selfBond(operatorA, VALIDATOR_A, 1e18);
-        bool rejected = false;
-        try staking.tryActivate(VALIDATOR_A) {
-        } catch {
-            rejected = true;
-        }
-        require(rejected, "cannot re-activate while jailed");
-
-        fastForward(101, 1);
-        _activate(VALIDATOR_A);
-        require(gov.isValidator(VALIDATOR_A), "re-activated after the cooldown");
+        require(staking.missedProposals(VALIDATOR_A) == 5, "misses counted");
+        require(staking.consecutiveMisses(VALIDATOR_A) == 5, "streak kept");
+        require(staking.jailedUntil(VALIDATOR_A) == 0, "no jail window");
+        require(staking.eligible(VALIDATOR_A), "still eligible");
+        require(staking.isValidator(VALIDATOR_A), "still seated");
+        require(gov.isValidator(VALIDATOR_A), "still in the consensus set");
+        require(gov.validatorCount() == 2, "set unchanged");
     }
 
     function it_does_not_count_a_miss_without_a_round_change() public {
@@ -881,18 +1028,6 @@ contract Describe_StratoStaking {
         staking.processBlock();
         require(staking.missedProposals(VALIDATOR_A) == 0, "nothing missed");
         require(staking.blocksProposed(VALIDATOR_A) == 1, "one proposal credited");
-    }
-
-    function it_process_block_never_reverts_when_governance_rejects() public {
-        _bondBoth();
-        gov.setStakingContract(address(0));
-        for (uint256 i = 0; i < 3; i++) {
-            setBlockContext(VALIDATOR_B, VALIDATOR_B, VALIDATOR_A, 1);
-            staking.processBlock();
-            fastForward(1, 1);
-        }
-        require(staking.jailedUntil(VALIDATOR_A) > block.timestamp, "jail recorded despite governance rejecting the removal");
-        require(staking.isValidator(VALIDATOR_A), "registration left as is");
     }
 
     function it_process_block_is_a_noop_before_initialization() public {

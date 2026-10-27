@@ -121,7 +121,7 @@ handleMsgClientConduit myId peer = do
       -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
       let highestBlockNum'' = if ver < 63 then highestBlockNum' - 8192 else highestBlockNum'
       lift . updatePeerLastBestBlockHash peer $ PeerLastBestBlockHash peerBestHash
-      lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum''
+      lift . claimPeerBest (pPeerHost peer) $ BestBlock peerBestHash highestBlockNum''
       startSyncTask peer highestBlockNum''
 
       lift stampActionTimestamp
@@ -193,7 +193,7 @@ handleMsgServerConduit myPubkey peer = do
         throwIO NetworkIDMismatch
 
       lift . updatePeerLastBestBlockHash peer $ PeerLastBestBlockHash peerBestHash
-      lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum'
+      lift . claimPeerBest (pPeerHost peer) $ BestBlock peerBestHash highestBlockNum'
       startSyncTask peer highestBlockNum'
 
       lift stampActionTimestamp

@@ -59,6 +59,7 @@ test-suite blockstanbul-test
   main-is: Main.hs
   other-modules:
       AuthenticationSpec
+      MessageSigningSpec
       MessageSpec
       RoundChangeSpec
       Spec

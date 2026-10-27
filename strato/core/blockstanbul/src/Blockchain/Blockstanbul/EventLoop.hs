@@ -71,7 +71,7 @@ authorize = \case
 isAuthorized :: StateMachineM m => InEvent -> m AuthResult
 isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ do
   doAuthn <- use productionAuth
-  authenticated <- authenticate iev
+  authenticated <- flip authenticate iev =<< use chainId
   let raiseInProd reason = when doAuthn $ do
         $logWarnS "blockstanbul/auth" . T.pack $ reason
         throwE reason --debug statement?

@@ -21,6 +21,17 @@ contract record MercataGovernance is Ownable {
     mapping (address => bool) public record stakingManaged;
     // Upper bound on the validator set (0 = none); the node is sized for ~50.
     uint public record hardCapValidators;
+    // First block in which a removed validator may be added again. A block header
+    // carries the block's additions and removals as two sets and consensus applies
+    // the additions first, so a validator removed and then re-added within one block
+    // would leave the consensus set while staying listed here.
+    mapping (address => uint) public record readdableFromBlock;
+    // Granularity of the published stake weights (0 = every change is published).
+    // Consensus picks each block's proposer from these weights, so a weight that
+    // follows the stake wei for wei lets a dust-sized stake change steer the pick.
+    // With a quantum, a weight is republished only once the stake has moved a whole
+    // quantum away from it, and it is published rounded down to the quantum.
+    uint public record stakeQuantum;
 
     event ValidatorVoteMade(address voter, address recipient, bool voteDirection);
     event ValidatorAdded(address validator);
@@ -28,6 +39,7 @@ contract record MercataGovernance is Ownable {
     event ValidatorStakeUpdated(address validator, uint stake);
     event StakingContractSet(address newStakingContract);
     event HardCapValidatorsSet(uint hardCap);
+    event StakeQuantumSet(uint quantum);
 
     event AdminVoteMade(address voter, address recipient, bool voteDirection);
     event AdminAdded(address admin);
@@ -49,6 +61,14 @@ contract record MercataGovernance is Ownable {
         require(_hardCap == 0 || _hardCap >= validators.length, "Hard cap below the current validator count");
         hardCapValidators = _hardCap;
         emit HardCapValidatorsSet(_hardCap);
+    }
+
+    // Keep the quantum at or below the staking contract's minStake: a validator whose
+    // stake is under one quantum is published with no weight. Weights already
+    // published stay as they are until their stake next moves a quantum.
+    function setStakeQuantum(uint _quantum) external onlyOwner {
+        stakeQuantum = _quantum;
+        emit StakeQuantumSet(_quantum);
     }
 
     function isValidator(address validator) external view returns (bool) {
@@ -86,8 +106,10 @@ contract record MercataGovernance is Ownable {
 
     function addValidator(address validator) internal {
         require(hardCapValidators == 0 || validators.length < hardCapValidators, "Validator set is at its hard cap");
+        require(block.number >= readdableFromBlock[validator], "Validator was removed in this block");
         validators.push(validator);
         validatorMap[validator] = validators.length;
+        clearValidatorVotes(validator);
         emit ValidatorAdded(validator);
     }
 
@@ -106,13 +128,38 @@ contract record MercataGovernance is Ownable {
         validatorMap[validator] = 0;
         validatorStake[validator] = 0;
         stakingManaged[validator] = false;
+        readdableFromBlock[validator] = block.number + 1;
+        clearValidatorVotes(validator);
         emit ValidatorRemoved(validator);
     }
 
+    // Votes are cast for a change of membership. Once membership changes, by vote or
+    // through staking, the votes still pending would count toward the opposite change.
+    function clearValidatorVotes(address validator) internal {
+        for (uint i = 0; i < validatorVotes[validator].length; i++) {
+            address voter = validatorVotes[validator][i];
+            delete validatorVotes[validator][i];
+            delete validatorVoteMap[validator][voter];
+        }
+        validatorVotes[validator].length = 0;
+    }
+
     function setValidatorStake(address validator, uint stake) internal {
-        if (validatorStake[validator] == stake) return;
-        validatorStake[validator] = stake;
-        emit ValidatorStakeUpdated(validator, stake);
+        uint published = validatorStake[validator];
+        uint weight = stake;
+        if (stakeQuantum > 0) {
+            uint moved = 0;
+            if (stake > published) {
+                moved = stake - published;
+            } else {
+                moved = published - stake;
+            }
+            if (moved < stakeQuantum) return;
+            weight = stake - (stake % stakeQuantum);
+        }
+        if (published == weight) return;
+        validatorStake[validator] = weight;
+        emit ValidatorStakeUpdated(validator, weight);
     }
 
     function voteToAddValidator(address proposedValidator) external onlyOwner {
@@ -144,19 +191,20 @@ contract record MercataGovernance is Ownable {
         validatorVotes[proposedValidator].push(sender);
         validatorVoteMap[proposedValidator][sender] = validatorVotes[proposedValidator].length;
 
-        uint newVoteCount = validatorVotes[proposedValidator].length;
+        uint newVoteCount = countAdminVotes(validatorVotes[proposedValidator]);
         if (newVoteCount >= ((2 * admins.length) / 3) + 1) {
-            for (uint i = 0; i < validatorVotes[proposedValidator].length; i++) {
-                address voter = validatorVotes[proposedValidator][i];
-                delete validatorVotes[proposedValidator][i];
-                delete validatorVoteMap[proposedValidator][voter];
-            }
-            validatorVotes[proposedValidator].length = 0;
             if (voteDirection) {
                 addValidator(proposedValidator);
             } else {
                 removeValidator(proposedValidator);
             }
+        }
+    }
+
+    // A vote stops counting when the admin who cast it is removed.
+    function countAdminVotes(address[] votes) internal view returns (uint count) {
+        for (uint i = 0; i < votes.length; i++) {
+            if (adminMap[votes[i]] > 0) count += 1;
         }
     }
 
@@ -191,7 +239,7 @@ contract record MercataGovernance is Ownable {
         adminVotes[proposedAdmin].push(sender);
         adminVoteMap[proposedAdmin][sender] = adminVotes[proposedAdmin].length;
 
-        uint newVoteCount = adminVotes[proposedAdmin].length;
+        uint newVoteCount = countAdminVotes(adminVotes[proposedAdmin]);
         if (newVoteCount >= ((2 * admins.length) / 3) + 1) {
             for (uint i = 0; i < adminVotes[proposedAdmin].length; i++) {
                 address voter = adminVotes[proposedAdmin][i];
