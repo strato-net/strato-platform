@@ -23,7 +23,10 @@ library
       Blockchain.SolidVM.Builtins.Crypto
       Blockchain.SolidVM.Builtins.Crypto.Metered
       Blockchain.SolidVM.Builtins.Functions
+      Blockchain.SolidVM.Builtins.Functions.Metered
       Blockchain.SolidVM.Builtins.Gas
+      Blockchain.SolidVM.Builtins.Operators
+      Blockchain.SolidVM.Builtins.Operators.Metered
   other-modules:
       Paths_solid_vm_builtins
   hs-source-dirs:

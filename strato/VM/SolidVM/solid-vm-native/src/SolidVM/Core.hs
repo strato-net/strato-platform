@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, GADTs, KindSignatures, TypeOperators, TypeFamilies, RankNTypes,
-             ScopedTypeVariables, LambdaCase, OverloadedStrings, ExistentialQuantification, CPP #-}
+             ScopedTypeVariables, LambdaCase, OverloadedStrings, ExistentialQuantification, FlexibleInstances, CPP #-}
 -- Typed core for the SolidVM -> Haskell-action compiler.
 -- No `Value` sum type at runtime: every compiled closure has an exact Haskell type.
 module SolidVM.Core where
@@ -18,7 +18,8 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Type.Equality
 import Blockchain.SolidVM.Exception (SolidException (TooMuchGas))
-import Data.Bits ((.|.), (.&.), xor, shiftL, shiftR)
+import qualified Blockchain.SolidVM.Builtins.Gas as BuiltinGas
+import Blockchain.Strato.Model.Gas (getGasValue)
 import Blockchain.Strato.Model.Address (Address (..))
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
 
@@ -357,18 +358,8 @@ chargeAfter amount action = do
   chargeGas amount
   pure value
 
-chargeOp :: Integer -> M ()
-chargeOp bytes = chargeGas (operationGas bytes)
-
-operationGas :: Integer -> Integer
-operationGas bytes = 1 + (bytes `shiftR` 5)
-
--- SolidVM charges by 256-bit limbs, including a full limb for small integers.
-byteWidth :: Integer -> Integer
-byteWidth = go 0 . abs
-  where
-    go width 0 = width
-    go width n = go (width + 32) (n `shiftR` 256)
+instance BuiltinGas.MonadBuiltinGas (ReaderT (RT, Frame) IO) where
+  chargeBuiltinGas = chargeGas . getGasValue
 
 catchContractFailure :: M a -> M a -> M a
 catchContractFailure action handler = do
@@ -605,5 +596,3 @@ dynFromText t s = case t of
 -- ---------------------------------------------------------------- control flow
 
 data Flow r = Next | Brk | Cnt | Ret r | RetDynamic [Dyn]
-
-#include "IntegerActions.inc"

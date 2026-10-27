@@ -20,8 +20,8 @@ lookupBuiltinCall sc abiMember name args = do
     selectDynamic = \case
       "keccak256" -> Just (dynamicCall TStr (EMIT_BEGIN Builtins.keccak EMIT_END))
       "ecrecover" -> Just (dynamicCall TAddr (EMIT_BEGIN Builtins.recover EMIT_END))
-      "addmod" -> Just (dynamicCall TInt (EMIT_BEGIN (Builtins.modular (+)) EMIT_END))
-      "mulmod" -> Just (dynamicCall TInt (EMIT_BEGIN (Builtins.modular (*)) EMIT_END))
+      "addmod" -> Just (dynamicCall TInt (EMIT_BEGIN (Builtins.modular Shared.addmod) EMIT_END))
+      "mulmod" -> Just (dynamicCall TInt (EMIT_BEGIN (Builtins.modular Shared.mulmod) EMIT_END))
       "string" -> Just (dynamicCall TStr (EMIT_BEGIN Builtins.string EMIT_END))
       "decimal" -> Just (dynamicCall TDecimal (EMIT_BEGIN Builtins.decimal EMIT_END))
       "int" -> Just (dynamicCall TInt (EMIT_BEGIN Builtins.integer EMIT_END))

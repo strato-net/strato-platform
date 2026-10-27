@@ -41,6 +41,8 @@ import qualified SolidVM.SourceTemplate as SourceTemplate
 import qualified SolidVM.Builtins as Builtins
 import qualified Blockchain.SolidVM.Builtins.Casts as Casts
 import qualified Blockchain.SolidVM.Builtins.Functions as Shared
+import qualified Blockchain.SolidVM.Builtins.Functions.Metered as Metered
+import qualified Blockchain.SolidVM.Builtins.Operators.Metered as Operators
 import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.Exts as Haskell
 import qualified Language.Haskell.TH.Syntax as TH (NameSpace(..))

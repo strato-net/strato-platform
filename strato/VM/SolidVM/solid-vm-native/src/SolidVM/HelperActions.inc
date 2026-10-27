@@ -1,6 +1,3 @@
-rounded :: (Decimal -> Decimal -> Decimal) -> Decimal -> Decimal -> M Decimal
-rounded f a b = pure $ roundTo (max (decimalPlaces a) (decimalPlaces b)) (f a b)
-
 checkIndex :: Int -> Integer -> M ()
 checkIndex n i = when (i < 0 || i >= fromIntegral n) $ revert ("index out of bounds: " <> T.pack (show i))
 

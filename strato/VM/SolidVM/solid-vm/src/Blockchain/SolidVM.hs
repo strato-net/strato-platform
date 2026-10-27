@@ -43,7 +43,8 @@ import Blockchain.SolidVM.Builtins.ABI.Values (abiDecode)
 import qualified Blockchain.SolidVM.Builtins as Builtins
 import qualified Blockchain.SolidVM.Builtins.Casts as Casts
 import qualified Blockchain.SolidVM.Builtins.Crypto.Metered as CryptoBuiltin
-import qualified Blockchain.SolidVM.Builtins.Functions as Builtin
+import qualified Blockchain.SolidVM.Builtins.Functions.Metered as Builtin
+import qualified Blockchain.SolidVM.Builtins.Operators.Metered as Operators
 import Blockchain.SolidVM.Builtins.Gas
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment as Env
@@ -58,7 +59,6 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import SolidVM.Model.Delta
 import SolidVM.Model.Event
-import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Action)
@@ -83,7 +83,6 @@ import qualified Data.ByteString.Char8 as BC
 import Data.Decimal
 import Data.Char (isDigit)
 import Data.Foldable (for_)
-import Data.Function (on)
 import Data.List
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
@@ -1216,29 +1215,25 @@ expToVar' (CC.Unitary _ "--" e) = do
   setVar var next
   return $ Constant next
 expToVar' (CC.Binary _ "+=" lhs rhs) = addAndAssign lhs rhs
-expToVar' (CC.Binary _ "-=" lhs rhs) = binopAssign' (-) (-) lhs rhs (\a b -> 1 + (max `on` byteWidth) a b)
-expToVar' (CC.Binary _ "*=" lhs rhs) = binopAssign' (*) (*) lhs rhs ((+) `on` byteWidth)
-expToVar' ex@(CC.Binary _ "/=" lhs rhs) = do
+expToVar' (CC.Binary _ "-=" lhs rhs) = binopAssign' "binopAssign'" Operators.integerSubtract Operators.decimalSubtract Operators.decimalIntegerSubtract Operators.integerDecimalSubtract lhs rhs
+expToVar' (CC.Binary _ "*=" lhs rhs) = binopAssign' "binopAssign'" Operators.integerMultiply Operators.decimalMultiply Operators.decimalIntegerMultiply Operators.integerDecimalMultiply lhs rhs
+expToVar' (CC.Binary _ "/=" lhs rhs) = do
   rhs' <- getRealNum =<< expToVar rhs
-  case rhs' of
-    Left 0 -> divideByZero $ unparseExpression ex
-    Right 0 -> divideByZero $ unparseExpression ex
-    _ -> binopDivide (div) (/) lhs rhs
-expToVar' ex@(CC.Binary _ "%=" lhs rhs) = do
+  either Operators.checkDivisor Operators.checkDivisor rhs'
+  binopDivide lhs rhs
+expToVar' (CC.Binary _ "%=" lhs rhs) = do
   rhs' <- getRealNum =<< expToVar rhs
-  case rhs' of
-    Left 0 -> divideByZero $ unparseExpression ex
-    Right 0 -> divideByZero $ unparseExpression ex
-    _ -> binopAssign' rem decMod lhs rhs (const byteWidth)
-expToVar' (CC.Binary _ "|=" lhs rhs) = binopAssign (.|.) lhs rhs (max `on` byteWidth)
-expToVar' (CC.Binary _ "&=" lhs rhs) = binopAssign (.&.) lhs rhs (max `on` byteWidth)
-expToVar' (CC.Binary _ "^=" lhs rhs) = binopAssign xor lhs rhs (max `on` byteWidth)
+  either Operators.checkDivisor Operators.checkDivisor rhs'
+  binopAssign' "binopAssign'" Operators.integerRemainder Operators.decimalRemainder Operators.decimalIntegerRemainder Operators.integerDecimalRemainder lhs rhs
+expToVar' (CC.Binary _ "|=" lhs rhs) = binopAssign Operators.integerOr lhs rhs
+expToVar' (CC.Binary _ "&=" lhs rhs) = binopAssign Operators.integerAnd lhs rhs
+expToVar' (CC.Binary _ "^=" lhs rhs) = binopAssign Operators.integerXor lhs rhs
 expToVar' (CC.Binary _ ">>=" lhs rhs) = do
-  binopAssign (\x i -> x `shiftR` fromInteger i) lhs rhs (const . byteWidth)
+  binopAssign Operators.integerShiftRight lhs rhs
 expToVar' (CC.Binary _ "<<=" lhs rhs) = do
-  binopAssign (\x i -> x `shiftL` fromInteger i) lhs rhs (\a b -> byteWidth a + b)
+  binopAssign Operators.integerShiftLeftAssign lhs rhs
 expToVar' (CC.Binary _ ">>>=" lhs rhs) = do
-  binopAssign (\x i -> fromInteger (toInteger ((fromInteger x) :: Word256)) `shiftR` fromInteger i) lhs rhs (const . byteWidth)
+  binopAssign Operators.integerUnsignedShiftRight lhs rhs
 expToVar' (CC.MemberAccess _ (CC.FunctionCall x (CC.Variable _ "type") [CC.Variable _ name]) "runTimeCode") = do
   (_, cc) <- getCurrentCodeCollection
   return $
@@ -1398,28 +1393,24 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
 
 expToVar' (CC.Binary _ "+" expr1 expr2) = expToVarAdd expr1 expr2
-expToVar' (CC.Binary _ "-" expr1 expr2) = expToVarArith (-) (-) expr1 expr2 (\a b -> 1 + (max `on` byteWidth) a b)
-expToVar' (CC.Binary _ "*" expr1 expr2) = expToVarArith (*) (*) expr1 expr2 ((+) `on` byteWidth)
-expToVar' ex@(CC.Binary _ "/" expr1 expr2) = do
+expToVar' (CC.Binary _ "-" expr1 expr2) = expToVarArith "expToVarArith" Operators.integerSubtract Operators.decimalSubtract Operators.decimalIntegerSubtract Operators.integerDecimalSubtract expr1 expr2
+expToVar' (CC.Binary _ "*" expr1 expr2) = expToVarArith "expToVarArith" Operators.integerMultiply Operators.decimalMultiply Operators.decimalIntegerMultiply Operators.integerDecimalMultiply expr1 expr2
+expToVar' (CC.Binary _ "/" expr1 expr2) = do
   rhs <- getRealNum =<< expToVar expr2
-  case rhs of
-    Left 0 -> divideByZero $ unparseExpression ex
-    Right 0 -> divideByZero $ unparseExpression ex
-    _ -> expToVarDivide (div) (/) expr1 expr2
+  either Operators.checkDivisor Operators.checkDivisor rhs
+  expToVarDivide expr1 expr2
 --modified to use decimal division
-expToVar' ex@(CC.Binary _ "%" expr1 expr2) = do
+expToVar' (CC.Binary _ "%" expr1 expr2) = do
   rhs <- getRealNum =<< expToVar expr2
-  case rhs of
-    Left 0 -> divideByZero $ unparseExpression ex
-    Right 0 -> divideByZero $ unparseExpression ex
-    _ -> expToVarArith rem decMod expr1 expr2 (const byteWidth)
-expToVar' (CC.Binary _ "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger (max `on` byteWidth)
-expToVar' (CC.Binary _ "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger (max `on` byteWidth)
-expToVar' (CC.Binary _ "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteger (max `on` byteWidth)
-expToVar' (CC.Binary _ "**" expr1 expr2) = expToVarInteger expr1 (^) expr2 SInteger (\a b -> byteWidth a * b)
-expToVar' (CC.Binary _ "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shift` fromInteger i) expr2 SInteger (\a b -> byteWidth a + b)
-expToVar' (CC.Binary _ ">>" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shiftR` fromInteger i) expr2 SInteger (const . byteWidth)
-expToVar' (CC.Binary _ ">>>" expr1 expr2) = expToVarInteger expr1 (\x i -> fromInteger (toInteger ((fromInteger x) :: Word256)) `shiftR` fromInteger i) expr2 SInteger (const . byteWidth)
+  either Operators.checkDivisor Operators.checkDivisor rhs
+  expToVarArith "expToVarArith" Operators.integerRemainder Operators.decimalRemainder Operators.decimalIntegerRemainder Operators.integerDecimalRemainder expr1 expr2
+expToVar' (CC.Binary _ "|" expr1 expr2) = expToVarInteger expr1 Operators.integerOr expr2 SInteger
+expToVar' (CC.Binary _ "&" expr1 expr2) = expToVarInteger expr1 Operators.integerAnd expr2 SInteger
+expToVar' (CC.Binary _ "^" expr1 expr2) = expToVarInteger expr1 Operators.integerXor expr2 SInteger
+expToVar' (CC.Binary _ "**" expr1 expr2) = expToVarInteger expr1 Operators.integerPower expr2 SInteger
+expToVar' (CC.Binary _ "<<" expr1 expr2) = expToVarInteger expr1 Operators.integerShiftLeft expr2 SInteger
+expToVar' (CC.Binary _ ">>" expr1 expr2) = expToVarInteger expr1 Operators.integerShiftRight expr2 SInteger
+expToVar' (CC.Binary _ ">>>" expr1 expr2) = expToVarInteger expr1 Operators.integerUnsignedShiftRight expr2 SInteger
 expToVar' (CC.Unitary _ "!" expr) = do
   (Constant . SBool . not) <$> (getBool =<< expToVar expr)
 expToVar' (CC.Unitary _ "delete" expr) = do
@@ -1725,8 +1716,8 @@ expToVar' (CC.FunctionCall _ e args) = do
                   return . Constant . SStruct structName . fmap Constant . M.fromList $
                     zipStructFields vals' argVals
             Constant (SContractDef contractName') -> do
-              decrementGas 500
-              case argVals of
+              convertedArgs <- Builtin.contractCast argVals
+              case convertedArgs of
                 [SInteger address] ->
                   --TODO- clean up this ambiguity between SAddress and SInteger....
                   return $ Constant $ SContract contractName' $ fromInteger address
@@ -1777,7 +1768,6 @@ expToVar' (CC.FunctionCall _ e args) = do
                 _ -> pure $ Nothing
               --get only the contract containing the sweet succulent ContractF definition
               (!contract, _, _) <- getCodeAndCollection toAccount
-              decrementGas 1000 -- Discourage creating/calling contract instances willy nilly
               let codeSnippets :: [String]
                   codeSnippets =
                     case (fromMaybe "" searchTerms) of
@@ -1828,7 +1818,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                                 Nothing -> Nothing
                          in --Remove all of the items that were found to contain nothing, this should leave just the items that we found
                             catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
-              pure . Constant $ SString (unlines codeSnippets)
+              Constant . SString <$> Builtin.contractCode codeSnippets -- Discourage creating/calling contract instances willy nilly
             Constant (SContractItem address itemName) -> do
               from <- getCurrentAddress
               result <- callWithResult from address CC.DefaultCall itemName argVals
@@ -1867,7 +1857,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                     )
                     $ typeError "string concat" $ show argVals
                   let strs = (\x -> case x of (SString s) -> s; _ -> "") <$> argVals
-                  Constant . SString <$> Builtin.stringConcat (deductGasForOp . fromIntegral) strs
+                  Constant . SString <$> Builtin.stringConcat strs
             Constant SHexDecodeAndTrim ->
               case argVals of
                 -- bytes should already be hex decoded when appropriate
@@ -2001,41 +1991,31 @@ expToVarAdd expr1 expr2 = do
   let addEm i1 i2 = case i1 of
         SInteger a -> case defaultToInt i2 of
           SInteger b -> do
-            deductGasForOp $ 1 + (max `on` byteWidth) a b
-            return . Constant . SInteger $ a + b
+            Constant . SInteger <$> Operators.integerAdd a b
           SDecimal b -> do
-            deductGasForOp $ 1 + fromIntegral (decimalPlaces b) + (max `on` byteWidth) a (decimalMantissa b)
-            return . Constant . SDecimal $ (Decimal 0 a) + b
+            Constant . SDecimal <$> Operators.integerDecimalAdd a b
           _ -> typeError "expToVarAdd" $ show (i1, i2)
         SDecimal a -> case defaultToInt i2 of
           SInteger b -> do
-            deductGasForOp $ 1 + fromIntegral (decimalPlaces a) + (max `on` byteWidth) (decimalMantissa a) b
-            return . Constant . SDecimal $ a + (Decimal 0 b)
+            Constant . SDecimal <$> Operators.decimalIntegerAdd a b
           SDecimal b -> do
-            deductGasForOp $ 1 + fromIntegral ((max `on` decimalPlaces) a b) + (max `on` byteWidth) (decimalMantissa a) (decimalMantissa b)
-            return . Constant . SDecimal $ a + b
+            Constant . SDecimal <$> Operators.decimalAdd a b
           _ -> typeError "expToVarAdd" $ show (i1, i2)
         SString a -> case i2 of
           SString b -> do
-            deductGasForOp . fromIntegral $ ((+) `on` length) a b
-            return . Constant . SString $ a ++ b
+            Constant . SString <$> Operators.stringAdd a b
           SNULL -> do
-            deductGasForOp . fromIntegral $ length a
-            return . Constant $ SString a
+            Constant . SString <$> Operators.stringAdd a ""
           SReference{} -> do
-            deductGasForOp . fromIntegral $ length a
-            return . Constant $ SString a
+            Constant . SString <$> Operators.stringAdd a ""
           _ -> typeError "expToVarAdd" $ show (i1, i2)
         SBytes a -> case i2 of
           SBytes b -> do
-            deductGasForOp . fromIntegral $ ((+) `on` B.length) a b
-            return . Constant . SBytes $ a <> b
+            Constant . SBytes <$> Operators.bytesAdd a b
           SNULL -> do
-            deductGasForOp . fromIntegral $ B.length a
-            return . Constant $ SBytes a
+            Constant . SBytes <$> Operators.bytesAdd a B.empty
           SReference{} -> do
-            deductGasForOp . fromIntegral $ B.length a
-            return . Constant $ SBytes a
+            Constant . SBytes <$> Operators.bytesAdd a B.empty
           _ -> typeError "expToVarAdd" $ show (i1, i2)
         SNULL -> case i2 of
           SNULL -> return $ Constant SNULL
@@ -2049,157 +2029,55 @@ expToVarAdd expr1 expr2 = do
         _ -> typeError "expToVarAdd" $ show (i1, i2)
   addEm i1' i2'
 
---decMod operation, implements % w Data.Decimal library functions
-decMod :: Decimal -> Decimal -> Decimal
-decMod a b = fromRational (toRational a `mod'` toRational b)
-  where
-    mod' x y = x - (fromIntegral (floor (x / y) :: Integer)) * y
-
 expToVarArith :: MonadSM m =>
-  (Integer -> Integer -> Integer) ->
-  (Decimal -> Decimal -> Decimal) ->
-  CC.Expression ->
-  CC.Expression ->
-  (Integer -> Integer -> Integer) ->
-  m Variable
-expToVarArith intOp decOp expr1 expr2 gasFormula = do
+  String ->
+  (Integer -> Integer -> m Integer) ->
+  (Decimal -> Decimal -> m Decimal) ->
+  (Decimal -> Integer -> m Decimal) ->
+  (Integer -> Decimal -> m Decimal) ->
+  CC.Expression -> CC.Expression -> m Variable
+expToVarArith label intOp decOp decIntOp intDecOp expr1 expr2 = do
   i1 <- getVar =<< expToVar expr1
   i2 <- getVar =<< expToVar expr2
   case (defaultToInt i1, defaultToInt i2) of
-    (SInteger a, SInteger b) -> do
-      deductGasForOp $ gasFormula a b
-      return . Constant . SInteger $ a `intOp` b
-    (SDecimal a, SDecimal b) -> do
-      let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
-          result = a `decOp` b
-      deductGasForOp $ fromIntegral maxDecimalPlaces + (gasFormula `on` decimalMantissa) a b
-      return $ Constant $ SDecimal $ roundTo maxDecimalPlaces result
-    (SDecimal a, SInteger b) -> do
-      let maxDecimalPlaces = decimalPlaces a
-          result = a `decOp` (Decimal 0 b)
-      deductGasForOp $ fromIntegral maxDecimalPlaces + gasFormula (decimalMantissa a) b
-      return $ Constant $ SDecimal $ roundTo maxDecimalPlaces result
-    (SInteger a, SDecimal b) -> do
-      let maxDecimalPlaces = decimalPlaces b
-          result = (Decimal 0 a) `decOp` b
-      deductGasForOp $ fromIntegral maxDecimalPlaces + gasFormula a (decimalMantissa b)
-      return $ Constant $ SDecimal $ roundTo maxDecimalPlaces result
-    _ -> typeError "expToVarArith" $ show (i1, i2)
+    (SInteger a, SInteger b) -> Constant . SInteger <$> intOp a b
+    (SDecimal a, SDecimal b) -> Constant . SDecimal <$> decOp a b
+    (SDecimal a, SInteger b) -> Constant . SDecimal <$> decIntOp a b
+    (SInteger a, SDecimal b) -> Constant . SDecimal <$> intDecOp a b
+    _ -> typeError label $ show (i1, i2)
 
-expToVarDivide :: MonadSM m =>
-  (Integer -> Integer -> Integer) ->
-  (Decimal -> Decimal -> Decimal) ->
-  CC.Expression ->
-  CC.Expression ->
-  m Variable
-expToVarDivide intOp decOp expr1 expr2 = do
-  i1 <- getVar =<< expToVar expr1
-  i2 <- getVar =<< expToVar expr2
-  case (defaultToInt i1, defaultToInt i2) of
-    (SInteger a, SInteger b) -> do
-      deductGasForOp $ byteWidth a
-      return . Constant . SInteger $ a `intOp` b
-    (SDecimal a, SDecimal b) -> do
-      let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
-          result = a `decOp` b
-      deductGasForOp $ fromIntegral maxDecimalPlaces + (max `on` byteWidth) (decimalMantissa a) (decimalMantissa b)
-      return $ Constant $ SDecimal $ roundTo maxDecimalPlaces result
-    (SDecimal a, SInteger b) -> do
-      let maxDecimalPlaces = decimalPlaces a
-          result = a `decOp` (Decimal 0 b)
-      deductGasForOp $ fromIntegral maxDecimalPlaces + byteWidth (decimalMantissa a)
-      return $ Constant $ SDecimal $ roundTo maxDecimalPlaces result
-    (SInteger a, SDecimal b) -> do
-      let maxDecimalPlaces = decimalPlaces b
-          result = (Decimal 0 a) `decOp` b
-      deductGasForOp $ fromIntegral maxDecimalPlaces + byteWidth a
-      return $ Constant $ SDecimal $ roundTo maxDecimalPlaces result
-    _ -> typeError "expToVarDivide" $ show (i1, i2)
+expToVarDivide :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
+expToVarDivide = expToVarArith "expToVarDivide" Operators.integerDivide Operators.decimalDivide Operators.decimalIntegerDivide Operators.integerDecimalDivide
 
-byteWidth :: Integer -> Integer
-byteWidth = go 0 . abs
-  where go w 0 = w
-        go w n = let !v = w + 32 in go v (n `shiftR` 256)
-
--- Deduct 1 gas for every 256 bits (32 bytes) used
-deductGasForOp :: MonadSM m => Integer -> m ()
-deductGasForOp numBytes = decrementGas . Gas $ 1 + (numBytes `shiftR` 5)
-
-expToVarInteger :: MonadSM m => CC.Expression -> (Integer -> Integer -> a) -> CC.Expression -> (a -> Value) -> (Integer -> Integer -> Integer) -> m Variable
-expToVarInteger expr1 o expr2 retType gasFormula = do
+expToVarInteger :: MonadSM m => CC.Expression -> (Integer -> Integer -> m Integer) -> CC.Expression -> (Integer -> Value) -> m Variable
+expToVarInteger expr1 operation expr2 retType = do
   i1 <- getInt =<< expToVar expr1
   i2 <- getInt =<< expToVar expr2
-  deductGasForOp $ gasFormula i1 i2
-  return . Constant . retType $ i1 `o` i2
+  Constant . retType <$> operation i1 i2
 
 binopAssign' :: MonadSM m =>
-  (Integer -> Integer -> Integer) ->
-  (Decimal -> Decimal -> Decimal) ->
-  CC.Expression ->
-  CC.Expression ->
-  (Integer -> Integer -> Integer) ->
-  m Variable
-binopAssign' intOp decOp lhs rhs gasFormula = do
+  String ->
+  (Integer -> Integer -> m Integer) ->
+  (Decimal -> Decimal -> m Decimal) ->
+  (Decimal -> Integer -> m Decimal) ->
+  (Integer -> Decimal -> m Decimal) ->
+  CC.Expression -> CC.Expression -> m Variable
+binopAssign' label intOp decOp decIntOp intDecOp lhs rhs = do
   let readVal e = getVar =<< expToVar e
   delta <- readVal rhs
   curValue <- readVal lhs
   varToAssign <- expToVar lhs
   next <- case (defaultToInt curValue, defaultToInt delta) of
-    (SInteger c, SInteger d) -> do
-      deductGasForOp $ gasFormula c d
-      pure . SInteger $ c `intOp` d
-    (SDecimal a, SDecimal b) -> do
-      let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
-          result = a `decOp` b
-      deductGasForOp $ fromIntegral maxDecimalPlaces + gasFormula (decimalMantissa a) (decimalMantissa b)
-      pure $ SDecimal $ roundTo maxDecimalPlaces result
-    (SDecimal a, SInteger b) -> do
-      let maxDecimalPlaces = decimalPlaces a
-          result = a `decOp` (Decimal 0 b)
-      deductGasForOp $ fromIntegral maxDecimalPlaces + gasFormula (decimalMantissa a) b
-      return $ SDecimal $ roundTo maxDecimalPlaces result
-    (SInteger a, SDecimal b) -> do
-      let maxDecimalPlaces = decimalPlaces b
-          result = (Decimal 0 a) `decOp` b
-      deductGasForOp $ fromIntegral maxDecimalPlaces + gasFormula a (decimalMantissa b)
-      return $ SDecimal $ roundTo maxDecimalPlaces result
-    _ -> typeError "binopAssign'" $ show (curValue, delta)
+    (SInteger c, SInteger d) -> SInteger <$> intOp c d
+    (SDecimal a, SDecimal b) -> SDecimal <$> decOp a b
+    (SDecimal a, SInteger b) -> SDecimal <$> decIntOp a b
+    (SInteger a, SDecimal b) -> SDecimal <$> intDecOp a b
+    _ -> typeError label $ show (curValue, delta)
   setVar varToAssign next
   return $ Constant next
 
-binopDivide :: MonadSM m =>
-  (Integer -> Integer -> Integer) ->
-  (Decimal -> Decimal -> Decimal) ->
-  CC.Expression ->
-  CC.Expression ->
-  m Variable
-binopDivide intOp decOp lhs rhs = do
-  let readVal e = getVar =<< expToVar e
-  delta <- readVal rhs
-  curValue <- readVal lhs
-  varToAssign <- expToVar lhs
-  next <- case (defaultToInt curValue, defaultToInt delta) of
-    (SInteger c, SInteger d) -> do
-      deductGasForOp $ (max `on` byteWidth) c d
-      pure . SInteger $ c `intOp` d
-    (SDecimal a, SDecimal b) -> do
-      let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
-          result = a `decOp` b
-      deductGasForOp $ fromIntegral maxDecimalPlaces + (max `on` byteWidth) (decimalMantissa a) (decimalMantissa b)
-      return $ SDecimal $ roundTo maxDecimalPlaces result
-    (SDecimal a, SInteger b) -> do
-      let maxDecimalPlaces = decimalPlaces a
-          result = a `decOp` (Decimal 0 b)
-      deductGasForOp $ fromIntegral maxDecimalPlaces + (max `on` byteWidth) (decimalMantissa a) b
-      return $ SDecimal $ roundTo maxDecimalPlaces result
-    (SInteger a, SDecimal b) -> do
-      let maxDecimalPlaces = decimalPlaces b
-          result = (Decimal 0 a) `decOp` b
-      deductGasForOp $ fromIntegral maxDecimalPlaces + (max `on` byteWidth) a (decimalMantissa b)
-      return $ SDecimal $ roundTo maxDecimalPlaces result
-    _ -> typeError "binopDivide'" $ show (curValue, delta)
-  setVar varToAssign next
-  return $ Constant next
+binopDivide :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
+binopDivide = binopAssign' "binopDivide'" Operators.integerDivideAssign Operators.decimalDivideAssign Operators.decimalIntegerDivideAssign Operators.integerDecimalDivideAssign
 
 addAndAssign :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
 addAndAssign lhs rhs = do
@@ -2208,36 +2086,23 @@ addAndAssign lhs rhs = do
   curValue <- readVal lhs
   varToAssign <- expToVar lhs
   next <- case (defaultToInt curValue, defaultToInt delta) of
-    (SInteger c, SInteger d) -> do
-      deductGasForOp $ 1 + (max `on` byteWidth) c d
-      pure . SInteger $ c + d
-    (SString c, SString d) -> do
-      deductGasForOp . fromIntegral $ ((+) `on` length) c d
-      pure . SString $ c ++ d
-    (SBytes c, SBytes d) -> do
-      deductGasForOp . fromIntegral $ ((+) `on` B.length) c d
-      pure . SBytes $ c <> d
-    (SDecimal c, SDecimal d) -> do
-      deductGasForOp $ 1 + fromIntegral ((max `on` decimalPlaces) c d) + (max `on` byteWidth) (decimalMantissa c) (decimalMantissa d)
-      pure . SDecimal $ c + d
-    (SDecimal a, SInteger b) -> do
-      deductGasForOp $ 1 + fromIntegral (decimalPlaces a) + (max `on` byteWidth) (decimalMantissa a) b
-      pure . SDecimal $ a + (Decimal 0 b)
-    (SInteger a, SDecimal b) -> do
-      deductGasForOp $ 1 + fromIntegral (decimalPlaces b) + (max `on` byteWidth) a (decimalMantissa b)
-      pure . SDecimal $ (Decimal 0 a) + b
+    (SInteger c, SInteger d) -> SInteger <$> Operators.integerAdd c d
+    (SString c, SString d) -> SString <$> Operators.stringAdd c d
+    (SBytes c, SBytes d) -> SBytes <$> Operators.bytesAdd c d
+    (SDecimal c, SDecimal d) -> SDecimal <$> Operators.decimalAdd c d
+    (SDecimal a, SInteger b) -> SDecimal <$> Operators.decimalIntegerAdd a b
+    (SInteger a, SDecimal b) -> SDecimal <$> Operators.integerDecimalAdd a b
     _ -> typeError "addAndAssign" $ show (curValue, delta)
   setVar varToAssign next
   return $ Constant next
 
-binopAssign :: MonadSM m => (Integer -> Integer -> Integer) -> CC.Expression -> CC.Expression -> (Integer -> Integer -> Integer) -> m Variable
-binopAssign oper lhs rhs gasFormula = do
+binopAssign :: MonadSM m => (Integer -> Integer -> m Integer) -> CC.Expression -> CC.Expression -> m Variable
+binopAssign operation lhs rhs = do
   let readInt e = getInt =<< expToVar e
   delta <- readInt rhs
   curValue <- readInt lhs
   varToAssign <- expToVar lhs
-  deductGasForOp $ gasFormula curValue delta
-  let next = SInteger $ curValue `oper` delta
+  next <- SInteger <$> operation curValue delta
   setVar varToAssign next
   return $ Constant next
 

@@ -6,7 +6,6 @@ extra-source-files:
   - src/SolidVM/BuiltinCalls.inc
   - src/SolidVM/HelperActions.inc
   - src/SolidVM/ActionCode.inc
-  - src/SolidVM/IntegerActions.inc
 
 dependencies:
   - base

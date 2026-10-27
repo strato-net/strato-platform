@@ -2,6 +2,7 @@ module Blockchain.SolidVM.Builtins.Gas where
 
 import Blockchain.Strato.Model.Gas
 import Control.Monad.IO.Class (MonadIO)
+import Data.Bits (shiftR)
 
 class MonadIO m => MonadBuiltinGas m where
   chargeBuiltinGas :: Gas -> m ()
@@ -62,3 +63,14 @@ gasBlsMapFpToG1 = 5000
 gasBlsMapFp2ToG2 = 20000
 gasBlsDecompressG1 = 5000
 gasBlsDecompressG2 = 20000
+
+-- Deduct 1 gas for every 256 bits (32 bytes) used
+chargeOperation :: MonadBuiltinGas m => Integer -> m ()
+chargeOperation bytes = chargeBuiltinGas (Gas (1 + (bytes `shiftR` 5)))
+
+-- SolidVM charges by 256-bit limbs, including a full limb for small integers.
+byteWidth :: Integer -> Integer
+byteWidth = go 0 . abs
+  where
+    go width 0 = width
+    go width n = go (width + 32) (n `shiftR` 256)

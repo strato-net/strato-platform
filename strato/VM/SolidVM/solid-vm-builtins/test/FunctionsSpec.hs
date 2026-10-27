@@ -7,6 +7,9 @@ import qualified Blockchain.SolidVM.Builtins.ABI as ABI
 import qualified Blockchain.SolidVM.Builtins.ABI.Values as Values
 import qualified Blockchain.SolidVM.Builtins.Crypto.Metered as Crypto
 import qualified Blockchain.SolidVM.Builtins.Functions as B
+import qualified Blockchain.SolidVM.Builtins.Functions.Metered as Charged
+import qualified Blockchain.SolidVM.Builtins.Operators as Operators
+import qualified Blockchain.SolidVM.Builtins.Operators.Metered as ChargedOperators
 import Blockchain.SolidVM.Builtins.Gas
 import Blockchain.Strato.Model.Gas (Gas)
 import Blockchain.VM.SolidException (SolidException (..))
@@ -18,6 +21,7 @@ import qualified Data.ByteString as BS
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import Data.IORef
+import Data.Decimal (DecimalRaw (Decimal))
 import Data.Time.Clock
 import Data.Time.Calendar (fromGregorian)
 import Test.Hspec
@@ -33,6 +37,67 @@ instance MonadBuiltinGas Metered where
 
 spec :: Spec
 spec = do
+  describe "shared operator gas" $ do
+    it "charges integer operations using the interpreter schedule" $ do
+      charges <- newIORef []
+      values <- runReaderT (runMetered $ sequence
+        [ ChargedOperators.integerAdd 5 7
+        , ChargedOperators.integerSubtract 5 7
+        , ChargedOperators.integerMultiply 5 7
+        , ChargedOperators.integerDivide 35 7
+        , ChargedOperators.integerRemainder 35 7
+        , ChargedOperators.integerPower 10 100
+        , ChargedOperators.integerOr 5 7
+        , ChargedOperators.integerAnd 5 7
+        , ChargedOperators.integerXor 5 7
+        , ChargedOperators.integerShiftLeft 1 65
+        , ChargedOperators.integerShiftRight 8 2
+        ]) charges
+      values `shouldBe` [12,-2,35,5,0,10 ^ (100 :: Integer),7,5,2,2 ^ (65 :: Integer),2]
+      readIORef charges `shouldReturn` [2,2,3,2,2,101,2,2,2,4,2]
+    it "charges before the underlying operator is evaluated" $ do
+      charges <- newIORef []
+      (runReaderT (runMetered $ ChargedOperators.integerDivide 1 0) charges >>= evaluate)
+        `shouldThrow` (== DivideByZero "0")
+      readIORef charges `shouldReturn` [2]
+    it "uses the shared zero-divisor error for modular builtins" $ do
+      evaluate (B.addmod 1 2 0) `shouldThrow` (== DivideByZero "0")
+      evaluate (B.mulmod 1 2 0) `shouldThrow` (== DivideByZero "0")
+    it "raises the shared error for decimal zero divisors and negative powers" $ do
+      charges <- newIORef []
+      runReaderT (runMetered $ ChargedOperators.decimalDivide 1 0) charges
+        `shouldThrow` (== DivideByZero "0")
+      runReaderT (runMetered $ ChargedOperators.integerPower 2 (-1)) charges
+        `shouldThrow` (== ArithmeticException "negative exponent" "-1")
+    it "retains the different ordinary and compound division prices" $ do
+      charges <- newIORef []
+      values <- runReaderT (runMetered $ sequence
+        [ ChargedOperators.integerDivide 1 (2 ^ (256 :: Integer))
+        , ChargedOperators.integerDivideAssign 1 (2 ^ (256 :: Integer))
+        ]) charges
+      values `shouldBe` [0,0]
+      readIORef charges `shouldReturn` [2,3]
+    it "prices decimal operands using their original precision and representation" $ do
+      charges <- newIORef []
+      let a = Decimal 0 1
+          b = Decimal 32 (2 ^ (256 :: Integer))
+      values <- runReaderT (runMetered $ sequence
+        [ ChargedOperators.decimalDivide a b
+        , ChargedOperators.integerDecimalDivide 1 b
+        , ChargedOperators.integerDecimalDivideAssign 1 b
+        ]) charges
+      values `shouldBe` [Operators.decimalDivide a b, Operators.integerDecimalDivide 1 b, Operators.integerDecimalDivide 1 b]
+      readIORef charges `shouldReturn` [4,3,4]
+    it "charges concatenation and contract conversions once" $ do
+      charges <- newIORef []
+      runReaderT (runMetered $ do
+        _ <- ChargedOperators.stringAdd (replicate 31 'a') "b"
+        _ <- ChargedOperators.bytesAdd (BS.replicate 32 1) (BS.singleton 2)
+        _ <- Charged.stringConcat [replicate 31 'a', "b"]
+        _ <- Charged.contractCast (7 :: Integer)
+        Charged.contractCode ["one", "two"]) charges `shouldReturn` "one\ntwo\n"
+      readIORef charges `shouldReturn` [2,2,2,500,1000]
+
   describe "builtin conversions and encoding" $ do
     it "preserves odd-length hex input and lowercase normalization" $ do
       B.b16decode "abc" `shouldBe` BS.pack [10, 188]

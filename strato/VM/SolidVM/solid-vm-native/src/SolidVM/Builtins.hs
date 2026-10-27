@@ -6,7 +6,7 @@ import Blockchain.Data.RLP
 import qualified Blockchain.SolidVM.Exception as E
 import Blockchain.Strato.Model.Address (Address (..))
 import Blockchain.Strato.Model.Keccak256
-import Control.Exception (throwIO)
+import Control.Exception (evaluate, throwIO)
 import Control.Monad.Reader
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -33,11 +33,9 @@ missingUserCert = liftIO $ throwIO $ E.UnknownVariable "not found" "getUserCert"
 invalidLowLevel :: [Dyn] -> M a
 invalidLowLevel ds = liftIO $ throwIO $ E.TypeError "low-level call needs first argument to be a string" (show (map showDyn ds))
 
-modular :: (Integer -> Integer -> Integer) -> [Dyn] -> M Dyn
+modular :: (Integer -> Integer -> Integer -> Integer) -> [Dyn] -> M Dyn
 modular op ds = case flatten ds of
-  [Dyn TInt a, Dyn TInt b, Dyn TInt c]
-    | c == 0 -> liftIO $ throwIO $ E.DivideByZero "modular arithmetic"
-    | otherwise -> pure $ Dyn TInt (op a b `mod` c)
+  [Dyn TInt a, Dyn TInt b, Dyn TInt c] -> Dyn TInt <$> modularValue op a b c
   xs -> bad "modular arithmetic expects three integers" xs
 
 castResult :: Casts.CastResult a -> M a
@@ -145,9 +143,7 @@ addmodValue = modularValue Shared.addmod
 mulmodValue = modularValue Shared.mulmod
 
 modularValue :: (Integer -> Integer -> Integer -> Integer) -> Integer -> Integer -> Integer -> M Integer
-modularValue op a b c
-  | c == 0 = liftIO $ throwIO $ E.DivideByZero "modularValue arithmetic"
-  | otherwise = pure $ op a b c
+modularValue op a b c = liftIO $ evaluate (op a b c)
 
 integerValue :: Ty a -> a -> M Integer
 integerValue t = case t of

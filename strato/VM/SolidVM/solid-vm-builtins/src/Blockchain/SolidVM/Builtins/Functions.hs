@@ -9,11 +9,12 @@ module Blockchain.SolidVM.Builtins.Functions
     keccak256, keccak256Hex, sha256, ripemd160, base64encode, base64urlencode,
     hashHex, base64String, ecrecover, RecoverHash, verifyP256, p256PublicKeyFromHex,
     blockhash, selfdestruct, create, create2, setBlockContext, fastForward,
-    log, require, assert, push, stringConcat, payable, bytes32ToString,
+    log, require, assert, push, stringConcat, payable, bytes32ToString, contractCast, contractCode,
   ) where
 
 import Prelude hiding (log)
 import Blockchain.Data.Util (integer2Bytes)
+import qualified Blockchain.SolidVM.Builtins.Operators as Operators
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
@@ -55,8 +56,8 @@ byte :: Integer -> Integer
 byte n = n .&. 0xff
 
 addmod, mulmod :: Integer -> Integer -> Integer -> Integer
-addmod a b c = (a + b) `mod` c
-mulmod a b c = (a * b) `mod` c
+addmod a b c = Operators.checkDivisor c `seq` ((a + b) `mod` c)
+mulmod a b c = Operators.checkDivisor c `seq` ((a * b) `mod` c)
 
 b16encode :: B.ByteString -> B.ByteString
 b16encode = B16.encode
@@ -211,7 +212,11 @@ push getLength setLength setElement = do
   setElement len
   pure (len + 1)
 
-stringConcat :: Monad m => (Int -> m ()) -> [String] -> m String
-stringConcat charge strs = do
-  charge $ sum $ length <$> strs
-  pure $ concat strs
+stringConcat :: [String] -> String
+stringConcat = concat
+
+contractCast :: a -> a
+contractCast = id
+
+contractCode :: [String] -> String
+contractCode = unlines

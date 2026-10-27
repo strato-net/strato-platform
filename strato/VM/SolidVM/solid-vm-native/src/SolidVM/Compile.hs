@@ -36,6 +36,8 @@ import SolidVM.Code
 import qualified SolidVM.Builtins as Builtins
 import qualified Blockchain.SolidVM.Builtins.Casts as Casts
 import qualified Blockchain.SolidVM.Builtins.Functions as Shared
+import qualified Blockchain.SolidVM.Builtins.Functions.Metered as Metered
+import qualified Blockchain.SolidVM.Builtins.Operators.Metered as Operators
 
 makeFun :: T.Text -> Sig args r -> Code (Fn args r) -> Fun
 makeFun name sig action = withCode action (Fun name sig)

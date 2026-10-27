@@ -250,24 +250,25 @@ atomicIntegerExpression sc op left right charges = do
         IntegerLocal | Just known <- knownInteger sc expression -> IntegerLiteral known
         _ -> value, units)
 
-#define INTEGER_EXPRESSION(operator, size) \
+#define INTEGER_EXPRESSION(operator, operation) \
   case (lhs, rhs) of { \
     (IntegerLiteral a, IntegerLiteral b) -> \
-      Just (constantFunction (beforeAction (fixed + operationGas (size)) \
-        (pureAction (withForm (IntegerValue (a operator b)) \
-          (EMIT_BEGIN (a operator b) EMIT_END))))); \
+      Just (constantFunction (beforeAction fixed \
+        (thenAction (EMIT_BEGIN (operation a b) EMIT_END) \
+          (pureAction (withForm (IntegerValue (a operator b)) \
+            (EMIT_BEGIN (a operator b) EMIT_END)))))); \
     (IntegerLocal, IntegerLiteral b) -> \
-      Just (EMIT_BEGIN (\(a :& _) -> chargeGas (fixed + operationGas (size)) >> pure (a operator b)) EMIT_END); \
+      Just (EMIT_BEGIN (\(a :& _) -> chargeGas fixed >> operation a b) EMIT_END); \
     (IntegerLiteral a, IntegerLocal) -> \
-      Just (EMIT_BEGIN (\(b :& _) -> chargeGas (fixed + operationGas (size)) >> pure (a operator b)) EMIT_END); \
+      Just (EMIT_BEGIN (\(b :& _) -> chargeGas fixed >> operation a b) EMIT_END); \
     (IntegerLocal, IntegerLocal) -> \
-      Just (EMIT_BEGIN (\(a :& _) -> let b = a in chargeGas (fixed + operationGas (size)) >> pure (a operator b)) EMIT_END) }
+      Just (EMIT_BEGIN (\(a :& _) -> chargeGas fixed >> operation a a) EMIT_END) }
 
 integerExpressionCode :: T.Text -> IntegerAtom ls -> IntegerAtom ls -> Integer -> Maybe (Code (Env ls -> M Integer))
 integerExpressionCode symbol lhs rhs fixed = case symbol of
-  "+" -> INTEGER_EXPRESSION(+, (1 + max (byteWidth a) (byteWidth b)))
-  "-" -> INTEGER_EXPRESSION(-, (1 + max (byteWidth a) (byteWidth b)))
-  "*" -> INTEGER_EXPRESSION(*, (byteWidth a + byteWidth b))
+  "+" -> INTEGER_EXPRESSION(+, Operators.integerAdd)
+  "-" -> INTEGER_EXPRESSION(-, Operators.integerSubtract)
+  "*" -> INTEGER_EXPRESSION(*, Operators.integerMultiply)
   _ -> Nothing
 
 #undef INTEGER_EXPRESSION
@@ -490,7 +491,8 @@ compileExpressionBody sc chargeDestination e = case e of
     case (t, bop) of
       (TDecimal, _) -> do
         rf <- compileAs sc TDecimal r
-        f <- decimalOp True (case compileE sc r of Right (CE TDecimal _) -> True; _ -> False) bop
+        f <- if bop == "/" then pure (EMIT_BEGIN Operators.decimalDivideAssign EMIT_END)
+             else decimalOp True (case compileE sc r of Right (CE TDecimal _) -> True; _ -> False) bop
         pure $ CE TDecimal (CAPTURE4 rf get f set $ \compiled_0 compiled_1 compiled_2 compiled_3 ->
           EMIT_BEGIN (\env_4 -> do {b_5 <- compiled_0 env_4;
           a_6 <- chargeAfter 1 (compiled_1 env_4);
@@ -505,14 +507,14 @@ compileExpressionBody sc chargeDestination e = case e of
           EMIT_BEGIN (\env_3 -> do {b_4 <- compiled_0 env_3;
           a_5 <- chargeAfter 1 (compiled_1 env_3);
           void $ chargeAfter 1 (compiled_1 env_3);
-          chargeOp (fromIntegral (T.length a_5 + T.length b_4));
-          compiled_2 env_3 (a_5 <> b_4);
-          pure (a_5 <> b_4)})
+          value_5 <- Operators.textAdd a_5 b_4;
+          compiled_2 env_3 value_5;
+          pure value_5})
           EMIT_END)
       _ -> do
         Refl <- sameTy TInt t
         rf <- compileAs sc TInt r
-        f <- intOp bop
+        f <- if bop == "/" then pure (EMIT_BEGIN Operators.integerDivideAssign EMIT_END) else intOp bop
         pure $ CE TInt (CAPTURE4 rf get f set $ \compiled_0 compiled_1 compiled_2 compiled_3 ->
           EMIT_BEGIN (\env_4 -> do {b_5 <- compiled_0 env_4;
           a_6 <- chargeAfter 1 (compiled_1 env_4);
@@ -576,7 +578,7 @@ compileExpressionBody sc chargeDestination e = case e of
               f <- decimalOp True (isDecimal r) op
               pure $ CE TDecimal $ if op `elem` ["/", "%"]
                 then (CAPTURE3 rf lf f $ \compiled_0 compiled_1 compiled_2 ->
-                  EMIT_BEGIN (\env_3 -> do {compiled_0 env_3 >>= (\b_4 -> when (b_4 == 0) (revert "division by zero"));
+                  EMIT_BEGIN (\env_3 -> do {compiled_0 env_3 >>= (\b_4 -> Operators.checkDivisor b_4);
                   a_5 <- compiled_1 env_3;
                   b_6 <- compiled_0 env_3;
                   compiled_2 a_5 b_6})
@@ -587,7 +589,7 @@ compileExpressionBody sc chargeDestination e = case e of
               f <- decimalOp False True op
               pure $ CE TDecimal $ if op `elem` ["/", "%"]
                 then (CAPTURE3 rf lf f $ \compiled_0 compiled_1 compiled_2 ->
-                  EMIT_BEGIN (\env_3 -> do {compiled_0 env_3 >>= (\b_4 -> when (b_4 == 0) (revert "division by zero"));
+                  EMIT_BEGIN (\env_3 -> do {compiled_0 env_3 >>= (\b_4 -> Operators.checkDivisor b_4);
                   a_5 <- compiled_1 env_3;
                   b_6 <- compiled_0 env_3;
                   compiled_2 (fromInteger a_5) b_6})
@@ -600,14 +602,12 @@ compileExpressionBody sc chargeDestination e = case e of
             (TStr, "+") -> do rf <- compileAs sc TStr r; pure $ CE TStr (CAPTURE2 lf rf $ \compiled_0 compiled_1 ->
                                EMIT_BEGIN (\env_2 -> do {a_3 <- compiled_0 env_2;
                                b_4 <- compiled_1 env_2;
-                               chargeOp (fromIntegral (T.length a_3 + T.length b_4));
-                               pure (a_3 <> b_4)})
+                               Operators.textAdd a_3 b_4})
                                EMIT_END)
             (TBytes, "+") -> do rf <- compileAs sc TBytes r; pure $ CE TBytes (CAPTURE2 lf rf $ \compiled_0 compiled_1 ->
                                  EMIT_BEGIN (\env_2 -> do {a_3 <- compiled_0 env_2;
                                  b_4 <- compiled_1 env_2;
-                                 chargeOp (fromIntegral (B.length a_3 + B.length b_4));
-                                 pure (a_3 <> b_4)})
+                                 Operators.bytesAdd a_3 b_4})
                                  EMIT_END)
             _ -> do
               Refl <- sameTy TInt lt
@@ -615,7 +615,7 @@ compileExpressionBody sc chargeDestination e = case e of
               f <- intOp op
               pure $ CE TInt $ if op `elem` ["/", "%"]
                 then (CAPTURE3 rf lf f $ \compiled_0 compiled_1 compiled_2 ->
-                  EMIT_BEGIN (\env_3 -> do {compiled_0 env_3 >>= (\b_4 -> when (b_4 == 0) (revert "division by zero"));
+                  EMIT_BEGIN (\env_3 -> do {compiled_0 env_3 >>= (\b_4 -> Operators.checkDivisor b_4);
                   a_5 <- compiled_1 env_3;
                   b_6 <- compiled_0 env_3;
                   compiled_2 a_5 b_6})
@@ -716,36 +716,13 @@ comparisonOp = \case
   _ -> (primitiveCode GreaterEqualPrimitive)
 
 decimalOp :: Bool -> Bool -> T.Text -> C (Code (Decimal -> Decimal -> M Decimal))
-decimalOp leftDecimal rightDecimal op = do
-  operation <- decimalOp' op
-  let size = if op == "/" && leftDecimal && rightDecimal
-        then (
-                (EMIT_BEGIN (\a_0 b_1 -> max (byteWidth a_0) (byteWidth b_1))
-                EMIT_END))
-        else integerOpSize op
-  pure $ (CAPTURE2 size operation $ \compiled_0 compiled_1 ->
-    EMIT_BEGIN (\a_2 b_3 -> do {let {places_4 = fromIntegral (max (decimalPlaces a_2) (decimalPlaces b_3));
-    bytes_5 = compiled_0 (decimalMantissa a_2) (decimalMantissa b_3)};
-    chargeOp (places_4 + bytes_5);
-    compiled_1 a_2 b_3})
-    EMIT_END)
-
-decimalOp' :: T.Text -> C (Code (Decimal -> Decimal -> M Decimal))
-decimalOp' op = case op of
-  "+" -> pure (
-                 (EMIT_BEGIN (rounded (+))
-                 EMIT_END))
-  "-" -> pure (
-                 (EMIT_BEGIN (rounded (-))
-                 EMIT_END))
-  "*" -> pure (
-                 (EMIT_BEGIN (rounded (*))
-                 EMIT_END))
-  "/" -> pure $ (
-                   (EMIT_BEGIN (\a_0 b_1 -> if b_1 == 0
-                   then revert "division by zero"
-                   else rounded (/) a_0 b_1)
-                   EMIT_END))
+decimalOp leftDecimal rightDecimal op = case op of
+  "+" -> pure (EMIT_BEGIN Operators.decimalAdd EMIT_END)
+  "-" -> pure (EMIT_BEGIN Operators.decimalSubtract EMIT_END)
+  "*" -> pure (EMIT_BEGIN Operators.decimalMultiply EMIT_END)
+  "/" | leftDecimal && rightDecimal -> pure (EMIT_BEGIN Operators.decimalDivide EMIT_END)
+      | leftDecimal -> pure (EMIT_BEGIN (\a b -> Operators.decimalIntegerDivide a (decimalMantissa b)) EMIT_END)
+      | otherwise -> pure (EMIT_BEGIN (\a b -> Operators.integerDecimalDivide (decimalMantissa a) b) EMIT_END)
   _ -> unsupported ("decimal operator " <> op)
 
 data SomeTuple ls = forall ts. SomeTuple (Fields ts) (Code (Env ls -> M (HL ts)))
@@ -803,70 +780,40 @@ tupleSettersBody sc (FCons _ t rest) (mx : xs) = do
     EMIT_END)
 tupleSettersBody _ _ _ = typeErr "destructuring arity mismatch"
 
-integerOpSize :: T.Text -> Code (Integer -> Integer -> Integer)
-integerOpSize = \case
-  "+" -> (
-            (EMIT_BEGIN (\a_0 b_1 -> 1 + max (byteWidth a_0) (byteWidth b_1))
-            EMIT_END))
-  "-" -> (
-            (EMIT_BEGIN (\a_0 b_1 -> 1 + max (byteWidth a_0) (byteWidth b_1))
-            EMIT_END))
-  "*" -> (
-            (EMIT_BEGIN (\a_0 b_1 -> byteWidth a_0 + byteWidth b_1)
-            EMIT_END))
-  "/" -> (
-            (EMIT_BEGIN (\a_0 _ -> byteWidth a_0)
-            EMIT_END))
-  "%" -> (
-            (EMIT_BEGIN (\_ b_0 -> byteWidth b_0)
-            EMIT_END))
-  "**" -> (
-             (EMIT_BEGIN (\a_0 b_1 -> byteWidth a_0 * b_1)
-             EMIT_END))
-  "<<" -> (
-             (EMIT_BEGIN (\a_0 b_1 -> byteWidth a_0 + b_1)
-             EMIT_END))
-  ">>" -> (
-             (EMIT_BEGIN (\a_0 _ -> byteWidth a_0)
-             EMIT_END))
-  _ -> (
-          (EMIT_BEGIN (\a_0 b_1 -> max (byteWidth a_0) (byteWidth b_1))
-          EMIT_END))
-
 intOp :: T.Text -> C (Code (Integer -> Integer -> M Integer))
 intOp op = case T.unpack op of
   "+" -> pure (
-                 (EMIT_BEGIN (integerAdd)
+                 (EMIT_BEGIN (Operators.integerAdd)
                  EMIT_END))
   "-" -> pure (
-                 (EMIT_BEGIN (integerSubtract)
+                 (EMIT_BEGIN (Operators.integerSubtract)
                  EMIT_END))
   "*" -> pure (
-                 (EMIT_BEGIN (integerMultiply)
+                 (EMIT_BEGIN (Operators.integerMultiply)
                  EMIT_END))
   "/" -> pure (
-                 (EMIT_BEGIN (integerDivide)
+                 (EMIT_BEGIN (Operators.integerDivide)
                  EMIT_END))
   "%" -> pure (
-                 (EMIT_BEGIN (integerRemainder)
+                 (EMIT_BEGIN (Operators.integerRemainder)
                  EMIT_END))
   "**" -> pure (
-                  (EMIT_BEGIN (integerPower)
+                  (EMIT_BEGIN (Operators.integerPower)
                   EMIT_END))
   "|" -> pure (
-                 (EMIT_BEGIN (integerOr)
+                 (EMIT_BEGIN (Operators.integerOr)
                  EMIT_END))
   "&" -> pure (
-                 (EMIT_BEGIN (integerAnd)
+                 (EMIT_BEGIN (Operators.integerAnd)
                  EMIT_END))
   "^" -> pure (
-                 (EMIT_BEGIN (integerXor)
+                 (EMIT_BEGIN (Operators.integerXor)
                  EMIT_END))
   "<<" -> pure (
-                  (EMIT_BEGIN (integerShiftLeft)
+                  (EMIT_BEGIN (Operators.integerShiftLeftAssign)
                   EMIT_END))
   ">>" -> pure (
-                  (EMIT_BEGIN (integerShiftRight)
+                  (EMIT_BEGIN (Operators.integerShiftRight)
                   EMIT_END))
   _ -> unsupported ("operator " <> op)
 
@@ -1419,10 +1366,10 @@ compileCall sc callee args = case callee of
   S.Variable _ n | M.member n (cCC c ^. contracts) -> case args of
     [x] -> do CE t f <- compileE sc x
               case t of
-                TAddr -> pure (CE (TContract n) (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (chargeAfter 500 . compiled_0)
+                TAddr -> pure (CE (TContract n) (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (\environment -> compiled_0 environment >>= Metered.contractCast)
                   EMIT_END))
                 TContract _ -> pure (CE (TContract n) (CAPTURE f $ \compiled_0 ->
-                  EMIT_BEGIN (chargeAfter 500 . compiled_0)
+                  EMIT_BEGIN (\environment -> compiled_0 environment >>= Metered.contractCast)
                   EMIT_END))
                 _ -> typeErr ("cannot convert " <> showTy t <> " to contract " <> n)
     _ -> typeErr "contract conversion takes one argument"
