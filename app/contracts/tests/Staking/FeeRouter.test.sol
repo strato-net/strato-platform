@@ -115,12 +115,14 @@ contract record Signer is FeeRouterHarness {
 
 contract Describe_FeeRouter {
     address constant PROPOSER = address(0xaaaa);
+    address constant BURN_ADDRESS = address(0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddead);
     uint constant Q192 = 6277101735386680763835789423207666416102355444464034512896;
     uint constant WINDOW = 1800; // FeeRouter._twapWindow
     int constant FULL_RANGE = 887220; // widest tick multiple of the 0.30% tier's spacing
     int constant HALF_PRICE_TICK = -6932; // 1.0001^-6932 = 0.50004
     uint constant BIG = 100000000e18;
 
+    AdminRegistry admin;
     TokenFactory factory;
     Token usdst;
     Token strato;
@@ -134,12 +136,15 @@ contract Describe_FeeRouter {
     PoolV3Factory poolFactory;
     PoolV3 pool;
 
+    // The paused-token whitelist lives in the AdminRegistry that owns the token factory.
     function beforeAll() public {
         feeCollector = new User();
+        admin = new AdminRegistry();
+        admin.initialize([this]);
     }
 
     function beforeEach() public {
-        factory = new TokenFactory(address(this));
+        factory = new TokenFactory(address(admin));
         usdst = _token("USDST");
         strato = _token("STRATO");
 
@@ -165,8 +170,10 @@ contract Describe_FeeRouter {
     }
 
     function _token(string symbol) internal returns (Token) {
-        Token t = Token(factory.createTokenWithInitialOwner(
-            symbol, symbol + " Token", new string[](0), new string[](0), new string[](0), symbol, 0, 18, address(this)));
+        (bool created, variadic ret) = admin.castVoteOnIssue(address(factory), "createTokenWithInitialOwner",
+            symbol, symbol + " Token", [], [], [], symbol, 0, 18, this);
+        require(created, "token not created");
+        Token t = Token(address(ret));
         t.setStatus(2);
         return t;
     }
@@ -365,18 +372,34 @@ contract Describe_FeeRouter {
         signer.pay(address(router));
     }
 
-    // ---- payment: one whole voucher, else burn STRATO ----
+    // ---- payment: one whole voucher, else STRATO to the burn address ----
 
-    function it_burns_the_strato_fee_rather_than_collecting_it() public {
+    function it_sends_the_strato_fee_to_the_burn_address() public {
         _pricedPool(0, true);
         uint supply = strato.totalSupply();
 
         signer.pay(address(router));
         require(strato.balanceOf(address(signer)) == 1e18 - 1e16, "signer paid 0.01 STRATO");
-        require(strato.totalSupply() == supply - 1e16, "burned, not moved");
+        require(strato.balanceOf(BURN_ADDRESS) == 1e16, "the fee sits at the burn address");
+        require(strato.totalSupply() == supply, "moved, not burned");
         require(strato.balanceOf(address(feeCollector)) == 0, "nothing to the collector");
         require(strato.balanceOf(address(router)) == 0, "nothing to the router");
+        require(strato.allowance(address(signer), address(router)) == 0, "no allowance left behind");
         require(usdst.balanceOf(address(signer)) == 0, "no USDST involved");
+    }
+
+    // sinkFee is callable by anyone, but only ever spends the caller's own approval.
+    function it_only_sinks_the_callers_own_strato() public {
+        _pricedPool(0, true);
+        signer.approve(address(strato), address(router), 1e16);
+
+        bool reverted = false;
+        try router.sinkFee(1e16) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "a stranger cannot spend the signer's approval");
+        require(strato.balanceOf(address(signer)) == 1e18, "signer untouched");
     }
 
     function it_prefers_a_whole_voucher_over_strato() public {
@@ -405,13 +428,17 @@ contract Describe_FeeRouter {
         require(strato.balanceOf(address(signer)) == 1e18 - fee, "charged exactly the quote");
     }
 
-    // Pausing STRATO transfers must not switch off every paid transaction on the chain.
-    function it_burns_strato_while_the_token_is_paused() public {
+    // Pausing STRATO transfers must not switch off every paid transaction on the chain,
+    // which holds once the router is whitelisted for transferFrom.
+    function it_pays_strato_while_the_token_is_paused() public {
         _pricedPool(0, true);
         strato.pause();
+        require(_paymentReverts(signer), "a paused token stops a router that is not whitelisted");
 
+        admin.castVoteOnIssue(address(admin), "addWhitelist", address(strato), "transferFrom", address(router));
         signer.pay(address(router));
         require(strato.balanceOf(address(signer)) == 1e18 - 1e16, "paid while paused");
+        require(strato.balanceOf(BURN_ADDRESS) == 1e16, "to the burn address");
     }
 
     function it_reverts_when_strato_is_short_and_there_is_no_voucher() public {
@@ -530,7 +557,8 @@ contract Describe_FeeRouter {
 
         s.pay(address(router));
         require(strato.balanceOf(address(s)) == 0, "exactly the shortfall bought, then the fee burned");
-        require(strato.totalSupply() == supply - 1e16, "the whole fee is burned");
+        require(strato.balanceOf(BURN_ADDRESS) == 1e16, "the whole fee goes to the burn address");
+        require(strato.totalSupply() == supply, "nothing burned");
         uint spent = 1e18 - usdst.balanceOf(address(s));
         require(spent >= 5e15 && spent <= 5e15 * 101 / 100, "shortfall bought at the pool price plus its fee");
     }

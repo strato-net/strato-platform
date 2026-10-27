@@ -1,11 +1,11 @@
 abstract contract ERC20_Template {
   function transfer(address _to, uint _amount) public;
+  function transferFrom(address _from, address _to, uint _amount) public;
   function approve(address _spender, uint _amount) public;
   function allowance(address _owner, address _spender) public view returns (uint);
 }
 
 interface IGasToken {
-    function burn(uint amount) external; // holder-only Token.burn(uint256)
     function balanceOf(address account) external view returns (uint);
     function decimals() external view returns (uint8);
 }
@@ -16,6 +16,10 @@ interface IFeeContractLookup {
 
 interface IStratoFeeQuote {
     function stratoFeeQuote() external view returns (uint fee, uint priceVersion, bool valid);
+}
+
+interface IFeeSink {
+    function sinkFee(uint amount) external;
 }
 
 interface ICanonicalPool {
@@ -47,7 +51,8 @@ enum FeeMethod { NONE, VOUCHER, STRATO_BURN, USDST_SWAP_BURN, USDST_COLLECTED }
 //
 // Fee policy, $0.01 per submitted transaction, paid with the first of:
 //   1. one whole voucher;
-//   2. STRATO worth 0.01 USDST, burned from the signer. Nothing is collected or split.
+//   2. STRATO worth 0.01 USDST, moved from the signer to the burn address, so
+//      totalSupply stays fixed. Nothing is collected or split.
 //      A signer short of STRATO first buys exactly the shortfall from the canonical pool
 //      with its own USDST, paying at most the shortfall's time-weighted value plus a
 //      bounded premium, so a USDST-only account keeps transacting through the switch.
@@ -123,6 +128,7 @@ contract record FeeRouter {
 
     uint constant USD_FEE = 1e16; // $0.01, in 18-decimal USDST
     uint constant VOUCHER_FEE = 1e18; // one whole voucher
+    address constant BURN_ADDRESS = address(0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddead);
     uint constant Q192 = 6277101735386680763835789423207666416102355444464034512896; // 2**192: sqrtPriceX96 squared is Q192
 
     // ---- Router storage. Only payBlockRewards and the views may touch it: those are
@@ -304,10 +310,13 @@ contract record FeeRouter {
                 _buyStratoShortfall(fee - held, fee);
                 method = FeeMethod.USDST_SWAP_BURN;
             }
-            // A signer still short reverts here, and the platform rejects the
-            // transaction before it runs: nothing is burned or swapped for a
-            // transaction that is not included.
-            IGasToken(strato).burn(fee);
+            // A paused STRATO lets only whitelisted callers move it, and this runs as
+            // the signer, so the signer approves the installed router (whitelisted for
+            // transferFrom) and the router moves the fee. A signer still short reverts
+            // here, and the platform rejects the transaction before it runs: nothing is
+            // paid or swapped for a transaction that is not included.
+            ERC20_Template(strato).approve(router, fee);
+            IFeeSink(router).sinkFee(fee);
             amount = fee;
             version = ver;
         }
@@ -318,6 +327,13 @@ contract record FeeRouter {
             } catch {
             }
         }
+    }
+
+    // The STRATO leg of payFees, as a plain call so the token sees the router as the
+    // caller. It only ever moves the caller's own STRATO, out of the allowance the
+    // caller just gave, and only to the burn address.
+    function sinkFee(uint amount) external {
+        ERC20_Template(_strato()).transferFrom(msg.sender, BURN_ADDRESS, amount);
     }
 
     // Buy exactly `shortfall` STRATO from the canonical pool with the signer's USDST.

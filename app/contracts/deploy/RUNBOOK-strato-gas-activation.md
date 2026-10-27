@@ -12,9 +12,9 @@ client, `GLOBAL_ADMIN_NAME` / `GLOBAL_ADMIN_PASSWORD`).
 
 | Piece | Where |
 |---|---|
-| STRATO token, burnable logic, transfers paused (pre-TGE rehearsal) with the pool whitelisted for `transfer` | proxy `8ee9a339…8b04`, impl `646cdf8e…cb04`; pool whitelisted at block 858468, paused at 858475 |
+| STRATO token, burnable logic, transfers paused (pre-TGE rehearsal) with the pool whitelisted for `transfer` and the fee router for `transferFrom` | proxy `8ee9a339…8b04`, impl `646cdf8e…cb04`; pool whitelisted at block 858468, paused at 858475; router V6 whitelisted 2026-10-27, before its install |
 | Canonical STRATO/USDST PoolV3 (fee 3000, cardinality 500) | `6df32c9b…3165` |
-| HeliumFeeRouterV5 (voucher, else burn STRATO, USDST buys a shortfall; no block reward; quote frozen below the floor) | `7b9caebb…b5ca`, installed at block 858387. V4 `76a6839f…9da9d6` paid 0.01 STRATO per block from 803253 to 858386 and keeps its 1,528 STRATO |
+| HeliumFeeRouterV6 (voucher, else STRATO moved to the burn address `0xdead…dead`, so totalSupply stays fixed; USDST buys a shortfall; no block reward; quote frozen below the floor) | `b01ce4cc…6aec`, installed at block 863930. V5 `7b9caebb…b5ca` burned fees from 858387 to 863930. V4 `76a6839f…9da9d6` paid 0.01 STRATO per block from 803253 to 858386 and keeps its 1,528 STRATO |
 | Native-token flag day (eth_getBalance, native transfers, envelope rules) | helium block 900000 (`stratoGasForkBlock`) |
 | App (fee quote, send-max, voucher display) | deploy_testnet_app_ha #25, strato-gas 0750d10 |
 
@@ -32,8 +32,9 @@ Legend: **contract** = `app/contracts/tests/Staking/FeeRouter.test.sol` (39 case
 | Check | How | Helium 2026-10-22 |
 |---|---|---|
 | Every fee equals the block's quote (or one whole voucher) | audit *fees charged at the block quote* | 30,058 fees, 0 mismatches |
-| Every burned fee left the supply; nothing else burned | audit *burned fees reconcile with supply* | 155.88 STRATO in 14,109 txs, 0 differ, other burns 0 |
+| Every STRATO fee left circulation (burned through V5, sent to the burn address from V6); nothing else did | audit *STRATO fees reconcile with supply and the burn address* | 155.88 STRATO in 14,109 txs, 0 differ, other burns 0; V6 on 2026-10-27: 0.0376 STRATO in 8 txs to the burn address, 0 differ |
 | totalSupply equals the sum of balances | same gate | 47,680,847 = sum of 30 balances |
+| The burn address holds exactly what was sent to it | same gate | 2026-10-27: 0.0376 STRATO = 8 transfers in |
 | Reverted transactions still pay | audit *every included transaction paid* | 6 reverted in 300 blocks, all paid, 0 unpaid |
 | Receipts show the fee log wallets read | audit *receipts carry the FeePaid log* | **FAIL on helium**: 12 of 341 receipts lack it. The runner dropped the fee hook's delegatecall record whenever the transaction had its own action, so Cirrus never recorded the router's code at those payers and the receipt builder could not resolve FeePaid (the charge itself was right). Fixed in `vm-runner` `attachFeeResult` on this branch; after redeploy each payer's next transaction repairs its whole history, since the record is per (payer, contract name) |
 
@@ -94,13 +95,15 @@ Preconditions, in order. "Vote" = one AdminRegistry issue, run once per admin.
    sentinel), release, and upgrade every validator and the app before A. Mixed builds
    agree until A; at A a validator on the old build forks off.
 2. **Token.** Upgrade the STRATO proxy to the burnable logic (`upgrade.js`, vote). Transfers
-   stay paused until TGE: `burn(uint256)` is not pause-gated, so fees burn regardless, and
-   whitelisting the pool for `transfer` (`strato-gas-helium.js whitelist-pool <pool>`, vote)
+   stay paused until TGE: the router moves each fee to the burn address with `transferFrom`,
+   so whitelist it for `transferFrom` (`whitelist-feerouter.js <router>`, vote) before
+   installing it, or every STRATO-paid transaction is rejected. Whitelisting the pool for `transfer` (`strato-gas-helium.js whitelist-pool <pool>`, vote)
    lets USDST buy STRATO, including the router's shortfall buy, while `transferFrom` stays
    blocked so nothing sells STRATO into the pool or mints liquidity. Seed the pool before
    pausing (mint needs `transferFrom`). Block rewards need the staking proxy whitelisted for
    `transferFrom`. Verified on helium 2026-10-26: buy swap and fee burns succeed under the
-   pause, a sell swap fails.
+   pause, a sell swap fails; 2026-10-27: V6 fees reach the burn address under the pause
+   with totalSupply unchanged.
 3. **Pool.** Create the canonical STRATO/USDST PoolV3 (vote), seed full-range liquidity,
    grow the observation ring, and let 30 minutes of observations accumulate. Read the
    seeded `liquidity` from `strato-gas-helium.js status` and pick the floor as a fraction

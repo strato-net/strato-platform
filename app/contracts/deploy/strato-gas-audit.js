@@ -15,6 +15,7 @@ const axios = require('axios');
 
 const DECIDER_STATE = '00000000000000000000000000000000dec1de02';
 const ZERO = '0000000000000000000000000000000000000000';
+const DEAD = 'deaddeaddeaddeaddeaddeaddeaddeaddeaddead'; // FeeRouter.BURN_ADDRESS (V6 on); routers through V5 burned to ZERO
 const WAD = 10n ** 18n;
 const USD_FEE = 10n ** 16n;
 const FEE_PAID_TOPIC = '0x9766415a366eee49dea2373907d50273c3aefcd4207d8c7063a5bb343305a8e0'; // FeePaid(address,uint8,uint256,uint256)
@@ -48,6 +49,7 @@ async function storage(address) {
   for (const r of data) rows[r.key] = r.value;
   return rows;
 }
+const strato4 = (w) => `${w / WAD}.${(w % WAD).toString().padStart(18, '0').slice(0, 4)}`;
 const addrOf = (v) => { const m = /\(([0-9a-fA-F]{40})\)/.exec(v || ''); return m ? m[1] : String(v || ''); };
 
 // Every row of a Cirrus table matching params, in id order (keyset, so size is no limit).
@@ -141,16 +143,17 @@ const gate = (status, name, detail) => { results.push({ status, name, detail });
   const swapPayers = [...payers.entries()].filter(([, p]) => p.USDST_SWAP_BURN).length;
   gate(swapPayers ? 'PASS' : 'INFO', 'USDST-only accounts bought their STRATO fee', `${swapPayers} payers used USDST_SWAP_BURN`);
 
-  // ---- 3. Supply: every burned fee left the supply, and the supply is the balances ----
+  // ---- 3. Supply: every STRATO fee left circulation (burned, or sent to the burn address),
+  // nothing ever left the burn address, and the supply is the balances ----
   const strato = (await axios.get(`${cirrus}/event`, { params: { event_name: 'eq.FeePaid', 'attributes->>method': 'eq.FeeMethod.STRATO_BURN', select: 'transaction_hash', limit: '1' }, timeout: 60000 })).data[0];
   const stratoTx = strato && strato.transaction_hash;
   const sample = stratoTx && await rpc(node, 'eth_getTransactionReceipt', [`0x${stratoTx}`]);
-  const stratoToken = sample && sample.logs.find(l => l.topics[2] === `0x${'0'.repeat(24)}${ZERO}`)?.address.replace(/^0x/, '');
-  let supplyDetail = 'no STRATO burn found yet';
+  const stratoToken = sample && sample.logs.find(l => [ZERO, DEAD].some(a => l.topics[2] === `0x${'0'.repeat(24)}${a}`))?.address.replace(/^0x/, '');
+  let supplyDetail = 'no STRATO fee found yet';
   let supplyOk = true;
   if (stratoToken) {
     const burns = await page('event', { address: `eq.${stratoToken}`, event_name: 'eq.Transfer', block_number: `gte.${installBlock}`,
-      and: `(block_number.lte.${auditTip})`, 'attributes->>to': `eq.${ZERO}`, select: 'id,transaction_hash,attributes' });
+      and: `(block_number.lte.${auditTip})`, 'attributes->>to': `in.(${ZERO},${DEAD})`, select: 'id,transaction_hash,attributes' });
     let feeBurns = 0n, otherBurns = 0n, mismatchedTx = 0;
     const burnByTx = new Map();
     for (const t of burns) burnByTx.set(t.transaction_hash, (burnByTx.get(t.transaction_hash) || 0n) + BigInt(t.attributes.value));
@@ -162,12 +165,17 @@ const gate = (status, name, detail) => { results.push({ status, name, detail });
     const [{ _totalSupply }] = (await axios.get(`${cirrus}/BlockApps-Token`, { params: { address: `eq.${stratoToken}`, select: '_totalSupply::text' }, timeout: 60000 })).data;
     const balances = await pageOffset('BlockApps-Token-_balances', { address: `eq.${stratoToken}`, select: 'key,value::text', order: 'key.asc' });
     const sumBalances = balances.reduce((s, r) => s + BigInt(r.value), 0n);
-    supplyOk = mismatchedTx === 0 && feeBurns === burned && sumBalances === BigInt(_totalSupply);
-    supplyDetail = `fee burns ${feeBurns / WAD}.${(feeBurns % WAD).toString().padStart(18, '0').slice(0, 4)} STRATO in ${burnTxs.size} txs ` +
-      `(${mismatchedTx} tx amounts differ from FeePaid), other burns ${otherBurns / WAD} STRATO; ` +
-      `totalSupply ${BigInt(_totalSupply) / WAD} == sum of ${balances.length} balances: ${sumBalances === BigInt(_totalSupply)}`;
+    // Nothing can sign for the burn address, so its balance is every transfer ever made into it.
+    const deadIn = await page('event', { address: `eq.${stratoToken}`, event_name: 'eq.Transfer', 'attributes->>to': `eq.${DEAD}`, select: 'id,attributes' });
+    const deadSent = deadIn.reduce((s, t) => s + BigInt(t.attributes.value), 0n);
+    const deadBalance = BigInt(balances.find(r => r.key === DEAD)?.value || 0);
+    supplyOk = mismatchedTx === 0 && feeBurns === burned && sumBalances === BigInt(_totalSupply) && deadBalance === deadSent;
+    supplyDetail = `fees burned or sent to the burn address ${strato4(feeBurns)} STRATO in ${burnTxs.size} txs ` +
+      `(${mismatchedTx} tx amounts differ from FeePaid), other burns or sends ${otherBurns / WAD} STRATO; ` +
+      `totalSupply ${BigInt(_totalSupply) / WAD} == sum of ${balances.length} balances: ${sumBalances === BigInt(_totalSupply)}; ` +
+      `burn address holds ${strato4(deadBalance)} STRATO == ${deadIn.length} transfers into it: ${deadBalance === deadSent}`;
   }
-  gate(supplyOk ? 'PASS' : 'FAIL', 'burned fees reconcile with supply', supplyDetail);
+  gate(supplyOk ? 'PASS' : 'FAIL', 'STRATO fees reconcile with supply and the burn address', supplyDetail);
 
   // ---- 4. Included transactions all paid, reverted ones included ----
   // Paid = Cirrus holds a FeePaid for the transaction. Whether the node's receipt also
