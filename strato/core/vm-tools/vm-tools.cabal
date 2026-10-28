@@ -130,6 +130,7 @@ test-suite contextm-test
     , strato-conf
     , strato-model
     , text
+    , time
     , vector
     , vm-tools
   default-language: Haskell2010
