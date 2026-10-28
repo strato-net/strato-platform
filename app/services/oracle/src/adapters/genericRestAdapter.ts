@@ -32,6 +32,17 @@ export function generateConstantPrices(assetKeys: string[], assets: Record<strin
 
 // Main fetch function - uses sourceConfig directly
 export async function fetchPrices(sourceConfig: SourceConfig): Promise<BatchPriceResult> {
+    // Kraken Trades accepts one pair per request. A failed pair is already logged and drops only that asset;
+    // the source fails only when every pair fails.
+    if (sourceConfig.parse === 'kraken' && sourceConfig.assets.length > 1) {
+        const results = await Promise.allSettled(sourceConfig.assets.map(symbol =>
+            fetchPrices({ ...sourceConfig, assets: [symbol] })
+        ));
+        const prices = results.flatMap(r => r.status === 'fulfilled' ? [r.value] : []);
+        if (prices.length === 0) throw (results[0] as PromiseRejectedResult).reason;
+        return Object.assign({}, ...prices);
+    }
+
     const url = buildUrl(sourceConfig);
     const requestOptions = buildRequestOptions(sourceConfig, url);
 
@@ -41,12 +52,23 @@ export async function fetchPrices(sourceConfig: SourceConfig): Promise<BatchPric
         method: requestOptions.method || 'GET'
     });
 
-    if (response.data && response.data.success === false) {
-        const errorMessage = response.data.error?.message || response.data.error || 'API returned error response';
-        throw new Error(`${sourceConfig.url}: ${errorMessage}`);
+    // Provider errors reported inside a 2xx body (success:false, Kraken error[]), a response that prices none of the
+    // configured assets, and parse crashes are reported like a failed request: logError here (error log + health
+    // flag), then the rejection reaches fetchSource, which logs the warning and marks the source failed for the cycle.
+    try {
+        if (response.data && response.data.success === false) {
+            throw new Error(response.data.error?.message || response.data.error || 'API returned error response');
+        }
+        const result = parseResponse(response.data, sourceConfig);
+        if (sourceConfig.assets.length > 0 && Object.keys(result).length === 0) {
+            throw new Error(`no prices parsed for [${sourceConfig.assets.join(', ')}]`);
+        }
+        return result;
+    } catch (err) {
+        const error = new Error(`${sourceConfig.url}: ${(err as Error).message}`);
+        logError('GenericRestAdapter', error);
+        throw error;
     }
-
-    return parseResponse(response.data, sourceConfig);
 }
 
 function buildUrl(sourceConfig: SourceConfig): string {
@@ -119,12 +141,13 @@ function buildRequestOptions(sourceConfig: SourceConfig, url: string): any {
 
     const requestOptions: any = { method: sourceConfig.method || 'GET', url, headers };
 
-    // Add POST body if needed
-    if (sourceConfig.body && sourceConfig.method === 'POST') {
+    // POST body: Alchemy by-address takes [{network, address}], mapped as "<network>:<address>"
+    if (sourceConfig.body === 'addresses' && sourceConfig.method === 'POST') {
         requestOptions.data = {
-            codes: sourceConfig.assets.map(s => sourceConfig.symbolMapping?.[s] || s),
-            currency: 'USD',
-            meta: false
+            addresses: sourceConfig.assets.map(s => {
+                const [network, address] = (sourceConfig.symbolMapping?.[s] || s).split(':');
+                return { network, address };
+            })
         };
     }
 
@@ -136,11 +159,11 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
     const parsePattern = sourceConfig.parse;
     const symbols = sourceConfig.assets;
     
-    // Alchemy: data[].prices[0].value
+    // Alchemy: data[].prices[0].value, matched on symbol (by-symbol) or "<network>:<address>" (by-address)
     if (parsePattern === 'data[].prices[0].value' && data.data && Array.isArray(data.data)) {
         symbols.forEach(symbol => {
             const mapped = sourceConfig.symbolMapping?.[symbol] || symbol;
-            const item = data.data.find((d: any) => d.symbol === mapped);
+            const item = data.data.find((d: any) => d.symbol === mapped || `${d.network}:${d.address}`.toLowerCase() === mapped.toLowerCase());
             if (item?.prices?.[0]?.value) {
                 const price = Math.floor(parseFloat(item.prices[0].value) * 1e18);
                 if (isValidPrice(price)) result[symbol] = { price, feedTimestamp: item.prices[0].lastUpdatedAt || new Date().toISOString() };
@@ -232,6 +255,17 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
         
+    // Pure: data[] of {material, bid, ask} in USD cents per troy ounce; submit the bid/ask mid
+    } else if (parsePattern === 'pure' && Array.isArray(data?.data)) {
+        symbols.forEach(symbol => {
+            const material = sourceConfig.symbolMapping?.[symbol] || symbol;
+            const quote = data.data.find((d: any) => d.material === material);
+            if (quote?.bid > 0 && quote?.ask > 0) {
+                const price = Math.floor((quote.bid + quote.ask) / 2 * 1e16); // cents -> USD x 1e18
+                if (isValidPrice(price)) result[symbol] = { price, feedTimestamp: new Date().toISOString() };
+            }
+        });
+
     // CommodityPriceAPI: rates.{symbol} object with close price
     } else if (parsePattern === 'rates.{symbol}' && data.rates) {
         symbols.forEach(symbol => {
@@ -281,12 +315,30 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
 
-    // DexScreener: data.pairs[] across DEXes/chains; pick highest-liquidity Ethereum/Base pair where baseToken matches the mapped contract address
+    // Kraken: count=1 returns the latest trade as [price, volume, time, ...], with time in Unix seconds.
+    // One unknown pair fails the whole request (HTTP 200, error[] set, result{} empty), so surface it as a source failure.
+    } else if (parsePattern === 'kraken') {
+        const errors = (data.error || []).filter((e: string) => e.startsWith('E'));
+        if (errors.length) throw new Error(`Kraken: ${errors.join(', ')}`);
+        symbols.forEach(symbol => {
+            const pair = sourceConfig.symbolMapping?.[symbol] || symbol;
+            const trade = data.result?.[pair]?.[0];
+            const timestamp = trade?.[2];
+            if (Array.isArray(trade) && typeof timestamp === 'number' && timestamp > 0) {
+                const price = Math.floor(parseFloat(trade[0]) * 1e18);
+                const feedTimestamp = new Date(timestamp * 1000);
+                if (isValidPrice(price) && Number.isFinite(feedTimestamp.getTime())) {
+                    result[symbol] = { price, feedTimestamp: feedTimestamp.toISOString() };
+                }
+            }
+        });
+
+    // DexScreener: data.pairs[] across DEXes/chains; pick highest-liquidity Ethereum/Base/HyperEVM pair where baseToken matches the mapped contract address
     } else if (parsePattern === 'dexscreener' && Array.isArray(data?.pairs)) {
         symbols.forEach(symbol => {
             const mappedAddress = (sourceConfig.symbolMapping?.[symbol] || symbol).toLowerCase();
             const candidates = data.pairs.filter((p: any) =>
-                (p.chainId === 'ethereum' || p.chainId === 'base') &&
+                (p.chainId === 'ethereum' || p.chainId === 'base' || p.chainId === 'hyperevm') &&
                 p.baseToken?.address?.toLowerCase() === mappedAddress &&
                 p.priceUsd
             );

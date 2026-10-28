@@ -42,7 +42,7 @@ export interface SourceConfig {
     method?: string;
     params?: string; // Comma-separated URL parameters
     headers?: string; // Comma-separated header names
-    body?: string; // Request body key
+    body?: string; // POST body shape: 'addresses' for Alchemy by-address
     parse: string; // Price parsing pattern
     apiKeyEnvVar?: string; // Environment variable name for API key
     apiKey?: string; // Resolved API key (populated at load time)
