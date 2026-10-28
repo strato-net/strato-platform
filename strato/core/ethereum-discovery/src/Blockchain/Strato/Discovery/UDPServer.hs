@@ -221,7 +221,8 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
     peers <- getPeersClosestTo (20 :: Natural) targetPubkey otherPubKey
     let theNeighbors = catMaybes $ (\p -> Neighbor (mkEndpoint p) <$> mkNodeId p) <$> peers
         UDPPort udpPort' = otherUdpPort
-    sendPacket def{pPeerHost = host, pPeerIp = Just ip, pPeerUdpPort = udpPort'} $ Neighbors theNeighbors nextTime
+    forM_ (neighborsPackets nextTime theNeighbors) $
+      sendPacket def{pPeerHost = host, pPeerIp = Just ip, pPeerUdpPort = udpPort'}
     where
       mkEndpoint PPeer {..} = Endpoint (stringToIAddr $ hostToString pPeerHost) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
       mkNodeId = fmap pointToNodeID . pPeerPubkey
