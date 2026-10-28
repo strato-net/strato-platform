@@ -1,20 +1,31 @@
 import { usdstAddress } from '@/lib/constants';
 
-// The STRATO-as-gas launch as a fixed sequence of admin actions with every value filled in,
-// so an admin only confirms each one. Votes go through the AdminRegistry (one issue per
+// A deployment is a fixed sequence of admin actions with every value filled in, so an admin
+// only confirms each one. Votes go through the AdminRegistry (one issue per
 // target/function/args; the same call from every admin lands on the same issue). Contract
 // creations are issues too, but their source is the argument, so one admin raises them with
-// the deploy script and the rest approve by issue id. Two steps are plain transactions by a
-// single key and are shown as the command to run.
+// the deploy script and the rest approve by issue id. Steps that are a plain transaction by
+// a single key are shown as the command to run.
 
-export type LaunchArg = { label: string; type: 'address' | 'string' | 'int'; value: string | null };
+export type DeploymentArg = { label: string; type: 'address' | 'string' | 'int'; value: string | null };
 
-export type LaunchStep =
-  | { kind: 'vote'; title: string; why: string; target: string; targetName: string; func: string; args: LaunchArg[] }
+export type DeploymentStep =
+  | { kind: 'vote'; title: string; why: string; target: string; targetName: string; func: string; args: DeploymentArg[] }
   | { kind: 'create'; title: string; why: string; contractName: string; command: string }
   | { kind: 'manual'; title: string; why: string; command: string };
 
-type LaunchValues = {
+export type Network = 'helium' | 'upquark';
+
+export type Deployment = {
+  id: string;
+  title: string;
+  description: string;
+  steps: (network: Network) => DeploymentStep[];
+};
+
+const ADMIN_REGISTRY = '000000000000000000000000000000000000100c';
+
+type StratoGasValues = {
   strato: string;
   burnableLogic: string | null;
   pool: string | null;
@@ -25,10 +36,8 @@ type LaunchValues = {
   initialSqrtPriceX96: string | null;
 };
 
-const ADMIN_REGISTRY = '000000000000000000000000000000000000100c';
-
 // null = not known yet: the step shows what it is waiting on and cannot be approved.
-const VALUES: Record<'helium' | 'upquark', LaunchValues> = {
+const STRATO_GAS_VALUES: Record<Network, StratoGasValues> = {
   helium: {
     strato: '8ee9a3391e38176feebf5d43cb2c1d6c4f728b04',
     burnableLogic: '646cdf8ec887a23dd6fe007280909c36c994cb04',
@@ -49,9 +58,9 @@ const VALUES: Record<'helium' | 'upquark', LaunchValues> = {
   },
 };
 
-export const launchSteps = (network: 'helium' | 'upquark'): LaunchStep[] => {
-  const v = VALUES[network];
-  const strato: LaunchArg = { label: 'token', type: 'address', value: v.strato };
+const stratoGasSteps = (network: Network): DeploymentStep[] => {
+  const v = STRATO_GAS_VALUES[network];
+  const strato: DeploymentArg = { label: 'token', type: 'address', value: v.strato };
   return [
     {
       kind: 'vote',
@@ -125,6 +134,15 @@ export const launchSteps = (network: 'helium' | 'upquark'): LaunchStep[] => {
   ];
 };
 
+export const DEPLOYMENTS: Deployment[] = [
+  {
+    id: 'strato-gas',
+    title: 'STRATO as gas',
+    description: 'Fees paid in STRATO, priced per block from the STRATO/USDST pool, with transfers paused until TGE.',
+    steps: stratoGasSteps,
+  },
+];
+
 export const normalizeArg = (value: unknown): string => String(value ?? '').toLowerCase().replace(/^0x/, '');
 
 // Issue args arrive as a JSON string from Cirrus or as an array from the API.
@@ -135,7 +153,16 @@ const issueArgs = (issue: { args: unknown }): unknown[] => {
 
 export type RegistryIssue = { issueId: string; target: string; func: string; args: unknown };
 
-export const issueForStep = <T extends RegistryIssue>(step: LaunchStep, issues: T[]): T | undefined => {
+export type RegistryState = {
+  issues: RegistryIssue[];
+  votes: Array<{ issueId: string; voter: string }>;
+  executed: RegistryIssue[];
+  admins: Array<{ address: string }>;
+  globalThreshold: number;
+  thresholds: Array<{ target: string; func: string; threshold: number }>;
+};
+
+export const issueForStep = <T extends RegistryIssue>(step: DeploymentStep, issues: T[]): T | undefined => {
   if (step.kind === 'manual') return undefined;
   return issues.find((issue) => {
     const args = issueArgs(issue);
@@ -149,12 +176,26 @@ export const issueForStep = <T extends RegistryIssue>(step: LaunchStep, issues: 
   });
 };
 
+export const votesNeeded = (state: RegistryState, issue: RegistryIssue): number => {
+  const own = state.thresholds.find((t) => normalizeArg(t.target) === normalizeArg(issue.target) && t.func === issue.func)?.threshold;
+  return Math.ceil((state.admins.length * (own || state.globalThreshold)) / 10000);
+};
+
 // What castVoteOnIssue sends: addresses 0x-prefixed, everything else as typed in.
-export const voteArgs = (step: Extract<LaunchStep, { kind: 'vote' }>): string[] =>
+export const voteArgs = (step: Extract<DeploymentStep, { kind: 'vote' }>): string[] =>
   step.args.map((arg) => (arg.type === 'address' ? `0x${arg.value}` : String(arg.value)));
 
-export const missingValue = (step: LaunchStep): string | null => {
+export const missingValue = (step: DeploymentStep): string | null => {
   if (step.kind !== 'vote') return null;
   const missing = step.args.find((arg) => arg.value === null);
   return missing ? missing.label : null;
+};
+
+export type StepStatus = { executed: boolean; openIssue?: RegistryIssue; votesCast: number; voted: boolean };
+
+export const stepStatus = (step: DeploymentStep, state: RegistryState, userAddress: string | null): StepStatus => {
+  const executed = Boolean(issueForStep(step, state.executed));
+  const openIssue = executed ? undefined : issueForStep(step, state.issues);
+  const votes = openIssue ? state.votes.filter((v) => v.issueId === openIssue.issueId) : [];
+  return { executed, openIssue, votesCast: votes.length, voted: votes.some((v) => normalizeArg(v.voter) === normalizeArg(userAddress)) };
 };

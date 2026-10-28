@@ -1,21 +1,20 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Check, Loader2, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
-import { useNetwork } from '@/context/NetworkContext';
-import { api } from '@/lib/axios';
 import CopyButton from '../ui/copy';
-import { issueForStep, launchSteps, missingValue, normalizeArg, voteArgs, type LaunchStep, type RegistryIssue } from './launchSteps';
-
-type OpenIssues = {
-  issues: RegistryIssue[];
-  votes: Array<{ issueId: string; voter: string }>;
-  admins: Array<{ address: string }>;
-  globalThreshold: number;
-  thresholds: Array<{ target: string; func: string; threshold: number }>;
-};
+import {
+  missingValue,
+  stepStatus,
+  voteArgs,
+  votesNeeded,
+  type Deployment,
+  type DeploymentStep,
+  type Network,
+  type RegistryState,
+} from './deployments';
 
 const errorMessage = (error: unknown): string => {
   const failure = error as { response?: { data?: { error?: { message?: string } | string } }; message?: string } | null;
@@ -44,51 +43,34 @@ const ValueRow = ({ label, value, mono = true }: { label: string; value: string;
   </div>
 );
 
-const LaunchChecklistTab = () => {
+interface DeploymentStepsModalProps {
+  deployment: Deployment | null;
+  network: Network;
+  state: RegistryState;
+  onOpenChange: (open: boolean) => void;
+  // Called after every approval so the caller can refetch the registry.
+  onApproved: () => Promise<void>;
+}
+
+const DeploymentStepsModal = ({ deployment, network, state, onOpenChange, onApproved }: DeploymentStepsModalProps) => {
   const { toast } = useToast();
   const { userAddress, castVoteOnIssue, castVoteOnIssueById } = useUser();
-  const { isTestnet } = useNetwork();
-  const steps = launchSteps(isTestnet ? 'helium' : 'upquark');
-
-  const [open, setOpen] = useState<OpenIssues | null>(null);
-  const [executed, setExecuted] = useState<RegistryIssue[]>([]);
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<number | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [openRes, executedRes] = await Promise.all([
-        api.get('/user/admin/issues', { params: { page: 1, limit: 100 } }),
-        api.get('/user/admin/issues/executed', { params: { page: 1, limit: 200 } }),
-      ]);
-      setOpen(openRes.data);
-      setExecuted(executedRes.data?.executed || []);
-    } catch (error) {
-      toast({ title: 'Could not load issues', description: errorMessage(error), variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  if (!deployment) return null;
+  const steps = deployment.steps(network);
+  const statuses = steps.map((step) => stepStatus(step, state, userAddress));
+  const currentIndex = steps.findIndex((step, i) => step.kind !== 'manual' && !statuses[i].executed);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const votesNeeded = (issue: RegistryIssue): number => {
-    if (!open) return 0;
-    const own = open.thresholds.find((t) => normalizeArg(t.target) === normalizeArg(issue.target) && t.func === issue.func)?.threshold;
-    return Math.ceil((open.admins.length * (own || open.globalThreshold)) / 10000);
-  };
-
-  const approve = async (index: number, step: LaunchStep, openIssue?: RegistryIssue) => {
+  const approve = async (index: number, step: DeploymentStep) => {
     if (step.kind === 'manual') return;
     setBusy(index);
     try {
+      const openIssue = statuses[index].openIssue;
       if (step.kind === 'vote') await castVoteOnIssue(`0x${step.target}`, step.func, voteArgs(step));
       else if (openIssue) await castVoteOnIssueById(openIssue.issueId);
       toast({ title: 'Approved', description: step.title });
-      await load();
+      await onApproved();
     } catch (error) {
       toast({ title: 'Approval failed', description: errorMessage(error), variant: 'destructive' });
     } finally {
@@ -96,37 +78,27 @@ const LaunchChecklistTab = () => {
     }
   };
 
-  const done = steps.map((step) => step.kind === 'manual' || Boolean(issueForStep(step, executed)));
-  const currentIndex = done.findIndex((d) => !d);
-
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between space-y-0">
-        <div>
-          <CardTitle>STRATO as gas: launch checklist</CardTitle>
-          <CardDescription>
-            Every value is filled in. Each approval is your vote on that AdminRegistry issue; it executes once enough admins have approved.
-          </CardDescription>
-        </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <ol className="space-y-6">
+    <Dialog open onOpenChange={(o) => busy === null && onOpenChange(o)}>
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>{deployment.title}</DialogTitle>
+          <DialogDescription>
+            {deployment.description} Every value is filled in; each approval is your vote on that issue, and it executes once enough admins have approved.
+          </DialogDescription>
+        </DialogHeader>
+
+        <ol className="space-y-6 overflow-y-auto flex-1 py-2">
           {steps.map((step, index) => {
-            const state = done[index] && step.kind !== 'manual' ? 'done' : index === currentIndex ? 'current' : 'todo';
-            const openIssue = open ? issueForStep(step, open.issues) : undefined;
-            const votesCast = openIssue ? open!.votes.filter((v) => v.issueId === openIssue.issueId).length : 0;
-            const voted = Boolean(openIssue && open!.votes.some((v) => v.issueId === openIssue.issueId && normalizeArg(v.voter) === normalizeArg(userAddress)));
+            const { executed, openIssue, votesCast, voted } = statuses[index];
+            const state_ = executed ? 'done' : index === currentIndex ? 'current' : 'todo';
             const missing = missingValue(step);
 
             return (
               <li key={step.title} className="flex gap-3">
-                <Marker index={index + 1} state={state} />
+                <Marker index={index + 1} state={state_} />
                 <div className="min-w-0 flex-1 space-y-2">
-                  <p className={`text-sm font-medium ${state === 'todo' ? 'text-muted-foreground' : ''}`}>{step.title}</p>
+                  <p className={`text-sm font-medium ${state_ === 'todo' ? 'text-muted-foreground' : ''}`}>{step.title}</p>
                   <p className="text-sm text-muted-foreground">{step.why}</p>
 
                   {step.kind === 'vote' && (
@@ -148,13 +120,13 @@ const LaunchChecklistTab = () => {
 
                   {step.kind !== 'manual' && (
                     <div className="flex items-center gap-3">
-                      {state === 'done' ? (
+                      {executed ? (
                         <span className="text-xs text-muted-foreground">Executed</span>
                       ) : (
                         <>
                           <Button
                             size="sm"
-                            onClick={() => approve(index, step, openIssue)}
+                            onClick={() => approve(index, step)}
                             disabled={busy !== null || voted || missing !== null || (step.kind === 'create' && !openIssue)}
                             className="bg-strato-blue hover:bg-strato-blue/90"
                           >
@@ -165,7 +137,7 @@ const LaunchChecklistTab = () => {
                             {missing
                               ? `Waiting on ${missing}`
                               : openIssue
-                                ? `${votesCast} of ${votesNeeded(openIssue)} approvals`
+                                ? `${votesCast} of ${votesNeeded(state, openIssue)} approvals`
                                 : step.kind === 'create'
                                   ? 'Waiting for the deploy script to raise the issue'
                                   : 'Not raised yet; your approval raises it'}
@@ -179,9 +151,9 @@ const LaunchChecklistTab = () => {
             );
           })}
         </ol>
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   );
 };
 
-export default LaunchChecklistTab;
+export default DeploymentStepsModal;
