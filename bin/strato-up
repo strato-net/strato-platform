@@ -59,7 +59,7 @@ for arg in "$@"; do
             ;;
         # --role is passed through to strato-setup; remembered here because a
         # snapshot (chain state) has nothing to restore into an API-only directory
-        # and a validator keeps no SQL databases. strato-setup matches the value
+        # and a validator loads only the eth dump. strato-setup matches the value
         # case-insensitively, so it is lowercased here too.
         --role=*)
             ROLE="$(printf '%s' "${arg#*=}" | tr '[:upper:]' '[:lower:]')"
@@ -241,11 +241,12 @@ if [[ "$FROM_SNAPSHOT" == "true" ]]; then
         SNAPSHOT_ARG=(--snapshot)
         echo "Restoring node from latest $NETWORK snapshot..."
     fi
-    # A validator keeps no SQL block index and no Cirrus: restore the chain
-    # state only and leave the eth and cirrus dumps out.
+    # A validator keeps the SQL block index (strato-p2p and vm-runner read
+    # blocks from it) but runs no Cirrus: load the eth dump and leave the
+    # cirrus dump out.
     RESTORE_ARGS=()
     if [[ "$ROLE" == "validator" ]]; then
-        RESTORE_ARGS+=(--skip-databases)
+        RESTORE_ARGS+=(--databases eth)
     fi
     if ! strato_tool strato-snapshot restore "$NODE_DIR" "${SNAPSHOT_ARG[@]}" --network "$NETWORK" --force "${RESTORE_ARGS[@]}"; then
         echo "Error: snapshot restore failed; not starting STRATO." >&2

@@ -1816,7 +1816,7 @@ load_databases() {
   # completes (on failure we just retry the whole restore).
   cid="$(pg_temp_start "$data_dir" "$node_password" "$run_user" fast "$dumps_dir")"
   info "      Temporary postgres ready after $(elapsed_since "$t0") (container ${cid:0:12}); dumps mounted read-only at /dumps"
-  for db in "${SNAPSHOT_PG_DATABASES[@]}"; do
+  for db in $(selected_databases); do
     [[ -f "$dumps_dir/$db.dump" ]] || { pg_temp_stop "$cid"; die "snapshot missing database dump: $db.dump"; }
     t1="$(date +%s)"
     info "      Database '$db': drop and recreate it empty, then pg_restore -j $jobs from $db.dump ($(human_bytes "$(file_size_bytes "$dumps_dir/$db.dump")"))"
@@ -1892,7 +1892,7 @@ selected_databases() {
     printf '%s\n' "${SNAPSHOT_PG_DATABASES[@]}"
     return 0
   fi
-  local want db found known
+  local want db found known named=0
   IFS=',' read -ra want <<< "$SNAPSHOT_DATABASES"
   for db in "${want[@]}"; do
     db="$(printf '%s' "$db" | tr -d '[:space:]')"
@@ -1901,7 +1901,9 @@ selected_databases() {
     for known in "${SNAPSHOT_PG_DATABASES[@]}"; do [[ "$known" == "$db" ]] && found=true; done
     [[ "$found" == true ]] || die "--databases: '$db' is not one of: ${SNAPSHOT_PG_DATABASES[*]}"
     printf '%s\n' "$db"
+    named=$((named + 1))
   done
+  (( named > 0 )) || die "--databases names no database; expected some of: ${SNAPSHOT_PG_DATABASES[*]}"
 }
 
 # Clear a database on the shared cluster before reloading it. Restoring over a
@@ -2076,8 +2078,8 @@ restore_payload() {
   else
     [[ -f "$node_dir/secrets/postgres_password" ]] \
       || die "target node has no secrets/postgres_password; run strato-setup first"
-    info "[6/7] Loading the public databases (eth, cirrus) into the node's own postgres cluster"
-    info "      The node keeps its own postgres password and its local-only oauth database; only eth and cirrus are replaced"
+    info "[6/7] Loading the public databases ($(selected_databases | paste -sd, -)) into the node's own postgres cluster"
+    info "      The node keeps its own postgres password and its local-only oauth database; only the databases named above are replaced"
     local node_password
     node_password="$(<"$node_dir/secrets/postgres_password")"
     load_databases "$node_dir/postgres" "$extracted/payload/postgres-dumps" "$node_password"
@@ -2297,6 +2299,8 @@ cmd_restore() {
   done
 
   [[ -n "$network" ]] || die "--network is required"
+  # An unknown --databases name must fail here, not partway through the load.
+  selected_databases >/dev/null
   local t_start t_step
   t_start="$(date +%s)"
   source="$(resolve_selection_source "$source" "$use_snapshot" "$timestamp" "$network" "$bucket")"
