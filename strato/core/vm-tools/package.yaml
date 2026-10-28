@@ -112,6 +112,7 @@ tests:
       - statedb-monad
       - solid-vm-model
       - strato-model
+      - time
       - vector
       - Decimal
       - binary
