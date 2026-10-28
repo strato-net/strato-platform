@@ -200,9 +200,9 @@ genEthConf nodeRole = do
         -- (sqlDiff), no state diffs on the VM event stream (diffPublish), and no
         -- VM event stream at all (publishVmEvents): with nobody reading it, JLog
         -- would never trim it.
-        , sqlDiff = flags_sqlDiff && roleIndexesSql nodeRole
-        , diffPublish = flags_diffPublish && roleIndexesSql nodeRole
-        , publishVmEvents = roleIndexesSql nodeRole
+        , sqlDiff = flags_sqlDiff && roleRunsCirrus nodeRole
+        , diffPublish = flags_diffPublish && roleRunsCirrus nodeRole
+        , publishVmEvents = roleRunsCirrus nodeRole
         }
     , cellId = if null flags_cellId then Nothing else Just flags_cellId
     , peerDbConfig = if null flags_peerDatabase then Nothing else Just writerSql { database = flags_peerDatabase }

@@ -168,19 +168,31 @@ bootstrapIfFirstRun = do
 
 initializeBestBlock :: ContextM ()
 initializeBestBlock = do
-  maybeRedisBestBlockHash <- fmap (fmap bestBlockHash) (execRedis getBestBlockInfo)
+  maybeRedisBestBlock <- execRedis getBestBlockInfo
   genesisBlock <- genesisInfoToBlock <$> getGenesisInfo
   maybeBestBlock <-
-    case maybeRedisBestBlockHash of
+    case maybeRedisBestBlock of
       Nothing -> error "no best block hash in redisdb"
-      Just hash | hash == blockHash genesisBlock -> return $ Just genesisBlock
-      Just hash -> do
-        let loadBlock = do
+      Just (BestBlock hash _) | hash == blockHash genesisBlock -> return $ Just genesisBlock
+      Just (BestBlock hash number) -> do
+        -- strato-indexer writes the block to SQL after Redis names it best, so
+        -- right after a start the row may not be there yet. Wait for it, and
+        -- say so every 10 s: a node whose indexer is behind, broken or not
+        -- indexing SQL would otherwise sit here for good and look alive.
+        let loadBlock :: Int -> ContextM (Maybe Block)
+            loadBlock waited = do
               block <- liftIO . runNoLoggingT $ runPostgresConn connStr $ getBlockSql hash
               case block of
-                Nothing -> liftIO (threadDelay 100000) >> loadBlock
                 Just _ -> return block
-        loadBlock
+                Nothing -> do
+                  when (waited > 0 && waited `mod` 100 == 0) $
+                    $logWarnS "initializeBestBlock" . T.pack $
+                      "waiting for best block " ++ format hash ++ " #" ++ show number
+                        ++ " to appear in SQL (" ++ show (waited `div` 10)
+                        ++ " s so far; is strato-indexer running and caught up?)"
+                  liftIO (threadDelay 100000)
+                  loadBlock (waited + 1)
+        loadBlock 0
 
   case maybeBestBlock of
     Nothing -> error "no best block in SQL"
