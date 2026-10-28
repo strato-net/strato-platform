@@ -223,8 +223,8 @@ class UserController {
   ): Promise<void> {
     try {
       const { accessToken } = req;
-      const { calls, contracts } = validateExecutedLookup(req.body);
-      const result = await lookupExecuted(accessToken, calls, contracts);
+      const { calls } = validateExecutedLookup(req.body);
+      const result = await lookupExecuted(accessToken, calls);
       res.status(RestStatus.OK).json(result);
       next();
     } catch (e) {

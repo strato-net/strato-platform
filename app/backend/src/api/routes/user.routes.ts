@@ -348,7 +348,7 @@ router.get("/admin/issues/executed", authHandler.authorizeRequest(), UserControl
  * @swagger
  * /user/admin/issues/executed/lookup:
  *   post:
- *     summary: Which of the given registry calls have executed and which contracts exist
+ *     summary: Which of the given registry calls have executed
  *     tags: [Admin]
  *     requestBody:
  *       content:
@@ -365,13 +365,9 @@ router.get("/admin/issues/executed", authHandler.authorizeRequest(), UserControl
  *                       type: string
  *                     func:
  *                       type: string
- *               contracts:
- *                 type: array
- *                 items:
- *                   type: string
  *     responses:
  *       200:
- *         description: Executed issues for those target/function pairs and the contract names that exist
+ *         description: Executed issues for those target/function pairs
  */
 router.post("/admin/issues/executed/lookup", authHandler.authorizeRequest(), UserController.lookupExecutedIssues);
 

@@ -764,26 +764,19 @@ export const getExecutedIssues = async (
 
 // Whether a deployment's steps have already executed, unbounded by the lookback window
 // that keeps the paged list cheap: executed issues by target and function (the caller
-// matches the args), and created contracts by name.
+// matches the args).
 export const lookupExecuted = async (
   accessToken: string,
   calls: Array<{ target: string; func: string }>,
-  contracts: string[],
-): Promise<{ executed: object[]; contracts: string[] }> => {
-  const executed = calls.length === 0 ? [] : cirrus
-    .get(accessToken, "/" + AdminRegistry + "-IssueExecuted", {
-      params: {
-        select: "issueId,target,func,args,block_number",
-        or: `(${calls.map((c) => `and(target.eq.${c.target.toLowerCase().replace(/^0x/, "")},func.eq.${c.func})`).join(",")})`,
-      },
-    })
-    .then((res) => (Array.isArray(res.data) ? res.data : []));
-  const created = Promise.all(contracts.map((name) =>
-    cirrus
-      .get(accessToken, "/contract", { params: { contract_name: `eq.${name}`, select: "contract_name", limit: "1" } })
-      .then((res) => (Array.isArray(res.data) && res.data.length > 0 ? name : null))));
-  const [issues, names] = await Promise.all([executed, created]);
-  return { executed: issues, contracts: names.filter((n): n is string => n !== null) };
+): Promise<{ executed: object[] }> => {
+  if (calls.length === 0) return { executed: [] };
+  const res = await cirrus.get(accessToken, "/" + AdminRegistry + "-IssueExecuted", {
+    params: {
+      select: "issueId,target,func,args,block_number",
+      or: `(${calls.map((c) => `and(target.eq.${c.target.toLowerCase().replace(/^0x/, "")},func.eq.${c.func})`).join(",")})`,
+    },
+  });
+  return { executed: Array.isArray(res.data) ? res.data : [] };
 };
 
 export const contractSearch = async (

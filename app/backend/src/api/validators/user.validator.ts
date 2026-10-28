@@ -32,13 +32,12 @@ export function validateIssuesQuery(query: any) {
 
 const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-export function validateExecutedLookup(body: any): { calls: Array<{ target: string; func: string }>; contracts: string[] } {
+export function validateExecutedLookup(body: any): { calls: Array<{ target: string; func: string }> } {
   const schema = Joi.object({
     calls: Joi.array().max(50).items(Joi.object({
       target: Joi.string().pattern(/^(0x)?[0-9a-fA-F]{40}$/).required(),
       func: Joi.string().pattern(IDENTIFIER).required(),
     })).default([]),
-    contracts: Joi.array().max(50).items(Joi.string().pattern(IDENTIFIER)).default([]),
   });
 
   const { error, value } = schema.validate(body);
