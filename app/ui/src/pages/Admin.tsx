@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote, Database, ChevronDown, ArrowRightLeft, Vault, Layers } from 'lucide-react';
+import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote, Database, ChevronDown, ArrowRightLeft, Vault, Layers, Rocket } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import CreateTokenForm from '@/components/admin/CreateTokenForm';
 import CreatePoolForm from '@/components/admin/CreatePoolForm';
@@ -18,6 +18,7 @@ import VoteTab from '@/components/admin/VoteTab';
 import BridgeTransactionsPage from '@/components/dashboard/BridgeTransactionsPage';
 import YieldVaultAdminTab from '@/components/admin/YieldVaultAdminTab';
 import StakingAdminTab from '@/components/admin/StakingAdminTab';
+import LaunchChecklistTab from '@/components/admin/LaunchChecklistTab';
 
 const Admin = () => {
   usePageTitle("Admin");
@@ -144,6 +145,11 @@ const Admin = () => {
                 <span className="hidden sm:inline">Staking</span>
                 <span className="sm:hidden">Stake</span>
               </TabsTrigger>
+              <TabsTrigger value="launch" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
+                <Rocket className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Launch</span>
+                <span className="sm:hidden">Launch</span>
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -208,6 +214,9 @@ const Admin = () => {
 
           <TabsContent value="vote" className="space-y-6">
             <VoteTab />
+          </TabsContent>
+          <TabsContent value="launch" className="space-y-6">
+            <LaunchChecklistTab />
           </TabsContent>
           <TabsContent value="bridge" className="space-y-6">
             <BridgeTransactionsPage isAdmin={true} />
