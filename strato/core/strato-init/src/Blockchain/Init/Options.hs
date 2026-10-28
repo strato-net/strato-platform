@@ -77,6 +77,8 @@ defineFlag "monitoring" (True :: Bool) "Run the prometheus and apex containers, 
 
 defineFlag "repoUrl" ("" :: String) "Registry prefix of the node's images in docker-compose.yml, e.g. 'ghcr.io/strato-net/strato-platform/' (bin/strato-up --prebuilt sets it); images built locally have none"
 
+defineFlag "syncFromFile" ("" :: String) "Sync a new node from saved blocks, then continue syncing from peers"
+
 -- P2P config flags
 -- The ethconf.yaml flag migration silently raised these from 20/30 to
 -- 1000/3600, which is what turned fresh syncs from minutes into hours.
@@ -102,11 +104,14 @@ defineFlag "mempoolLivenessCutoff" (60 :: Integer) "Max age of a transaction in 
 -- Consensus timing flags
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag "blockstanbul_round_period_s" (3600 :: Int) "Seconds without progress before a forced PBFT round change (a missed proposal is detected within seconds regardless)"
+defineFlag "blockstanbul_max_timestamp_drift_s" (15 :: Int) "Seconds a proposed block's timestamp may run ahead of this node's clock before the node refuses to vote for it (local policy, not consensus)"
 defineFlag "stakingActivationBlock" (-1 :: Integer) "Block number from which stake-weighted proposer selection is in force (-1 = network default: from genesis for new networks, unscheduled for existing ones)"
 
 -- VM config flags
 defineFlag "sqlDiff" (True :: Bool) "Update account state and storage in SQL DB (set false for faster sync)"
 defineFlag "diffPublish" (True :: Bool) "Publish state changes to streaming for indexer"
+defineFlag "disableSqlIndexing" (False :: Bool) "Skip VM SQL indexing messages; keep blocks and best-block updates for Redis"
+defineFlag "disableCirrusIndexing" (False :: Bool) "Skip VM Cirrus indexing messages; keep transaction results"
 
 -- Kafka log retention flags (defaults match Kafka's own defaults / the current
 -- generated config, so behavior is unchanged unless overridden). Nodes whose

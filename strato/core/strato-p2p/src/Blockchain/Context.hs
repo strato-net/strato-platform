@@ -56,7 +56,7 @@ module Blockchain.Context
 
 import           Conduit
 import           Control.Applicative
-import           Control.Exception                       hiding (bracket, catch)
+import           Control.Exception                       hiding (bracket, catch, throwIO)
 import           Control.Lens                            hiding (Context)
 import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.Change.Modify             as Mod
@@ -69,7 +69,6 @@ import qualified Data.ByteString.Char8                   as BC
 import           Data.Conduit.Network
 import           Data.Foldable                           (toList)
 import qualified Data.Kind                               as DK
-import qualified Data.Map.Strict                         as M
 import           Data.Maybe
 import           Data.Proxy
 import qualified Data.Set.Ordered                        as S
@@ -80,9 +79,8 @@ import           GHC.Exts                                (Constraint)
 
 import           BlockApps.Logging
 
-import           Blockchain.BlockDB
+import           Blockchain.BlockDB                     (getCanonical, getHashesByNumber)
 import           Blockchain.Blockstanbul                 (WireMessage)
-import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader
 import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
@@ -91,7 +89,6 @@ import           Blockchain.EthConf
 import qualified Blockchain.EthConf.Model as Conf
 import           Blockchain.Model.SyncState
 import qualified Blockchain.Model.SyncTask               as SYNCTASK
-import           Blockchain.Model.WrappedBlock
 import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka              as SK
@@ -110,6 +107,7 @@ import qualified Blockchain.Strato.RedisBlockDB          as RBDB
 import           Blockchain.SyncDB
 import           Control.Monad                           (unless, void)
 import           Control.Monad.Composable.Base
+import           Control.Monad.Composable.BlockDB (BlockDBEnv, HasBlockDB, runBlockDB)
 import qualified Database.Persist.Sql                    as SQL
 import qualified Database.Redis                          as Redis
 import           Network.Wai.Handler.Warp.Internal       (setSocketCloseOnExec)
@@ -185,10 +183,11 @@ makeLenses ''Context
 
 newtype GenesisBlockHash = GenesisBlockHash {unGenesisBlockHash :: Keccak256}
 
-type ContextRow = '[ReaderEnv Config, InternalState, VaultData, Logger]
+type ContextRow = '[BlockDBEnv, ReaderEnv Config, InternalState, VaultData, Logger]
 
 newtype ContextM a = ContextM {unContextM :: Eff ContextRow a}
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadReader Config, MonadLogger, MonadLoggerIO, MonadResource, HasVault)
+  deriving newtype (AccessibleEnv BlockDBEnv)
 
 data P2pConduits m = P2pConduits
   { _peerSource :: ConduitM () B.ByteString m (),
@@ -216,9 +215,14 @@ instance RunsClient ContextM where
       let pSource = appSource app
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
+      -- Logged here, where the address is known, and rethrown so the client
+      -- loop's handler can disable the peer: swallowed, every failure was
+      -- followed by a fresh dial five seconds later.
       catch
         (handler conduits)
-        (\(e :: SomeException) -> $logErrorS "runClientConnection/Exception" . T.pack $ show e)
+        (\(e :: SomeException) -> do
+          $logErrorS "runClientConnection/Exception" . T.pack $ show e
+          throwIO e)
 
 instance RunsServer ContextM where
   runServer (TCPPort listenPort') runner handler = do
@@ -232,17 +236,6 @@ instance RunsServer ContextM where
       catch
         (handler conduits ip pn)
         (\(e :: SomeException) -> $logErrorS "runServer/Exception" . T.pack $ show e)
-
-instance (Keccak256 `A.Alters` BlockHeader) ContextM where
-  lookup _ = RBDB.withRedisBlockDB . getHeader
-  insert _ k v = void . RBDB.withRedisBlockDB $ insertHeader k v
-  delete _ = void . RBDB.withRedisBlockDB . deleteHeader
-  lookupMany _ =
-    fmap (M.fromList . mapMaybe sequenceA)
-      . RBDB.withRedisBlockDB
-      . getHeaders
-  insertMany _ = void . RBDB.withRedisBlockDB . insertHeaders
-  deleteMany _ = void . RBDB.withRedisBlockDB . deleteHeaders
 
 instance Mod.Modifiable WorldBestBlock ContextM where
   get _ =
@@ -276,20 +269,6 @@ instance Mod.Modifiable BestSequencedBlock ContextM where
     RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case
       Left err -> error $ "Failed to update best sequenced block in Redis: " ++ show err
       Right _ -> return ()
-
-instance A.Selectable Integer (Canonical BlockHeader) ContextM where
-  select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ getCanonicalHeader i
-
-instance (Keccak256 `A.Alters` OutputBlock) ContextM where
-  lookup _ = RBDB.withRedisBlockDB . getBlock
-  insert _ k v = void . RBDB.withRedisBlockDB $ insertBlock k v
-  delete _ = void . RBDB.withRedisBlockDB . deleteBlock
-  lookupMany _ =
-    fmap (M.fromList . mapMaybe sequenceA)
-      . RBDB.withRedisBlockDB
-      . getBlocks
-  insertMany _ = void . RBDB.withRedisBlockDB . insertBlocks
-  deleteMany _ = void . RBDB.withRedisBlockDB . deleteBlocks
 
 instance (Keccak256 `A.Alters` Proxy (Inbound WireMessage)) ContextM where
   lookup _ k = do
@@ -486,6 +465,7 @@ type MonadP2P m =
     MonadResource m,
     MonadUnliftIO m,
     HasVault m,
+    HasBlockDB m,
     HasSyncDB m,
     HasPeerDB m,
     m `Mod.Outputs` [IngestEvent],
@@ -511,16 +491,13 @@ type MonadP2P m =
       m,
     All2
       '[A.Selectable]
-      '[ '(Integer, Canonical BlockHeader),
-         '(Host, PPeer),
+      '[ '(Host, PPeer),
          '(Host, [PPeer])
        ]
       m,
     All2
       '[A.Alters]
-      '[ '(Keccak256, BlockHeader),
-         '(Keccak256, OutputBlock),
-         '(Keccak256, Proxy (Inbound WireMessage)),
+      '[ '(Keccak256, Proxy (Inbound WireMessage)),
          '((Host, Keccak256), Proxy (Outbound WireMessage))
        ]
       m
@@ -552,7 +529,7 @@ clearActionTimestamp :: Mod.Modifiable ActionTimestamp m => m ()
 clearActionTimestamp = Mod.put (Proxy @ActionTimestamp) emptyActionTimestamp
 
 runContextM :: Config -> ContextM a -> Eff '[VaultData, Logger] ()
-runContextM r (ContextM m) = void . withResources $ withReaderEnv r m
+runContextM r (ContextM m) = void . withResources $ withReaderEnv r $ runBlockDB (configSQLDB r) m
 
 initConfig :: (MonadLogger m, MonadUnliftIO m) => IORef (S.OSet Keccak256) -> m Config
 initConfig wireMessagesRef = do

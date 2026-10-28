@@ -6,7 +6,7 @@
 -- the ≤16GB tiers compact the oldest generation (@-c@) instead.
 --
 -- Also pins how strato-setup reads @--role@, and which roles may turn
--- monitoring off or run local auth.
+-- monitoring off, run local auth or run Cirrus.
 module Main (main) where
 
 import Blockchain.Init.Role
@@ -109,3 +109,8 @@ main = hspec $ do
     it "only an api-node may drop prometheus and apex (--monitoring=false)" $
       filter roleAllowsMonitoringOff [RoleNode, RoleCore, RoleApi, RoleValidator, RoleApiNode]
         `shouldBe` [RoleApiNode]
+
+  describe "roleRunsCirrus" $
+    it "every role but a validator runs Cirrus (slipstream, vmevents, the state mirror); the SQL block index is not a role choice" $
+      filter roleRunsCirrus [RoleNode, RoleCore, RoleApi, RoleValidator, RoleApiNode]
+        `shouldBe` [RoleNode, RoleCore, RoleApi, RoleApiNode]

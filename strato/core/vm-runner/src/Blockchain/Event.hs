@@ -25,7 +25,6 @@ import Blockchain.Blockstanbul (PreprepareDecision(..))
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.Data.Block (Block(..))
 import Blockchain.Data.ExecResults
-import Blockchain.Database.MerklePatricia.NodeData (NodeData)
 import Blockchain.Data.TXOrigin
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
@@ -36,8 +35,10 @@ import Blockchain.Strato.Model.Validator
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.StateDiff
 import Blockchain.Stream.VMEvent
+import Control.Monad.Composable.StateDB (TrieNode)
 import qualified Data.DList as DL
 import Data.Map (Map)
+import Data.Time.Clock (UTCTime)
 
 type VmInEvent = VmTask
 
@@ -49,7 +50,7 @@ data VmInEventBatch = InBatch
     bLen :: {-# UNPACK #-} !Int,
     privateTxs :: [OutputTx],
     mpNodesReqs :: [(TXOrigin, [StateRoot])],
-    mpNodesResps :: [[NodeData]],
+    mpNodesResps :: [[TrieNode]],
     preprepareBlock :: Maybe Block,
     selfAddress :: Maybe Address
   }
@@ -84,6 +85,8 @@ data BlockVerificationFailureDetails
   | UnclesMismatch           (BlockDelta Keccak256)
   | UnexpectedBlockNumber    (BlockDelta Integer)
   | ReceiptsRootMismatch     (BlockDelta StateRoot)
+  -- | The block's timestamp precedes its parent's (@_derived@ is the parent's)
+  | TimestampBeforeParent    (BlockDelta UTCTime)
   deriving (Eq, Show)
 
 data BlockVerificationFailure = BlockVerificationFailure
@@ -101,7 +104,7 @@ data VmOutEvent
   | OutJSONRPC JsonRpcResponse
   | OutBlockVerificationFailure [BlockVerificationFailure]
   | OutGetMPNodes [StateRoot]
-  | OutMPNodesResponse TXOrigin [NodeData]
+  | OutMPNodesResponse TXOrigin [TrieNode]
   | OutPreprepareResponse PreprepareDecision
 
 data VmOutEventBatch = OutBatch
@@ -114,7 +117,7 @@ data VmOutEventBatch = OutBatch
     outJSONRPCs :: DL.DList JsonRpcResponse,
     outBlockVerificationFailure :: [BlockVerificationFailure],
     outGetMPNodes :: DL.DList [StateRoot],
-    outMPNodesResponses :: DL.DList (TXOrigin, [NodeData]),
+    outMPNodesResponses :: DL.DList (TXOrigin, [TrieNode]),
     outPreprepareResponses :: DL.DList (PreprepareDecision)
   }
 

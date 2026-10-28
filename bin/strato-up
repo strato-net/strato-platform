@@ -59,7 +59,7 @@ for arg in "$@"; do
             ;;
         # --role is passed through to strato-setup; remembered here because a
         # snapshot (chain state) has nothing to restore into an API-only directory
-        # and a validator keeps no SQL databases. strato-setup matches the value
+        # and a validator loads only the eth dump. strato-setup matches the value
         # case-insensitively, so it is lowercased here too.
         --role=*)
             ROLE="$(printf '%s' "${arg#*=}" | tr '[:upper:]' '[:lower:]')"
@@ -148,7 +148,10 @@ if [[ "$PREBUILT" == "true" ]]; then
             exit 1
         fi
         VERSION_FILE="$(tr -d '[:space:]' < "$SCRIPT_DIR/../VERSION")"
-        COMMIT="$(git -C "$SCRIPT_DIR/.." rev-parse --short=7 HEAD 2>/dev/null || true)"
+        # Under sudo git refuses the checkout, owned by the invoking user (its
+        # SUDO_UID exemption does not survive a nested sudo, as in a wrapper
+        # script); the checkout strato-up itself runs from is trusted.
+        COMMIT="$(git -c safe.directory="$SCRIPT_DIR/.." -C "$SCRIPT_DIR/.." rev-parse --short=7 HEAD 2>/dev/null || true)"
         IMAGE_TAGS=()
         [[ -n "$COMMIT" ]] && IMAGE_TAGS+=("$VERSION_FILE-$COMMIT")
         IMAGE_TAGS+=("$VERSION_FILE")
@@ -156,6 +159,23 @@ if [[ "$PREBUILT" == "true" ]]; then
     STRATO_IMAGE=""
     LOOKUP_ERROR=""
     for tag in "${IMAGE_TAGS[@]}"; do
+        # The plain VERSION tag is the release build of that version, not this
+        # checkout's commit: it can be older than the checkout, and than a
+        # snapshot taken from develop. Falling back to it is the user's call;
+        # only a checkout without git history (a release tarball) takes it as is.
+        if [[ "$tag" == "$VERSION_FILE" && -e "$SCRIPT_DIR/../.git" ]]; then
+            if [[ -n "$COMMIT" ]]; then
+                echo "No prebuilt strato image for this checkout's commit (${REPO_URL}strato:$VERSION_FILE-$COMMIT); CI publishes a commit's images a few minutes after it is pushed."
+            else
+                echo "Could not read this checkout's commit (git -C $SCRIPT_DIR/.. rev-parse HEAD failed), so its prebuilt image could not be looked up."
+            fi
+            echo "${REPO_URL}strato:$VERSION_FILE is the $VERSION_FILE release build, which may be older than this checkout and not match a snapshot taken from develop."
+            read -r -p "Start from ${REPO_URL}strato:$VERSION_FILE anyway? [y/N] " answer || answer=""
+            if [[ "$answer" != [yY] ]]; then
+                echo "Not starting STRATO: pass --prebuilt=<tag> to choose an image, or wait for the commit's build." >&2
+                exit 1
+            fi
+        fi
         if docker image inspect "${REPO_URL}strato:$tag" >/dev/null 2>&1; then
             STRATO_IMAGE="${REPO_URL}strato:$tag"
             break
@@ -221,11 +241,12 @@ if [[ "$FROM_SNAPSHOT" == "true" ]]; then
         SNAPSHOT_ARG=(--snapshot)
         echo "Restoring node from latest $NETWORK snapshot..."
     fi
-    # A validator keeps no SQL block index and no Cirrus: restore the chain
-    # state only and leave the eth and cirrus dumps out.
+    # A validator keeps the SQL block index (strato-p2p and vm-runner read
+    # blocks from it) but runs no Cirrus: load the eth dump and leave the
+    # cirrus dump out.
     RESTORE_ARGS=()
     if [[ "$ROLE" == "validator" ]]; then
-        RESTORE_ARGS+=(--skip-databases)
+        RESTORE_ARGS+=(--databases eth)
     fi
     if ! strato_tool strato-snapshot restore "$NODE_DIR" "${SNAPSHOT_ARG[@]}" --network "$NETWORK" --force "${RESTORE_ARGS[@]}"; then
         echo "Error: snapshot restore failed; not starting STRATO." >&2
@@ -292,7 +313,7 @@ export MALLOC_ARENA_MAX=2
 # "-p", drops an output it can no longer write (the gone terminal, a closed
 # pipe) instead of exiting: a dead tee leaves convoke's pipe without a reader.
 : > logs/convoke.log
-nohup convoke > >(trap '' HUP; tee -a -p logs/convoke.log >/dev/null) 2> >(trap '' HUP; tee -a -p logs/convoke.log >&2) &
+nohup strato-fast-cores convoke > >(trap '' HUP; tee -a -p logs/convoke.log >/dev/null) 2> >(trap '' HUP; tee -a -p logs/convoke.log >&2) &
 CONVOKE_PID=$!
 echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
 

@@ -152,13 +152,14 @@ runEthServerConduit ::
   ConduitM () P2pEvent m () ->
   String ->
   m (PPeer, Maybe SomeException)
-runEthServerConduit p pSource pSink seqSrc peerStr = labelPeerThread peerStr "Peer Manager" (Just "CONNECTED") $ do
+runEthServerConduit p pSource pSink seqSrc peerStr = labelPeerThread peerStr "Peer Manager" (Just "HANDSHAKING") $ do
   myPubKey' <- getPub
   let myPubkey = secPubKeyToPoint myPubKey'
   mConnectionResult <- timeout 2000000 $ pSource $$+ ethCryptAccept `fuseUpstream` pSink
   case mConnectionResult of
     Nothing -> pure (p, Just $ toException $ HandshakeException "handshake timed out")
     Just (_, (otherPubKey, outCtx, inCtx)) -> do
+      changeLabelStatusM "CONNECTED"
       let p' = p{pPeerPubkey = Just otherPubKey}
       ret <-
         fmap (either Just (const Nothing)) . try $

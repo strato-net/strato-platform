@@ -11,6 +11,7 @@ build-type:     Simple
 library
   exposed-modules:
       Blockchain.BlockDB
+      Blockchain.BlockStream
       Blockchain.ChainMetrics
       Blockchain.Data.NodeStatus
       Blockchain.DB.Witnessable
@@ -20,6 +21,7 @@ library
       Blockchain.Model.WrappedBlock
       Blockchain.NodeStatusMirror
       Blockchain.SyncDB
+      Control.Monad.Composable.BlockDB
   other-modules:
       Paths_blockDB
   hs-source-dirs:
@@ -55,6 +57,7 @@ library
     , text
     , time
     , unliftio
+    , uuid
   default-language: Haskell2010
 
 test-suite blockdb-test

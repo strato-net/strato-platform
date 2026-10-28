@@ -59,7 +59,7 @@ import MetalBuyProgressModal, { type MetalBuyStep } from "./MetalBuyProgressModa
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowDownToLine, Gem, CheckCircle2, ChevronLeft, ChevronRight, AlertTriangle, Mail } from "lucide-react";
-import { usdstAddress, WAD, METAL_BUY_FEE } from "@/lib/constants";
+import { usdstAddress, WAD, METAL_BUY_FEE, metalPurchasesEnabled } from "@/lib/constants";
 import type { WalletTxProgressEvent } from "@/lib/axios";
 import { isTxPending, isTxSubmitted } from "@/utils/transactionStatus";
 import { captureApi } from "@/lib/analytics";
@@ -111,7 +111,8 @@ const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: strin
     case "lending":
       return "/dashboard/earn-lending";
     case "vault":
-      return "/dashboard/earn-vault";
+      // Yield vaults are listed on the Earn page
+      return "/dashboard/earn";
     case "swap":
     case "weighted_swap":
       return info.poolAddress ? `/dashboard/earn-pools?pool=${info.poolAddress}` : "/dashboard/earn-pools";
@@ -378,7 +379,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
 
   // State -- fundingMode can be controlled externally or managed internally
   const [internalMode, setInternalMode] = useState<"bridge" | "metals">("bridge");
-  const fundingMode = externalFundingMode ?? internalMode;
+  const fundingMode = metalPurchasesEnabled ? externalFundingMode ?? internalMode : "bridge";
   const setFundingMode = onFundingModeChange ?? setInternalMode;
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -459,6 +460,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     const actions = selectedToken.routeType === "native"
       ? []
       : depositActions.filter((action) =>
+          (metalPurchasesEnabled || action.action !== 2) &&
           action.payToken &&
           routeTokens.has(normAddr(action.payToken)) &&
           action.externalChainIds.includes(currentNetwork?.chainId || "")
@@ -1324,10 +1326,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         <section className="space-y-3">
           <div className="flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">1</span>
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">How Are You Funding?</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{metalPurchasesEnabled ? "How Are You Funding?" : "Choose Network"}</h3>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {metalPurchasesEnabled && <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => { if (guestMode) openConnectModal?.(); else setFundingMode("bridge"); }}
@@ -1356,12 +1358,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               <p className="text-sm font-semibold">Buy Metals</p>
               <p className="text-xs text-muted-foreground mt-0.5">Gold, Silver & more</p>
             </button>
-          </div>
+          </div>}
 
           <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
             fundingMode === "bridge" ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0"
           }`}>
-            <p className="text-xs font-medium text-muted-foreground mb-2">Choose Network</p>
+            {metalPurchasesEnabled && <p className="text-xs font-medium text-muted-foreground mb-2">Choose Network</p>}
             <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${availableNetworks.length || 1}, 1fr)` }}>
               {availableNetworks.map((network) => {
                 const active = selectedNetwork === network.chainName;
@@ -1431,7 +1433,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           </div>
 
           <div className="relative">
-            <CrossfadePanel active={fundingMode === "metals"}>
+            {metalPurchasesEnabled && <CrossfadePanel active={fundingMode === "metals"}>
               <div className="rounded-md border-2 border-border p-3 space-y-2">
                 <div className="flex items-center gap-2">
                   <Select value={selectedPayToken?.address || ""}
@@ -1464,7 +1466,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                   </div>
                 </div>
               </div>
-            </CrossfadePanel>
+            </CrossfadePanel>}
             <CrossfadePanel active={fundingMode === "bridge"}>
               <div className="rounded-md border-2 border-border p-3 space-y-2">
                 <div className="flex items-center gap-2">
@@ -1542,7 +1544,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           </div>
 
           <div className="relative">
-            <CrossfadePanel active={fundingMode === "metals"}>
+            {metalPurchasesEnabled && <CrossfadePanel active={fundingMode === "metals"}>
               <ScrollRow>
                 {!metalsConfig
                   ? Array.from({ length: 2 }).map((_, i) => <CardSkeleton key={`ms-${i}`} id={`ms-${i}`} />)
@@ -1566,7 +1568,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                     })
                 }
               </ScrollRow>
-            </CrossfadePanel>
+            </CrossfadePanel>}
             <CrossfadePanel active={fundingMode === "bridge"}>
               <ScrollRow>
                 {sourceTokenRoutes.length > 0 ? [

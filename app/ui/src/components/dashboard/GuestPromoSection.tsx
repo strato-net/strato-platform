@@ -8,7 +8,7 @@ import { useRewards } from "@/hooks/useRewards";
 import { formatEmissionRatePerDay } from "@/services/rewardsService";
 import { findBestEarnApyInfo, buildEarnApyMap } from "@/utils/earnUtils";
 import type { UserRewardsData } from "@/services/rewardsService";
-import { rewardsEnabled, usdstAddress } from "@/lib/constants";
+import { rewardsEnabled, usdstAddress, metalPurchasesEnabled } from "@/lib/constants";
 
 /** GOLDST / SILVST — images from TokenContext (earningAssets ∪ inactiveTokens) */
 const METAL_PROMO_TOKEN_ADDRESSES = [
@@ -279,9 +279,9 @@ const GuestPromoSection = ({ variant, userRewards }: GuestPromoSectionProps) => 
       </div>
 
       {/* Feature Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className={`grid grid-cols-1 gap-4 ${metalPurchasesEnabled ? "md:grid-cols-2" : ""}`}>
         {/* Buy Tokenized Gold and Silver */}
-        <div className="bg-card border border-border rounded-2xl p-6 flex flex-col justify-between min-h-[240px]">
+        {metalPurchasesEnabled && <div className="bg-card border border-border rounded-2xl p-6 flex flex-col justify-between min-h-[240px]">
           <div>
             <h2 className="text-xl md:text-2xl font-bold text-foreground mb-2">
               Buy Tokenized Gold and Silver
@@ -329,7 +329,7 @@ const GuestPromoSection = ({ variant, userRewards }: GuestPromoSectionProps) => 
               <ArrowRight size={16} />
             </button>
           </div>
-        </div>
+        </div>}
 
         {/* Earn on USDST */}
         <div className="bg-card border border-border rounded-2xl p-6 flex flex-col justify-between min-h-[240px]">

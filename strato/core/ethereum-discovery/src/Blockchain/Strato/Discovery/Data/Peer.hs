@@ -137,6 +137,9 @@ class HasPeerDB m where
   getPeerBondingState :: Host -> Point -> m (Maybe Int)
   getBondedPeers :: m (Either SomeException [PPeer])
   getBondedPeersForUDP :: m (Either SomeException [PPeer])
+  -- | Bonded peers with UDP enabled, whether or not an ETH handshake has
+  -- proven them to be on this network: what a joining node has to ask.
+  getAnyBondedPeersForUDP :: m (Either SomeException [PPeer])
   getUnbondedPeers :: m [PPeer]
   getClosestPeers :: Point -> Natural -> m [PPeer]
 
