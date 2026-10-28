@@ -1,4 +1,5 @@
 import { usdstAddress } from '@/lib/constants';
+import { parseJsonBigInt } from '@/utils/numberUtils';
 
 // A deployment is a fixed sequence of admin actions with every value filled in, so an admin
 // only confirms each one. Votes go through the AdminRegistry (one issue per
@@ -145,9 +146,10 @@ export const DEPLOYMENTS: Deployment[] = [
 
 export const normalizeArg = (value: unknown): string => String(value ?? '').toLowerCase().replace(/^0x/, '');
 
-// Issue args arrive as a JSON string from Cirrus or as an array from the API.
+// Issue args arrive as a JSON string from Cirrus or as an array from the API. Some strings
+// do not parse (a contract source, say); those issues simply match no step.
 const issueArgs = (issue: { args: unknown }): unknown[] => {
-  const raw = typeof issue.args === 'string' ? JSON.parse(issue.args) : issue.args;
+  const raw = typeof issue.args === 'string' ? parseJsonBigInt(issue.args, { fallback: [] }) : issue.args;
   return Array.isArray(raw) ? raw : [];
 };
 
