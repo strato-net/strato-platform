@@ -344,4 +344,35 @@ router.get("/admin/issues", authHandler.authorizeRequest(), UserController.getOp
  */
 router.get("/admin/issues/executed", authHandler.authorizeRequest(), UserController.getExecutedIssues);
 
+/**
+ * @swagger
+ * /user/admin/issues/executed/lookup:
+ *   post:
+ *     summary: Which of the given registry calls have executed and which contracts exist
+ *     tags: [Admin]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               calls:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     target:
+ *                       type: string
+ *                     func:
+ *                       type: string
+ *               contracts:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: Executed issues for those target/function pairs and the contract names that exist
+ */
+router.post("/admin/issues/executed/lookup", authHandler.authorizeRequest(), UserController.lookupExecutedIssues);
+
 export default router;

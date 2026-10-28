@@ -156,7 +156,10 @@ export type RegistryIssue = { issueId: string; target: string; func: string; arg
 export type RegistryState = {
   issues: RegistryIssue[];
   votes: Array<{ issueId: string; voter: string }>;
+  // From the executed lookup: issues for the deployments' target/function pairs, and the
+  // names of contracts that exist.
   executed: RegistryIssue[];
+  created: string[];
   admins: Array<{ address: string }>;
   globalThreshold: number;
   thresholds: Array<{ target: string; func: string; threshold: number }>;
@@ -194,7 +197,7 @@ export const missingValue = (step: DeploymentStep): string | null => {
 export type StepStatus = { executed: boolean; openIssue?: RegistryIssue; votesCast: number; voted: boolean };
 
 export const stepStatus = (step: DeploymentStep, state: RegistryState, userAddress: string | null): StepStatus => {
-  const executed = Boolean(issueForStep(step, state.executed));
+  const executed = step.kind === 'create' ? state.created.includes(step.contractName) : Boolean(issueForStep(step, state.executed));
   const openIssue = executed ? undefined : issueForStep(step, state.issues);
   const votes = openIssue ? state.votes.filter((v) => v.issueId === openIssue.issueId) : [];
   return { executed, openIssue, votesCast: votes.length, voted: votes.some((v) => normalizeArg(v.voter) === normalizeArg(userAddress)) };

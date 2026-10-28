@@ -25,17 +25,20 @@ const DeploymentsTable = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const steps = DEPLOYMENTS.flatMap((d) => d.steps(network));
+      const calls = steps.flatMap((s) => (s.kind === 'vote' ? [{ target: s.target, func: s.func }] : []));
+      const contracts = steps.flatMap((s) => (s.kind === 'create' ? [s.contractName] : []));
       const [open, executed] = await Promise.all([
         api.get('/user/admin/issues', { params: { page: 1, limit: 100 } }),
-        api.get('/user/admin/issues/executed', { params: { page: 1, limit: 100 } }),
+        api.post('/user/admin/issues/executed/lookup', { calls, contracts }),
       ]);
-      setState({ ...open.data, executed: executed.data?.executed || [] });
+      setState({ ...open.data, executed: executed.data?.executed || [], created: executed.data?.contracts || [] });
     } catch (error) {
       toast({ title: 'Could not load deployments', description: error instanceof Error ? error.message : 'Request failed', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, network]);
 
   useEffect(() => {
     load();

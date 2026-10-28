@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import { getAdmin, isUserAdmin, addAdmin, removeAdmin, createIssue, castVoteOnIssueById, simulateCastVoteOnIssue, dismissIssue, getOpenIssues,
-         getExecutedIssues, contractSearch, getContractDetails,
+         getExecutedIssues, lookupExecuted, contractSearch, getContractDetails,
  } from "../services/user.service";
 import { validateUserAddress, validateAddressField } from "../validators/common.validators";
-import { validateIssuesQuery } from "../validators/user.validator";
+import { validateIssuesQuery, validateExecutedLookup } from "../validators/user.validator";
 
 class UserController {
   static async me(
@@ -209,6 +209,22 @@ class UserController {
       const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
       const result = await getExecutedIssues(accessToken, page, limit);
+      res.status(RestStatus.OK).json(result);
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  static async lookupExecutedIssues(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const { calls, contracts } = validateExecutedLookup(req.body);
+      const result = await lookupExecuted(accessToken, calls, contracts);
       res.status(RestStatus.OK).json(result);
       next();
     } catch (e) {
