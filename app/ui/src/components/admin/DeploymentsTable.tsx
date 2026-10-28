@@ -15,14 +15,14 @@ import { DEPLOYMENTS, stepStatus, type Deployment, type RegistryState } from './
 const DeploymentsTable = () => {
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { isTestnet } = useNetwork();
-  const network = isTestnet ? 'helium' : 'upquark';
+  const { network } = useNetwork();
 
   const [state, setState] = useState<RegistryState | null>(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Deployment | null>(null);
 
   const load = useCallback(async () => {
+    if (!network) return;
     setLoading(true);
     try {
       const steps = DEPLOYMENTS.flatMap((d) => d.steps(network));
@@ -44,13 +44,13 @@ const DeploymentsTable = () => {
     load();
   }, [load]);
 
-  const rows = DEPLOYMENTS.map((deployment) => {
+  const rows = network ? DEPLOYMENTS.map((deployment) => {
     const steps = deployment.steps(network).filter((step) => step.kind !== 'manual');
     const statuses = state ? steps.map((step) => stepStatus(step, state, userAddress)) : [];
     const executed = statuses.filter((s) => s.executed).length;
     const owed = statuses.filter((s) => !s.executed && !s.voted).length;
     return { deployment, total: steps.length, executed, owed };
-  });
+  }) : [];
 
   return (
     <Card className="dark:bg-card overflow-hidden">
@@ -95,7 +95,7 @@ const DeploymentsTable = () => {
         </div>
       </CardContent>
 
-      {state && (
+      {state && network && (
         <DeploymentStepsModal deployment={selected} network={network} state={state} onOpenChange={(o) => !o && setSelected(null)} onApproved={load} />
       )}
     </Card>

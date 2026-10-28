@@ -49,6 +49,12 @@ const NETWORKS = {
     staking: null,
     name: 'UpquarkFeeRouter',
   },
+  // Mainnet fork for rehearsals: no block rewards, so no staking fallback.
+  forktest: {
+    strato: 'ac621a150f49198036f84ffe90b4f2286b623583',
+    staking: null,
+    name: 'ForktestFeeRouter',
+  },
 };
 const OUT = 'feerouter-source.txt';
 

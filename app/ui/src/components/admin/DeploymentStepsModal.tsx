@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
+import type { StratoNetwork } from '@/context/NetworkContext';
 import CopyButton from '../ui/copy';
 import {
   missingValue,
@@ -12,7 +13,6 @@ import {
   votesNeeded,
   type Deployment,
   type DeploymentStep,
-  type Network,
   type RegistryState,
 } from './deployments';
 
@@ -45,7 +45,7 @@ const ValueRow = ({ label, value, mono = true }: { label: string; value: string;
 
 interface DeploymentStepsModalProps {
   deployment: Deployment | null;
-  network: Network;
+  network: StratoNetwork;
   state: RegistryState;
   onOpenChange: (open: boolean) => void;
   // Called after every approval so the caller can refetch the registry.

@@ -1,5 +1,6 @@
 import { usdstAddress } from '@/lib/constants';
 import { parseJsonBigInt } from '@/utils/numberUtils';
+import type { StratoNetwork } from '@/context/NetworkContext';
 
 // A deployment is a fixed sequence of admin actions with every value filled in, so an admin
 // only confirms each one. Votes go through the AdminRegistry (one issue per
@@ -15,13 +16,11 @@ export type DeploymentStep =
   | { kind: 'create'; title: string; why: string; contractName: string; command: string }
   | { kind: 'manual'; title: string; why: string; command: string };
 
-export type Network = 'helium' | 'upquark';
-
 export type Deployment = {
   id: string;
   title: string;
   description: string;
-  steps: (network: Network) => DeploymentStep[];
+  steps: (network: StratoNetwork) => DeploymentStep[];
 };
 
 const ADMIN_REGISTRY = '000000000000000000000000000000000000100c';
@@ -32,13 +31,13 @@ type StratoGasValues = {
   pool: string | null;
   router: string | null;
   routerName: string;
-  poolV3Factory: string;
+  poolV3Factory: string | null;
   // isqrt(usdstPerStrato * 2^192 / 1e18): the pool's opening price.
   initialSqrtPriceX96: string | null;
 };
 
 // null = not known yet: the step shows what it is waiting on and cannot be approved.
-const STRATO_GAS_VALUES: Record<Network, StratoGasValues> = {
+const STRATO_GAS_VALUES: Record<StratoNetwork, StratoGasValues> = {
   helium: {
     strato: '8ee9a3391e38176feebf5d43cb2c1d6c4f728b04',
     burnableLogic: '646cdf8ec887a23dd6fe007280909c36c994cb04',
@@ -57,9 +56,19 @@ const STRATO_GAS_VALUES: Record<Network, StratoGasValues> = {
     poolV3Factory: '5d630126d908b46bcf8d00bc15e591a459375809',
     initialSqrtPriceX96: null,
   },
+  // Forked before mainnet's PoolV3 factory existed, so the pool step waits on one.
+  forktest: {
+    strato: 'ac621a150f49198036f84ffe90b4f2286b623583',
+    burnableLogic: null,
+    pool: null,
+    router: null,
+    routerName: 'ForktestFeeRouter',
+    poolV3Factory: null,
+    initialSqrtPriceX96: null,
+  },
 };
 
-const stratoGasSteps = (network: Network): DeploymentStep[] => {
+const stratoGasSteps = (network: StratoNetwork): DeploymentStep[] => {
   const v = STRATO_GAS_VALUES[network];
   const strato: DeploymentArg = { label: 'token', type: 'address', value: v.strato };
   return [
@@ -83,7 +92,7 @@ const stratoGasSteps = (network: Network): DeploymentStep[] => {
       kind: 'vote',
       title: 'Create the STRATO/USDST pool',
       why: 'The canonical pool the router prices from. Opens at the oracle price so the first quote matches the legacy fee.',
-      target: v.poolV3Factory,
+      target: v.poolV3Factory ?? '',
       targetName: 'PoolV3 factory',
       func: 'createPoolV3',
       args: [
@@ -192,6 +201,7 @@ export const voteArgs = (step: Extract<DeploymentStep, { kind: 'vote' }>): strin
 
 export const missingValue = (step: DeploymentStep): string | null => {
   if (step.kind !== 'vote') return null;
+  if (!step.target) return step.targetName;
   const missing = step.args.find((arg) => arg.value === null);
   return missing ? missing.label : null;
 };

@@ -380,18 +380,22 @@ stratoTokenAddress :: String -> Maybe Address
 stratoTokenAddress net
   | take 6 net == "helium" = Just 0x8ee9a3391e38176feebf5d43cb2c1d6c4f728b04
   | net == "upquark" = Just 0x2ca3e170e6714282da77815f7864b17f612f5f83
+  | net == "forktest" = Just 0xac621a150f49198036f84ffe90b4f2286b623583
   | otherwise = Nothing
 
 -- | Block from which STRATO is the native currency: what eth_getBalance
 -- reports and what a native-value transfer moves. Fees already burn STRATO
 -- wherever DeciderState points at a FeeRouter; the native-token switch is
 -- consensus-visible, so a live network keeps the configured token until its
--- flag day (helium: 2026-10-19 tip 804099 + 50000, rounded up to 900000).
+-- flag day (helium: 2026-10-19 tip 804099 + 50000, rounded up to 900000;
+-- forktest: the mainnet-activation rehearsal, far enough past its idle tip
+-- that the lazy-block network only reaches it when driven there).
 -- A network without a STRATO token never leaves it.
 stratoGasForkBlock :: String -> Integer
 stratoGasForkBlock net
   | take 6 net == "helium" = 900000
   | net == "upquark" = stakingNotScheduled
+  | net == "forktest" = 1000
   | otherwise = 0
 
 -- | The token native balances and native-value transfers refer to at this
