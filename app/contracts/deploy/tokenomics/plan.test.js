@@ -1,7 +1,7 @@
 // node --test deploy/tokenomics/plan.test.js
 const test = require('node:test');
 const assert = require('node:assert');
-const { buildPlan, fillPlaceholders, toWei, scheduleProblems, fundingShortfall, externalSupply } = require('./plan');
+const { buildPlan, fillPlaceholders, toWei, scheduleProblems, walletAllocation, fundingShortfall, externalSupply } = require('./plan');
 const schedule = require('./schedule.json');
 const deployment = require('./deployment.json');
 
@@ -38,11 +38,18 @@ test('explicit pre-minted allocations come off their categories and land on 100M
   assert.strictEqual(funded + LIVE, toWei('100000000'));
 });
 
-test('treasury grants resolve to the treasury address', () => {
+test('treasury categories vest straight to the treasury, member categories through VestingClaims', () => {
   const d = explicitlyAssigned();
   const plan = buildPlan(schedule, d, LIVE);
-  assert.strictEqual(byKey(plan, 'ecosystemFund').grants[0].address, d.treasury);
-  assert.strictEqual(byKey(plan, 'ongoingTvl').recipient, d.treasury);
+  const fund = byKey(plan, 'ecosystemFund');
+  assert.strictEqual(fund.contract, 'MonthlyVestingWallet');
+  assert.strictEqual(fund.beneficiary, d.treasury);
+  assert.strictEqual(byKey(plan, 'ongoingTvl').contract, 'EmissionVestingWallet');
+  assert.strictEqual(byKey(plan, 'ongoingTvl').beneficiary, d.treasury);
+  assert.strictEqual(byKey(plan, 'team').contract, 'VestingClaims');
+
+  d.beneficiaries.team = [];
+  assert.ok(buildPlan(schedule, d, LIVE).problems.includes('beneficiaries.team: no members'));
 });
 
 test('supply drift is rejected instead of changing bootstrapping', () => {
@@ -67,26 +74,40 @@ test('an explicit emission premint larger than year 1 is reported', () => {
   assert.ok(plan.problems.some(p => p.includes('bootstrapping: pre-minted amount 5000000 exceeds year 1')), plan.problems.join('\n'));
 });
 
+// What readChain reports for a correctly deployed category: its contract row and,
+// in details.wallet, its vesting wallet (the same row unless it is a VestingClaims).
 function chainState(plan, instance) {
+  const address = '9'.repeat(40);
+  const walletAddress = instance.contract === 'VestingClaims' ? '8'.repeat(40) : address;
+  const wallet = {
+    contract: instance.contract === 'VestingClaims' ? 'MonthlyVestingWallet' : instance.contract,
+    address: walletAddress,
+    wallet: walletAddress,
+    category: instance.label,
+    start: plan.tgeTimestamp,
+    beneficiary: instance.contract === 'VestingClaims' ? address : instance.beneficiary,
+  };
+  if (instance.contract === 'EmissionVestingWallet') {
+    wallet.total = instance.fundWei;
+    return { row: wallet, details: { wallet, yearlyWei: [...instance.yearlyWei] } };
+  }
+  Object.assign(wallet, {
+    cliffMonths: instance.cliffMonths,
+    cliffUnlockBps: instance.cliffUnlockBps,
+    vestingMonths: instance.vestingMonths,
+  });
+  if (instance.contract === 'MonthlyVestingWallet') return { row: wallet, details: { wallet } };
   const row = {
-    contract: instance.contract,
+    contract: 'VestingClaims',
+    address,
+    wallet: walletAddress,
     category: instance.label,
     token: plan.token,
-    tgeTimestamp: plan.tgeTimestamp,
     setupAdmin: plan.setupAdmin,
     finalized: false,
+    totalGranted: instance.fundWei,
   };
-  if (instance.contract === 'VestingSchedule') {
-    Object.assign(row, {
-      cliffMonths: instance.cliffMonths,
-      cliffUnlockBps: instance.cliffUnlockBps,
-      vestingMonths: instance.vestingMonths,
-      totalGranted: instance.fundWei,
-    });
-    return { row, details: { grants: Object.fromEntries(instance.grants.map(g => [g.address, g.wei])) } };
-  }
-  Object.assign(row, { recipient: instance.recipient, total: instance.fundWei });
-  return { row, details: { yearlyWei: [...instance.yearlyWei] } };
+  return { row, details: { wallet, grants: Object.fromEntries(instance.grants.map(g => [g.address, g.wei])) } };
 }
 
 test('deployment TGE controls the on-chain schedule independently of spreadsheet metadata', () => {
@@ -98,8 +119,8 @@ test('deployment TGE controls the on-chain schedule independently of spreadsheet
   const team = byKey(plan, 'team');
   const state = chainState(plan, team);
   assert.deepStrictEqual(scheduleProblems(team, state.row, state.details, plan), []);
-  state.row.tgeTimestamp += 1;
-  assert.ok(scheduleProblems(team, state.row, state.details, plan).some(p => p.includes('tgeTimestamp')));
+  state.details.wallet.start += 1;
+  assert.ok(scheduleProblems(team, state.row, state.details, plan).some(p => p.includes('start')));
 });
 
 test('schedule verification rejects stale immutable terms and recipients', () => {
@@ -107,14 +128,22 @@ test('schedule verification rejects stale immutable terms and recipients', () =>
   const team = byKey(plan, 'team');
   const teamState = chainState(plan, team);
   assert.deepStrictEqual(scheduleProblems(team, teamState.row, teamState.details, plan), []);
-  teamState.row.cliffMonths += 1;
+  teamState.details.wallet.cliffMonths += 1;
   assert.ok(scheduleProblems(team, teamState.row, teamState.details, plan).some(p => p.includes('cliffMonths')));
+  teamState.details.wallet.beneficiary = '1'.repeat(40);
+  assert.ok(scheduleProblems(team, teamState.row, teamState.details, plan).some(p => p.includes('wallet beneficiary')));
+
+  const fund = byKey(plan, 'ecosystemFund');
+  const fundState = chainState(plan, fund);
+  assert.deepStrictEqual(scheduleProblems(fund, fundState.row, fundState.details, plan), []);
+  fundState.details.wallet.cliffUnlockBps = 2500;
+  assert.ok(scheduleProblems(fund, fundState.row, fundState.details, plan).some(p => p.includes('cliffUnlockBps')));
 
   const boot = byKey(plan, 'bootstrapping');
   const bootState = chainState(plan, boot);
   assert.deepStrictEqual(scheduleProblems(boot, bootState.row, bootState.details, plan), []);
-  bootState.row.recipient = '1'.repeat(40);
-  assert.ok(scheduleProblems(boot, bootState.row, bootState.details, plan).some(p => p.includes('recipient')));
+  bootState.details.wallet.beneficiary = '1'.repeat(40);
+  assert.ok(scheduleProblems(boot, bootState.row, bootState.details, plan).some(p => p.includes('beneficiary')));
 });
 
 test('schedule verification checks same-total yearly curves and every grant', () => {
@@ -140,23 +169,32 @@ test('a finalized schedule is never funded again after releases', () => {
   assert.deepStrictEqual(scheduleProblems(team, state.row, state.details, plan), []);
   assert.strictEqual(fundingShortfall(team, { finalized: true }, 0n), 0n);
   assert.strictEqual(fundingShortfall(team, { finalized: false }, team.fundWei - 1n), 1n);
+
+  // A treasury wallet has no finalize; its releases keep counting as funded.
+  const fund = byKey(plan, 'ecosystemFund');
+  const wallet = { wallet: '1'.repeat(40), released: toWei('1000') };
+  const allocation = walletAllocation(wallet, { [wallet.wallet]: fund.fundWei - toWei('1000') });
+  assert.strictEqual(fundingShortfall(fund, wallet, allocation), 0n);
 });
 
 test('released tokens remain attributed to their schedules', () => {
   const total = toWei('100000000');
-  const vesting = { address: '1'.repeat(40), contract: 'VestingSchedule', totalReleased: 0 };
-  const emission = { address: '2'.repeat(40), contract: 'EmissionSchedule', released: 0 };
+  // A VestingClaims row is counted through its wallet; what the wallet released
+  // to it (held or already claimed) stays attributed to the category.
+  const claims = { address: '1'.repeat(40), wallet: '3'.repeat(40), released: 0n };
+  const emission = { address: '2'.repeat(40), wallet: '2'.repeat(40), released: 0n };
   const balances = {
-    [vesting.address]: toWei('80000000'),
-    [emission.address]: toWei('17250000'),
+    [claims.wallet]: toWei('80000000'),
+    [emission.wallet]: toWei('17250000'),
   };
-  assert.strictEqual(externalSupply(total, [vesting, emission], balances), toWei('2750000'));
+  assert.strictEqual(externalSupply(total, [claims, emission], balances), toWei('2750000'));
 
-  balances[vesting.address] -= toWei('1000000');
-  vesting.totalReleased = toWei('1000000');
-  balances[emission.address] -= toWei('250000');
+  balances[claims.wallet] -= toWei('1000000');
+  balances[claims.address] = toWei('400000');
+  claims.released = toWei('1000000');
+  balances[emission.wallet] -= toWei('250000');
   emission.released = toWei('250000');
-  const external = externalSupply(total, [vesting, emission], balances);
+  const external = externalSupply(total, [claims, emission], balances);
   assert.strictEqual(external, toWei('2750000'));
   assert.deepStrictEqual(buildPlan(schedule, filled(), external).problems, []);
 });

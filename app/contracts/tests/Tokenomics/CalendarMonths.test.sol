@@ -3,6 +3,7 @@ import "../../concrete/Tokenomics/CalendarMonths.sol";
 contract record CalendarHarness is CalendarMonths {
     function civil(uint ts) public pure returns (uint, uint, uint) { return _civil(ts / SECONDS_PER_DAY); }
     function monthsBetween(uint a, uint b) public pure returns (uint) { return _monthsBetween(a, b); }
+    function addMonths(uint t, uint k) public pure returns (uint) { return _addMonths(t, k); }
 }
 
 contract Describe_CalendarMonths {
@@ -56,5 +57,25 @@ contract Describe_CalendarMonths {
         require(h.monthsBetween(JAN31_2027, JAN31_2027 + 89 * DAY) == 3, "Apr 30 2027");
         require(h.monthsBetween(JAN31_2028, JAN31_2028 + 28 * DAY) == 0, "Feb 28 2028 (leap year)");
         require(h.monthsBetween(JAN31_2028, JAN31_2028 + 29 * DAY) == 1, "Feb 29 2028");
+    }
+
+    function it_adds_months_to_the_anniversary_that_starts_them() public {
+        require(h.addMonths(TGE, 0) == TGE, "month 0 is TGE");
+        require(h.addMonths(TGE, 1) == TGE + 31 * DAY, "Nov 26");
+        require(h.addMonths(TGE, 24) == TGE + 731 * DAY, "Oct 26 2028 (one leap day)");
+        require(h.addMonths(JAN31_2027, 1) == JAN31_2027 + 28 * DAY, "Feb 28 2027");
+        require(h.addMonths(JAN31_2028, 1) == JAN31_2028 + 29 * DAY, "Feb 29 2028");
+        require(h.addMonths(JAN31_2027, 2) == JAN31_2027 + 59 * DAY, "Mar 31 2027");
+        uint[] memory starts = new uint[](3);
+        starts[0] = TGE + 15 * 3600;
+        starts[1] = JAN31_2027;
+        starts[2] = JAN31_2028 + 1;
+        for (uint i = 0; i < starts.length; i++) {
+            for (uint k = 1; k <= 40; k++) {
+                uint t = h.addMonths(starts[i], k);
+                require(h.monthsBetween(starts[i], t) == k, "month " + string(k) + " starts at addMonths");
+                require(h.monthsBetween(starts[i], t - 1) == k - 1, "and not a second earlier, month " + string(k));
+            }
+        }
     }
 }

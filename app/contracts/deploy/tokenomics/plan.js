@@ -3,6 +3,12 @@
 // chain input is externalSupplyWei, the STRATO already minted outside these
 // contracts.
 //
+// Each category gets one vesting wallet. A category whose beneficiaries entry is an
+// address (or "treasury") vests to it directly: a MonthlyVestingWallet, or an
+// EmissionVestingWallet for the emission rows, which always vest to the treasury.
+// A category with a member list gets a VestingClaims contract, which creates its
+// wallet and splits it among the members.
+//
 // Pre-minted supply counts against the categories named in deployment.preMinted.
 // Every token already outside these schedules must be assigned explicitly; unknown
 // supply is an error rather than an implicit deduction from another category.
@@ -92,16 +98,24 @@ function buildPlan(schedule, deployment, externalSupplyWei) {
         if (alreadyMinted > yearly[0]) problems.push(`${c.key}: pre-minted amount ${formatWei(alreadyMinted)} exceeds year 1`);
         else yearly[0] -= alreadyMinted;
       }
-      instances.push({ key: c.key, label: c.label, contract: 'EmissionSchedule', recipient: treasury,
+      instances.push({ key: c.key, label: c.label, contract: 'EmissionVestingWallet', beneficiary: treasury,
         yearlyWei: yearly, fundWei: yearly.reduce((a, b) => a + b, 0n) });
       continue;
     }
     if (wei < 0n) problems.push(`${c.key}: pre-minted exceeds the allocation`);
     if (wei <= 0n) continue;
 
+    const terms = { cliffMonths: c.cliffMonths, cliffUnlockBps: c.cliffUnlockBps, vestingMonths: c.vestingMonths };
+    const entry = deployment.beneficiaries?.[c.key];
+    if (!Array.isArray(entry)) {
+      instances.push({ key: c.key, label: c.label, contract: 'MonthlyVestingWallet',
+        beneficiary: address(`beneficiaries.${c.key}`, entry), ...terms, fundWei: wei });
+      continue;
+    }
+
     const grants = [];
     const seen = new Set();
-    (deployment.beneficiaries?.[c.key] || []).forEach((g, i) => {
+    entry.forEach((g, i) => {
       const a = address(`beneficiaries.${c.key}[${i}]`, g.address);
       if (a && seen.has(a)) problems.push(`beneficiaries.${c.key}: duplicate ${a}`);
       if (a) seen.add(a);
@@ -109,8 +123,8 @@ function buildPlan(schedule, deployment, externalSupplyWei) {
     });
     const granted = grants.reduce((s, g) => s + g.wei, 0n);
     if (granted !== wei) problems.push(`beneficiaries.${c.key}: grants total ${formatWei(granted)}, allocation is ${formatWei(wei)}`);
-    instances.push({ key: c.key, label: c.label, contract: 'VestingSchedule', cliffMonths: c.cliffMonths,
-      cliffUnlockBps: c.cliffUnlockBps, vestingMonths: c.vestingMonths, grants, fundWei: wei });
+    if (grants.length === 0) problems.push(`beneficiaries.${c.key}: no members`);
+    instances.push({ key: c.key, label: c.label, contract: 'VestingClaims', ...terms, grants, fundWei: wei });
   }
 
   const funded = instances.reduce((s, i) => s + i.fundWei, 0n);
@@ -120,9 +134,10 @@ function buildPlan(schedule, deployment, externalSupplyWei) {
   return { tgeTimestamp, setupAdmin, treasury, token, totalSupply, externalSupplyWei, preMintedTotal, instances, problems };
 }
 
-// Compare one deployed schedule with the plan. Setup may repair TGE, yearly
-// amounts and missing grants, but constructor fields are immutable and must always
-// match. Funding and finalization require the complete configured state.
+// Compare one deployed category with the plan. Every term is fixed at creation and
+// must always match; only a VestingClaims member list is added after creation, so
+// grants are checked once `configured`. `row` is the category's contract and
+// `details.wallet` its wallet (the same row unless it is a VestingClaims).
 function scheduleProblems(instance, row, details, plan, configured = true) {
   const problems = [];
   const mismatch = (field, got, want) => problems.push(`${instance.key}: ${field} on chain ${got} != plan ${want}`);
@@ -140,64 +155,68 @@ function scheduleProblems(instance, row, details, plan, configured = true) {
   if (!row) return [`${instance.key}: not created yet`];
   if (row.contract !== instance.contract) mismatch('contract', row.contract, instance.contract);
   if (row.category !== instance.label) mismatch('category', row.category, instance.label);
-  address('token', row.token, plan.token);
-  if (!isTrue(row.finalized)) address('setupAdmin', row.setupAdmin, plan.setupAdmin);
-  else if (normalizeAddress(row.setupAdmin) !== ZERO_ADDRESS) mismatch('finalized setupAdmin', row.setupAdmin, ZERO_ADDRESS);
 
-  if (instance.contract === 'VestingSchedule') {
-    number('cliffMonths', row.cliffMonths, instance.cliffMonths);
-    number('cliffUnlockBps', row.cliffUnlockBps, instance.cliffUnlockBps);
-    number('vestingMonths', row.vestingMonths, instance.vestingMonths);
+  const wallet = details.wallet;
+  if (!wallet) return [...problems, `${instance.key}: vesting wallet ${row.wallet} not found`];
+  if (wallet.category !== instance.label) mismatch('wallet category', wallet.category, instance.label);
+  number('start', wallet.start, plan.tgeTimestamp);
+  if (instance.contract === 'VestingClaims') {
+    address('wallet beneficiary', wallet.beneficiary, row.address);
+    address('token', row.token, plan.token);
+    if (!isTrue(row.finalized)) address('setupAdmin', row.setupAdmin, plan.setupAdmin);
+    else if (normalizeAddress(row.setupAdmin) !== ZERO_ADDRESS) mismatch('finalized setupAdmin', row.setupAdmin, ZERO_ADDRESS);
   } else {
-    address('recipient', row.recipient, instance.recipient);
+    address('beneficiary', wallet.beneficiary, instance.beneficiary);
   }
 
-  if (!configured) return problems;
-  number('tgeTimestamp', row.tgeTimestamp, plan.tgeTimestamp);
-  number('required total', instance.contract === 'VestingSchedule' ? row.totalGranted : row.total, instance.fundWei);
-
-  if (instance.contract === 'EmissionSchedule') {
+  if (instance.contract === 'EmissionVestingWallet') {
+    number('total', wallet.total, instance.fundWei);
     const have = details.yearlyWei || [];
     if (have.length !== instance.yearlyWei.length) {
       mismatch('year count', have.length, instance.yearlyWei.length);
     } else {
       for (let i = 0; i < have.length; i++) number(`yearlyAmounts[${i}]`, have[i], instance.yearlyWei[i]);
     }
-  } else {
-    const have = details.grants || {};
-    const want = Object.fromEntries(instance.grants.map(g => [normalizeAddress(g.address), g.wei]));
-    for (const [account, amount] of Object.entries(have)) {
-      const key = normalizeAddress(account);
-      if (!(key in want)) problems.push(`${instance.key}: unexpected on-chain grant ${key}`);
-      else number(`grant ${key}`, amount, want[key]);
-    }
-    for (const [account, amount] of Object.entries(want)) {
-      if (!(account in have)) mismatch(`grant ${account}`, 0, amount);
-    }
+    return problems;
+  }
+  number('cliffMonths', wallet.cliffMonths, instance.cliffMonths);
+  number('cliffUnlockBps', wallet.cliffUnlockBps, instance.cliffUnlockBps);
+  number('vestingMonths', wallet.vestingMonths, instance.vestingMonths);
+
+  if (instance.contract !== 'VestingClaims' || !configured) return problems;
+  number('totalGranted', row.totalGranted, instance.fundWei);
+  const have = details.grants || {};
+  const want = Object.fromEntries(instance.grants.map(g => [normalizeAddress(g.address), g.wei]));
+  for (const [account, amount] of Object.entries(have)) {
+    const key = normalizeAddress(account);
+    if (!(key in want)) problems.push(`${instance.key}: unexpected on-chain grant ${key}`);
+    else number(`grant ${key}`, amount, want[key]);
+  }
+  for (const [account, amount] of Object.entries(want)) {
+    if (!(account in have)) mismatch(`grant ${account}`, 0, amount);
   }
   return problems;
 }
 
-function fundingShortfall(instance, row, balance) {
+// What a category's wallet has been given: its balance plus what it has released
+// (VestingWallet.vestedAmount's total allocation). Releases never lower it.
+function walletAllocation(row, balances) {
+  return BigInt(balances[normalizeAddress(row.wallet)] || 0) + BigInt(row.released || 0);
+}
+
+function fundingShortfall(instance, row, allocation) {
   if (isTrue(row.finalized)) return 0n;
-  const held = BigInt(balance);
-  if (held > instance.fundWei) throw new Error(`${instance.key}: holds ${formatWei(held)}, more than ${formatWei(instance.fundWei)}`);
-  return instance.fundWei - held;
+  if (allocation > instance.fundWei) throw new Error(`${instance.key}: holds ${formatWei(allocation)}, more than ${formatWei(instance.fundWei)}`);
+  return instance.fundWei - allocation;
 }
 
 // Supply that was minted outside the schedules. Released tokens still belong to
-// their original schedule allocation, so count both current balances and
-// cumulative releases when removing scheduled supply from the total.
-function externalSupply(totalSupply, schedules, balances) {
-  const scheduled = schedules.reduce((sum, row) => {
-    const balance = BigInt(balances[normalizeAddress(row.address)] || 0);
-    const released = BigInt((row.contract === 'VestingSchedule' ? row.totalReleased : row.released) || 0);
-    return sum + balance + released;
-  }, 0n);
-  return BigInt(totalSupply) - scheduled;
+// their original schedule allocation.
+function externalSupply(totalSupply, rows, balances) {
+  return BigInt(totalSupply) - rows.reduce((sum, row) => sum + walletAllocation(row, balances), 0n);
 }
 
 module.exports = {
-  buildPlan, fillPlaceholders, toWei, formatWei, parseTge, normalizeAddress, isTrue, scheduleProblems, fundingShortfall,
-  externalSupply,
+  buildPlan, fillPlaceholders, toWei, formatWei, parseTge, normalizeAddress, isTrue, scheduleProblems, walletAllocation,
+  fundingShortfall, externalSupply,
 };

@@ -3,12 +3,12 @@
 //
 // Each category's contract must reproduce the sheet's cumulative unlock table for
 // months 0..120 to within 1000000000000 wei (float noise in the sheet).
-import "../../concrete/Tokenomics/VestingSchedule.sol";
-import "../../concrete/Tokenomics/EmissionSchedule.sol";
+import "../../concrete/Tokenomics/MonthlyVestingWallet.sol";
+import "../../concrete/Tokenomics/EmissionVestingWallet.sol";
 
 contract Describe_TokenomicsSheet {
-    address constant TOKEN = address(0x5772a70);
-    uint constant TGE = 1792972800;
+    address constant BENEFICIARY = address(0x7e5);
+    uint64 constant TGE = 1792972800;
     uint constant TOLERANCE = 1000000000000;
 
     function _check(string name, uint month, uint got, uint want) internal {
@@ -133,7 +133,7 @@ contract Describe_TokenomicsSheet {
 
     function it_matches_the_sheet_for_team() public {
         uint[] memory want = _expectedTeam();
-        VestingSchedule s = new VestingSchedule("Team", TOKEN, TGE, 12, 0, 24, address(this));
+        MonthlyVestingWallet s = new MonthlyVestingWallet("Team", BENEFICIARY, TGE, 12, 0, 24);
         for (uint m = 0; m < 121; m++) { _check("team", m, s.cumulativeUnlocked(14040000000000000000000000, m), want[m]); }
         _check("team fully unlocked", 120, 14040000000000000000000000, want[120]);
     }
@@ -267,7 +267,7 @@ contract Describe_TokenomicsSheet {
 
     function it_matches_the_sheet_for_advisors() public {
         uint[] memory want = _expectedAdvisors();
-        VestingSchedule s = new VestingSchedule("Advisors", TOKEN, TGE, 0, 2500, 12, address(this));
+        MonthlyVestingWallet s = new MonthlyVestingWallet("Advisors", BENEFICIARY, TGE, 0, 2500, 12);
         for (uint m = 0; m < 121; m++) { _check("advisors", m, s.cumulativeUnlocked(500000000000000000000000, m), want[m]); }
         _check("advisors fully unlocked", 120, 500000000000000000000000, want[120]);
     }
@@ -400,7 +400,7 @@ contract Describe_TokenomicsSheet {
 
     function it_matches_the_sheet_for_investors() public {
         uint[] memory want = _expectedInvestors();
-        VestingSchedule s = new VestingSchedule("Private sales", TOKEN, TGE, 0, 0, 24, address(this));
+        MonthlyVestingWallet s = new MonthlyVestingWallet("Private sales", BENEFICIARY, TGE, 0, 0, 24);
         for (uint m = 0; m < 121; m++) { _check("investors", m, s.cumulativeUnlocked(30294890000000000000000000, m), want[m]); }
         _check("investors fully unlocked", 120, 30294890000000000000000000, want[120]);
     }
@@ -534,7 +534,7 @@ contract Describe_TokenomicsSheet {
 
     function it_matches_the_sheet_for_publicSales() public {
         uint[] memory want = _expectedPublicSales();
-        VestingSchedule s = new VestingSchedule("Public sales", TOKEN, TGE, 0, 10000, 0, address(this));
+        MonthlyVestingWallet s = new MonthlyVestingWallet("Public sales", BENEFICIARY, TGE, 0, 10000, 0);
         for (uint m = 0; m < 121; m++) { _check("publicSales", m, s.cumulativeUnlocked(5000000000000000000000000, m), want[m]); }
         _check("publicSales fully unlocked", 120, 5000000000000000000000000, want[120]);
     }
@@ -668,7 +668,7 @@ contract Describe_TokenomicsSheet {
 
     function it_matches_the_sheet_for_airdrop() public {
         uint[] memory want = _expectedAirdrop();
-        VestingSchedule s = new VestingSchedule("Airdrop", TOKEN, TGE, 0, 10000, 0, address(this));
+        MonthlyVestingWallet s = new MonthlyVestingWallet("Airdrop", BENEFICIARY, TGE, 0, 10000, 0);
         for (uint m = 0; m < 121; m++) { _check("airdrop", m, s.cumulativeUnlocked(5000000000000000000000000, m), want[m]); }
         _check("airdrop fully unlocked", 120, 5000000000000000000000000, want[120]);
     }
@@ -802,7 +802,7 @@ contract Describe_TokenomicsSheet {
 
     function it_matches_the_sheet_for_tvlDeal1() public {
         uint[] memory want = _expectedTvlDeal1();
-        VestingSchedule s = new VestingSchedule("Ecosystem rewards (TVL Deal 1)", TOKEN, TGE, 0, 2500, 6, address(this));
+        MonthlyVestingWallet s = new MonthlyVestingWallet("Ecosystem rewards (TVL Deal 1)", BENEFICIARY, TGE, 0, 2500, 6);
         for (uint m = 0; m < 121; m++) { _check("tvlDeal1", m, s.cumulativeUnlocked(900000000000000000000000, m), want[m]); }
         _check("tvlDeal1 fully unlocked", 120, 900000000000000000000000, want[120]);
     }
@@ -946,7 +946,7 @@ contract Describe_TokenomicsSheet {
         yearly[7] = 710847994148621760000000;
         yearly[8] = 568930689317034648000000;
         yearly[9] = 455346476196265912000000;
-        EmissionSchedule s = new EmissionSchedule("Ecosystem rewards (Ongoing TVL)", TOKEN, TGE, address(0x7e5), yearly, address(this));
+        EmissionVestingWallet s = new EmissionVestingWallet("Ecosystem rewards (Ongoing TVL)", BENEFICIARY, TGE, yearly);
         require(s.total() == 15100000000000000000000000, "emission total");
         for (uint m = 0; m < 121; m++) { _check("ongoingTvl", m, s.cumulativeUnlocked(m), want[m]); }
         _check("ongoingTvl fully unlocked", 120, 15100000000000000000000000, want[120]);
@@ -1091,7 +1091,7 @@ contract Describe_TokenomicsSheet {
         yearly[7] = 479935397636048208000000;
         yearly[8] = 408156837667096488000000;
         yearly[9] = 347113392666936944000000;
-        EmissionSchedule s = new EmissionSchedule("Ecosystem rewards (Bootstrapping Emissions)", TOKEN, TGE, address(0x7e5), yearly, address(this));
+        EmissionVestingWallet s = new EmissionVestingWallet("Ecosystem rewards (Bootstrapping Emissions)", BENEFICIARY, TGE, yearly);
         require(s.total() == 8000000000000000000000000, "emission total");
         for (uint m = 0; m < 121; m++) { _check("bootstrapping", m, s.cumulativeUnlocked(m), want[m]); }
         _check("bootstrapping fully unlocked", 120, 8000000000000000000000000, want[120]);
@@ -1226,7 +1226,7 @@ contract Describe_TokenomicsSheet {
 
     function it_matches_the_sheet_for_ecosystemFund() public {
         uint[] memory want = _expectedEcosystemFund();
-        VestingSchedule s = new VestingSchedule("Ecosystem fund (Listing costs, Launchpool, MM loans, DEX liquidity)", TOKEN, TGE, 0, 5000, 24, address(this));
+        MonthlyVestingWallet s = new MonthlyVestingWallet("Ecosystem fund (Listing costs, Launchpool, MM loans, DEX liquidity)", BENEFICIARY, TGE, 0, 5000, 24);
         for (uint m = 0; m < 121; m++) { _check("ecosystemFund", m, s.cumulativeUnlocked(15165110000000000000000000, m), want[m]); }
         _check("ecosystemFund fully unlocked", 120, 15165110000000000000000000, want[120]);
     }
@@ -1359,7 +1359,7 @@ contract Describe_TokenomicsSheet {
 
     function it_matches_the_sheet_for_ecosystemDev() public {
         uint[] memory want = _expectedEcosystemDev();
-        VestingSchedule s = new VestingSchedule("Ecosystem development", TOKEN, TGE, 0, 0, 24, address(this));
+        MonthlyVestingWallet s = new MonthlyVestingWallet("Ecosystem development", BENEFICIARY, TGE, 0, 0, 24);
         for (uint m = 0; m < 121; m++) { _check("ecosystemDev", m, s.cumulativeUnlocked(6000000000000000000000000, m), want[m]); }
         _check("ecosystemDev fully unlocked", 120, 6000000000000000000000000, want[120]);
     }

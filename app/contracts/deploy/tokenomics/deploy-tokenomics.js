@@ -1,21 +1,22 @@
-// Deploy and fund the TGE tokenomics schedules from schedule.json (the spreadsheet)
-// and deployment.json (TGE, addresses, grants). Every step reads chain state first,
-// so any step can be rerun. Run from app/contracts/deploy, in order:
+// Deploy and fund the TGE tokenomics vesting wallets from schedule.json (the
+// spreadsheet) and deployment.json (TGE, addresses, grants). Every step reads chain
+// state first, so any step can be rerun. Run from app/contracts/deploy, in order:
 //
 //   node tokenomics/deploy-tokenomics.js plan        the plan and chain state; run any time
 //   node tokenomics/deploy-tokenomics.js gen         combine sources, identical for every admin
-//   node tokenomics/deploy-tokenomics.js create      each admin: vote to create missing schedules
-//   edit deployment.addresses to pin every created schedule before continuing
-//   node tokenomics/deploy-tokenomics.js setup       setup admin: push TGE, grants, emission tables
+//   node tokenomics/deploy-tokenomics.js create      each admin: vote to create missing contracts
+//   edit deployment.addresses to pin every created contract before continuing
+//   node tokenomics/deploy-tokenomics.js setup       setup admin: add the VestingClaims members
 //   node upgrade.js --proxy-address <token> --contract-name Token --contract-file concrete/Tokens/Token.sol
 //   node tokenomics/deploy-tokenomics.js cap         each admin: permanently cap STRATO at 100M
 //   node tokenomics/deploy-tokenomics.js fund        each admin: vote STRATO.mint for each shortfall
-//   node tokenomics/deploy-tokenomics.js finalize    setup admin: lock everything; needs supply == 100M
+//   node tokenomics/deploy-tokenomics.js finalize    setup admin: lock the member lists; needs supply == 100M
 //   node tokenomics/deploy-tokenomics.js ephemeral   write a copy of the config with random addresses
 //
 // Options: --config <file> (default tokenomics/deployment.json).
 //
-// TGE: edit "tge" and rerun setup; it can move until finalize.
+// TGE and every schedule term are fixed when a contract is created, so settle
+// deployment.json before create; a wrong term means creating that contract again.
 // Every STRATO already outside these schedules must be assigned explicitly in
 // preMinted. Freeze other mints during deployment or the plan will reject the
 // resulting unexplained supply.
@@ -26,10 +27,15 @@ const axios = require('axios');
 const config = require('../config');
 const { rest, util, importer } = require('blockapps-rest');
 const {
-  buildPlan, fillPlaceholders, formatWei, normalizeAddress, isTrue, scheduleProblems, fundingShortfall, externalSupply,
+  buildPlan, fillPlaceholders, formatWei, normalizeAddress, isTrue, scheduleProblems, walletAllocation, fundingShortfall,
+  externalSupply,
 } = require('./plan');
 
-const SOURCES = { VestingSchedule: 'Tokenomics/VestingSchedule.sol', EmissionSchedule: 'Tokenomics/EmissionSchedule.sol' };
+const SOURCES = {
+  VestingClaims: 'Tokenomics/VestingClaims.sol',
+  MonthlyVestingWallet: 'Tokenomics/MonthlyVestingWallet.sol',
+  EmissionVestingWallet: 'Tokenomics/EmissionVestingWallet.sol',
+};
 const sourceFile = (name) => path.join(__dirname, `${name}-source.txt`);
 const GRANT_BATCH = 100;
 const addr = (value) => ({ type: 'address', value });
@@ -81,19 +87,31 @@ async function login() {
   return tokenObj;
 }
 
-// Chain state: the schedules already created for this token, their balances, and
-// the STRATO minted outside them.
+// Chain state: each category's contract and wallet, their balances and releases,
+// and the STRATO minted outside them. VestingClaims contracts are found by token,
+// wallets that vest to the treasury by beneficiary, and the other wallets through
+// the VestingClaims contract that created them.
 async function readChain(tokenObj, deployment, schedule) {
   const prefix = deployment.cirrusPrefix;
-  const [vesting, emission, tokenRows] = await Promise.all([
-    cirrus(tokenObj, `${prefix}-VestingSchedule`, { token: `eq.${deployment.token}` }),
-    cirrus(tokenObj, `${prefix}-EmissionSchedule`, { token: `eq.${deployment.token}` }),
-    cirrus(tokenObj, `${prefix}-Token`, { address: `eq.${deployment.token}`, select: '_totalSupply,maxSupply' }),
+  const table = (contract, field) => `${prefix}-${contract}${field ? `-${field}` : ''}`;
+  const inList = (addrs) => `in.(${addrs.join(',')})`;
+  const treasury = normalizeAddress(deployment.treasury);
+  const byTreasury = /^[0-9a-f]{40}$/.test(treasury) ? { _beneficiary: `eq.${treasury}` } : null;
+  const [claims, monthly, emission, tokenRows] = await Promise.all([
+    cirrus(tokenObj, table('VestingClaims'), { token: `eq.${deployment.token}` }),
+    byTreasury ? cirrus(tokenObj, table('MonthlyVestingWallet'), byTreasury) : [],
+    byTreasury ? cirrus(tokenObj, table('EmissionVestingWallet'), byTreasury) : [],
+    cirrus(tokenObj, table('Token'), { address: `eq.${deployment.token}`, select: '_totalSupply,maxSupply' }),
   ]);
-  if (!tokenRows.length) throw new Error(`token ${deployment.token} not found in ${prefix}-Token`);
+  if (!tokenRows.length) throw new Error(`token ${deployment.token} not found in ${table('Token')}`);
+  const wallet = (contract) => (r) => ({
+    ...r, contract, address: normalizeAddress(r.address), wallet: normalizeAddress(r.address),
+    beneficiary: normalizeAddress(r._beneficiary), start: r._start,
+  });
   const rows = [
-    ...vesting.map(r => ({ ...r, address: normalizeAddress(r.address), contract: 'VestingSchedule' })),
-    ...emission.map(r => ({ ...r, address: normalizeAddress(r.address), contract: 'EmissionSchedule' })),
+    ...claims.map(r => ({ ...r, contract: 'VestingClaims', address: normalizeAddress(r.address), wallet: normalizeAddress(r.wallet) })),
+    ...monthly.map(wallet('MonthlyVestingWallet')),
+    ...emission.map(wallet('EmissionVestingWallet')),
   ];
 
   const found = {};
@@ -101,27 +119,42 @@ async function readChain(tokenObj, deployment, schedule) {
   for (const c of schedule.categories) {
     const pinned = deployment.addresses?.[c.key];
     const matches = rows.filter(r => (pinned ? r.address === normalizeAddress(pinned) : r.category === c.label));
-    if (pinned && matches.length === 0) problems.push(`${c.key}: pinned schedule ${pinned} not found`);
-    if (matches.length > 1) problems.push(`${c.key}: ${matches.length} schedules named "${c.label}"; pin one in addresses.${c.key}`);
+    if (pinned && matches.length === 0) problems.push(`${c.key}: pinned contract ${pinned} not found`);
+    if (matches.length > 1) problems.push(`${c.key}: ${matches.length} contracts named "${c.label}"; pin one in addresses.${c.key}`);
     else if (matches.length === 1) found[c.key] = matches[0];
   }
 
-  const instanceAddrs = Object.values(found).map(r => r.address);
-  const vestingAddrs = Object.values(found).filter(r => r.contract === 'VestingSchedule').map(r => r.address);
-  const emissionAddrs = Object.values(found).filter(r => r.contract === 'EmissionSchedule').map(r => r.address);
-  const balances = {};
-  const details = Object.fromEntries(instanceAddrs.map(a => [a, { grants: {}, yearlyWei: [] }]));
-  const [balanceRows, grantRows, yearlyRows] = await Promise.all([
-    instanceAddrs.length
-      ? cirrus(tokenObj, `${prefix}-Token-_balances`, { address: `eq.${deployment.token}`, key: `in.(${instanceAddrs.join(',')})` })
+  const foundRows = Object.values(found);
+  const of = (contract) => foundRows.filter(r => r.contract === contract);
+  const claimsAddrs = of('VestingClaims').map(r => r.address);
+  const claimsWallets = of('VestingClaims').map(r => r.wallet);
+  const monthlyWallets = [...claimsWallets, ...of('MonthlyVestingWallet').map(r => r.address)];
+  const emissionWallets = of('EmissionVestingWallet').map(r => r.address);
+  const released = (contract, addrs) => (addrs.length
+    ? cirrus(tokenObj, table(contract, '_erc20Released'), { address: inList(addrs), key: `eq.${deployment.token}`, select: 'address,value' })
+    : []);
+  const [claimsWalletRows, balanceRows, grantRows, yearlyRows, monthlyReleased, emissionReleased] = await Promise.all([
+    claimsWallets.length ? cirrus(tokenObj, table('MonthlyVestingWallet'), { address: inList(claimsWallets) }) : [],
+    foundRows.length
+      ? cirrus(tokenObj, table('Token', '_balances'), { address: `eq.${deployment.token}`, key: inList([...claimsAddrs, ...monthlyWallets, ...emissionWallets]) })
       : [],
-    vestingAddrs.length
-      ? cirrus(tokenObj, `${prefix}-VestingSchedule-granted`, { address: `in.(${vestingAddrs.join(',')})`, select: 'address,key,value' })
+    claimsAddrs.length ? cirrus(tokenObj, table('VestingClaims', 'granted'), { address: inList(claimsAddrs), select: 'address,key,value' }) : [],
+    emissionWallets.length
+      ? cirrus(tokenObj, table('EmissionVestingWallet', 'yearlyAmounts'), { address: inList(emissionWallets), select: 'address,key,value' })
       : [],
-    emissionAddrs.length
-      ? cirrus(tokenObj, `${prefix}-EmissionSchedule-yearlyAmounts`, { address: `in.(${emissionAddrs.join(',')})`, select: 'address,key,value' })
-      : [],
+    released('MonthlyVestingWallet', monthlyWallets),
+    released('EmissionVestingWallet', emissionWallets),
   ]);
+
+  const wallets = Object.fromEntries([...claimsWalletRows.map(wallet('MonthlyVestingWallet')), ...foundRows.filter(r => r.contract !== 'VestingClaims')]
+    .map(w => [w.address, w]));
+  const releasedBy = Object.fromEntries([...monthlyReleased, ...emissionReleased].map(r => [normalizeAddress(r.address), BigInt(r.value)]));
+  const details = {};
+  for (const r of foundRows) {
+    r.released = releasedBy[r.wallet] || 0n;
+    details[r.address] = { wallet: wallets[r.wallet], grants: {}, yearlyWei: [] };
+  }
+  const balances = {};
   for (const r of balanceRows) balances[normalizeAddress(r.key)] = BigInt(r.value);
   for (const r of grantRows) {
     const a = normalizeAddress(r.address);
@@ -135,7 +168,7 @@ async function readChain(tokenObj, deployment, schedule) {
   const maxSupply = BigInt(tokenRows[0].maxSupply || 0);
   return {
     found, balances, details, totalSupply, maxSupply,
-    externalSupply: externalSupply(totalSupply, Object.values(found), balances),
+    externalSupply: externalSupply(totalSupply, foundRows, balances),
     problems,
   };
 }
@@ -157,21 +190,9 @@ function requireSchedule(plan, chain, instance, configured) {
   return row;
 }
 
-function sameAmounts(a, b) {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    try {
-      if (BigInt(a[i]) !== BigInt(b[i])) return false;
-    } catch {
-      return false;
-    }
-  }
-  return true;
-}
-
 function requirePinnedAddresses(deployment, plan) {
   const missing = plan.instances.filter(i => !/^(0x)?[0-9a-fA-F]{40}$/.test(String(deployment.addresses?.[i.key] || '')));
-  if (missing.length) throw new Error(`pin deployed schedule addresses before this step: ${missing.map(i => `addresses.${i.key}`).join(', ')}`);
+  if (missing.length) throw new Error(`pin deployed contract addresses before this step: ${missing.map(i => `addresses.${i.key}`).join(', ')}`);
 }
 
 function printPlan(plan, chain) {
@@ -180,10 +201,12 @@ function printPlan(plan, chain) {
   console.log(`  explicitly assigned pre-minted supply: ${formatWei(plan.preMintedTotal)}`);
   for (const i of plan.instances) {
     const row = chain.found[i.key];
-    const terms = i.contract === 'VestingSchedule'
-      ? `cliff ${i.cliffMonths}m, ${i.cliffUnlockBps / 100}% at cliff, ${i.vestingMonths}m vest, ${i.grants.length} grant(s)`
-      : `10y emission to ${i.recipient}, year 1 ${formatWei(i.yearlyWei[0])}`;
-    const state = row ? `${row.address}${isTrue(row.finalized) ? ' finalized' : ''} holds ${formatWei(chain.balances[row.address] || 0n)}` : 'not created';
+    const terms = i.contract === 'EmissionVestingWallet'
+      ? `${i.yearlyWei.length}y emission to ${i.beneficiary}, year 1 ${formatWei(i.yearlyWei[0])}`
+      : `cliff ${i.cliffMonths}m, ${i.cliffUnlockBps / 100}% at cliff, ${i.vestingMonths}m vest, `
+        + (i.contract === 'VestingClaims' ? `${i.grants.length} member(s)` : `to ${i.beneficiary}`);
+    const wallet = row && row.wallet !== row.address ? ` (wallet ${row.wallet})` : '';
+    const state = row ? `${row.address}${wallet}${isTrue(row.finalized) ? ' finalized' : ''} allocation ${formatWei(walletAllocation(row, chain.balances))}` : 'not created';
     console.log(`${i.key.padEnd(14)} ${formatWei(i.fundWei).padStart(26)}  ${terms}\n${''.padEnd(16)}${state}`);
   }
   if (plan.problems.length) console.log('PROBLEMS:\n  ' + plan.problems.join('\n  '));
@@ -204,11 +227,13 @@ async function create(tokenObj, plan, chain) {
   const { getCreatedAddress, getIssueId, pollForCreateIssueExecution } = require('../util');
   for (const i of plan.instances) {
     if (chain.found[i.key]) continue;
-    const args = i.contract === 'VestingSchedule'
-      ? { _category: i.label, _token: addr(plan.token), _tgeTimestamp: plan.tgeTimestamp, _cliffMonths: i.cliffMonths,
-          _cliffUnlockBps: i.cliffUnlockBps, _vestingMonths: i.vestingMonths, _setupAdmin: addr(plan.setupAdmin) }
-      : { _category: i.label, _token: addr(plan.token), _tgeTimestamp: plan.tgeTimestamp, _recipient: addr(i.recipient),
-          _yearlyAmounts: i.yearlyWei.map(String), _setupAdmin: addr(plan.setupAdmin) };
+    const terms = { _cliffMonths: i.cliffMonths, _cliffUnlockBps: i.cliffUnlockBps, _vestingMonths: i.vestingMonths };
+    const args = i.contract === 'VestingClaims'
+      ? { _category: i.label, _token: addr(plan.token), startTimestamp: plan.tgeTimestamp, ...terms, _setupAdmin: addr(plan.setupAdmin) }
+      : i.contract === 'MonthlyVestingWallet'
+        ? { _category: i.label, beneficiaryAddress: addr(i.beneficiary), startTimestamp: plan.tgeTimestamp, ...terms }
+        : { _category: i.label, beneficiaryAddress: addr(i.beneficiary), startTimestamp: plan.tgeTimestamp,
+            _yearlyAmounts: i.yearlyWei.map(String) };
     const submittedAt = new Date().toISOString();
     const resp = await rest.createContract(tokenObj, {
       name: i.contract, source: fs.readFileSync(sourceFile(i.contract), 'utf8'), args,
@@ -218,7 +243,7 @@ async function create(tokenObj, plan, chain) {
     let created = getCreatedAddress(final);
     if (!created) {
       const issueId = getIssueId(final);
-      if (issueId) created = await pollForCreateIssueExecution(tokenObj, issueId, final, submittedAt, `${i.key} schedule`);
+      if (issueId) created = await pollForCreateIssueExecution(tokenObj, issueId, final, submittedAt, `${i.key} ${i.contract}`);
     }
     console.log(`${i.key}: ${final && final.status} | ${created || '(awaiting another vote)'}`);
   }
@@ -227,24 +252,16 @@ async function create(tokenObj, plan, chain) {
 async function setup(tokenObj, plan, chain) {
   if (tokenObj.me !== plan.setupAdmin) throw new Error(`signed in as ${tokenObj.me}, setup admin is ${plan.setupAdmin}`);
   for (const i of plan.instances) {
+    if (i.contract !== 'VestingClaims') continue;
     const row = requireSchedule(plan, chain, i, isTrue(chain.found[i.key]?.finalized));
     if (isTrue(row.finalized)) continue;
     console.log(`${i.key} (${row.address})`);
-    if (BigInt(row.tgeTimestamp) !== BigInt(plan.tgeTimestamp)) {
-      await send(tokenObj, row.address, i.contract, 'setTgeTimestamp', { _tgeTimestamp: plan.tgeTimestamp }, `setTgeTimestamp ${plan.tgeTimestamp}`);
-    }
-    if (i.contract === 'EmissionSchedule') {
-      if (!sameAmounts(chain.details[row.address].yearlyWei, i.yearlyWei)) {
-        await send(tokenObj, row.address, i.contract, 'setYearlyAmounts', { _yearlyAmounts: i.yearlyWei.map(String) }, `setYearlyAmounts total ${formatWei(i.fundWei)}`);
-      }
-      continue;
-    }
     // Grants cannot be edited, only added: anything on chain that disagrees with
-    // the plan means redeploying this schedule (before it is funded).
+    // the plan means creating this category again (before it is funded).
     const have = chain.details[row.address].grants;
     const want = Object.fromEntries(i.grants.map(g => [g.address, g.wei]));
     for (const [a, v] of Object.entries(have)) {
-      if (want[a] !== v) throw new Error(`${i.key}: on-chain grant ${a} = ${formatWei(v)} is not in the plan; redeploy this schedule`);
+      if (want[a] !== v) throw new Error(`${i.key}: on-chain grant ${a} = ${formatWei(v)} is not in the plan; create this category again`);
     }
     const missing = i.grants.filter(g => !have[g.address]);
     for (let k = 0; k < missing.length; k += GRANT_BATCH) {
@@ -260,16 +277,16 @@ async function fund(tokenObj, plan, chain) {
   if (chain.maxSupply !== plan.totalSupply) {
     throw new Error(`STRATO cap is ${chain.maxSupply ? formatWei(chain.maxSupply) : 'not set'}, not ${formatWei(plan.totalSupply)}; upgrade STRATO and run cap first`);
   }
+  // Releases lower a wallet's balance; its allocation counts them, but funding is
+  // only ever needed before TGE, when nothing can have been released.
+  if (Date.now() / 1000 >= plan.tgeTimestamp) throw new Error('TGE has passed; the wallets are funded before TGE only');
   for (const i of plan.instances) {
     const row = requireSchedule(plan, chain, i, true);
-    // A finalized schedule may already have released tokens. Its lower balance is
-    // not a funding shortfall and must never trigger another mint.
-    const balance = chain.balances[row.address] || 0n;
-    const amount = fundingShortfall(i, row, balance);
+    const amount = fundingShortfall(i, row, walletAllocation(row, chain.balances));
     if (amount === 0n) continue;
     // STRATO is owned by AdminRegistry: an admin's mint is a vote, executed at quorum.
-    await send(tokenObj, plan.token, 'Token', 'mint', { to: addr(row.address), amount: amount.toString() },
-      `${i.key}: mint ${formatWei(amount)} to ${row.address} (vote)`);
+    await send(tokenObj, plan.token, 'Token', 'mint', { to: addr(row.wallet), amount: amount.toString() },
+      `${i.key}: mint ${formatWei(amount)} to wallet ${row.wallet} (vote)`);
   }
 }
 
@@ -288,11 +305,11 @@ async function finalize(tokenObj, plan, chain) {
   for (const i of plan.instances) {
     const row = requireSchedule(plan, chain, i, true);
     if (isTrue(row.finalized)) continue;
-    if ((chain.balances[row.address] || 0n) < i.fundWei) throw new Error(`${i.key}: underfunded; run fund`);
+    if (walletAllocation(row, chain.balances) < i.fundWei) throw new Error(`${i.key}: underfunded; run fund`);
   }
   for (const i of plan.instances) {
     const row = chain.found[i.key];
-    if (!isTrue(row.finalized)) await send(tokenObj, row.address, i.contract, 'finalize', {}, `${i.key}: finalize`);
+    if (i.contract === 'VestingClaims' && !isTrue(row.finalized)) await send(tokenObj, row.address, i.contract, 'finalize', {}, `${i.key}: finalize`);
   }
 }
 
