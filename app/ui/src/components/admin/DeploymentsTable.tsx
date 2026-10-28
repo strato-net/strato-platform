@@ -27,7 +27,7 @@ const DeploymentsTable = () => {
     try {
       const [open, executed] = await Promise.all([
         api.get('/user/admin/issues', { params: { page: 1, limit: 100 } }),
-        api.get('/user/admin/issues/executed', { params: { page: 1, limit: 200 } }),
+        api.get('/user/admin/issues/executed', { params: { page: 1, limit: 100 } }),
       ]);
       setState({ ...open.data, executed: executed.data?.executed || [] });
     } catch (error) {
