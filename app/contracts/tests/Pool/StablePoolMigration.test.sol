@@ -12,7 +12,6 @@
 // ============================================================================
 
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 
 /// @dev Stands in for PoolFactory so the test can drive a pool it actually owns.
 contract PoolHarness {
@@ -33,37 +32,42 @@ contract PoolHarness {
     }
 }
 
-contract Describe_StablePool_Migration is Authorizable {
+contract Describe_StablePool_Migration {
 
     Mercata m;
     string[] emptyArray;
 
     function beforeAll() {
-        bypassAuthorizations = true;
         m = new Mercata();
         emptyArray = new string[](0);
     }
 
     function newToken(string name, string sym) internal returns (address) {
-        address t = m.tokenFactory().createToken(
+        AdminRegistry reg = m.adminRegistry();
+        (bool executed, variadic ret) = reg.castVoteOnIssue(address(m.tokenFactory()), "createToken",
             name, "audit token", emptyArray, emptyArray, emptyArray, sym, 100000000000e18, 18
         );
-        Token(t).setStatus(2); // ACTIVE
-        Token(t).mint(address(this), 10000000000e18);
+        address t = address(ret);
+        reg.castVoteOnIssue(t, "setStatus", 2); // ACTIVE
+        reg.castVoteOnIssue(t, "mint", address(this), 10000000000e18);
         return t;
     }
 
     function it_f8_migration_locks_the_drained_pool() {
         address t0 = newToken("Audit M0", "AUDM0");
         address t1 = newToken("Audit M1", "AUDM1");
-        address lpAddr = m.tokenFactory().createTokenWithInitialOwner(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createTokenWithInitialOwner",
             "Audit LP", "lp", emptyArray, emptyArray, emptyArray, "AUDLP", 0, 18, address(this)
         );
+        address lpAddr = address(ret);
         fastForward(100);
 
         PoolHarness harness = new PoolHarness();
         StablePool p = harness.makePool(t0, t1, lpAddr);
-        Ownable(lpAddr).transferOwnership(address(p));
+        AdminRegistry adminRegistry = m.adminRegistry();
+        Ownable(lpAddr).transferOwnership(address(adminRegistry));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", lpAddr, "mint", address(p));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", lpAddr, "burn", address(p));
 
         ERC20(t0).approve(address(p), 10000000000e18);
         ERC20(t1).approve(address(p), 10000000000e18);

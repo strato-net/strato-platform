@@ -1,6 +1,5 @@
 import "../concrete/BaseCodeCollection.sol";
 import "../abstract/ERC20/IERC20.sol";
-import "../abstract/ERC20/access/Authorizable.sol";
 import "../concrete/Tokens/Token.sol";
 
 contract User {
@@ -10,7 +9,7 @@ contract User {
     }
 }
 
-contract Describe_BadDebt_Basic is Authorizable {
+contract Describe_BadDebt_Basic {
 
     constructor() {
     }
@@ -23,7 +22,6 @@ contract Describe_BadDebt_Basic is Authorizable {
     address USDST;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
     }
@@ -38,14 +36,15 @@ contract Describe_BadDebt_Basic is Authorizable {
     // Test basic token creation functionality
     function it_ab_can_create_tokens() public {
         // Create test token for borrowing
-        USDST = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        USDST = address(ret);
         require(address(USDST) != address(0), "Failed to create USDST token");
     }
 
     // Test token activation functionality
     function it_ac_can_activate_tokens() public {
         // Set tokens to active status
-        Token(USDST).setStatus(2);
+        m.adminRegistry().castVoteOnIssue(USDST, "setStatus", 2);
 
         // Basic checks - tokens activated successfully
         require(Token(USDST).status() == TokenStatus.ACTIVE, "USDST token not activated");
@@ -61,7 +60,9 @@ contract Describe_BadDebt_Basic is Authorizable {
         require(address(configurator) != address(0), "PoolConfigurator not found");
 
         // Configure USDST
-        configurator.configureAsset(
+        m.adminRegistry().castVoteOnIssue(
+            address(configurator),
+            "configureAsset",
             USDST,
             0,
             0,
@@ -88,7 +89,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         user1 = new User();
         user2 = new User();
 
-        Token(USDST).mint(address(this), 1000e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 1000e18);
         IERC20(USDST).transfer(address(user1), 1000e18);
         require(IERC20(USDST).balanceOf(address(user1)) == 1000e18, "User1 should have 1000 USDST after receipt");
         user1.do(USDST, "transfer", address(user2), 1000e18);
@@ -97,7 +98,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         user2.do(USDST, "transfer", address(this), 1000e18);
         require(IERC20(USDST).balanceOf(address(user2)) == 0, "User2 should have 0 USDST after transfer out");
         require(IERC20(USDST).balanceOf(address(this)) == 1000e18, "Admin should have 1000 USDST after receipt");
-        Token(USDST).burn(address(this), 1000e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "burn", address(this), 1000e18);
     }
 
 }

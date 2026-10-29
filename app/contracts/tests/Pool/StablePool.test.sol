@@ -1,5 +1,4 @@
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 
 contract User {
     function do(address a, string f, variadic args) public returns (variadic) {
@@ -8,7 +7,7 @@ contract User {
     }
 }
 
-contract Describe_StablePool is Authorizable {
+contract Describe_StablePool {
 
     Mercata m;
     string[] emptyArray;
@@ -20,7 +19,6 @@ contract Describe_StablePool is Authorizable {
     StablePool pool;
 
     function beforeAll() {
-        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
         emptyArray = new string[](0);
@@ -28,24 +26,27 @@ contract Describe_StablePool is Authorizable {
 
     function beforeEach() {
         // Create fresh tokens for each test
-        tokenAAddress = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Token A", "Test Token A", emptyArray, emptyArray, emptyArray, "TKA", 10000000e18, 18
         );
-        tokenBAddress = m.tokenFactory().createToken(
+        tokenAAddress = address(ret);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Token B", "Test Token B", emptyArray, emptyArray, emptyArray, "TKB", 10000000e18, 18
         );
+        tokenBAddress = address(ret);
 
         // Activate tokens
-        Token(tokenAAddress).setStatus(2); // ACTIVE
-        Token(tokenBAddress).setStatus(2); // ACTIVE
+        m.adminRegistry().castVoteOnIssue(tokenAAddress, "setStatus", 2); // ACTIVE
+        m.adminRegistry().castVoteOnIssue(tokenBAddress, "setStatus", 2); // ACTIVE
 
         // Mint tokens to test contract
-        Token(tokenAAddress).mint(address(this), 100000000e18);
-        Token(tokenBAddress).mint(address(this), 100000000e18);
+        m.adminRegistry().castVoteOnIssue(tokenAAddress, "mint", address(this), 100000000e18);
+        m.adminRegistry().castVoteOnIssue(tokenBAddress, "mint", address(this), 100000000e18);
 
         // Create pool
         fastForward(100);
-        poolAddress = m.poolFactory().createStablePool(tokenAAddress, tokenBAddress);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "createStablePool", tokenAAddress, tokenBAddress);
+        poolAddress = address(ret);
         pool = StablePool(poolAddress);
 
         // Give Pool mint/burn rights over its LP token
@@ -251,7 +252,7 @@ contract Describe_StablePool is Authorizable {
             uint tokenAPost = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPost = ERC20(tokenBAddress).balanceOf(address(pool));
             peg = (1025e15 * peg) / 1e18;
-            pool.updatePeg(peg);
+            m.adminRegistry().castVoteOnIssue(address(pool), "updatePeg", peg);
             // log(string(tokenAPost/1e14) + "," + string(tokenBPost/1e14) + "," + string(uint(pool.aToBRatio()*10000.0)));
             // log("Point " + string(i) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::10::A::1::0::0::0::0;");
             // log("Point " + string(i) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
@@ -286,7 +287,7 @@ contract Describe_StablePool is Authorizable {
             uint tokenAPost = ERC20(tokenAAddress).balanceOf(address(pool));
             uint tokenBPost = ERC20(tokenBAddress).balanceOf(address(pool));
             peg = (975e15 * peg) / 1e18;
-            pool.updatePeg(peg);
+            m.adminRegistry().castVoteOnIssue(address(pool), "updatePeg", peg);
             // log(string(tokenAPost/1e14) + "," + string(tokenBPost/1e14) + "," + string(uint(pool.aToBRatio()*10000.0)));
             // log("Point " + string(i+Q) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::" + string(uint(pool.bToARatio()*10000.0)) + "::10::A::1::0::0::0::0;");
             // log("Point " + string(i+Q) + "::" + string(tokenAPre/1e14) + "::" + string(tokenBPre/1e14) + "::" + string(output/1e14) + "::" + string(output/1e14) + "::10::A::1::0::0::0::0;");
@@ -313,7 +314,7 @@ contract Describe_StablePool is Authorizable {
 
         uint256 initialLPBalance = ERC20(pool.lpToken()).balanceOf(address(this));
 
-        pool.setPaused(true);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", true);
         require(pool.isPaused() == true, "Pool should be paused");
 
         // RemoveLiquidity should STILL WORK when paused (exit always allowed)
@@ -322,7 +323,7 @@ contract Describe_StablePool is Authorizable {
         require(tokenAReceived > 0 && tokenBReceived > 0, "RemoveLiquidity should work when paused");
 
         // Unpause and verify operations work again
-        pool.setPaused(false);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", false);
         require(pool.isPaused() == false, "Pool should be unpaused");
 
         uint256 swapAmt = 100e18;
@@ -346,12 +347,12 @@ contract Describe_StablePool is Authorizable {
 
         uint256 lpBalance = ERC20(pool.lpToken()).balanceOf(address(this));
 
-        pool.setDisabled(true);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setDisabled", true);
         require(pool.isPaused() == true, "Pool should be paused when disabled");
         require(pool.isDisabled() == true, "Pool should be disabled");
 
         // Re-enable: clears isDisabled but isPaused remains true
-        pool.setDisabled(false);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setDisabled", false);
         require(pool.isDisabled() == false, "Pool should be re-enabled (isDisabled cleared)");
         require(pool.isPaused() == true, "Pool should STILL be paused after re-enable (safety feature)");
 
@@ -361,7 +362,7 @@ contract Describe_StablePool is Authorizable {
         require(tokenAReceived > 0 && tokenBReceived > 0, "RemoveLiquidity should work after re-enable");
 
         // Must explicitly unpause to allow swaps/adds again
-        pool.setPaused(false);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", false);
         require(pool.isPaused() == false, "Pool should be unpaused after explicit setPaused(false)");
 
         uint256 swapAmt = 100e18;
@@ -373,31 +374,31 @@ contract Describe_StablePool is Authorizable {
     function it_pool_owner_can_toggle_pause_and_disable() {
         require(pool.isPaused() == false, "Pool should start unpaused");
 
-        pool.setPaused(true);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", true);
         require(pool.isPaused() == true, "setPaused(true) should pause pool");
 
-        pool.setPaused(false);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", false);
         require(pool.isPaused() == false, "setPaused(false) should unpause pool");
 
         require(pool.isDisabled() == false, "Pool should start enabled");
 
-        pool.setDisabled(true);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setDisabled", true);
         require(pool.isPaused() == true, "setDisabled(true) should set isPaused");
         require(pool.isDisabled() == true, "setDisabled(true) should set isDisabled");
 
         // Re-enable: should clear isDisabled but KEEP isPaused
-        pool.setDisabled(false);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setDisabled", false);
         require(pool.isPaused() == true, "setDisabled(false) should KEEP isPaused (must unpause separately)");
         require(pool.isDisabled() == false, "setDisabled(false) should clear isDisabled");
 
-        pool.setPaused(false);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", false);
         require(pool.isPaused() == false, "Explicit setPaused(false) should clear isPaused");
 
         // Test setDisabled when already paused
-        pool.setPaused(true);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", true);
         require(pool.isPaused() == true, "Pool should be paused");
 
-        pool.setDisabled(true);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setDisabled", true);
         require(pool.isPaused() == true, "setDisabled(true) should keep isPaused when already paused");
         require(pool.isDisabled() == true, "setDisabled(true) should set isDisabled");
     }
@@ -410,7 +411,7 @@ contract Describe_StablePool is Authorizable {
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
         pool.addLiquidityGeneral([amountA, amountB], amountB, address(0));
 
-        pool.setPaused(true);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", true);
 
         // Verify pause state persists even after allowed operations (remove)
         uint256 lpBalance = ERC20(pool.lpToken()).balanceOf(address(this));
@@ -419,7 +420,7 @@ contract Describe_StablePool is Authorizable {
 
         require(pool.isPaused() == true, "Pause state should persist after remove operation");
 
-        pool.setPaused(false);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", false);
         require(pool.isPaused() == false, "Pool should be unpaused");
     }
 }

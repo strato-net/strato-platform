@@ -63,6 +63,10 @@ require("dotenv").config();
 
   const headers = { Authorization: `Bearer ${ADMIN_TOKEN}`, "Content-Type": "application/json" };
   const buildCall = (name, addr, method, args = {}) => ({ type: "FUNCTION", payload: { contractName: name, contractAddress: addr, method, args } });
+  // onlyOwner calls on AdminRegistry-owned contracts go through castVoteOnIssue with positional {type, value} args
+  const ADMIN_REGISTRY = (process.env.ADMIN_REGISTRY_ADDRESS || "000000000000000000000000000000000000100c").toLowerCase();
+  const governedCall = (addr, method, args) =>
+    buildCall("AdminRegistry", ADMIN_REGISTRY, "castVoteOnIssue", { _target: addr, _func: method, _args: args });
 
   const cirrusGet = async (table, params) => {
     const url = `${cirrusBase}${table}`;
@@ -114,7 +118,7 @@ require("dotenv").config();
     // console.log(`tfCurrent: ${tfCurrent}`);
     if (tfCurrent !== TOKEN_FACTORY) {
       console.log(`\nPoolFactory.tokenFactory mismatch – fixing (was ${tfCurrent}, want ${TOKEN_FACTORY})…`);
-      const tx = buildCall("PoolFactory", POOL_FACTORY, "setTokenFactory", { _tokenFactory: TOKEN_FACTORY });
+      const tx = governedCall(POOL_FACTORY, "setTokenFactory", [{ type: "address", value: TOKEN_FACTORY }]);
       const { data: res } = await axios.post(`${BASE}/transaction/parallel?resolve=true`, { txs: [tx] }, { headers });
       if (res[0].status !== "Success") {
         throw new Error(`setTokenFactory failed: ${JSON.stringify(res[0])}`);
@@ -188,7 +192,7 @@ require("dotenv").config();
       const current = rows[0] ? Number(rows[0].status) : 0;
       if (current !== 2) {
         console.log(`  – Activating token ${token} (was ${current})…`);
-        const tx = buildCall("Token", token, "setStatus", { newStatus: 2 });
+        const tx = governedCall(token, "setStatus", [{ type: "uint", value: 2 }]);
         const { data: res } = await axios.post(txEndpoint, { txs: [tx] }, { headers });
         if (res[0].status !== "Success") throw new Error(res[0].error || res[0].status);
       }
@@ -200,9 +204,9 @@ require("dotenv").config();
   // 2) registerMigratedTokens to make sure isFactoryToken true
   try {
     console.log("  – Registering tokens in TokenFactory if missing…");
-    const tx = buildCall("TokenFactory", TOKEN_FACTORY, "registerMigratedTokens", {
-      tokens: allTokens,
-    });
+    const tx = governedCall(TOKEN_FACTORY, "registerMigratedTokens", [
+      { type: "address[]", value: allTokens },
+    ]);
     await axios.post(txEndpoint, { txs: [tx] }, { headers });
   } catch (e) {
     console.warn("  ! registerMigratedTokens call ignored (might already be factory tokens)");
@@ -215,11 +219,13 @@ require("dotenv").config();
       console.log(`Pool already exists: ${poolAddr}`);
     } else {
       console.log("Creating pool via PoolFactory.createPool…");
-      const tx = buildCall("PoolFactory", POOL_FACTORY, "createPool", { tokenA: USDST, tokenB });
+      const tx = governedCall(POOL_FACTORY, "createPool", [{ type: "address", value: USDST }, { type: "address", value: tokenB }]);
       const body = { txs: [tx], txParams: { gasPrice: 1, gasLimit: 32100000000 } };
       const { data: res } = await axios.post(txEndpoint, body, { headers });
       if (res[0].status !== "Success") throw new Error(`createPool failed: ${JSON.stringify(res[0])}`);
-      poolAddr = res[0].data.contents[0];
+      const [executed, ret] = res[0].data.contents;
+      if (!executed) throw new Error(`createPool recorded as vote on issue ${ret}, not executed`);
+      poolAddr = ret;
       console.log(`Pool created at ${poolAddr}`);
     }
 

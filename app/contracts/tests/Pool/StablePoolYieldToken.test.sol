@@ -1,7 +1,6 @@
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 
-contract Describe_StablePool_YieldToken is Authorizable {
+contract Describe_StablePool_YieldToken {
 
     Mercata m;
     string[] emptyArray;
@@ -16,17 +15,17 @@ contract Describe_StablePool_YieldToken is Authorizable {
     uint constant PRECISION = 1e18;
 
     function beforeAll() {
-        bypassAuthorizations = true;
         m = new Mercata();
         oracle = m.priceOracle();
         emptyArray = new string[](0);
     }
 
     function _createStablePool(address coinA, address coinB, uint coinBAssetType) internal returns (StablePool) {
-        address lpTokenAddr = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "LP Token", "LP", emptyArray, emptyArray, emptyArray, "LP", 0, 18
         );
-        Token(lpTokenAddr).setStatus(2);
+        address lpTokenAddr = address(ret);
+        m.adminRegistry().castVoteOnIssue(lpTokenAddr, "setStatus", 2);
 
         StablePool p = new StablePool(address(this));
         p.initialize(
@@ -49,17 +48,19 @@ contract Describe_StablePool_YieldToken is Authorizable {
     }
 
     function beforeEach() {
-        usdstAddress = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "USDST", "USDST Stablecoin", emptyArray, emptyArray, emptyArray, "USDST", 0, 18
         );
-        Token(usdstAddress).setStatus(2);
-        Token(usdstAddress).mint(address(this), 10000000e18);
+        usdstAddress = address(ret);
+        m.adminRegistry().castVoteOnIssue(usdstAddress, "setStatus", 2);
+        m.adminRegistry().castVoteOnIssue(usdstAddress, "mint", address(this), 10000000e18);
 
-        tokenBAddress = m.tokenFactory().createToken(
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Token B", "Test Token B", emptyArray, emptyArray, emptyArray, "TKB", 0, 18
         );
-        Token(tokenBAddress).setStatus(2);
-        Token(tokenBAddress).mint(address(this), 10000000e18);
+        tokenBAddress = address(ret);
+        m.adminRegistry().castVoteOnIssue(tokenBAddress, "setStatus", 2);
+        m.adminRegistry().castVoteOnIssue(tokenBAddress, "mint", address(this), 10000000e18);
 
         vault = new SaveUSDSTVault(address(this));
         vault.initialize(usdstAddress, "Save USDST", "saveUSDST");
@@ -139,11 +140,12 @@ contract Describe_StablePool_YieldToken is Authorizable {
     // =====================================================================
 
     function it_composes_exchange_rate_with_oracle_for_non_usdst_underlying() {
-        address ethToken = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "ETH", "Ethereum", emptyArray, emptyArray, emptyArray, "ETH", 0, 18
         );
-        Token(ethToken).setStatus(2);
-        Token(ethToken).mint(address(this), 10000000e18);
+        address ethToken = address(ret);
+        m.adminRegistry().castVoteOnIssue(ethToken, "setStatus", 2);
+        m.adminRegistry().castVoteOnIssue(ethToken, "mint", address(this), 10000000e18);
 
         SaveUSDSTVault ethVault = new SaveUSDSTVault(address(this));
         ethVault.initialize(ethToken, "Yield ETH", "yETH");
@@ -157,7 +159,7 @@ contract Describe_StablePool_YieldToken is Authorizable {
         require(ethVault.exchangeRate() == 102e16, "ETH vault rate should be 1.02e18");
 
         // Set ETH oracle price to 2000 USDST
-        oracle.setAssetPrice(ethToken, 2000e18);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ethToken, 2000e18);
 
         // Create pool: tokenB + ethVault
         fastForward(100);
@@ -188,7 +190,7 @@ contract Describe_StablePool_YieldToken is Authorizable {
 
     function it_ignores_oracle_for_usdst_underlying_even_when_price_set() {
         // Set USDST oracle price to $2 (simulating depeg or misconfiguration)
-        oracle.setAssetPrice(usdstAddress, 2e18);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", usdstAddress, 2e18);
 
         // Add reward → rate = 1.5
         Token(usdstAddress).transfer(vaultAddress, 50000e18);
@@ -220,18 +222,20 @@ contract Describe_StablePool_YieldToken is Authorizable {
 
     function it_prices_three_token_pool_with_mixed_asset_types() {
         // Create syrupUSDC (standard token, type 1)
-        address syrupUSDC = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Syrup USDC", "syrupUSDC", emptyArray, emptyArray, emptyArray, "syrupUSDC", 0, 18
         );
-        Token(syrupUSDC).setStatus(2);
-        Token(syrupUSDC).mint(address(this), 10000000e18);
+        address syrupUSDC = address(ret);
+        m.adminRegistry().castVoteOnIssue(syrupUSDC, "setStatus", 2);
+        m.adminRegistry().castVoteOnIssue(syrupUSDC, "mint", address(this), 10000000e18);
 
         // Create sUSDS (standard token, type 1)
-        address sUSDS = m.tokenFactory().createToken(
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "sUSDS", "sUSDS", emptyArray, emptyArray, emptyArray, "sUSDS", 0, 18
         );
-        Token(sUSDS).setStatus(2);
-        Token(sUSDS).mint(address(this), 10000000e18);
+        address sUSDS = address(ret);
+        m.adminRegistry().castVoteOnIssue(sUSDS, "setStatus", 2);
+        m.adminRegistry().castVoteOnIssue(sUSDS, "mint", address(this), 10000000e18);
 
         // saveUSDST vault already created in beforeEach with USDST underlying
         // Bump exchange rate to 1.1
@@ -241,15 +245,16 @@ contract Describe_StablePool_YieldToken is Authorizable {
         require(xRate == 11e17, "saveUSDST exchange rate should be 1.1e18");
 
         // Set oracle prices for syrupUSDC and sUSDS
-        oracle.setAssetPrice(syrupUSDC, 105e16);  // $1.05
-        oracle.setAssetPrice(sUSDS, 108e16);       // $1.08
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", syrupUSDC, 105e16);  // $1.05
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", sUSDS, 108e16);       // $1.08
 
         // Create 3-token pool: [syrupUSDC, sUSDS, saveUSDST]
         //   assetTypes:         [1,         1,     3]
-        address lpAddr = m.tokenFactory().createToken(
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Yield LP", "yLP", emptyArray, emptyArray, emptyArray, "yLP", 0, 18
         );
-        Token(lpAddr).setStatus(2);
+        address lpAddr = address(ret);
+        m.adminRegistry().castVoteOnIssue(lpAddr, "setStatus", 2);
 
         fastForward(100);
         StablePool triPool = new StablePool(address(this));

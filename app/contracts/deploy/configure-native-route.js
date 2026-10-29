@@ -21,6 +21,7 @@ require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
 const { rest, util } = require('blockapps-rest');
+const { getVoteResult, governedCallArgs } = require('./util');
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -66,12 +67,12 @@ function ensurePositiveIntegerString(value, label) {
 }
 
 async function callContract(tokenObj, address, name, method, args) {
-  const callArgs = {
+  const callArgs = await governedCallArgs(tokenObj, {
     contract: { address, name },
     method,
     args,
     txParams: buildTxParams(),
-  };
+  });
   const response = await rest.call(
     tokenObj,
     callArgs,
@@ -108,7 +109,8 @@ async function callContract(tokenObj, address, name, method, args) {
 
 function logCallResult(label, result) {
   const suffix = result && result.hash ? ` (tx: ${result.hash})` : '';
-  console.log(`${label}: submitted successfully${suffix}`);
+  const vote = getVoteResult(result);
+  console.log(`${label}: ${vote?.executed ? 'executed' : `vote recorded on issue ${vote?.value}`}${suffix}`);
 }
 
 async function main() {

@@ -1,5 +1,4 @@
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../concrete/Admin/AdminRegistry.sol";
 import "../../concrete/Proxy/Proxy.sol";
@@ -25,14 +24,10 @@ contract User {
 
 /**
  * @title AdminUser
- * @notice A second AdminRegistry admin. Must be Authorizable so the registry
- *         accepts votes routed through Ownable's governance fallback.
+ * @notice A second AdminRegistry admin. It votes by calling castVoteOnIssue
+ *         through `do`.
  */
-contract AdminUser is Authorizable {
-    constructor() {
-        bypassAuthorizations = true;
-    }
-
+contract AdminUser {
     function do(address a, string f, variadic args) public returns (variadic) {
         variadic result = address(a).call(f, args);
         return result;
@@ -49,7 +44,7 @@ contract AdminUser is Authorizable {
  *      vault burns/mints through whitelist entries; the vault proxy is owned by this
  *      test contract by default and handed to a registry in the governance tests.
  */
-contract Describe_VaultRedeemAllFor is Authorizable {
+contract Describe_VaultRedeemAllFor {
 
     string[] emptyArray;
 
@@ -78,7 +73,6 @@ contract Describe_VaultRedeemAllFor is Authorizable {
     // ============ SETUP ============
 
     function beforeAll() {
-        bypassAuthorizations = true;
         emptyArray = new string[](0);
 
         botExecutor = new User();
@@ -400,7 +394,7 @@ contract Describe_VaultRedeemAllFor is Authorizable {
         uint u1a = _bal(tokenA, address(user1));
 
         // Sole admin: one vote reaches the 60% threshold and the registry re-enters the vault
-        address(vault).call("redeemAllFor", _three());
+        adminRegistry.castVoteOnIssue(address(vault), "redeemAllFor", _three());
 
         require(IERC20(shareTokenAddress).totalSupply() == 0, "supply zero after vote");
         _assertApprox(_bal(tokenA, address(user1)) - u1a, (s1 * a0) / supply0, "user1 tokenA via vote");
@@ -421,11 +415,11 @@ contract Describe_VaultRedeemAllFor is Authorizable {
         address[] holders = _three();
 
         // First vote: issue created, nothing executes
-        address(vault).call("redeemAllFor", holders);
+        twoAdmins.castVoteOnIssue(address(vault), "redeemAllFor", holders);
         require(IERC20(shareTokenAddress).totalSupply() == supply0, "first vote must not execute");
 
         // Second admin votes with identical arguments: executes
-        adminUser.do(vaultAddress, "redeemAllFor", holders);
+        adminUser.do(address(twoAdmins), "castVoteOnIssue", vaultAddress, "redeemAllFor", holders);
         require(IERC20(shareTokenAddress).totalSupply() == 0, "second vote executes");
         require(_bal(tokenA, address(botExecutor)) <= TOL, "dust only after governed sweep");
     }

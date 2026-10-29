@@ -62,6 +62,7 @@ const { rest, importer, util } = require('blockapps-rest');
 const fs = require('fs-extra');
 const path = require('path');
 const axios = require('axios');
+const { getCreatedAddress, getVoteResult, governedCallArgs } = require('./util');
 
 const FACTORY_IMPL = { name: 'PoolV3Factory', file: 'Pools/PoolV3Factory.sol' };
 const POOL_IMPL = { name: 'PoolV3', file: 'Pools/PoolV3.sol' };
@@ -152,7 +153,8 @@ async function cirrus(tokenObj, tableName, params) {
 
 /** A 64-hex string in a receipt's response value is an AdminRegistry issue id. */
 function issueIdFromReceipt(final) {
-  const v = final && final.txResult && final.txResult.response && final.txResult.response.v;
+  const vote = getVoteResult(final);
+  const v = vote ? (vote.executed ? null : vote.value) : final && final.txResult && final.txResult.response && final.txResult.response.v;
   const value = Array.isArray(v) ? v[0] : v;
   return typeof value === 'string' && /^[0-9a-fA-F]{64}$/.test(value) ? value : null;
 }
@@ -197,8 +199,7 @@ async function submitImplementationDeploy(tokenObj, impl, source) {
   if (!final || final.status !== 'Success') {
     throw new Error(`${impl.name} implementation deployment failed: ` + JSON.stringify(final || finalResults));
   }
-  const created = final.txResult && final.txResult.contractsCreated;
-  const address = Array.isArray(created) ? created[0] : created;
+  const address = getCreatedAddress(final);
   if (address) return { address: normalizeAddr(address) };
   const issueId = issueIdFromReceipt(final);
   if (issueId) return { issueId };
@@ -299,9 +300,16 @@ async function callContract(tokenObj, contract, method, args) {
   return final;
 }
 
+/** callContract for an onlyOwner function of an AdminRegistry-owned contract, via AdminRegistry.castVoteOnIssue. */
+async function callGoverned(tokenObj, contract, method, args) {
+  const governed = await governedCallArgs(tokenObj, { contract, method, args });
+  return callContract(tokenObj, governed.contract, governed.method, governed.args);
+}
+
 /** A 64-hex return value from an onlyOwner call is the AdminRegistry vote-issue id. */
 function voteIssueHint(receipt) {
-  const v = receipt && receipt.txResult && receipt.txResult.response && receipt.txResult.response.v;
+  const vote = getVoteResult(receipt);
+  const v = vote ? (vote.executed ? null : vote.value) : receipt && receipt.txResult && receipt.txResult.response && receipt.txResult.response.v;
   const value = Array.isArray(v) ? v[0] : v;
   return typeof value === 'string' && /^[0-9a-fA-F]{64}$/.test(value) ? value : null;
 }
@@ -529,7 +537,7 @@ async function main() {
   } else if (normalizeAddr(factoryProxy.logicContract) === factoryImpl) {
     console.log('  Already upgraded; skipping.');
   } else {
-    const receipt = await callContract(
+    const receipt = await callGoverned(
       tokenObj,
       { address: factory, name: 'Proxy' },
       'setLogicContract',
@@ -559,7 +567,7 @@ async function main() {
       console.log(`  ${label}: already upgraded; skipping.`);
       continue;
     }
-    const receipt = await callContract(
+    const receipt = await callGoverned(
       tokenObj,
       { address: pool, name: 'Proxy' },
       'setLogicContract',
@@ -590,7 +598,7 @@ async function main() {
     console.log('  Already upgraded; skipping.');
     managerLogicReady = true;
   } else {
-    const receipt = await callContract(
+    const receipt = await callGoverned(
       tokenObj,
       { address: manager, name: 'Proxy' },
       'setLogicContract',
@@ -616,7 +624,7 @@ async function main() {
     console.log('  Skipped — manager proxy not yet pointing at the new implementation (awaiting votes).');
     pending.push(`manager ${manager} initialize (blocked until the logic upgrade lands; re-run after voting)`);
   } else {
-    const receipt = await callContract(
+    const receipt = await callGoverned(
       tokenObj,
       { address: manager, name: MANAGER_NAME },
       'initialize',

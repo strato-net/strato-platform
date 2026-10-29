@@ -1,4 +1,3 @@
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Admin/AdminRegistry.sol";
 import "../../concrete/BaseCodeCollection.sol";
@@ -11,7 +10,7 @@ import "../../concrete/Tokens/TokenFactory.sol";
 
 import "../Util.sol";
 
-contract Describe_StratoNativeBridge is Authorizable {
+contract Describe_StratoNativeBridge {
     using BridgeTypes for *;
 
     Mercata mercata;
@@ -37,7 +36,6 @@ contract Describe_StratoNativeBridge is Authorizable {
     string externalTxHash;
 
     function beforeAll() {
-        bypassAuthorizations = true;
 
         user1 = new User();
         user2 = new User();
@@ -78,13 +76,17 @@ contract Describe_StratoNativeBridge is Authorizable {
         );
         custodyVaultAddress = address(custodyVault);
 
-        nativeBridge.initialize(
+        adminRegistry.castVoteOnIssue(
+            address(nativeBridge),
+            "initialize",
             address(tokenFactory),
             address(custodyVault),
             address(relayer),
             address(this)
         );
-        custodyVault.initialize(
+        adminRegistry.castVoteOnIssue(
+            address(custodyVault),
+            "initialize",
             address(nativeBridge),
             address(this)
         );
@@ -95,9 +97,11 @@ contract Describe_StratoNativeBridge is Authorizable {
         require(nativeBridge.custodyVault() == address(custodyVault), "Native bridge custodyVault should initialize");
         require(custodyVault.bridge() == address(nativeBridge), "Custody vault bridge should initialize");
 
-        adminRegistry.addWhitelist(address(nativeBridge), "abortWithdrawal", address(relayer));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(nativeBridge), "abortWithdrawal", address(relayer));
 
-        nativeTokenAddress = tokenFactory.createToken(
+        (bool executed, variadic ret) = adminRegistry.castVoteOnIssue(
+            address(tokenFactory),
+            "createToken",
             "Native STRATO",
             "NST",
             [],
@@ -107,11 +111,14 @@ contract Describe_StratoNativeBridge is Authorizable {
             0,
             18
         );
+        nativeTokenAddress = address(ret);
         nativeToken = Token(nativeTokenAddress);
-        nativeToken.setStatus(2);
-        nativeToken.mint(address(user1), 1000e18);
+        adminRegistry.castVoteOnIssue(nativeTokenAddress, "setStatus", 2);
+        adminRegistry.castVoteOnIssue(nativeTokenAddress, "mint", address(user1), 1000e18);
 
-        nativeBridge.setAsset(
+        adminRegistry.castVoteOnIssue(
+            address(nativeBridge),
+            "setAsset",
             true,
             externalChainId,
             externalBridge,
@@ -173,7 +180,9 @@ contract Describe_StratoNativeBridge is Authorizable {
             address(user1)
         );
 
-        nativeBridge.setAsset(
+        adminRegistry.castVoteOnIssue(
+            address(nativeBridge),
+            "setAsset",
             true,
             externalChainId,
             externalBridge,
@@ -201,7 +210,7 @@ contract Describe_StratoNativeBridge is Authorizable {
     }
 
     function it_native_withdrawal_rejects_inactive_factory_token() {
-        nativeToken.setStatus(1);
+        adminRegistry.castVoteOnIssue(nativeTokenAddress, "setStatus", 1);
         user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
 
         bool reverted = false;
@@ -222,13 +231,13 @@ contract Describe_StratoNativeBridge is Authorizable {
     }
 
     function it_owner_can_update_instant_withdrawal_delay() {
-        nativeBridge.setInstantWithdrawalDelaySeconds(1234);
+        adminRegistry.castVoteOnIssue(address(nativeBridge), "setInstantWithdrawalDelaySeconds", 1234);
 
         require(nativeBridge.INSTANT_WITHDRAWAL_DELAY_SECONDS() == 1234, "Instant delay should update");
     }
 
     function it_owner_can_configure_token_bridge_directions_and_cap() {
-        nativeBridge.setTokenBridgeConfig(nativeTokenAddress, true, true, 250e18);
+        adminRegistry.castVoteOnIssue(address(nativeBridge), "setTokenBridgeConfig", nativeTokenAddress, true, true, 250e18);
 
         (
             bool depositsDisabled,
@@ -259,7 +268,7 @@ contract Describe_StratoNativeBridge is Authorizable {
     }
 
     function it_token_withdrawal_control_does_not_disable_deposits() {
-        nativeBridge.setTokenBridgeConfig(nativeTokenAddress, false, true, 0);
+        adminRegistry.castVoteOnIssue(address(nativeBridge), "setTokenBridgeConfig", nativeTokenAddress, false, true, 0);
         user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
 
         bool withdrawalReverted = false;
@@ -295,7 +304,7 @@ contract Describe_StratoNativeBridge is Authorizable {
     }
 
     function it_token_deposit_control_does_not_disable_withdrawals() {
-        nativeBridge.setTokenBridgeConfig(nativeTokenAddress, true, false, 0);
+        adminRegistry.castVoteOnIssue(address(nativeBridge), "setTokenBridgeConfig", nativeTokenAddress, true, false, 0);
         user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
 
         uint256 withdrawalId = user1.do(
@@ -329,7 +338,7 @@ contract Describe_StratoNativeBridge is Authorizable {
     }
 
     function it_aggregate_withdrawal_cap_counts_locked_supply_and_abort_restores_capacity() {
-        nativeBridge.setTokenBridgeConfig(nativeTokenAddress, false, false, 100e18);
+        adminRegistry.castVoteOnIssue(address(nativeBridge), "setTokenBridgeConfig", nativeTokenAddress, false, false, 100e18);
         user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 250e18);
 
         uint256 withdrawalId = user1.do(

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { config } from "../config";
 import { bloc } from "./api";
-import { postAndWaitForTx, TxPendingError } from "./stratoHelper";
+import { governed, postAndWaitForTx, TxPendingError } from "./stratoHelper";
 
 config.strato.polling.defaultInterval = 1;
 
@@ -125,4 +125,54 @@ test("a short result list is treated as unresolved", async () => {
       );
     },
   );
+});
+
+test("governed routes an onlyOwner call through castVoteOnIssue with typed positional args", async () => {
+  const bridge = "0000000000000000000000000000000000001008";
+  const original = (bloc as any).get;
+  let detailReads = 0;
+  (bloc as any).get = async (url: string) => {
+    assert.equal(url, `/contracts/contract/${bridge}/details`);
+    detailReads++;
+    return {
+      _functions: {
+        confirmDepositBatch: {
+          _funcArgs: [
+            ["externalTxHashes", { index: 1, type: { tag: "Array", entry: { tag: "String" } } }],
+            ["externalChainIds", { index: 0, type: { tag: "Array", entry: { tag: "Int", signed: false, bytes: 32 } } }],
+          ],
+        },
+      },
+    };
+  };
+  try {
+    const input = {
+      contractName: "MercataBridge",
+      contractAddress: bridge,
+      method: "confirmDepositBatch",
+      args: { externalChainIds: [999], externalTxHashes: ["0xabc"] },
+    };
+    const expected = {
+      contractName: "AdminRegistry",
+      contractAddress: config.adminRegistry.address,
+      method: "castVoteOnIssue",
+      args: {
+        _target: bridge,
+        _func: "confirmDepositBatch",
+        _args: [
+          { type: "uint256[]", value: [999] },
+          { type: "string[]", value: ["0xabc"] },
+        ],
+      },
+    };
+    assert.deepEqual(await governed(input), expected);
+    assert.deepEqual(await governed(input), expected);
+    assert.equal(detailReads, 1, "the function's parameters are read once per process");
+    await assert.rejects(
+      () => governed({ ...input, args: { externalChainIds: [999] } }),
+      /Missing confirmDepositBatch argument externalTxHashes/,
+    );
+  } finally {
+    (bloc as any).get = original;
+  }
 });

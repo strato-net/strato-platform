@@ -4,7 +4,7 @@ const config = require('./config');
 const auth = require('./auth');
 const fs = require('fs');
 const { rest, util } = require('blockapps-rest');
-const { getCreatedAddress, getIssueId, pollForCreateIssueExecution } = require('./util');
+const { getCreatedAddress, getIssueId, governedCallArgs, pollForCreateIssueExecution } = require('./util');
 const PROXY = 'd6726e06c3c71a3bad80b5eb6925707a31729b81';
 async function poll(tokenObj, hashes) {
   const results = await util.until(
@@ -26,7 +26,7 @@ async function poll(tokenObj, hashes) {
   if (!impl) { const iid = getIssueId(final); if (iid) impl = await pollForCreateIssueExecution(tokenObj, iid, final, submittedAt, 'impl'); }
   console.log(user, 'create result:', final && final.status, '| impl:', impl || '(pending 2nd vote)');
   if (!impl) return;
-  const up = await rest.call(tokenObj, { contract: { address: PROXY, name: 'Proxy' }, method: 'setLogicContract', args: { _logicContract: impl }, txParams: { gasPrice: 10, gasLimit: 5000000 } }, { config, isAsync: true, cacheNonce: true });
+  const up = await rest.call(tokenObj, await governedCallArgs(tokenObj, { contract: { address: PROXY, name: 'Proxy' }, method: 'setLogicContract', args: { _logicContract: impl }, txParams: { gasPrice: 10, gasLimit: 5000000 } }), { config, isAsync: true, cacheNonce: true });
   const uh = (Array.isArray(up)?up:[up]).map(r=>r&&r.hash).filter(Boolean);
   const uf = await poll(tokenObj, uh);
   console.log(user, 'setLogicContract:', uf && uf.status);

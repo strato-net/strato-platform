@@ -167,8 +167,10 @@ export const execute = async (
   timeout?: number,
 ): Promise<TxResponse> => {
   const inputArray = Array.isArray(inputs) ? inputs : [inputs];
-  const { method = "unknown", contractName = "unknown" } = inputArray[0] || {};
-  const context = `${method} on ${contractName}`;
+  const { method = "unknown", contractName = "unknown", args } = inputArray[0] || {};
+  const context = method === "castVoteOnIssue"
+    ? `${args?._func} via ${contractName}`
+    : `${method} on ${contractName}`;
 
   return enqueueStratoWrite(async () => {
     logInfo("StratoHelper", `Executing ${context} (${inputArray.length} tx)`);
@@ -195,6 +197,97 @@ export const execute = async (
 };
 
 // ============================================================================
+// Governed Calls
+// ============================================================================
+
+type AbiType = {
+  tag?: string;
+  signed?: boolean;
+  bytes?: number;
+  entry?: AbiType;
+  length?: number;
+  actual?: AbiType;
+  contents?: string;
+  typedef?: string;
+};
+
+// Solidity name of a bloc ABI type, as a {type, value} argument hint spells it
+const solidityTypeName = (type: AbiType): string => {
+  switch (type.tag) {
+    case "Int":
+      return `${type.signed ? "" : "u"}int${type.bytes ? type.bytes * 8 : ""}`;
+    case "String":
+    case "Bool":
+    case "Address":
+    case "Account":
+    case "Decimal":
+      return type.tag.toLowerCase();
+    case "Bytes":
+      return `bytes${type.bytes ?? ""}`;
+    case "Array":
+      return `${solidityTypeName(type.entry || {})}[${type.length ?? ""}]`;
+    case "UnknownLabel":
+      return type.contents || "";
+    case "UserDefined":
+      return solidityTypeName(type.actual || {});
+    default:
+      return type.typedef || "";
+  }
+};
+
+const funcArgsCache = new Map<string, Promise<[string, AbiType][]>>();
+
+// A deployed function's [name, type] parameters in declaration order, read once per process
+const fetchFuncArgs = (address: string, method: string): Promise<[string, AbiType][]> => {
+  const key = `${address.toLowerCase()}.${method}`;
+  let funcArgs = funcArgsCache.get(key);
+  if (!funcArgs) {
+    funcArgs = bloc.get<any>(`/contracts/contract/${address}/details`).then((details) => {
+      const params = details?._functions?.[method]?._funcArgs;
+      if (!Array.isArray(params)) {
+        throw new Error(`Function ${method} not found on contract ${address}`);
+      }
+      return params
+        .slice()
+        .sort((a, b) => (a?.[1]?.index ?? 0) - (b?.[1]?.index ?? 0))
+        .map((entry): [string, AbiType] => [entry?.[0] ?? "", entry?.[1]?.type || {}]);
+    });
+    funcArgsCache.set(key, funcArgs);
+    funcArgs.catch(() => funcArgsCache.delete(key));
+  }
+  return funcArgs;
+};
+
+/**
+ * The AdminRegistry call that runs an onlyOwner function of a registry-owned contract: the registry
+ * executes it at once for a whitelisted caller such as this relayer. Its args go positionally into
+ * castVoteOnIssue's variadic _args, each hinted with the declared type, since unhinted the node
+ * infers them instead (a digit-only address becomes an int). Revert reasons come back unchanged.
+ */
+export const governed = async ({ contractAddress, method, args }: FunctionInput): Promise<FunctionInput> => {
+  const funcArgs = await fetchFuncArgs(contractAddress, method);
+  const hintedArgs = funcArgs.flatMap(([name, type]) => {
+    if (args[name] === undefined) throw new Error(`Missing ${method} argument ${name}`);
+    return type.tag === "Variadic" ? args[name] : [{ type: solidityTypeName(type), value: args[name] }];
+  });
+  return {
+    contractName: "AdminRegistry",
+    contractAddress: config.adminRegistry.address,
+    method: "castVoteOnIssue",
+    args: { _target: contractAddress, _func: method, _args: hintedArgs },
+  };
+};
+
+/**
+ * Execute onlyOwner call(s) on registry-owned contracts through the AdminRegistry.
+ */
+export const executeGoverned = async (
+  inputs: FunctionInput | FunctionInput[],
+  timeout?: number,
+): Promise<TxResponse> =>
+  execute(await Promise.all((Array.isArray(inputs) ? inputs : [inputs]).map(governed)), timeout);
+
+// ============================================================================
 // Exports
 // ============================================================================
 
@@ -203,4 +296,6 @@ export default {
   until,
   postAndWaitForTx,
   execute,
+  governed,
+  executeGoverned,
 };

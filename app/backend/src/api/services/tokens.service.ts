@@ -1,5 +1,6 @@
 import { cirrus, strato, eth } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
+import { governedInput, ownerInput } from "./user.service";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { usc } from "../../utils/importer";
 import { extractContractName } from "../../utils/utils";
@@ -396,12 +397,12 @@ export const createToken = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = await buildFunctionTx({
+    const tx = await buildFunctionTx(await governedInput(accessToken, {
       contractName: extractContractName(TokenFactory),
       contractAddress: tokenFactory,
       method: "createToken",
       args: usc(body),
-    }, userAddress, accessToken);
+    }), userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -570,14 +571,19 @@ export const setTokenStatus = async (
   body: Record<string, string | number>
 ) => {
   try {
-    const tx = await buildFunctionTx({
+    const tokenAddress = body.address as string;
+    const { data: [token] = [] } = await cirrus.get(accessToken, "/" + Token, {
+      params: { address: `eq.${tokenAddress}`, select: "_owner" },
+    });
+    if (!token) throw new Error(`Token ${tokenAddress} not found`);
+    const tx = await buildFunctionTx(await ownerInput(accessToken, {
       contractName: extractContractName(Token),
-      contractAddress: body.address as string,
+      contractAddress: tokenAddress,
       method: "setStatus",
       args: {
         newStatus: body.status,
       },
-    }, userAddress, accessToken);
+    }, token._owner), userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)

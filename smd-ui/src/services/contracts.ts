@@ -169,8 +169,10 @@ export function isFunctionValue(v: unknown): v is string {
 export function functionArgs(info: any, fnName: string): FuncArg[] {
   const args = info?._functions?.[fnName]?._funcArgs;
   if (!Array.isArray(args)) return [];
-  // _funcArgs is an array of [name, { type: { tag } }] tuples.
-  return args.map((entry: any) => ({ name: entry?.[0] ?? "", type: argType(entry?.[1]) }));
+  // _funcArgs is an array of [name, { index, type: { tag } }] tuples; keep declared order.
+  return [...args]
+    .sort((x: any, y: any) => (x?.[1]?.index ?? 0) - (y?.[1]?.index ?? 0))
+    .map((entry: any) => ({ name: entry?.[0] ?? "", type: argType(entry?.[1]) }));
 }
 
 /** Whether a function is payable (accepts value), from its state mutability. */

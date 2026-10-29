@@ -7,6 +7,7 @@ import { extractContractName } from "../../utils/utils";
 import { StratoError } from "../../errors";
 import JSONBig from "json-bigint";
 import { normalizeLegacyEscapes, repairStructuredJson } from "../helpers/jsonStringParsing.helper";
+import { FunctionInput } from "../../types/types";
 const { AdminRegistry, adminRegistry, DAY_MS } = constants;
 const JSONBigString = JSONBig({ storeAsString: true });
 const JSONBigNumber = JSONBig({ useNativeBigInt: true });
@@ -321,9 +322,7 @@ const hintedArg = (type: AbiType, value: any): any => {
     : formattedValue;
 };
 
-// Direct call to target.func(args). When the caller doesn't own the target, the
-// Ownable fallback routes msg.sig/msg.data into AdminRegistry.castVoteOnIssue, so
-// the issueId is keccak256(target, func, args) over the exact call args
+// Submit one contract call, with large integers serialized at full precision
 const callTargetFunction = async (
   accessToken: string,
   userAddress: string,
@@ -354,40 +353,63 @@ type ContractCall = {
 };
 
 // The registry call a vote resolves to, whose args it hashes into the issueId
-const castVoteCall = (target: string, func: string, typedArgs: any[]): ContractCall => ({
+const castVoteCall = (target: string, func: string, typedArgs: any[], registry: string = adminRegistry): ContractCall => ({
   contractName: extractContractName(AdminRegistry),
-  contractAddress: adminRegistry,
+  contractAddress: registry,
   method: "castVoteOnIssue",
   args: { _func: func, _target: target, _args: typedArgs },
 });
 
-// Resolve an issue into the call that creates it, plus its args coerced to the
-// target's declared Solidity types. Creating one normally calls the target function
-// directly (SMD-style): the Ownable fallback hands the registry msg.sig/msg.data,
-// which the VM has already coerced, so applying the same coercion here keeps the
-// issueId aligned across voters. The AdminRegistry is the exception: it owns itself,
-// so its onlyOwner functions can't reach the fallback and go via castVoteOnIssue
+// Positional args for the registry's variadic _args, each hinted with the target's
+// declared Solidity type: unhinted, the VM infers them instead (a digit-only address
+// becomes an int), which changes both the call and its issueId. A variadic parameter
+// takes every remaining arg, so its values go flat into _args.
+// Enum fields inside struct args must be ordinals: hints don't reach struct fields,
+// and only an ordinal hashes to the same issueId as the coerced enum
+const governedArgs = (funcArgs: [string, AbiType][], args: any[]): any[] =>
+  funcArgs.flatMap(([, type], i) =>
+    type.tag === "Variadic"
+      ? args.slice(i).map((arg) => hintedArg(type, arg))
+      : [hintedArg(type, args[i])]);
+
+// The registry call that runs target.func(args) under governance, given the same named
+// args as a direct call: a whitelisted caller executes it at once, an admin's call is
+// recorded as their vote. Integers come back JSON-safe (large ones as decimal strings,
+// which the node coerces the same way), so it posts like any other function input
+export const governedInput = async (
+  accessToken: string,
+  { contractAddress, method, args }: FunctionInput,
+  registry: string = adminRegistry,
+): Promise<FunctionInput> => {
+  const { funcArgs } = await fetchFuncArgs(accessToken, contractAddress, method);
+  const positional = funcArgs.flatMap(([name, type]) =>
+    type.tag === "Variadic" ? args[name] ?? [] : [args[name]]);
+  const typedArgs = JSONBigString.parse(JSONBigNumber.stringify(governedArgs(funcArgs, positional)));
+  return castVoteCall(contractAddress, method, typedArgs, registry);
+};
+
+// For a target an account may own: the direct call when its owner is an account, or a
+// vote through the owner when that is a registry (its ABI has castVoteOnIssue)
+export const ownerInput = async (
+  accessToken: string,
+  input: FunctionInput,
+  owner: string,
+): Promise<FunctionInput> => {
+  const details: any = await getContractDetails(accessToken, owner);
+  return details?._functions?.castVoteOnIssue ? governedInput(accessToken, input, owner) : input;
+};
+
+// Resolve an issue into the registry call that creates it, plus its args coerced to
+// the target's declared Solidity types, which keeps the issueId aligned across voters
 const resolveIssueCall = async (
   accessToken: string,
   target: string,
   func: string,
   args: any[],
 ): Promise<{ call: ContractCall; typedArgs: any[] }> => {
-  const { contractName, funcArgs } = await fetchFuncArgs(accessToken, target, func);
-  if (sameAddress(target, adminRegistry)) {
-    const typedArgs = args.map((arg, i) =>
-      hintedArg(funcArgs[i]?.[1] || {}, arg));
-    return { call: castVoteCall(target, func, typedArgs), typedArgs };
-  }
-  // A variadic parameter takes every remaining arg, so it is flat in the registry's
-  // own variadic _args but one nested argument in a direct call to the target
-  const typedArgs = funcArgs.flatMap(([, type], i) =>
-    type.tag === "Variadic"
-      ? args.slice(i).map((arg) => hintedArg(type, arg))
-      : [hintedArg(type, args[i])]);
-  const namedArgs = Object.fromEntries(funcArgs.map(([name, type], i) =>
-    [name, type.tag === "Variadic" ? typedArgs.slice(i) : typedArgs[i]]));
-  return { call: { contractName, contractAddress: target, method: func, args: namedArgs }, typedArgs };
+  const { funcArgs } = await fetchFuncArgs(accessToken, target, func);
+  const typedArgs = governedArgs(funcArgs, args);
+  return { call: castVoteCall(target, func, typedArgs), typedArgs };
 };
 
 // Cirrus indexes a block only once it is mined, so the vote's event trails its receipt
@@ -413,9 +435,8 @@ const findIssueIdForTx = async (accessToken: string, hash: string): Promise<stri
   return until((issueId) => issueId !== null, fetchIssueId, ISSUE_EVENT_TIMEOUT_MS);
 };
 
-// An issue only exists if the call reached the registry. A target function without
-// onlyOwner has no fallback to catch the call, so it just executes — report what the
-// transaction actually did rather than assuming a vote was recorded.
+// Report the issue the vote landed on, read back from the transaction's events rather
+// than assumed, since only an issue the registry recorded exists for others to vote on
 export const createIssue = async (
   accessToken: string,
   userAddress: string,

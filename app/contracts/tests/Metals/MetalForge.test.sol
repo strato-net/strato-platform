@@ -1,5 +1,4 @@
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Metals/MetalForge.sol";
 
 contract User {
@@ -9,7 +8,7 @@ contract User {
     }
 }
 
-contract Describe_MetalForge is Authorizable {
+contract Describe_MetalForge {
 
     Mercata m;
     string[] emptyArray;
@@ -38,7 +37,6 @@ contract Describe_MetalForge is Authorizable {
     uint BUYER_BALANCE;
 
     function beforeAll() {
-        bypassAuthorizations = true;
         m = new Mercata();
         emptyArray = new string[](0);
         buyer1 = new User();
@@ -60,15 +58,19 @@ contract Describe_MetalForge is Authorizable {
         treasurer = address(0xDEAD);
         collector = new FeeCollector(address(this));
 
-        usdstAddr = m.tokenFactory().createToken("USDST", "USD Stablecoin", emptyArray, emptyArray, emptyArray, "USDST", 0, 18);
-        goldAddr = m.tokenFactory().createToken("Gold", "Tokenized Gold", emptyArray, emptyArray, emptyArray, "GOLD", 0, 18);
-        silverAddr = m.tokenFactory().createToken("Silver", "Tokenized Silver", emptyArray, emptyArray, emptyArray, "SLVR", 0, 18);
-        altPayAddr = m.tokenFactory().createToken("AltPay", "Alt Payment Token", emptyArray, emptyArray, emptyArray, "ALT", 0, 18);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USD Stablecoin", emptyArray, emptyArray, emptyArray, "USDST", 0, 18);
+        usdstAddr = address(ret);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "Gold", "Tokenized Gold", emptyArray, emptyArray, emptyArray, "GOLD", 0, 18);
+        goldAddr = address(ret);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "Silver", "Tokenized Silver", emptyArray, emptyArray, emptyArray, "SLVR", 0, 18);
+        silverAddr = address(ret);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "AltPay", "Alt Payment Token", emptyArray, emptyArray, emptyArray, "ALT", 0, 18);
+        altPayAddr = address(ret);
 
-        Token(usdstAddr).setStatus(2);
-        Token(goldAddr).setStatus(2);
-        Token(silverAddr).setStatus(2);
-        Token(altPayAddr).setStatus(2);
+        m.adminRegistry().castVoteOnIssue(usdstAddr, "setStatus", 2);
+        m.adminRegistry().castVoteOnIssue(goldAddr, "setStatus", 2);
+        m.adminRegistry().castVoteOnIssue(silverAddr, "setStatus", 2);
+        m.adminRegistry().castVoteOnIssue(altPayAddr, "setStatus", 2);
 
         forge = new MetalForge(address(this));
         forge.initialize(address(oracle), treasurer, address(collector), usdstAddr);
@@ -86,10 +88,10 @@ contract Describe_MetalForge is Authorizable {
         adminReg.castVoteOnIssue(address(adminReg), "addWhitelist", goldAddr, "mint", address(forge));
         adminReg.castVoteOnIssue(address(adminReg), "addWhitelist", silverAddr, "mint", address(forge));
 
-        Token(usdstAddr).mint(address(buyer1), BUYER_BALANCE);
-        Token(usdstAddr).mint(address(buyer2), BUYER_BALANCE);
-        Token(altPayAddr).mint(address(buyer1), BUYER_BALANCE);
-        Token(altPayAddr).mint(address(buyer2), BUYER_BALANCE);
+        m.adminRegistry().castVoteOnIssue(usdstAddr, "mint", address(buyer1), BUYER_BALANCE);
+        m.adminRegistry().castVoteOnIssue(usdstAddr, "mint", address(buyer2), BUYER_BALANCE);
+        m.adminRegistry().castVoteOnIssue(altPayAddr, "mint", address(buyer1), BUYER_BALANCE);
+        m.adminRegistry().castVoteOnIssue(altPayAddr, "mint", address(buyer2), BUYER_BALANCE);
 
         buyer1.do(usdstAddr, "approve", address(forge), 2**256 - 1);
         buyer1.do(altPayAddr, "approve", address(forge), 2**256 - 1);
@@ -262,7 +264,7 @@ contract Describe_MetalForge is Authorizable {
             f.setPayToken(usdstAddr, true);
             AdminRegistry adminReg = m.adminRegistry();
             adminReg.castVoteOnIssue(address(adminReg), "addWhitelist", goldAddr, "mint", address(f));
-            Token(usdstAddr).mint(address(buyer1), amounts[i]);
+            m.adminRegistry().castVoteOnIssue(usdstAddr, "mint", address(buyer1), amounts[i]);
             buyer1.do(usdstAddr, "approve", address(f), amounts[i]);
 
             uint buyerBefore = ERC20(usdstAddr).balanceOf(address(buyer1));
@@ -282,7 +284,7 @@ contract Describe_MetalForge is Authorizable {
         uint expectedFee = (payAmount * GOLD_FEE_BPS) / 10000;
         require(expectedFee == 0, "Precondition: fee should round to 0 for dust");
 
-        Token(usdstAddr).mint(address(buyer1), payAmount);
+        m.adminRegistry().castVoteOnIssue(usdstAddr, "mint", address(buyer1), payAmount);
         buyer1.do(usdstAddr, "approve", address(forge), payAmount);
 
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, payAmount, 0);
@@ -360,7 +362,7 @@ contract Describe_MetalForge is Authorizable {
         forge.setFeeBps(goldAddr, 0);
         uint payAmount = 1;
 
-        Token(usdstAddr).mint(address(buyer1), payAmount);
+        m.adminRegistry().castVoteOnIssue(usdstAddr, "mint", address(buyer1), payAmount);
         buyer1.do(usdstAddr, "approve", address(forge), payAmount);
 
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, payAmount, 0);

@@ -1,4 +1,3 @@
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/utils/StringUtils.sol";
 import "../../concrete/Proxy/Proxy.sol";
@@ -84,7 +83,7 @@ contract record UserRegistry is Proxy {
     }
 }
 
-contract record User is Proxy, Authorizable {
+contract record User is Proxy {
     using BytesUtils for bytes;
 
     string public username;

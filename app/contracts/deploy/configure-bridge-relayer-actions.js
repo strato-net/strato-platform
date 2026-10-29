@@ -18,6 +18,7 @@ require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
 const { rest, util } = require('blockapps-rest');
+const { getVoteResult, governedCallArgs } = require('./util');
 
 const DEFAULT_ADMIN_REGISTRY = '000000000000000000000000000000000000100c';
 const DEFAULT_METHODS = ['depositWithAction', 'depositBatchWithAction'];
@@ -50,15 +51,17 @@ function normalizeAddress(value, label) {
   return normalized.toLowerCase();
 }
 
+// The registry owns itself, so its onlyOwner setters go through its own castVoteOnIssue
 async function callAndWait(tokenObj, address, method, args) {
+  const callArgs = await governedCallArgs(tokenObj, {
+    contract: { address, name: 'AdminRegistry' },
+    method,
+    args,
+    txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
+  });
   const response = await rest.call(
     tokenObj,
-    {
-      contract: { address, name: 'AdminRegistry' },
-      method,
-      args,
-      txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
-    },
+    { ...callArgs, contract: { address, name: 'AdminRegistry' } },
     { config, cacheNonce: true, isAsync: true }
   );
   const responses = Array.isArray(response) ? response : [response];
@@ -142,8 +145,9 @@ async function main() {
       call.method,
       call.args
     );
+    const vote = getVoteResult(result);
     console.log(
-      `${call.method} ${call.args._func}: submitted successfully (${result.hash})`
+      `${call.method} ${call.args._func}: ${vote?.executed ? 'executed' : `vote recorded on issue ${vote?.value}`} (${result.hash})`
     );
   }
   console.log(

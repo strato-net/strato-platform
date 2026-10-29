@@ -1,6 +1,5 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/Savings/SaveUSDSTVault.sol";
 
@@ -11,7 +10,7 @@ contract User {
     }
 }
 
-contract Describe_SaveUSDSTVault is Authorizable {
+contract Describe_SaveUSDSTVault {
     uint public INFINITY = 2 ** 256 - 1;
     uint public MAX_RATE = 1000000021979553151239153027;
     uint public MONTH = 2592000;
@@ -21,7 +20,6 @@ contract Describe_SaveUSDSTVault is Authorizable {
     address USDST;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
     }
@@ -29,8 +27,9 @@ contract Describe_SaveUSDSTVault is Authorizable {
     function beforeEach() public {
         vault = new SaveUSDSTVault(address(this));
 
-        USDST = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        Token(USDST).setStatus(2);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        USDST = address(ret);
+        m.adminRegistry().castVoteOnIssue(USDST, "setStatus", 2);
 
         vault.initialize(USDST, "Save USDST", "saveUSDST");
     }
@@ -68,7 +67,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User attacker = new User();
         User victim = new User();
 
-        Token(USDST).mint(address(attacker), 10000e18 + 1);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(attacker), 10000e18 + 1);
         attacker.do(USDST, "approve", address(vault), INFINITY);
         attacker.do(address(vault), "deposit(uint256,address)", 1, address(attacker));
 
@@ -79,7 +78,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
         require(vault.totalAssets() == 1, "donation should not change managed assets");
         require(vault.totalSupply() == 1, "supply should remain unchanged");
 
-        Token(USDST).mint(address(victim), 1000e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(victim), 1000e18);
         victim.do(USDST, "approve", address(vault), INFINITY);
         victim.do(address(vault), "deposit(uint256,address)", 1000e18, address(victim));
 
@@ -91,13 +90,13 @@ contract Describe_SaveUSDSTVault is Authorizable {
     function it_increases_exchange_rate_when_rewards_are_notified() public {
         User saver = new User();
 
-        Token(USDST).mint(address(saver), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(saver), 100e18);
         saver.do(USDST, "approve", address(vault), INFINITY);
         saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
 
         require(vault.convertToAssets(100e18) == 100e18, "initial assets mismatch");
 
-        Token(USDST).mint(address(this), 20e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 20e18);
         recordRewardTransfer(20e18);
 
         require(vault.totalAssets() == 120e18, "reward should raise assets");
@@ -109,11 +108,11 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User saver = new User();
         User distributor = new User();
 
-        Token(USDST).mint(address(saver), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(saver), 100e18);
         saver.do(USDST, "approve", address(vault), INFINITY);
         saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
 
-        Token(USDST).mint(address(distributor), 25e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(distributor), 25e18);
         distributor.do(USDST, "approve", address(vault), INFINITY);
         configureFundedAccrual(distributor, MAX_RATE);
 
@@ -129,11 +128,11 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User saver = new User();
         User distributor = new User();
 
-        Token(USDST).mint(address(saver), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(saver), 100e18);
         saver.do(USDST, "approve", address(vault), INFINITY);
         saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
 
-        Token(USDST).mint(address(distributor), 1e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(distributor), 1e18);
         distributor.do(USDST, "approve", address(vault), INFINITY);
         configureFundedAccrual(distributor, MAX_RATE);
 
@@ -142,7 +141,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
         require(credited == 1e18, "should cap accrual by available funding");
         require(vault.totalAssets() == 101e18, "managed assets should only include funded amount");
 
-        Token(USDST).mint(address(distributor), 10e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(distributor), 10e18);
         distributor.do(USDST, "approve", address(vault), INFINITY);
         uint creditedAgain = vault.accrue();
 
@@ -155,11 +154,11 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User bob = new User();
         User distributor = new User();
 
-        Token(USDST).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(alice), 100e18);
         alice.do(USDST, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
-        Token(USDST).mint(address(distributor), 10e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(distributor), 10e18);
         distributor.do(USDST, "approve", address(vault), INFINITY);
         configureFundedAccrual(distributor, MAX_RATE);
 
@@ -167,7 +166,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
         (uint target, uint funded) = vault.pendingAccrual();
         require(target == funded && funded > 0, "expected funded pending accrual");
 
-        Token(USDST).mint(address(bob), 110e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(bob), 110e18);
         bob.do(USDST, "approve", address(vault), INFINITY);
         bob.do(address(vault), "deposit(uint256,address)", 110e18, address(bob));
 
@@ -181,11 +180,11 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User saver = new User();
         User distributor = new User();
 
-        Token(USDST).mint(address(saver), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(saver), 100e18);
         saver.do(USDST, "approve", address(vault), INFINITY);
         saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
 
-        Token(USDST).mint(address(distributor), 10e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(distributor), 10e18);
         distributor.do(USDST, "approve", address(vault), INFINITY);
         configureFundedAccrual(distributor, MAX_RATE);
 
@@ -215,7 +214,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
     }
 
     function it_reverts_reward_notification_when_no_shares_exist() public {
-        Token(USDST).mint(address(this), 20e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 20e18);
         Token(USDST).transfer(address(vault), 20e18);
 
         bool reverted = false;
@@ -231,11 +230,11 @@ contract Describe_SaveUSDSTVault is Authorizable {
     function it_allows_withdrawal_of_principal_plus_rewards() public {
         User saver = new User();
 
-        Token(USDST).mint(address(saver), 50e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(saver), 50e18);
         saver.do(USDST, "approve", address(vault), INFINITY);
         saver.do(address(vault), "deposit(uint256,address)", 50e18, address(saver));
 
-        Token(USDST).mint(address(this), 10e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 10e18);
         recordRewardTransfer(10e18);
 
         uint saverBalanceBefore = IERC20(USDST).balanceOf(address(saver));
@@ -250,12 +249,12 @@ contract Describe_SaveUSDSTVault is Authorizable {
     function it_reverts_reward_notification_after_vault_has_been_fully_redeemed() public {
         User saver = new User();
 
-        Token(USDST).mint(address(saver), 50e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(saver), 50e18);
         saver.do(USDST, "approve", address(vault), INFINITY);
         saver.do(address(vault), "deposit(uint256,address)", 50e18, address(saver));
         saver.do(address(vault), "redeem(uint256,address,address)", 50e18, address(saver), address(saver));
 
-        Token(USDST).mint(address(this), 10e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 10e18);
         Token(USDST).transfer(address(vault), 10e18);
 
         bool reverted = false;
@@ -273,15 +272,15 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User alice = new User();
         User bob = new User();
 
-        Token(USDST).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(alice), 100e18);
         alice.do(USDST, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
-        Token(USDST).mint(address(bob), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(bob), 100e18);
         bob.do(USDST, "approve", address(vault), INFINITY);
         bob.do(address(vault), "deposit(uint256,address)", 100e18, address(bob));
 
-        Token(USDST).mint(address(this), 20e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 20e18);
         recordRewardTransfer(20e18);
 
         // 220 managed, 200 shares. Each user has 100 shares = 110 USDST.
@@ -304,16 +303,16 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User bob = new User();
 
         // Alice deposits 100 at 1:1, gets 100 shares
-        Token(USDST).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(alice), 100e18);
         alice.do(USDST, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
         // Reward of 100 doubles the rate to 2:1
-        Token(USDST).mint(address(this), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 100e18);
         recordRewardTransfer(100e18);
 
         // Bob deposits 100 at 2:1, gets 50 shares
-        Token(USDST).mint(address(bob), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(bob), 100e18);
         bob.do(USDST, "approve", address(vault), INFINITY);
         bob.do(address(vault), "deposit(uint256,address)", 100e18, address(bob));
 
@@ -321,7 +320,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
         require(bobShares == 50e18, "bob should get 50 shares at 2:1 rate");
 
         // Another reward of 30. Total managed = 330, total shares = 150.
-        Token(USDST).mint(address(this), 30e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 30e18);
         recordRewardTransfer(30e18);
 
         // Alice: 100/150 * 330 = 220. Bob: 50/150 * 330 = 110.
@@ -343,19 +342,19 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User bob = new User();
         User charlie = new User();
 
-        Token(USDST).mint(address(alice), 50e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(alice), 50e18);
         alice.do(USDST, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 50e18, address(alice));
 
-        Token(USDST).mint(address(bob), 30e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(bob), 30e18);
         bob.do(USDST, "approve", address(vault), INFINITY);
         bob.do(address(vault), "deposit(uint256,address)", 30e18, address(bob));
 
-        Token(USDST).mint(address(charlie), 20e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(charlie), 20e18);
         charlie.do(USDST, "approve", address(vault), INFINITY);
         charlie.do(address(vault), "deposit(uint256,address)", 20e18, address(charlie));
 
-        Token(USDST).mint(address(this), 10e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 10e18);
         recordRewardTransfer(10e18);
 
         // Alice and bob withdraw. Charlie is last.
@@ -375,16 +374,16 @@ contract Describe_SaveUSDSTVault is Authorizable {
     function it_reverts_deposit_of_1_wei_when_rate_is_above_1() public {
         User alice = new User();
 
-        Token(USDST).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(alice), 100e18);
         alice.do(USDST, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
-        Token(USDST).mint(address(this), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 100e18);
         recordRewardTransfer(100e18);
 
         // Rate is now 2:1. Depositing 1 wei should yield 0 shares and revert.
         User dust = new User();
-        Token(USDST).mint(address(dust), 1);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(dust), 1);
         dust.do(USDST, "approve", address(vault), INFINITY);
 
         bool reverted = false;
@@ -398,12 +397,12 @@ contract Describe_SaveUSDSTVault is Authorizable {
     function it_recovers_stray_assets_without_affecting_accounting() public {
         User saver = new User();
 
-        Token(USDST).mint(address(saver), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(saver), 100e18);
         saver.do(USDST, "approve", address(vault), INFINITY);
         saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
 
         // Donate 500 USDST directly
-        Token(USDST).mint(address(this), 500e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 500e18);
         Token(USDST).transfer(address(vault), 500e18);
 
         require(vault.totalAssets() == 100e18, "managed assets unchanged by donation");
@@ -424,12 +423,12 @@ contract Describe_SaveUSDSTVault is Authorizable {
     function it_caps_max_withdraw_by_live_balance_when_balance_drops_below_managed_assets() public {
         User saver = new User();
 
-        Token(USDST).mint(address(saver), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(saver), 100e18);
         saver.do(USDST, "approve", address(vault), INFINITY);
         saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
 
         // Simulate unexpected live-balance loss while internal accounting stays unchanged.
-        Token(USDST).burn(address(vault), 40e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "burn", address(vault), 40e18);
 
         require(vault.totalAssets() == 100e18, "managed assets unchanged");
         require(IERC20(USDST).balanceOf(address(vault)) == 60e18, "live balance reduced");
@@ -440,15 +439,15 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User alice = new User();
         User bob = new User();
 
-        Token(USDST).mint(address(alice), 50e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(alice), 50e18);
         alice.do(USDST, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 50e18, address(alice));
 
-        Token(USDST).mint(address(bob), 50e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(bob), 50e18);
         bob.do(USDST, "approve", address(vault), INFINITY);
         bob.do(address(vault), "deposit(uint256,address)", 50e18, address(bob));
 
-        Token(USDST).burn(address(vault), 40e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "burn", address(vault), 40e18);
 
         require(vault.totalAssets() == 100e18, "managed assets unchanged after loss");
         require(IERC20(USDST).balanceOf(address(vault)) == 60e18, "live balance should reflect loss");
@@ -477,13 +476,13 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User incumbent = new User();
         User newcomer = new User();
 
-        Token(USDST).mint(address(incumbent), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(incumbent), 100e18);
         incumbent.do(USDST, "approve", address(vault), INFINITY);
         incumbent.do(address(vault), "deposit(uint256,address)", 100e18, address(incumbent));
 
-        Token(USDST).burn(address(vault), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "burn", address(vault), 100e18);
 
-        Token(USDST).mint(address(newcomer), 10e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(newcomer), 10e18);
         newcomer.do(USDST, "approve", address(vault), INFINITY);
 
         bool reverted = false;
@@ -509,7 +508,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
 
     function it_blocks_operations_when_paused() public {
         User saver = new User();
-        Token(USDST).mint(address(saver), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(saver), 100e18);
         saver.do(USDST, "approve", address(vault), INFINITY);
         saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
 
@@ -543,7 +542,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User owner = new User();
         User spender = new User();
 
-        Token(USDST).mint(address(owner), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(owner), 100e18);
         owner.do(USDST, "approve", address(vault), INFINITY);
         owner.do(address(vault), "deposit(uint256,address)", 100e18, address(owner));
 
@@ -564,12 +563,12 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User saver = new User();
         User distributor = new User();
 
-        Token(USDST).mint(address(saver), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(saver), 100e18);
         saver.do(USDST, "approve", address(vault), INFINITY);
         saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
 
         // Distributor holds plenty of balance but only approves 1 USDST.
-        Token(USDST).mint(address(distributor), 25e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(distributor), 25e18);
         distributor.do(USDST, "approve", address(vault), 1e18);
         configureFundedAccrual(distributor, MAX_RATE);
 
@@ -588,11 +587,11 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User saver = new User();
         User distributor = new User();
 
-        Token(USDST).mint(address(saver), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(saver), 100e18);
         saver.do(USDST, "approve", address(vault), INFINITY);
         saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
 
-        Token(USDST).mint(address(distributor), 25e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(distributor), 25e18);
         distributor.do(USDST, "approve", address(vault), INFINITY);
         configureFundedAccrual(distributor, MAX_RATE);
 
@@ -613,11 +612,11 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User saver = new User();
         User distributor = new User();
 
-        Token(USDST).mint(address(saver), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(saver), 100e18);
         saver.do(USDST, "approve", address(vault), INFINITY);
         saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
 
-        Token(USDST).mint(address(distributor), 25e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(distributor), 25e18);
         distributor.do(USDST, "approve", address(vault), INFINITY);
         configureFundedAccrual(distributor, MAX_RATE);
 
@@ -641,11 +640,11 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User saver = new User();
         User distributor = new User();
 
-        Token(USDST).mint(address(saver), 100e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(saver), 100e18);
         saver.do(USDST, "approve", address(vault), INFINITY);
         saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
 
-        Token(USDST).mint(address(distributor), 25e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(distributor), 25e18);
         distributor.do(USDST, "approve", address(vault), INFINITY);
         configureFundedAccrual(distributor, MAX_RATE);
 
@@ -669,7 +668,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
         amount = amount * 1e12;
 
         User u = new User();
-        Token(USDST).mint(address(u), amount);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(u), amount);
         u.do(USDST, "approve", address(vault), INFINITY);
         u.do(address(vault), "deposit(uint256,address)", amount, address(u));
 
@@ -694,15 +693,15 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User alice = new User();
         User bob = new User();
 
-        Token(USDST).mint(address(alice), amountA);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(alice), amountA);
         alice.do(USDST, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", amountA, address(alice));
 
-        Token(USDST).mint(address(bob), amountB);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(bob), amountB);
         bob.do(USDST, "approve", address(vault), INFINITY);
         bob.do(address(vault), "deposit(uint256,address)", amountB, address(bob));
 
-        Token(USDST).mint(address(this), reward);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), reward);
         recordRewardTransfer(reward);
 
         uint aliceShares = IERC20(address(vault)).balanceOf(address(alice));
@@ -732,17 +731,17 @@ contract Describe_SaveUSDSTVault is Authorizable {
         User u1 = new User();
         User u2 = new User();
 
-        Token(USDST).mint(address(u1), dep1);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(u1), dep1);
         u1.do(USDST, "approve", address(vault), INFINITY);
         u1.do(address(vault), "deposit(uint256,address)", dep1, address(u1));
         uint rate1 = vault.exchangeRate();
 
-        Token(USDST).mint(address(this), rew);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), rew);
         recordRewardTransfer(rew);
         uint rate2 = vault.exchangeRate();
         require(rate2 >= rate1, "rate must not decrease after reward");
 
-        Token(USDST).mint(address(u2), dep2);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(u2), dep2);
         u2.do(USDST, "approve", address(vault), INFINITY);
         u2.do(address(vault), "deposit(uint256,address)", dep2, address(u2));
         uint rate3 = vault.exchangeRate();
@@ -755,17 +754,17 @@ contract Describe_SaveUSDSTVault is Authorizable {
         uint rew = ((seedReward % 200000) + 1) * 1e12;
 
         User u = new User();
-        Token(USDST).mint(address(u), dep);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(u), dep);
         u.do(USDST, "approve", address(vault), INFINITY);
         u.do(address(vault), "deposit(uint256,address)", dep, address(u));
 
-        Token(USDST).mint(address(this), rew);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), rew);
         recordRewardTransfer(rew);
 
         uint liveBalanceBeforeBurn = IERC20(USDST).balanceOf(address(vault));
         uint burnAmt = seedBurn % (liveBalanceBeforeBurn + 1);
         if (burnAmt > 0) {
-            Token(USDST).burn(address(vault), burnAmt);
+            m.adminRegistry().castVoteOnIssue(USDST, "burn", address(vault), burnAmt);
         }
 
         uint maxW = vault.maxWithdraw(address(u));
@@ -777,7 +776,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
 
         // Needed because state persists across test runs
         if (burnAmt > 0) {
-            Token(USDST).mint(address(vault), burnAmt);
+            m.adminRegistry().castVoteOnIssue(USDST, "mint", address(vault), burnAmt);
         }
     }
 }

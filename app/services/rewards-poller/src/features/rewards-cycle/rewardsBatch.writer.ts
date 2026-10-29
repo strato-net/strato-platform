@@ -3,6 +3,19 @@ import { execute } from "../../infra/http/strato.client";
 import { retryWithBackoff } from "../../infra/http/retry.policy";
 import { NonEmptyArray, RewardsAction, BonusCredit, FunctionInput } from "../../shared/types";
 
+// A Rewards batch handler run through the AdminRegistry, which executes it at once for this
+// whitelisted poller. castVoteOnIssue's variadic args carry no ABI, so each is hinted with its type
+const rewardsCall = (method: string, typedArgs: [string, unknown[]][]): FunctionInput => ({
+  contractName: "AdminRegistry",
+  contractAddress: config.adminRegistry.address,
+  method: "castVoteOnIssue",
+  args: {
+    _target: config.rewards.address!,
+    _func: method,
+    _args: typedArgs.map(([type, value]) => ({ type, value })),
+  },
+});
+
 export const batchHandleAction = async (
   actions: NonEmptyArray<RewardsAction>
 ): Promise<void> => {
@@ -13,19 +26,14 @@ export const batchHandleAction = async (
   const blockNumbers = actions.map((action) => action.blockNumber);
   const eventIndexes = actions.map((action) => action.eventIndex);
 
-  const input: FunctionInput = {
-    contractName: "Rewards",
-    contractAddress: config.rewards.address!,
-    method: "batchHandleAction",
-    args: {
-      sourceContracts,
-      eventNames,
-      users,
-      amounts,
-      blockNumbers,
-      eventIndexes,
-    },
-  };
+  const input = rewardsCall("batchHandleAction", [
+    ["address[]", sourceContracts],
+    ["string[]", eventNames],
+    ["address[]", users],
+    ["uint256[]", amounts],
+    ["uint256[]", blockNumbers],
+    ["uint256[]", eventIndexes],
+  ]);
 
   await retryWithBackoff(
     () => execute(input),
@@ -36,20 +44,15 @@ export const batchHandleAction = async (
 export const batchHandleTransfer = async (
   actions: NonEmptyArray<RewardsAction>
 ): Promise<void> => {
-  const input: FunctionInput = {
-    contractName: "Rewards",
-    contractAddress: config.rewards.address!,
-    method: "batchHandleTransfer",
-    args: {
-      sourceContracts: actions.map((action) => action.sourceContract),
-      eventNames: actions.map((action) => action.eventName),
-      senders: actions.map((action) => action.user),
-      recipients: actions.map((action) => action.recipient),
-      amounts: actions.map((action) => action.amount),
-      blockNumbers: actions.map((action) => action.blockNumber),
-      eventIndexes: actions.map((action) => action.eventIndex),
-    },
-  };
+  const input = rewardsCall("batchHandleTransfer", [
+    ["address[]", actions.map((action) => action.sourceContract)],
+    ["string[]", actions.map((action) => action.eventName)],
+    ["address[]", actions.map((action) => action.user)],
+    ["address[]", actions.map((action) => action.recipient)],
+    ["uint256[]", actions.map((action) => action.amount)],
+    ["uint256[]", actions.map((action) => action.blockNumber)],
+    ["uint256[]", actions.map((action) => action.eventIndex)],
+  ]);
 
   await retryWithBackoff(
     () => execute(input),
@@ -67,12 +70,14 @@ export const batchAddBonus = async (
   const blockNumbers = credits.map((c) => c.blockNumber);
   const eventIndexes = credits.map((c) => c.eventIndex);
 
-  const input: FunctionInput = {
-    contractName: "Rewards",
-    contractAddress: config.rewards.address!,
-    method: "batchHandleAction",
-    args: { sourceContracts, eventNames, users, amounts, blockNumbers, eventIndexes },
-  };
+  const input = rewardsCall("batchHandleAction", [
+    ["address[]", sourceContracts],
+    ["string[]", eventNames],
+    ["address[]", users],
+    ["uint256[]", amounts],
+    ["uint256[]", blockNumbers],
+    ["uint256[]", eventIndexes],
+  ]);
 
   await execute(input);
 };

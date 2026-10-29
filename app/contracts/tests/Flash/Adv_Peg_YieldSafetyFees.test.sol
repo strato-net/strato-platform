@@ -8,7 +8,6 @@
 
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/YieldVault/YieldVault.sol";
 import "../../concrete/Lending/SafetyModule.sol";
@@ -138,7 +137,7 @@ contract YsRaider {
     }
 }
 
-contract Describe_Adv_Peg_YieldSafetyFees is Authorizable {
+contract Describe_Adv_Peg_YieldSafetyFees {
 
     uint public INFINITY = 2 ** 256 - 1;
     uint public WAD = 1e18;
@@ -160,29 +159,31 @@ contract Describe_Adv_Peg_YieldSafetyFees is Authorizable {
     User distributor;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata();
         areg = m.adminRegistry();
 
-        USDST = Token(m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18));
-        USDST.setStatus(2);
-        USDC = Token(m.tokenFactory().createToken("USDC","Strato USDC",[],[],[],"USDC",0,18));
-        USDC.setStatus(2);
-        sUSDST = Token(m.tokenFactory().createToken("sUSDST","Staked USDST",[],[],[],"sUSDST",0,18));
-        sUSDST.setStatus(2);
+        (bool executed, variadic ret) = areg.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",[],[],[],"USDST",0,18);
+        USDST = Token(address(ret));
+        areg.castVoteOnIssue(address(USDST), "setStatus", 2);
+        (executed, ret) = areg.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDC","Strato USDC",[],[],[],"USDC",0,18);
+        USDC = Token(address(ret));
+        areg.castVoteOnIssue(address(USDC), "setStatus", 2);
+        (executed, ret) = areg.castVoteOnIssue(address(m.tokenFactory()), "createToken", "sUSDST","Staked USDST",[],[],[],"sUSDST",0,18);
+        sUSDST = Token(address(ret));
+        areg.castVoteOnIssue(address(sUSDST), "setStatus", 2);
 
         // ── SafetyModule
         sm = new SafetyModule(address(this));
         sm.initialize(address(m.lendingRegistry()), address(m.tokenFactory()));
-        m.poolConfigurator().setBorrowableAsset(address(USDST));
-        m.poolConfigurator().setMToken(address(sUSDST));
+        areg.castVoteOnIssue(address(m.poolConfigurator()), "setBorrowableAsset", address(USDST));
+        areg.castVoteOnIssue(address(m.poolConfigurator()), "setMToken", address(sUSDST));
         sm.syncFromRegistry();
         sm.setTokens(address(sUSDST), address(USDST));
-        areg.addWhitelist(address(sUSDST), "mint", address(sm));
-        areg.addWhitelist(address(sUSDST), "burn", address(sm));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(sUSDST), "mint", address(sm));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(sUSDST), "burn", address(sm));
 
         staker = new User();
-        USDST.mint(address(staker), 500000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(staker), 500000e18);
         staker.do(address(USDST), "approve", address(sm), INFINITY);
         staker.do(address(sm), "stake", 500000e18, 0);
 
@@ -191,32 +192,32 @@ contract Describe_Adv_Peg_YieldSafetyFees is Authorizable {
         yv.initialize(address(USDST), "Yield USDST", "yUSDST");
         yv.initializeAccrual();
         distributor = new User();
-        USDST.mint(address(distributor), 50000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(distributor), 50000e18);
         distributor.do(address(USDST), "approve", address(yv), INFINITY);
         yv.setRewardDistributor(address(distributor));
         yv.setPerSecondSavingsRate(1000000001500000000000000000);
 
         lp = new User();
-        USDST.mint(address(lp), 1000000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(lp), 1000000e18);
         lp.do(address(USDST), "approve", address(yv), INFINITY);
         lp.do(address(yv), "deposit(uint256,address)", 1000000e18, address(lp));
 
         // ── PSM, to give a callback something supply-moving to do
         psm = new DirectMintPSM(address(this));
-        areg.addWhitelist(address(USDST), "mint", address(psm));
-        areg.addWhitelist(address(USDST), "burn", address(psm));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(USDST), "mint", address(psm));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(USDST), "burn", address(psm));
         psm.initialize(address(USDST), address(m.feeCollector()), [address(USDC)]);
         User whale = new User();
-        USDC.mint(address(whale), 101347e18);
+        areg.castVoteOnIssue(address(USDC), "mint", address(whale), 101347e18);
         whale.do(address(USDC), "approve", address(psm), INFINITY);
         whale.do(address(psm), "mint", 101347e18, address(USDC));
 
         // ── FlashMint
         fm = new FlashMint(address(areg));
-        areg.addWhitelist(address(USDST), "mint", address(fm));
-        areg.addWhitelist(address(USDST), "burn", address(fm));
-        fm.initialize(address(USDST), address(m.feeCollector()), MAXLOAN);
-        fm.setWhitelistEnabled(false);
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(USDST), "mint", address(fm));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(USDST), "burn", address(fm));
+        areg.castVoteOnIssue(address(fm), "initialize", address(USDST), address(m.feeCollector()), MAXLOAN);
+        areg.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
 
         log("── fixture ──");
         log("USDST totalSupply    = " + string(USDST.totalSupply() / WAD));
@@ -233,7 +234,7 @@ contract Describe_Adv_Peg_YieldSafetyFees is Authorizable {
     function _raider(uint bankroll) internal returns (YsRaider r) {
         r = new YsRaider();
         r.init(address(fm), address(yv), address(sm), address(psm), address(USDST), address(USDC));
-        if (bankroll > 0) USDST.mint(address(r), bankroll);
+        if (bankroll > 0) areg.castVoteOnIssue(address(USDST), "mint", address(r), bankroll);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -286,7 +287,7 @@ contract Describe_Adv_Peg_YieldSafetyFees is Authorizable {
 
         // (b) real-capital donation that survives: internal accounting must ignore it entirely
         User donor = new User();
-        USDST.mint(address(donor), MAXLOAN);
+        areg.castVoteOnIssue(address(USDST), "mint", address(donor), MAXLOAN);
         donor.do(address(USDST), "transfer", address(sm), MAXLOAN);
         log("after 2,000,000 REAL donation:");
         log("  SM live before/after = " + string(live0) + " / " + string(USDST.balanceOf(address(sm))));
@@ -323,7 +324,7 @@ contract Describe_Adv_Peg_YieldSafetyFees is Authorizable {
         //     Same donation into SaveUSDSTVault or SafetyModule is ignored (see s4 / y2).
         User donor = new User();
         uint donation = 500000e18;
-        USDST.mint(address(donor), donation);
+        areg.castVoteOnIssue(address(USDST), "mint", address(donor), donation);
         uint lpValue0 = yv.convertToAssets(IERC20(address(yv)).balanceOf(address(lp)));
         donor.do(address(USDST), "transfer", address(yv), donation);
 
@@ -341,7 +342,7 @@ contract Describe_Adv_Peg_YieldSafetyFees is Authorizable {
         // and the stale accrual base gets picked up by the next checkpointing call
         uint baseStale = yv.accrualBaseAssets();
         User poke = new User();
-        USDST.mint(address(poke), 1e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(poke), 1e18);
         poke.do(address(USDST), "approve", address(yv), INFINITY);
         poke.do(address(yv), "deposit(uint256,address)", 1e18, address(poke));
         log("  accrualBase after a 1e18 deposit checkpoint = " + string(yv.accrualBaseAssets()));
@@ -405,10 +406,10 @@ contract Describe_Adv_Peg_YieldSafetyFees is Authorizable {
         uint baseA = yv.accrualBaseAssets();
         (uint tA, uint fA) = yv.pendingAccrual();
         User donor = new User();
-        USDST.mint(address(donor), MAXLOAN);
+        areg.castVoteOnIssue(address(USDST), "mint", address(donor), MAXLOAN);
         donor.do(address(USDST), "transfer", address(yv), MAXLOAN);
         User poke = new User();
-        USDST.mint(address(poke), 1e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(poke), 1e18);
         poke.do(address(USDST), "approve", address(yv), INFINITY);
         poke.do(address(yv), "deposit(uint256,address)", 1e18, address(poke));   // forces a checkpoint
         fastForward(86400);
@@ -462,7 +463,7 @@ contract Describe_Adv_Peg_YieldSafetyFees is Authorizable {
     /// Fee is minted to the collector after burning amount+fee. Check neutrality under a
     /// callback that itself moves supply, and check feesAccrued bookkeeping.
     function it_y7_fee_routing_is_supply_neutral_and_accounted() public {
-        fm.setFeeBps(100);   // 1%
+        areg.castVoteOnIssue(address(fm), "setFeeBps", 100);   // 1%
         require(fm.feeBps() == 100, "fee set");
 
         YsRaider r = _raider(50000e18);
@@ -500,12 +501,12 @@ contract Describe_Adv_Peg_YieldSafetyFees is Authorizable {
         require(USDST.balanceOf(address(m.feeCollector())) - coll1 == fee3, "sequential loans each pay once");
         require(fm.feesAccrued() - acc1 == fee3, "feesAccrued exact");
 
-        fm.setFeeBps(0);
+        areg.castVoteOnIssue(address(fm), "setFeeBps", 0);
     }
 
     /// Fee rounding and the redirect surface.
     function it_y8_fee_rounding_and_redirect_surface() public {
-        fm.setFeeBps(100);
+        areg.castVoteOnIssue(address(fm), "setFeeBps", 100);
         log("── y8 fee rounding / redirect ──");
         log("largest fee-free loan      = 99 wei; loans to evade $1 of fee = " + string((1e18) / 99));
 
@@ -524,12 +525,12 @@ contract Describe_Adv_Peg_YieldSafetyFees is Authorizable {
         log("non-owner setFeeCollector  = " + err);
         require(fm.feeCollector() == address(m.feeCollector()), "collector unchanged");
 
-        fm.setFeeBps(0);
+        areg.castVoteOnIssue(address(fm), "setFeeBps", 0);
     }
 
     /// FeeCollector holds the fee as a plain balance: only the owner can move it.
     function it_y9_collected_fee_is_only_owner_withdrawable() public {
-        fm.setFeeBps(100);
+        areg.castVoteOnIssue(address(fm), "setFeeBps", 100);
         YsRaider r = _raider(50000e18);
         r.attack(8, 1000000e18);
         uint held = USDST.balanceOf(address(m.feeCollector()));
@@ -543,6 +544,6 @@ contract Describe_Adv_Peg_YieldSafetyFees is Authorizable {
         log("non-owner withdraw revert  = " + err);
         require(USDST.balanceOf(address(outsider)) == 0, "outsider got nothing");
         require(USDST.balanceOf(address(m.feeCollector())) == held, "collector balance intact");
-        fm.setFeeBps(0);
+        areg.castVoteOnIssue(address(fm), "setFeeBps", 0);
     }
 }

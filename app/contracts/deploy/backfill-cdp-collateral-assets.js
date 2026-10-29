@@ -21,6 +21,7 @@ require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
 const { rest, util } = require('blockapps-rest');
+const { getVoteResult, governedCallArgs } = require('./util');
 
 function printUsage() {
   console.error('Usage: node backfill-cdp-collateral-assets.js --engine-address <address> --assets <addr1,addr2,...>');
@@ -119,7 +120,7 @@ async function main() {
   const tokenObj = { token };
   console.log(`Authenticated as ${process.env.GLOBAL_ADMIN_NAME}\n`);
 
-  const callArgs = {
+  const callArgs = await governedCallArgs(tokenObj, {
     contract: { address: engineAddress, name: 'CDPEngine' },
     method: 'registerCollateralAssets',
     args: { assets },
@@ -127,11 +128,13 @@ async function main() {
       gasPrice: config.gasPrice,
       gasLimit: config.gasLimit,
     },
-  };
+  });
 
   const receipt = await callAsync(tokenObj, callArgs, { config, cacheNonce: true });
   console.log('====== Backfill Submitted ======');
   console.log(`Tx status: ${receipt.status}`);
+  const vote = getVoteResult(receipt);
+  console.log(vote?.executed ? 'Executed' : `Vote recorded on issue ${vote?.value}; verify once the issue executes`);
   console.log('Verify with (public RPC):');
   console.log(`  cast call 0x${engineAddress} "collateralAssetCount()(uint256)" --rpc-url ${process.env.NODE_URL}/rpc`);
   console.log(`  cast call 0x${engineAddress} "totalDebtAll()(uint256)" --rpc-url ${process.env.NODE_URL}/rpc`);

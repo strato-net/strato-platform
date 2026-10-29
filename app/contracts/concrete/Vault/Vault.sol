@@ -5,6 +5,7 @@ import "../../abstract/ERC20/utils/Pausable.sol";
 import "../Lending/PriceOracle.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
+import "../Admin/AdminRegistry.sol";
 
 /**
  * @title Vault
@@ -158,7 +159,7 @@ contract record Vault is Ownable, Pausable {
         require(success, "Vault: transfer failed");
 
         // Mint shares to depositor
-        Token(shareToken).mint(msg.sender, sharesMinted);
+        AdminRegistry(Ownable(shareToken).owner()).castVoteOnIssue(shareToken, "mint", msg.sender, sharesMinted);
 
         emit Deposited(msg.sender, assetIn, amountIn, sharesMinted, depositValueUSD);
 
@@ -226,7 +227,7 @@ contract record Vault is Ownable, Pausable {
         require(amountUSD <= withdrawableEquity, "Vault: insufficient withdrawable liquidity");
 
         // Burn shares first 
-        Token(shareToken).burn(msg.sender, sharesBurned);
+        AdminRegistry(Ownable(shareToken).owner()).castVoteOnIssue(shareToken, "burn", msg.sender, sharesBurned);
 
         // Calculate and transfer payouts
         _executeWithdrawalPayouts(amountUSD, withdrawableEquity, msg.sender);
@@ -260,7 +261,7 @@ contract record Vault is Ownable, Pausable {
         require(amountUSD <= withdrawableEquity, "Vault: insufficient withdrawable liquidity");
 
         // Burn shares first
-        Token(shareToken).burn(msg.sender, sharesToBurn);
+        AdminRegistry(Ownable(shareToken).owner()).castVoteOnIssue(shareToken, "burn", msg.sender, sharesToBurn);
 
         // Calculate and transfer payouts
         _executeWithdrawalPayouts(amountUSD, withdrawableEquity, msg.sender);
@@ -615,7 +616,7 @@ contract record Vault is Ownable, Pausable {
             }
 
             // Burn first, then pay out (mirrors withdrawShares ordering)
-            Token(shareToken).burn(holder, shares);
+            AdminRegistry(Ownable(shareToken).owner()).castVoteOnIssue(shareToken, "burn", holder, shares);
 
             if (amountUSD > 0) {
                 _executeWithdrawalPayouts(amountUSD, withdrawableEquity, holder);

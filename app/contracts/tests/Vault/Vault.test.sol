@@ -1,6 +1,5 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/Vault/Vault.sol";
 import "../../concrete/Vault/VaultFactory.sol";
@@ -32,7 +31,7 @@ contract User {
  *   - Multi-user scenarios
  *   - Edge cases and error conditions
  */
-contract Describe_Vault is Authorizable {
+contract Describe_Vault {
 
     // ============ STATE VARIABLES ============
 
@@ -63,7 +62,6 @@ contract Describe_Vault is Authorizable {
     // ============ SETUP ============
 
     function beforeAll() {
-        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
         emptyArray = new string[](0);
@@ -81,40 +79,45 @@ contract Describe_Vault is Authorizable {
     }
 
     function beforeEach() {
+        AdminRegistry adminRegistry = m.adminRegistry();
+
         // Create fresh tokens for each test
-        tokenA = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = adminRegistry.castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "ETHST", "Ethereum Staked Token", emptyArray, emptyArray, emptyArray, "ETHST", 0, 18
         );
-        tokenB = m.tokenFactory().createToken(
+        tokenA = address(ret);
+        (executed, ret) = adminRegistry.castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "WBTCST", "Wrapped Bitcoin Staked Token", emptyArray, emptyArray, emptyArray, "WBTCST", 0, 18
         );
-        tokenC = m.tokenFactory().createToken(
+        tokenB = address(ret);
+        (executed, ret) = adminRegistry.castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "GOLDST", "Gold Staked Token", emptyArray, emptyArray, emptyArray, "GOLDST", 0, 18
         );
+        tokenC = address(ret);
 
         // Activate tokens
-        Token(tokenA).setStatus(2); // ACTIVE
-        Token(tokenB).setStatus(2); // ACTIVE
-        Token(tokenC).setStatus(2); // ACTIVE
+        adminRegistry.castVoteOnIssue(tokenA, "setStatus", 2); // ACTIVE
+        adminRegistry.castVoteOnIssue(tokenB, "setStatus", 2); // ACTIVE
+        adminRegistry.castVoteOnIssue(tokenC, "setStatus", 2); // ACTIVE
 
         // Mint tokens to test contract and users
-        Token(tokenA).mint(address(this), 1000000e18);
-        Token(tokenB).mint(address(this), 1000000e18);
-        Token(tokenC).mint(address(this), 1000000e18);
+        adminRegistry.castVoteOnIssue(tokenA, "mint", address(this), 1000000e18);
+        adminRegistry.castVoteOnIssue(tokenB, "mint", address(this), 1000000e18);
+        adminRegistry.castVoteOnIssue(tokenC, "mint", address(this), 1000000e18);
 
-        Token(tokenA).mint(address(user1), 1000000e18);
-        Token(tokenB).mint(address(user1), 1000000e18);
-        Token(tokenC).mint(address(user1), 1000000e18);
+        adminRegistry.castVoteOnIssue(tokenA, "mint", address(user1), 1000000e18);
+        adminRegistry.castVoteOnIssue(tokenB, "mint", address(user1), 1000000e18);
+        adminRegistry.castVoteOnIssue(tokenC, "mint", address(user1), 1000000e18);
 
-        Token(tokenA).mint(address(user2), 1000000e18);
-        Token(tokenB).mint(address(user2), 1000000e18);
-        Token(tokenC).mint(address(user2), 1000000e18);
+        adminRegistry.castVoteOnIssue(tokenA, "mint", address(user2), 1000000e18);
+        adminRegistry.castVoteOnIssue(tokenB, "mint", address(user2), 1000000e18);
+        adminRegistry.castVoteOnIssue(tokenC, "mint", address(user2), 1000000e18);
 
         // Set oracle prices (18 decimals: 1e18 = $1)
         PriceOracle oracle = m.priceOracle();
-        oracle.setAssetPrice(tokenA, 2000e18);   // ETHST = $2,000
-        oracle.setAssetPrice(tokenB, 40000e18);  // WBTCST = $40,000
-        oracle.setAssetPrice(tokenC, 100e18);    // GOLDST = $100
+        adminRegistry.castVoteOnIssue(address(oracle), "setAssetPrice", tokenA, 2000e18);   // ETHST = $2,000
+        adminRegistry.castVoteOnIssue(address(oracle), "setAssetPrice", tokenB, 40000e18);  // WBTCST = $40,000
+        adminRegistry.castVoteOnIssue(address(oracle), "setAssetPrice", tokenC, 100e18);    // GOLDST = $100
 
         // Create VaultFactory
         address vaultFactoryImpl = address(new VaultFactory(address(this)));
@@ -127,7 +130,6 @@ contract Describe_Vault is Authorizable {
         );
 
         // Whitelist VaultFactory to create tokens
-        AdminRegistry adminRegistry = m.adminRegistry();
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(m.tokenFactory()), "createTokenWithInitialOwner", address(vaultFactory));
 
         // Create vault
@@ -135,11 +137,11 @@ contract Describe_Vault is Authorizable {
         vault = Vault(vaultAddress);
         shareTokenAddress = vault.shareToken();
 
-        // Transfer share token ownership to vault so it can mint/burn
-        // (VaultFactory transfers to factory owner, we need vault to own it)
-        Ownable(shareTokenAddress).transferOwnership(vaultAddress);
-        // adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(shareTokenAddress), "mint", address(vault));
-        // adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(shareTokenAddress), "burn", address(vault));
+        // Hand the share token to the registry and whitelist the vault to mint/burn it
+        // (VaultFactory transfers it to the factory owner, which is this test)
+        Ownable(shareTokenAddress).transferOwnership(address(adminRegistry));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", shareTokenAddress, "mint", vaultAddress);
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", shareTokenAddress, "burn", vaultAddress);
 
         // Add supported assets to vault
         vault.addSupportedAsset(tokenA);
@@ -270,11 +272,12 @@ contract Describe_Vault is Authorizable {
 
     function it_deposit_unsupported_asset_reverts() {
         // Create new token that is not supported
-        address unsupportedToken = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "UNSUP", "Unsupported Token", emptyArray, emptyArray, emptyArray, "UNSUP", 1000000e18, 18
         );
-        Token(unsupportedToken).setStatus(2);
-        m.priceOracle().setAssetPrice(unsupportedToken, 100e18);
+        address unsupportedToken = address(ret);
+        m.adminRegistry().castVoteOnIssue(unsupportedToken, "setStatus", 2);
+        m.adminRegistry().castVoteOnIssue(address(m.priceOracle()), "setAssetPrice", unsupportedToken, 100e18);
 
         require(ERC20(unsupportedToken).approve(vaultAddress, 500e18), "Approval failed");
 
@@ -545,10 +548,11 @@ contract Describe_Vault is Authorizable {
     // ============ ADMIN FUNCTION TESTS ============
 
     function it_owner_can_add_supported_asset() {
-        address newToken = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "NEWST", "New Token", emptyArray, emptyArray, emptyArray, "NEWST", 1000000e18, 18
         );
-        Token(newToken).setStatus(2);
+        address newToken = address(ret);
+        m.adminRegistry().castVoteOnIssue(newToken, "setStatus", 2);
 
         vault.addSupportedAsset(newToken);
 
@@ -701,7 +705,7 @@ contract Describe_Vault is Authorizable {
         require(navBefore == WAD, "Initial NAV should be $1");
 
         // Price increases to $4,000
-        m.priceOracle().setAssetPrice(tokenA, 4000e18);
+        m.adminRegistry().castVoteOnIssue(address(m.priceOracle()), "setAssetPrice", tokenA, 4000e18);
 
         // NAV should double: $100,000 / 50,000 shares = $2
         uint navAfter = vault.getNAVPerShare();
@@ -718,7 +722,7 @@ contract Describe_Vault is Authorizable {
         user1.do(vaultAddress, "deposit", tokenA, 25e18);
 
         // Price doubles to $4,000
-        m.priceOracle().setAssetPrice(tokenA, 4000e18);
+        m.adminRegistry().castVoteOnIssue(address(m.priceOracle()), "setAssetPrice", tokenA, 4000e18);
 
         // User2 deposits 25 ETHST at $4,000 = $100,000
         // Equity is now $100,000, should get 50,000 shares (100,000 * 50,000 / 100,000)
@@ -798,7 +802,7 @@ contract Describe_Vault is Authorizable {
 
     function it_owner_can_rescue_tokens() {
         // Accidentally send tokens directly to vault (not through deposit)
-        Token(tokenA).mint(vaultAddress, 100e18);
+        m.adminRegistry().castVoteOnIssue(tokenA, "mint", vaultAddress, 100e18);
 
         uint vaultBalance = IERC20(tokenA).balanceOf(vaultAddress);
         require(vaultBalance == 100e18, "Vault should have 100 ETHST");
@@ -865,10 +869,10 @@ contract Describe_Vault is Authorizable {
         vault.deposit(tokenA, 25e18);
 
         // Rapid price changes
-        m.priceOracle().setAssetPrice(tokenA, 3000e18);
-        m.priceOracle().setAssetPrice(tokenA, 1500e18);
-        m.priceOracle().setAssetPrice(tokenA, 2500e18);
-        m.priceOracle().setAssetPrice(tokenA, 2000e18);
+        m.adminRegistry().castVoteOnIssue(address(m.priceOracle()), "setAssetPrice", tokenA, 3000e18);
+        m.adminRegistry().castVoteOnIssue(address(m.priceOracle()), "setAssetPrice", tokenA, 1500e18);
+        m.adminRegistry().castVoteOnIssue(address(m.priceOracle()), "setAssetPrice", tokenA, 2500e18);
+        m.adminRegistry().castVoteOnIssue(address(m.priceOracle()), "setAssetPrice", tokenA, 2000e18);
 
         // State should still be consistent
         uint nav = vault.getNAVPerShare();

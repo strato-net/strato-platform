@@ -4,6 +4,7 @@ require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
 const { rest, util } = require('blockapps-rest');
+const { getVoteResult, governedCallArgs } = require('./util');
 (async () => {
   const [proxy, impl] = process.argv.slice(2);
   if (!proxy || !impl) throw new Error('usage: node vote-setlogic.js <proxy> <impl>');
@@ -11,12 +12,12 @@ const { rest, util } = require('blockapps-rest');
   const token = await auth.getUserToken(username, process.env.GLOBAL_ADMIN_PASSWORD);
   const tokenObj = { token };
   console.log('Authenticated as', username);
-  const resp = await rest.call(tokenObj, {
+  const resp = await rest.call(tokenObj, await governedCallArgs(tokenObj, {
     contract: { address: proxy, name: 'Proxy' },
     method: 'setLogicContract',
     args: { _logicContract: impl },
     txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
-  }, { config, isAsync: true, cacheNonce: true });
+  }), { config, isAsync: true, cacheNonce: true });
   const arr = Array.isArray(resp) ? resp : [resp];
   const hashes = arr.map(r => r && r.hash).filter(Boolean);
   if (!hashes.length) throw new Error('no tx hash: ' + JSON.stringify(resp));
@@ -25,6 +26,6 @@ const { rest, util } = require('blockapps-rest');
     opts => rest.getBlocResults(tokenObj, hashes, opts),
     { config, isAsync: true }, 180000);
   const final = Array.isArray(results) ? results[0] : results;
-  console.log('setLogicContract vote:', final && final.status);
+  console.log('setLogicContract vote:', final && final.status, final && getVoteResult(final));
   if (!final || final.status !== 'Success') process.exit(1);
 })().catch(e => { console.error('FAILED:', e.message); process.exit(1); });

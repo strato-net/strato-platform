@@ -1,6 +1,5 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 
 contract User {
@@ -38,7 +37,7 @@ contract NowAFunction {
     }
 }
 
-contract Describe_BadDebt_Basic is Authorizable {
+contract Describe_BadDebt_Basic {
 
     constructor() {
     }
@@ -55,7 +54,6 @@ contract Describe_BadDebt_Basic is Authorizable {
     }
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
 
@@ -64,7 +62,8 @@ contract Describe_BadDebt_Basic is Authorizable {
         require(address(user1) != address(0), "User1 address is 0");
         require(address(user2) != address(0), "User2 address is 0");
 
-        USDST = Token(m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18));
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        USDST = Token(address(ret));
         require(address(USDST) != address(0), "USDST address is 0");
     }
 
@@ -80,13 +79,13 @@ contract Describe_BadDebt_Basic is Authorizable {
         require(address(feeCollectorImpl) != address(0), "FeeCollector address is 0");
         FeeCollector feeCollector = FeeCollector(address(new Proxy(feeCollectorImpl, this)));
 
-        Token(USDST).mint(address(feeCollector), 100e18);
+        m.adminRegistry().castVoteOnIssue(address(USDST), "mint", address(feeCollector), 100e18);
         // Ensure the functions may be called through the proxy
         feeCollector.withdrawToken(address(USDST), address(user1), 100e18);
         require(ERC20(USDST).balanceOf(address(user1)) == 100e18, "User1 should have 100 USDST");
 
         // Cleanup
-        Token(USDST).burn(address(user1), 100e18);
+        m.adminRegistry().castVoteOnIssue(address(USDST), "burn", address(user1), 100e18);
         require(ERC20(USDST).balanceOf(address(user1)) == 0, "User1 should have 0 USDST");
     }
 
@@ -96,13 +95,13 @@ contract Describe_BadDebt_Basic is Authorizable {
         FeeCollector feeCollector = FeeCollector(address(new Proxy(feeCollectorImpl, this)));
         Ownable(feeCollector).transferOwnership(address(user1));
 
-        Token(USDST).mint(address(feeCollector), 100e18);
+        m.adminRegistry().castVoteOnIssue(address(USDST), "mint", address(feeCollector), 100e18);
         // Ensure that ownership was successfully transferred
         user1.do(address(feeCollector), "withdrawToken", address(USDST), address(user1), 100e18);
         require(ERC20(USDST).balanceOf(address(user1)) == 100e18, "User1 should have 100 USDST");
 
         // Cleanup
-        Token(USDST).burn(address(user1), 100e18);
+        m.adminRegistry().castVoteOnIssue(address(USDST), "burn", address(user1), 100e18);
         require(ERC20(USDST).balanceOf(address(user1)) == 0, "User1 should have 0 USDST");
     }
 
@@ -111,13 +110,13 @@ contract Describe_BadDebt_Basic is Authorizable {
         Ownable(feeCollector).transferOwnership(address(user1));
         require(Ownable(feeCollector).owner() == address(user1), "Owner is not user1");
 
-        Token(USDST).mint(address(feeCollector), 100e18);
+        m.adminRegistry().castVoteOnIssue(address(USDST), "mint", address(feeCollector), 100e18);
         // Ensure that ownership was successfully transferred
         user1.do(address(feeCollector), "withdrawToken", address(USDST), address(user1), 100e18);
         require(ERC20(USDST).balanceOf(address(user1)) == 100e18, "User1 should have 100 USDST");
 
         // Cleanup
-        Token(USDST).burn(address(user1), 100e18);
+        m.adminRegistry().castVoteOnIssue(address(USDST), "burn", address(user1), 100e18);
         require(ERC20(USDST).balanceOf(address(user1)) == 0, "User1 should have 0 USDST");
     }
 
@@ -129,13 +128,13 @@ contract Describe_BadDebt_Basic is Authorizable {
         try Ownable(feeCollector).transferOwnership(address(user2))
             { revert("Ownership transfer should fail"); } catch {}
 
-        Token(USDST).mint(address(feeCollector), 100e18);
+        m.adminRegistry().castVoteOnIssue(address(USDST), "mint", address(feeCollector), 100e18);
         try feeCollector.withdrawToken(address(USDST), address(user1), 100e18)
             { revert("Withdrawal should fail"); } catch {}
         require(ERC20(USDST).balanceOf(address(user1)) == 0, "User1 should have 0 USDST");
 
         // Cleanup
-        Token(USDST).burn(address(feeCollector), 100e18);
+        m.adminRegistry().castVoteOnIssue(address(USDST), "burn", address(feeCollector), 100e18);
         require(ERC20(USDST).balanceOf(address(feeCollector)) == 0, "FeeCollector should have 0 USDST");
     }
 
@@ -151,13 +150,8 @@ contract Describe_BadDebt_Basic is Authorizable {
     }
 
     function it_proxy_can_access_boolean_member_var() public {
-                // Test that admins array access should be possible for fresh AdminRegistry
-        AdminRegistry fresh_admin_registry = new AdminRegistry();
-        fresh_admin_registry.initialize([this]);
-        require(fresh_admin_registry.initialized(), "AdminRegistry should be initialized");
-
-        // Test that admins array access should be possible for fresh proxied AdminRegistry
-        AdminRegistry fresh_proxied_admin_registry = AdminRegistry(address(new Proxy(address(fresh_admin_registry), this)));
+                // Test that admins array access should be possible for fresh proxied AdminRegistry
+        AdminRegistry fresh_proxied_admin_registry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), this)));
         fresh_proxied_admin_registry.initialize([this]);
         require(fresh_proxied_admin_registry.initialized(), "AdminRegistry should be initialized");
 
@@ -166,13 +160,8 @@ contract Describe_BadDebt_Basic is Authorizable {
     }
 
     function it_proxy_can_access_admins_array() public {
-        // Test that admins array access should be possible for fresh AdminRegistry
-        AdminRegistry fresh_admin_registry = new AdminRegistry();
-        fresh_admin_registry.initialize([this]);
-        require(fresh_admin_registry.admins(0) == this, "First admin should be this");
-
         // Test that admins array access should be possible for fresh proxied AdminRegistry
-        AdminRegistry fresh_proxied_admin_registry = AdminRegistry(address(new Proxy(address(fresh_admin_registry), this)));
+        AdminRegistry fresh_proxied_admin_registry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), this)));
         fresh_proxied_admin_registry.initialize([this]);
         require(fresh_proxied_admin_registry.admins(0) == this, "First admin should be this");
 
@@ -188,7 +177,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         require(address(feeCollector) != address(feeCollectorImpl), "FeeCollector proxy address should not be the same as the implementation address");
         Ownable(feeCollector).transferOwnership(address(user1));
 
-        Token(USDST).mint(address(feeCollector), 200e18);
+        m.adminRegistry().castVoteOnIssue(address(USDST), "mint", address(feeCollector), 200e18);
         user1.do(address(feeCollector), "withdrawToken", address(USDST), address(user1), 100e18);
         require(ERC20(USDST).balanceOf(address(user1)) == 100e18, "User1 should have 100 USDST");
 
@@ -200,8 +189,8 @@ contract Describe_BadDebt_Basic is Authorizable {
             { revert("Old implementation functions should not be callable"); } catch {}
         require(ERC20(USDST).balanceOf(address(user1)) == 100e18, "User1 should not have gained any USDST");
 
-        // Can treat feeCollector as an AdminRegistry now
-        AdminRegistry(address(feeCollector)).initialize([this]);
+        // Can treat feeCollector as an AdminRegistry now (initialized by its owner)
+        user1.do(address(feeCollector), "initialize", [address(this)]);
 
         // Note: Succeeds so far, then fails for the same reason as the previous test
 
@@ -211,8 +200,8 @@ contract Describe_BadDebt_Basic is Authorizable {
         require(AdminRegistry(address(feeCollector)).admins(0) == this, "First admin should be this");
 
         // Cleanup
-        Token(USDST).burn(address(user1), 100e18);
-        Token(USDST).burn(address(feeCollector), 100e18);
+        m.adminRegistry().castVoteOnIssue(address(USDST), "burn", address(user1), 100e18);
+        m.adminRegistry().castVoteOnIssue(address(USDST), "burn", address(feeCollector), 100e18);
         require(ERC20(USDST).balanceOf(address(user1)) == 0, "User1 should have 0 USDST");
         require(ERC20(USDST).balanceOf(address(feeCollector)) == 0, "FeeCollector should have 0 USDST");
     }

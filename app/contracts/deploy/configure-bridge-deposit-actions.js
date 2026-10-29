@@ -119,15 +119,15 @@ function normalizeAddress(value, label) {
   return normalized;
 }
 
-async function callAndWait(tokenObj, address, args, config, rest, util) {
+async function callAndWait(tokenObj, address, args, config, rest, util, governedCallArgs) {
   const response = await rest.call(
     tokenObj,
-    {
+    await governedCallArgs(tokenObj, {
       contract: { address, name: "MercataBridge" },
       method: "setDepositAction",
       args,
       txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
-    },
+    }),
     { config, cacheNonce: true, isAsync: true },
   );
   const responses = Array.isArray(response) ? response : [response];
@@ -211,6 +211,7 @@ async function main() {
   const config = require("./config");
   const auth = require("./auth");
   const { rest, util } = require("blockapps-rest");
+  const { getVoteResult, governedCallArgs } = require("./util");
   const token = await auth.getUserToken(
     process.env.GLOBAL_ADMIN_NAME,
     process.env.GLOBAL_ADMIN_PASSWORD,
@@ -225,9 +226,11 @@ async function main() {
       config,
       rest,
       util,
+      governedCallArgs,
     );
+    const vote = getVoteResult(result);
     console.log(
-      `${call.symbol} ${call.actionName}: submitted successfully (${result.hash})`,
+      `${call.symbol} ${call.actionName}: ${vote?.executed ? "executed" : `vote recorded on issue ${vote?.value}`} (${result.hash})`,
     );
   }
 

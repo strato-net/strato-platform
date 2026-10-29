@@ -8,7 +8,8 @@
 //
 // Standalone harness: this file deliberately does NOT import BaseCodeCollection.sol. It wires the
 // CDP stack directly so the suite compiles on solid-vm-cli builds that predate the Staking V2 block
-// context. The test contract owns every component, so onlyOwner passes without an AdminRegistry.
+// context. The test contract owns every component, so onlyOwner passes without an AdminRegistry,
+// except USDST: CDPEngine mints/burns it through castVoteOnIssue on a local AdminRegistry.
 import "../../concrete/CDP/CDPEngine.sol";
 import "../../concrete/Tokens/TokenFactory.sol";
 import "../../concrete/Tokens/Token.sol";
@@ -64,7 +65,12 @@ contract Describe_CDPUnitScale {
         );
         Token(usdstAddress).setStatus(2); // ACTIVE
         Token(usdstAddress).mint(address(this), 1000000e18);
-        Ownable(usdstAddress).transferOwnership(address(cdpEngine)); // engine mints/burns USDST
+        AdminRegistry adminRegistry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
+        adminRegistry.initialize([address(this)]);
+        Ownable(address(adminRegistry)).transferOwnership(address(adminRegistry));
+        Ownable(usdstAddress).transferOwnership(address(adminRegistry));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", usdstAddress, "mint", address(cdpEngine));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", usdstAddress, "burn", address(cdpEngine));
 
         cdpRegistry.setAllComponents(
             address(cdpVault),

@@ -10,7 +10,6 @@
 
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/Metals/MetalForge.sol";
 import "../../concrete/Vault/Vault.sol";
@@ -111,7 +110,7 @@ contract ForgeRaider {
     }
 }
 
-contract Describe_Adv_Peg_ForgeVault is Authorizable {
+contract Describe_Adv_Peg_ForgeVault {
 
     uint public INFINITY = 2 ** 256 - 1;
     uint public WAD = 1e18;
@@ -134,17 +133,18 @@ contract Describe_Adv_Peg_ForgeVault is Authorizable {
     User botExecutor;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata();
         areg = m.adminRegistry();
         oracle = m.priceOracle();
 
-        USDST = Token(m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18));
-        USDST.setStatus(2);
-        GOLDST = Token(m.tokenFactory().createToken("GOLDST","Gold",[],[],[],"GOLDST",0,18));
-        GOLDST.setStatus(2);
-        oracle.setAssetPrice(address(USDST), 1e18);
-        oracle.setAssetPrice(address(GOLDST), GOLD_PX);
+        (bool executed, variadic ret) = areg.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",[],[],[],"USDST",0,18);
+        USDST = Token(address(ret));
+        areg.castVoteOnIssue(address(USDST), "setStatus", 2);
+        (executed, ret) = areg.castVoteOnIssue(address(m.tokenFactory()), "createToken", "GOLDST","Gold",[],[],[],"GOLDST",0,18);
+        GOLDST = Token(address(ret));
+        areg.castVoteOnIssue(address(GOLDST), "setStatus", 2);
+        areg.castVoteOnIssue(address(oracle), "setAssetPrice", address(USDST), 1e18);
+        areg.castVoteOnIssue(address(oracle), "setAssetPrice", address(GOLDST), GOLD_PX);
 
         // ── MetalForge
         treasurer = new User();
@@ -152,11 +152,11 @@ contract Describe_Adv_Peg_ForgeVault is Authorizable {
         forge.initialize(address(oracle), address(treasurer), address(m.feeCollector()), address(USDST));
         forge.setPayToken(address(USDST), true);
         forge.setMetalConfig(address(GOLDST), true, 1500e18, 200);   // VERIFIED live: 1,500e18 cap, 200 bps
-        areg.addWhitelist(address(GOLDST), "mint", address(forge));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(GOLDST), "mint", address(forge));
 
         desk = new MetalDesk();
         desk.init(address(GOLDST), address(USDST), GOLD_PX);
-        USDST.mint(address(desk), 1000000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(desk), 1000000e18);
 
         // ── bot Vault
         botExecutor = new User();
@@ -166,7 +166,9 @@ contract Describe_Adv_Peg_ForgeVault is Authorizable {
         areg.castVoteOnIssue(address(areg), "addWhitelist", address(m.tokenFactory()), "createTokenWithInitialOwner", address(vaultFactory));
         address va = vaultFactory.createVault("Bot Vault", "vBOT");
         bvault = Vault(va);
-        Ownable(bvault.shareToken()).transferOwnership(va);
+        Ownable(bvault.shareToken()).transferOwnership(address(areg));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", bvault.shareToken(), "mint", va);
+        areg.castVoteOnIssue(address(areg), "addWhitelist", bvault.shareToken(), "burn", va);
         bvault.addSupportedAsset(address(USDST));
         bvault.addSupportedAsset(address(GOLDST));
         botExecutor.do(address(USDST), "approve", va, INFINITY);
@@ -174,16 +176,16 @@ contract Describe_Adv_Peg_ForgeVault is Authorizable {
 
         // seed the bot vault above MIN_FIRST_DEPOSIT_USD
         User lp = new User();
-        USDST.mint(address(lp), 500000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(lp), 500000e18);
         lp.do(address(USDST), "approve", va, INFINITY);
         lp.do(va, "deposit", address(USDST), 500000e18);
 
         // ── FlashMint
         fm = new FlashMint(address(areg));
-        areg.addWhitelist(address(USDST), "mint", address(fm));
-        areg.addWhitelist(address(USDST), "burn", address(fm));
-        fm.initialize(address(USDST), address(m.feeCollector()), MAXLOAN);
-        fm.setWhitelistEnabled(false);
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(USDST), "mint", address(fm));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(USDST), "burn", address(fm));
+        areg.castVoteOnIssue(address(fm), "initialize", address(USDST), address(m.feeCollector()), MAXLOAN);
+        areg.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
 
         log("── fixture ──");
         log("USDST supply         = " + string(USDST.totalSupply() / WAD));
@@ -199,7 +201,7 @@ contract Describe_Adv_Peg_ForgeVault is Authorizable {
     function _raider(uint bankroll) internal returns (ForgeRaider r) {
         r = new ForgeRaider();
         r.init(address(fm), address(forge), address(desk), address(bvault), address(USDST), address(GOLDST));
-        if (bankroll > 0) USDST.mint(address(r), bankroll);
+        if (bankroll > 0) areg.castVoteOnIssue(address(USDST), "mint", address(r), bankroll);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -226,7 +228,7 @@ contract Describe_Adv_Peg_ForgeVault is Authorizable {
 
         // with real capital, prove the mint really is unbounded-depth / zero-slippage
         User buyer = new User();
-        USDST.mint(address(buyer), MAXLOAN);
+        areg.castVoteOnIssue(address(USDST), "mint", address(buyer), MAXLOAN);
         buyer.do(address(USDST), "approve", address(forge), INFINITY);
         buyer.do(address(forge), "mintMetal", address(GOLDST), address(USDST), MAXLOAN, 0);
         uint got = GOLDST.balanceOf(address(buyer));
@@ -268,7 +270,7 @@ contract Describe_Adv_Peg_ForgeVault is Authorizable {
         // Pin WHY the old number was wrong: an infinite-depth desk lets the notional scale to
         // maxLoan, which real pool depth never permits.
         desk.setBid((GOLD_PX * 110) / 100);
-        USDST.mint(address(desk), 5000000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(desk), 5000000e18);
         ForgeRaider r2 = _raider(0);
         r2.attack(2, MAXLOAN);
         log("IDEALISED desk, +10%, notional 2,000,000:");
@@ -295,7 +297,7 @@ contract Describe_Adv_Peg_ForgeVault is Authorizable {
 
         // fee rounds down: any payAmount below 10000/30 = 333 wei pays zero fee
         User u = new User();
-        USDST.mint(address(u), 1000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(u), 1000e18);
         u.do(address(USDST), "approve", address(forge), INFINITY);
         uint fc0 = USDST.balanceOf(address(m.feeCollector()));
         u.do(address(forge), "mintMetal", address(GOLDST), address(USDST), 333, 0);
@@ -338,7 +340,7 @@ contract Describe_Adv_Peg_ForgeVault is Authorizable {
 
         // real-capital donation: NAV moves immediately, no internal-accounting guard
         User donor = new User();
-        USDST.mint(address(donor), 250000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(donor), 250000e18);
         donor.do(address(USDST), "transfer", address(botExecutor), 250000e18);
         log("after a 250,000 REAL donation to the bot executor:");
         log("  equity before/after       = " + string(eq0) + " / " + string(bvault.getTotalEquity()));
@@ -362,7 +364,7 @@ contract Describe_Adv_Peg_ForgeVault is Authorizable {
         require(GOLDST.balanceOf(address(botExecutor)) < 100e18, "GOLDST is in deficit");
 
         User u = new User();
-        USDST.mint(address(u), 10000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(u), 10000e18);
         u.do(address(USDST), "approve", address(bvault), INFINITY);
         string err = "";
         try u.do(address(bvault), "deposit", address(USDST), 10000e18) { }
