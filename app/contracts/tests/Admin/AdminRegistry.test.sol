@@ -3,7 +3,6 @@ pragma solidity ^0.8.30;
 
 import "../../concrete/Admin/AdminRegistry.sol";
 import "../../abstract/ERC20/ERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
 contract TestERC20 is ERC20, Ownable {
@@ -26,7 +25,7 @@ contract User {
     }
 }
 
-contract Describe_AdminRegistry is Authorizable {
+contract Describe_AdminRegistry {
     AdminRegistry adminRegistry;
     TestERC20 token;
     User user1;
@@ -39,7 +38,6 @@ contract Describe_AdminRegistry is Authorizable {
     address zeroAddress;
 
     function beforeAll() {
-        bypassAuthorizations = true;
         admin1 = address(this);
         admin2 = address(0x2);
         admin3 = address(0x3);
@@ -528,6 +526,27 @@ contract Describe_AdminRegistry is Authorizable {
         }
 
         require(reverted, "Should revert when non-admin non-whitelisted user tries to create issue");
+    }
+
+    // Consents to any vote cast in this admin's name, as Authorizable used to
+    function isAuthorized(address _account) external returns (bool) {
+        return true;
+    }
+
+    function it_admin_registry_rejects_votes_cast_on_behalf_of_an_admin() {
+        // Scenario: A non-admin names a consenting admin (this contract) as the target.
+        // That used to be counted as the admin's vote; now it must pass the whitelist check.
+        require(!adminRegistry.isAdminAddress(address(user3)), "User3 should not be an admin");
+        require(adminRegistry.isAdminAddress(admin1), "admin1 should be an admin");
+
+        bool reverted = false;
+        try {
+            user3.do(address(adminRegistry), "castVoteOnIssue", admin1, "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "Should revert when a non-admin votes on behalf of an admin");
     }
 
     function it_cannot_execute_internal_functions() {

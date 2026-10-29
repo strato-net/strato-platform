@@ -1,6 +1,5 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 
 contract User {
@@ -10,7 +9,7 @@ contract User {
     }
 }
 
-contract Describe_BadDebt_Basic is Authorizable {
+contract Describe_BadDebt_Basic {
 
     struct LoanInfo {
         uint scaledDebt;     // user debt in index-scaled units
@@ -36,7 +35,6 @@ contract Describe_BadDebt_Basic is Authorizable {
     address SILVST;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
     }
@@ -70,18 +68,23 @@ contract Describe_BadDebt_Basic is Authorizable {
     // Test basic token creation functionality
     function it_ac_can_create_and_activate_tokens() public {
         // Create test token for borrowing
-        USDST = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        USDST = address(ret);
         require(address(USDST) != address(0), "Failed to create USDST token");
 
         // Create test tokens for lending
-        mUSDST = m.tokenFactory().createToken("mUSDST", "mUSDST Token", [], [], [], "mUSDST", 0, 18);
-        sUSDST = m.tokenFactory().createToken("sUSDST", "sUSDST Token", [], [], [], "msSDST", 0, 18);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "mUSDST", "mUSDST Token", [], [], [], "mUSDST", 0, 18);
+        mUSDST = address(ret);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "sUSDST", "sUSDST Token", [], [], [], "msSDST", 0, 18);
+        sUSDST = address(ret);
         require(address(mUSDST) != address(0), "Failed to create mUSDST token");
         require(address(sUSDST) != address(0), "Failed to create sUSDST token");
 
         // Create test tokens for collateral
-        GOLDST = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
-        SILVST= m.tokenFactory().createToken("SILVST", "SILVST Token", [], [], [], "SILVST", 0, 18);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
+        GOLDST = address(ret);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "SILVST", "SILVST Token", [], [], [], "SILVST", 0, 18);
+        SILVST= address(ret);
         require(address(GOLDST) != address(0), "Failed to create GOLDST token");
         require(address(SILVST) != address(0), "Failed to create SILVST token");
     }
@@ -89,11 +92,11 @@ contract Describe_BadDebt_Basic is Authorizable {
     // Test token activation functionality
     function it_ad_can_activate_tokens() public {
         // Set tokens to active status
-        Token(USDST).setStatus(2);
-        Token(mUSDST).setStatus(2);
-        Token(sUSDST).setStatus(2);
-        Token(GOLDST).setStatus(2);
-        Token(SILVST).setStatus(2);
+        m.adminRegistry().castVoteOnIssue(USDST, "setStatus", 2);
+        m.adminRegistry().castVoteOnIssue(mUSDST, "setStatus", 2);
+        m.adminRegistry().castVoteOnIssue(sUSDST, "setStatus", 2);
+        m.adminRegistry().castVoteOnIssue(GOLDST, "setStatus", 2);
+        m.adminRegistry().castVoteOnIssue(SILVST, "setStatus", 2);
 
         // Basic checks - tokens activated successfully
         require(Token(USDST).status() == TokenStatus.ACTIVE, "USDST token not activated");
@@ -106,14 +109,11 @@ contract Describe_BadDebt_Basic is Authorizable {
     function it_ae_can_whitelist_tokens() public {
         AdminRegistry adminRegistry = m.adminRegistry();
 
-        // Option A: Use castVoteOnIssue
+        // Whitelist through castVoteOnIssue (addWhitelist is owner-only)
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(mUSDST), "mint", address(m.liquidityPool()));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(mUSDST), "burn", address(m.liquidityPool()));
-
-        // Option B: Use addWhitelist directly, since it's external;
-        // this results in a castVoteOnIssue call via the onlyOwner modifier
-        adminRegistry.addWhitelist(address(sUSDST), "mint", address(m.safetyModule()));
-        adminRegistry.addWhitelist(address(sUSDST), "burn", address(m.safetyModule()));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(sUSDST), "mint", address(m.safetyModule()));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(sUSDST), "burn", address(m.safetyModule()));
     }
 
     // Test complete lending pool configuration with full setup
@@ -129,11 +129,11 @@ contract Describe_BadDebt_Basic is Authorizable {
         // === STEP 1: Configure borrowable asset and mToken ===
 
         // Set the borrowable asset (USD)
-        configurator.setBorrowableAsset(USDST);
+        m.adminRegistry().castVoteOnIssue(address(configurator), "setBorrowableAsset", USDST);
         require(pool.borrowableAsset() == USDST, "Borrowable asset not set correctly");
 
         // Set the corresponding mToken
-        configurator.setMToken(mUSDST);
+        m.adminRegistry().castVoteOnIssue(address(configurator), "setMToken", mUSDST);
         require(pool.mToken() == mUSDST, "mToken not set correctly");
 
         // === STEP 2: Set debt ceilings and safety parameters ===
@@ -142,8 +142,8 @@ contract Describe_BadDebt_Basic is Authorizable {
         uint debtCeilingUSD = 10000000e18;        // 10M USD value
         uint safetyShareBps = 1000;              // 10% to safety module
 
-        configurator.setDebtCeilings(debtCeilingAssetUnits, debtCeilingUSD);
-        configurator.setSafetyShareBps(safetyShareBps);
+        m.adminRegistry().castVoteOnIssue(address(configurator), "setDebtCeilings", debtCeilingAssetUnits, debtCeilingUSD);
+        m.adminRegistry().castVoteOnIssue(address(configurator), "setSafetyShareBps", safetyShareBps);
 
         // Verify debt ceiling configuration
         require(pool.debtCeilingAsset() == debtCeilingAssetUnits, "Asset debt ceiling not set");
@@ -159,7 +159,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         uint usdReserveFactor = 1000;     // 10%
         uint usdPerSecondFactorRAY = 1000000001547125956666413085; // plucked from smd
 
-        configurator.configureAsset(
+        m.adminRegistry().castVoteOnIssue(address(configurator), "configureAsset",
             USDST,
             usdLtv,
             usdLiquidationThreshold,
@@ -179,7 +179,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         uint goldReserveFactor = 0;       // No reserves for collateral
         uint goldPerSecondFactorRAY = 1e27; // No compounding for collateral
 
-        configurator.configureAsset(
+        m.adminRegistry().castVoteOnIssue(address(configurator), "configureAsset",
             GOLDST,
             goldLtv,
             goldLiquidationThreshold,
@@ -197,7 +197,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         uint silverReserveFactor = 0;     // No reserves for collateral
         uint silverPerSecondFactorRAY = 1e27; // No compounding for collateral
 
-        configurator.configureAsset(
+        m.adminRegistry().castVoteOnIssue(address(configurator), "configureAsset",
             SILVST,
             silverLtv,
             silverLiquidationThreshold,
@@ -280,9 +280,9 @@ contract Describe_BadDebt_Basic is Authorizable {
     function it_ai_can_set_oracle_prices() public {
         PriceOracle oracle = m.priceOracle();
 
-        oracle.setAssetPrice(USDST, 1e18);      // $1 USD
-        oracle.setAssetPrice(GOLDST, 2000e18);  // $2000 Gold
-        oracle.setAssetPrice(SILVST, 25e18);  // $25 Silver
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", USDST, 1e18);      // $1 USD
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", GOLDST, 2000e18);  // $2000 Gold
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", SILVST, 25e18);  // $25 Silver
 
         // Verify oracle prices
         require(oracle.getAssetPrice(USDST) == 1e18, "USD price not set correctly");
@@ -297,9 +297,9 @@ contract Describe_BadDebt_Basic is Authorizable {
     // Test token minting and burn operations
     function it_ak_can_mint_and_burn_tokens() public {
         // Test minting - simplified
-        Token(USDST).mint(address(this), 1000e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 1000e18);
         require(IERC20(USDST).balanceOf(address(this)) == 1000e18, "Should have 1000 USDST after mint");
-        Token(USDST).burn(address(this), 1000e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "burn", address(this), 1000e18);
         require(IERC20(USDST).balanceOf(address(this)) == 0, "Should have 0 USDST after burn");
     }
 
@@ -307,7 +307,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         user1 = new User();
         user2 = new User();
 
-        Token(USDST).mint(address(this), 1000e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 1000e18);
         IERC20(USDST).transfer(address(user1), 1000e18);
         require(IERC20(USDST).balanceOf(address(user1)) == 1000e18, "User1 should have 1000 USDST after receipt");
         user1.do(USDST, "transfer", address(user2), 1000e18);
@@ -316,7 +316,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         user2.do(USDST, "transfer", address(this), 1000e18);
         require(IERC20(USDST).balanceOf(address(user2)) == 0, "User2 should have 0 USDST after transfer out");
         require(IERC20(USDST).balanceOf(address(this)) == 1000e18, "Admin should have 1000 USDST after receipt");
-        Token(USDST).burn(address(this), 1000e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "burn", address(this), 1000e18);
     }
 
     function it_am_can_configure_safety_module() public {
@@ -325,14 +325,14 @@ contract Describe_BadDebt_Basic is Authorizable {
         uint cooldown = 1;
         uint window = 432000;
         uint maxSlashBps = 3000;
-        sm.setParams(cooldown, window, maxSlashBps);
+        m.adminRegistry().castVoteOnIssue(address(sm), "setParams", cooldown, window, maxSlashBps);
 
         require(sm.COOLDOWN_SECONDS() == cooldown, "Cooldown seconds not set correctly");
         require(sm.UNSTAKE_WINDOW() == window, "Unstake window not set correctly");
         require(sm.MAX_SLASH_BPS() == maxSlashBps, "Max slash BPS not set correctly");
 
-        sm.syncFromRegistry(); // important, took some debugging to determine where in the process to do this
-        sm.setTokens(sUSDST, USDST);
+        m.adminRegistry().castVoteOnIssue(address(sm), "syncFromRegistry"); // important, took some debugging to determine where in the process to do this
+        m.adminRegistry().castVoteOnIssue(address(sm), "setTokens", sUSDST, USDST);
 
         require(sm.asset() == USDST, "Asset not set correctly");
         require(sm.sToken() == sUSDST, "sToken not set correctly");
@@ -345,7 +345,7 @@ contract Describe_BadDebt_Basic is Authorizable {
     function it_an_can_accept_liquidity_deposits() public {
         LendingPool pool = m.lendingPool();
 
-        Token(USDST).mint(address(this), 1000000e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 1000000e18);
         require(IERC20(USDST).balanceOf(address(this)) == 1000000e18, "USDST balance should be 1000000e18 after mint");
 
         require(pool.getExchangeRate() == 1e18, "Exchange rate should be 1e18 initially");
@@ -362,7 +362,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         uint amount = 2000e18; // chosen to be big enough to cover the bad debt for the can_cover_bad_debt test
 
         // Mint USDST
-        Token(USDST).mint(address(this), amount);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), amount);
         require(IERC20(USDST).balanceOf(address(this)) == amount, "USDST balance should be 1000e18 after mint");
 
         // Stake USDST in SafetyModule
@@ -376,7 +376,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         CollateralVault cv = m.collateralVault();
         LendingPool pool = m.lendingPool();
 
-        Token(GOLDST).mint(address(user1), 1e18);
+        m.adminRegistry().castVoteOnIssue(GOLDST, "mint", address(user1), 1e18);
         require(IERC20(GOLDST).balanceOf(address(user1)) == 1e18, "GOLDST balance should be 1e18 after mint");
 
         user1.do(GOLDST, "approve", address(cv), 1e18);
@@ -404,7 +404,7 @@ contract Describe_BadDebt_Basic is Authorizable {
 
         uint newPrice = price / 2;
 
-        oracle.setAssetPrice(GOLDST, newPrice);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", GOLDST, newPrice);
 
         require(oracle.getAssetPrice(GOLDST) == newPrice, "GOLDST price should be 1000e18 after set price");
 
@@ -421,7 +421,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         uint prior_balance = IERC20(USDST).balanceOf(address(this)); // to help with cleanup
 
         // Liquidation requires USDST balance
-        Token(USDST).mint(address(this), 1000e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 1000e18);
         IERC20(USDST).approve(address(m.liquidityPool()), 1000e18);
 
         // Perform Liquidation
@@ -439,7 +439,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         require(loan.lastUpdated == 0, "User loan last updated should be zero after bad debt liquidation");
 
         // Cleanup; note that LiquidityPool approval is not cleaned
-        Token(USDST).burn(address(this), IERC20(USDST).balanceOf(address(this)) - prior_balance);
+        m.adminRegistry().castVoteOnIssue(USDST, "burn", address(this), IERC20(USDST).balanceOf(address(this)) - prior_balance);
     }
 
     function it_at_can_cover_bad_debt() public {
@@ -455,7 +455,7 @@ contract Describe_BadDebt_Basic is Authorizable {
             "Bad debt should be less than 1 cover from USDST balance of SM" // (for this test case)
         );
         log("at toCover: "+string(toCover));
-        sm.coverShortfall(toCover);
+        m.adminRegistry().castVoteOnIssue(address(sm), "coverShortfall", toCover);
         require(pool.badDebt() == 0, "Bad debt should be 0 after cover shortfall");
 
         log("at exchangeRate after: "+string(pool.getExchangeRate()));
@@ -475,7 +475,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         uint initialGoldBalance = IERC20(GOLDST).balanceOf(address(this));
 
         User user = new User();
-        Token(GOLDST).mint(address(user), 1e18);
+        m.adminRegistry().castVoteOnIssue(GOLDST, "mint", address(user), 1e18);
         user.do(GOLDST, "approve", address(cv), 1e18);
         user.do(address(pool), "supplyCollateral", GOLDST, 1e18);
         user.do(address(pool), "borrowMax");
@@ -483,18 +483,18 @@ contract Describe_BadDebt_Basic is Authorizable {
         uint amountBorrowed = pool.getUserDebt(address(user));
 
         // 90% fall in price of GOLDST
-        oracle.setAssetPrice(GOLDST, oracle.getAssetPrice(GOLDST) * 10/100);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", GOLDST, oracle.getAssetPrice(GOLDST) * 10/100);
 
         require(pool.getHealthFactor(address(user)) < 1e18, "Health factor should be less than 1e18 after price fall");
 
         // Liquidate
-        Token(USDST).mint(address(this), amountBorrowed); // enough to cover the debt
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), amountBorrowed); // enough to cover the debt
         IERC20(USDST).approve(address(m.liquidityPool()), INFINITY);
         pool.liquidationCallAll(GOLDST, address(user), 1);
 
         require(pool.badDebt() > 0, "Bad debt should be > 0 after liquidation");
 
-        configurator.writeOffBadDebtWithHaircut(pool.badDebt(), "Admin shouldn't actually do this before SM cover");
+        m.adminRegistry().castVoteOnIssue(address(configurator), "writeOffBadDebtWithHaircut", pool.badDebt(), "Admin shouldn't actually do this before SM cover");
         require(pool.badDebt() == 0, "Bad debt should be 0 after write off bad debt with haircut");
 
         require(pool.getExchangeRate() < 1e18, "Exchange rate should fall due to mUSDST haircut");

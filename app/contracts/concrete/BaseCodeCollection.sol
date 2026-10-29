@@ -1,5 +1,4 @@
 //ERC20
-import "../abstract/ERC20/access/Authorizable.sol";
 import "../abstract/ERC20/ERC20.sol";
 //import "ERC20/extensions/ERC20Burnable.sol";
 
@@ -79,7 +78,7 @@ import "./Pools/DirectMintPSM.sol";
 //Flash mint
 import "./Flash/FlashMint.sol";
 
-contract record Mercata is Authorizable {
+contract record Mercata {
     RateStrategy public rateStrategy;
     PriceOracle public priceOracle;
     CollateralVault public collateralVault;

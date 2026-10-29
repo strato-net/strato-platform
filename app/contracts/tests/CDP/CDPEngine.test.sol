@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 
 // User contract for multi-user testing
 contract User {
@@ -10,7 +9,7 @@ contract User {
     }
 }
 
-contract Describe_CDPEngine is Authorizable {
+contract Describe_CDPEngine {
     // Per‑vault state keyed by (user, asset)
     struct Vault {
         uint collateral; // raw token units
@@ -55,7 +54,6 @@ contract Describe_CDPEngine is Authorizable {
     }
 
     function beforeAll() {
-        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
         emptyArray = new string[](0);
@@ -73,7 +71,8 @@ contract Describe_CDPEngine is Authorizable {
 
         //  Create a mock USDST and set it in the registry
         // This replaces the hardcoded address with a working token
-        address mockUSDSTAddress = m.tokenFactory().createToken(
+        AdminRegistry adminRegistry = m.adminRegistry();
+        (bool executed, variadic ret) = adminRegistry.castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "USDST",
             "USD Stablecoin Token",
             emptyArray,
@@ -83,34 +82,34 @@ contract Describe_CDPEngine is Authorizable {
             1000000000e18,
             18
         );
+        address mockUSDSTAddress = address(ret);
         Token mockUSDST = Token(mockUSDSTAddress);
-        mockUSDST.setStatus(2); // ACTIVE
+        adminRegistry.castVoteOnIssue(address(mockUSDST), "setStatus", 2); // ACTIVE
 
         // Give ourselves some USDST for testing BEFORE transferring ownership
-        mockUSDST.mint(address(this), 1000000e18);
+        adminRegistry.castVoteOnIssue(address(mockUSDST), "mint", address(this), 1000000e18);
          // Mint USDST to users for liquidation testing
-        mockUSDST.mint(address(userA), 100000e18);
-        mockUSDST.mint(address(userB), 100000e18);
+        adminRegistry.castVoteOnIssue(address(mockUSDST), "mint", address(userA), 100000e18);
+        adminRegistry.castVoteOnIssue(address(mockUSDST), "mint", address(userB), 100000e18);
 
         // Grant CDPEngine mint and burn access to the mock USDST
-        AdminRegistry adminRegistry = m.adminRegistry();
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", mockUSDSTAddress, "mint", address(cdpEngine));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", mockUSDSTAddress, "burn", address(cdpEngine));
 
         // Update the registry to use our mock USDST instead of hardcoded address
-        cdpRegistry.setUSDST(mockUSDSTAddress);
+        adminRegistry.castVoteOnIssue(address(cdpRegistry), "setUSDST", mockUSDSTAddress);
 
         // Set up our test references
         usdst = mockUSDST;
         usdstAddress = mockUSDSTAddress;
 
         // Set up price oracle
-        priceOracle.setAssetPrice(usdstAddress, 1e18); // $1.00 in 18 decimals
+        adminRegistry.castVoteOnIssue(address(priceOracle), "setAssetPrice", usdstAddress, 1e18); // $1.00 in 18 decimals
     }
 
     function beforeEach() {
         // Create fresh collateral token for each test
-        collateralTokenAddress = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Collateral Token",
             "Test Collateral",
             emptyArray,
@@ -120,20 +119,21 @@ contract Describe_CDPEngine is Authorizable {
             10000000e18,
             18
         );
+        collateralTokenAddress = address(ret);
         collateralToken = Token(collateralTokenAddress);
 
         // Activate collateral token
-        collateralToken.setStatus(2); // ACTIVE
+        m.adminRegistry().castVoteOnIssue(address(collateralToken), "setStatus", 2); // ACTIVE
 
         // Mint collateral tokens to test contract and users
-        collateralToken.mint(address(this), 100000e18); // Plenty for all tests
-        collateralToken.mint(address(userA), 10000e18);
-        collateralToken.mint(address(userB), 10000e18);
+        m.adminRegistry().castVoteOnIssue(address(collateralToken), "mint", address(this), 100000e18); // Plenty for all tests
+        m.adminRegistry().castVoteOnIssue(address(collateralToken), "mint", address(userA), 10000e18);
+        m.adminRegistry().castVoteOnIssue(address(collateralToken), "mint", address(userB), 10000e18);
 
 
 
         // Configure collateral asset in CDP engine
-        cdpEngine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setCollateralAssetParams",
             collateralTokenAddress,
             LIQUIDATION_RATIO,
             160e16, // minCR = 1.6 WAD (160%) - must be >= liquidationRatio
@@ -147,7 +147,7 @@ contract Describe_CDPEngine is Authorizable {
 
         // CRITICAL: Set price for collateral token in the price oracle
         // Without this, CDPEngine will fail with "Price not available"
-        priceOracle.setAssetPrice(collateralTokenAddress, 5e18); // $5.00 per token (18 decimals)
+        m.adminRegistry().castVoteOnIssue(address(priceOracle), "setAssetPrice", collateralTokenAddress, 5e18); // $5.00 per token (18 decimals)
     }
 
     // ============ BASIC SETUP TESTS ============
@@ -689,7 +689,7 @@ contract Describe_CDPEngine is Authorizable {
         cdpEngine.deposit(collateralTokenAddress, depositAmount); // Should work
 
         // Pause the asset
-        cdpEngine.setPaused(collateralTokenAddress, true);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setPaused", collateralTokenAddress, true);
 
         // Verify that paused operations are blocked
         bool depositReverted = false;
@@ -709,7 +709,7 @@ contract Describe_CDPEngine is Authorizable {
         require(mintReverted, "Mint should be blocked when asset is paused");
 
         // Unpause and verify operations work again
-        cdpEngine.setPaused(collateralTokenAddress, false);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setPaused", collateralTokenAddress, false);
         require(
             ERC20(collateralTokenAddress).approve(address(cdpVault), 100e18),
             "Additional collateral approval failed"
@@ -719,13 +719,13 @@ contract Describe_CDPEngine is Authorizable {
 
     function it_cdp_engine_can_pause_globally() {
         // Pause globally
-        cdpEngine.setPausedGlobal(true);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setPausedGlobal", true);
 
         // Check global pause
         require(cdpEngine.globalPaused(), "Engine should be globally paused");
 
         // Unpause for other tests
-        cdpEngine.setPausedGlobal(false);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setPausedGlobal", false);
         require(!cdpEngine.globalPaused(), "Engine should be unpaused");
     }
 
@@ -741,7 +741,7 @@ contract Describe_CDPEngine is Authorizable {
         cdpEngine.deposit(collateralTokenAddress, initialDeposit);
 
         // Disable support for the asset
-        cdpEngine.setSupportedAsset(collateralTokenAddress, false);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setSupportedAsset", collateralTokenAddress, false);
 
         // Deposit should revert when unsupported
         bool depositReverted = false;
@@ -762,7 +762,7 @@ contract Describe_CDPEngine is Authorizable {
         require(mintReverted, "Mint should be blocked when asset unsupported");
 
         // Re-enable support and verify deposit works again
-        cdpEngine.setSupportedAsset(collateralTokenAddress, true);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setSupportedAsset", collateralTokenAddress, true);
         require(
             ERC20(collateralTokenAddress).approve(address(cdpVault), 1e18),
             "Re-enable: collateral approval failed"
@@ -782,7 +782,7 @@ contract Describe_CDPEngine is Authorizable {
         cdpEngine.mint(collateralTokenAddress, mintAmount);
 
         // Disable support for the asset
-        cdpEngine.setSupportedAsset(collateralTokenAddress, false);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setSupportedAsset", collateralTokenAddress, false);
 
         // Withdraw should revert when unsupported
         bool withdrawReverted = false;
@@ -807,7 +807,7 @@ contract Describe_CDPEngine is Authorizable {
         require(repayReverted, "Repay should be blocked when asset unsupported");
 
         // Re-enable support; operations should succeed again
-        cdpEngine.setSupportedAsset(collateralTokenAddress, true);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setSupportedAsset", collateralTokenAddress, true);
         require(
             ERC20(usdstAddress).approve(address(cdpEngine), 1e18),
             "USDST re-approval failed"
@@ -826,7 +826,7 @@ contract Describe_CDPEngine is Authorizable {
         cdpEngine.deposit(collateralTokenAddress, depositAmount);
 
         // Disable support
-        cdpEngine.setSupportedAsset(collateralTokenAddress, false);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setSupportedAsset", collateralTokenAddress, false);
 
         // mintMax should revert when unsupported
         bool mintMaxReverted = false;
@@ -838,7 +838,7 @@ contract Describe_CDPEngine is Authorizable {
         require(mintMaxReverted, "mintMax should be blocked when asset unsupported");
 
         // Re-enable and verify mintMax works
-        cdpEngine.setSupportedAsset(collateralTokenAddress, true);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setSupportedAsset", collateralTokenAddress, true);
         uint256 minted = cdpEngine.mintMax(collateralTokenAddress);
         require(minted > 0, "mintMax should succeed when re-enabled");
     }
@@ -853,7 +853,7 @@ contract Describe_CDPEngine is Authorizable {
         cdpEngine.deposit(collateralTokenAddress, depositAmount);
 
         // Disable support
-        cdpEngine.setSupportedAsset(collateralTokenAddress, false);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setSupportedAsset", collateralTokenAddress, false);
 
         // withdrawMax should revert when unsupported
         bool withdrawMaxReverted = false;
@@ -865,7 +865,7 @@ contract Describe_CDPEngine is Authorizable {
         require(withdrawMaxReverted, "withdrawMax should be blocked when asset unsupported");
 
         // Re-enable and verify withdrawMax returns full deposit (no debt case)
-        cdpEngine.setSupportedAsset(collateralTokenAddress, true);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setSupportedAsset", collateralTokenAddress, true);
         uint256 withdrawn = cdpEngine.withdrawMax(collateralTokenAddress);
         require(withdrawn == depositAmount, "withdrawMax should withdraw all when re-enabled and no debt");
     }
@@ -882,7 +882,7 @@ contract Describe_CDPEngine is Authorizable {
         cdpEngine.mint(collateralTokenAddress, mintAmount);
 
         // Disable support
-        cdpEngine.setSupportedAsset(collateralTokenAddress, false);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setSupportedAsset", collateralTokenAddress, false);
 
         // repayAll should revert when unsupported
         bool repayAllReverted = false;
@@ -894,7 +894,7 @@ contract Describe_CDPEngine is Authorizable {
         require(repayAllReverted, "repayAll should be blocked when asset unsupported");
 
         // Re-enable and verify repayAll works
-        cdpEngine.setSupportedAsset(collateralTokenAddress, true);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setSupportedAsset", collateralTokenAddress, true);
         require(
             ERC20(usdstAddress).approve(address(cdpEngine), mintAmount + 100e18),
             "USDST approval failed"
@@ -915,10 +915,10 @@ contract Describe_CDPEngine is Authorizable {
         // Make the position unsafe
         uint256 currentPrice = priceOracle.getAssetPrice(collateralTokenAddress);
         uint256 newPrice = (currentPrice * 3) / 10; // drop to $1.5 (70% drop)
-        priceOracle.setAssetPrice(collateralTokenAddress, newPrice);
+        m.adminRegistry().castVoteOnIssue(address(priceOracle), "setAssetPrice", collateralTokenAddress, newPrice);
 
         // Disable support
-        cdpEngine.setSupportedAsset(collateralTokenAddress, false);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setSupportedAsset", collateralTokenAddress, false);
 
         // Liquidation should revert when unsupported
         bool liquidationReverted = false;
@@ -930,7 +930,7 @@ contract Describe_CDPEngine is Authorizable {
         require(liquidationReverted, "Liquidate should be blocked when asset unsupported");
 
         // Re-enable and verify liquidation proceeds
-        cdpEngine.setSupportedAsset(collateralTokenAddress, true);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setSupportedAsset", collateralTokenAddress, true);
         ( , uint256 debtBefore) = cdpEngine.vaults(address(userB), collateralTokenAddress);
         userA.do(address(cdpEngine), "liquidate", collateralTokenAddress, address(userB), 1000e18);
         ( , uint256 debtAfter) = cdpEngine.vaults(address(userB), collateralTokenAddress);
@@ -948,10 +948,10 @@ contract Describe_CDPEngine is Authorizable {
         require(reverted, "Non-owner should not be able to setSupportedAsset");
 
         // Owner can call successfully
-        cdpEngine.setSupportedAsset(collateralTokenAddress, false);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setSupportedAsset", collateralTokenAddress, false);
         require(!cdpEngine.isSupportedAsset(collateralTokenAddress), "Owner call should succeed");
         // Re-enable for cleanliness
-        cdpEngine.setSupportedAsset(collateralTokenAddress, true);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setSupportedAsset", collateralTokenAddress, true);
         require(cdpEngine.isSupportedAsset(collateralTokenAddress), "Asset should be re-enabled");
     }
 
@@ -976,7 +976,7 @@ contract Describe_CDPEngine is Authorizable {
         // Price crash: Drop collateral price from $5 to $1.5 (70% drop)
         uint256 currentPrice = priceOracle.getAssetPrice(collateralTokenAddress);
         uint256 newPrice = currentPrice * 7 / 10;
-        priceOracle.setAssetPrice(collateralTokenAddress, newPrice);
+        m.adminRegistry().castVoteOnIssue(address(priceOracle), "setAssetPrice", collateralTokenAddress, newPrice);
 
         // Verify position is now unsafe
         uint256 newCR = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress);
@@ -1043,7 +1043,7 @@ contract Describe_CDPEngine is Authorizable {
         // SEVERE Price crash: Drop collateral price from $5 to $1 (80% drop)
         uint256 currentPrice = priceOracle.getAssetPrice(collateralTokenAddress);
         uint256 severelyLowPrice = currentPrice / 5;
-        priceOracle.setAssetPrice(collateralTokenAddress, severelyLowPrice);
+        m.adminRegistry().castVoteOnIssue(address(priceOracle), "setAssetPrice", collateralTokenAddress, severelyLowPrice);
 
 
         // Verify position is severely underwater
@@ -1300,7 +1300,7 @@ contract Describe_CDPEngine is Authorizable {
 
         // Simulate collateral price doubling from $5 to $10
         uint256 newPrice = currentPrice * princeIncreaseMultiplier;
-        priceOracle.setAssetPrice(collateralTokenAddress, newPrice);
+        m.adminRegistry().castVoteOnIssue(address(priceOracle), "setAssetPrice", collateralTokenAddress, newPrice);
 
         uint256 crAfterPriceIncrease = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
         require(
@@ -1721,7 +1721,7 @@ contract Describe_CDPEngine is Authorizable {
 
         // Update collateral oracle price after time advancement.
         // Avoid touching USDST oracle state here due to SolidVM oracleState index instability.
-        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
+        m.adminRegistry().castVoteOnIssue(address(priceOracle), "setAssetPrice", collateralTokenAddress, 5e18);
 
         // Set up collateral and mint debt
         uint256 collateralAmount = 1000e18;
@@ -1752,7 +1752,7 @@ contract Describe_CDPEngine is Authorizable {
 
         // Update collateral oracle price after time advancement.
         // Avoid touching USDST oracle state here due to SolidVM oracleState index instability.
-        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
+        m.adminRegistry().castVoteOnIssue(address(priceOracle), "setAssetPrice", collateralTokenAddress, 5e18);
 
         // log("Time before fastForward", timestampBefore);
         // log("Time after fastForward", timestampAfter);
@@ -1845,8 +1845,8 @@ contract Describe_CDPEngine is Authorizable {
         fastForward(1);
 
         // Update oracle prices after time advancement to prevent staleness
-        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
-        priceOracle.setAssetPrice(usdstAddress, 1e18);
+        m.adminRegistry().castVoteOnIssue(address(priceOracle), "setAssetPrice", collateralTokenAddress, 5e18);
+        m.adminRegistry().castVoteOnIssue(address(priceOracle), "setAssetPrice", usdstAddress, 1e18);
 
         // Set up position
         uint256 collateralAmount = 1000e18;
@@ -1865,8 +1865,8 @@ contract Describe_CDPEngine is Authorizable {
         fastForward(thirtyDays);
 
         // Update oracle prices after time advancement to prevent staleness
-        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
-        priceOracle.setAssetPrice(usdstAddress, 1e18);
+        m.adminRegistry().castVoteOnIssue(address(priceOracle), "setAssetPrice", collateralTokenAddress, 5e18);
+        m.adminRegistry().castVoteOnIssue(address(priceOracle), "setAssetPrice", usdstAddress, 1e18);
 
         // Trigger accrual with a small mint
         cdpEngine.mint(collateralTokenAddress, 1);
@@ -1911,7 +1911,7 @@ contract Describe_CDPEngine is Authorizable {
         // Reconfigure with an intentionally simple per-second factor:
         // stabilityFeeRate = 2.0 RAY so each second doubles rateAccumulator.
         // This makes hand calculations exact and easy to verify.
-        cdpEngine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setCollateralAssetParams",
             collateralTokenAddress,
             LIQUIDATION_RATIO,
             160e16,
@@ -1922,7 +1922,7 @@ contract Describe_CDPEngine is Authorizable {
             DEBT_CEILING,
             false
         );
-        cdpEngine.setFeeToReserveBps(2500); // 25% reserve, 75% collector
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setFeeToReserveBps", 2500); // 25% reserve, 75% collector
 
         // Open position: scaledDebt = 100e18 because initial rateAccumulator = 1.0 RAY
         _openPositionForStabilityFeeMath(2000e18, 100e18);
@@ -1974,7 +1974,7 @@ contract Describe_CDPEngine is Authorizable {
 
     function it_stability_fee_manual_example_repay_rounding_after_accrual() {
         // Same simple factor for deterministic hand math.
-        cdpEngine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setCollateralAssetParams",
             collateralTokenAddress,
             LIQUIDATION_RATIO,
             160e16,
@@ -2023,7 +2023,7 @@ contract Describe_CDPEngine is Authorizable {
     function it_stability_fee_2pct_one_year_on_100_routes_2_to_fee_collector() {
         // Configure a simple 2% APR scenario and route all fees to FeeCollector.
         uint256 twoPctPerYear = RAY + ((RAY * 2) / 100 / 31536000);
-        cdpEngine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setCollateralAssetParams",
             collateralTokenAddress,
             LIQUIDATION_RATIO,
             160e16,
@@ -2034,7 +2034,7 @@ contract Describe_CDPEngine is Authorizable {
             DEBT_CEILING,
             false
         );
-        cdpEngine.setFeeToReserveBps(0);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setFeeToReserveBps", 0);
 
         _openPositionForStabilityFeeMath(2000e18, 100e18);
 
@@ -2065,7 +2065,7 @@ contract Describe_CDPEngine is Authorizable {
         // t0 + 12 months: accrue again
         // Expected whole-fee check: ~3 USDST total routed to collector.
         uint256 twoPctPerYear = RAY + ((RAY * 2) / 100 / 31536000);
-        cdpEngine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setCollateralAssetParams",
             collateralTokenAddress,
             LIQUIDATION_RATIO,
             160e16,
@@ -2076,7 +2076,7 @@ contract Describe_CDPEngine is Authorizable {
             DEBT_CEILING,
             false
         );
-        cdpEngine.setFeeToReserveBps(0);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setFeeToReserveBps", 0);
 
         _openPositionForStabilityFeeMath(3000e18, 100e18);
 
@@ -2114,7 +2114,7 @@ contract Describe_CDPEngine is Authorizable {
         // 3) At t0 + 12 months, trigger accrual #2
         // Assert FeeCollector balance increments exactly by feeUSD each accrual call.
         uint256 twoPctPerYear = RAY + ((RAY * 2) / 100 / 31536000);
-        cdpEngine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setCollateralAssetParams",
             collateralTokenAddress,
             LIQUIDATION_RATIO,
             160e16,
@@ -2125,7 +2125,7 @@ contract Describe_CDPEngine is Authorizable {
             DEBT_CEILING,
             false
         );
-        cdpEngine.setFeeToReserveBps(0); // 100% to FeeCollector for direct assertions
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setFeeToReserveBps", 0); // 100% to FeeCollector for direct assertions
 
         _openPositionForStabilityFeeMath(2000e18, 100e18);
 
@@ -2188,7 +2188,7 @@ contract Describe_CDPEngine is Authorizable {
     function it_stability_fee_ugly_numbers_single_accrue_exact_split() {
         // Stress rounding with ugly principal + ugly dt + uneven split.
         uint256 sevenPctPerYear = RAY + ((RAY * 7) / 100 / 31536000);
-        cdpEngine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setCollateralAssetParams",
             collateralTokenAddress,
             LIQUIDATION_RATIO,
             160e16,
@@ -2199,7 +2199,7 @@ contract Describe_CDPEngine is Authorizable {
             DEBT_CEILING,
             false
         );
-        cdpEngine.setFeeToReserveBps(3333); // intentionally uneven split
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setFeeToReserveBps", 3333); // intentionally uneven split
 
         uint256 uglyMint = 1234567891234567890123; // 1234.567891234567890123
         _openPositionForStabilityFeeMath(2000e18, uglyMint);
@@ -2238,7 +2238,7 @@ contract Describe_CDPEngine is Authorizable {
     function it_stability_fee_ugly_numbers_mid_repay_rounding_and_second_accrue() {
         // Stress odd repayment amount and verify exact burn + per-accrual fee routing.
         uint256 threePctPerYear = RAY + ((RAY * 3) / 100 / 31536000);
-        cdpEngine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setCollateralAssetParams",
             collateralTokenAddress,
             LIQUIDATION_RATIO,
             160e16,
@@ -2249,7 +2249,7 @@ contract Describe_CDPEngine is Authorizable {
             DEBT_CEILING,
             false
         );
-        cdpEngine.setFeeToReserveBps(0); // all fees to collector for simpler assertions
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setFeeToReserveBps", 0); // all fees to collector for simpler assertions
 
         uint256 uglyMint = 987654321987654321000; // 987.654321987654321
         _openPositionForStabilityFeeMath(2000e18, uglyMint);
@@ -2314,7 +2314,7 @@ contract Describe_CDPEngine is Authorizable {
     function it_stability_fee_ugly_numbers_two_step_split_with_exact_running_balances() {
         // Verify running reserve/collector balances over two odd accrual windows.
         uint256 elevenPctPerYear = RAY + ((RAY * 11) / 100 / 31536000);
-        cdpEngine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setCollateralAssetParams",
             collateralTokenAddress,
             LIQUIDATION_RATIO,
             160e16,
@@ -2325,7 +2325,7 @@ contract Describe_CDPEngine is Authorizable {
             DEBT_CEILING,
             false
         );
-        cdpEngine.setFeeToReserveBps(2718); // odd split percent
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setFeeToReserveBps", 2718); // odd split percent
 
         uint256 uglyMint = 432109876543210987654; // 432.109876543210987654
         _openPositionForStabilityFeeMath(2000e18, uglyMint);
@@ -2378,7 +2378,7 @@ contract Describe_CDPEngine is Authorizable {
     function it_stability_fee_ugly_numbers_multiple_mints_and_repays() {
         // Multi-step stress case: ugly mints + ugly repays + odd time windows.
         uint256 ninePctPerYear = RAY + ((RAY * 9) / 100 / 31536000);
-        cdpEngine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setCollateralAssetParams",
             collateralTokenAddress,
             LIQUIDATION_RATIO,
             160e16,
@@ -2389,7 +2389,7 @@ contract Describe_CDPEngine is Authorizable {
             DEBT_CEILING,
             false
         );
-        cdpEngine.setFeeToReserveBps(2468); // ugly split
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setFeeToReserveBps", 2468); // ugly split
 
         // Keep collateral value comfortably above borrow cap.
         uint256 initialMint = 1234567891234567890123;
@@ -2692,7 +2692,7 @@ contract Describe_CDPEngine is Authorizable {
     function it_cdp_engine_validates_min_collateral_ratio_parameter() {
         // Test that minCR must be >= liquidationRatio
         bool reverted = false;
-        try cdpEngine.setCollateralAssetParams(
+        try m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setCollateralAssetParams",
             collateralTokenAddress,
             150e16, // 150% liquidation ratio
             140e16, // 140% minCR (invalid - less than liquidation ratio)
@@ -2710,7 +2710,7 @@ contract Describe_CDPEngine is Authorizable {
         require(reverted, "Should reject minCR < liquidationRatio");
 
         // Test that minCR can equal liquidationRatio
-        cdpEngine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setCollateralAssetParams",
             collateralTokenAddress,
             150e16, // 150% liquidation ratio
             150e16, // 150% minCR (valid - equal to liquidation ratio)
@@ -2733,7 +2733,7 @@ contract Describe_CDPEngine is Authorizable {
     // delta-based to stay independent of test ordering.
 
     function _createConfiguredCollateral(string symbol) internal returns (address) {
-        address tokenAddress = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Extra Collateral",
             "Extra Test Collateral",
             emptyArray,
@@ -2743,9 +2743,10 @@ contract Describe_CDPEngine is Authorizable {
             10000000e18,
             18
         );
-        Token(tokenAddress).setStatus(2); // ACTIVE
-        Token(tokenAddress).mint(address(this), 100000e18);
-        cdpEngine.setCollateralAssetParams(
+        address tokenAddress = address(ret);
+        m.adminRegistry().castVoteOnIssue(tokenAddress, "setStatus", 2); // ACTIVE
+        m.adminRegistry().castVoteOnIssue(tokenAddress, "mint", address(this), 100000e18);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setCollateralAssetParams",
             tokenAddress,
             LIQUIDATION_RATIO,
             160e16,
@@ -2756,7 +2757,7 @@ contract Describe_CDPEngine is Authorizable {
             DEBT_CEILING,
             false
         );
-        priceOracle.setAssetPrice(tokenAddress, 5e18);
+        m.adminRegistry().castVoteOnIssue(address(priceOracle), "setAssetPrice", tokenAddress, 5e18);
         return tokenAddress;
     }
 
@@ -2764,7 +2765,7 @@ contract Describe_CDPEngine is Authorizable {
         uint256 countBefore = cdpEngine.collateralAssetCount();
         // beforeEach configured collateralTokenAddress, so it is already enumerated:
         // reconfiguring it must not create a duplicate entry
-        cdpEngine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setCollateralAssetParams",
             collateralTokenAddress,
             LIQUIDATION_RATIO,
             160e16,
@@ -2848,16 +2849,16 @@ contract Describe_CDPEngine is Authorizable {
         require(!paused, "asset should not be paused");
 
         // Per-asset pause is reflected
-        cdpEngine.setPaused(collateralTokenAddress, true);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setPaused", collateralTokenAddress, true);
         (, , , , , bool pausedAsset) = cdpEngine.collateralParams(collateralTokenAddress);
         require(pausedAsset, "paused should be true when asset is paused");
-        cdpEngine.setPaused(collateralTokenAddress, false);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setPaused", collateralTokenAddress, false);
 
         // Global pause is reflected too (restored so later tests are unaffected)
-        cdpEngine.setPausedGlobal(true);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setPausedGlobal", true);
         (, , , , , bool pausedGlobal) = cdpEngine.collateralParams(collateralTokenAddress);
         require(pausedGlobal, "paused should be true under global pause");
-        cdpEngine.setPausedGlobal(false);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "setPausedGlobal", false);
     }
 
     function it_cdp_engine_register_collateral_assets_backfill() {
@@ -2865,11 +2866,11 @@ contract Describe_CDPEngine is Authorizable {
         uint256 countBefore = cdpEngine.collateralAssetCount();
         address[] memory known = new address[](1);
         known[0] = collateralTokenAddress;
-        cdpEngine.registerCollateralAssets(known);
+        m.adminRegistry().castVoteOnIssue(address(cdpEngine), "registerCollateralAssets", known);
         require(cdpEngine.collateralAssetCount() == countBefore, "re-register should not duplicate");
 
         // An address with no collateral config is rejected
-        address unconfigured = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Unconfigured Token",
             "Never configured as collateral",
             emptyArray,
@@ -2879,10 +2880,11 @@ contract Describe_CDPEngine is Authorizable {
             1000e18,
             18
         );
+        address unconfigured = address(ret);
         address[] memory bad = new address[](1);
         bad[0] = unconfigured;
         bool reverted = false;
-        try cdpEngine.registerCollateralAssets(bad) {
+        try m.adminRegistry().castVoteOnIssue(address(cdpEngine), "registerCollateralAssets", bad) {
         } catch {
             reverted = true;
         }

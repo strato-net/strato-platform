@@ -1,5 +1,4 @@
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 
 contract User {
     function do(address a, string f, variadic args) public returns (variadic) {
@@ -8,7 +7,7 @@ contract User {
     }
 }
 
-contract Describe_Pool is Authorizable {
+contract Describe_Pool {
 
     Mercata m;
     string[] emptyArray;
@@ -20,7 +19,6 @@ contract Describe_Pool is Authorizable {
     Pool pool;
 
     function beforeAll() {
-        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
         emptyArray = new string[](0);
@@ -28,23 +26,26 @@ contract Describe_Pool is Authorizable {
 
     function beforeEach() {
         // Create fresh tokens for each test
-        tokenAAddress = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Token A", "Test Token A", emptyArray, emptyArray, emptyArray, "TKA", 10000000e18, 18
         );
-        tokenBAddress = m.tokenFactory().createToken(
+        tokenAAddress = address(ret);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Token B", "Test Token B", emptyArray, emptyArray, emptyArray, "TKB", 10000000e18, 18
         );
+        tokenBAddress = address(ret);
 
         // Activate tokens
-        Token(tokenAAddress).setStatus(2); // ACTIVE
-        Token(tokenBAddress).setStatus(2); // ACTIVE
+        m.adminRegistry().castVoteOnIssue(tokenAAddress, "setStatus", 2); // ACTIVE
+        m.adminRegistry().castVoteOnIssue(tokenBAddress, "setStatus", 2); // ACTIVE
 
         // Mint tokens to test contract
-        Token(tokenAAddress).mint(address(this), 100000000e18);
-        Token(tokenBAddress).mint(address(this), 100000000e18);
+        m.adminRegistry().castVoteOnIssue(tokenAAddress, "mint", address(this), 100000000e18);
+        m.adminRegistry().castVoteOnIssue(tokenBAddress, "mint", address(this), 100000000e18);
 
         // Create pool
-        poolAddress = m.poolFactory().createPool(tokenAAddress, tokenBAddress);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "createPool", tokenAAddress, tokenBAddress);
+        poolAddress = address(ret);
         pool = Pool(poolAddress);
 
         // Give Pool mint/burn rights over its LP token
@@ -155,8 +156,8 @@ contract Describe_Pool is Authorizable {
         require(singleTokenLiquidity > 0, "Pre-sync single token liquidity should work");
 
         // Mint tokens directly to pool (simulating external transfer - creates excess)
-        Token(tokenAAddress).mint(address(pool), 100e18);
-        Token(tokenBAddress).mint(address(pool), 200e18);
+        m.adminRegistry().castVoteOnIssue(tokenAAddress, "mint", address(pool), 100e18);
+        m.adminRegistry().castVoteOnIssue(tokenBAddress, "mint", address(pool), 200e18);
 
         // Test functionality WITH excess tokens (after minting, before sync)
         // 4. Test swap A to B with excess tokens
@@ -180,7 +181,7 @@ contract Describe_Pool is Authorizable {
         // Now test sync function (owner only, so we call it through the pool factory)
         address[] memory pools = new address[](1);
         pools[0] = address(pool);
-        m.poolFactory().syncPools(pools);
+        m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "syncPools", pools);
 
         // Test functionality AFTER sync (excess tokens still there, but internal balances updated)
         // 7. Test swap A to B after sync
@@ -235,13 +236,13 @@ contract Describe_Pool is Authorizable {
         require(output2 > 0, "Pre-skim swap B->A should work");
 
         // Mint tokens directly to pool (simulating external transfer)
-        Token(tokenAAddress).mint(address(pool), 100e18);
-        Token(tokenBAddress).mint(address(pool), 200e18);
+        m.adminRegistry().castVoteOnIssue(tokenAAddress, "mint", address(pool), 100e18);
+        m.adminRegistry().castVoteOnIssue(tokenBAddress, "mint", address(pool), 200e18);
 
         // Test skim function (owner only, so we call it through the pool factory)
         address[] memory pools = new address[](1);
         pools[0] = address(pool);
-        m.poolFactory().skimPools(pools, address(this));
+        m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "skimPools", pools, address(this));
 
         // Test functionality AFTER skim
         // 1. Test swap A to B
@@ -514,7 +515,7 @@ contract Describe_Pool is Authorizable {
         // Test setting fee parameters (owner only, so we call it through the pool factory)
         uint256 newSwapFeeRate = 50; // 0.5%
         uint256 newLpSharePercent = 8000; // 80%
-        m.poolFactory().setPoolFeeParameters(address(pool), newSwapFeeRate, newLpSharePercent);
+        m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "setPoolFeeParameters", address(pool), newSwapFeeRate, newLpSharePercent);
 
         // Verify fee parameters were updated
         require(pool.swapFeeRate() == newSwapFeeRate, "swapFeeRate should be updated");
@@ -561,7 +562,7 @@ contract Describe_Pool is Authorizable {
         pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
 
         // Test setting minimal fee parameters (both must be > 0)
-        m.poolFactory().setPoolFeeParameters(address(pool), 1, 1);
+        m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "setPoolFeeParameters", address(pool), 1, 1);
 
         // Verify that pool uses the set parameters
         require(pool.swapFeeRate() == 1, "swapFeeRate should be 1");
@@ -920,10 +921,12 @@ contract Describe_Pool is Authorizable {
         // GIVEN: A pool with initial liquidity and a user with tokens to deposit
 
         // Create two tokens for the pool
-        address t1 = m.tokenFactory().createToken("ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
-        Token(t1).setStatus(2);
-        address t2 = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        Token(t2).setStatus(2);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
+        address t1 = address(ret);
+        m.adminRegistry().castVoteOnIssue(t1, "setStatus", 2);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        address t2 = address(ret);
+        m.adminRegistry().castVoteOnIssue(t2, "setStatus", 2);
 
         User u1 = new User();
         User u2 = new User();
@@ -937,12 +940,13 @@ contract Describe_Pool is Authorizable {
         uint u1Amt = c * 1e17; // c is denominated in 0.1 token units
 
         // Mint tokens: pool gets t1 and t2, user u1 gets t2 for single-sided deposit
-        Token(t1).mint(address(this), t1Amt);
-        Token(t2).mint(address(this), t2Amt);
-        Token(t2).mint(address(u1), u1Amt);
+        m.adminRegistry().castVoteOnIssue(t1, "mint", address(this), t1Amt);
+        m.adminRegistry().castVoteOnIssue(t2, "mint", address(this), t2Amt);
+        m.adminRegistry().castVoteOnIssue(t2, "mint", address(u1), u1Amt);
 
         // Create pool and set up permissions
-        address p1 = m.poolFactory().createPool(t1,t2);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "createPool", t1,t2);
+        address p1 = address(ret);
         Token lpToken = Pool(p1).lpToken();
         AdminRegistry adminRegistry = m.adminRegistry();
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "mint", address(p1));
@@ -976,10 +980,12 @@ contract Describe_Pool is Authorizable {
         uint extraBSeed
     ) {
         // Create tokens and pool
-        address t1 = m.tokenFactory().createToken("ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
-        Token(t1).setStatus(2);
-        address t2 = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        Token(t2).setStatus(2);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
+        address t1 = address(ret);
+        m.adminRegistry().castVoteOnIssue(t1, "setStatus", 2);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        address t2 = address(ret);
+        m.adminRegistry().castVoteOnIssue(t2, "setStatus", 2);
 
         // Scale randomized amounts to reasonable sizes
         uint amountAScaledMod = aSeed % 10000;
@@ -990,11 +996,12 @@ contract Describe_Pool is Authorizable {
         uint amountB = amountBScaled * 1e18;
 
         // Mint tokens to test contract
-        Token(t1).mint(address(this), amountA);
-        Token(t2).mint(address(this), amountB);
+        m.adminRegistry().castVoteOnIssue(t1, "mint", address(this), amountA);
+        m.adminRegistry().castVoteOnIssue(t2, "mint", address(this), amountB);
 
         // Create pool and whitelist LP token permissions
-        address p1 = m.poolFactory().createPool(t1,t2);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "createPool", t1,t2);
+        address p1 = address(ret);
         Token lpToken = Pool(p1).lpToken();
         AdminRegistry adminRegistry = m.adminRegistry();
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "mint", address(p1));
@@ -1013,13 +1020,13 @@ contract Describe_Pool is Authorizable {
         uint extraBScaled = extraBScaledMod + 1;
         uint extraA = extraAScaled * 1e18;
         uint extraB = extraBScaled * 1e18;
-        Token(t1).mint(p1, extraA);
-        Token(t2).mint(p1, extraB);
+        m.adminRegistry().castVoteOnIssue(t1, "mint", p1, extraA);
+        m.adminRegistry().castVoteOnIssue(t2, "mint", p1, extraB);
 
         // Run sync via factory
         address[] memory pools = new address[](1);
         pools[0] = p1;
-        m.poolFactory().syncPools(pools);
+        m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "syncPools", pools);
 
         // Assert internal matches actual balances after sync
         require(Pool(p1).tokenABalance() == Token(t1).balanceOf(p1), "sync: tokenABalance mismatch after sync");
@@ -1033,10 +1040,12 @@ contract Describe_Pool is Authorizable {
         uint amtSeedB
     ) {
         // Create tokens and pool
-        address t1 = m.tokenFactory().createToken("ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
-        Token(t1).setStatus(2);
-        address t2 = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        Token(t2).setStatus(2);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
+        address t1 = address(ret);
+        m.adminRegistry().castVoteOnIssue(t1, "setStatus", 2);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        address t2 = address(ret);
+        m.adminRegistry().castVoteOnIssue(t2, "setStatus", 2);
 
         // Fund the test contract - mint enough for initial liquidity plus cycles
         uint baseAScaledMod = amtSeedA % 50000;
@@ -1051,11 +1060,12 @@ contract Describe_Pool is Authorizable {
         uint totalA = baseA + maxCycleAmount;
         uint totalB = baseB + maxCycleAmount;
 
-        Token(t1).mint(address(this), totalA);
-        Token(t2).mint(address(this), totalB);
+        m.adminRegistry().castVoteOnIssue(t1, "mint", address(this), totalA);
+        m.adminRegistry().castVoteOnIssue(t2, "mint", address(this), totalB);
 
         // Create pool and whitelist LP token permissions
-        address p1 = m.poolFactory().createPool(t1,t2);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "createPool", t1,t2);
+        address p1 = address(ret);
         Token lpToken = Pool(p1).lpToken();
         AdminRegistry adminRegistry = m.adminRegistry();
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "mint", address(p1));
@@ -1735,7 +1745,7 @@ contract Describe_Pool is Authorizable {
 
 function it_single_token_a_zap_matches_swap_then_add_with_fees() {
   // -------- Path 1: swap A->B then add dual liquidity (Pool #1 created in beforeEach) --------
-  pool.setZapSwapFeesEnabled(true);
+  m.adminRegistry().castVoteOnIssue(address(pool), "setZapSwapFeesEnabled", true);
 
   uint256 initA = 1000e18;
   uint256 initB = 2000e18;
@@ -1770,18 +1780,21 @@ function it_single_token_a_zap_matches_swap_then_add_with_fees() {
 
   // -------- Path 2: single-token zap (new Pool #2 with identical setup) --------
   // Fresh tokens for isolation
-  address tokenA2 = m.tokenFactory().createToken(
+  (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
     "Token A2", "Test Token A2", emptyArray, emptyArray, emptyArray, "TKA2", 10000000e18, 18
   );
-  address tokenB2 = m.tokenFactory().createToken(
+  address tokenA2 = address(ret);
+  (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
     "Token B2", "Test Token B2", emptyArray, emptyArray, emptyArray, "TKB2", 10000000e18, 18
   );
-  Token(tokenA2).setStatus(2);
-  Token(tokenB2).setStatus(2);
-  Token(tokenA2).mint(address(this), 100000000e18);
-  Token(tokenB2).mint(address(this), 100000000e18);
+  address tokenB2 = address(ret);
+  m.adminRegistry().castVoteOnIssue(tokenA2, "setStatus", 2);
+  m.adminRegistry().castVoteOnIssue(tokenB2, "setStatus", 2);
+  m.adminRegistry().castVoteOnIssue(tokenA2, "mint", address(this), 100000000e18);
+  m.adminRegistry().castVoteOnIssue(tokenB2, "mint", address(this), 100000000e18);
 
-  address poolAddr2 = m.poolFactory().createPool(tokenA2, tokenB2);
+  (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "createPool", tokenA2, tokenB2);
+  address poolAddr2 = address(ret);
   Pool pool2 = Pool(poolAddr2);
 
   // Whitelist mint/burn for LP2
@@ -1790,7 +1803,7 @@ function it_single_token_a_zap_matches_swap_then_add_with_fees() {
   adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lp2), "mint", address(pool2));
   adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lp2), "burn", address(pool2));
 
-  pool2.setZapSwapFeesEnabled(true);
+  m.adminRegistry().castVoteOnIssue(address(pool2), "setZapSwapFeesEnabled", true);
 
   // Same initial dual liquidity as Path 1
   require(ERC20(tokenA2).approve(address(pool2), initA), "P2: approve A init");
@@ -1825,7 +1838,7 @@ function it_single_token_a_zap_matches_swap_then_add_with_fees() {
         uint256 initialLPBalance = ERC20(pool.lpToken()).balanceOf(address(this));
 
         // Pause the pool
-        pool.setPaused(true);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", true);
         require(pool.isPaused() == true, "Pool should be paused");
 
         // TEST: RemoveLiquidity should STILL WORK when paused (exit always allowed)
@@ -1834,7 +1847,7 @@ function it_single_token_a_zap_matches_swap_then_add_with_fees() {
         require(tokenAReceived > 0 && tokenBReceived > 0, "RemoveLiquidity should work when paused");
 
         // Unpause and verify operations work again
-        pool.setPaused(false);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", false);
         require(pool.isPaused() == false, "Pool should be unpaused");
 
         // Now swap should work
@@ -1861,12 +1874,12 @@ function it_single_token_a_zap_matches_swap_then_add_with_fees() {
         uint256 lpBalance = ERC20(pool.lpToken()).balanceOf(address(this));
 
         // Disable the pool (sets both isPaused and isDisabled)
-        pool.setDisabled(true);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setDisabled", true);
         require(pool.isPaused() == true, "Pool should be paused when disabled");
         require(pool.isDisabled() == true, "Pool should be disabled");
 
         // Re-enable: clears isDisabled but isPaused remains true (must unpause separately)
-        pool.setDisabled(false);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setDisabled", false);
         require(pool.isDisabled() == false, "Pool should be re-enabled (isDisabled cleared)");
         require(pool.isPaused() == true, "Pool should STILL be paused after re-enable (safety feature)");
 
@@ -1876,7 +1889,7 @@ function it_single_token_a_zap_matches_swap_then_add_with_fees() {
         require(tokenAReceived > 0 && tokenBReceived > 0, "RemoveLiquidity should work after re-enable");
 
         // Must explicitly unpause to allow swaps/adds again
-        pool.setPaused(false);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", false);
         require(pool.isPaused() == false, "Pool should be unpaused after explicit setPaused(false)");
 
         // Now swaps should work
@@ -1899,11 +1912,11 @@ function it_single_token_a_zap_matches_swap_then_add_with_fees() {
         require(Token(tokenBAddress).status() == TokenStatus.ACTIVE, "TokenB should start active");
 
         // Deactivate tokenA (status != ACTIVE)
-        Token(tokenAAddress).setStatus(1); // Not ACTIVE
+        m.adminRegistry().castVoteOnIssue(tokenAAddress, "setStatus", 1); // Not ACTIVE
         require(Token(tokenAAddress).status() != TokenStatus.ACTIVE, "TokenA should be inactive");
 
         // Reactivate tokenA
-        Token(tokenAAddress).setStatus(2); // ACTIVE
+        m.adminRegistry().castVoteOnIssue(tokenAAddress, "setStatus", 2); // ACTIVE
         require(Token(tokenAAddress).status() == TokenStatus.ACTIVE, "TokenA should be active again");
 
         // TEST: Operations should work with active tokens
@@ -1915,26 +1928,29 @@ function it_single_token_a_zap_matches_swap_then_add_with_fees() {
 
     function it_pool_initialize_checks_token_status() {
         // Create new tokens with different statuses
-        address newTokenA = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "New Token A", "Test New A", emptyArray, emptyArray, emptyArray, "NTA", 10000000e18, 18
         );
-        address newTokenB = m.tokenFactory().createToken(
+        address newTokenA = address(ret);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "New Token B", "Test New B", emptyArray, emptyArray, emptyArray, "NTB", 10000000e18, 18
         );
+        address newTokenB = address(ret);
         
         // Set both tokens to active
-        Token(newTokenA).setStatus(2); // ACTIVE
-        Token(newTokenB).setStatus(2); // ACTIVE
+        m.adminRegistry().castVoteOnIssue(newTokenA, "setStatus", 2); // ACTIVE
+        m.adminRegistry().castVoteOnIssue(newTokenB, "setStatus", 2); // ACTIVE
 
         // Verify tokens are active before pool creation
         require(Token(newTokenA).status() == TokenStatus.ACTIVE, "NewTokenA should be active");
         require(Token(newTokenB).status() == TokenStatus.ACTIVE, "NewTokenB should be active");
 
         // Create pool with active tokens - should succeed
-        Token(newTokenA).mint(address(this), 100000000e18);
-        Token(newTokenB).mint(address(this), 100000000e18);
+        m.adminRegistry().castVoteOnIssue(newTokenA, "mint", address(this), 100000000e18);
+        m.adminRegistry().castVoteOnIssue(newTokenB, "mint", address(this), 100000000e18);
         
-        address newPoolAddress = m.poolFactory().createPool(newTokenA, newTokenB);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "createPool", newTokenA, newTokenB);
+        address newPoolAddress = address(ret);
         require(newPoolAddress != address(0), "Pool should be created with active tokens");
         
         Pool newPool = Pool(newPoolAddress);
@@ -1946,34 +1962,34 @@ function it_single_token_a_zap_matches_swap_then_add_with_fees() {
         // Test setPaused
         require(pool.isPaused() == false, "Pool should start unpaused");
         
-        pool.setPaused(true);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", true);
         require(pool.isPaused() == true, "setPaused(true) should pause pool");
         
-        pool.setPaused(false);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", false);
         require(pool.isPaused() == false, "setPaused(false) should unpause pool");
 
         // Test setDisabled behavior
         require(pool.isDisabled() == false, "Pool should start enabled");
         
         // Disable: should set both isPaused and isDisabled
-        pool.setDisabled(true);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setDisabled", true);
         require(pool.isPaused() == true, "setDisabled(true) should set isPaused");
         require(pool.isDisabled() == true, "setDisabled(true) should set isDisabled");
         
         // Re-enable: should clear isDisabled but KEEP isPaused (safety feature)
-        pool.setDisabled(false);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setDisabled", false);
         require(pool.isPaused() == true, "setDisabled(false) should KEEP isPaused (must unpause separately)");
         require(pool.isDisabled() == false, "setDisabled(false) should clear isDisabled");
 
         // Must explicitly unpause
-        pool.setPaused(false);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", false);
         require(pool.isPaused() == false, "Explicit setPaused(false) should clear isPaused");
 
         // Test setDisabled when already paused
-        pool.setPaused(true);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", true);
         require(pool.isPaused() == true, "Pool should be paused");
         
-        pool.setDisabled(true);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setDisabled", true);
         require(pool.isPaused() == true, "setDisabled(true) should keep isPaused when already paused");
         require(pool.isDisabled() == true, "setDisabled(true) should set isDisabled");
     }
@@ -1987,7 +2003,7 @@ function it_single_token_a_zap_matches_swap_then_add_with_fees() {
         pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
 
         // Pause
-        pool.setPaused(true);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", true);
         
         // Verify pause state persists even after allowed operations (remove)
         uint256 lpBalance = ERC20(pool.lpToken()).balanceOf(address(this));
@@ -1997,7 +2013,7 @@ function it_single_token_a_zap_matches_swap_then_add_with_fees() {
         require(pool.isPaused() == true, "Pause state should persist after remove operation");
         
         // Unpause
-        pool.setPaused(false);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", false);
         require(pool.isPaused() == false, "Pool should be unpaused");
     }
 

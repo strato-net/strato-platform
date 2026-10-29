@@ -1,4 +1,3 @@
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record AdminRegistry is Ownable {
@@ -15,9 +14,9 @@ contract record AdminRegistry is Ownable {
 
     uint public defaultVotingThresholdBps = 6000; // 3/5
 
-    event IssueCreated(address sender, address creator, string issueId, address target, string func, variadic args);
-    event IssueVoted(address sender, address voter, string issueId, address target, string func, variadic args);
-    event IssueExecuted(address sender, address executor, string issueId, address target, string func, variadic args);
+    event IssueCreated(address creator, string issueId, address target, string func, variadic args);
+    event IssueVoted(address voter, string issueId, address target, string func, variadic args);
+    event IssueExecuted(address executor, string issueId, address target, string func, variadic args);
     event IssueDismissed(address sender, string issueId);
 
     event AdminAdded(address indexed admin);
@@ -81,49 +80,28 @@ contract record AdminRegistry is Ownable {
     }
 
     function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
-        if (adminMap[msg.sender] != 0 || adminMap[_target] != 0) {
-            address sender = msg.sender;
-            if (adminMap[msg.sender] == 0) {
-                if (_target != tx.origin) {
-                    bool authorizationGranted = false;
-                    try {
-                        authorizationGranted = Authorizable(_target).isAuthorized(msg.sender);
-                    } catch {
+        string issueId = _getIssueId(_target, _func, _args);
+        if (adminMap[msg.sender] != 0) {
+            bool hasVoted = votesMap[issueId][msg.sender] != 0;
 
-                    }
-                    require(authorizationGranted, "Cannot forge a vote on behalf of an admin without their consent");
-                }
-                sender = _target;
-                _target = msg.sender;
-            }
-            string issueId = _getIssueId(_target, _func, _args);
-            bool hasVoted = votesMap[issueId][sender] != 0;
-
-            _createIssue(sender, issueId, _target, _func, _args);
+            _createIssue(issueId, _target, _func, _args);
 
             if (!hasVoted) {
-                votes[issueId].push(sender);
-                votesMap[issueId][sender] = votes[issueId].length;
-                emit IssueVoted(msg.sender, sender, issueId, _target, _func, _args);
+                votes[issueId].push(msg.sender);
+                votesMap[issueId][msg.sender] = votes[issueId].length;
+                emit IssueVoted(msg.sender, issueId, _target, _func, _args);
             }
 
             if (_shouldExecute(issueId, _target, _func, _args)) {
-                variadic ret = _executeIssue(sender, issueId, _target, _func, _args);
+                variadic ret = _executeIssue(issueId, _target, _func, _args);
                 return (true, ret);
             } else {
                 return (false, issueId);
             }
         } else {
             // Non-admin path: only execute if whitelisted
-            address sender = msg.sender;
-            address target = _target;
-            require(whitelist[target][_func][sender] || whitelist[sender][_func][target], "Only an admin or a whitelisted account can call castVoteOnIssue");
-            if (!whitelist[target][_func][sender] && whitelist[sender][_func][target]) {
-                sender = _target;
-                target = msg.sender;
-            }
-            string issueId = _getIssueId(target, _func, _args);
-            variadic ret = _executeIssue(sender, issueId, target, _func, _args);
+            require(whitelist[_target][_func][msg.sender], "Only an admin or a whitelisted account can call castVoteOnIssue");
+            variadic ret = _executeIssue(issueId, _target, _func, _args);
             return (true, ret);
         }
     }
@@ -137,10 +115,10 @@ contract record AdminRegistry is Ownable {
         return 10000 * issueVotes >= votingThresholdBps * admins.length;
     }
 
-    function _createIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal {
+    function _createIssue(string _issueId, address _target, string _func, variadic _args) internal {
         if(votes[_issueId].length == 0) {
             currentIssues[_issueId] = true;
-            emit IssueCreated(msg.sender, _sender, _issueId, _target, _func, _args);
+            emit IssueCreated(msg.sender, _issueId, _target, _func, _args);
         }
     }
 
@@ -152,7 +130,7 @@ contract record AdminRegistry is Ownable {
         return keccak256(_target, _func, _args);
     }
 
-    function _executeIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal returns (variadic) {
+    function _executeIssue(string _issueId, address _target, string _func, variadic _args) internal returns (variadic) {
         variadic ret = _target.call(_func, _args);
         for (uint i = 0; i < votes[_issueId].length; i++) {
             votesMap[_issueId][votes[_issueId][i]] = 0;
@@ -160,7 +138,7 @@ contract record AdminRegistry is Ownable {
         }
         votes[_issueId].length = 0;
         delete currentIssues[_issueId];
-        emit IssueExecuted(msg.sender, _sender, _issueId, _target, _func, _args);
+        emit IssueExecuted(msg.sender, _issueId, _target, _func, _args);
         return ret;
     }
 

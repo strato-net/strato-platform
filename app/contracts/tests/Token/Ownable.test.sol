@@ -182,7 +182,7 @@ contract Describe_Ownable {
 
     // ============ ADMIN INTEGRATION TESTS ============
 
-    function it_ownable_falls_back_to_admin_registry_when_not_owner() {
+    function it_ownable_does_not_fall_back_to_admin_registry_when_not_owner() {
         AdminRegistry admin = new AdminRegistry();
         admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
@@ -190,17 +190,15 @@ contract Describe_Ownable {
         // Initially, the function should not have been called
         require(!ownableWithAdmin.ownerOnlyFunctionCalled(), "Function should not be called initially");
 
-        // The AdminRegistry fallback mechanism has compatibility issues with the test framework
-        // This test demonstrates the intended behavior but may not work due to msg.sig/msg.data incompatibility
+        // A registry admin calling directly is not the owner; it must vote through the registry
         bool reverted = false;
         try {
             user1.do(address(ownableWithAdmin), "ownerOnlyFunction");
         } catch {
             reverted = true;
         }
-        // The fallback mechanism may not work in the test environment due to msg.sig/msg.data issues
-        // This is a known limitation of the AdminRegistry integration
-        require(true, "Admin fallback mechanism has compatibility issues with test framework");
+        require(reverted, "Direct call by a registry admin should revert");
+        require(!ownableWithAdmin.ownerOnlyFunctionCalled(), "Direct call should not run the function");
     }
 
     function it_ownable_requires_admin_votes_for_non_owner_access() {
@@ -374,12 +372,12 @@ contract Describe_Ownable {
         require(reverted, "Non-owner should fail onlyOwner modifier");
     }
 
-    function it_ownable_only_owner_modifier_with_admin_fallback() {
+    function it_ownable_only_owner_modifier_with_admin_votes() {
         AdminRegistry admin = new AdminRegistry();
         admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
 
-        // Admin fallback should work with votes using correct parameter format
+        // Admins vote through the registry, which calls the function as owner
         (bool firstVoteExecuted, ) = admin.castVoteOnIssue(address(ownableWithAdmin), "ownerOnlyFunction");
         require(!firstVoteExecuted, "First vote should not execute immediately");
 
@@ -387,7 +385,7 @@ contract Describe_Ownable {
         require(secondVoteExecuted, "Second vote should execute function call");
 
         // Check that the function was called by checking state
-        require(ownableWithAdmin.ownerOnlyFunctionCalled(), "Admin fallback should work with votes");
+        require(ownableWithAdmin.ownerOnlyFunctionCalled(), "Admin votes should call the function");
     }
 
     // ============ ERROR HANDLING TESTS ============

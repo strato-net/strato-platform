@@ -8,7 +8,6 @@
 
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/Savings/SaveUSDSTVault.sol";
 import "../../concrete/Flash/FlashMint.sol";
@@ -101,7 +100,7 @@ contract VaultRaider {
     }
 }
 
-contract Describe_Adv_Peg_SaveVault is Authorizable {
+contract Describe_Adv_Peg_SaveVault {
 
     uint public INFINITY = 2 ** 256 - 1;
     uint public WAD = 1e18;
@@ -120,37 +119,37 @@ contract Describe_Adv_Peg_SaveVault is Authorizable {
     User distributor;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata();
         areg = m.adminRegistry();
 
-        USDST = Token(m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18));
-        USDST.setStatus(2);
+        (bool executed, variadic ret) = areg.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",[],[],[],"USDST",0,18);
+        USDST = Token(address(ret));
+        areg.castVoteOnIssue(address(USDST), "setStatus", 2);
 
         vault = new SaveUSDSTVault(address(this));
         vault.initialize(address(USDST), "Save USDST", "saveUSDST");
 
         saver = new User();
-        USDST.mint(address(saver), VAULT_SHARES);
+        areg.castVoteOnIssue(address(USDST), "mint", address(saver), VAULT_SHARES);
         saver.do(address(USDST), "approve", address(vault), INFINITY);
         saver.do(address(vault), "deposit(uint256,address)", VAULT_SHARES, address(saver));
 
         uint topUp = VAULT_MANAGED - VAULT_SHARES;
-        USDST.mint(address(this), topUp);
+        areg.castVoteOnIssue(address(USDST), "mint", address(this), topUp);
         IERC20(address(USDST)).transfer(address(vault), topUp);
         vault.recordRewardTransfer(topUp);
 
         distributor = new User();
-        USDST.mint(address(distributor), DISTRIB_BAL);
+        areg.castVoteOnIssue(address(USDST), "mint", address(distributor), DISTRIB_BAL);
         distributor.do(address(USDST), "approve", address(vault), INFINITY);
         vault.setRewardDistributor(address(distributor));
         vault.setPerSecondSavingsRate(MAINNET_RATE);
 
         fm = new FlashMint(address(areg));
-        areg.addWhitelist(address(USDST), "mint", address(fm));
-        areg.addWhitelist(address(USDST), "burn", address(fm));
-        fm.initialize(address(USDST), address(m.feeCollector()), MAXLOAN);
-        fm.setWhitelistEnabled(false);
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(USDST), "mint", address(fm));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(USDST), "burn", address(fm));
+        areg.castVoteOnIssue(address(fm), "initialize", address(USDST), address(m.feeCollector()), MAXLOAN);
+        areg.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
 
         log("── fixture ──");
         log("vault managed  = " + string(vault.totalAssets()));
@@ -171,7 +170,7 @@ contract Describe_Adv_Peg_SaveVault is Authorizable {
         VaultRaider r = new VaultRaider();
         r.init(address(fm), address(vault), address(USDST), address(distributor));
         uint bankroll = 1e18;
-        USDST.mint(address(r), bankroll);
+        areg.castVoteOnIssue(address(USDST), "mint", address(r), bankroll);
 
         uint rate0 = vault.exchangeRate();
         uint mgd0 = vault.totalAssets();
@@ -201,7 +200,7 @@ contract Describe_Adv_Peg_SaveVault is Authorizable {
     function it_s2_deposit_withdraw_round_trip_is_strictly_worse() public {
         VaultRaider r = new VaultRaider();
         r.init(address(fm), address(vault), address(USDST), address(distributor));
-        USDST.mint(address(r), 1e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(r), 1e18);
 
         uint rate0 = vault.exchangeRate();
         r.attack(2, MAXLOAN);
@@ -223,7 +222,7 @@ contract Describe_Adv_Peg_SaveVault is Authorizable {
     function it_s3_mint_redeem_round_trip_is_strictly_worse() public {
         VaultRaider r = new VaultRaider();
         r.init(address(fm), address(vault), address(USDST), address(distributor));
-        USDST.mint(address(r), 1e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(r), 1e18);
 
         uint rate0 = vault.exchangeRate();
         r.attack(3, MAXLOAN);
@@ -258,7 +257,7 @@ contract Describe_Adv_Peg_SaveVault is Authorizable {
 
         // and with real capital the donation is pure loss to the donor: min() keeps pricing at managed
         User donor = new User();
-        USDST.mint(address(donor), 500000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(donor), 500000e18);
         donor.do(address(USDST), "transfer", address(vault), 500000e18);
         log("after 500,000 REAL donation:");
         log("  managed                = " + string(vault.totalAssets()));
@@ -276,7 +275,7 @@ contract Describe_Adv_Peg_SaveVault is Authorizable {
 
         User attacker = new User();
         User victim = new User();
-        USDST.mint(address(attacker), 1 + MAXLOAN);
+        areg.castVoteOnIssue(address(USDST), "mint", address(attacker), 1 + MAXLOAN);
         attacker.do(address(USDST), "approve", address(fresh), INFINITY);
         attacker.do(address(fresh), "deposit(uint256,address)", 1, address(attacker));
         attacker.do(address(USDST), "transfer", address(fresh), MAXLOAN);
@@ -289,7 +288,7 @@ contract Describe_Adv_Peg_SaveVault is Authorizable {
         log("fresh rate               = " + string(fresh.exchangeRate()));
         log("previewDeposit(1000e18)  = " + string(fresh.previewDeposit(1000e18)));
 
-        USDST.mint(address(victim), 1000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(victim), 1000e18);
         victim.do(address(USDST), "approve", address(fresh), INFINITY);
         victim.do(address(fresh), "deposit(uint256,address)", 1000e18, address(victim));
         uint vShares = IERC20(address(fresh)).balanceOf(address(victim));
@@ -312,14 +311,14 @@ contract Describe_Adv_Peg_SaveVault is Authorizable {
         // A flash mint adds nothing new. Demonstrate the deposit leg keeps them locked together:
         VaultRaider r = new VaultRaider();
         r.init(address(fm), address(vault), address(USDST), address(distributor));
-        USDST.mint(address(r), 1e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(r), 1e18);
         r.attack(1, MAXLOAN);
         require(USDST.balanceOf(address(vault)) >= vault.totalAssets(), "live must stay >= managed");
         log("after 2,000,000 round trip: live - managed = " + string(USDST.balanceOf(address(vault)) - vault.totalAssets()));
 
         // and a zero-asset deposit / dust deposit is rejected rather than mispriced
         User u = new User();
-        USDST.mint(address(u), 10e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(u), 10e18);
         u.do(address(USDST), "approve", address(vault), INFINITY);
         string err = "";
         try u.do(address(vault), "deposit(uint256,address)", 0, address(u)) { }
@@ -341,7 +340,7 @@ contract Describe_Adv_Peg_SaveVault is Authorizable {
         // nested: name the vault as receiver from inside a live callback
         VaultRaider r = new VaultRaider();
         r.init(address(fm), address(vault), address(USDST), address(distributor));
-        USDST.mint(address(r), 10e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(r), 10e18);
         r.attack(7, 1e18);
 
         log("── s7 burn-the-vault attempts ──");
@@ -365,8 +364,8 @@ contract Describe_Adv_Peg_SaveVault is Authorizable {
 
         User a = new User();
         User b = new User();
-        USDST.mint(address(a), 1000e18);
-        USDST.mint(address(b), 1000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(a), 1000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(b), 1000e18);
         a.do(address(USDST), "approve", address(v), INFINITY);
         b.do(address(USDST), "approve", address(v), INFINITY);
         a.do(address(v), "deposit(uint256,address)", 1000e18, address(a));
@@ -376,7 +375,7 @@ contract Describe_Adv_Peg_SaveVault is Authorizable {
         log("managed/live/rate before  = " + string(v.totalAssets()) + " / " + string(USDST.balanceOf(address(v))) + " / " + string(v.exchangeRate()));
 
         // simulate a 40% impairment
-        USDST.burn(address(v), 800e18);
+        areg.castVoteOnIssue(address(USDST), "burn", address(v), 800e18);
         log("managed/live/rate after   = " + string(v.totalAssets()) + " / " + string(USDST.balanceOf(address(v))) + " / " + string(v.exchangeRate()));
 
         // a withdraws: pays out at the impaired price but managed drops by the un-impaired share
@@ -442,7 +441,7 @@ contract Describe_Adv_Peg_SaveVault is Authorizable {
         // a zero-capital flash mint round trip is enough to stamp lastAccrual
         VaultRaider r = new VaultRaider();
         r.init(address(fm), address(vault), address(USDST), address(distributor));
-        USDST.mint(address(r), 1e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(r), 1e18);
         uint mgdPre = vault.totalAssets();
         r.attack(6, MAXLOAN);
 

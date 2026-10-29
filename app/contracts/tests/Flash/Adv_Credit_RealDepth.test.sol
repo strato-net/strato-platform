@@ -20,7 +20,6 @@ pragma solidity ^0.8.0;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Tokens/Token.sol";
 
@@ -179,7 +178,7 @@ contract ProxyLiquidator {
     }
 }
 
-contract Describe_Adv_Credit_RealDepth is Authorizable {
+contract Describe_Adv_Credit_RealDepth {
 
     Mercata m;
     FlashMint fm;
@@ -203,7 +202,6 @@ contract Describe_Adv_Credit_RealDepth is Authorizable {
 
     // Current venue, rebuilt fresh for every measurement.
     address curColl;
-    Token   curCollT;
     Pool    curPool;
     uint    curPrice;
     uint    venueCount;
@@ -214,7 +212,6 @@ contract Describe_Adv_Credit_RealDepth is Authorizable {
     uint h4BestKept;   uint h4BestAt;   uint h4LargestOk;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         WAD = 1e18; RAY = 1e27; CAP = 2000000e18;
         LR = 150e16; MINCR = 155e16; PEN = 1000; CF = 5000;
 
@@ -231,19 +228,20 @@ contract Describe_Adv_Credit_RealDepth is Authorizable {
         fm       = new FlashMint(address(admin));
         pf       = m.poolFactory();
 
-        USDST  = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",[],[],[],"USDST",0,18);
+        USDST  = address(ret);
         usdstT = Token(USDST);
-        usdstT.setStatus(2);
-        reg.setUSDST(USDST);
-        oracle.setAssetPrice(USDST, 1e18);
+        admin.castVoteOnIssue(USDST, "setStatus", 2);
+        admin.castVoteOnIssue(address(reg), "setUSDST", USDST);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", USDST, 1e18);
 
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(cdp));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(cdp));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(fm));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(fm));
 
-        fm.initialize(USDST, address(m.feeCollector()), CAP);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), CAP);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
     }
 
     function beforeEach() public { }
@@ -251,12 +249,12 @@ contract Describe_Adv_Credit_RealDepth is Authorizable {
     /// @notice Create a fresh collateral token, configured in the CDP at $100.
     function _newColl() internal {
         venueCount += 1;
-        curColl  = m.tokenFactory().createToken("GOLDST","Gold",[],[],[],"GOLDST",0,18);
-        curCollT = Token(curColl);
-        curCollT.setStatus(2);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "GOLDST","Gold",[],[],[],"GOLDST",0,18);
+        curColl  = address(ret);
+        admin.castVoteOnIssue(curColl, "setStatus", 2);
         curPrice = 100e18;
-        oracle.setAssetPrice(curColl, curPrice);
-        cdp.setCollateralAssetParams(curColl, LR, MINCR, PEN, CF, RAY, 1e18, 1e30, false);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", curColl, curPrice);
+        admin.castVoteOnIssue(address(cdp), "setCollateralAssetParams", curColl, LR, MINCR, PEN, CF, RAY, 1e18, 1e30, false);
     }
 
     /// @notice Re-price the collateral (the gap), then build the exit venue so that its
@@ -265,18 +263,19 @@ contract Describe_Adv_Credit_RealDepth is Authorizable {
     ///         the collateral side only fixes the marginal price.
     function _gapAndBuildVenue(uint newPrice) internal {
         curPrice = newPrice;
-        oracle.setAssetPrice(curColl, newPrice);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", curColl, newPrice);
 
         uint collReserve = (RES_USDST * WAD) / newPrice;
 
-        address p = pf.createPool(curColl, USDST);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(pf), "createPool", curColl, USDST);
+        address p = address(ret);
         curPool = Pool(p);
         Token lp = curPool.lpToken();
         admin.castVoteOnIssue(address(admin), "addWhitelist", address(lp), "mint", p);
         admin.castVoteOnIssue(address(admin), "addWhitelist", address(lp), "burn", p);
 
-        curCollT.mint(address(this), collReserve);
-        usdstT.mint(address(this), RES_USDST);
+        admin.castVoteOnIssue(curColl, "mint", address(this), collReserve);
+        admin.castVoteOnIssue(USDST, "mint", address(this), RES_USDST);
         IERC20(curColl).approve(p, collReserve);
         IERC20(USDST).approve(p, RES_USDST);
         curPool.addLiquidity(RES_USDST, collReserve, 99999999999);
@@ -295,7 +294,7 @@ contract Describe_Adv_Credit_RealDepth is Authorizable {
         Vault_ v = new Vault_();
         v.init(address(cdp));
         uint collAmt = (debtUSD * 40000e18) / 1500000e18;   // 40,000 COLL per $1.5m of debt
-        curCollT.mint(address(v), collAmt);
+        admin.castVoteOnIssue(curColl, "mint", address(v), collAmt);
         v.open(curColl, collAmt, debtUSD);
         _gapAndBuildVenue(gapPrice);
         return address(v);
@@ -380,7 +379,7 @@ contract Describe_Adv_Credit_RealDepth is Authorizable {
 
         LoopLiquidator ll = new LoopLiquidator();
         ll.init(address(fm), address(cdp), USDST);
-        usdstT.mint(address(ll), 1500000e18);       // the liquidator's OWN money
+        admin.castVoteOnIssue(USDST, "mint", address(ll), 1500000e18);       // the liquidator's OWN money
         ll.runFunded(curColl, v, 10);
 
         (uint col1, uint sd1) = cdp.vaults(v, curColl);
@@ -481,7 +480,7 @@ contract Describe_Adv_Credit_RealDepth is Authorizable {
 
         ProxyLiquidator pl = new ProxyLiquidator();
         pl.init(address(fm), address(cdp), USDST);
-        usdstT.mint(address(pl), 750000e18);          // the OWNER'S own USDST
+        admin.castVoteOnIssue(USDST, "mint", address(pl), 750000e18);          // the OWNER'S own USDST
         uint res0 = usdstT.balanceOf(address(reserve));
 
         pl.runFunded(curColl, address(v), 750000e18);

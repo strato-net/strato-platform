@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Tokens/Token.sol";
 
@@ -263,7 +262,7 @@ contract OTCDesk {
  * Suite
  * ─────────────────────────────────────────────────────────────────────────────
  */
-contract Describe_FlashMint is Authorizable {
+contract Describe_FlashMint {
 
     Mercata m;
     FlashMint fm;
@@ -291,7 +290,6 @@ contract Describe_FlashMint is Authorizable {
     uint CAP;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
 
         WAD    = 1e18;
         LR     = 150e16;   // 1.50
@@ -312,18 +310,20 @@ contract Describe_FlashMint is Authorizable {
         fm       = new FlashMint(address(admin));
 
         // USDST
-        USDST  = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",[],[],[],"USDST",0,18);
+        USDST  = address(ret);
         usdstT = Token(USDST);
-        usdstT.setStatus(2);
-        reg.setUSDST(USDST);
-        oracle.setAssetPrice(USDST, 1e18);
+        admin.castVoteOnIssue(USDST, "setStatus", 2);
+        admin.castVoteOnIssue(address(reg), "setUSDST", USDST);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", USDST, 1e18);
 
         // Collateral
-        COLL  = m.tokenFactory().createToken("GOLDST","Gold",[],[],[],"GOLDST",0,18);
+        (executed, ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "GOLDST","Gold",[],[],[],"GOLDST",0,18);
+        COLL  = address(ret);
         collT = Token(COLL);
-        collT.setStatus(2);
-        oracle.setAssetPrice(COLL, 100e18);
-        cdp.setCollateralAssetParams(COLL, LR, MINCR, PEN, CF, SFR, FLOOR_, CEIL_, false);
+        admin.castVoteOnIssue(COLL, "setStatus", 2);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", COLL, 100e18);
+        admin.castVoteOnIssue(address(cdp), "setCollateralAssetParams", COLL, LR, MINCR, PEN, CF, SFR, FLOOR_, CEIL_, false);
 
         // The two mint/burn grants — identical in shape to the ones CDPEngine already holds.
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(cdp));
@@ -332,8 +332,8 @@ contract Describe_FlashMint is Authorizable {
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(fm));
 
         // Point the facility at this suite's USDST and open it.
-        fm.initialize(USDST, address(m.feeCollector()), CAP);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), CAP);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
 
         desk = new OTCDesk();
         desk.setPrice(USDST, 1e18);
@@ -438,24 +438,24 @@ contract Describe_FlashMint is Authorizable {
         GoodBorrower b = new GoodBorrower();
         b.init(address(fm), USDST);
 
-        fm.setPaused(true);
+        admin.castVoteOnIssue(address(fm), "setPaused", true);
         require(fm.maxFlashLoan() == 0, "paused maxFlashLoan is 0");
         try { b.go(1e18); require(false, "paused must revert"); } catch { }
-        fm.setPaused(false);
+        admin.castVoteOnIssue(address(fm), "setPaused", false);
 
-        fm.setWhitelistEnabled(true);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", true);
         try { b.go(1e18); require(false, "non-whitelisted must revert"); } catch { }
-        fm.setWhitelist(address(b), true);
+        admin.castVoteOnIssue(address(fm), "setWhitelist", address(b), true);
         b.go(1e18);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
     }
 
     function it_bh_fee_is_supply_neutral_and_reaches_the_collector() public {
-        fm.setFeeBps(50);   // 0.5%
+        admin.castVoteOnIssue(address(fm), "setFeeBps", 50);   // 0.5%
 
         GoodBorrower b = new GoodBorrower();
         b.init(address(fm), USDST);
-        usdstT.mint(address(b), 10000e18);   // borrower's own float pays the fee
+        admin.castVoteOnIssue(USDST, "mint", address(b), 10000e18);   // borrower's own float pays the fee
 
         uint supplyBefore  = usdstT.totalSupply();
         uint collectBefore = usdstT.balanceOf(address(m.feeCollector()));
@@ -469,20 +469,20 @@ contract Describe_FlashMint is Authorizable {
         require(usdstT.totalSupply() == supplyBefore, "supply must be unchanged");
         require(fm.feesAccrued() - accruedBefore == fee, "feesAccrued exact");
 
-        fm.setFeeBps(0);
+        admin.castVoteOnIssue(address(fm), "setFeeBps", 0);
     }
 
     /// Has the principal but is 1 wei short of the fee. Must fail the repay require,
     /// not the later ERC20 burn — otherwise a mutated check (`>= amount`) still passes.
     function it_bj_short_the_fee_reverts_not_repaid() public {
-        fm.setFeeBps(50);
+        admin.castVoteOnIssue(address(fm), "setFeeBps", 50);
 
         GoodBorrower b = new GoodBorrower();
         b.init(address(fm), USDST);
 
         uint amount = 10000e18;
         uint fee = (amount * 50) / 10000;
-        usdstT.mint(address(b), fee - 1);
+        admin.castVoteOnIssue(USDST, "mint", address(b), fee - 1);
 
         uint supplyBefore = usdstT.totalSupply();
         string err = "";
@@ -492,15 +492,15 @@ contract Describe_FlashMint is Authorizable {
         require(usdstT.totalSupply() == supplyBefore, "no supply leaked");
         require(usdstT.balanceOf(address(b)) == fee - 1, "borrower's own float untouched");
 
-        fm.setFeeBps(0);
+        admin.castVoteOnIssue(address(fm), "setFeeBps", 0);
     }
 
     function it_bi_whitelisted_borrower_pays_no_fee() public {
-        fm.setFeeBps(50);
+        admin.castVoteOnIssue(address(fm), "setFeeBps", 50);
 
         GoodBorrower b = new GoodBorrower();
         b.init(address(fm), USDST);
-        fm.setWhitelist(address(b), true);
+        admin.castVoteOnIssue(address(fm), "setWhitelist", address(b), true);
 
         uint collectBefore = usdstT.balanceOf(address(m.feeCollector()));
         b.go(1000000e18);
@@ -509,8 +509,8 @@ contract Describe_FlashMint is Authorizable {
         require(usdstT.balanceOf(address(m.feeCollector())) == collectBefore, "no fee routed");
         require(usdstT.balanceOf(address(b)) == 0, "borrower ends flat");
 
-        fm.setWhitelist(address(b), false);
-        fm.setFeeBps(0);
+        admin.castVoteOnIssue(address(fm), "setWhitelist", address(b), false);
+        admin.castVoteOnIssue(address(fm), "setFeeBps", 0);
     }
 
     // ───────────────────────── S9 / S11 / S12 / S14 ─────────────────────────
@@ -557,12 +557,12 @@ contract Describe_FlashMint is Authorizable {
         b.init(address(fm), USDST);
         require(fm.canBorrow(address(b)), "precondition: borrower can draw");
 
-        fm.setPaused(true);
+        admin.castVoteOnIssue(address(fm), "setPaused", true);
         require(fm.maxFlashLoan() == 0, "paused maxFlashLoan is 0");
         require(!fm.canBorrow(address(b)), "paused canBorrow is false");
         try { b.go(1e18); require(false, "paused flashLoan must revert"); } catch { }
 
-        fm.setPaused(false);
+        admin.castVoteOnIssue(address(fm), "setPaused", false);
         require(fm.maxFlashLoan() == CAP, "unpause restores maxFlashLoan");
         require(fm.canBorrow(address(b)), "unpause restores canBorrow");
         uint served = fm.loansServed();
@@ -576,24 +576,24 @@ contract Describe_FlashMint is Authorizable {
         b.init(address(fm), USDST);
         uint served = fm.loansServed();
 
-        usdstT.pause();
+        admin.castVoteOnIssue(USDST, "pause");
         require(usdstT.paused(), "USDST paused");
         require(!fm.paused(), "FlashMint.paused is independent");
         require(fm.maxFlashLoan() == 0, "token pause advertises 0");
         require(!fm.canBorrow(address(b)), "token pause closes canBorrow");
         try { b.go(1e18); require(false, "flashLoan must revert while token is paused"); } catch { }
         require(fm.loansServed() == served, "no loan while token paused");
-        usdstT.unpause();
+        admin.castVoteOnIssue(USDST, "unpause");
 
         require(fm.maxFlashLoan() == CAP, "unpause restores maxFlashLoan");
         require(fm.canBorrow(address(b)), "unpause restores canBorrow");
 
-        usdstT.setStatus(3);   // LEGACY
+        admin.castVoteOnIssue(USDST, "setStatus", 3);   // LEGACY
         require(fm.maxFlashLoan() == 0, "disabled token advertises 0");
         require(!fm.canBorrow(address(b)), "disabled token closes canBorrow");
         try { b.go(1e18); require(false, "flashLoan must revert while token is disabled"); } catch { }
         require(fm.loansServed() == served, "no loan while token disabled");
-        usdstT.setStatus(2);   // ACTIVE
+        admin.castVoteOnIssue(USDST, "setStatus", 2);   // ACTIVE
 
         b.go(1e18);
         require(fm.loansServed() == served + 1, "restored token allows flashLoan");
@@ -606,20 +606,20 @@ contract Describe_FlashMint is Authorizable {
 
         require(fm.maxFlashLoan() == CAP, "live maxFlashLoan");
 
-        fm.setFeeBps(50);
+        admin.castVoteOnIssue(address(fm), "setFeeBps", 50);
         uint fee = (1000000e18 * 50) / 10000;
-        usdstT.mint(address(b), 10000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(b), 10000e18);
         uint collectBefore = usdstT.balanceOf(address(m.feeCollector()));
         b.go(1000000e18);
         require(usdstT.balanceOf(address(m.feeCollector())) == collectBefore + fee, "charged fee matches formula");
-        fm.setFeeBps(0);
+        admin.castVoteOnIssue(address(fm), "setFeeBps", 0);
 
-        fm.setWhitelistEnabled(true);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", true);
         require(!fm.canBorrow(address(b)), "unlist canBorrow");
         try { b.go(1e18); require(false, "unlist flashLoan must revert"); } catch { }
-        fm.setWhitelist(address(b), true);
+        admin.castVoteOnIssue(address(fm), "setWhitelist", address(b), true);
         require(fm.canBorrow(address(b)), "listed canBorrow");
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
         require(fm.canBorrow(address(b)), "permissionless canBorrow");
     }
 
@@ -638,12 +638,12 @@ contract Describe_FlashMint is Authorizable {
         try { b.go(0); require(false, "zero amount must revert"); } catch { }
 
         uint served = fm.loansServed();
-        fm.setMaxLoan(0);
+        admin.castVoteOnIssue(address(fm), "setMaxLoan", 0);
         require(fm.maxFlashLoan() == 0, "maxLoan 0 advertises 0");
         require(!fm.canBorrow(address(b)), "maxLoan 0 closes canBorrow");
         try { b.go(1e18); require(false, "maxLoan 0 flashLoan must revert"); } catch { }
         require(fm.loansServed() == served, "no loan while disabled");
-        fm.setMaxLoan(CAP);
+        admin.castVoteOnIssue(address(fm), "setMaxLoan", CAP);
         b.go(1e18);
         require(fm.loansServed() == served + 1, "restored cap allows flashLoan");
     }
@@ -654,18 +654,18 @@ contract Describe_FlashMint is Authorizable {
     function it_ca_liquidation_with_zero_liquidator_capital() public {
         // Borrower opens: 40,000 COLL @ $100 = $4,000,000 collateral, $1,500,000 debt (CR 2.67)
         User borrower = new User();
-        collT.mint(address(borrower), 40000e18);
+        admin.castVoteOnIssue(COLL, "mint", address(borrower), 40000e18);
         borrower.callFunction(COLL, "approve", address(cdpVault), 40000e18);
         borrower.callFunction(address(cdp), "deposit", COLL, 40000e18);
         borrower.callFunction(address(cdp), "mint", COLL, 1500000e18);
 
         // Price drops 45%: collateral $2,200,000 vs debt $1,500,000 -> CR 1.4667 < 1.50
-        oracle.setAssetPrice(COLL, 55e18);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", COLL, 55e18);
         desk.setPrice(COLL, 55e18);
         require(cdp.collateralizationRatio(address(borrower), COLL) < LR, "must be liquidatable");
 
         // Fund the desk so it can pay for seized collateral.
-        usdstT.mint(address(desk), 2000000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(desk), 2000000e18);
 
         Liquidator liq = new Liquidator();
         liq.init(address(fm), address(cdp), address(cdpVault), USDST);
@@ -684,7 +684,7 @@ contract Describe_FlashMint is Authorizable {
         require(liq.profit() == repay / 10, "profit = the liquidation bonus");
         require(usdstT.balanceOf(address(liq)) == repay / 10, "liquidator keeps the bonus");
 
-        oracle.setAssetPrice(COLL, 100e18);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", COLL, 100e18);
         desk.setPrice(COLL, 100e18);
     }
 
@@ -694,15 +694,15 @@ contract Describe_FlashMint is Authorizable {
         sl.init(address(fm), address(cdp), USDST);
 
         // 40,000 COLL @ $100 = $4,000,000; borrow $1,500,000.
-        collT.mint(address(sl), 40000e18);
+        admin.castVoteOnIssue(COLL, "mint", address(sl), 40000e18);
         sl.open(COLL, 40000e18, 1500000e18);
 
         // Drop to $55: CR 1.4667, i.e. liquidatable. A liquidator would take $75k of it.
-        oracle.setAssetPrice(COLL, 55e18);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", COLL, 55e18);
         desk.setPrice(COLL, 55e18);
         require(cdp.collateralizationRatio(address(sl), COLL) < LR, "must be liquidatable");
 
-        usdstT.mint(address(desk), 2000000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(desk), 2000000e18);
         uint supplyBefore = usdstT.totalSupply();
 
         // Sell only enough collateral to clear the debt: $1.5m / $55 = 27272.72... COLL
@@ -719,7 +719,7 @@ contract Describe_FlashMint is Authorizable {
         require(sl.keptCollateral() == 40000e18 - toSell, "keeps the rest of the collateral");
         require(sl.keptCollateral() > 12000e18, "retains ~$700k of collateral");
 
-        oracle.setAssetPrice(COLL, 100e18);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", COLL, 100e18);
         desk.setPrice(COLL, 100e18);
     }
 
@@ -729,9 +729,9 @@ contract Describe_FlashMint is Authorizable {
         lev.init(address(fm), address(cdp), USDST);
 
         // Seed equity: 1,000 COLL @ $100 = $100,000.
-        collT.mint(address(lev), 1000e18);
-        collT.mint(address(desk), 100000e18);
-        usdstT.mint(address(desk), 5000000e18);
+        admin.castVoteOnIssue(COLL, "mint", address(lev), 1000e18);
+        admin.castVoteOnIssue(COLL, "mint", address(desk), 100000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(desk), 5000000e18);
 
         // Deposit equity first so the levered mint has a base to build on.
         lev.open_equity(COLL, address(cdp));

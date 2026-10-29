@@ -13,7 +13,7 @@ contract Describe_AdminRegistryUpgrade {
         AdminRegistry adminRegistry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), this)));
         adminRegistry.initialize([this]);
         Ownable(address(adminRegistry)).transferOwnership(address(adminRegistry));
-        Proxy(address(adminRegistry)).setLogicContract(address(new AdminRegistry()));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "setLogicContract", address(new AdminRegistry()));
     }
 
 

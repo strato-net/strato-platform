@@ -191,7 +191,7 @@ The deployment (`BaseCodeCollection.sol`) transfers ownership of platform contra
 AdminRegistry controls owner-only functions in two ways:
 
 - **Admin voting.** An admin calls `castVoteOnIssue(target, function, args)`, which opens an issue or votes on an existing one. The call executes once the votes reach a threshold. The threshold is set per target and function, or falls back to a default. It is expressed in basis points of the admin count.
-- **Whitelist.** A whitelisted `(target, function, caller)` entry lets a specific non-admin account execute that function directly. For example, `FlashMint` is whitelisted to mint and burn USDST.
+- **Whitelist.** A whitelisted `(target, function, caller)` entry lets a specific non-admin account execute that function through `castVoteOnIssue` without a vote. For example, `FlashMint` is whitelisted to mint and burn USDST.
 
 Several contracts, including `Pool`, `StablePool` and `YieldVault`, use reentrancy guards. `Token`, `Vault`, `YieldVault` and `SaveUSDSTVault` are pausable.
 

@@ -1,4 +1,3 @@
-import "../abstract/ERC20/access/Authorizable.sol";
 import "../abstract/ERC20/utils/StringUtils.sol";
 import "../concrete/BaseCodeCollection.sol";
 import "General/main.groth16.sol";
@@ -10,7 +9,7 @@ contract User {
     }
 }
 
-contract Describe_Mercata is Authorizable {
+contract Describe_Mercata {
     using StringUtils for string;
     using BytesUtils for bytes;
     constructor() {
@@ -18,7 +17,6 @@ contract Describe_Mercata is Authorizable {
 
     Mercata m;
     function beforeAll() {
-        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
     }
@@ -41,29 +39,33 @@ contract Describe_Mercata is Authorizable {
     }
 
     function it_can_create_tokens() {
-        address t = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        address t = address(ret);
         require(t != address(0), "Failed to create Token");
     }
 
     function it_can_create_pools() {
-        address t1 = m.tokenFactory().createToken("ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
-        Token(t1).setStatus(2);
-        address t2 = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        Token(t2).setStatus(2);
+        AdminRegistry adminRegistry = m.adminRegistry();
+        (bool executed, variadic ret) = adminRegistry.castVoteOnIssue(address(m.tokenFactory()), "createToken", "ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
+        address t1 = address(ret);
+        adminRegistry.castVoteOnIssue(t1, "setStatus", 2);
+        (executed, ret) = adminRegistry.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        address t2 = address(ret);
+        adminRegistry.castVoteOnIssue(t2, "setStatus", 2);
         User u1 = new User();
         User u2 = new User();
-        Token(t1).mint(address(this), 8000e18);
-        Token(t2).mint(address(this), 20000000e18);
-        Token(t1).mint(address(u1), 4e18);
-        Token(t2).mint(address(u1), 10000e18);
-        Token(t1).mint(address(u1), 4e18);
-        Token(t2).mint(address(u2), 10000e18);
-        address p1 = m.poolFactory().createPool(t1,t2);
+        adminRegistry.castVoteOnIssue(t1, "mint", address(this), 8000e18);
+        adminRegistry.castVoteOnIssue(t2, "mint", address(this), 20000000e18);
+        adminRegistry.castVoteOnIssue(t1, "mint", address(u1), 4e18);
+        adminRegistry.castVoteOnIssue(t2, "mint", address(u1), 10000e18);
+        adminRegistry.castVoteOnIssue(t1, "mint", address(u1), 4e18);
+        adminRegistry.castVoteOnIssue(t2, "mint", address(u2), 10000e18);
+        (executed, ret) = adminRegistry.castVoteOnIssue(address(m.poolFactory()), "createPool", t1, t2);
+        address p1 = address(ret);
         require(p1 != address(0), "Failed to create pool 1");
 
         // Give Pool mint/burn rights over its LP token
         Token lpToken = Pool(p1).lpToken();
-        AdminRegistry adminRegistry = m.adminRegistry();
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "mint", address(p1));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "burn", address(p1));
 
@@ -84,22 +86,25 @@ contract Describe_Mercata is Authorizable {
     }
 
     function it_cannot_bankrupt_a_pool() {
-        address t1 = m.tokenFactory().createToken("ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
-        Token(t1).setStatus(2);
-        address t2 = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        Token(t2).setStatus(2);
+        AdminRegistry adminRegistry = m.adminRegistry();
+        (bool executed, variadic ret) = adminRegistry.castVoteOnIssue(address(m.tokenFactory()), "createToken", "ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
+        address t1 = address(ret);
+        adminRegistry.castVoteOnIssue(t1, "setStatus", 2);
+        (executed, ret) = adminRegistry.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        address t2 = address(ret);
+        adminRegistry.castVoteOnIssue(t2, "setStatus", 2);
         User u1 = new User();
         User u2 = new User();
-        Token(t1).mint(address(this), 8000e18);
-        Token(t2).mint(address(this), 20000000e18);
+        adminRegistry.castVoteOnIssue(t1, "mint", address(this), 8000e18);
+        adminRegistry.castVoteOnIssue(t2, "mint", address(this), 20000000e18);
         uint u1t1Amt = 16000000000000000e18;
-        Token(t1).mint(address(u1), u1t1Amt);
-        Token(t2).mint(address(u1), 20000000e18);
-        address p1 = m.poolFactory().createPool(t1,t2);
+        adminRegistry.castVoteOnIssue(t1, "mint", address(u1), u1t1Amt);
+        adminRegistry.castVoteOnIssue(t2, "mint", address(u1), 20000000e18);
+        (executed, ret) = adminRegistry.castVoteOnIssue(address(m.poolFactory()), "createPool", t1, t2);
+        address p1 = address(ret);
 
         // Give Pool mint/burn rights over its LP token
         Token lpToken = Pool(p1).lpToken();
-        AdminRegistry adminRegistry = m.adminRegistry();
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "mint", address(p1));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "burn", address(p1));
 

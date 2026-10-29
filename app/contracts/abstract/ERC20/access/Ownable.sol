@@ -1,5 +1,4 @@
 import "../utils/Context.sol";
-import "../../../concrete/Admin/AdminRegistry.sol";
 
 /**
  * @dev Contract module which provides a basic access control mechanism, where
@@ -42,19 +41,8 @@ abstract contract Ownable is Context {
      * @dev Throws if called by any account other than the owner.
      */
     modifier onlyOwner() {
-        try {
-            _checkOwner();
-            _;
-        } catch {
-            address myOwner = owner();
-            AdminRegistry admin = AdminRegistry(myOwner);
-            address sender = _msgSender();
-            if (myOwner == this) {
-                sender = this;
-            }
-            (bool didExecute, variadic ret) = admin.castVoteOnIssue(sender, msg.sig, msg.data);
-            return ret;
-        }
+        _checkOwner();
+        _;
     }
 
     /**
