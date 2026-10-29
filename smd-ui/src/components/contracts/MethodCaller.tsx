@@ -104,7 +104,15 @@ export function MethodCaller({
         contractAddress: govOwner,
         value: 0,
         method: "castVoteOnIssue",
-        args: { _target: contractAddress, _func: method, _args: args.map((a) => parsed[a.name]) },
+        args: {
+          _target: contractAddress,
+          _func: method,
+          _args: args.flatMap((a) =>
+            a.type.toLowerCase() === "variadic"
+              ? (parsed[a.name] as { value: unknown[] }).value
+              : [parsed[a.name]]
+          ),
+        },
         metadata: {},
       };
     }
