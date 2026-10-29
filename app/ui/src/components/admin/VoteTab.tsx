@@ -17,7 +17,6 @@ import CreateAdminIssueModal from './CreateAdminIssueModal';
 import CastVoteModal from './CastVoteModal';
 import AddAdminModal from './AddAdminModal';
 import RemoveAdminModal from './RemoveAdminModal';
-import DeploymentsTable from './DeploymentsTable';
 import { formatArgValue, parseJsonBigInt } from '@/utils/numberUtils';
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE } from '@/lib/constants';
 
@@ -210,9 +209,6 @@ const VoteTab = () => {
           )}
         </CardContent>
       </Card>
-
-
-      <DeploymentsTable />
 
       { }
       <Card className="dark:bg-card overflow-hidden">

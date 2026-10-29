@@ -762,23 +762,6 @@ export const getExecutedIssues = async (
   }
 };
 
-// Whether a deployment's steps have already executed, unbounded by the lookback window
-// that keeps the paged list cheap: executed issues by target and function (the caller
-// matches the args).
-export const lookupExecuted = async (
-  accessToken: string,
-  calls: Array<{ target: string; func: string }>,
-): Promise<{ executed: object[] }> => {
-  if (calls.length === 0) return { executed: [] };
-  const res = await cirrus.get(accessToken, "/" + AdminRegistry + "-IssueExecuted", {
-    params: {
-      select: "issueId,target,func,args,block_number",
-      or: `(${calls.map((c) => `and(target.eq.${c.target.toLowerCase().replace(/^0x/, "")},func.eq.${c.func})`).join(",")})`,
-    },
-  });
-  return { executed: Array.isArray(res.data) ? res.data : [] };
-};
-
 export const contractSearch = async (
   accessToken: string,
   search: string,
