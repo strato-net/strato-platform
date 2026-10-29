@@ -141,6 +141,7 @@ import qualified Prelude as Ordering (Ordering (..))
 
 data CallInfo = CallInfo
   { currentFunctionName :: SolidString,
+    currentArguments :: ValList,
     currentAddress :: Address,
     currentCodeAddress :: Address,
     currentContract :: CC.Contract,
@@ -847,6 +848,7 @@ addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
   let newCallInfo =
         CallInfo
           { currentFunctionName = fn,
+            currentArguments = [],
             currentAddress = a,
             currentCodeAddress = codeAddr,
             currentContract = c,

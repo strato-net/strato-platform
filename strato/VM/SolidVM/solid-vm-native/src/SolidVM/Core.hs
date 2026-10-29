@@ -4,9 +4,20 @@
 -- No `Value` sum type at runtime: every compiled closure has an exact Haskell type.
 module SolidVM.Core where
 
-import Blockchain.SolidVM.GasInfo (MonadBuiltinGas (..))
 import Control.Exception
-import Control.Monad.Reader
+import Control.Monad
+import Control.Monad.IO.Class
+import qualified UnliftIO as U
+import Blockchain.SolidVM.SM (SM)
+import qualified Blockchain.SolidVM.SM as SM
+import qualified Blockchain.SolidVM.Environment as ExecutionEnv
+import qualified Blockchain.Data.BlockHeader as BlockHeader
+import Blockchain.DB.SolidStorageDB
+import Blockchain.SolidVM.Exception (SolidException (InvalidWrite))
+import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Metered
+import Blockchain.SolidVM.Builtins.Size.Values (basicSize)
+import SolidVM.Gas (decrementGas)
+import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Foldable as F
@@ -21,7 +32,7 @@ import qualified Data.Text.Encoding as TE
 import Data.Type.Equality
 import Blockchain.SolidVM.Exception (SolidException (TooMuchGas))
 import qualified Blockchain.SolidVM.Builtins.Size as SharedSize
-import Blockchain.Strato.Model.Gas (getGasValue)
+import Blockchain.Strato.Model.Gas (Gas (..))
 import Blockchain.Strato.Model.Address (Address (..))
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
 
@@ -296,16 +307,6 @@ replaceValue (IS i) v (x :& env) = x :& replaceValue i v env
 
 data CallKind = Call | RawCall | DelegateCall deriving (Eq, Show)
 
-data Frame = Frame
-  { fThis :: Address      -- storage/identity context
-  , fCode :: Address      -- where the running code lives (differs from fThis under delegatecall)
-  , fSender :: Address
-  , fOrigin :: Address
-  , fSig :: T.Text        -- SolidVM msg.sig = function name
-  , fArgs :: [Dyn]        -- SolidVM msg.data = the call's arguments
-  , fValue :: Integer
-  }
-
 -- A revert carries a message; it unwinds to the nearest try/catch or external call boundary.
 newtype Revert = Revert T.Text deriving Show
 instance Exception Revert
@@ -318,27 +319,6 @@ instance Exception Divergence
 -- A required native entry is unavailable; this is an engine failure, not a revert.
 newtype NativeUnavailable = NativeUnavailable T.Text deriving Show
 instance Exception NativeUnavailable
-
-data RT = RT
-  { rtChargeGas :: Integer -> IO ()
-  , rtGet  :: Address -> StoragePath -> IO BasicValue
-  , rtPut  :: Address -> StoragePath -> BasicValue -> IO ()
-  , rtEmit :: Frame -> T.Text -> T.Text -> [(T.Text, Dyn)] -> IO ()   -- contract name, event name, args
-  , rtCall :: CallKind -> Frame -> Address -> T.Text -> [Dyn] -> Maybe SomeTy -> IO [Dyn]
-  , rtSender :: Frame -> IO Address
-  , rtAbiEncode :: Bool -> [Dyn] -> IO B.ByteString
-  , rtCreateCode :: Maybe Dyn -> T.Text -> T.Text -> [Dyn] -> IO Address
-  , rtSelfdestruct :: Address -> IO Bool
-  , rtPreviousBlock :: IO (Address, Address, Integer)
-  , rtProposer :: IO Address
-  , rtCopyStorage :: StoragePath -> StoragePath -> IO ()
-  , rtDerive :: Address -> T.Text -> T.Text -> [Dyn] -> IO Address
-  , rtCreate :: Frame -> T.Text -> Maybe (IO Dyn) -> IO [Dyn] -> IO Address
-  , rtBlockNumber :: Integer
-  , rtTimestamp :: Integer
-  }
-
-type M = ReaderT (RT, Frame) IO
 
 -- An action executes in a typed local environment. Composition uses the
 -- underlying monad's ordinary sequencing.
@@ -369,89 +349,103 @@ contextAction = Action
 withEnvironment :: (outer -> inner) -> Action inner m a -> Action outer m a
 withEnvironment project (Action action) = Action (action . project)
 
-chargeAction :: Integer -> Action env M ()
+chargeAction :: Integer -> Action env SM ()
 chargeAction = liftAction . chargeGas
 
 -- Keep the reader argument explicit to avoid an intermediate action for each
 -- environment application.
-chargeActionAfter :: Integer -> Action env M a -> Action env M a
-chargeActionAfter gas (Action action) = Action $ \env -> ReaderT $ \runtime -> do
-  value <- runReaderT (action env) runtime
-  runReaderT (chargeGas gas) runtime
+chargeActionAfter :: Integer -> Action env SM a -> Action env SM a
+chargeActionAfter gas (Action action) = Action $ \env -> do
+  value <- action env
+  chargeGas gas
   pure value
 {-# INLINE chargeActionAfter #-}
 
-storeAction :: Ty a -> StoragePath -> a -> Action env M ()
+storeAction :: Ty a -> StoragePath -> a -> Action env SM ()
 storeAction ty path value = liftAction (writeVal ty path value)
 
-readReference :: Ix ls (IORef a) -> Action (Env ls) M a
+readReference :: Ix ls (IORef a) -> Action (Env ls) SM a
 readReference index = Action (\env -> liftIO (readIORef (ref index env)))
 
 valueAt :: Applicative m => Ix ls a -> Action (Env ls) m a
 valueAt index = Action (pure . localValue index)
 
-bindActionChain :: M a -> [a -> M a] -> (a -> M b) -> M b
+bindActionChain :: SM a -> [a -> SM a] -> (a -> SM b) -> SM b
 bindActionChain initial commands final = continuation `seq` (initial >>= continuation)
   where
     continuation = foldr step final commands
     step command next = next `seq` (\value -> command value >>= next)
 
-chargeGas :: Integer -> M ()
-chargeGas amount = rt >>= \runtime -> liftIO (rtChargeGas runtime amount)
+chargeGas :: Integer -> SM ()
+chargeGas = decrementGas . Gas
 
-charged :: Integer -> M a -> M a
+charged :: Integer -> SM a -> SM a
 charged amount action = chargeGas amount >> action
 
-chargeAfter :: Integer -> M a -> M a
+chargeAfter :: Integer -> SM a -> SM a
 chargeAfter amount action = do
   value <- action
   chargeGas amount
   pure value
 
-instance MonadBuiltinGas (ReaderT (RT, Frame) IO) where
-  chargeBuiltinGas = chargeGas . getGasValue
+catchContractFailure :: SM a -> SM a -> SM a
+catchContractFailure action handler = action `U.catches`
+  [ U.Handler (\(_ :: Revert) -> handler)
+  , U.Handler (\(e :: SolidException) -> case e of
+      TooMuchGas{} -> U.throwIO e
+      _ -> handler)
+  ]
 
-catchContractFailure :: M a -> M a -> M a
-catchContractFailure action handler = do
-  state <- ask
-  liftIO $ runReaderT action state `catches`
-    [ Handler (\(_ :: Revert) -> runReaderT handler state)
-    , Handler (\(e :: SolidException) -> case e of
-        TooMuchGas{} -> throwIO e
-        _ -> runReaderT handler state)
-    ]
+thisAddress :: SM Address
+thisAddress = SM.getCurrentAddress
 
-rt :: M RT
-rt = asks fst
+senderAddress :: SM Address
+senderAddress = ExecutionEnv.sender <$> SM.getEnv
 
-frame :: M Frame
-frame = asks snd
+originAddress :: SM Address
+originAddress = ExecutionEnv.origin <$> SM.getEnv
 
-revert :: T.Text -> M a
+blockNumber :: SM Integer
+blockNumber = BlockHeader.number . ExecutionEnv.blockHeader <$> SM.getEnv
+
+blockTimestamp :: SM Integer
+blockTimestamp = round . utcTimeToPOSIXSeconds . BlockHeader.timestamp . ExecutionEnv.blockHeader <$> SM.getEnv
+
+readBasic :: StoragePath -> SM BasicValue
+readBasic path = do
+  address <- SM.getCurrentAddress
+  Metered.storageRead basicSize (getSolidStorageKeyVal' address path)
+
+writeBasic :: StoragePath -> BasicValue -> SM ()
+writeBasic path value = do
+  info <- SM.getCurrentCallInfo
+  when (SM.readOnly info) $ U.throwIO (InvalidWrite "native write during read-only access" (show path))
+  Metered.storageWrite (basicSize value)
+  let address = SM.currentAddress info
+  SM.markDiffForAction address path value
+  putSolidStorageKeyVal' address path value
+
+revert :: T.Text -> SM a
 revert = liftIO . throwIO . Revert
 
-diverge :: T.Text -> M a
+diverge :: T.Text -> SM a
 diverge = liftIO . throwIO . Divergence
 
-readSlot :: Ty t -> StoragePath -> M t
+readSlot :: Ty t -> StoragePath -> SM t
 readSlot t p = do
-  (r, f) <- ask
-  v <- liftIO $ rtGet r (fThis f) p
+  v <- readBasic p
   either diverge pure (fromBasic t v)
 
-writeSlot :: Ty t -> StoragePath -> t -> M ()
+writeSlot :: Ty t -> StoragePath -> t -> SM ()
 writeSlot t p v = do
-  (r, f) <- ask
-  liftIO $ rtPut r (fThis f) p (toBasic t v)
+  writeBasic p (toBasic t v)
 
 snocP :: StoragePath -> StoragePathPiece -> StoragePath
 snocP (StoragePath ps) p = StoragePath (ps ++ [p])
 
 -- Whole values in storage: scalars are one slot; arrays are `length` + indexed slots; structs are fields.
-readVal :: Ty t -> StoragePath -> M t
-readVal t p = do
-  (r, f) <- ask
-  readValWith (liftIO . rtGet r (fThis f)) t p
+readVal :: Ty t -> StoragePath -> SM t
+readVal = readValWith readBasic
 
 readValWith :: forall m t. MonadIO m => (StoragePath -> m BasicValue) -> Ty t -> StoragePath -> m t
 readValWith getSlot t p = case t of
@@ -468,7 +462,7 @@ readValWith getSlot t p = case t of
     readFields FNil = pure HNil
     readFields (FCons n ft rest) = (:*) <$> readValWith getSlot ft (snocP p (Field (TE.encodeUtf8 n))) <*> readFields rest
 
-writeVal :: Ty t -> StoragePath -> t -> M ()
+writeVal :: Ty t -> StoragePath -> t -> SM ()
 writeVal t p v = case t of
   TArr et -> do
     writeSlot TInt (snocP p (Field "length")) (fromIntegral (Seq.length v))
@@ -477,7 +471,7 @@ writeVal t p v = case t of
   TTuple fs -> writeFields fs v
   _ -> writeSlot t p v
   where
-    writeFields :: Fields ts -> HL ts -> M ()
+    writeFields :: Fields ts -> HL ts -> SM ()
     writeFields FNil HNil = pure ()
     writeFields (FCons n ft rest) (x :* xs) = writeVal ft (snocP p (Field (TE.encodeUtf8 n))) x >> writeFields rest xs
 
@@ -488,19 +482,19 @@ data Sig (args :: [Type]) r where
   SigCons :: Ty a -> Sig as r -> Sig (a ': as) r
 
 type family Fn (args :: [Type]) r where
-  Fn '[] r = M r
+  Fn '[] r = SM r
   Fn (a ': as) r = a -> Fn as r
 
 -- A checked call is assembled from these typed applications at compilation.
 -- Execution applies argument values without walking a signature.
-applyLast :: M r -> HL '[] -> M r
+applyLast :: SM r -> HL '[] -> SM r
 applyLast action HNil = action
 
-applyNext :: (Fn args r -> HL args -> M r) -> (a -> Fn args r) -> HL (a ': args) -> M r
+applyNext :: (Fn args r -> HL args -> SM r) -> (a -> Fn args r) -> HL (a ': args) -> SM r
 applyNext next f (value :* values) = next (f value) values
 
 -- Prepare currying once; execution applies values without traversing the signature.
-curryArguments :: Sig args r -> (HL args -> M r) -> Fn args r
+curryArguments :: Sig args r -> (HL args -> SM r) -> Fn args r
 curryArguments (SigNil _) = \body -> body HNil
 curryArguments (SigCons _ rest) =
   let next = curryArguments rest
@@ -526,21 +520,20 @@ sigArity (SigNil _) = 0
 sigArity (SigCons _ s) = 1 + sigArity s
 
 showSig :: Sig args r -> T.Text
-showSig (SigNil r) = "M " <> showTy r
+showSig (SigNil r) = "SM " <> showTy r
 showSig (SigCons a s) = showTy a <> " -> " <> showSig s
 
 -- Build the typed action from a body that sees its arguments as typed mutable locals.
 -- First argument is at index IZ.
-mkFn :: Sig args r -> (Env (RefTypes args) -> M r) -> Fn args r
+mkFn :: Sig args r -> (Env (RefTypes args) -> SM r) -> Fn args r
 mkFn (SigNil _) body = body ENil
 mkFn (SigCons _ rest) body = \a -> mkFn rest (\env -> do r <- liftIO (newIORef a); body (r :& env))
 
 -- The dynamic boundary (tx args, .call results): check each arg once, then run the typed action.
-callDyn :: Sig args r -> Fn args r -> [Dyn] -> M [Dyn]
-callDyn (SigNil r) f [] = do
-  st <- ask
-  liftIO $ runReaderT (retDyn r <$> f) st
-    `catch` (\(ForwardReturn ds) -> pure $ case ds of
+callDyn :: Sig args r -> Fn args r -> [Dyn] -> SM [Dyn]
+callDyn (SigNil r) f [] =
+  (retDyn r <$> f)
+    `U.catch` (\(ForwardReturn ds) -> pure $ case ds of
       [Dyn TUnit ()] -> []
       _ -> ds)
 callDyn (SigCons t rest) f (d : ds) = do v <- fromDyn t d; callDyn rest (f v) ds
@@ -555,9 +548,7 @@ instance Exception ForwardReturn
 
 typedReturns :: Sig args r -> Fn args r -> Fn args r
 typedReturns (SigCons _ rest) f = \a -> typedReturns rest (f a)
-typedReturns (SigNil r) f = do
-  st <- ask
-  liftIO $ runReaderT f st `catch` (\(ForwardReturn ds) -> runReaderT (decode ds) st)
+typedReturns (SigNil r) f = f `U.catch` (\(ForwardReturn ds) -> decode ds)
   where
     decode returned = case r of
       TUnit -> pure ()
@@ -570,17 +561,8 @@ typedReturns (SigNil r) f = do
       where
         ds = case returned of [Dyn TVariadic values] -> values; _ -> returned
 
-internalFrame :: T.Text -> Sig args r -> Fn args r -> Fn args r
-internalFrame name sig f = go sig f []
-  where
-    callName = maybe name id (T.stripPrefix "super." name)
-    go :: Sig as result -> Fn as result -> [Dyn] -> Fn as result
-    go (SigCons t rest) action args = \a -> go rest (action a) (Dyn t a : args)
-    go (SigNil _) action args = local (\(runtime, caller) ->
-      (runtime, caller {fSig = callName, fArgs = reverse args})) action
-
 -- address <-> contract and int <-> enum share a wire value; the typed side decides.
-fromDyn :: Ty t -> Dyn -> M t
+fromDyn :: Ty t -> Dyn -> SM t
 fromDyn t (Dyn t' v) = case tyEq t t' of
   Just Refl -> pure v
   Nothing -> case (t, t') of
@@ -607,7 +589,7 @@ fromDyn t (Dyn t' v) = case tyEq t t' of
     (_, TVariadic) | [d] <- v -> fromDyn t d
     _ -> diverge ("value of type " <> showTy t' <> " where " <> showTy t <> " was declared")
 
-fromDyns :: Fields ts -> [Dyn] -> M (HL ts)
+fromDyns :: Fields ts -> [Dyn] -> SM (HL ts)
 fromDyns FNil [] = pure HNil
 fromDyns (FCons _ t rest) (d : ds) = (:*) <$> fromDyn t d <*> fromDyns rest ds
 fromDyns _ _ = diverge "tuple arity mismatch at call boundary"

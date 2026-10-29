@@ -30,6 +30,9 @@ source = T.unlines
   [ "interface CreatedView { function value() external returns (uint); }"
   , "contract TypedBuiltins { uint counter; struct Pair { uint z; uint a; }"
   , "function creation() returns (bool) { address a = create(\"Made\",\"contract Made { uint public value; constructor(uint n) { value = n; } }\",7); address b = create2(\"typed-salt\",\"Made\",\"contract Made { uint public value; constructor(uint n) { value = n; } }\",9); return CreatedView(a).value() == 7 && CreatedView(b).value() == 9; }"
+  , "function frameLeaf(uint value) internal returns (bool) { return msg.sig == \"frameLeaf\" && keccak256(msg.data) == keccak256(value); }"
+  , "function frameFail(uint value) internal { require(frameLeaf(value)); revert(\"context probe\"); }"
+  , "function callContext(uint value) returns (bool) { value++; bool checked = frameLeaf(value); try { frameFail(value); } catch {} return checked && msg.sig == \"callContext\" && keccak256(msg.data) == keccak256(value - 1); }"
   , "function recovery() returns (bool) { return ecrecover(hex\"0000000000000000000000000000000000000000000000000000000000000000\",27,\"0x0\",0) == address(0); }"
   , "function modular() returns (bool) { return addmod(7,5,3) == 0 && mulmod(7,5,3) == 2; }"
   , "function hashes() returns (bool) { variadic args = variadic(1,\"abc\"); return keccak256(1,\"abc\") == keccak256(args); }"
@@ -88,6 +91,10 @@ main = do
         unless (show (erException result, erReturnVal result) == show (Nothing :: Maybe String, Just $ SBool True)) $
           fail $ T.unpack function ++ ": " ++ show (erException result, erReturnVal result)
         putStrLn $ "TYPED " ++ T.unpack function ++ " passed"
+    context <- call $ def & callCodeAddress .~ 0x3900 & callFuncName .~ "callContext" & callArgs . argsArgs .~ ["7"]
+    liftIO $ case (erException context, erReturnVal context) of
+      (Nothing, Just (SBool True)) -> putStrLn "TYPED SM call context restores after internal calls and caught failures"
+      _ -> fail $ show (erException context, erReturnVal context)
     destroyed <- create $ def & createNewAddress .~ 0x3910 & createContractName .~ "DestroyProbe"
       & createCode .~ Code "contract DestroyProbe { function remove() returns (bool) { return selfdestruct(address(0xabc)); } }"
     liftIO $ unless (show (erException destroyed) == "Nothing") $ fail $ show $ erException destroyed

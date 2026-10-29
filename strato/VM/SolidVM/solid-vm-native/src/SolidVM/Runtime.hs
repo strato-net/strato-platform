@@ -5,44 +5,36 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module SolidVM.Runtime (compiledContract, compiledFunction, constructorStage, runAction, getCodeAndCollection, Host (..)) where
+module SolidVM.Runtime (compiledContract, compiledFunction, constructorStage, runAction, getCodeAndCollection, internalFrame, messageSignature, messageArguments, callContract, encodeArguments, createCode, derive, createContract, copyStorage, emitContractEvent, previousBlock, proposer) where
 
-import Blockchain.DB.SolidStorageDB
-import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Metered
-import Blockchain.SolidVM.Builtins.Size.Values (basicSize)
-import qualified Blockchain.Data.BlockHeader as BlockHeader
+import SolidVM.Model.Storable (StoragePath)
+import qualified Data.ByteString as B
+import qualified Control.Monad.Change.Modify as Mod
+import {-# SOURCE #-} qualified SolidVM.Blockchain as Blockchain
+import SolidVM.Events (emitEventValuesForContract)
 import Blockchain.SolidVM.CodeCollectionDB (ParseOptions (..))
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
-import Blockchain.SolidVM.SM hiding (getCodeAndCollection)
+import Blockchain.SolidVM.SM hiding (action, getCodeAndCollection)
 import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Control.Lens ((^.))
 import Control.Monad
-import Control.Monad.Trans.Reader (runReaderT)
 import qualified SolidVM.Core as N
 import qualified SolidVM.Compile as N
 import qualified Data.Cache.LRU as LRU
 import Data.IORef
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
-import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import qualified Data.Vector as V
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.Value
 import System.IO.Unsafe (unsafePerformIO)
-import UnliftIO (catch, liftIO, throwIO, try, withRunInIO)
+import UnliftIO (bracket, catch, liftIO, throwIO)
 import SolidVM.Values
 import SolidVM.Storage (getVar, setVar)
 import qualified Blockchain.SolidVM.Builtins.ABI.Values as ABI
 import Blockchain.Data.ProposalFacts
-
-data Host = Host
-  { hostCreateCode :: Maybe Value -> T.Text -> T.Text -> ValList -> SM Address
-  , hostSelfdestruct :: Address -> SM Bool
-  , hostPreviousBlock :: SM ProposalFacts
-  , hostDerive :: Address -> T.Text -> T.Text -> ValList -> SM Address
-  }
 
 getCodeAndCollection :: Address -> SM (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection = getCodeAndCollectionWithTypeCheck False
@@ -92,108 +84,126 @@ constructorStage hsh cc contract stage = do
     _ -> throwIO $ N.NativeUnavailable ("compiled constructor stage unavailable: " <> stage)
 
 runAction ::
-  (Integer -> SM ()) ->
-  (Address -> Address -> CC.FunctionCallType -> T.Text -> ValList -> SM (Maybe Value)) ->
-  (T.Text -> Maybe (SM Value) -> SM ValList -> SM Address) ->
-  Host ->
-  (T.Text -> T.Text -> [Value] -> SM ()) ->
   CC.CodeCollection -> CC.Contract -> T.Text -> N.Fun -> ValList -> SM (Maybe Value)
-runAction charge callFunction createContract host emit cc contract name (N.Fun _ sig fun) values = do
-  nativeEnv <- getEnv
-  info <- getCurrentCallInfo
+runAction cc contract name (N.Fun _ sig fun) values = do
   let ctx = N.mkCtx cc contract
   args <- convertArgs (N.cStorage ctx) sig values
-  let frameValues = if N.variadicTail sig then
+  let messageValues = if N.variadicTail sig then
         let (fixed, remaining) = splitAt (N.sigArity sig - 1) values
          in fixed ++ [case remaining of [SVariadic vs] -> SVariadic vs; vs -> SVariadic vs]
         else values
-  frameArgs <- traverse (valueDynAt (currentAddress info) (N.cStorage ctx)) frameValues
-  let fr = N.Frame
-        { N.fThis = currentAddress info
-        , N.fCode = currentCodeAddress info
-        , N.fSender = Env.sender nativeEnv
-        , N.fOrigin = Env.origin nativeEnv
-        , N.fSig = name
-        , N.fArgs = frameArgs
-        , N.fValue = 0
-        }
-  out <- withRunInIO $ \run -> do
-    let runtime = N.RT
-          { N.rtChargeGas = \amount -> run $ charge amount
-          , N.rtGet = \a p -> run $ Metered.storageRead basicSize (getSolidStorageKeyVal' a p)
-          , N.rtPut = \a p v -> run $ do
-              ci <- getCurrentCallInfo
-              when (readOnly ci) $ throwIO (InvalidWrite "native write during read-only access" (show p))
-              Metered.storageWrite (basicSize v)
-              markDiffForAction a p v
-              putSolidStorageKeyVal' a p v
-          , N.rtEmit = \_ contractName event fields -> run $ emit contractName event =<< traverse (toValue . snd) fields
-          , N.rtCall = \kind caller addr fn ds expected -> run $ do
-              vals <- traverse toValue ds
-              depth <- getCallStackDepth
-              result <- try $ callFunction (N.fThis caller) addr
-                (case kind of N.Call -> CC.DefaultCall; N.RawCall -> CC.RawCall; N.DelegateCall -> CC.DelegateCall) fn vals
-              case result of
-                Left (e :: SolidException) -> do
-                  trimCallStackToDepth depth
-                  throwIO e
-                Right ret -> do
-                  let storageAddr = case kind of N.DelegateCall -> N.fThis caller; _ -> addr
-                  case expected of
-                    Just (N.SomeTy N.TUnit) -> pure []
-                    Just (N.SomeTy t) | not (isVariadic t) -> case ret of
-                      Just v -> N.retDyn t <$> valueAsAt storageAddr (N.cStorage ctx) t v
-                      Nothing -> throwIO $ N.Divergence "native external call returned no value"
-                    _ -> case ret of
-                      Nothing -> pure [N.Dyn N.TUnit ()]
-                      Just SNULL -> pure [N.Dyn N.TUnit ()]
-                      Just v -> do
-                        (callee, _, collection) <- getCodeAndCollection addr
-                        let calleeCtx = N.mkCtx collection callee
-                        case v of
-                          STuple xs -> traverse (valueDynAt storageAddr (N.cStorage calleeCtx) <=< weakGetVar) (V.toList xs)
-                          SVariadic vs -> do
-                            returnedValues <- traverse (valueDynAt storageAddr (N.cStorage calleeCtx)) vs
-                            pure $ case expected of
-                              Just (N.SomeTy N.TRaw) -> [N.Dyn N.TVariadic returnedValues]
-                              _ -> returnedValues
-                          _ -> (: []) <$> valueDynAt storageAddr (N.cStorage calleeCtx) v
-          , N.rtAbiEncode = \packed ds -> run $ do
-              vals <- traverse toValue ds
-              (if packed then ABI.abiEncodePacked else ABI.abiEncode) vals
-          , N.rtCreateCode = \salt contractName source ds -> run $ unwind $ do
-              saltValue <- traverse toValue salt
-              vals <- traverse toValue ds
-              hostCreateCode host saltValue contractName source vals
-          , N.rtSelfdestruct = \target -> run $ hostSelfdestruct host target
-          , N.rtPreviousBlock = run $ do
-              facts <- hostPreviousBlock host
-              pure (pfProposer facts, pfIntendedProposer facts, pfRound facts)
-          , N.rtProposer = run $ Env.proposer <$> getEnv
-          , N.rtCopyStorage = \destination source -> run $
-              setVar (Constant $ SReference destination) =<< getVar (Constant $ SReference source)
-          , N.rtDerive = \creator salt contractName ds -> run $
-              hostDerive host creator salt contractName =<< traverse toValue ds
-          , N.rtSender = \_ -> run $ Env.sender <$> getEnv
-          , N.rtCreate = \_ contractName getSalt getArgs -> run $ do
-              depth <- getCallStackDepth
-              result <- try $ createContract contractName ((\salt -> toValue =<< liftIO salt) <$> getSalt) (traverse toValue =<< liftIO getArgs)
-              case result of
-                Left (e :: SolidException) -> do
-                  trimCallStackToDepth depth
-                  throwIO e
-                Right address -> pure address
-          , N.rtBlockNumber = BlockHeader.number (Env.blockHeader nativeEnv)
-          , N.rtTimestamp = round $ utcTimeToPOSIXSeconds $ BlockHeader.timestamp (Env.blockHeader nativeEnv)
-          }
-    runReaderT (N.callDyn sig fun args) (runtime, fr)
-      `catch` (\(N.Revert message) -> throwIO (Require (Just (T.unpack message))))
-
+  out <- withCallArguments name messageValues (N.callDyn sig fun args)
+    `catch` (\(N.Revert message) -> throwIO (Require (Just (T.unpack message))))
   case out of
     [] -> pure Nothing
     [N.Dyn N.TUnit ()] -> pure Nothing
     [d] -> Just <$> toValue d
     ds -> Just . STuple . V.fromList . map Constant <$> traverse toValue ds
+
+withCallArguments :: T.Text -> ValList -> SM a -> SM a
+withCallArguments name values operation = bracket acquire restore (const operation)
+  where
+    acquire :: SM (Int, T.Text, ValList)
+    acquire = do
+      info <- getCurrentCallInfo
+      depth <- getCallStackDepth
+      Mod.modify_ (Mod.Proxy :: Mod.Proxy [CallInfo]) $ \stack -> pure $ case stack of
+        current : rest -> current {currentFunctionName = name, currentArguments = values} : rest
+        [] -> stack
+      pure (depth, currentFunctionName info, currentArguments info)
+    restore :: (Int, T.Text, ValList) -> SM ()
+    restore (depth, previousName, previousArgs) =
+      Mod.modify_ (Mod.Proxy :: Mod.Proxy [CallInfo]) $ \stack -> pure $
+        let (nested, caller) = splitAt (max 0 (length stack - depth)) stack
+         in nested ++ case caller of
+              current : rest -> current {currentFunctionName = previousName, currentArguments = previousArgs} : rest
+              [] -> []
+
+messageSignature :: SM T.Text
+messageSignature = currentFunctionName <$> getCurrentCallInfo
+
+messageArguments :: SM [N.Dyn]
+messageArguments = do
+  info <- getCurrentCallInfo
+  let ctx = N.mkCtx (codeCollection info) (currentContract info)
+  traverse (valueDynAt (currentAddress info) (N.cStorage ctx)) (currentArguments info)
+
+internalFrame :: T.Text -> N.Sig args r -> N.Fn args r -> N.Fn args r
+internalFrame name sig fun = go sig fun []
+  where
+    callName = maybe name id (T.stripPrefix "super." name)
+    go :: N.Sig as result -> N.Fn as result -> [N.Dyn] -> N.Fn as result
+    go (N.SigCons ty rest) action args = \value -> go rest (action value) (N.Dyn ty value : args)
+    go (N.SigNil _) action args = do
+      values <- traverse toValue (reverse args)
+      withCallArguments callName values action
+
+callContract :: N.CallKind -> Address -> T.Text -> [N.Dyn] -> Maybe N.SomeTy -> SM [N.Dyn]
+callContract kind address name args expected = unwind $ do
+  info <- getCurrentCallInfo
+  let ctx = N.mkCtx (codeCollection info) (currentContract info)
+      storageAddress = case kind of N.DelegateCall -> currentAddress info; _ -> address
+  values <- traverse toValue args
+  result <- Blockchain.call' (currentAddress info) address
+    (case kind of N.Call -> CC.DefaultCall; N.RawCall -> CC.RawCall; N.DelegateCall -> CC.DelegateCall) name values
+  case expected of
+    Just (N.SomeTy N.TUnit) -> pure []
+    Just (N.SomeTy ty) | not (isVariadic ty) -> case result of
+      Just value -> N.retDyn ty <$> valueAsAt storageAddress (N.cStorage ctx) ty value
+      Nothing -> throwIO $ N.Divergence "native external call returned no value"
+    _ -> case result of
+      Nothing -> pure [N.Dyn N.TUnit ()]
+      Just SNULL -> pure [N.Dyn N.TUnit ()]
+      Just value -> do
+        (callee, _, collection) <- getCodeAndCollection address
+        let calleeCtx = N.mkCtx collection callee
+        case value of
+          STuple xs -> traverse (valueDynAt storageAddress (N.cStorage calleeCtx) <=< weakGetVar) (V.toList xs)
+          SVariadic vs -> do
+            returnedValues <- traverse (valueDynAt storageAddress (N.cStorage calleeCtx)) vs
+            pure $ case expected of
+              Just (N.SomeTy N.TRaw) -> [N.Dyn N.TVariadic returnedValues]
+              _ -> returnedValues
+          _ -> (: []) <$> valueDynAt storageAddress (N.cStorage calleeCtx) value
+
+encodeArguments :: Bool -> [N.Dyn] -> SM B.ByteString
+encodeArguments packed args = do
+  values <- traverse toValue args
+  (if packed then ABI.abiEncodePacked else ABI.abiEncode) values
+
+createCode :: Maybe N.Dyn -> T.Text -> T.Text -> [N.Dyn] -> SM Address
+createCode salt name source args = unwind $ do
+  saltValue <- traverse toValue salt
+  values <- traverse toValue args
+  Blockchain.createCode saltValue name source values
+
+derive :: Address -> T.Text -> T.Text -> [N.Dyn] -> SM Address
+derive creator salt name args = Blockchain.derive creator salt name =<< traverse toValue args
+
+createContract :: T.Text -> Maybe (SM N.Dyn) -> SM [N.Dyn] -> SM Address
+createContract name salt args = unwind $
+  Blockchain.createContractValues name ((>>= toValue) <$> salt) (traverse toValue =<< args)
+
+copyStorage :: StoragePath -> StoragePath -> SM ()
+copyStorage destination source = setVar (Constant $ SReference destination) =<< getVar (Constant $ SReference source)
+
+emitContractEvent :: T.Text -> T.Text -> [(T.Text, N.Dyn)] -> SM ()
+emitContractEvent contractName event fields = do
+  (_, collection) <- getCurrentCodeCollection
+  contract <- maybe (missingType "event contract" contractName) pure $ M.lookup contractName (collection ^. CC.contracts)
+  info <- getCurrentCallInfo
+  let annotation = maybe (CC._contractContext contract) CC._funcContext $
+        M.lookup (currentFunctionName info) (currentContract info ^. CC.functions)
+  values <- traverse (toValue . snd) fields
+  void $ emitEventValuesForContract contract (CC.EmitStatement event [] annotation) event values
+
+previousBlock :: SM (Address, Address, Integer)
+previousBlock = do
+  facts <- Blockchain.getPrevBlockFacts
+  pure (pfProposer facts, pfIntendedProposer facts, pfRound facts)
+
+proposer :: SM Address
+proposer = Env.proposer <$> getEnv
 
 -- Nested contract failures must not leave frames behind when Solidity catches them.
 unwind :: SM a -> SM a

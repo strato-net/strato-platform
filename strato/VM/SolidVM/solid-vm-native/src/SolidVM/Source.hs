@@ -9,6 +9,7 @@
 -- Contract-to-address is a selected compatibility exception (see README.md).
 module SolidVM.Source where
 
+import Blockchain.SolidVM.SM (SM)
 import Control.Exception (throwIO)
 import Control.Lens ((^.), (&), (.~))
 import Control.Monad
@@ -34,6 +35,7 @@ import SolidVM.Model.CodeCollection hiding (DelegateCall, RawCall, Internal)
 import qualified SolidVM.Model.CodeCollection.Statement as S
 import SolidVM.Model.Storable (BasicValue (BDefault), StoragePath (..), StoragePathPiece (..))
 import qualified SolidVM.Model.Type as Ty
+import qualified SolidVM.Runtime as Runtime
 import SolidVM.Core hiding (Fun(..))
 import SolidVM.SourceCode
 import qualified SolidVM.SourceTemplate as SourceTemplate

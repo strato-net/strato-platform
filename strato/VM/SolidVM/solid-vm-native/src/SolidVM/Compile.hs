@@ -6,6 +6,7 @@
 -- Contract-to-address is a selected compatibility exception (see README.md).
 module SolidVM.Compile where
 
+import Blockchain.SolidVM.SM (SM)
 import Control.Exception (throwIO)
 import Control.Lens ((^.), (&), (.~))
 import Control.Monad
@@ -30,6 +31,7 @@ import SolidVM.Model.CodeCollection hiding (DelegateCall, RawCall, Internal)
 import qualified SolidVM.Model.CodeCollection.Statement as S
 import SolidVM.Model.Storable (BasicValue (BDefault), StoragePath (..), StoragePathPiece (..))
 import qualified SolidVM.Model.Type as Ty
+import {-# SOURCE #-} qualified SolidVM.Runtime as Runtime
 import SolidVM.Core
 import SolidVM.Code
 import qualified SolidVM.Builtins as Builtins
@@ -46,7 +48,7 @@ linkedAction :: a -> a
 linkedAction = id
 {-# INLINE linkedAction #-}
 
-constantCode :: Ty a -> a -> Code (b -> M a)
+constantCode :: Ty a -> a -> Code (b -> SM a)
 constantCode _ v = constantFunction (pureAction (plainCode v))
 {-# INLINE constantCode #-}
 valueCode :: Ty a -> a -> Code a
@@ -68,7 +70,7 @@ typedCode _ _ a = a
 typedBody :: [EnvTy] -> Ty r -> a -> a
 typedBody _ _ a = a
 {-# INLINE typedBody #-}
-typedUnary :: Ty a -> Ty b -> Code (a -> M b) -> Code (a -> M b)
+typedUnary :: Ty a -> Ty b -> Code (a -> SM b) -> Code (a -> SM b)
 typedUnary _ _ = id
 {-# INLINE typedUnary #-}
 typedSetter :: [EnvTy] -> Ty r -> a -> a

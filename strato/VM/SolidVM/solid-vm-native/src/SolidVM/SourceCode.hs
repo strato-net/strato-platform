@@ -2,6 +2,7 @@
 -- Inspection representations are never used by the executable compiler.
 module SolidVM.SourceCode where
 
+import Blockchain.SolidVM.SM (SM)
 import SolidVM.Core hiding (Fun(..))
 import qualified SolidVM.Core as Core
 import Data.Char (ord, isAscii, isAlphaNum)
@@ -77,42 +78,42 @@ actionProgram code = code { sourceExpression = LetE [PragmaD (LineP 0 "solidvm-a
 actionReturn :: Monad m => Code a -> Code (Action env m a)
 actionReturn code = Code (pure (runCode code)) (AppE (VarE 'pure) (toSource code)) Nothing Nothing (PureComputation code)
 
-actionCharge :: Integer -> Code (Action env M ())
+actionCharge :: Integer -> Code (Action env SM ())
 actionCharge gas = Code (inspectionOnly undefined) (AppE (VarE 'chargeAction) (toSource gas)) Nothing Nothing Ordinary
 
-actionStore :: Ty a -> Code StoragePath -> Code a -> Code (Action env M ())
+actionStore :: Ty a -> Code StoragePath -> Code a -> Code (Action env SM ())
 actionStore ty path value = Code (inspectionOnly undefined)
   (AppE (AppE (AppE (VarE 'storeAction) (toSource ty)) (toSource path)) (toSource value)) Nothing Nothing Ordinary
 
-referenceAction :: Ix ls (IORef a) -> Code (Action (Env ls) M a)
+referenceAction :: Ix ls (IORef a) -> Code (Action (Env ls) SM a)
 referenceAction index = Code (inspectionOnly undefined) (AppE (VarE 'readReference) (toSource index)) Nothing Nothing Ordinary
 
-valueAction :: Ix ls a -> Code (Action (Env ls) M a)
+valueAction :: Ix ls a -> Code (Action (Env ls) SM a)
 valueAction index = Code (inspectionOnly undefined) (AppE (VarE 'valueAt) (toSource index)) Nothing Nothing Ordinary
 
-actionAfter :: Integer -> Code (Action env M a) -> Code (Action env M a)
+actionAfter :: Integer -> Code (Action env SM a) -> Code (Action env SM a)
 actionAfter gas code = Code (inspectionOnly undefined)
   (AppE (AppE (VarE 'chargeActionAfter) (toSource gas)) (toSource code)) Nothing Nothing Ordinary
 
-actionThenResidual :: Code (Action env M a) -> Code (Action env M b) -> Code (Action env M b)
+actionThenResidual :: Code (Action env SM a) -> Code (Action env SM b) -> Code (Action env SM b)
 actionThenResidual first second = Code (inspectionOnly undefined)
   (DoE Nothing [NoBindS (toSource first), NoBindS (toSource second)]) Nothing Nothing Ordinary
 
-actionPureResidual :: Code (env -> a) -> Code (Action env M a)
+actionPureResidual :: Code (env -> a) -> Code (Action env SM a)
 actionPureResidual code = Code (inspectionOnly undefined)
   (AppE (AppE (VarE 'fmap) (toSource code)) (VarE 'askEnvironment)) Nothing Nothing Ordinary
 
-actionWritePath :: Ty a -> Code StoragePath -> Code (env -> a) -> Code (Action env M ())
+actionWritePath :: Ty a -> Code StoragePath -> Code (env -> a) -> Code (Action env SM ())
 actionWritePath ty path value = emitContextWrite ty (toSource path) (AppE (toSource value) (VarE (mkName "frame")))
 
-actionWriteValue :: Ty a -> Code (env -> StoragePath) -> Code a -> Code (Action env M ())
+actionWriteValue :: Ty a -> Code (env -> StoragePath) -> Code a -> Code (Action env SM ())
 actionWriteValue ty path value = emitContextWrite ty (AppE (toSource path) (VarE (mkName "frame"))) (toSource value)
 
-actionWriteResidual :: Ty a -> Code (env -> StoragePath) -> Code (env -> a) -> Code (Action env M ())
+actionWriteResidual :: Ty a -> Code (env -> StoragePath) -> Code (env -> a) -> Code (Action env SM ())
 actionWriteResidual ty path value = emitContextWrite ty
   (AppE (toSource path) (VarE (mkName "frame"))) (AppE (toSource value) (VarE (mkName "frame")))
 
-emitContextWrite :: Ty a -> Exp -> Exp -> Code (Action env M ())
+emitContextWrite :: Ty a -> Exp -> Exp -> Code (Action env SM ())
 emitContextWrite ty path value = Code (inspectionOnly undefined)
   (AppE (VarE 'contextAction) (LamE [VarP (mkName "frame")]
     (AppE (AppE (AppE (VarE 'writeVal) (toSource ty)) path) value))) Nothing Nothing Ordinary
@@ -121,15 +122,15 @@ applyResidual :: Code (a -> b) -> Code a -> Code b
 applyResidual function argument = Code (runCode function (runCode argument))
   (AppE (toSource function) (toSource argument)) Nothing Nothing Ordinary
 
-bindResidual :: Code (M a) -> Code (a -> M b) -> Code (M b)
+bindResidual :: Code (SM a) -> Code (a -> SM b) -> Code (SM b)
 bindResidual first continuation = Code (inspectionOnly undefined)
   (InfixE (Just (toSource first)) (VarE '(>>=)) (Just (toSource continuation))) Nothing Nothing Ordinary
 
-mapResidual :: Code (a -> b) -> Code (M a) -> Code (M b)
+mapResidual :: Code (a -> b) -> Code (SM a) -> Code (SM b)
 mapResidual function action = Code (inspectionOnly undefined)
   (AppE (AppE (VarE 'fmap) (toSource function)) (toSource action)) Nothing Nothing Ordinary
 
-applyActionResidual :: Code (M (a -> b)) -> Code (M a) -> Code (M b)
+applyActionResidual :: Code (SM (a -> b)) -> Code (SM a) -> Code (SM b)
 applyActionResidual function action = Code (inspectionOnly undefined)
   (InfixE (Just (toSource function)) (VarE '(<*>)) (Just (toSource action))) Nothing Nothing Ordinary
 
@@ -139,14 +140,14 @@ integerCode value = withForm (IntegerValue value) (valueCode TInt value)
 listCode :: [Code a] -> Code [a]
 listCode codes = Code (map runCode codes) (ListE (map toSource codes)) Nothing Nothing Ordinary
 
-sequenceResidual :: [Code (M a)] -> Code (M [a])
+sequenceResidual :: [Code (SM a)] -> Code (SM [a])
 sequenceResidual codes = Code (inspectionOnly undefined)
   (AppE (VarE 'sequence) (ListE (map toSource codes))) Nothing Nothing Ordinary
 
 unitCode :: Code ()
 unitCode = Code () (TupE []) Nothing Nothing UnitValue
 
-emitUnitSteps :: [ActionStep] -> Code (M ())
+emitUnitSteps :: [ActionStep] -> Code (SM ())
 emitUnitSteps steps = Code (inspectionOnly undefined) expression Nothing Nothing Ordinary
   where
     expression = case statements steps of
@@ -156,13 +157,13 @@ emitUnitSteps steps = Code (inspectionOnly undefined) expression Nothing Nothing
     statements (step : rest@(_ : _)) = actionStatement step : statements rest
     statements remaining = map actionStatement remaining
 
-emitResultSteps :: [ActionStep] -> Code a -> Code (M a)
+emitResultSteps :: [ActionStep] -> Code a -> Code (SM a)
 emitResultSteps steps value = emitSteps steps (AppE (VarE 'pure) (toSource value))
 
-emitResidualSteps :: [ActionStep] -> Code (M a) -> Code (M a)
+emitResidualSteps :: [ActionStep] -> Code (SM a) -> Code (SM a)
 emitResidualSteps steps final = emitSteps steps (toSource final)
 
-emitSteps :: [ActionStep] -> Exp -> Code (M a)
+emitSteps :: [ActionStep] -> Exp -> Code (SM a)
 emitSteps steps final = Code (inspectionOnly undefined)
   (DoE Nothing (map actionStatement steps ++ [NoBindS final])) Nothing Nothing Ordinary
 
@@ -183,7 +184,7 @@ localResidual :: Ix ls a -> Code (Env ls) -> Code a
 localResidual index code = Code (localValue index (runCode code))
   (AppE (AppE (VarE 'localValue) (toSource index)) (toSource code)) Nothing Nothing Ordinary
 
-afterResidual :: Integer -> Code (M a) -> Code (M a)
+afterResidual :: Integer -> Code (SM a) -> Code (SM a)
 afterResidual gas code = Code (inspectionOnly undefined) expression Nothing Nothing Ordinary
   where
     action = mkName "residual_action"
@@ -195,7 +196,7 @@ optionalCode codes = Code (runCode <$> codes) (toSource codes) Nothing Nothing O
 
 -- A do block is the syntax for this same right-associated chain of binds.
 -- Command expressions remain separate: only bind continuations are expanded.
-bindChainResidual :: T.Text -> Code (M a) -> [Code (a -> M a)] -> Code (a -> M b) -> Code (M b)
+bindChainResidual :: T.Text -> Code (SM a) -> [Code (a -> SM a)] -> Code (a -> SM b) -> Code (SM b)
 bindChainResidual name initial commands final = Code executable expression Nothing Nothing Ordinary
   where
     executable = bindActionChain (runCode initial) (map runCode commands) (runCode final)
@@ -381,7 +382,7 @@ instance ToSource Dyn where
 valueCode :: Ty a -> a -> Code a
 valueCode t value = Code value (literal t value) Nothing Nothing Ordinary
 
-constantCode :: Ty a -> a -> Code (b -> M a)
+constantCode :: Ty a -> a -> Code (b -> SM a)
 constantCode t v = constantFunction (pureAction (valueCode t v))
 
 namedCode :: T.Text -> Code a -> Code a
@@ -438,7 +439,7 @@ haskellType = \case
     fieldTypes (FCons _ t rest) = AppT (AppT PromotedConsT (haskellType t)) (fieldTypes rest)
 
 signatureType :: Sig args r -> Type
-signatureType (SigNil r) = AppT (ConT ''M) (haskellType r)
+signatureType (SigNil r) = AppT (ConT ''SM) (haskellType r)
 signatureType (SigCons t rest) = AppT (AppT ArrowT (haskellType t)) (signatureType rest)
 
 functionDeclarations :: Fun -> [Dec]
@@ -456,13 +457,13 @@ arrow :: Type -> Type -> Type
 arrow a b = AppT (AppT ArrowT a) b
 
 monadType :: Type -> Type
-monadType = AppT (ConT ''M)
+monadType = AppT (ConT ''SM)
 
 annotate :: Type -> Code a -> Code a
 annotate t code = code { codeType = Just t, codeForm = form, sourceExpression = expression }
   where
     expression = case t of
-      AppT (ConT monad) _ | monad == ''M || monad == ''IO ->
+      AppT (ConT monad) _ | monad == ''SM || monad == ''IO ->
         LetE [PragmaD (LineP 0 "solidvm-action")] residual
       _ -> residual
     residual = annotateFunctionExpression t form (sourceExpression code)
@@ -478,7 +479,7 @@ annotateForm t form = case (t, form) of
   (AppT _ result, PureAction value) | nestedMonad result -> PureAction (annotate result value)
   _ -> form
   where
-    nestedMonad (AppT (ConT monad) _) | monad == ''M || monad == ''IO = True
+    nestedMonad (AppT (ConT monad) _) | monad == ''SM || monad == ''IO = True
     nestedMonad (AppT function argument) = nestedMonad function || nestedMonad argument
     nestedMonad _ = False
 
@@ -488,27 +489,27 @@ annotateFunctionExpression t (FunctionSequence steps end) _ = actionFunctionExpr
 annotateFunctionExpression t (ActionFunction action) _ = actionFunctionExpression (Just t) action
 annotateFunctionExpression _ _ expression = expression
 
-typedCode :: [EnvTy] -> Ty r -> Code (Env ls -> M r) -> Code (Env ls -> M r)
+typedCode :: [EnvTy] -> Ty r -> Code (Env ls -> SM r) -> Code (Env ls -> SM r)
 typedCode env r = annotate (arrow (environmentType env) (monadType (haskellType r)))
 
-typedBody :: [EnvTy] -> Ty r -> Code (Env ls -> M (Flow r)) -> Code (Env ls -> M (Flow r))
+typedBody :: [EnvTy] -> Ty r -> Code (Env ls -> SM (Flow r)) -> Code (Env ls -> SM (Flow r))
 typedBody env r = annotate (arrow (environmentType env) (monadType (AppT (ConT ''Flow) (haskellType r))))
 
-typedUnary :: Ty a -> Ty b -> Code (a -> M b) -> Code (a -> M b)
+typedUnary :: Ty a -> Ty b -> Code (a -> SM b) -> Code (a -> SM b)
 typedUnary a b = annotate (arrow (haskellType a) (monadType (haskellType b)))
 
-typedSetter :: [EnvTy] -> Ty a -> Code (Env ls -> a -> M ()) -> Code (Env ls -> a -> M ())
+typedSetter :: [EnvTy] -> Ty a -> Code (Env ls -> a -> SM ()) -> Code (Env ls -> a -> SM ())
 typedSetter env t = annotate (arrow (environmentType env) (arrow (haskellType t) (monadType (TupleT 0))))
 
-typedPath :: [EnvTy] -> Code (Env ls -> M (Maybe StoragePath)) -> Code (Env ls -> M (Maybe StoragePath))
+typedPath :: [EnvTy] -> Code (Env ls -> SM (Maybe StoragePath)) -> Code (Env ls -> SM (Maybe StoragePath))
 typedPath env = annotate (arrow (environmentType env) (monadType (AppT (ConT ''Maybe) (ConT ''StoragePath))))
 
-typedDestination :: [EnvTy] -> Ty a -> Code (Env ls -> M (Maybe StoragePath, M a, a -> M ())) -> Code (Env ls -> M (Maybe StoragePath, M a, a -> M ()))
+typedDestination :: [EnvTy] -> Ty a -> Code (Env ls -> SM (Maybe StoragePath, SM a, a -> SM ())) -> Code (Env ls -> SM (Maybe StoragePath, SM a, a -> SM ()))
 typedDestination env t = annotate (arrow (environmentType env) (monadType
   (AppT (AppT (AppT (TupleT 3) (AppT (ConT ''Maybe) (ConT ''StoragePath))) (monadType (haskellType t)))
     (arrow (haskellType t) (monadType (TupleT 0))))))
 
-typedCall :: Sig args r -> Code (Fn args r -> HL args -> M r) -> Code (Fn args r -> HL args -> M r)
+typedCall :: Sig args r -> Code (Fn args r -> HL args -> SM r) -> Code (Fn args r -> HL args -> SM r)
 typedCall sig code = code { codeType = Just (arrow (signatureType sig)
   (arrow (AppT (ConT ''HL) (arguments sig)) (monadType (haskellType (sigRet sig))))) }
   where
@@ -516,7 +517,7 @@ typedCall sig code = code { codeType = Just (arrow (signatureType sig)
     arguments (SigNil _) = PromotedNilT
     arguments (SigCons t rest) = AppT (AppT PromotedConsT (haskellType t)) (arguments rest)
 
-typedGetter :: Sig args r -> Code (StoragePath -> Env (RefTypes args) -> M r) -> Code (StoragePath -> Env (RefTypes args) -> M r)
+typedGetter :: Sig args r -> Code (StoragePath -> Env (RefTypes args) -> SM r) -> Code (StoragePath -> Env (RefTypes args) -> SM r)
 typedGetter sig = annotate (arrow (ConT ''StoragePath) (arrow (signatureEnvironment sig) (monadType (haskellType (sigRet sig)))))
 
 signatureEnvironment :: Sig args r -> Type
@@ -526,18 +527,18 @@ signatureEnvironment = environmentType . types
     types (SigNil _) = []
     types (SigCons t rest) = RefSlot t : types rest
 
-typedSnapshot :: Sig args r -> Code (Env (RefTypes args) -> M [Dyn]) -> Code (Env (RefTypes args) -> M [Dyn])
+typedSnapshot :: Sig args r -> Code (Env (RefTypes args) -> SM [Dyn]) -> Code (Env (RefTypes args) -> SM [Dyn])
 typedSnapshot sig = annotate (arrow (signatureEnvironment sig) (monadType (AppT ListT (ConT ''Dyn))))
 
-typedDestructure :: [EnvTy] -> Fields ts -> Ty r -> Code (Env ls -> HL ts -> M (Flow r)) -> Code (Env ls -> HL ts -> M (Flow r))
+typedDestructure :: [EnvTy] -> Fields ts -> Ty r -> Code (Env ls -> HL ts -> SM (Flow r)) -> Code (Env ls -> HL ts -> SM (Flow r))
 typedDestructure env fs r = annotate (arrow (environmentType env)
   (arrow (haskellType (TTuple fs)) (monadType (AppT (ConT ''Flow) (haskellType r)))))
 
-typedTupleSetters :: [EnvTy] -> Fields ts -> Code (Env ls -> M (HL ts -> M ())) -> Code (Env ls -> M (HL ts -> M ()))
+typedTupleSetters :: [EnvTy] -> Fields ts -> Code (Env ls -> SM (HL ts -> SM ())) -> Code (Env ls -> SM (HL ts -> SM ()))
 typedTupleSetters env fs = annotate (arrow (environmentType env)
   (monadType (arrow (haskellType (TTuple fs)) (monadType (TupleT 0)))))
 
-emitFunction :: [FunctionStep env] -> FunctionEnd env a -> Code (env -> M a)
+emitFunction :: [FunctionStep env] -> FunctionEnd env a -> Code (env -> SM a)
 emitFunction [] (ResidualFunction code) = code
 emitFunction steps end = Code (inspectionOnly undefined) (actionFunctionExpression Nothing (functionAction steps end)) Nothing Nothing (FunctionSequence steps end)
 
@@ -555,11 +556,11 @@ hlistCode a b = Code (runCode a :* runCode b) (app '(:*) [toSource a, toSource b
 hlistConstructor :: Code (a -> HL ls -> HL (a ': ls))
 hlistConstructor = Code (:*) (ConE '(:*)) Nothing Nothing Ordinary
 
-writePrimitiveResidual :: Ty a -> Code (StoragePath -> a -> M ())
+writePrimitiveResidual :: Ty a -> Code (StoragePath -> a -> SM ())
 writePrimitiveResidual ty = Code (inspectionOnly undefined)
   (AppE (VarE 'writeVal) (toSource ty)) Nothing Nothing Ordinary
 
-writeFunctionResidual :: Ty a -> Code StoragePath -> Code (a -> M ())
+writeFunctionResidual :: Ty a -> Code StoragePath -> Code (a -> SM ())
 writeFunctionResidual ty code = Code (inspectionOnly undefined)
   (AppE (AppE (VarE 'writeVal) (toSource ty)) (toSource code)) Nothing Nothing Ordinary
 
@@ -591,15 +592,15 @@ primitiveCode primitive = Code (inspectionOnly undefined) expression Nothing Not
       RetDynPrimitive ty -> AppE (VarE 'retDyn) (toSource ty)
       ApplyLastPrimitive -> VarE 'applyLast
 
-mapComputation :: Code (a -> b) -> Code (Action env M a) -> Code (Action env M b)
+mapComputation :: Code (a -> b) -> Code (Action env SM a) -> Code (Action env SM b)
 mapComputation function action = Code (inspectionOnly undefined)
   (AppE (AppE (VarE 'fmap) (toSource function)) (toSource action)) Nothing Nothing Ordinary
 
-applyComputation :: Code (Action env M (a -> b)) -> Code (Action env M a) -> Code (Action env M b)
+applyComputation :: Code (Action env SM (a -> b)) -> Code (Action env SM a) -> Code (Action env SM b)
 applyComputation function action = Code (inspectionOnly undefined)
   (InfixE (Just (toSource function)) (VarE '(<*>)) (Just (toSource action))) Nothing Nothing Ordinary
 
-traverseFunctionResidual :: [Code (env -> M a)] -> Code (env -> M [a])
+traverseFunctionResidual :: [Code (env -> SM a)] -> Code (env -> SM [a])
 traverseFunctionResidual functions = Code (inspectionOnly undefined)
   (LamE [VarP environment] (AppE (AppE (VarE 'mapM)
     (InfixE Nothing (VarE '($)) (Just (VarE environment)))) (ListE (map toSource functions))))
@@ -618,14 +619,14 @@ dropEnvironmentResidual function = Code (inspectionOnly undefined)
     (AppE (toSource function) (VarE environment))) Nothing Nothing Ordinary
   where environment = mkName "environment"
 
-bindEnvironmentResidual :: Code (Env ls -> M a) -> Code (Env (a ': ls) -> M b) -> Code (Env ls -> M b)
+bindEnvironmentResidual :: Code (Env ls -> SM a) -> Code (Env (a ': ls) -> SM b) -> Code (Env ls -> SM b)
 bindEnvironmentResidual initial next = Code (inspectionOnly undefined)
   (LamE [VarP environment] (DoE Nothing
     [BindS (VarP value) (AppE (toSource initial) (VarE environment)),
      NoBindS (AppE (toSource next) (app '(:&) [VarE value, VarE environment]))])) Nothing Nothing Ordinary
   where environment = mkName "environment"; value = mkName "value"
 
-functionBindResidual :: Code (env -> M a) -> Code (env -> a -> M b) -> Code (env -> M b)
+functionBindResidual :: Code (env -> SM a) -> Code (env -> a -> SM b) -> Code (env -> SM b)
 functionBindResidual first next = Code (inspectionOnly undefined)
   (LamE [VarP environment] (InfixE (Just (AppE (toSource first) (VarE environment)))
     (VarE '(>>=)) (Just (AppE (toSource next) (VarE environment))))) Nothing Nothing Ordinary
@@ -637,5 +638,5 @@ extendValueAt environment function = Code (inspectionOnly undefined)
   Nothing Nothing Ordinary
   where value = mkName "value"
 
-emitGasResult :: Integer -> Code a -> Code (M a)
+emitGasResult :: Integer -> Code a -> Code (SM a)
 emitGasResult gas = emitResultSteps [GasStep gas]

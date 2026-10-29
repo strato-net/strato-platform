@@ -25,6 +25,7 @@ module SolidVM.Blockchain
     create,
     callReturnEnv,
     createReturnEnv,
+    call', createContractValues, createCode, selfdestruct, derive, getPrevBlockFacts,
   )
 where
 
@@ -45,9 +46,7 @@ import qualified Blockchain.SolidVM.Builtins.Contracts.Metered as ContractBuilti
 import Blockchain.SolidVM.SM hiding (action)
 import SolidVM.Storage
 import SolidVM.Values
-import SolidVM.Events
 import SolidVM.Gas
-import qualified SolidVM.Core as N
 import qualified SolidVM.Runtime as Runtime
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
@@ -574,7 +573,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
   let runStage stage = do
         fun <- Runtime.constructorStage hsh cc contract' stage
         values <- liftIO $ readIORef nativeArgs
-        result <- runAction cc contract' "constructor" (CC._contractContext contract') fun values
+        result <- Runtime.runAction cc contract' "constructor" fun values
         if stage == "<constructor>" then pure result else case result of
           Just (STuple outputs) -> case V.toList outputs of
             [updatedVar, valueVar] -> do
@@ -695,16 +694,8 @@ runTheCallValidated validation address codeAddress contract name hsh cc original
   fun <- Runtime.compiledFunction hsh cc contract name selected
   Metered.functionEntry (ValueArguments values)
   result <- withCallInfo address codeAddress contract name hsh cc M.empty ro ff $
-    runAction cc contract name (CC._funcContext selected) fun values
+    Runtime.runAction cc contract name fun values
   pure (selected ^. CC.funcVals, result)
-
-runAction :: CC.CodeCollection -> CC.Contract -> T.Text -> SourceAnnotation () -> N.Fun -> ValList -> SM (Maybe Value)
-runAction cc contract name annotation = Runtime.runAction (decrementGas . Gas) call' createContractValues host emit cc contract name
-  where
-    host = Runtime.Host createCode selfdestruct getPrevBlockFacts derive
-    emit eventContractName event values = do
-      eventContract <- maybe (missingType "event contract" eventContractName) pure $ M.lookup eventContractName (cc ^. CC.contracts)
-      void $ emitEventValuesForContract eventContract (CC.EmitStatement event [] annotation) event values
 
 createCode :: Maybe Value -> T.Text -> T.Text -> ValList -> SM Address
 createCode salt name source args = do

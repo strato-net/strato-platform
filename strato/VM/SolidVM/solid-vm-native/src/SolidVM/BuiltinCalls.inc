@@ -33,7 +33,7 @@ lookupBuiltinCall sc abiMember name args = do
       "create2" -> Just (dynamicCall TAddr (EMIT_BEGIN (Builtins.create True) EMIT_END))
       _ -> Nothing
 
-    dynamicCall :: Ty result -> Code ([Dyn] -> M Dyn) -> C (CE ls)
+    dynamicCall :: Ty result -> Code ([Dyn] -> SM Dyn) -> C (CE ls)
     dynamicCall result dynamic = do
       values <- compileDynArgs sc args
       pure $ CE result $ (CAPTURE2 values dynamic $ \compiled_values compiled_dynamic ->
@@ -57,14 +57,14 @@ lookupBuiltinFunction sc name args = select name
       CE t _ <- compileE sc expression
       pure (SomeTy t)
 
-    conversion :: Ty b -> (forall a. Ty a -> Code (a -> M b)) -> C SomeFunction
+    conversion :: Ty b -> (forall a. Ty a -> Code (a -> SM b)) -> C SomeFunction
     conversion result operation = do
       types <- argumentTypes
       case types of
         [SomeTy t] -> pure $ SomeFunction (SigCons t (SigNil result)) (operation t)
         _ -> typeErr ("invalid arguments to builtin " <> name)
 
-    integerCast :: Ty a -> Code (a -> M Integer)
+    integerCast :: Ty a -> Code (a -> SM Integer)
     integerCast t = case t of
       TInt -> EMIT_BEGIN (MeteredCasts.int) EMIT_END
       TDecimal -> EMIT_BEGIN (MeteredCasts.int) EMIT_END
@@ -76,7 +76,7 @@ lookupBuiltinFunction sc name args = select name
       TRef _ -> EMIT_BEGIN (const (MeteredCasts.int ())) EMIT_END
       _ -> EMIT_BEGIN (Builtins.invalidCast "integer cast" t) EMIT_END
 
-    decimalCast :: Ty a -> Code (a -> M Decimal)
+    decimalCast :: Ty a -> Code (a -> SM Decimal)
     decimalCast t = case t of
       TInt -> EMIT_BEGIN (MeteredCasts.decimal) EMIT_END
       TDecimal -> EMIT_BEGIN (MeteredCasts.decimal) EMIT_END
@@ -85,7 +85,7 @@ lookupBuiltinFunction sc name args = select name
       TRef _ -> EMIT_BEGIN (const (MeteredCasts.decimal ())) EMIT_END
       _ -> EMIT_BEGIN (Builtins.invalidCast "decimal cast" t) EMIT_END
 
-    addressCast :: Ty a -> Code (a -> M Address)
+    addressCast :: Ty a -> Code (a -> SM Address)
     addressCast t = case t of
       TAddr -> EMIT_BEGIN (MeteredCasts.address) EMIT_END
       TContract _ -> EMIT_BEGIN (MeteredCasts.address) EMIT_END
@@ -96,7 +96,7 @@ lookupBuiltinFunction sc name args = select name
       TRef _ -> EMIT_BEGIN (const (MeteredCasts.address ())) EMIT_END
       _ -> EMIT_BEGIN (Builtins.invalidCast "address cast" t) EMIT_END
 
-    stringCast :: Ty a -> Code (a -> M T.Text)
+    stringCast :: Ty a -> Code (a -> SM T.Text)
     stringCast t = case t of
       TStr -> EMIT_BEGIN (MeteredCasts.string) EMIT_END
       TAddr -> EMIT_BEGIN (MeteredCasts.string) EMIT_END
@@ -107,11 +107,11 @@ lookupBuiltinFunction sc name args = select name
       TRef _ -> EMIT_BEGIN (const (MeteredCasts.string ())) EMIT_END
       _ -> EMIT_BEGIN (Builtins.invalidCast "string cast" t) EMIT_END
 
-    destroyCast :: Ty a -> Code (a -> M Bool)
+    destroyCast :: Ty a -> Code (a -> SM Bool)
     destroyCast t = CAPTURE (addressCast t) $ \compiled_recipient ->
       EMIT_BEGIN (\value -> compiled_recipient value >>= Builtins.destroyAddress) EMIT_END
 
-    recoverFunction :: Ty a -> Code (a -> M (Integer -> Integer -> Integer -> M Address))
+    recoverFunction :: Ty a -> Code (a -> SM (Integer -> Integer -> Integer -> SM Address))
     recoverFunction t = case t of
       TBytes -> EMIT_BEGIN (pure . Metered.ecrecover) EMIT_END
       TInt -> EMIT_BEGIN (pure . Metered.ecrecover) EMIT_END
@@ -145,7 +145,7 @@ lookupBuiltinFunction sc name args = select name
           (EMIT_BEGIN (Builtins.createSaltedValue salt) EMIT_END)
         _ -> typeErr ("invalid arguments to builtin " <> name)
 
-    aggregate :: Ty result -> (forall as. Fields as -> Code (HL as -> M result)) -> C SomeFunction
+    aggregate :: Ty result -> (forall as. Fields as -> Code (HL as -> SM result)) -> C SomeFunction
     aggregate result body = do
       types <- argumentTypes
       case fieldsFor types of
