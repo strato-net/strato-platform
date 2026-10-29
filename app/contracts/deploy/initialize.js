@@ -122,7 +122,7 @@ async function initializeTarget(tokenObj, target, initializeArgs, owner) {
       gasLimit: config.gasLimit,
     },
   };
-  const callArgs = String(owner || "").toLowerCase() === ADMIN_REGISTRY
+  const callArgs = String(owner || "").toLowerCase().replace(/^0x/, "") === ADMIN_REGISTRY.toLowerCase().replace(/^0x/, "")
     ? await governedCallArgs(tokenObj, directCallArgs)
     : directCallArgs;
   const callOptions = {
