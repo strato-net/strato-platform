@@ -3,7 +3,7 @@ import test from "node:test";
 import JSONBig from "json-bigint";
 import { bloc, cirrus, eth, strato } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
-import { castVoteOnIssueById, createIssue, governedInput } from "./user.service";
+import { castVoteOnIssueById, createIssue, governedInput, ownerInput } from "./user.service";
 
 const JSONBigString = JSONBig({ storeAsString: true });
 
@@ -263,6 +263,39 @@ const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
 
   return posted;
 };
+
+test("ownerInput calls an account-owned target directly and votes through a registry owner", async (t) => {
+  const token = "0x3333333333333333333333333333333333333333";
+  const account = "4444444444444444444444444444444444444444";
+  const registry = "5555555555555555555555555555555555555555";
+  t.mock.method(bloc, "get", (async (_token: string, path: string) => {
+    if (path === `/contracts/contract/${token}/details`) {
+      return {
+        status: 200,
+        data: {
+          _contractName: "Token",
+          _functions: { setStatus: { _funcArgs: [["newStatus", { index: 0, type: { tag: "Int", signed: false, bytes: 32 } }]] } },
+        },
+      };
+    }
+    if (path === `/contracts/contract/${registry}/details`) {
+      return { status: 200, data: { _contractName: "AdminRegistry", _functions: { castVoteOnIssue: { _funcArgs: [] } } } };
+    }
+    return { status: 400, data: {} };
+  }) as typeof bloc.get);
+  const direct = { contractName: "Token", contractAddress: token, method: "setStatus", args: { newStatus: 2 } };
+
+  assert.deepEqual(await ownerInput("access-token", direct, account), direct);
+
+  const voted = await ownerInput("access-token", direct, registry);
+  assert.equal(voted.contractAddress, registry);
+  assert.equal(voted.method, "castVoteOnIssue");
+  assert.deepEqual(JSON.parse(JSON.stringify(voted.args)), {
+    _func: "setStatus",
+    _target: token,
+    _args: [{ type: "uint256", value: 2 }],
+  });
+});
 
 test("votes by replaying the original transaction when it decodes", async (t) => {
   const posted = mockVoteScenario(t, {

@@ -353,9 +353,9 @@ type ContractCall = {
 };
 
 // The registry call a vote resolves to, whose args it hashes into the issueId
-const castVoteCall = (target: string, func: string, typedArgs: any[]): ContractCall => ({
+const castVoteCall = (target: string, func: string, typedArgs: any[], registry: string = adminRegistry): ContractCall => ({
   contractName: extractContractName(AdminRegistry),
-  contractAddress: adminRegistry,
+  contractAddress: registry,
   method: "castVoteOnIssue",
   args: { _func: func, _target: target, _args: typedArgs },
 });
@@ -379,12 +379,24 @@ const governedArgs = (funcArgs: [string, AbiType][], args: any[]): any[] =>
 export const governedInput = async (
   accessToken: string,
   { contractAddress, method, args }: FunctionInput,
+  registry: string = adminRegistry,
 ): Promise<FunctionInput> => {
   const { funcArgs } = await fetchFuncArgs(accessToken, contractAddress, method);
   const positional = funcArgs.flatMap(([name, type]) =>
     type.tag === "Variadic" ? args[name] ?? [] : [args[name]]);
   const typedArgs = JSONBigString.parse(JSONBigNumber.stringify(governedArgs(funcArgs, positional)));
-  return castVoteCall(contractAddress, method, typedArgs);
+  return castVoteCall(contractAddress, method, typedArgs, registry);
+};
+
+// For a target an account may own: the direct call when its owner is an account, or a
+// vote through the owner when that is a registry (its ABI has castVoteOnIssue)
+export const ownerInput = async (
+  accessToken: string,
+  input: FunctionInput,
+  owner: string,
+): Promise<FunctionInput> => {
+  const details: any = await getContractDetails(accessToken, owner);
+  return details?._functions?.castVoteOnIssue ? governedInput(accessToken, input, owner) : input;
 };
 
 // Resolve an issue into the registry call that creates it, plus its args coerced to

@@ -76,16 +76,18 @@ export function MethodCaller({
   // Address params may have been entered as a username — use the resolution.
   const rawArg = (a: FuncArg) =>
     isPlainAddressType(a.type) ? resolvedAddrs[a.name] || values[a.name] : values[a.name];
+  // A blank string param is the empty string; any other blank param is missing.
+  const isMissing = (a: FuncArg) => a.type !== "string" && !rawArg(a);
   // castVoteOnIssue takes the args positionally, so none may be left out.
-  const missingArg = governed && args.some((a) => !rawArg(a));
+  const missingArg = governed && args.some(isMissing);
 
   // Build the FUNCTION payload once, so Simulate and Call submit identical data.
   const buildFunctionPayload = (): Record<string, unknown> => {
     const parsed: Record<string, unknown> = {};
     for (const a of args) {
       const isAddressArg = isPlainAddressType(a.type);
-      const raw = rawArg(a);
-      if (raw === undefined || raw === "") continue;
+      if (isMissing(a)) continue;
+      const raw = rawArg(a) ?? "";
       // Keep string- and address-typed params verbatim ("123" stays a string;
       // an all-digit address must not become a number); everything else gets a
       // bigint-safe parse ("42" -> 42, "[1,2]" -> array) with raw fallback —
