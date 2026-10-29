@@ -220,7 +220,9 @@ function getIssueId(receipt) {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
-const ADMIN_REGISTRY = process.env.ADMIN_REGISTRY_ADDRESS || '000000000000000000000000000000000000100c';
+const normalizeAddr = (value) => String(value || '').toLowerCase().replace(/^0x/, '');
+
+const ADMIN_REGISTRY = normalizeAddr(process.env.ADMIN_REGISTRY_ADDRESS || '000000000000000000000000000000000000100c');
 
 // Solidity name of a bloc ABI type, as a {type, value} argument hint spells it
 function solidityTypeName(type = {}) {
@@ -253,7 +255,7 @@ function solidityTypeName(type = {}) {
  * are positional and carry no ABI, so each is hinted with the target's declared type (unhinted, a
  * digit-only address becomes an int). Enum fields inside struct args must be ordinals.
  */
-async function governedCallArgs(tokenObj, { contract, method, args = {}, ...rest }, nodeUrl = config.nodes[0].url) {
+async function governedCallArgs(tokenObj, { contract, method, args = {}, registry = ADMIN_REGISTRY, ...rest }, nodeUrl = config.nodes[0].url) {
   const { data } = await axios.get(`${nodeUrl}/bloc/v2.2/contracts/contract/${contract.address}/details`, {
     headers: { Authorization: `Bearer ${tokenObj.token}` },
   });
@@ -268,10 +270,27 @@ async function governedCallArgs(tokenObj, { contract, method, args = {}, ...rest
     });
   return {
     ...rest,
-    contract: { address: ADMIN_REGISTRY, name: 'AdminRegistry' },
+    contract: { address: registry, name: 'AdminRegistry' },
     method: 'castVoteOnIssue',
     args: { _target: contract.address, _func: method, _args: hintedArgs },
   };
+}
+
+// Call args for an owner-only method on a proxy: sent as-is when an account owns the proxy,
+// voted through its owner when that owner is a registry (its ABI has castVoteOnIssue)
+async function proxyOwnerCallArgs(tokenObj, callArgs, nodeUrl = config.nodes[0].url) {
+  const proxy = normalizeAddr(callArgs.contract.address);
+  const [row] = await searchCirrusWithToken(tokenObj, 'BlockApps-Proxy', { address: `eq.${proxy}`, select: '_owner' });
+  if (!row) throw new Error(`Proxy ${proxy} not found in Cirrus`);
+  const owner = normalizeAddr(row._owner);
+  // bloc answers 400 for an address with no contract, i.e. an account
+  const { status, data } = await axios.get(`${nodeUrl}/bloc/v2.2/contracts/contract/${owner}/details`, {
+    headers: { Authorization: `Bearer ${tokenObj.token}` },
+    validateStatus: (code) => code === 200 || code === 400,
+  });
+  return status === 200 && data?._functions?.castVoteOnIssue
+    ? governedCallArgs(tokenObj, { ...callArgs, registry: owner }, nodeUrl)
+    : callArgs;
 }
 
 async function searchCirrusWithToken(tokenObj, tableName, params) {
@@ -402,4 +421,5 @@ module.exports = {
   getVoteResult,
   governedCallArgs,
   pollForCreateIssueExecution,
+  proxyOwnerCallArgs,
 };
