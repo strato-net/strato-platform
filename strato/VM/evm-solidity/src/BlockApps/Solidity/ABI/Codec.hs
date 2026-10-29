@@ -23,5 +23,5 @@ module BlockApps.Solidity.ABI.Codec
   )
 where
 
-import Blockchain.SolidVM.Builtins.ABI hiding (abiDecode)
-import Blockchain.SolidVM.Builtins.ABI.Values
+import SolidVM.Model.ABI hiding (abiDecode)
+import SolidVM.Model.ABI.Values

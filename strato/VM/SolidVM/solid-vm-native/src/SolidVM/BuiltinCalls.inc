@@ -20,8 +20,8 @@ lookupBuiltinCall sc abiMember name args = do
     selectDynamic = \case
       "keccak256" -> Just (dynamicCall TStr (EMIT_BEGIN Builtins.keccak EMIT_END))
       "ecrecover" -> Just (dynamicCall TAddr (EMIT_BEGIN Builtins.recover EMIT_END))
-      "addmod" -> Just (dynamicCall TInt (EMIT_BEGIN (Builtins.modular Shared.addmod) EMIT_END))
-      "mulmod" -> Just (dynamicCall TInt (EMIT_BEGIN (Builtins.modular Shared.mulmod) EMIT_END))
+      "addmod" -> Just (dynamicCall TInt (EMIT_BEGIN (Builtins.modular Metered.addmod) EMIT_END))
+      "mulmod" -> Just (dynamicCall TInt (EMIT_BEGIN (Builtins.modular Metered.mulmod) EMIT_END))
       "string" -> Just (dynamicCall TStr (EMIT_BEGIN Builtins.string EMIT_END))
       "decimal" -> Just (dynamicCall TDecimal (EMIT_BEGIN Builtins.decimal EMIT_END))
       "int" -> Just (dynamicCall TInt (EMIT_BEGIN Builtins.integer EMIT_END))
@@ -66,58 +66,58 @@ lookupBuiltinFunction sc name args = select name
 
     integerCast :: Ty a -> Code (a -> M Integer)
     integerCast t = case t of
-      TInt -> EMIT_BEGIN (Builtins.castResult . Casts.int) EMIT_END
-      TDecimal -> EMIT_BEGIN (Builtins.castResult . Casts.int) EMIT_END
-      TStr -> EMIT_BEGIN (Builtins.castResult . Casts.int) EMIT_END
-      TBytes -> EMIT_BEGIN (Builtins.castResult . Casts.int) EMIT_END
-      TAddr -> EMIT_BEGIN (Builtins.castResult . Casts.int) EMIT_END
-      TUnit -> EMIT_BEGIN (Builtins.castResult . Casts.int) EMIT_END
-      TEnum _ _ -> EMIT_BEGIN (Builtins.castResult . Casts.int . enumNumber) EMIT_END
-      TRef _ -> EMIT_BEGIN (const (Builtins.castResult (Casts.int ()))) EMIT_END
+      TInt -> EMIT_BEGIN (MeteredCasts.int) EMIT_END
+      TDecimal -> EMIT_BEGIN (MeteredCasts.int) EMIT_END
+      TStr -> EMIT_BEGIN (MeteredCasts.int) EMIT_END
+      TBytes -> EMIT_BEGIN (MeteredCasts.int) EMIT_END
+      TAddr -> EMIT_BEGIN (MeteredCasts.int) EMIT_END
+      TUnit -> EMIT_BEGIN (MeteredCasts.int) EMIT_END
+      TEnum _ _ -> EMIT_BEGIN (MeteredCasts.int . enumNumber) EMIT_END
+      TRef _ -> EMIT_BEGIN (const (MeteredCasts.int ())) EMIT_END
       _ -> EMIT_BEGIN (Builtins.invalidCast "integer cast" t) EMIT_END
 
     decimalCast :: Ty a -> Code (a -> M Decimal)
     decimalCast t = case t of
-      TInt -> EMIT_BEGIN (Builtins.castResult . Casts.decimal) EMIT_END
-      TDecimal -> EMIT_BEGIN (Builtins.castResult . Casts.decimal) EMIT_END
-      TStr -> EMIT_BEGIN (Builtins.castResult . Casts.decimal) EMIT_END
-      TUnit -> EMIT_BEGIN (Builtins.castResult . Casts.decimal) EMIT_END
-      TRef _ -> EMIT_BEGIN (const (Builtins.castResult (Casts.decimal ()))) EMIT_END
+      TInt -> EMIT_BEGIN (MeteredCasts.decimal) EMIT_END
+      TDecimal -> EMIT_BEGIN (MeteredCasts.decimal) EMIT_END
+      TStr -> EMIT_BEGIN (MeteredCasts.decimal) EMIT_END
+      TUnit -> EMIT_BEGIN (MeteredCasts.decimal) EMIT_END
+      TRef _ -> EMIT_BEGIN (const (MeteredCasts.decimal ())) EMIT_END
       _ -> EMIT_BEGIN (Builtins.invalidCast "decimal cast" t) EMIT_END
 
     addressCast :: Ty a -> Code (a -> M Address)
     addressCast t = case t of
-      TAddr -> EMIT_BEGIN (Builtins.castResult . Casts.address) EMIT_END
-      TContract _ -> EMIT_BEGIN (Builtins.castResult . Casts.address) EMIT_END
-      TInt -> EMIT_BEGIN (Builtins.castResult . Casts.address) EMIT_END
-      TBytes -> EMIT_BEGIN (Builtins.castResult . Casts.address) EMIT_END
-      TStr -> EMIT_BEGIN (Builtins.castResult . Casts.address) EMIT_END
-      TUnit -> EMIT_BEGIN (Builtins.castResult . Casts.address) EMIT_END
-      TRef _ -> EMIT_BEGIN (const (Builtins.castResult (Casts.address ()))) EMIT_END
+      TAddr -> EMIT_BEGIN (MeteredCasts.address) EMIT_END
+      TContract _ -> EMIT_BEGIN (MeteredCasts.address) EMIT_END
+      TInt -> EMIT_BEGIN (MeteredCasts.address) EMIT_END
+      TBytes -> EMIT_BEGIN (MeteredCasts.address) EMIT_END
+      TStr -> EMIT_BEGIN (MeteredCasts.address) EMIT_END
+      TUnit -> EMIT_BEGIN (MeteredCasts.address) EMIT_END
+      TRef _ -> EMIT_BEGIN (const (MeteredCasts.address ())) EMIT_END
       _ -> EMIT_BEGIN (Builtins.invalidCast "address cast" t) EMIT_END
 
     stringCast :: Ty a -> Code (a -> M T.Text)
     stringCast t = case t of
-      TStr -> EMIT_BEGIN (Builtins.castResult . Casts.string) EMIT_END
-      TAddr -> EMIT_BEGIN (Builtins.castResult . Casts.string) EMIT_END
-      TInt -> EMIT_BEGIN (Builtins.castResult . Casts.string) EMIT_END
-      TBool -> EMIT_BEGIN (Builtins.castResult . Casts.string) EMIT_END
-      TBytes -> EMIT_BEGIN (Builtins.castResult . Casts.string) EMIT_END
-      TUnit -> EMIT_BEGIN (Builtins.castResult . Casts.string) EMIT_END
-      TRef _ -> EMIT_BEGIN (const (Builtins.castResult (Casts.string ()))) EMIT_END
+      TStr -> EMIT_BEGIN (MeteredCasts.string) EMIT_END
+      TAddr -> EMIT_BEGIN (MeteredCasts.string) EMIT_END
+      TInt -> EMIT_BEGIN (MeteredCasts.string) EMIT_END
+      TBool -> EMIT_BEGIN (MeteredCasts.string) EMIT_END
+      TBytes -> EMIT_BEGIN (MeteredCasts.string) EMIT_END
+      TUnit -> EMIT_BEGIN (MeteredCasts.string) EMIT_END
+      TRef _ -> EMIT_BEGIN (const (MeteredCasts.string ())) EMIT_END
       _ -> EMIT_BEGIN (Builtins.invalidCast "string cast" t) EMIT_END
 
     destroyCast :: Ty a -> Code (a -> M Bool)
     destroyCast t = CAPTURE (addressCast t) $ \compiled_recipient ->
       EMIT_BEGIN (\value -> compiled_recipient value >>= Builtins.destroyAddress) EMIT_END
 
-    recoverFunction :: Ty a -> Code (a -> M (Integer -> Integer -> Integer -> Address))
+    recoverFunction :: Ty a -> Code (a -> M (Integer -> Integer -> Integer -> M Address))
     recoverFunction t = case t of
-      TBytes -> EMIT_BEGIN (pure . Shared.ecrecover) EMIT_END
-      TInt -> EMIT_BEGIN (pure . Shared.ecrecover) EMIT_END
-      TAddr -> EMIT_BEGIN (pure . Shared.ecrecover) EMIT_END
-      TStr -> EMIT_BEGIN (pure . Shared.ecrecover) EMIT_END
-      TUnit -> EMIT_BEGIN (pure . Shared.ecrecover) EMIT_END
+      TBytes -> EMIT_BEGIN (pure . Metered.ecrecover) EMIT_END
+      TInt -> EMIT_BEGIN (pure . Metered.ecrecover) EMIT_END
+      TAddr -> EMIT_BEGIN (pure . Metered.ecrecover) EMIT_END
+      TStr -> EMIT_BEGIN (pure . Metered.ecrecover) EMIT_END
+      TUnit -> EMIT_BEGIN (pure . Metered.ecrecover) EMIT_END
       _ -> EMIT_BEGIN (Builtins.invalidCast "ecrecover hash" t) EMIT_END
 
     stringCall = do
@@ -162,9 +162,7 @@ lookupBuiltinFunction sc name args = select name
       EMIT_END
 
     abiCall packed = aggregate TBytes $ \fields ->
-      EMIT_BEGIN (let encoder = Builtins.arguments (Builtins.abiEncoder packed) fields
-                  in encoder `seq` \values -> encoder values >>= Builtins.encodeArgumentsValue packed)
-      EMIT_END
+      EMIT_BEGIN (Builtins.abiArguments packed fields) EMIT_END
 
     fieldsFor [] = SomeFields FNil
     fieldsFor (SomeTy t : rest) = case fieldsFor rest of

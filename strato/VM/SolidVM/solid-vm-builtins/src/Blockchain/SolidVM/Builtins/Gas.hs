@@ -1,15 +1,12 @@
 module Blockchain.SolidVM.Builtins.Gas where
 
 import Blockchain.Strato.Model.Gas
-import Control.Monad.IO.Class (MonadIO)
+import Blockchain.SolidVM.GasInfo (MonadBuiltinGas (..))
 import Data.Bits (shiftR)
-
-class MonadIO m => MonadBuiltinGas m where
-  chargeBuiltinGas :: Gas -> m ()
 
 -- Gas schedule for the cryptographic builtins.
 --
--- Unlike the rest of SolidVM's gas -- a coarse counter of statements and
+-- Unlike the rest of SolidVM's gas -- a coarse counter of loop steps and
 -- expression nodes -- these operations do unbounded-cost work in a single
 -- node. Left unmetered they were effectively free: a contract could buy
 -- hundreds of milliseconds of pairing arithmetic for 5 gas, stalling block
@@ -66,7 +63,7 @@ gasBlsDecompressG2 = 20000
 
 -- Deduct 1 gas for every 256 bits (32 bytes) used
 chargeOperation :: MonadBuiltinGas m => Integer -> m ()
-chargeOperation bytes = chargeBuiltinGas (Gas (1 + (bytes `shiftR` 5)))
+chargeOperation bytes = chargeBuiltinGas (Gas (1 + (max 0 bytes `shiftR` 5)))
 
 -- SolidVM charges by 256-bit limbs, including a full limb for small integers.
 byteWidth :: Integer -> Integer

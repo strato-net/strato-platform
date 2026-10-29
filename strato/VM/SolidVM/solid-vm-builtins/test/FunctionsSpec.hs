@@ -1,15 +1,36 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module FunctionsSpec (spec) where
 
+import Blockchain.SolidVM.GasInfo (MonadBuiltinGas (..))
+import BlockApps.Logging (runLogging)
+import Blockchain.Data.AddressStateDB
+import qualified Blockchain.Data.BlockHeader as BlockHeader
+import Blockchain.SolidVM.Execution
+import qualified Blockchain.SolidVM.Environment as Env
+import Blockchain.SolidVM.GasInfo (GasInfo (..))
+import Blockchain.SolidVM.Builtins.Size.Values (ValueArguments (..))
+import Blockchain.SolidVM.SM
+import Blockchain.VMContext (runMemContextM)
+import Control.Monad.Composable.Base (runEff)
+import qualified Control.Monad.Composable.StateDB as MP
+import qualified Control.Monad.Change.Alter as A
+import Data.Default (def)
+import qualified Data.Map as M
+import Blockchain.Strato.Model.Keccak256 (emptyHash, unsafeCreateKeccak256FromWord256)
 import qualified Blockchain.SolidVM.Builtins.ABI as ABI
 import qualified Blockchain.SolidVM.Builtins.ABI.Values as Values
+import qualified Blockchain.SolidVM.Builtins.ABI.Values.Metered as MeteredABI
 import qualified Blockchain.SolidVM.Builtins.Crypto.Metered as Crypto
 import qualified Blockchain.SolidVM.Builtins.Functions as B
 import qualified Blockchain.SolidVM.Builtins.Functions.Metered as Charged
 import qualified Blockchain.SolidVM.Builtins.Operators as Operators
 import qualified Blockchain.SolidVM.Builtins.Operators.Metered as ChargedOperators
+import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Operations
+import qualified Blockchain.SolidVM.Builtins.Casts.Metered as Casts
 import Blockchain.SolidVM.Builtins.Gas
 import Blockchain.Strato.Model.Gas (Gas)
 import Blockchain.VM.SolidException (SolidException (..))
@@ -35,8 +56,75 @@ instance MonadBuiltinGas Metered where
     charges <- ask
     liftIO $ modifyIORef' charges (++ [amount])
 
+data TestEngine
+
+instance MonadContractCreation TestEngine SM where
+  prepareContractSource _ = error "unexpected compilation"
+  runContractConstructor _ _ _ _ _ _ = error "unexpected constructor"
+
+runBuiltin :: Bool -> SM a -> IO (Env.Environment, Either SolidException a)
+runBuiltin testing body = fst <$> (runEff . runLogging . runMemContextM (const $ pure Nothing) Nothing $
+  runSM Nothing environment (GasInfo 100000 0 100000 "") body)
+  where
+    header = BlockHeader.BlockHeader emptyHash emptyHash 0 MP.emptyTriePtr MP.emptyTriePtr MP.emptyTriePtr
+      "" 0 10 100000 0 (UTCTime (fromGregorian 2026 1 1) 0) "" emptyHash 0
+    environment = Env.Environment 0 0 0 header emptyHash Nothing Nothing testing Nothing
+
 spec :: Spec
 spec = do
+  describe "operation gas" $ do
+    it "prices arguments and storage by words, with flat local writes" $ do
+      charges <- newIORef []
+      runReaderT (runMetered $ do
+        Operations.functionEntry (ValueArguments [SBytes BS.empty, SBytes (BS.replicate 1 0), SBytes (BS.replicate 32 0), SBytes (BS.replicate 33 0)])
+        Operations.localWrite
+        value <- Operations.storageRead id (pure 33)
+        Operations.storageWrite value
+        Operations.allocate 3) charges
+      readIORef charges `shouldReturn` [9,1,5,2,22,4]
+    it "charges heterogeneous typed arguments using the same rules as Value arguments" $ do
+      charges <- newIORef []
+      runReaderT (runMetered $ do
+        Operations.functionEntry ((42 :: Integer), (True, ((T.replicate 33 "x"), ())))
+        Operations.functionEntry (ValueArguments [SInteger 42, SBool True, SString (replicate 33 'x')])
+        Operations.functionEntry (("a" :: T.Text), (("b" :: T.Text), ()))
+        Operations.functionEntry ()) charges
+      readIORef charges `shouldReturn` [9,9,7,5]
+    it "meters previously free hashing, encoding, casts, and control builtins" $ do
+      charges <- newIORef []
+      runReaderT (runMetered $ do
+        _ <- Charged.keccak256 (BS.replicate 1024 0)
+        _ <- Charged.sha256 BS.empty
+        _ <- Charged.b16encode "abc"
+        _ <- Casts.int ("10" :: T.Text)
+        _ <- Charged.identity True
+        _ <- Charged.variadic [1 :: Integer, 2]
+        Charged.require True Nothing
+        Charged.assert True) charges
+      readIORef charges `shouldReturn` [33,1,2,2,1,3,1,1]
+    it "charges before throwing cast failures without an error transformer" $ do
+      charges <- newIORef []
+      runReaderT (runMetered $ Casts.int ("hello" :: T.Text)) charges
+        `shouldThrow` (== InvalidArguments "invalid hexadecimal integer" (show ["\"hello\"" :: T.Text]))
+      readIORef charges `shouldReturn` [2]
+    it "charges only the integer input for the fixed-width bytes cast" $ do
+      charges <- newIORef []
+      runReaderT (runMetered $ Casts.bytes32 1) charges `shouldReturn` (BS.replicate 31 0 <> BS.singleton 1)
+      readIORef charges `shouldReturn` [2]
+    it "charges the address input word for payable conversion" $ do
+      charges <- newIORef []
+      runReaderT (runMetered $ Charged.payable (1 :: Address)) charges `shouldReturn` (1,True)
+      readIORef charges `shouldReturn` [2]
+    it "charges before evaluating the operation body" $ do
+      charges <- newIORef []
+      (runReaderT (runMetered $ Operations.invoke 32 (liftIO (evaluate (error "not executed" :: ())))) charges)
+        `shouldThrow` anyErrorCall
+      readIORef charges `shouldReturn` [2]
+    it "never refunds gas for negative operation sizes" $ do
+      charges <- newIORef []
+      runReaderT (runMetered (chargeOperation (-1000))) charges
+      readIORef charges `shouldReturn` [1]
+
   describe "shared operator gas" $ do
     it "charges integer operations using the interpreter schedule" $ do
       charges <- newIORef []
@@ -120,6 +208,18 @@ spec = do
       recover () `shouldBe` recover BS.empty
 
   describe "ABI layout and malformed data" $ do
+    it "charges typed inputs before encoding and preserves standard and packed bytes" $ do
+      charges <- newIORef []
+      let args = ((7 :: Integer), (("abc" :: T.Text), ()))
+          fields = [(False, ABI.encodeUint256 7), (True, ABI.encodeDynamicBytes "abc")]
+      standard <- runReaderT (runMetered $ MeteredABI.encodeArguments False args (pure fields)) charges
+      standard `shouldBe` ABI.abiEncode fields
+      packed <- runReaderT (runMetered $ MeteredABI.encodeArguments True args (pure fields)) charges
+      packed `shouldBe` ABI.abiEncodePacked (map snd fields)
+      readIORef charges `shouldReturn` [3,3]
+      runReaderT (runMetered $ MeteredABI.encodeArguments False args (liftIO $ evaluate $ error "encoding failed")) charges
+        `shouldThrow` anyErrorCall
+      readIORef charges `shouldReturn` [3,3,3]
     it "encodes and decodes SolidVM dynamic values through the shared package" $ do
       encoded <- Values.abiEncode [SInteger 7, SString "abc"]
       encoded `shouldBe` ABI.abiEncode [(False, ABI.encodeUint256 7), (True, ABI.encodeDynamicBytes "abc")]
@@ -152,6 +252,11 @@ spec = do
       charges <- newIORef []
       runReaderT (runMetered $ Crypto.modExp (error "invalid input") 10 1000) charges `shouldThrow` anyErrorCall
       readIORef charges `shouldReturn` [gasModExp]
+    it "charges at least one gas unit for empty MSM inputs" $ do
+      charges <- newIORef []
+      runReaderT (runMetered $ Crypto.bls12381G1MsmInts []) charges `shouldReturn` (0,0)
+      runReaderT (runMetered $ Crypto.bls12381G2MsmInts []) charges `shouldReturn` ((0,0),(0,0))
+      readIORef charges `shouldReturn` [1,1]
     it "charges incomplete MSM terms before rejecting their arity" $ do
       charges <- newIORef []
       runReaderT (runMetered $ Crypto.bls12381G1MsmInts [1,2]) charges `shouldThrow`
@@ -164,32 +269,38 @@ spec = do
       readIORef charges `shouldReturn` [gasBlsDecompressG1]
 
   describe "stateful builtin operation order" $ do
-    it "clears code, pays, and purges storage even when payment returns false" $ do
-      events <- newIORef ([] :: [String])
-      let record event = modifyIORef' events (++ [event])
-      result <- B.selfdestruct (record "address" >> pure (1 :: Int))
-        (\_ -> record "balance" >> pure 5)
-        (\_ -> record "clear")
-        (\_ _ _ -> record "pay" >> pure False)
-        (\_ -> record "purge") 2
-      result `shouldBe` False
-      readIORef events `shouldReturn` ["address", "balance", "clear", "pay", "purge"]
+    it "clears code and transfers the balance through the SolidVM state" $ do
+      (_, result) <- runBuiltin False $ withCallInfo 1 1 def "test" emptyHash def M.empty False False $ do
+        A.adjustWithDefault_ (A.Proxy @AddressState) (1 :: Address) $ \state -> pure state {addressStateBalance = 5}
+        sent <- Charged.selfdestruct 2
+        sender <- A.lookupWithDefault (A.Proxy @AddressState) (1 :: Address)
+        recipient <- A.lookupWithDefault (A.Proxy @AddressState) (2 :: Address)
+        gas <- getGasInfo
+        pure (sent, addressStateBalance sender, addressStateBalance recipient, addressStateCodeHash sender, _gasUsed gas)
+      result `shouldBe` Right (True, 0, 5, SolidVMCode "Code_0" (unsafeCreateKeccak256FromWord256 0), 5000)
+    it "charges before accessing a contract's state" $ do
+      (_, result) <- runBuiltin False $ do
+        chargeBuiltinGas 99999
+        Charged.selfdestruct 2
+      case result of
+        Left TooMuchGas{} -> pure ()
+        other -> expectationFailure $ show other
     it "rejects an empty create input before compilation or allocation" $ do
-      compiled <- newIORef False
-      B.create (pure (0 :: Int)) (writeIORef compiled True) (\_ -> pure ()) (\_ _ -> pure 1) "" "source"
-        `shouldReturn` 0
-      readIORef compiled `shouldReturn` False
+      (_, result) <- runBuiltin False $ B.create @TestEngine "" "source" []
+      result `shouldBe` Left (InvalidArguments
+        "The contract name and src arguments for the create function should not be empty" "[SString \"\",SString \"source\"]")
     it "validates blockhash before querying state" $ do
-      queried <- newIORef False
-      B.blockhash (\_ -> writeIORef queried True >> pure Nothing) (-1)
-        `shouldThrow` (== InvalidArguments "blockhash() only accepts arguments greater than or equal to 0" "[-1]")
-      readIORef queried `shouldReturn` False
+      (_, result) <- runBuiltin False $ B.blockhash (-1)
+      result `shouldBe` Left (InvalidArguments "blockhash() only accepts arguments greater than or equal to 0" "[-1]")
     it "preserves the minimum one-second fastForward and signed block increment" $ do
-      let timestamp = UTCTime (fromGregorian 2026 1 1) 0
-      result <- newIORef (timestamp, 10)
-      B.fastForward True (error "unexpected test guard") timestamp 10 (-3) (-2)
-        (\t n -> writeIORef result (t, n))
-      readIORef result `shouldReturn` (addUTCTime 1 timestamp, 8)
+      (environment, result) <- runBuiltin True $ B.fastForward (-3) (-2)
+      result `shouldBe` Right ()
+      let header = Env.blockHeader environment
+      BlockHeader.timestamp header `shouldBe` addUTCTime 1 (UTCTime (fromGregorian 2026 1 1) 0)
+      BlockHeader.number header `shouldBe` 8
+    it "rejects changes to the block outside tests" $ do
+      (_, result) <- runBuiltin False $ B.fastForward 5 1
+      result `shouldBe` Left (InvalidArguments "fastForward can only be called during testing" "[SInteger 5]")
     it "validates a P-256 digest before decoding the public key or signature" $
       B.verifyP256 "short" (error "public key evaluated") (error "signature evaluated")
         `shouldThrow` (== InvalidArguments "Could not decode hash from string" "\"short\"")

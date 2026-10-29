@@ -9,21 +9,22 @@ module Blockchain.SolidVM.Builtins.Casts
     string,
     bool,
     bytes,
+    bytes32,
     SolidInt,
     SolidDecimal,
     SolidAddress,
     SolidString,
     SolidBool,
     SolidBytes,
-    CastError,
-    CastResult,
   ) where
 
 import Blockchain.Data.Util (integer2Bytes)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Util (byteString2Integer)
-import Control.Monad.Except (MonadError, throwError)
+import Blockchain.VM.SolidException (SolidException (InvalidArguments))
+import Control.Exception (throwIO)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Bits ((.&.))
 import qualified Data.Bool as Bool
 import qualified Data.ByteString as B
@@ -54,23 +55,26 @@ parseBaseInt s n =
 type CastError = (String, [T.Text])
 type CastResult a = Either CastError a
 
-int :: (SolidInt a, MonadError CastError m) => a -> m Integer
+int :: (SolidInt a, MonadIO m) => a -> m Integer
 int = castResult . castInt
 
-decimal :: (SolidDecimal a, MonadError CastError m) => a -> m Decimal
+decimal :: (SolidDecimal a, MonadIO m) => a -> m Decimal
 decimal = castResult . castDecimal
 
-address :: (SolidAddress a, MonadError CastError m) => a -> m Address
+address :: (SolidAddress a, MonadIO m) => a -> m Address
 address = castResult . castAddress
 
-string :: (SolidString a, MonadError CastError m) => a -> m T.Text
+string :: (SolidString a, MonadIO m) => a -> m T.Text
 string = castResult . castString
 
-bool :: (SolidBool a, MonadError CastError m) => a -> m Bool
+bool :: (SolidBool a, MonadIO m) => a -> m Bool
 bool = castResult . castBool
 
-bytes :: (SolidBytes a, MonadError CastError m) => a -> m B.ByteString
+bytes :: (SolidBytes a, MonadIO m) => a -> m B.ByteString
 bytes = castResult . castBytes
+
+bytes32 :: MonadIO m => Integer -> m B.ByteString
+bytes32 value = bytes (32 :: Int, value)
 
 class SolidBool a where
   castBool :: a -> CastResult Bool
@@ -89,6 +93,9 @@ class SolidBytes a where
 
 instance SolidBytes Integer where
   castBytes = Right . bytesFromInteger
+
+instance SolidBytes T.Text where
+  castBytes = Right . DT.encodeUtf8
 
 instance SolidBytes String where
   castBytes = Right . bytesFromString
@@ -221,8 +228,8 @@ instance SolidString (B.ByteString, T.Text) where
 instance SolidString (B.ByteString, String) where
   castString (value, encoding) = castString (value, T.pack encoding)
 
-castResult :: MonadError CastError m => CastResult a -> m a
-castResult = either throwError pure
+castResult :: MonadIO m => CastResult a -> m a
+castResult = either (\(message, details) -> liftIO $ throwIO $ InvalidArguments message (show details)) pure
 
 integerFromText :: T.Text -> Integer -> CastResult Integer
 integerFromText s base = case base of

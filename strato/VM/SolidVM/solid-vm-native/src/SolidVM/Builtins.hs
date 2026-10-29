@@ -5,8 +5,7 @@ module SolidVM.Builtins where
 import Blockchain.Data.RLP
 import qualified Blockchain.SolidVM.Exception as E
 import Blockchain.Strato.Model.Address (Address (..))
-import Blockchain.Strato.Model.Keccak256
-import Control.Exception (evaluate, throwIO)
+import Control.Exception (throwIO)
 import Control.Monad.Reader
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -16,8 +15,11 @@ import Data.List (sortOn)
 import qualified Data.Text as T
 import SolidVM.Core
 import qualified Blockchain.SolidVM.Builtins.Casts as Casts
-import qualified Blockchain.SolidVM.Builtins.Functions as Shared
+import qualified Blockchain.SolidVM.Builtins.Functions.Metered as Metered
+import qualified Blockchain.SolidVM.Builtins.Casts.Metered as MeteredCasts
+import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Operations
 import qualified Blockchain.SolidVM.Builtins.ABI as ABI
+import qualified Blockchain.SolidVM.Builtins.ABI.Values.Metered as MeteredABI
 
 flatten :: [Dyn] -> [Dyn]
 flatten ds = case reverse ds of
@@ -33,19 +35,16 @@ missingUserCert = liftIO $ throwIO $ E.UnknownVariable "not found" "getUserCert"
 invalidLowLevel :: [Dyn] -> M a
 invalidLowLevel ds = liftIO $ throwIO $ E.TypeError "low-level call needs first argument to be a string" (show (map showDyn ds))
 
-modular :: (Integer -> Integer -> Integer -> Integer) -> [Dyn] -> M Dyn
+modular :: (Integer -> Integer -> Integer -> M Integer) -> [Dyn] -> M Dyn
 modular op ds = case flatten ds of
-  [Dyn TInt a, Dyn TInt b, Dyn TInt c] -> Dyn TInt <$> modularValue op a b c
+  [Dyn TInt a, Dyn TInt b, Dyn TInt c] -> Dyn TInt <$> op a b c
   xs -> bad "modular arithmetic expects three integers" xs
-
-castResult :: Casts.CastResult a -> M a
-castResult = either (\(name, values) -> liftIO $ throwIO $ E.InvalidArguments name (show values)) pure
 
 invalidCast :: T.Text -> Ty a -> a -> M b
 invalidCast name t value = liftIO $ throwIO $ E.InvalidArguments (T.unpack name) (show [formatValue t value])
 
 parseInteger :: T.Text -> Integer -> M Integer
-parseInteger value base = castResult $ Casts.int (value, base)
+parseInteger value base = MeteredCasts.int (value, base)
 
 integer :: [Dyn] -> M Dyn
 integer ds = fmap (Dyn TInt) $ case flatten ds of
@@ -74,7 +73,8 @@ string ds = fmap (Dyn TStr) $ case flatten ds of
 encode :: Bool -> [Dyn] -> M Dyn
 encode packed ds = do
   runtime <- rt
-  Dyn TBytes <$> liftIO (rtAbiEncode runtime packed (flatten ds))
+  let values = flatten ds
+  Operations.invokeSized values $ Dyn TBytes <$> liftIO (rtAbiEncode runtime packed values)
 
 destroy :: [Dyn] -> M Dyn
 destroy ds = case flatten ds of
@@ -107,8 +107,8 @@ recover ds = case flatten ds of
 
 keccak :: [Dyn] -> M Dyn
 keccak ds = case flatten ds of
-  [Dyn TBytes bs] -> pure (Dyn TBytes (keccak256ToByteString (hash bs)))
-  xs -> pure (Dyn TStr (T.pack (keccak256ToHex (hash (rlpSerialize (encodeValues xs))))))
+  [Dyn TBytes bs] -> Dyn TBytes <$> Metered.keccak256 bs
+  xs -> Dyn TStr <$> keccakValue (encodeValues xs)
 
 encodeValues :: [Dyn] -> RLPObject
 encodeValues [d] = encodeValue d
@@ -139,80 +139,79 @@ encodeValue (Dyn ty v) = case ty of
     fields (FCons n t rest) (x :* xs) = (n, Dyn t x) : fields rest xs
 
 addmodValue, mulmodValue :: Integer -> Integer -> Integer -> M Integer
-addmodValue = modularValue Shared.addmod
-mulmodValue = modularValue Shared.mulmod
-
-modularValue :: (Integer -> Integer -> Integer -> Integer) -> Integer -> Integer -> Integer -> M Integer
-modularValue op a b c = liftIO $ evaluate (op a b c)
+addmodValue = Metered.addmod
+mulmodValue = Metered.mulmod
 
 integerValue :: Ty a -> a -> M Integer
 integerValue t = case t of
-  TInt -> castResult . Casts.int
-  TEnum _ _ -> castResult . Casts.int . enumNumber
-  TDecimal -> castResult . Casts.int
-  TStr -> castResult . Casts.int
-  TBytes -> castResult . Casts.int
-  TAddr -> castResult . Casts.int
-  TUnit -> castResult . Casts.int
-  TRef _ -> const $ castResult $ Casts.int ()
+  TInt -> MeteredCasts.int
+  TEnum _ _ -> MeteredCasts.int . enumNumber
+  TDecimal -> MeteredCasts.int
+  TStr -> MeteredCasts.int
+  TBytes -> MeteredCasts.int
+  TAddr -> MeteredCasts.int
+  TUnit -> MeteredCasts.int
+  TRef _ -> const $ MeteredCasts.int ()
   _ -> invalidCast "integer cast" t
 
 decimalValue :: Ty a -> a -> M Decimal
 decimalValue t = case t of
-  TInt -> castResult . Casts.decimal
-  TDecimal -> castResult . Casts.decimal
-  TStr -> castResult . Casts.decimal
-  TUnit -> castResult . Casts.decimal
-  TRef _ -> const $ castResult $ Casts.decimal ()
+  TInt -> MeteredCasts.decimal
+  TDecimal -> MeteredCasts.decimal
+  TStr -> MeteredCasts.decimal
+  TUnit -> MeteredCasts.decimal
+  TRef _ -> const $ MeteredCasts.decimal ()
   _ -> invalidCast "decimal cast" t
 
 addressValue :: Ty a -> a -> M Address
 addressValue t = case t of
-  TAddr -> castResult . Casts.address
-  TContract _ -> castResult . Casts.address
-  TInt -> castResult . Casts.address
-  TBytes -> castResult . Casts.address
-  TStr -> castResult . Casts.address
-  TUnit -> castResult . Casts.address
-  TRef _ -> const $ castResult $ Casts.address ()
+  TAddr -> MeteredCasts.address
+  TContract _ -> MeteredCasts.address
+  TInt -> MeteredCasts.address
+  TBytes -> MeteredCasts.address
+  TStr -> MeteredCasts.address
+  TUnit -> MeteredCasts.address
+  TRef _ -> const $ MeteredCasts.address ()
   _ -> invalidCast "address cast" t
 
 stringValue :: Ty a -> a -> M T.Text
 stringValue t = case t of
-  TStr -> castResult . Casts.string
-  TAddr -> castResult . Casts.string
-  TInt -> castResult . Casts.string
-  TBool -> castResult . Casts.string
-  TBytes -> castResult . Casts.string
-  TUnit -> castResult . Casts.string
-  TRef _ -> const $ castResult $ Casts.string ()
+  TStr -> MeteredCasts.string
+  TAddr -> MeteredCasts.string
+  TInt -> MeteredCasts.string
+  TBool -> MeteredCasts.string
+  TBytes -> MeteredCasts.string
+  TUnit -> MeteredCasts.string
+  TRef _ -> const $ MeteredCasts.string ()
   _ -> invalidCast "string cast" t
 
 stringBase :: Integer -> Integer -> M T.Text
-stringBase value base = castResult $ Casts.string (value, base)
+stringBase value base = MeteredCasts.string (value, base)
 
 stringWidth :: Integer -> Integer -> Integer -> M T.Text
-stringWidth value base width = castResult $ Casts.string (value, base, width)
+stringWidth value base width = MeteredCasts.string (value, base, width)
 
 stringEncoding :: B.ByteString -> T.Text -> M T.Text
-stringEncoding value encoding = castResult $ Casts.string (value, encoding)
+stringEncoding value encoding = MeteredCasts.string (value, encoding)
 
 recoverValue :: Ty h -> Ty r -> Ty s -> h -> Integer -> r -> s -> M Address
 recoverValue ht rt' st = recoverTyped (recoverFunction ht) (integerValue rt') (integerValue st)
 
-recoverFunction :: Ty h -> h -> M (Integer -> Integer -> Integer -> Address)
+recoverFunction :: Ty h -> h -> M (Integer -> Integer -> Integer -> M Address)
 recoverFunction t = case t of
-  TBytes -> pure . Shared.ecrecover
-  TInt -> pure . Shared.ecrecover
-  TAddr -> pure . Shared.ecrecover
-  TStr -> pure . Shared.ecrecover
-  TUnit -> pure . Shared.ecrecover
+  TBytes -> pure . Metered.ecrecover
+  TInt -> pure . Metered.ecrecover
+  TAddr -> pure . Metered.ecrecover
+  TStr -> pure . Metered.ecrecover
+  TUnit -> pure . Metered.ecrecover
   _ -> invalidCast "ecrecover hash" t
 
-recoverTyped :: (h -> M (Integer -> Integer -> Integer -> Address)) -> (r -> M Integer) -> (s -> M Integer) -> h -> Integer -> r -> s -> M Address
+recoverTyped :: (h -> M (Integer -> Integer -> Integer -> M Address)) -> (r -> M Integer) -> (s -> M Integer) -> h -> Integer -> r -> s -> M Address
 recoverTyped prepare rArg sArg h v r s = do
   function <- prepare h
-  function v <$> rArg r <*> sArg s
+  rValue <- rArg r
+  sValue <- sArg s
+  function v rValue sValue
 
 destroyValue :: Ty a -> a -> M Bool
 destroyValue t value = addressValue t value >>= destroyAddress
@@ -237,10 +236,7 @@ deployValue salt name source args
       liftIO $ rtCreateCode runtime salt name source args
 
 keccakValue :: RLPObject -> M T.Text
-keccakValue = pure . T.pack . Shared.keccak256Hex
-
-encodeArgumentsValue :: Bool -> [(Bool, B.ByteString)] -> M B.ByteString
-encodeArgumentsValue packed = pure . if packed then ABI.abiEncodePacked . map snd else ABI.abiEncode
+keccakValue = fmap T.pack . Metered.keccak256Hex
 
 -- These factories select and compose typed encoders once, while compiling.
 rlpEncoder :: Ty a -> a -> RLPObject
@@ -285,7 +281,7 @@ abiEncoder packed t = case t of
   TInt -> scalar ABI.encodeInt256
   TBool -> scalar $ \b -> if packed then B.singleton (if b then 1 else 0) else ABI.encodeUint256 (if b then 1 else 0)
   TAddr -> \value -> do
-    encoded <- castResult $ Casts.bytes value
+    encoded <- Casts.bytes value
     pure (False, (if packed then id else ABI.padLeft32) encoded)
   TEnum _ _ -> scalar $ ABI.encodeUint256 . enumNumber
   TWireEnum _ _ -> scalar ABI.encodeUint256
@@ -322,6 +318,11 @@ abiEncoder packed t = case t of
       TWireArray -> True
       TRaw -> case value of [d] -> dynamicValue d; _ -> False
       _ -> False
+
+abiArguments :: Bool -> Fields args -> HL args -> M B.ByteString
+abiArguments packed fields = withArgumentTuple fields $ \tuple ->
+  let encoder = arguments (abiEncoder packed) fields
+   in encoder `seq` \values -> MeteredABI.encodeArguments packed (tuple values) (encoder values)
 
 arguments :: (forall a. Ty a -> a -> M result) -> Fields args -> HL args -> M [result]
 arguments _ FNil = const $ pure []

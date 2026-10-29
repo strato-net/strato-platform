@@ -314,7 +314,7 @@ compileExpressionBody sc chargeDestination e = case e of
       TArr et -> do
         lf <- compileAs sc TInt n
         pure $ CE t (CAPTURE lf $ \compiled_0 ->
-          EMIT_BEGIN (\env_1 -> (\k_2 -> Seq.replicate (fromIntegral k_2) (defaultOf et)) <$> compiled_0 env_1)
+          EMIT_BEGIN (\env_1 -> do {k_2 <- compiled_0 env_1; Operations.allocate k_2; pure (Seq.replicate (fromIntegral k_2) (defaultOf et))})
           EMIT_END)
       _ -> err Internal "array new"
   S.NewExpression _ ty mLen -> do
@@ -325,7 +325,7 @@ compileExpressionBody sc chargeDestination e = case e of
                               (constantFunction (pureAction (EMIT_BEGIN (0)
                               EMIT_END)))))) (compileAs sc TInt) mLen
         pure $ CE t (CAPTURE lf $ \compiled_0 ->
-          EMIT_BEGIN (\env_1 -> (\n_2 -> Seq.replicate (fromIntegral n_2) (defaultOf et)) <$> compiled_0 env_1)
+          EMIT_BEGIN (\env_1 -> do {n_2 <- compiled_0 env_1; Operations.allocate n_2; pure (Seq.replicate (fromIntegral n_2) (defaultOf et))})
           EMIT_END)
       TContract _ -> unsupported "contract creation (new)"
       _ -> typeErr ("new " <> showTy t)
@@ -415,6 +415,21 @@ compileExpressionBody sc chargeDestination e = case e of
         SomeTy t <- resolveTy c (cd ^. constType)
         f <- compileAs sc { sC = mkCtx (cCC c) libC } t (cd ^. constInitialVal)
         pure (CE t f)
+  S.MemberAccess _ x "length" | Right (ALV (TArr _) _ _ _) <- compileAliasLV sc x -> do
+    Destination t prepare <- compileAliasDestination sc True x
+    case t of
+      TArr _ -> pure $ CE TInt (CAPTURE prepare $ \compiled_prepare ->
+        EMIT_BEGIN (\env -> do
+          (path, get, _) <- compiled_prepare env
+          case path of
+            Just location -> readSlot TInt (snocP location (Field "length"))
+            Nothing -> fromIntegral . Seq.length <$> get)
+        EMIT_END)
+      _ -> err Internal "alias array length"
+  S.MemberAccess _ x "length" | Right (SArray _, _) <- compileStorage sc x -> do
+    LV t get _ <- compileLV sc e
+    Refl <- sameTy TInt t
+    pure (CE TInt get)
   S.MemberAccess _ x "length" | Right (CE t f) <- compileE sc x, isSeqLike t -> case t of
     TArr _ -> pure $ CE TInt (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap (fromIntegral . Seq.length) . compiled_0)
       EMIT_END)
@@ -474,6 +489,7 @@ compileExpressionBody sc chargeDestination e = case e of
         valueF <- compileAs sc t r
         pure $ CE t $ (CAPTURE valueF $ \compiled_0 -> EMIT_BEGIN (\env_1 -> do {value_2 <- compiled_0 env_1;
           when chargeDestination $ chargeGas 1;
+          Operations.localWrite;
           liftIO $ writeIORef (ref i env_1) (Right value_2);
           pure value_2})
           EMIT_END)
@@ -483,6 +499,7 @@ compileExpressionBody sc chargeDestination e = case e of
         when (showST st /= showST other) $ typeErr "storage alias type mismatch"
         pure $ CE TUnit $ (CAPTURE pathF $ \compiled_0 -> EMIT_BEGIN (\env_1 -> do {path_2 <- compiled_0 env_1;
           when chargeDestination $ chargeGas 1;
+          Operations.localWrite;
           liftIO $ writeIORef (ref i env_1) path_2})
           EMIT_END)
   S.Binary _ "=" l r -> compileAssignment sc False chargeDestination l r
@@ -561,7 +578,7 @@ compileExpressionBody sc chargeDestination e = case e of
       pure $ CE TInt $ (CAPTURE prepare $ \compiled_0 ->
         EMIT_BEGIN (\env_1 -> do {(_, get_2, set_3) <- compiled_0 env_1;
         v_4 <- get_2;
-        let {next_5 = v_4 + d};
+        next_5 <- if d == 1 then Operators.integerAdd v_4 1 else Operators.integerSubtract v_4 1;
         set_3 next_5;
         pure (if prefix
         then next_5
@@ -883,6 +900,17 @@ compileAliasLVBody sc expression = case expression of
 
 compileLV :: forall ls r. Scope ls r -> Expression -> C (LV ls)
 compileLV sc e = do
+  LV t get set <- compileLVUnmetered sc e
+  let localCell = case (compileAliasLV sc e, compileStorage' sc e) of
+        (Right _, _) -> False
+        (_, Right _) -> False
+        _ -> True
+      write = if not localCell then set else CAPTURE set $ \compiled_set ->
+        EMIT_BEGIN (\env value -> Operations.localWrite >> compiled_set env value) EMIT_END
+  pure (LV t get write)
+
+compileLVUnmetered :: Scope ls r -> Expression -> C (LV ls)
+compileLVUnmetered sc e = do
   LV t get set <- compileLVBody sc e
   pure (LV t (typedCode (scopeTypes sc) t get) (typedSetter (scopeTypes sc) t set))
 
@@ -895,11 +923,11 @@ compileLVBody sc e | Right (ALV originalTy pathOf _ set) <- compileAliasLV sc e 
       get_2})
       EMIT_END)
     (CAPTURE2 pathOf set $ \compiled_0 compiled_1 ->
-      EMIT_BEGIN (\env_2 value_3 -> compiled_0 env_2 >>= maybe (compiled_1 env_2 value_3) (\path_4 -> writeVal t path_4 value_3))
+      EMIT_BEGIN (\env_2 value_3 -> compiled_0 env_2 >>= maybe (Operations.localWrite >> compiled_1 env_2 value_3) (\path_4 -> writeVal t path_4 value_3))
       EMIT_END)
 compileLVBody sc e = atLine (S.extractExpression e) $ case e of
   S.InlineBoundsCheck _ lo hi x -> do
-    LV t get set <- compileLV sc x
+    LV t get set <- compileLVUnmetered sc x
     Refl <- sameTy TInt t
     pure $ LV TInt (functionAfter 1 get) $ (CAPTURE set $ \compiled_0 ->
       EMIT_BEGIN (\env_1 v_2 -> do {when (maybe False (v_2 <) lo) $ revert ("underflow: " <> T.pack (show v_2));
@@ -986,7 +1014,7 @@ compileLVBody sc e = atLine (S.extractExpression e) $ case e of
                                         (EMIT_BEGIN (\_ _ -> diverge "assignment to a temporary")
                                         EMIT_END))))
     chargedParent x = do
-      LV t get set <- compileLV sc x
+      LV t get set <- compileLVUnmetered sc x
       pure $ LV t (functionAfter 1 get) set
     isStorageRooted :: Expression -> Bool
     isStorageRooted = \case
@@ -1077,27 +1105,36 @@ data Destination ls = forall t. Destination (Ty t) (Code (Env ls -> M (Maybe Sto
 
 compileDestination :: forall ls r. Scope ls r -> Bool -> Expression -> C (Destination ls)
 compileDestination sc metered e = do
+  Destination t action <- compileDestinationUnmetered sc metered e
+  pure $ Destination t $ CAPTURE action $ \compiled_run ->
+    EMIT_BEGIN (\env -> do
+      (path, get, set) <- compiled_run env
+      pure (path, get, \value -> do
+        when (isNothing path) $ Operations.localWrite
+        set value)) EMIT_END
+
+compileDestinationUnmetered :: Scope ls r -> Bool -> Expression -> C (Destination ls)
+compileDestinationUnmetered sc metered e = do
   Destination t action <- compileDestinationBody sc metered e
   pure (Destination t (typedDestination (scopeTypes sc) t action))
 
 compileDestinationBody :: forall ls r. Scope ls r -> Bool -> Expression -> C (Destination ls)
 compileDestinationBody sc metered expression = case expression of
   S.InlineBoundsCheck _ lo hi inner -> do
-    Destination t prepare <- compileDestination sc True inner
+    Destination t prepare <- compileDestinationUnmetered sc True inner
     Refl <- sameTy TInt t
     pure $ Destination TInt $ (CAPTURE prepare $ \compiled_0 ->
-      EMIT_BEGIN (\env_1 -> do {location_2@(_, get_3, _) <- compiled_0 env_1;
+      EMIT_BEGIN (\env_1 -> do {(path_2, get_3, set_3) <- compiled_0 env_1;
       value_4 <- get_3;
       when (maybe False (value_4 <) lo) $ revert ("underflow: " <> T.pack (show value_4));
       when (maybe False (value_4 >) hi) $ revert ("overflow: " <> T.pack (show value_4));
       when metered $ chargeGas 1;
-      pure location_2})
+      pure (path_2, pure value_4, set_3)})
       EMIT_END)
   S.Variable _ n | Just (Var _ t i) <- lookupVar sc n, notReference t ->
-    pure $ Destination t $ (
-                              (EMIT_BEGIN (\env_0 -> do {when metered $ chargeGas 1;
-                              pure (Nothing, liftIO (readIORef (ref i env_0)), liftIO . writeIORef (ref i env_0))})
-                              EMIT_END))
+    pure $ Destination t $ EMIT_BEGIN (\env_0 -> do {when metered $ chargeGas 1;
+      pure (Nothing, liftIO (readIORef (ref i env_0)), liftIO . writeIORef (ref i env_0))})
+      EMIT_END
   _ | Right _ <- compileAliasLV sc expression -> compileAliasDestination sc metered expression
   _ | Right (st, pathOf) <- compileStorage' sc expression -> do
     SomeTy t <- stypeTy st
@@ -1106,7 +1143,7 @@ compileDestinationBody sc metered expression = case expression of
       pure (Just path_2, readVal t path_2, writeVal t path_2)})
       EMIT_END)
   S.MemberAccess _ parent field -> do
-    Destination pt prepare <- compileDestination sc True parent
+    Destination pt prepare <- compileDestinationUnmetered sc True parent
     case pt of
       TStruct _ fs -> do
         SomeIx t i <- fieldIx fs field
@@ -1117,7 +1154,7 @@ compileDestinationBody sc metered expression = case expression of
           EMIT_END)
       _ -> typeErr "destination member of a non-struct"
   S.IndexAccess _ parent (Just index) -> do
-    Destination pt prepare <- compileDestination sc True parent
+    Destination pt prepare <- compileDestinationUnmetered sc True parent
     indexF <- compileAs sc TInt index
     case pt of
       TArr t -> pure $ Destination t $ (CAPTURE2 prepare indexF $ \compiled_0 compiled_1 ->
@@ -1141,7 +1178,7 @@ compileDestinationBody sc metered expression = case expression of
         EMIT_END)
       _ -> typeErr "destination index into a non-array"
   _ -> do
-    LV t get set <- compileLV sc expression
+    LV t get set <- compileLVUnmetered sc expression
     pure $ Destination t $ (CAPTURE2 get set $ \compiled_0 compiled_1 ->
       EMIT_BEGIN (\env_2 -> do {when metered $ chargeGas 1;
       pure (Nothing, compiled_0 env_2, compiled_1 env_2)})
@@ -1209,11 +1246,12 @@ compileAssignment sc destinationFirst metered l r
   , Just (Var _ t i) <- lookupVar sc name
   , plainLocal t = do
       valueF <- compileAs sc t r
-      let evaluateValue = if not metered then valueF
+      let chargedValue = meterLocalValue valueF
+          evaluateValue = if not metered then chargedValue
             else if destinationFirst
               then (
-                                        functionBefore 1 valueF)
-              else (functionAfter 1 valueF)
+                                        functionBefore 1 chargedValue)
+              else (functionAfter 1 chargedValue)
       pure $ CE t $ typedCode (scopeTypes sc) t (CAPTURE evaluateValue $ \compiled_0 ->
         EMIT_BEGIN (\env_1 -> do {value_2 <- compiled_0 env_1;
         liftIO $ writeIORef (ref i env_1) value_2;
@@ -1342,7 +1380,7 @@ compileCall sc callee args = case callee of
     _ -> typeErr "revert takes at most one argument"
   S.Variable _ "keccak256" -> case args of
     [x] | Right (CE TBytes f) <- compileE sc x -> pure $ CE TBytes (CAPTURE f $ \compiled_0 ->
-      EMIT_BEGIN (fmap (keccak256ToByteString . hash) . compiled_0)
+      EMIT_BEGIN (\env -> compiled_0 env >>= Metered.keccak256)
       EMIT_END)
     _ -> builtinCall TStr "keccak256"
   S.MemberAccess _ (S.Variable _ "abi") member ->
@@ -1394,6 +1432,7 @@ compileCall sc callee args = case callee of
         pure $ CE TInt $ (CAPTURE2 vf pp $ \compiled_0 compiled_1 -> EMIT_BEGIN (\env_2 -> do {v_3 <- compiled_0 env_2;
           _ <- compiled_1 env_2;
           ps_4 <- compiled_1 env_2;
+          Operations.invoke 0 (pure ());
           n_5 <- readSlot TInt (snocP ps_4 (Field "length"));
           writeSlot TInt (snocP ps_4 (Field "length")) (n_5 + 1);
           writeVal et (snocP ps_4 (Index (BC.pack (show n_5)))) v_3;
@@ -1412,6 +1451,7 @@ compileCall sc callee args = case callee of
           pure $ CE TInt $ (CAPTURE3 vf get set $ \compiled_0 compiled_1 compiled_2 ->
             EMIT_BEGIN (\env_3 -> do {v_4 <- compiled_0 env_3;
             chargeGas 1;
+            Operations.invoke 0 (pure ());
             xs_5 <- chargeAfter 1 (compiled_1 env_3);
             compiled_2 env_3 (xs_5 Seq.|> v_4);
             pure (fromIntegral (Seq.length xs_5 + 1))})
@@ -1496,13 +1536,13 @@ compileCall sc callee args = case callee of
     requireLike :: T.Text -> C (CE ls)
     requireLike nm = case args of
       [x] -> do f <- compileAs sc TBool x; pure $ CE TUnit (CAPTURE f $ \compiled_0 ->
-                 EMIT_BEGIN (\env_1 -> compiled_0 env_1 >>= (\b_2 -> unless b_2 (revert nm)))
+                 EMIT_BEGIN (\env_1 -> compiled_0 env_1 >>= (\b_2 -> Operations.invoke 0 (unless b_2 (revert nm))))
                  EMIT_END)
       [x, m] -> do f <- compileAs sc TBool x; mf <- compileAs sc TStr m
                    pure $ CE TUnit (CAPTURE2 f mf $ \compiled_0 compiled_1 ->
                      EMIT_BEGIN (\env_2 -> do {b_3 <- compiled_0 env_2;
                      message_4 <- compiled_1 env_2;
-                     unless b_3 (revert message_4)})
+                     Operations.invoke (fromIntegral (B.length (TE.encodeUtf8 message_4))) (unless b_3 (revert message_4))})
                      EMIT_END)
       _ -> typeErr (nm <> " takes one or two arguments")
 
@@ -1517,62 +1557,51 @@ compileCall sc callee args = case callee of
     cast :: T.Text -> C (CE ls)
     cast "variadic" = do
       f <- dynArgs args
-      pure $ CE TVariadic f
+      pure $ CE TVariadic (CAPTURE f $ \compiled_run -> EMIT_BEGIN (\env -> compiled_run env >>= Metered.variadic) EMIT_END)
     cast "string" | [x] <- args = do
-      CE t f <- compileE sc x
+      CE t raw <- compileE sc x
       case t of
-        TStr -> pure $ CE TStr f
-        TAddr -> pure $ CE TStr (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap (T.pack . show) . compiled_0)
-          EMIT_END)
-        TInt -> pure $ CE TStr (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap (T.pack . show) . compiled_0)
-          EMIT_END)
-        TBool -> pure $ CE TStr (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap (\v_1 -> if v_1
-          then "true"
-          else "false") . compiled_0)
-          EMIT_END)
+        TStr -> pure $ CE TStr (functionUnary (typedUnary t TStr (EMIT_BEGIN MeteredCasts.string EMIT_END)) raw)
+        TAddr -> pure $ CE TStr (functionUnary (typedUnary t TStr (EMIT_BEGIN MeteredCasts.string EMIT_END)) raw)
+        TInt -> pure $ CE TStr (functionUnary (typedUnary t TStr (EMIT_BEGIN MeteredCasts.string EMIT_END)) raw)
+        TBool -> pure $ CE TStr (functionUnary (typedUnary t TStr (EMIT_BEGIN MeteredCasts.string EMIT_END)) raw)
         _ -> builtinCall TStr "string"
     cast k | k `elem` ["string", "decimal"] = do
       SomeTy t <- castTy k
       builtinCall t k
     cast k = case args of
       [x] -> do
-        CE t f <- compileE sc x
+        CE t raw <- compileE sc x
         case (k, t) of
-          ("address", TAddr) -> pure (CE TAddr f)
-          ("address", TContract _) -> pure (CE TAddr f)
+          ("address", TAddr) -> pure $ CE TAddr (functionUnary (typedUnary t TAddr (EMIT_BEGIN MeteredCasts.address EMIT_END)) raw)
+          ("address", TContract _) -> pure $ CE TAddr (functionUnary (typedUnary t TAddr (EMIT_BEGIN MeteredCasts.address EMIT_END)) raw)
           ("address", TStr) -> builtinCall TAddr "address"
           ("address", TBytes) -> builtinCall TAddr "address"
           ("int", TDecimal) -> builtinCall TInt "int"
           ("int", TStr) -> builtinCall TInt "int"
-          ("address", TInt) -> pure (CE TAddr (CAPTURE f $ \compiled_0 ->
-            EMIT_BEGIN (fmap (Address . fromIntegral) . compiled_0)
-            EMIT_END))
-          ("int", TInt) -> pure (CE TInt f)
-          ("int", TEnum _ _) -> pure (CE TInt (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap enumNumber . compiled_0)
-            EMIT_END))
-          ("int", TAddr) -> pure (CE TInt (CAPTURE f $ \compiled_0 ->
-            EMIT_BEGIN (fmap (\(Address a_1) -> fromIntegral a_1) . compiled_0)
-            EMIT_END))
-          ("int", TBytes) -> pure (CE TInt (CAPTURE f $ \compiled_0 ->
-            EMIT_BEGIN (fmap (B.foldl' (\acc_1 w_2 -> (acc_1 * 256) + fromIntegral w_2) 0) . compiled_0)
-            EMIT_END))
-          ("bytes", TInt) -> pure (CE TBytes (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap intToBytes32 . compiled_0)
-            EMIT_END))
-          ("bytes", TStr) -> pure (CE TBytes (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap TE.encodeUtf8 . compiled_0)
-            EMIT_END))
-          ("bytes", TBytes) -> pure (CE TBytes f)
-          ("bool", TBool) -> pure (CE TBool f)
+          ("address", TInt) -> pure $ CE TAddr (functionUnary (typedUnary t TAddr (EMIT_BEGIN MeteredCasts.address EMIT_END)) raw)
+          ("int", TInt) -> pure $ CE TInt (functionUnary (typedUnary t TInt (EMIT_BEGIN MeteredCasts.int EMIT_END)) raw)
+          ("int", TEnum _ _) -> pure $ CE TInt (functionUnary (typedUnary t TInt (EMIT_BEGIN (MeteredCasts.int . enumNumber) EMIT_END)) raw)
+          ("int", TAddr) -> pure $ CE TInt (functionUnary (typedUnary t TInt (EMIT_BEGIN MeteredCasts.int EMIT_END)) raw)
+          ("int", TBytes) -> pure $ CE TInt (functionUnary (typedUnary t TInt (EMIT_BEGIN MeteredCasts.int EMIT_END)) raw)
+          ("bytes", TInt) -> pure $ CE TBytes (functionUnary (typedUnary t TBytes (EMIT_BEGIN MeteredCasts.bytes32 EMIT_END)) raw)
+          ("bytes", TStr) -> pure $ CE TBytes (functionUnary (typedUnary t TBytes (EMIT_BEGIN MeteredCasts.bytes EMIT_END)) raw)
+          ("bytes", TBytes) -> pure $ CE TBytes (functionUnary (typedUnary t TBytes (EMIT_BEGIN MeteredCasts.bytes EMIT_END)) raw)
+          ("bool", TBool) -> pure $ CE TBool (functionUnary (typedUnary t TBool (EMIT_BEGIN MeteredCasts.bool EMIT_END)) raw)
           -- explicit conversion out of the dynamic world: checked once at runtime
           (_, TVariadic) -> do
             SomeTy target <- castTy k
-            pure $ CE target $ (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (\env_1 -> compiled_0 env_1 >>= (\case
-              {[d_2] -> fromDyn target d_2;
-              ds_3 -> diverge ("converting " <> (T.pack (show (length ds_3)) <> (" dynamic values to " <> showTy target)))}))
+            pure $ CE target $ (CAPTURE raw $ \compiled_0 -> EMIT_BEGIN (\env_1 -> do
+              {values <- compiled_0 env_1;
+              Operations.invokeSized values $ case values of
+                {[d_2] -> fromDyn target d_2;
+                ds_3 -> diverge ("converting " <> (T.pack (show (length ds_3)) <> (" dynamic values to " <> showTy target)))}})
               EMIT_END)
           (_, TRaw) -> do
             SomeTy target <- castTy k
-            pure $ CE target (CAPTURE f $ \compiled_0 ->
-              EMIT_BEGIN (\env_1 -> compiled_0 env_1 >>= (fromDyn target . Dyn TRaw))
+            pure $ CE target (CAPTURE raw $ \compiled_0 ->
+              EMIT_BEGIN (\env_1 -> do {values <- compiled_0 env_1;
+                Operations.invokeSized values (fromDyn target (Dyn TRaw values))})
               EMIT_END)
           _ -> typeErr ("cannot convert " <> showTy t <> " to " <> k)
       _ -> typeErr "conversion takes one argument"
@@ -1707,9 +1736,6 @@ variadicTail :: Sig args r -> Bool
 variadicTail (SigCons TVariadic (SigNil _)) = True
 variadicTail (SigCons _ rest) = variadicTail rest
 variadicTail (SigNil _) = False
-
-intToBytes32 :: Integer -> B.ByteString
-intToBytes32 n = B.pack [fromIntegral (shiftR n (8 * i) .&. 0xff) | i <- [31, 30 .. 0]]
 
 -- Evaluate arguments left to right into the exactly typed action.
 applyCall :: Scope ls r -> Sig args r' -> (Code (Env ls -> M (Fn args r'))) -> [Expression] -> C (CE ls)
@@ -1847,8 +1873,13 @@ linkWithCharge metered sig = \case
   Left e -> throwFn sig ("callee failed to compile: " <> showErr e)
 
 chargeFunction :: Sig args r -> Fn args r -> Fn args r
-chargeFunction (SigNil _) action = charged 5 action
-chargeFunction (SigCons _ rest) f = \value -> chargeFunction rest (f value)
+chargeFunction signature = go signature ()
+  where
+    go :: SharedSize.FunctionArguments values => Sig as result -> values -> Fn as result -> Fn as result
+    go (SigNil _) = \values action -> Operations.functionEntry values >> action
+    go (SigCons t rest) = withGasArgument t $ \adapt ->
+      let next = go rest
+       in next `seq` \values f value -> next (adapt value, values) (f value)
 
 throwFn :: Sig args r -> T.Text -> Fn args r
 throwFn (SigNil _) msg = diverge msg
@@ -2080,7 +2111,7 @@ withModifier sc mn margs inner = do
 withParams :: forall ls r a. Scope ls r -> [(T.Text, SomeTy, Expression)] -> (forall ls'. Scope ls' r -> C (Code (Env ls' -> M a))) -> C (Code (Env ls -> M a))
 withParams sc [] k = k sc
 withParams sc ((n, SomeTy t, e) : ps) k = do
-  ve <- compileAs sc t e
+  ve <- meterLocalValue <$> compileAs sc t e
   rest <- withParams (pushVar n t sc) ps k
   pure $ (CAPTURE2 ve rest $ \compiled_0 compiled_1 -> EMIT_BEGIN (\env_2 -> do {v_3 <- compiled_0 env_2;
     rr_4 <- liftIO (newIORef v_3);
@@ -2150,7 +2181,7 @@ compileLinearInteger c (S.SimpleStatement (S.VariableDefinition [S.VarDefEntry (
   guard (loc /= Just S.Storage && name `notElem` ["this", "now"])
   guard $ case resolveTy c ty of Right (SomeTy TInt) -> True; _ -> False
   (IntegerLiteral value, units) <- integerAtom (Scope [] TUnit [] Nothing c) initial
-  let initializer = beforeAction (1 + fromIntegral units) (pureAction (integerCode value))
+  let initializer = beforeAction (fromIntegral units + Operations.localWriteCost) (pureAction (integerCode value))
       sc = Scope [ValueVar name TInt IZ (Just value)] TUnit [] Nothing c
   case fusedIntegerSequence sc name value units rest of
     Just action -> Just action
@@ -2162,7 +2193,8 @@ compileLinearInteger c (S.SimpleStatement (S.VariableDefinition [S.VarDefEntry (
     commands _ [] = Just ([], (constantFunction (pureAction unitCode)))
     commands sc (S.SimpleStatement (S.ExpressionStatement (S.Binary _ "=" (S.Variable _ target) rhs)) _ : remaining)
       | target == name = do
-          command <- linearIntegerExpression sc rhs (chargeUnits 2)
+          rawCommand <- linearIntegerExpression sc rhs (chargeUnits 1)
+          let command = meterLocalValue rawCommand
           let nextScope = sc { sVars = [ValueVar name TInt IZ (knownInteger sc rhs)] }
           (steps, final) <- commands nextScope remaining
           pure (command : steps, final)
@@ -2222,11 +2254,15 @@ fusedIntegerSequence sc name value initialUnits
   (op, lhs, leftUnits, rhs, rightUnits, units) <- integerBinaryAtoms sc expression
   let operand IntegerLocal = value
       operand (IntegerLiteral number) = number
-      fixed = fromIntegral (1 + initialUnits + 2 + leftUnits + rightUnits + units + 2 + storeUnits)
+      fixed = fromIntegral (initialUnits + 1 + leftUnits + rightUnits + units + 1 + storeUnits)
   calculation <- integerExpressionCode op (IntegerLiteral (operand lhs)) (IntegerLiteral (operand rhs)) fixed
   result <- constantBody calculation
   (charges, computed) <- knownAction result
-  pure (thenAction charges (writeAction TInt (valueCode (TRef (SScalar (SomeTy TInt))) (StoragePath [Field (TE.encodeUtf8 target)])) computed))
+  pure (CAPTURE (thenAction charges (writeAction TInt (valueCode (TRef (SScalar (SomeTy TInt))) (StoragePath [Field (TE.encodeUtf8 target)])) computed)) $ \compiled_run ->
+    EMIT_BEGIN (do
+      Operations.localWrite
+      Operations.localWrite
+      compiled_run) EMIT_END)
 fusedIntegerSequence _ _ _ _ _ = Nothing
 
 linearIntegerWrite :: Scope '[Integer] () -> T.Text -> Expression -> Maybe (Code (Integer -> M ()))
@@ -2236,7 +2272,7 @@ linearIntegerWrite sc target rhs = do
       computed = case source of
         IntegerLocal -> identityFunction
         IntegerLiteral value -> constantFunction (integerCode value)
-  pure (functionBefore (2 + fromIntegral units) (functionWrite TInt path computed))
+  pure (functionBefore (1 + fromIntegral units) (functionWrite TInt path computed))
 
 functionKeep :: Code (env -> M a) -> Code (env -> M env)
 functionKeep action = staticFunction
@@ -2292,6 +2328,14 @@ compileBlockBody :: BlockExit r a -> Scope ls r -> [Statement] -> C (Code (Env l
 compileBlockBody exit sc [] = pure (blockEnd exit (sRet sc))
 compileBlockBody exit sc statements@(_ : _) = compileBlockStatements exit sc statements
 
+meterLocalValue :: Code (env -> M a) -> Code (env -> M a)
+meterLocalValue action = CAPTURE action $ \compiled_run ->
+  EMIT_BEGIN (\env -> do
+    value <- compiled_run env
+    Operations.localWrite
+    pure value)
+  EMIT_END
+
 compileBlockStatements :: BlockExit r a -> Scope ls r -> [Statement] -> C (Code (Env ls -> M a))
 compileBlockStatements exit sc [] = pure (blockEnd exit (sRet sc))
 compileBlockStatements exit sc (s : rest) = case s of
@@ -2306,31 +2350,33 @@ compileBlockStatements exit sc (s : rest) = case s of
           SStruct{} | loc /= Just S.Storage -> do
             SomeTy t <- stypeTy st
             k <- compileBlockWith exit (pushVar n (TAlias t st) sc) rest
-            pure $ (CAPTURE2 pathOf k $ \compiled_0 compiled_1 -> EMIT_BEGIN (\env_2 -> do {chargeGas 1;
+            pure $ (CAPTURE2 pathOf k $ \compiled_0 compiled_1 -> EMIT_BEGIN (\env_2 -> do {
               p_3 <- compiled_0 env_2;
+              Operations.localWrite;
               rr_4 <- liftIO (newIORef (Left p_3));
               compiled_1 (rr_4 :& env_2)})
               EMIT_END)
           _ -> do
             k <- compileBlockWith exit (pushVar n (TRef st) sc) rest
-            pure $ (CAPTURE2 pathOf k $ \compiled_0 compiled_1 -> EMIT_BEGIN (\env_2 -> do {chargeGas 1;
+            pure $ (CAPTURE2 pathOf k $ \compiled_0 compiled_1 -> EMIT_BEGIN (\env_2 -> do {
               p_3 <- compiled_0 env_2;
+              Operations.localWrite;
               rr_4 <- liftIO (newIORef p_3);
               compiled_1 (rr_4 :& env_2)})
               EMIT_END)
       else do
         SomeTy t <- resolveTy (sC sc) ty
-        initF <- maybe (pure (constantCode t (defaultOf t))) (compileAs sc t) mInit
+        initF <- meterLocalValue <$> maybe (pure (constantCode t (defaultOf t))) (compileAs sc t) mInit
         if valueLocal t && valueLocalTail sc n rest
           then do
             let known = maybe (Just (defaultOf t)) (knownValue sc t) mInit
                 sc' = Scope (ValueVar n t IZ known : map weaken (sVars sc)) (sRet sc) (sNamedRet sc)
                   (fmap (\f -> (dropEnvironment f)) (sInner sc)) (sC sc)
             k <- compileBlockWith exit sc' rest
-            pure (functionBefore 1 (bindEnvironment initF k))
+            pure (bindEnvironment initF k)
           else do
             k <- compileBlockWith exit (pushVar n t sc) rest
-            pure $ (CAPTURE2 initF k $ \compiled_0 compiled_1 -> EMIT_BEGIN (\env_2 -> do {chargeGas 1;
+            pure $ (CAPTURE2 initF k $ \compiled_0 compiled_1 -> EMIT_BEGIN (\env_2 -> do {
               v_3 <- compiled_0 env_2;
               rr_4 <- liftIO (newIORef v_3);
               compiled_1 (rr_4 :& env_2)})
@@ -2342,13 +2388,13 @@ compileBlockStatements exit sc (s : rest) = case s of
     case rt' of
       TStruct _ fs -> do
         k <- destructure sc fs entries rest
-        pure $ finishBlock exit (sRet sc) $ (functionBefore 1 (functionBind rf k))
+        pure $ finishBlock exit (sRet sc) $ (functionBind rf k)
       TTuple fs -> do
         k <- destructure sc fs entries rest
-        pure $ finishBlock exit (sRet sc) $ (functionBefore 1 (functionBind rf k))
+        pure $ finishBlock exit (sRet sc) $ (functionBind rf k)
       TRaw -> do
         k <- destructureRaw sc entries rest
-        pure $ finishBlock exit (sRet sc) $ (functionBefore 1 (functionBind rf k))
+        pure $ finishBlock exit (sRet sc) $ (functionBind rf k)
       _ -> typeErr ("destructuring a non-tuple " <> showTy rt')
   S.SimpleStatement (S.VariableDefinition _ Nothing) a -> atLine a (typeErr "tuple declaration without an initialiser")
   S.SimpleStatement (S.ExpressionStatement (S.Binary _ "=" (S.Variable _ name) rhs)) a
@@ -2359,45 +2405,45 @@ compileBlockStatements exit sc (s : rest) = case s of
             updateKnown (v : vs) = v : updateKnown vs
             updateKnown [] = []
         k <- compileBlockWith exit sc' rest
-        pure (functionBefore 2 (functionReplace i valueF k))
+        pure (functionBefore 1 (functionReplace i (meterLocalValue valueF) k))
   S.SimpleStatement (S.ExpressionStatement e) a -> atLine a $ do
     CE _ action <- compileStatementExpression sc e
     case rest of
-      [] -> pure $ functionBefore 1 $ case exit of
+      [] -> pure $ case exit of
         KeepFlow -> functionMap (constantFunction (primitiveCode NextPrimitive)) action
         ReturnValue -> case sRet sc of
           TUnit -> functionMap (constantFunction unitCode) action
           result -> functionMap (constantFunction (valueCode result (defaultOf result))) action
       _ -> do
         k <- compileBlockWith exit sc rest
-        pure (functionBefore 1 (functionThen action k))
+        pure (functionThen action k)
   S.Return (Just expression) annotation | ReturnValue <- exit -> atLine annotation $ do
     _ <- compileBlockWith exit sc rest
     case compileE sc expression of
       Right (CE TRaw action) | isJust (tyEq (sRet sc) TRaw) ->
-        pure (CAPTURE action $ \compiled_0 -> EMIT_BEGIN (\env_1 -> do {chargeGas 1;
+        pure (CAPTURE action $ \compiled_0 -> EMIT_BEGIN (\env_1 -> do {
           compiled_0 env_1 >>= (liftIO . (throwIO . ForwardReturn))})
           EMIT_END)
       _ -> do
         action <- compileAs sc (sRet sc) expression
-        pure (functionBefore 1 (action))
+        pure action
   S.Return Nothing annotation | ReturnValue <- exit, TUnit <- sRet sc -> atLine annotation $ do
     _ <- compileBlockWith exit sc rest
-    pure (functionBefore 1 (constantFunction (pureAction unitCode)))
+    pure (constantFunction (pureAction unitCode))
   _ -> do
     sf <- compileStmt sc s
     k <- compileBlockWith exit sc rest
     let done = finishBlock exit (sRet sc) sf
-    pure $ if null rest then (functionBefore 1 (done))
+    pure $ if null rest then done
       else case exit of
-        KeepFlow -> (CAPTURE2 sf k $ \compiled_0 compiled_1 -> EMIT_BEGIN (\env_2 -> do {chargeGas 1;
+        KeepFlow -> (CAPTURE2 sf k $ \compiled_0 compiled_1 -> EMIT_BEGIN (\env_2 -> do {
           compiled_0 env_2 >>= (\case
           {Next -> compiled_1 env_2;
           flow_3 -> pure flow_3})})
           EMIT_END)
         ReturnValue ->
           let result = sRet sc
-           in (CAPTURE2 sf k $ \compiled_0 compiled_1 -> EMIT_BEGIN (\env_2 -> do {chargeGas 1;
+           in (CAPTURE2 sf k $ \compiled_0 compiled_1 -> EMIT_BEGIN (\env_2 -> do {
              compiled_0 env_2 >>= (\case
              {Next -> compiled_1 env_2;
              Ret value_3 -> pure value_3;
@@ -2431,7 +2477,7 @@ destructureBody sc (FCons _ t fs) (en : ens) rest = case en of
     forM_ mty $ \ty -> do SomeTy dt <- resolveTy (sC sc) ty; void (sameTy dt t)
     k <- destructure (pushVar n t sc) fs ens rest
     pure (CAPTURE k $ \compiled_0 -> EMIT_BEGIN (\env_1 hl_2 -> case hl_2 of
-      {v_3 :* vs_4 -> do {rr_5 <- liftIO (newIORef v_3);
+      {v_3 :* vs_4 -> do {Operations.localWrite; rr_5 <- liftIO (newIORef v_3);
       compiled_0 (rr_5 :& env_1) vs_4}})
       EMIT_END)
 destructureBody _ _ _ _ = typeErr "destructuring arity mismatch"
@@ -2455,6 +2501,7 @@ destructureRaw sc (S.VarDefEntry (Just ty) _ name _ : entries) rest = do
   k <- destructureRaw (pushVar name t sc) entries rest
   pure $ (CAPTURE k $ \compiled_0 -> EMIT_BEGIN (\env_1 ds_2 -> case ds_2 of
     {d_3 : values_4 -> do {value_5 <- fromDyn t d_3;
+    Operations.localWrite;
     slot_6 <- liftIO $ newIORef value_5;
     compiled_0 (slot_6 :& env_1) values_4};
     [] -> revert "destructuring arity mismatch"})
@@ -2515,7 +2562,7 @@ compileStmtBody sc s = atLine (S.extractStatement s) $ case s of
   S.ForStatement mInit mCond mStep body a -> case mInit of
     Just (S.VariableDefinition [S.VarDefEntry (Just ty) _ n _] mInitE) -> atLine a $ do
       SomeTy t <- resolveTy (sC sc) ty
-      initF <- maybe (pure (constantCode t (defaultOf t))) (compileAs sc t) mInitE
+      initF <- meterLocalValue <$> maybe (pure (constantCode t (defaultOf t))) (compileAs sc t) mInitE
       k <- forBody (pushVar n t sc)
       pure $ (CAPTURE2 initF k $ \compiled_0 compiled_1 -> EMIT_BEGIN (\env_2 -> do {v_3 <- compiled_0 env_2;
         rr_4 <- liftIO (newIORef v_3);

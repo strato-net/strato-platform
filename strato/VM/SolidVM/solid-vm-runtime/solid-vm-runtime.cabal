@@ -12,6 +12,7 @@ build-type:     Simple
 library
   exposed-modules:
       Blockchain.SolidVM.Environment
+      Blockchain.SolidVM.Execution
       Blockchain.SolidVM.GasInfo
       Blockchain.SolidVM.SM
   other-modules:
@@ -37,7 +38,6 @@ library
     , monad-alter
     , nibblestring
     , ordered-containers
-    , solid-vm-builtins
     , solid-vm-compiler
     , solid-vm-model
     , solid-vm-parser

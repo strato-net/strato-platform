@@ -494,6 +494,9 @@ typedCode env r = annotate (arrow (environmentType env) (monadType (haskellType 
 typedBody :: [EnvTy] -> Ty r -> Code (Env ls -> M (Flow r)) -> Code (Env ls -> M (Flow r))
 typedBody env r = annotate (arrow (environmentType env) (monadType (AppT (ConT ''Flow) (haskellType r))))
 
+typedUnary :: Ty a -> Ty b -> Code (a -> M b) -> Code (a -> M b)
+typedUnary a b = annotate (arrow (haskellType a) (monadType (haskellType b)))
+
 typedSetter :: [EnvTy] -> Ty a -> Code (Env ls -> a -> M ()) -> Code (Env ls -> a -> M ())
 typedSetter env t = annotate (arrow (environmentType env) (arrow (haskellType t) (monadType (TupleT 0))))
 

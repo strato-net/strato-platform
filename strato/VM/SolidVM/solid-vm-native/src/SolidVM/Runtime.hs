@@ -8,6 +8,8 @@
 module SolidVM.Runtime (compiledContract, compiledFunction, constructorStage, runAction, getCodeAndCollection, Host (..)) where
 
 import Blockchain.DB.SolidStorageDB
+import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Metered
+import Blockchain.SolidVM.Builtins.Size.Values (basicSize)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.SolidVM.CodeCollectionDB (ParseOptions (..))
 import qualified Blockchain.SolidVM.Environment as Env
@@ -118,10 +120,11 @@ runAction charge callFunction createContract host emit cc contract name (N.Fun _
   out <- withRunInIO $ \run -> do
     let runtime = N.RT
           { N.rtChargeGas = \amount -> run $ charge amount
-          , N.rtGet = \a p -> run $ getSolidStorageKeyVal' a p
+          , N.rtGet = \a p -> run $ Metered.storageRead basicSize (getSolidStorageKeyVal' a p)
           , N.rtPut = \a p v -> run $ do
               ci <- getCurrentCallInfo
               when (readOnly ci) $ throwIO (InvalidWrite "native write during read-only access" (show p))
+              Metered.storageWrite (basicSize v)
               markDiffForAction a p v
               putSolidStorageKeyVal' a p v
           , N.rtEmit = \_ contractName event fields -> run $ emit contractName event =<< traverse (toValue . snd) fields

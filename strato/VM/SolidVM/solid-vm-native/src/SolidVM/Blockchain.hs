@@ -28,17 +28,20 @@ module SolidVM.Blockchain
   )
 where
 
-import Blockchain.DB.ModifyStateDB (pay)
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.ExecResults
 import qualified Control.Monad.Composable.StateDB as MP
+import Blockchain.SolidVM.Execution
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.GasInfo
 import Blockchain.SolidVM.Metrics (recordCall)
+import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Metered
+import Blockchain.SolidVM.Builtins.Size.Values (ValueArguments (..))
+import qualified Blockchain.SolidVM.Builtins.Contracts.Metered as ContractBuiltins
 import Blockchain.SolidVM.SM hiding (action)
 import SolidVM.Storage
 import SolidVM.Values
@@ -565,6 +568,8 @@ runTheConstructors from to hsh cc contractName' argVals' = do
       Just (_, vals) -> pure vals
       Nothing -> invalidArguments "constructor arguments don't match" (contractName', argVals')
 
+  Metered.functionEntry (ValueArguments argVals)
+
   nativeArgs <- liftIO $ newIORef $ maybe [] (const argVals) (contract' ^. CC.constructor)
   let runStage stage = do
         fun <- Runtime.constructorStage hsh cc contract' stage
@@ -688,7 +693,7 @@ runTheCallValidated validation address codeAddress contract name hsh cc original
       Just pair -> pure pair
       Nothing -> typeError "function arguments do not match" (labelToString name)
   fun <- Runtime.compiledFunction hsh cc contract name selected
-  decrementGas 5
+  Metered.functionEntry (ValueArguments values)
   result <- withCallInfo address codeAddress contract name hsh cc M.empty ro ff $
     runAction cc contract name (CC._funcContext selected) fun values
   pure (selected ^. CC.funcVals, result)
@@ -705,28 +710,21 @@ createCode :: Maybe Value -> T.Text -> T.Text -> ValList -> SM Address
 createCode salt name source args = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "contract creation during read-only access" (T.unpack name)
-  creator <- getCurrentAddress
-  isRunningTests <- Env.runningTests <$> getEnv
-  opts <- parseOptionsForCurrentBlock
-  (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests False (DT.encodeUtf8 source)
-  addNewCodeCollection hsh cc
-  address <- case salt of
-    Nothing -> getNewAddress creator
-    Just s -> getNewAddressWithSalt creator s hsh (SString (T.unpack name) : args)
-  result <- create' creator address hsh cc name args
-  pure $ fromMaybe (internalError "create did not produce an address" result) (erNewContractAddress result)
+  let name' = T.unpack name
+      source' = T.unpack source
+  case salt of
+    Nothing -> ContractBuiltins.create @Native name' source' args
+    Just value -> ContractBuiltins.create2 @Native value name' source' args
+
+instance MonadContractCreation Native SM where
+  prepareContractSource = compileSourceForCreation False
+  runContractConstructor = create'
 
 selfdestruct :: Address -> SM Bool
 selfdestruct target = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "selfdestruct during read-only access" (show target)
-  address <- getCurrentAddress
-  balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) address
-  A.adjustWithDefault_ (A.Proxy @AddressState) address $ \addressState ->
-    pure addressState {addressStateCodeHash = SolidVMCode "Code_0" (unsafeCreateKeccak256FromWord256 0)}
-  sent <- pay "selfdestruct function" address target balance
-  purgeStorageMap address
-  pure sent
+  ContractBuiltins.selfdestruct target
 
 derive :: Address -> T.Text -> T.Text -> ValList -> SM Address
 derive address salt name args = do

@@ -90,7 +90,6 @@ import Blockchain.Forks (isOperatorPrecedenceForkActive)
 import Blockchain.SolidVM.Exception
 import Blockchain.Data.VmTrace
 import Blockchain.SolidVM.GasInfo
-import qualified Blockchain.SolidVM.Builtins.Gas as BuiltinGas
 import Blockchain.Strato.Model.Gas (Gas (..), getGasValue)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
@@ -439,7 +438,7 @@ instance MonadGas SM where
     pure gi'
   {-# INLINE chargeGasState #-}
 
-instance BuiltinGas.MonadBuiltinGas SM where
+instance MonadBuiltinGas SM where
   chargeBuiltinGas !gas = do
     gi' <- chargeGasState gas
     when (gi' ^. gasLeft < Gas 0) $ do
@@ -946,7 +945,7 @@ getCurrentContract = do
     (currentCallInfo : _) -> return $ currentContract currentCallInfo
     _ -> internalError "getCurrentContract called with an empty stack" ()
 
-getCurrentAddress :: MonadSM m => m Address
+getCurrentAddress :: Mod.Modifiable [CallInfo] m => m Address
 getCurrentAddress = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
@@ -1105,7 +1104,7 @@ addNewCodeCollection ch cc = do
       Mod.modify_ (Mod.Proxy @(OMap.OMap (Text, Keccak256) CodeCollection)) $ pure . (OMap.|> ((username, ch), cc))
     Nothing -> pure ()
 
-getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
+getBlockHashWithNumber :: (MonadLogger m, (Keccak256 `A.Alters` BlockSummary) m) => Integer -> Keccak256 -> m (Maybe Keccak256)
 getBlockHashWithNumber num h = do
   $logInfoS "getBlockHashWithNumber" . T.pack $ "calling getBSum with " ++ format h
   bSum <- getBSum h

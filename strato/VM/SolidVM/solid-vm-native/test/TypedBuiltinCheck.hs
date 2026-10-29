@@ -37,6 +37,7 @@ source = T.unlines
   , "function abiArrays() returns (bool) { uint[] values = [1,2,3]; variadic args = variadic(values); return abi.encode(values) == abi.encode(args) && abi.encodePacked(values) == abi.encodePacked(args); }"
   , "function structFields() returns (bool) { Pair pair = Pair(3,5); variadic args = variadic(pair); uint[] values = [1,2,3]; variadic arrayArgs = variadic(values); return keccak256(pair) == keccak256(args) && keccak256(values) == keccak256(arrayArgs); }"
   , "function casts() returns (bool) { return int(decimal(\"2.75\")) == 3 && address(\"0xabc\") == address(0xabc) && string(255,16,2) == \"0x00ff\" && string(hex\"616263\",\"raw\") == \"abc\"; }"
+  , "function inlineCasts() returns (bool) { uint x = 42; bytes v = bytes(x++); string s = \"abc\"; bytes raw = bytes(s); bool b = true; address a = address(42); return x == 43 && v == hex\"000000000000000000000000000000000000000000000000000000000000002a\" && bytes(raw) == hex\"616263\" && uint(raw) == 0x616263 && int(x) == 43 && uint(a) == 42 && address(a) == a && bool(b) == b && string(x) == \"43\" && string(a) == \"000000000000000000000000000000000000002a\" && string(b) == \"true\" && string(s) == \"abc\"; }"
   , "function castArguments() returns (bool) { variadic value = variadic(42); variadic number = variadic(255,16,2); return int(value) == 42 && string(number) == string(255,16,2); }"
   , "function invalidValue() returns (bool) { bool caught = false; try { string(1,2); } catch { caught = true; } return caught; }"
   , "function invalidEncoding() returns (bool) { bool caught = false; try { string(hex\"ff\",\"utf-8\"); } catch { caught = true; } return caught; }"
@@ -51,6 +52,7 @@ staticSource = TE.encodeUtf8 $ T.unlines
   , "function hash(uint a) returns (string) { return keccak256(a,\"abc\"); }"
   , "function encode(uint a) returns (bytes) { return abi.encode(a,true,\"abc\"); }"
   , "function cast(decimal a) returns (uint) { return uint(a); }"
+  , "function castBytes(uint a) returns (bytes) { return bytes(a); }"
   , "function castAddress(bytes a) returns (address) { return address(a); }"
   , "function castDecimal(int a) returns (decimal) { return decimal(a); }"
   , "function castString(bytes a) returns (string) { return string(a); }"
@@ -80,7 +82,7 @@ main = do
   void $ runEff . runLogging . runMemContextM (const $ pure Nothing) Nothing $ do
     deployed <- create $ def & createNewAddress .~ 0x3900 & createContractName .~ "TypedBuiltins" & createCode .~ Code source
     liftIO $ unless (show (erException deployed) == "Nothing") $ fail $ show $ erException deployed
-    forM_ ["creation", "recovery", "modular", "hashes", "abiValues", "abiArrays", "structFields", "casts", "castArguments", "invalidValue", "invalidEncoding", "argumentOrder"] $ \function -> do
+    forM_ ["creation", "recovery", "modular", "hashes", "abiValues", "abiArrays", "structFields", "casts", "inlineCasts", "castArguments", "invalidValue", "invalidEncoding", "argumentOrder"] $ \function -> do
       result <- call $ def & callCodeAddress .~ 0x3900 & callFuncName .~ function
       liftIO $ do
         unless (show (erException result, erReturnVal result) == show (Nothing :: Maybe String, Just $ SBool True)) $

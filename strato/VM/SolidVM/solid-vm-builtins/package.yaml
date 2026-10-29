@@ -10,23 +10,28 @@ library:
   dependencies:
     - base16-bytestring
     - base64-bytestring
+    - blockapps-data
+    - blockapps-mpdbs
     - blockapps-secp256k1-haskell
     - bytestring
+    - common-log
+    - containers
     - cryptohash
     - crypton
     - Decimal
     - elliptic-curve
     - ethereum-rlp
     - memory
-    - mtl
+    - monad-alter
     - pairing
     - poseidon-hash
     - solid-vm-model
+    - solid-vm-runtime
     - strato-model
     - text
     - time
-    - transformers
     - vector
+    - vm-tools
 
 tests:
   solid-vm-builtins-spec:
@@ -34,6 +39,15 @@ tests:
     main: Main.hs
     dependencies:
       - solid-vm-builtins
+      - blockapps-data
+      - blockapps-mpdbs
+      - common-log
+      - composable-monads-base
+      - containers
+      - data-default
+      - hflags
+      - monad-alter
+      - vm-tools
       - base16-bytestring
       - bytestring
       - Decimal
@@ -41,6 +55,7 @@ tests:
       - hspec
       - pairing
       - solid-vm-model
+      - solid-vm-runtime
       - strato-model
       - text
       - time

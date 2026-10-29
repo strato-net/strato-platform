@@ -19,14 +19,35 @@ library
       Blockchain.SolidVM.BLS12381.HashToCurve.HashToField
       Blockchain.SolidVM.Builtins.ABI
       Blockchain.SolidVM.Builtins.ABI.Values
+      Blockchain.SolidVM.Builtins.ABI.Values.Metered
       Blockchain.SolidVM.Builtins.Casts
+      Blockchain.SolidVM.Builtins.Casts.Metered
+      Blockchain.SolidVM.Builtins.Collections
+      Blockchain.SolidVM.Builtins.Collections.Metered
+      Blockchain.SolidVM.Builtins.Contracts
+      Blockchain.SolidVM.Builtins.Contracts.Metered
+      Blockchain.SolidVM.Builtins.Control
+      Blockchain.SolidVM.Builtins.Control.Metered
       Blockchain.SolidVM.Builtins.Crypto
       Blockchain.SolidVM.Builtins.Crypto.Metered
+      Blockchain.SolidVM.Builtins.Encoding
+      Blockchain.SolidVM.Builtins.Encoding.Metered
+      Blockchain.SolidVM.Builtins.Environment
+      Blockchain.SolidVM.Builtins.Environment.Metered
       Blockchain.SolidVM.Builtins.Functions
       Blockchain.SolidVM.Builtins.Functions.Metered
       Blockchain.SolidVM.Builtins.Gas
+      Blockchain.SolidVM.Builtins.Hashing
+      Blockchain.SolidVM.Builtins.Hashing.Metered
+      Blockchain.SolidVM.Builtins.Modular
+      Blockchain.SolidVM.Builtins.Modular.Metered
+      Blockchain.SolidVM.Builtins.Operations.Metered
       Blockchain.SolidVM.Builtins.Operators
       Blockchain.SolidVM.Builtins.Operators.Metered
+      Blockchain.SolidVM.Builtins.Signatures
+      Blockchain.SolidVM.Builtins.Signatures.Metered
+      Blockchain.SolidVM.Builtins.Size
+      Blockchain.SolidVM.Builtins.Size.Values
   other-modules:
       Paths_solid_vm_builtins
   hs-source-dirs:
@@ -37,22 +58,27 @@ library
     , base
     , base16-bytestring
     , base64-bytestring
+    , blockapps-data
+    , blockapps-mpdbs
     , blockapps-secp256k1-haskell
     , bytestring
+    , common-log
+    , containers
     , cryptohash
     , crypton
     , elliptic-curve
     , ethereum-rlp
     , memory
-    , mtl
+    , monad-alter
     , pairing
     , poseidon-hash
     , solid-vm-model
+    , solid-vm-runtime
     , strato-model
     , text
     , time
-    , transformers
     , vector
+    , vm-tools
   default-language: Haskell2010
 
 test-suite solid-vm-builtins-spec
@@ -70,15 +96,25 @@ test-suite solid-vm-builtins-spec
       Decimal
     , base
     , base16-bytestring
+    , blockapps-data
+    , blockapps-mpdbs
     , bytestring
+    , common-log
+    , composable-monads-base
+    , containers
+    , data-default
     , elliptic-curve
+    , hflags
     , hspec
+    , monad-alter
     , pairing
     , solid-vm-builtins
     , solid-vm-model
+    , solid-vm-runtime
     , strato-model
     , text
     , time
     , transformers
     , vector
+    , vm-tools
   default-language: Haskell2010

@@ -28,7 +28,6 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Type.Equality ((:~:) (Refl))
 import Blockchain.Strato.Model.Address (Address (..))
-import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import qualified Data.Source.Annotation as SA
 import qualified Data.Source.Position as SP
 import SolidVM.Model.CodeCollection hiding (DelegateCall, RawCall, Internal)
@@ -39,8 +38,9 @@ import SolidVM.Core hiding (Fun(..))
 import SolidVM.SourceCode
 import qualified SolidVM.SourceTemplate as SourceTemplate
 import qualified SolidVM.Builtins as Builtins
-import qualified Blockchain.SolidVM.Builtins.Casts as Casts
-import qualified Blockchain.SolidVM.Builtins.Functions as Shared
+import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Operations
+import qualified Blockchain.SolidVM.Builtins.Size as SharedSize
+import qualified Blockchain.SolidVM.Builtins.Casts.Metered as MeteredCasts
 import qualified Blockchain.SolidVM.Builtins.Functions.Metered as Metered
 import qualified Blockchain.SolidVM.Builtins.Operators.Metered as Operators
 import qualified Language.Haskell.TH as TH

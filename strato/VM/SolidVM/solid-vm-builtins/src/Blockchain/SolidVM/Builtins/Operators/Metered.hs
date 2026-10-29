@@ -1,5 +1,6 @@
 module Blockchain.SolidVM.Builtins.Operators.Metered where
 
+import Blockchain.SolidVM.GasInfo (MonadBuiltinGas (..))
 import qualified Blockchain.SolidVM.Builtins.Operators as Operators
 import Blockchain.SolidVM.Builtins.Gas
 import Control.Exception (evaluate)

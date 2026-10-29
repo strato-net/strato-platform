@@ -24,7 +24,6 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Type.Equality ((:~:) (Refl))
 import Blockchain.Strato.Model.Address (Address (..))
-import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import qualified Data.Source.Annotation as SA
 import qualified Data.Source.Position as SP
 import SolidVM.Model.CodeCollection hiding (DelegateCall, RawCall, Internal)
@@ -34,8 +33,9 @@ import qualified SolidVM.Model.Type as Ty
 import SolidVM.Core
 import SolidVM.Code
 import qualified SolidVM.Builtins as Builtins
-import qualified Blockchain.SolidVM.Builtins.Casts as Casts
-import qualified Blockchain.SolidVM.Builtins.Functions as Shared
+import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Operations
+import qualified Blockchain.SolidVM.Builtins.Size as SharedSize
+import qualified Blockchain.SolidVM.Builtins.Casts.Metered as MeteredCasts
 import qualified Blockchain.SolidVM.Builtins.Functions.Metered as Metered
 import qualified Blockchain.SolidVM.Builtins.Operators.Metered as Operators
 
@@ -68,6 +68,9 @@ typedCode _ _ a = a
 typedBody :: [EnvTy] -> Ty r -> a -> a
 typedBody _ _ a = a
 {-# INLINE typedBody #-}
+typedUnary :: Ty a -> Ty b -> Code (a -> M b) -> Code (a -> M b)
+typedUnary _ _ = id
+{-# INLINE typedUnary #-}
 typedSetter :: [EnvTy] -> Ty r -> a -> a
 typedSetter _ _ a = a
 {-# INLINE typedSetter #-}

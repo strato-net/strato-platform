@@ -1,9 +1,10 @@
 {-# LANGUAGE DataKinds, GADTs, KindSignatures, TypeOperators, TypeFamilies, RankNTypes,
-             ScopedTypeVariables, LambdaCase, OverloadedStrings, ExistentialQuantification, FlexibleInstances, CPP #-}
+             ScopedTypeVariables, LambdaCase, OverloadedStrings, ExistentialQuantification, FlexibleInstances, ConstraintKinds, CPP #-}
 -- Typed core for the SolidVM -> Haskell-action compiler.
 -- No `Value` sum type at runtime: every compiled closure has an exact Haskell type.
 module SolidVM.Core where
 
+import Blockchain.SolidVM.GasInfo (MonadBuiltinGas (..))
 import Control.Exception
 import Control.Monad.Reader
 import qualified Data.ByteString as B
@@ -12,13 +13,14 @@ import qualified Data.Foldable as F
 import Data.Decimal
 import Text.Read (readMaybe)
 import Data.IORef
-import Data.Kind (Type)
+import Data.Kind (Type, Constraint)
+import Data.Proxy (Proxy (..))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Type.Equality
 import Blockchain.SolidVM.Exception (SolidException (TooMuchGas))
-import qualified Blockchain.SolidVM.Builtins.Gas as BuiltinGas
+import qualified Blockchain.SolidVM.Builtins.Size as SharedSize
 import Blockchain.Strato.Model.Gas (getGasValue)
 import Blockchain.Strato.Model.Address (Address (..))
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
@@ -141,6 +143,54 @@ formatValue t v = case t of
     showFields :: Fields ts -> HL ts -> [T.Text]
     showFields FNil HNil = []
     showFields (FCons n ft rest) (x :* xs) = (if T.null n then "" else n <> "=") <> formatValue ft x : showFields rest xs
+
+data Dict (constraint :: Constraint) where
+  Dict :: constraint => Dict constraint
+
+instance SharedSize.GasSize EnumValue where gasSize = SharedSize.slotSize
+instance SharedSize.TupleSize ts => SharedSize.GasSize (HL ts) where
+  gasSize = const (SharedSize.tupleSize (Proxy :: Proxy ts))
+instance SharedSize.GasSize [Dyn] where gasSize = SharedSize.variadicSize
+instance SharedSize.GasSize Dyn where
+  gasSize (Dyn ty value) = withGasArgument ty $ \adapt -> SharedSize.gasSize (adapt value)
+
+-- Resolve class instances while assembling typed code.
+gasSizeDict :: Ty a -> Dict (SharedSize.GasSize a)
+gasSizeDict ty = case ty of
+  TInt -> Dict
+  TDecimal -> Dict
+  TBool -> Dict
+  TAddr -> Dict
+  TStr -> Dict
+  TBytes -> Dict
+  TEnum _ _ -> Dict
+  TContract _ -> Dict
+  TUnit -> Dict
+  TArr _ -> Dict
+  TStruct _ fields -> case tupleSizeDict fields of Dict -> Dict
+  TTuple fields -> case tupleSizeDict fields of Dict -> Dict
+  TVariadic -> Dict
+  TRaw -> Dict
+  TWireArray -> Dict
+  TWireEnum _ _ -> Dict
+  TMaybe element -> case gasSizeDict element of Dict -> Dict
+  TRef _ -> Dict
+  TAlias _ _ -> Dict
+
+tupleSizeDict :: Fields ts -> Dict (SharedSize.TupleSize ts)
+tupleSizeDict FNil = Dict
+tupleSizeDict (FCons _ _ rest) = case tupleSizeDict rest of Dict -> Dict
+
+withGasArgument :: Ty a -> (forall b. SharedSize.GasSize b => (a -> b) -> result) -> result
+withGasArgument TWireArray use = use SharedSize.ArraySlots
+withGasArgument (TWireEnum _ _) use = use (\number -> EnumValue number True)
+withGasArgument (TMaybe element) use = withGasArgument element $ \adapt -> use (fmap adapt)
+withGasArgument ty use = case gasSizeDict ty of Dict -> use id
+
+withArgumentTuple :: Fields ts -> (forall args. SharedSize.GasSize args => (HL ts -> args) -> result) -> result
+withArgumentTuple FNil use = use (const ())
+withArgumentTuple (FCons _ ty rest) use = withGasArgument ty $ \adapt ->
+  withArgumentTuple rest $ \remaining -> use (\(value :* values) -> (adapt value, remaining values))
 
 defaultOf :: Ty t -> t
 defaultOf = \case
@@ -358,7 +408,7 @@ chargeAfter amount action = do
   chargeGas amount
   pure value
 
-instance BuiltinGas.MonadBuiltinGas (ReaderT (RT, Frame) IO) where
+instance MonadBuiltinGas (ReaderT (RT, Frame) IO) where
   chargeBuiltinGas = chargeGas . getGasValue
 
 catchContractFailure :: M a -> M a -> M a

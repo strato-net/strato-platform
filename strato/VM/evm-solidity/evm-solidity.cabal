@@ -78,7 +78,6 @@ library
     , quickcheck-instances
     , scientific
     , semver-range
-    , solid-vm-builtins
     , solid-vm-model
     , strato-model
     , text

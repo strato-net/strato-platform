@@ -12,6 +12,7 @@ module Blockchain.SolidVM.Builtins.Crypto.Metered
     poseidon2Permute, poseidon2Hash, poseidon2HashBytes, poseidon2gl, poseidon2glBytes,
   ) where
 
+import Blockchain.SolidVM.GasInfo (MonadBuiltinGas (..))
 import qualified Blockchain.SolidVM.Builtins.Crypto as Crypto
 import Blockchain.SolidVM.Builtins.Gas
 import Blockchain.Strato.Model.Gas (Gas)
@@ -39,7 +40,7 @@ forcePoint value = do
 -- decode attempt that is about to reject it.
 chargePerTerm :: MonadBuiltinGas m => Gas -> Gas -> Int -> Int -> m ()
 chargePerTerm base perTerm width count =
-  chargeBuiltinGas $ base + perTerm * fromIntegral ((count + width - 1) `div` width)
+  chargeBuiltinGas $ max 1 (base + perTerm * fromIntegral ((count + width - 1) `div` width))
 
 bytesResult :: (MonadIO m, Show input) => String -> input -> Either String B.ByteString -> m B.ByteString
 bytesResult name input = either (\message -> invalidArguments (name ++ ": " ++ message) input) pure

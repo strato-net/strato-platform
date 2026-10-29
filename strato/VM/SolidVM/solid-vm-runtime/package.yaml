@@ -24,7 +24,6 @@ library:
     - monad-alter
     - nibblestring
     - ordered-containers
-    - solid-vm-builtins
     - solid-vm-compiler
     - solid-vm-model
     - solid-vm-parser
