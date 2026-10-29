@@ -179,8 +179,7 @@ contract record Mercata is Authorizable {
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setRateStrategy", address(poolConfigurator));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setPriceOracle", address(poolConfigurator));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setAllComponents", address(poolConfigurator));
-        authorizations[address(adminRegistry)][address(poolConfigurator)] = 1;
-        poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0,1000);
+        adminRegistry.castVoteOnIssue(address(poolConfigurator), "initializeProtocol", address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0,1000);
 
         // Create Services
         address mercataBridgeImpl = address(new MercataBridge(implOwnerIgnored));

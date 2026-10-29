@@ -19,6 +19,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
 import "../Proxy/Proxy.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
+import "../Admin/AdminRegistry.sol";
 
 /// @notice Pool factory contract
 contract record PoolFactory is Ownable {
@@ -229,7 +230,9 @@ contract record PoolFactory is Ownable {
         string lpName = ERC20(tokenA).name() + "-" + ERC20(tokenB).name() + " LP Token";
         string lpSymbol = ERC20(tokenA).symbol() + "-" + ERC20(tokenB).symbol() + "-LP";
 
-        address lpTokenAddress = TokenFactory(tokenFactory).createTokenWithInitialOwner(
+        (bool didExecute, variadic ret) = AdminRegistry(Ownable(tokenFactory).owner()).castVoteOnIssue(
+            tokenFactory,
+            "createTokenWithInitialOwner",
             lpName,
             "Liquidity Provider Token",
             [],
@@ -240,6 +243,7 @@ contract record PoolFactory is Ownable {
             18,
             this
         );
+        address lpTokenAddress = address(ret);
 
         // deploy new pool first
         _updatePoolImplementation();
@@ -270,7 +274,9 @@ contract record PoolFactory is Ownable {
         string lpName = ERC20(tokenA).name() + "-" + ERC20(tokenB).name() + " LP Token";
         string lpSymbol = ERC20(tokenA).symbol() + "-" + ERC20(tokenB).symbol() + "-LP";
 
-        address lpTokenAddress = TokenFactory(tokenFactory).createTokenWithInitialOwner(
+        (bool didExecute, variadic ret) = AdminRegistry(Ownable(tokenFactory).owner()).castVoteOnIssue(
+            tokenFactory,
+            "createTokenWithInitialOwner",
             lpName,
             "Liquidity Provider Token",
             [],
@@ -281,6 +287,7 @@ contract record PoolFactory is Ownable {
             18,
             this
         );
+        address lpTokenAddress = address(ret);
 
         // deploy new pool first
         _updatePoolImplementation();
@@ -338,7 +345,9 @@ contract record PoolFactory is Ownable {
         string lpName = ERC20(tokens[0]).name() + "Multi-Token Stable LP Token";
         string lpSymbol = ERC20(tokens[0]).symbol() + "-MTSLP";
 
-        address lpTokenAddress = TokenFactory(tokenFactory).createTokenWithInitialOwner(
+        (bool didExecute, variadic ret) = AdminRegistry(Ownable(tokenFactory).owner()).castVoteOnIssue(
+            tokenFactory,
+            "createTokenWithInitialOwner",
             lpName,
             "Liquidity Provider Token",
             [],
@@ -349,6 +358,7 @@ contract record PoolFactory is Ownable {
             18,
             this
         );
+        address lpTokenAddress = address(ret);
 
         // deploy new pool first
         _updatePoolImplementation();
@@ -510,7 +520,9 @@ contract record PoolFactory is Ownable {
         string lpName = "Merged Stable LP Token";
         string lpSymbol = "MSLP";
 
-        address lpTokenAddress = TokenFactory(tokenFactory).createTokenWithInitialOwner(
+        (bool didExecute, variadic ret) = AdminRegistry(Ownable(tokenFactory).owner()).castVoteOnIssue(
+            tokenFactory,
+            "createTokenWithInitialOwner",
             lpName,
             "Liquidity Provider Token",
             [],
@@ -521,6 +533,7 @@ contract record PoolFactory is Ownable {
             18,
             this
         );
+        address lpTokenAddress = address(ret);
 
         _updatePoolImplementation();
         _updateStablePoolImplementation();

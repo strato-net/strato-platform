@@ -63,7 +63,10 @@ contract Describe_StablePool_Migration is Authorizable {
 
         PoolHarness harness = new PoolHarness();
         StablePool p = harness.makePool(t0, t1, lpAddr);
-        Ownable(lpAddr).transferOwnership(address(p));
+        AdminRegistry adminRegistry = m.adminRegistry();
+        Ownable(lpAddr).transferOwnership(address(adminRegistry));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", lpAddr, "mint", address(p));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", lpAddr, "burn", address(p));
 
         ERC20(t0).approve(address(p), 10000000000e18);
         ERC20(t1).approve(address(p), 10000000000e18);

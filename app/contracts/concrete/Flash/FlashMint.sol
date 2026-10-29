@@ -19,6 +19,7 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../Tokens/Token.sol";
+import "../Admin/AdminRegistry.sol";
 
 /// @notice Borrowers implement this. The magic return string is the borrower's acknowledgement
 ///         that it understands the loan contract, mirroring ERC-3156's return-value handshake.
@@ -182,16 +183,17 @@ interface IFlashMintReceiver {
 
         uint fee = whitelist[msg.sender] ? 0 : (amount * feeBps) / 10000;
 
-        Token(token).mint(receiver, amount);
+        AdminRegistry admin = AdminRegistry(Ownable(token).owner());
+        admin.castVoteOnIssue(token, "mint", receiver, amount);
 
         string ack = IFlashMintReceiver(receiver).onFlashMint(token, amount, fee, data);
         require(ack == CALLBACK_OK, "FlashMint: bad callback ack");
 
         require(IERC20(token).balanceOf(receiver) >= amount + fee, "FlashMint: not repaid");
 
-        Token(token).burn(receiver, amount + fee);
+        admin.castVoteOnIssue(token, "burn", receiver, amount + fee);
         if (fee > 0) {
-            Token(token).mint(feeCollector, fee);
+            admin.castVoteOnIssue(token, "mint", feeCollector, fee);
             feesAccrued += fee;
         }
 

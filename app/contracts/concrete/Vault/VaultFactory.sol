@@ -14,6 +14,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
 import "../Proxy/Proxy.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
+import "../Admin/AdminRegistry.sol";
 import "../Lending/PriceOracle.sol";
 
 /// @notice Vault factory contract
@@ -144,7 +145,9 @@ contract record VaultFactory is Ownable {
         vault = address(new Proxy(vaultImplementation, address(this)));
 
         // Create share token via TokenFactory (owned by factory initially)
-        address shareTokenAddress = TokenFactory(tokenFactory).createTokenWithInitialOwner(
+        (bool didExecute, variadic ret) = AdminRegistry(Ownable(tokenFactory).owner()).castVoteOnIssue(
+            tokenFactory,
+            "createTokenWithInitialOwner",
             name,
             "Vault share token representing proportional ownership of vault equity",
             [],
@@ -155,6 +158,7 @@ contract record VaultFactory is Ownable {
             18, // 18 decimals
             this
         );
+        address shareTokenAddress = address(ret);
 
         // Initialize the vault with the share token
         Vault(vault).initialize(
@@ -197,7 +201,9 @@ contract record VaultFactory is Ownable {
         vault = address(new Proxy(vaultImplementation, address(this)));
 
         // Create share token via TokenFactory (owned by factory initially)
-        address shareTokenAddress = TokenFactory(tokenFactory).createTokenWithInitialOwner(
+        (bool didExecute, variadic ret) = AdminRegistry(Ownable(tokenFactory).owner()).castVoteOnIssue(
+            tokenFactory,
+            "createTokenWithInitialOwner",
             name,
             "Vault share token representing proportional ownership of vault equity",
             [],
@@ -208,6 +214,7 @@ contract record VaultFactory is Ownable {
             18, // 18 decimals
             this
         );
+        address shareTokenAddress = address(ret);
 
         // Initialize the vault with custom bot executor
         Vault(vault).initialize(

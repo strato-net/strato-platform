@@ -93,8 +93,9 @@ contract Describe_CDPEngine is Authorizable {
         mockUSDST.mint(address(userB), 100000e18);
 
         // Grant CDPEngine mint and burn access to the mock USDST
-        // Since Token uses onlyOwner for mint/burn, we transfer ownership to CDPEngine
-        Ownable(address(mockUSDST)).transferOwnership(address(cdpEngine));
+        AdminRegistry adminRegistry = m.adminRegistry();
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", mockUSDSTAddress, "mint", address(cdpEngine));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", mockUSDSTAddress, "burn", address(cdpEngine));
 
         // Update the registry to use our mock USDST instead of hardcoded address
         cdpRegistry.setUSDST(mockUSDSTAddress);

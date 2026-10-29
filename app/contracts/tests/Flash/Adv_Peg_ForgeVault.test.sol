@@ -166,7 +166,9 @@ contract Describe_Adv_Peg_ForgeVault is Authorizable {
         areg.castVoteOnIssue(address(areg), "addWhitelist", address(m.tokenFactory()), "createTokenWithInitialOwner", address(vaultFactory));
         address va = vaultFactory.createVault("Bot Vault", "vBOT");
         bvault = Vault(va);
-        Ownable(bvault.shareToken()).transferOwnership(va);
+        Ownable(bvault.shareToken()).transferOwnership(address(areg));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", bvault.shareToken(), "mint", va);
+        areg.castVoteOnIssue(address(areg), "addWhitelist", bvault.shareToken(), "burn", va);
         bvault.addSupportedAsset(address(USDST));
         bvault.addSupportedAsset(address(GOLDST));
         botExecutor.do(address(USDST), "approve", va, INFINITY);

@@ -2,6 +2,7 @@ import "../../abstract/ERC20/IERC20.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../Lending/PriceOracle.sol";
 import "../Tokens/Token.sol";
+import "../Admin/AdminRegistry.sol";
 import "../Admin/FeeCollector.sol";
 contract record MetalForge is Ownable {
 
@@ -112,7 +113,7 @@ contract record MetalForge is Ownable {
 
         IERC20(payToken).transferFrom(msg.sender, treasurer, principal);
         IERC20(payToken).transferFrom(msg.sender, address(feeCollector), feeAmount);
-        Token(metalToken).mint(msg.sender, metalAmount);
+        AdminRegistry(Ownable(metalToken).owner()).castVoteOnIssue(metalToken, "mint", msg.sender, metalAmount);
 
         emit MetalMinted(
             msg.sender,
