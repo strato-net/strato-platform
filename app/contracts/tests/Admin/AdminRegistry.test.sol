@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import "../../concrete/Admin/AdminRegistry.sol";
+import "../../concrete/Proxy/Proxy.sol";
 import "../../abstract/ERC20/ERC20.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
@@ -22,6 +23,25 @@ contract User {
     function do(address a, string f, variadic args) public returns (variadic) {
         variadic result = address(a).call(f, args);
         return result;
+    }
+}
+
+// An admin that votes for a call to itself and, when that call runs, votes for it again
+contract ReentrantAdmin {
+    AdminRegistry registry;
+    uint public executions;
+
+    function setRegistry(AdminRegistry _registry) public {
+        registry = _registry;
+    }
+
+    function vote() public {
+        registry.castVoteOnIssue(address(this), "reenter");
+    }
+
+    function reenter() public {
+        executions++;
+        if (executions < 3) registry.castVoteOnIssue(address(this), "reenter");
     }
 }
 
@@ -52,8 +72,9 @@ contract Describe_AdminRegistry {
         address[] memory initialAdmins = new address[](2);
         initialAdmins[0] = admin1;
         initialAdmins[1] = address(user1);
-        adminRegistry = new AdminRegistry();
+        adminRegistry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
         adminRegistry.initialize(initialAdmins);
+        Ownable(address(adminRegistry)).transferOwnership(address(adminRegistry));
         token = new TestERC20("Test Token", "TEST", address(adminRegistry));
     }
 
@@ -68,16 +89,55 @@ contract Describe_AdminRegistry {
 
     function it_admin_registry_handles_empty_initial_admins() {
         address[] memory emptyAdmins = new address[](0);
-        AdminRegistry emptyRegistry = new AdminRegistry();
-        emptyRegistry.initialize(emptyAdmins);
+        AdminRegistry emptyRegistry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
+        bool reverted = false;
+        try {
+            emptyRegistry.initialize(emptyAdmins);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject an empty admin set");
         require(!emptyRegistry.isAdminAddress(admin1), "Should have no admins");
+    }
+
+    function it_admin_registry_rejects_duplicate_initial_admins() {
+        AdminRegistry dupRegistry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
+        bool reverted = false;
+        try {
+            dupRegistry.initialize([admin1, admin1]);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject duplicate admins");
+        require(!dupRegistry.isAdminAddress(admin1), "Should have no admins");
+    }
+
+    function it_admin_registry_cannot_be_initialized_by_non_owner() {
+        // A bare registry owns itself; a proxied one belongs to its proxy's owner
+        AdminRegistry bareRegistry = new AdminRegistry();
+        AdminRegistry foreignRegistry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(user2))));
+        bool bareReverted = false;
+        try {
+            bareRegistry.initialize([admin1]);
+        } catch {
+            bareReverted = true;
+        }
+        bool foreignReverted = false;
+        try {
+            foreignRegistry.initialize([admin1]);
+        } catch {
+            foreignReverted = true;
+        }
+        require(bareReverted && foreignReverted, "Only the owner should be able to initialize");
+        require(!bareRegistry.isAdminAddress(admin1) && !foreignRegistry.isAdminAddress(admin1), "Should have no admins");
     }
 
     function it_admin_registry_handles_single_initial_admin() {
         address[] memory singleAdmin = new address[](1);
         singleAdmin[0] = admin1;
-        AdminRegistry singleRegistry = new AdminRegistry();
+        AdminRegistry singleRegistry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
         singleRegistry.initialize(singleAdmin);
+        Ownable(address(singleRegistry)).transferOwnership(address(singleRegistry));
         require(singleRegistry.isAdminAddress(admin1), "Should have one admin");
         require(!singleRegistry.isAdminAddress(admin2), "Should not have second admin");
     }
@@ -547,6 +607,65 @@ contract Describe_AdminRegistry {
         }
 
         require(reverted, "Should revert when a non-admin votes on behalf of an admin");
+    }
+
+    function it_admin_registry_moves_its_ownership_only_by_unanimous_vote() {
+        AdminRegistry registry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
+        registry.initialize([address(this), address(user1), address(user2)]);
+        Ownable(address(registry)).transferOwnership(address(registry));
+
+        // Renouncing is refused outright
+        bool renounceReverted = false;
+        try {
+            registry.castVoteOnIssue(address(registry), "renounceOwnership");
+        } catch {
+            renounceReverted = true;
+        }
+        require(renounceReverted, "Renouncing the registry's ownership should be rejected");
+
+        // A whitelist entry is no shortcut
+        registry.castVoteOnIssue(address(registry), "addWhitelist", address(registry), "transferOwnership", address(user3));
+        user1.do(address(registry), "castVoteOnIssue", address(registry), "addWhitelist", address(registry), "transferOwnership", address(user3));
+        require(registry.whitelist(address(registry), "transferOwnership", address(user3)), "user3 should be whitelisted");
+        bool whitelistReverted = false;
+        try {
+            user3.do(address(registry), "castVoteOnIssue", address(registry), "transferOwnership", address(user3));
+        } catch {
+            whitelistReverted = true;
+        }
+        require(whitelistReverted, "A whitelisted account should not transfer the registry's ownership");
+
+        // Two of three admins pass the default threshold, but a transfer needs all three
+        registry.castVoteOnIssue(address(registry), "transferOwnership", admin3);
+        user1.do(address(registry), "castVoteOnIssue", address(registry), "transferOwnership", admin3);
+        require(Ownable(address(registry)).owner() == address(registry), "Two of three votes should not transfer ownership");
+        user2.do(address(registry), "castVoteOnIssue", address(registry), "transferOwnership", admin3);
+        require(Ownable(address(registry)).owner() == admin3, "A unanimous vote should transfer ownership");
+    }
+
+    function it_admin_registry_remove_whitelist_requires_an_existing_entry() {
+        require(!adminRegistry.whitelist(address(token), "mint", address(user3)), "user3 should not be whitelisted");
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "removeWhitelist", address(token), "mint", address(user3));
+        bool reverted = false;
+        try {
+            user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "removeWhitelist", address(token), "mint", address(user3));
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Removing a missing whitelist entry should revert");
+    }
+
+    function it_admin_registry_executes_an_issue_once_when_the_target_reenters() {
+        ReentrantAdmin reentrant = new ReentrantAdmin();
+        AdminRegistry registry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
+        registry.initialize([address(this), address(reentrant)]);
+        Ownable(address(registry)).transferOwnership(address(registry));
+        reentrant.setRegistry(registry);
+
+        // Both admins vote; when the call runs, the target votes again for the same issue
+        registry.castVoteOnIssue(address(reentrant), "reenter");
+        reentrant.vote();
+        require(reentrant.executions() == 1, "Issue should execute once even when its target re-enters");
     }
 
     function it_cannot_execute_internal_functions() {

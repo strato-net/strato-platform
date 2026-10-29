@@ -16,11 +16,6 @@ abstract contract Ownable is Context {
     address private _owner;
 
     /**
-     * @dev The caller account is not authorized to perform an operation.
-     */
-    error OwnableUnauthorizedAccount(address account);
-
-    /**
      * @dev The owner is not a valid owner account. (eg. `address(0)`)
      */
     error OwnableInvalidOwner(address owner);
@@ -56,10 +51,7 @@ abstract contract Ownable is Context {
      * @dev Throws if the sender is not the owner.
      */
     function _checkOwner() internal view virtual {
-        if (owner() != _msgSender()) {
-            require(owner() == _msgSender(), string(owner()) + " does not match sender " + string(_msgSender()));
-            revert OwnableUnauthorizedAccount(_msgSender());
-        }
+        require(owner() == _msgSender(), string(owner()) + " does not match sender " + string(_msgSender()));
     }
 
     /**

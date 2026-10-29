@@ -65,8 +65,9 @@ contract Describe_CDPUnitScale {
         );
         Token(usdstAddress).setStatus(2); // ACTIVE
         Token(usdstAddress).mint(address(this), 1000000e18);
-        AdminRegistry adminRegistry = new AdminRegistry();
+        AdminRegistry adminRegistry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
         adminRegistry.initialize([address(this)]);
+        Ownable(address(adminRegistry)).transferOwnership(address(adminRegistry));
         Ownable(usdstAddress).transferOwnership(address(adminRegistry));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", usdstAddress, "mint", address(cdpEngine));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", usdstAddress, "burn", address(cdpEngine));

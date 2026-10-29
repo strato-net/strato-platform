@@ -39,13 +39,16 @@ contract record AdminRegistry is Ownable {
 
     constructor() Ownable(this) { }
 
-    function initialize(address[] _initialAdmins) external onlyOnce {
+    function initialize(address[] _initialAdmins) external onlyOwner onlyOnce {
         defaultVotingThresholdBps = 6000; // 3/5
         require(admins.length == 0, "AdminRegistry is already initialized");
+        require(_initialAdmins.length > 0, "At least one admin is required");
         for (uint i = 0; i < _initialAdmins.length; i++) {
             require(_initialAdmins[i] != address(0), "Invalid admin address");
+            require(adminMap[_initialAdmins[i]] == 0, "Duplicate admin address");
             admins.push(_initialAdmins[i]);
             adminMap[_initialAdmins[i]] = admins.length;
+            emit AdminAdded(_initialAdmins[i]);
         }
     }
 
@@ -80,6 +83,11 @@ contract record AdminRegistry is Ownable {
     }
 
     function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
+        // Ownership lives on the registry's Proxy, so its only route to owner-only calls on itself is through here
+        if (_target == address(this)) {
+            require(_func != "renounceOwnership", "AdminRegistry cannot renounce its ownership");
+            require(_func != "transferOwnership" || adminMap[msg.sender] != 0, "Only admins can vote to transfer AdminRegistry ownership");
+        }
         string issueId = _getIssueId(_target, _func, _args);
         if (adminMap[msg.sender] != 0) {
             bool hasVoted = votesMap[issueId][msg.sender] != 0;
@@ -107,6 +115,15 @@ contract record AdminRegistry is Ownable {
     }
 
     function _shouldExecute(string _issueId, address _target, string _func, variadic _args) internal returns (bool) {
+        // Handing the registry's ownership away takes every current admin
+        if (_target == address(this) && _func == "transferOwnership") {
+            uint currentAdminVotes = 0;
+            for (uint i = 0; i < votes[_issueId].length; i++) {
+                if (adminMap[votes[_issueId][i]] != 0) currentAdminVotes++;
+            }
+            return currentAdminVotes == admins.length;
+        }
+
         uint issueVotes = votes[_issueId].length;
 
         uint votingThresholdBps = votingThresholds[_target][_func];
@@ -131,13 +148,13 @@ contract record AdminRegistry is Ownable {
     }
 
     function _executeIssue(string _issueId, address _target, string _func, variadic _args) internal returns (variadic) {
-        variadic ret = _target.call(_func, _args);
         for (uint i = 0; i < votes[_issueId].length; i++) {
             votesMap[_issueId][votes[_issueId][i]] = 0;
             votes[_issueId][i] = address(0);
         }
         votes[_issueId].length = 0;
         delete currentIssues[_issueId];
+        variadic ret = _target.call(_func, _args);
         emit IssueExecuted(msg.sender, _issueId, _target, _func, _args);
         return ret;
     }
@@ -198,6 +215,7 @@ contract record AdminRegistry is Ownable {
     }
 
     function removeWhitelist(address _target, string _func, address _user) external onlyOwner {
+        require(whitelist[_target][_func][_user], "Whitelist entry does not exist");
         whitelist[_target][_func][_user] = false;
         emit WhitelistRevoked(_target, _func, _user);
     }

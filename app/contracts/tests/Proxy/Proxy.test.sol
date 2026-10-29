@@ -150,13 +150,8 @@ contract Describe_BadDebt_Basic {
     }
 
     function it_proxy_can_access_boolean_member_var() public {
-                // Test that admins array access should be possible for fresh AdminRegistry
-        AdminRegistry fresh_admin_registry = new AdminRegistry();
-        fresh_admin_registry.initialize([this]);
-        require(fresh_admin_registry.initialized(), "AdminRegistry should be initialized");
-
-        // Test that admins array access should be possible for fresh proxied AdminRegistry
-        AdminRegistry fresh_proxied_admin_registry = AdminRegistry(address(new Proxy(address(fresh_admin_registry), this)));
+                // Test that admins array access should be possible for fresh proxied AdminRegistry
+        AdminRegistry fresh_proxied_admin_registry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), this)));
         fresh_proxied_admin_registry.initialize([this]);
         require(fresh_proxied_admin_registry.initialized(), "AdminRegistry should be initialized");
 
@@ -165,13 +160,8 @@ contract Describe_BadDebt_Basic {
     }
 
     function it_proxy_can_access_admins_array() public {
-        // Test that admins array access should be possible for fresh AdminRegistry
-        AdminRegistry fresh_admin_registry = new AdminRegistry();
-        fresh_admin_registry.initialize([this]);
-        require(fresh_admin_registry.admins(0) == this, "First admin should be this");
-
         // Test that admins array access should be possible for fresh proxied AdminRegistry
-        AdminRegistry fresh_proxied_admin_registry = AdminRegistry(address(new Proxy(address(fresh_admin_registry), this)));
+        AdminRegistry fresh_proxied_admin_registry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), this)));
         fresh_proxied_admin_registry.initialize([this]);
         require(fresh_proxied_admin_registry.admins(0) == this, "First admin should be this");
 
@@ -199,8 +189,8 @@ contract Describe_BadDebt_Basic {
             { revert("Old implementation functions should not be callable"); } catch {}
         require(ERC20(USDST).balanceOf(address(user1)) == 100e18, "User1 should not have gained any USDST");
 
-        // Can treat feeCollector as an AdminRegistry now
-        AdminRegistry(address(feeCollector)).initialize([this]);
+        // Can treat feeCollector as an AdminRegistry now (initialized by its owner)
+        user1.do(address(feeCollector), "initialize", [address(this)]);
 
         // Note: Succeeds so far, then fails for the same reason as the previous test
 
