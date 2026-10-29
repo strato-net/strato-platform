@@ -23,7 +23,7 @@
     "@promster/express": "^3.1.0",
     "axios": "1.19.0",
     "big-integer": "^1.6.26",
-    "body-parser": "1.20.6",
+    "body-parser": "1.20.9",
     "chai": "4.1.2",
     "cookie-parser": "1.4.7",
     "cors": "2.8.4",
