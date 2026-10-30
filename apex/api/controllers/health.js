@@ -7,6 +7,7 @@ const config = require("../config/app.config");
 const utils = require("../lib/utils");
 const nodeStatusDB = require("../lib/node-status-db");
 const redisBlockDB = require("../lib/redis-block-db");
+const p2pPeers = require("../lib/p2p-peers");
 
 
 const API_VERSION = "2.0";
@@ -20,19 +21,9 @@ module.exports = {
   nodeStatus: async function (req, res, next) {
     try {
       //get node's block number, best block hash, best block parent hash
-      const [lastBlock, activePeerCount, validators] = await Promise.all([
+      const [lastBlock, { peers, activePeerCount }, validators] = await Promise.all([
         getLastBlock(),
-        // Peers the node is currently connected to: active (active_state=1)
-        // and bonded (bond_state=2). Falls back to null so /status remains usable.
-        Peer.count({
-          where: {
-            active_state: 1,
-            bond_state: 2,
-          },
-        }).catch((err) => {
-          winston.warn(`Unable to fetch active peers count: ${err.message}`);
-          return null;
-        }),
+        getPeers(),
         getValidators(),
       ]);
 
@@ -96,6 +87,7 @@ module.exports = {
         timestamp: new Date().toISOString(),
         nodeAddress,
         activePeerCount,
+        peers,
         validators,
         lastBlock,
         pbftData: findView(pbftData),
@@ -115,23 +107,13 @@ module.exports = {
         lastBlock,
         pbftData,
         nodeAddress,
-        activePeerCount,
+        { peers, activePeerCount },
       ] = await Promise.all([
         utils.getLatestHealth(),
         getLastBlock(),
         getPbftDataOrNull(),
         getNodeAddress(),
-        // Peers the node is currently connected to: active (active_state=1)
-        // and bonded (bond_state=2). Falls back to null so /health remains usable.
-        Peer.count({
-          where: {
-            active_state: 1,
-            bond_state: 2,
-          },
-        }).catch((err) => {
-          winston.warn(`Unable to fetch active peers count: ${err.message}`);
-          return null;
-        }),
+        getPeers(),
       ]);
 
       if (healthInfo && stallInfo && systemInfo && syncInfo) {
@@ -153,6 +135,7 @@ module.exports = {
         timestamp: new Date().toISOString(),
         nodeAddress,
         activePeerCount,
+        peers,
         lastBlock,
         pbftData: findView(pbftData),
         health: health,
@@ -226,6 +209,39 @@ async function getValidators() {
   }
   return nodeStatusDB.getValidators().catch((err) => {
     winston.warn(`Unable to fetch validators: ${err.message}`);
+    return null;
+  });
+}
+
+// The node's live connections from strato-p2p, as { peers, activePeerCount }:
+// every peer the node is in session with, accepted or dialed, and how many
+// of those are past the handshake (the count strato-p2p's own connection
+// limit uses). The peer table knew only the dialed peers: an accepted
+// session was recorded under the connection's source port and matched no
+// row, so a bootnode showed a handful of peers while most of the network
+// was connected to it. The table's count remains the fallback, with peers
+// null, when strato-p2p's API cannot be reached (an API tier's apex).
+async function getPeers() {
+  try {
+    const peers = await p2pPeers.fetchConnections();
+    return { peers, activePeerCount: p2pPeers.countEstablished(peers) };
+  } catch (err) {
+    winston.warn(`Unable to fetch the connections from strato-p2p, counting the peer table instead: ${err.message}`);
+    return { peers: null, activePeerCount: await countActivePeerRows() };
+  }
+}
+
+// Peers the peer table has as connected: active (active_state=1) and bonded
+// (bond_state=2). Null when the table cannot be read, so /status and /health
+// remain usable.
+function countActivePeerRows() {
+  return Peer.count({
+    where: {
+      active_state: 1,
+      bond_state: 2,
+    },
+  }).catch((err) => {
+    winston.warn(`Unable to fetch active peers count: ${err.message}`);
     return null;
   });
 }
