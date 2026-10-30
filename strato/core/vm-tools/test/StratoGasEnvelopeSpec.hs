@@ -2,7 +2,7 @@
 
 module StratoGasEnvelopeSpec (spec) where
 
-import Blockchain.Bagger.Transactions (envelopeRejection, feeBoundRejection, signedFeeBound)
+import Blockchain.Bagger.Transactions (chainIdRequired, envelopeRejection, feeBoundRejection, signedFeeBound)
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (transactionHash, whoSignedThisTransaction)
 import Blockchain.Data.TransactionDef (Transaction (..))
@@ -92,12 +92,18 @@ spec = describe "STRATO-gas envelope boundary" $ do
     feeBoundRejection 0 (legacy 0 B.empty) `shouldBe` Nothing -- nothing quoted: legacy fee implementation
     feeBoundRejection 1 (legacy 0 B.empty) `shouldBe` Nothing -- 20 gwei x 21000 covers it
     feeBoundRejection (10 ^ (30 :: Int)) (MessageTX 0 1000000 1 "ping" ["7"] "mercata" (Just 1) 0 0 27 1 B.empty) `shouldBe` Nothing
+  it "binds a typed envelope to the configured chain even before replay protection" $ do
+    chainIdRequired False valueTransfer `shouldBe` True
+    chainIdRequired False legacyTransfer `shouldBe` False
+    chainIdRequired True legacyTransfer `shouldBe` True
+    chainIdRequired False (MessageTX 0 1000000 1 "ping" ["7"] "mercata" (Just 1) 0 0 27 1 B.empty) `shouldBe` False
   it "never rejects STRATO-native transactions" $
     mapM_ (\active -> envelopeRejection active (MessageTX 0 1000000 1 "ping" ["7"] "mercata" (Just 1) 0 0 27 1 B.empty) `shouldSatisfy` isNothing) [False, True]
-  it "schedules helium, leaves upquark unscheduled and new networks at genesis" $ do
+  it "schedules helium, upquark and the forktest rehearsal, and starts new networks at genesis" $ do
     stratoGasForkBlock "helium" `shouldBe` 900000
-    stratoGasForkBlock "upquark" `shouldBe` 2 ^ (62 :: Int)
-    stratoGasForkBlock "forktest" `shouldBe` 0
+    stratoGasForkBlock "upquark" `shouldBe` 2000000
+    stratoGasForkBlock "forktest" `shouldBe` 1000
+    stratoGasForkBlock "beryllium" `shouldBe` 0
     -- The test config is the default, upquark-shaped network.
-    isStratoGasForkActive 900000 `shouldBe` False
-    isStratoGasForkActive (2 ^ (62 :: Int)) `shouldBe` True
+    isStratoGasForkActive 1999999 `shouldBe` False
+    isStratoGasForkActive 2000000 `shouldBe` True

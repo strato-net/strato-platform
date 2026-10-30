@@ -58,10 +58,11 @@ const CollateralModal = ({
   });
 
   const isSupply = type === "supply";
+  // A withdrawal returns to the wallet, so the fee is checked but not reserved from it.
   const maxAmount = useMemo(() => {
     return isSupply
       ? computeMaxTransferable(asset?.userBalance || "0", asset?.address, calls, feeQuote, setFeeError)
-      : computeMaxTransferable(getMaxSafeWithdrawAmount(asset, loanData).toString(), asset?.address, calls, feeQuote, setFeeError)
+      : computeMaxTransferable(getMaxSafeWithdrawAmount(asset, loanData).toString(), undefined, calls, feeQuote, setFeeError)
   }, [asset, loanData, isSupply, feeQuote, calls]);
   
   // NEW: reflect on-chain 1 wei safety when there is outstanding debt

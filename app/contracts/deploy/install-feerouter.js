@@ -1,12 +1,13 @@
 // Point the Decider at a payFees implementation.
 //
 //   node install-feerouter.js status
-//   node install-feerouter.js install [address]   (default: the deployed HeliumFeeRouter)
-//   node install-feerouter.js rollback            (back to DeciderState's own payFees)
+//   node install-feerouter.js install <router>
+//   node install-feerouter.js rollback           (back to DeciderState's own payFees)
 //
-// DeciderState.updatePayFeeContract is onlyOwner and the owner is an EOA, not the
-// AdminRegistry, so this is a single direct transaction — no vote. Run it as the
-// owner (blockapps_test), not as one of the voting admins.
+// DeciderState.updatePayFeeContract is onlyOwner. On helium the owner is an EOA
+// (blockapps_test), so this is a single direct transaction run as the owner, not as
+// a voting admin. Where the AdminRegistry owns DeciderState (upquark, forktest) the
+// call is a registry vote instead and this script refuses to sign it.
 //
 // The platform DELEGATECALLs payFees for every transaction, so a bad implementation
 // here fails the whole chain; rollback restores DeciderState's own legacy payFees.
@@ -17,7 +18,6 @@ const axios = require('axios');
 const { rest, util } = require('blockapps-rest');
 
 const DECIDER_STATE = '00000000000000000000000000000000dec1de02';
-const FEE_ROUTER = '76a6839f96b8265a0edcbfc141f7cc89b09da9d6'; // HeliumFeeRouterV4: voucher, else STRATO burn priced from pool 6df32c9b…, shortfall bought with USDST
 const LEGACY = DECIDER_STATE; // DeciderState is its own default implementation
 
 async function deciderState() {
@@ -43,8 +43,8 @@ async function deciderState() {
 
   if (mode === 'status') return;
 
-  const target = mode === 'rollback' ? LEGACY : (process.argv[3] || FEE_ROUTER).replace(/^0x/, '');
-  if (!/^[0-9a-fA-F]{40}$/.test(target)) throw new Error(`not an address: ${target}`);
+  const target = mode === 'rollback' ? LEGACY : (process.argv[3] || '').replace(/^0x/, '');
+  if (!/^[0-9a-fA-F]{40}$/.test(target)) throw new Error('usage: node install-feerouter.js install <router>');
   if (target === before.currentFeeContract) {
     console.log(`\nAlready pointed at ${target}; nothing to do.`);
     return;

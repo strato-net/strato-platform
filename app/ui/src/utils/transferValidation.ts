@@ -38,7 +38,7 @@ export const handleRecipientAddress = (
 
 export const computeMaxTransferable = (
   tokenBalanceWei: string,           // wei
-  tokenAddress: string,
+  tokenAddress: string | undefined,
   calls: number,                     // contract calls the action makes
   quote: FeeQuote | null,
   setError: Dispatch<SetStateAction<string>>

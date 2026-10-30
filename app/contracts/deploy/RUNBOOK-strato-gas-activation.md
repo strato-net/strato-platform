@@ -90,14 +90,16 @@ first quote exists.
 
 Preconditions, in order. "Vote" = one AdminRegistry issue, run once per admin.
 
-1. **Pick A and ship the node.** Set `stratoGasForkBlock "upquark"` in
-   `strato/core/strato-conf/src/Blockchain/EthConf/Model.hs` (today the unscheduled
-   sentinel), release, and upgrade every validator and the app before A. Mixed builds
-   agree until A; at A a validator on the old build forks off.
+1. **A is scheduled.** `stratoGasForkBlock "upquark"` in
+   `strato/core/strato-conf/src/Blockchain/EthConf/Model.hs` is 2000000, the block
+   staking activates at, so the two switch together. Release and upgrade every
+   validator and the app before A. Mixed builds agree until A; at A a validator on
+   the old build forks off. The router's activation block (step 4) must be the same
+   number.
 2. **Token.** Upgrade the STRATO proxy to the burnable logic (`upgrade.js`, vote). Transfers
    stay paused until TGE: the router moves each fee to the burn address with `transferFrom`,
-   so whitelist it for `transferFrom` (`whitelist-feerouter.js <router>`, vote) before
-   installing it, or every STRATO-paid transaction is rejected. Whitelisting the pool for `transfer` (`strato-gas-helium.js whitelist-pool <pool>`, vote)
+   so whitelist it for `transferFrom` (`whitelist-feerouter.js upquark <router>`, vote) before
+   installing it, or every STRATO-paid transaction is rejected. Whitelisting the pool for `transfer` (`whitelist-feerouter.js upquark transfer <pool>`, vote)
    lets USDST buy STRATO, including the router's shortfall buy, while `transferFrom` stays
    blocked so nothing sells STRATO into the pool or mints liquidity. Seed the pool before
    pausing (mint needs `transferFrom`). Block rewards need the staking proxy whitelisted for
@@ -106,13 +108,13 @@ Preconditions, in order. "Vote" = one AdminRegistry issue, run once per admin.
    with totalSupply unchanged.
 3. **Pool.** Create the canonical STRATO/USDST PoolV3 (vote), seed full-range liquidity,
    grow the observation ring, and let 30 minutes of observations accumulate. Read the
-   seeded `liquidity` from `strato-gas-helium.js status` and pick the floor as a fraction
+   seeded `liquidity` from the pool's Cirrus row (`BlockApps-PoolV3`) and pick the floor as a fraction
    of it (a tenth keeps ordinary LP churn from stopping pricing; a drained pool must
    fall below it). Below the floor the router stops quoting and the last quote stays
    frozen until the pool refills.
-4. **Router.** `gen-feerouter-source.js upquark --pool <pool> --activate A --min-liquidity <L>`
+4. **Router.** `gen-feerouter-source.js upquark --pool <pool> --activate 2000000 --min-liquidity <L>`
    (the generator refuses upquark without a floor; `--block-reward 0` switches rewards off, as on helium),
-   `deploy-feerouter.js` as both admins, fund it with STRATO for block rewards, and
+   `deploy-feerouter.js` as both admins (it deploys the generated `UpquarkFeeRouter`), fund it with STRATO for block rewards, and
    decide what tops it up: the router pays 0.01 STRATO per block from its own balance
    and nothing refills it. Before A the router charges the legacy fee (one whole
    voucher, else 0.01 USDST to FeeCollector), writes no quote and pays no reward, so
@@ -121,7 +123,9 @@ Preconditions, in order. "Vote" = one AdminRegistry issue, run once per admin.
 5. **Operational balances.** Services and bots: either STRATO, or USDST (the router buys
    their STRATO at up to 2× the call's value) plus `STRATO_TOKEN_ADDRESS` in their env so
    their balance checks count STRATO. Confirm with the audit's payer list.
-6. **Switch together at A.** `install-feerouter.js install` days ahead of A. The
+6. **Switch together at A.** Days ahead of A, vote `DeciderState.updatePayFeeContract(<router>)`
+   through the AdminRegistry, which owns DeciderState on upquark (`install-feerouter.js install <router>`
+   is the direct-owner form used on helium). The
    router's activation block and the node's `stratoGasForkBlock` are the same number,
    so fee policy and native currency flip in the same block; contract tests
    `it_charges_the_legacy_usdst_fee_before_activation`, `it_quotes_nothing_and_pays_no_reward_before_activation`
@@ -129,8 +133,8 @@ Preconditions, in order. "Vote" = one AdminRegistry issue, run once per admin.
 7. **After A.** Run the audit against all validators, re-run the replay gate, and watch
    the router runway and the services' balance checks.
 
-Rollback: `install-feerouter.js rollback` restores DeciderState's own legacy payFees
-at any time. The native-token switch at A is consensus and does not roll back; recovery
+Rollback: `updatePayFeeContract(0xdec1de02…)` (`install-feerouter.js rollback` on helium) restores
+DeciderState's own legacy payFees at any time. The native-token switch at A is consensus and does not roll back; recovery
 after A keeps STRATO as gas.
 
 ## Open before activation

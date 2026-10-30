@@ -68,10 +68,10 @@ export const checkBalances = async (): Promise<void> => {
     config.strato.tokenAddress ? balanceOf("BlockApps-Token-_balances", config.strato.tokenAddress) : 0n,
   ]);
 
-  // Under the STRATO router USDST buys the missing STRATO at up to twice the call's value.
+  // Under the STRATO router USDST buys the missing STRATO at up to twice the call's value, and nothing while the router has no price.
   const voucherTransactions = voucherBalance / config.balance.gasFeeVoucher;
   const stratoTransactions = quote?.valid && quote.fee > 0n ? stratoBalance / quote.fee : 0n;
-  const usdstTransactions = usdstBalance / (quote ? config.balance.gasFeeUSDST * 2n : config.balance.gasFeeUSDST);
+  const usdstTransactions = quote && !quote.valid ? 0n : usdstBalance / (quote ? config.balance.gasFeeUSDST * 2n : config.balance.gasFeeUSDST);
   const totalTransactions = voucherTransactions + stratoTransactions + usdstTransactions;
 
   const stratoBalanceUnits = Number(stratoBalance) / 1e18;

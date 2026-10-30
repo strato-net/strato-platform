@@ -84,10 +84,10 @@ export async function checkBalances(): Promise<void> {
     ]);
 
     // Calculate total possible transactions using all three. Under the STRATO router
-    // USDST buys the missing STRATO at up to twice the call's value.
+    // USDST buys the missing STRATO at up to twice the call's value, and nothing while the router has no price.
     const voucherTransactions = voucherBalance / CONSTANTS.GAS_FEE_VOUCHER;
     const stratoTransactions = quote?.valid && quote.fee > 0n ? stratoBalance / quote.fee : 0n;
-    const usdstTransactions = usdstBalance / (quote ? CONSTANTS.GAS_FEE_USDST * 2n : CONSTANTS.GAS_FEE_USDST);
+    const usdstTransactions = quote && !quote.valid ? 0n : usdstBalance / (quote ? CONSTANTS.GAS_FEE_USDST * 2n : CONSTANTS.GAS_FEE_USDST);
     const totalTransactions = voucherTransactions + stratoTransactions + usdstTransactions;
 
     const stratoBalanceUnits = Number(stratoBalance) / 1e18;

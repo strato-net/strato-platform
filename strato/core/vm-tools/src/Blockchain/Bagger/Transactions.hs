@@ -243,6 +243,14 @@ feeBoundRejection quote tx = case signedFeeBound tx of
 transactionChainIdValid :: Integer -> TD.Transaction -> Bool
 transactionChainIdValid expected tx = TD.chainId tx == Just expected
 
+-- | Whether a transaction must carry the configured chain ID: every one from
+-- the replay-protection fork, and a typed Ethereum envelope at any height,
+-- since a wallet signs one for a single chain and nothing else binds it here.
+chainIdRequired :: Bool -> TD.Transaction -> Bool
+chainIdRequired replayProtection tx = replayProtection || case tx of
+  TD.EthereumTX {TD.txVersion = ver} -> ver /= 0
+  _ -> False
+
 -- | The STRATO-gas envelope boundary, given whether the fork is active at the
 -- height the transaction would run. Before it only legacy Ethereum envelopes
 -- exist, so nothing signed as a type-2 envelope can be a USDST transfer; from

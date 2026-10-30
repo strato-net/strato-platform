@@ -34,6 +34,7 @@ import { EarnApyInfo } from "@/utils/earnUtils";
 import { useToast } from "@/hooks/use-toast";
 import { STAKING_STAKE_CALLS, STAKING_ACTION_CALLS } from "@/lib/constants";
 import { feeShortfall } from "@/utils/feeUtils";
+import { computeMaxTransferable } from "@/utils/transferValidation";
 import { safeParseUnits, truncateAddress, truncateDecimals } from "@/utils/numberUtils";
 import ValidatorStatusBadge, { type ValidatorLifecycle } from "@/components/staking/ValidatorStatusBadge";
 import BecomeValidatorCard, { type RegisterValidatorInput } from "@/components/staking/BecomeValidatorCard";
@@ -747,6 +748,11 @@ const EarnStaking = () => {
   const validatorSetDeployed = info?.validatorSetDeployed !== false;
   const claimableFees = useMemo(() => BigInt(info?.claimableFees || "0"), [info?.claimableFees]);
   const totalStakeAmount = useMemo(() => safeParseUnits(stakeAmount, decimals), [decimals, stakeAmount]);
+  // The stake fee comes out of the STRATO being staked: reserve it from the wallet balance.
+  const maxStakeAmount = useMemo(
+    () => BigInt(computeMaxTransferable(info?.walletBalance || "0", info?.stratoTokenAddress, STAKING_STAKE_CALLS, feeQuote, () => {})),
+    [feeQuote, info?.stratoTokenAddress, info?.walletBalance]
+  );
   const apyLabel = isV2 ? "APY (7d)" : "Est. APY";
 
   const filteredValidators = useMemo(() => {
@@ -797,7 +803,7 @@ const EarnStaking = () => {
     canCoverStakeFee &&
     !!actionValidator?.active &&
     totalStakeAmount > 0n &&
-    totalStakeAmount <= walletBalance;
+    totalStakeAmount <= maxStakeAmount;
   const claimReady =
     isLoggedIn &&
     canCoverActionFee &&
@@ -1108,7 +1114,7 @@ const EarnStaking = () => {
 
   const setMaxStakeAmount = () => {
     if (!info) return;
-    setStakeAmount(formatAmountInput(BigInt(info.walletBalance || "0"), decimals));
+    setStakeAmount(formatAmountInput(maxStakeAmount, decimals));
   };
 
   const setMaxUnstakeAmount = () => {

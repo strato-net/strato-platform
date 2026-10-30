@@ -612,7 +612,7 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = do
   quote <- if isStratoGasForkActive nextBlock then quotedStratoFee else return 0
   return $
     if
-      | isReplayProtectionForkActive nextBlock && not (transactionChainIdValid expectedChainId bt) -> Left $ ChainIdMismatch Validation Incoming expectedChainId t
+      | chainIdRequired (isReplayProtectionForkActive nextBlock) bt && not (transactionChainIdValid expectedChainId bt) -> Left $ ChainIdMismatch Validation Incoming expectedChainId t
       | Just why <- envelopeRejection (isStratoGasForkActive nextBlock) bt -> Left $ InvalidEnvelope Validation Incoming why t
       | Just (q, bound) <- feeBoundRejection quote bt -> Left $ FeeBoundExceeded Validation Incoming q bound t
       | intrinsicGas >= gLimit -> Left $ GasLimitTooLow Validation Incoming intrinsicGas gLimit t

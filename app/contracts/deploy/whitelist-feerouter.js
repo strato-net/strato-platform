@@ -7,20 +7,27 @@
 // transaction paying in STRATO is rejected while the token is paused. Whitelist
 // before installing the router.
 //
-//   node whitelist-feerouter.js <router>
+//   node whitelist-feerouter.js <network> <router>          (transferFrom)
+//   node whitelist-feerouter.js <network> transfer <pool>   (the pool pays STRATO out to swappers)
 //
-// Run once per admin (GLOBAL_ADMIN_NAME); identical calls vote on one issue.
+// Network: helium | upquark | forktest (networks.js). Run once per admin
+// (GLOBAL_ADMIN_NAME); identical calls vote on one issue.
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
 const { rest, util } = require('blockapps-rest');
 
 const REGISTRY = '000000000000000000000000000000000000100c';
-const STRATO_TOKEN = '8ee9a3391e38176feebf5d43cb2c1d6c4f728b04';
-const FEE_ROUTER = (process.argv[2] || '').replace(/^0x/, '');
+const NETWORKS = require('./networks');
+const [network, a1, a2] = process.argv.slice(2);
+const STRATO_TOKEN = (NETWORKS[network] || {}).strato;
+const [FUNC, CALLEE] = a2 ? [a1, a2] : ['transferFrom', a1];
+const callee = (CALLEE || '').replace(/^0x/, '');
 
 (async () => {
-  if (!/^[0-9a-fA-F]{40}$/.test(FEE_ROUTER)) throw new Error('usage: node whitelist-feerouter.js <router>');
+  if (!STRATO_TOKEN || !['transferFrom', 'transfer'].includes(FUNC) || !/^[0-9a-fA-F]{40}$/.test(callee)) {
+    throw new Error('usage: node whitelist-feerouter.js <network> <router> | <network> transfer <pool>');
+  }
   const username = process.env.GLOBAL_ADMIN_NAME;
   const token = await auth.getUserToken(username, process.env.GLOBAL_ADMIN_PASSWORD);
   const tokenObj = { token };
@@ -33,8 +40,8 @@ const FEE_ROUTER = (process.argv[2] || '').replace(/^0x/, '');
       _func: 'addWhitelist',
       _args: [
         { type: 'address', value: STRATO_TOKEN },
-        'transferFrom',
-        { type: 'address', value: FEE_ROUTER },
+        FUNC,
+        { type: 'address', value: callee },
       ],
     },
     txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
@@ -47,6 +54,6 @@ const FEE_ROUTER = (process.argv[2] || '').replace(/^0x/, '');
     opts => rest.getBlocResults(tokenObj, hashes, opts),
     { config, isAsync: true }, 180000);
   const final = Array.isArray(results) ? results[0] : results;
-  console.log(`whitelist transferFrom vote by ${username}: ${final && final.status}`);
+  console.log(`whitelist ${FUNC} vote by ${username}: ${final && final.status}`);
   if (!final || final.status !== 'Success') process.exit(1);
 })().catch(e => { console.error('FAILED:', e.message.slice(0, 200)); process.exit(1); });

@@ -81,6 +81,8 @@ export const feeShortfall = (quote: FeeQuote, calls: number, spend = NO_SPEND): 
   if (!uncoveredCalls) return "";
   if (!quote.valid) return "Network fee price unavailable: only vouchers can pay right now";
   if (chargeWei + spend.currencyWei <= BigInt(quote.balanceWei)) return "";
+  // USDST buys only the fee: what the action itself spends must already be there.
+  if (spend.currencyWei > BigInt(quote.balanceWei)) return `Insufficient ${quote.currency}`;
   if (!quote.fallback) return `Insufficient ${quote.currency} for the network fee`;
   if (fallbackCharge(quote, calls, spend.currencyWei) + spend.fallbackWei > BigInt(quote.fallback.balanceWei)) {
     return `Insufficient ${quote.currency} and USDST for the network fee`;

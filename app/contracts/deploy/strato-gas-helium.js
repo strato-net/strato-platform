@@ -19,7 +19,7 @@ const auth = require('./auth');
 const axios = require('axios');
 const { rest, util } = require('blockapps-rest');
 
-const STRATO = '8ee9a3391e38176feebf5d43cb2c1d6c4f728b04';
+const STRATO = require('./networks').helium.strato;
 const ADMIN_REGISTRY = '000000000000000000000000000000000000100c';
 const USDST = '937efa7e3a77e20bbdbd7c0d32b6514f368c1010';
 const POOL_V3_FACTORY = 'e6b6f05a88e649e4102a801aade9a6bae02f352d'; // backend defaultPoolV3FactoryFor helium

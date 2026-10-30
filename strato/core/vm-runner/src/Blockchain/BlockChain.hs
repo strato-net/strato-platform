@@ -438,7 +438,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       sizeLimit = toInteger (Conf.txSizeLimit (networkConfig ethConf))
       expectedChainId = Conf.chainId $ networkConfig ethConf
       precheck
-        | isReplayProtectionForkActive (number b) && not (transactionChainIdValid expectedChainId bt) = Left $ TFIncorrectChainId expectedChainId t
+        | chainIdRequired (isReplayProtectionForkActive (number b)) bt && not (transactionChainIdValid expectedChainId bt) = Left $ TFIncorrectChainId expectedChainId t
         | Just why <- envelopeRejection (isStratoGasForkActive (number b)) bt = Left $ TFInvalidEnvelope why t
         | Just (q, bound) <- feeBoundRejection quote bt = Left $ TFFeeBoundExceeded q bound t
         | TD.gasLimit bt > min remainingBlockGas maxGas = Left $ TFBlockGasLimitExceeded (TD.gasLimit bt) remainingBlockGas t
