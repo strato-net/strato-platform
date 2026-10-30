@@ -132,6 +132,15 @@ newtype PeerLastBestBlockHash = PeerLastBestBlockHash { unPeerLastBestBlockHash 
 class HasPeerDB m where
   getNumAvailablePeers :: m Int
   setPeerActiveState :: Host -> Int -> ActivityState -> m ()
+  -- | Mark every stored record of the peer with this key at this address:
+  -- the address itself, or a name resolving to it (a peer can be stored
+  -- under both). Returns how many records that was. This is how an
+  -- accepted connection is found: it is known by its source address and,
+  -- once the RLPx handshake is through, by its key, never by the listening
+  -- port that 'setPeerActiveState' needs.
+  setPeerActiveStateByKey :: Host -> Point -> ActivityState -> m Int
+  -- | Store a record for a peer this node has none for.
+  insertPeer :: PPeer -> m ()
   getActivePeers :: m (Either SomeException [PPeer])
   setPeerBondingState :: Host -> Point -> Int -> m (Either SomeException ())
   getPeerBondingState :: Host -> Point -> m (Maybe Int)

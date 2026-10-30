@@ -52,6 +52,7 @@ module Blockchain.Context
     , setPeerAddrIfUnset
     , shouldSendToPeer
     , withActivePeer
+    , withActiveInboundPeer
     ) where
 
 import           Conduit
@@ -67,6 +68,7 @@ import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Char8                   as BC
 import           Data.Conduit.Network
+import           Data.Default                            (def)
 import           Data.Foldable                           (toList)
 import qualified Data.Kind                               as DK
 import           Data.Maybe
@@ -105,7 +107,7 @@ import           Blockchain.Strato.Model.Keccak256
 
 import qualified Blockchain.Strato.RedisBlockDB          as RBDB
 import           Blockchain.SyncDB
-import           Control.Monad                           (unless, void)
+import           Control.Monad                           (unless, void, when)
 import           Control.Monad.Composable.Base
 import           Control.Monad.Composable.BlockDB (BlockDBEnv, HasBlockDB, runBlockDB)
 import qualified Database.Persist.Sql                    as SQL
@@ -635,3 +637,31 @@ withActivePeer p = bracket a b . const
     a = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Active
     b _ = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Inactive
 
+-- | Hold the stored records of an accepted peer active for the session.
+-- 'withActivePeer' finds a peer by host and listening port, which a dialed
+-- peer has and an accepted one does not: a connection the server accepted
+-- carries the remote's ephemeral source port, which matches no stored row,
+-- so until now no inbound peer was ever active in the table. Such a peer is
+-- known by its source address (the IP the socket reports) and, once the
+-- RLPx handshake is through, by its key. Every record of that key at that
+-- address is marked, under the address and under any name stored for it,
+-- so the client loop does not dial a peer this node is already in session
+-- with. A peer with no record gets one under its address, unbonded and with
+-- the default ports, for discovery to bond like any other newcomer; its real
+-- ports arrive with its Pong.
+withActiveInboundPeer ::
+  ( MonadUnliftIO m,
+    HasPeerDB m
+  ) =>
+  Host ->
+  Point ->
+  m a ->
+  m a
+withActiveInboundPeer remote pubkey = bracket mark (const unmark) . const
+  where
+    mark = do
+      marked <- setPeerActiveStateByKey remote pubkey Active
+      when (marked == 0) $ do
+        newcomer <- mkPeer (Just pubkey) remote (readMaybe $ hostToString remote) (UDPPort $ pPeerUdpPort def) (TCPPort $ pPeerTcpPort def)
+        insertPeer newcomer {pPeerActiveState = fromEnum Active}
+    unmark = void $ setPeerActiveStateByKey remote pubkey Inactive

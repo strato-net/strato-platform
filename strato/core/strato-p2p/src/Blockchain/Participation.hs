@@ -13,6 +13,9 @@ module Blockchain.Participation
     getParticipationMode,
     remoteSetParticipationMode,
     p2pApp,
+    PeerInfo (..),
+    PeerDirection (..),
+    peerInfoFromLabel,
   )
 where
 
@@ -21,6 +24,7 @@ import Blockchain.Threads
 import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Data
+import Data.Maybe (mapMaybe)
 import qualified Data.Text as T
 import GHC.Conc
 import GHC.Generics
@@ -31,6 +35,7 @@ import Servant.Client
 import System.Exit
 import System.IO.Unsafe
 import Text.Printf
+import Text.Read (readMaybe)
 import UnliftIO.IORef
 
 data ParticipationMode
@@ -75,6 +80,7 @@ checkOutbound msg = do
 type P2PAPI =
     "threads" :> Get '[JSON] [String]
     :<|> "peers" :> Get '[JSON] [String]
+    :<|> "connections" :> Get '[JSON] [PeerInfo]
     :<|> "participation_mode" :> Get '[JSON] ParticipationMode
     :<|> "participation_mode" :> ReqBody '[JSON] ParticipationMode :> Post '[JSON] ParticipationMode
 
@@ -82,6 +88,7 @@ p2pServer :: Server P2PAPI
 p2pServer =
     getThreads
     :<|> getPeers
+    :<|> getConnections
     :<|> getParticipationMode
     :<|> \m -> setParticipationMode m >> getParticipationMode
 
@@ -89,7 +96,7 @@ p2pApp :: Application
 p2pApp = serve (Proxy :: Proxy P2PAPI) p2pServer
 
 postParticipationMode :: ParticipationMode -> ClientM ParticipationMode
-_ :<|> _ :<|> _ :<|> postParticipationMode = client (Proxy @P2PAPI)
+_ :<|> _ :<|> _ :<|> _ :<|> postParticipationMode = client (Proxy @P2PAPI)
 
 remoteSetParticipationMode :: ParticipationMode -> IO ()
 remoteSetParticipationMode mode = do
@@ -109,3 +116,53 @@ getPeers :: Handler [String]
 getPeers = do
   peersByThreads <- liftIO $ getPeersByThreads
   return $ map (\(peer, status) -> peer ++ "/" ++ status) peersByThreads
+
+-- | Which side opened the connection.
+data PeerDirection = PeerInbound | PeerOutbound
+  deriving (Show, Eq)
+
+instance ToJSON PeerDirection where
+  toJSON PeerInbound = String "inbound"
+  toJSON PeerOutbound = String "outbound"
+
+instance FromJSON PeerDirection where
+  parseJSON = withText "PeerDirection" fromText
+    where
+      fromText "inbound" = pure PeerInbound
+      fromText "outbound" = pure PeerOutbound
+      fromText other = fail $ "unknown peer direction: " ++ T.unpack other
+
+-- | One live connection, as the peer threads' labels describe it (see
+-- "Blockchain.Threads"): an accepted peer is known by its source address
+-- alone ("<host"), a dialed one by the address and listening port it was
+-- dialed at (">host:port"). The state is the status those labels carry,
+-- "CONNECTED" once the RLPx handshake is through; the entries in that state
+-- are the ones the connection limit counts.
+data PeerInfo = PeerInfo
+  { peerHost :: String,
+    peerPort :: Maybe Int,
+    peerDirection :: PeerDirection,
+    peerState :: String
+  }
+  deriving (Show, Eq)
+
+instance ToJSON PeerInfo where
+  toJSON PeerInfo {peerHost = h, peerPort = p, peerDirection = d, peerState = s} =
+    object ["host" .= h, "port" .= p, "direction" .= d, "state" .= s]
+
+instance FromJSON PeerInfo where
+  parseJSON = withObject "PeerInfo" $ \o ->
+    PeerInfo <$> o .: "host" <*> o .: "port" <*> o .: "direction" <*> o .: "state"
+
+-- | The connection a peer thread group's label and status describe.
+peerInfoFromLabel :: (String, String) -> Maybe PeerInfo
+peerInfoFromLabel ('<' : remote, state) = Just $ PeerInfo remote Nothing PeerInbound state
+peerInfoFromLabel ('>' : dialed, state) = Just $ case break (== ':') (reverse dialed) of
+  -- The port follows the last colon, so an IPv6 address keeps its own.
+  (portR, ':' : remoteR) | Just portNum <- readMaybe (reverse portR) -> PeerInfo (reverse remoteR) (Just portNum) PeerOutbound state
+  _ -> PeerInfo dialed Nothing PeerOutbound state
+peerInfoFromLabel _ = Nothing
+
+-- | The live connections as JSON: what \/health reports as the node's peers.
+getConnections :: Handler [PeerInfo]
+getConnections = mapMaybe peerInfoFromLabel <$> liftIO getPeersByThreads

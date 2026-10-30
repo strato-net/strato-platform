@@ -28,6 +28,9 @@ fi
 
 export STRATO_HOSTNAME
 export STRATO_PORT_API
+# strato-p2p's own API, the source of /health's peer list: the fixed port
+# Prometheus scrapes its metrics from, next to strato-api on the same host.
+export STRATO_PORT_P2P_API=${STRATO_PORT_P2P_API:-10248}
 export STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
 export stratoRoot=${stratoRoot:-http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2}
 export vaultUrl=$(yq '.urlConfig.vaultUrl' "$ETHCONF_FILE")

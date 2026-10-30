@@ -10,11 +10,13 @@ import           Blockchain.DB.SQLDB                   (runSqlPool,
                                                         withGlobalSQLPool)
 import           Blockchain.MiscJSON                   ()
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Host          (Host, hostToString)
 import           Blockchain.Strato.Model.Keccak256     (zeroHash)
 import           Control.Monad.Reader
 import           Data.Time
 import qualified Database.Esqueleto.Experimental       as E
 import qualified Database.Persist.Postgresql           as SQL
+import           Text.Read                             (readMaybe)
 import           UnliftIO
 
 instance MonadIO m => HasPeerDB m where
@@ -27,6 +29,14 @@ instance MonadIO m => HasPeerDB m where
     SQL.updateWhere
       [PPeerHost SQL.==. host, PPeerTcpPort SQL.==. port]
       [PPeerActiveState SQL.=. fromEnum state]
+
+  setPeerActiveStateByKey host point state = liftIO $ withGlobalSQLPool . runSqlPool $
+    fmap fromIntegral $
+      SQL.updateWhereCount
+        (sameAddress host ++ [PPeerPubkey SQL.==. Just point])
+        [PPeerActiveState SQL.=. fromEnum state]
+
+  insertPeer peer = liftIO $ withGlobalSQLPool . runSqlPool $ SQL.insert_ peer
 
   getActivePeers = liftIO $ withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime
@@ -181,3 +191,9 @@ instance MonadIO m => HasPeerDB m where
                         PPeerEnableTime SQL.=. jamshidBirth,
                         PPeerUdpEnableTime SQL.=. jamshidBirth
                       ]
+
+-- | The records stored under this address, or under a name resolving to it.
+sameAddress :: Host -> [SQL.Filter PPeer]
+sameAddress host = maybe byHost (\ip -> byHost SQL.||. [PPeerIp SQL.==. Just ip]) (readMaybe $ hostToString host)
+  where
+    byHost = [PPeerHost SQL.==. host]

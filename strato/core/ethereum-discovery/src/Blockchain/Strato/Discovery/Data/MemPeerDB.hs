@@ -17,11 +17,13 @@ import           Control.Lens                          hiding (Context, view)
 import qualified Control.Monad.Change.Alter            as A
 import           Control.Monad.Composable.Base
 import           Control.Monad.Reader
+import           Crypto.Types.PubKey.ECC               (Point)
 import           Data.IP
 import           Data.Map                              (Map)
 import qualified Data.Map                              as M
 import           Data.Maybe
 import           Data.Time.Clock                       (getCurrentTime)
+import           Text.Read                             (readMaybe)
 import           UnliftIO
 
 data MemPeerDBEnv = MemPeerDBEnv {
@@ -56,6 +58,16 @@ instance {-# OVERLAPPING #-} (MemPeerDBEnv :> es) => HasPeerDB (Eff es) where
   setPeerActiveState host _ a = do
     peerMap <- fmap stringPPeerMap accessEnv
     atomicModifyIORef' peerMap $ (,()) . (ix host %~ \p -> p {pPeerActiveState = fromActivityState a})
+
+  setPeerActiveStateByKey host point a = do
+    peerMap <- fmap stringPPeerMap accessEnv
+    atomicModifyIORef' peerMap $ \m ->
+      let hit = sameAddressAndKey host point
+       in (M.map (\p -> if hit p then p {pPeerActiveState = fromActivityState a} else p) m, M.size (M.filter hit m))
+
+  insertPeer p = do
+    peerMap <- fmap stringPPeerMap accessEnv
+    atomicModifyIORef' peerMap $ \m -> (M.insert (pPeerHost p) p m, ())
 
   getActivePeers = try $ do
     peerMap <- readIORef . stringPPeerMap =<< accessEnv
@@ -164,6 +176,8 @@ instance {-# OVERLAPPING #-} (MemPeerDBEnv :> es) => HasPeerDB (Eff es) where
 instance (MonadTrans t, Monad m, HasPeerDB m) => HasPeerDB (t m) where
   getNumAvailablePeers = lift getNumAvailablePeers
   setPeerActiveState a b c = lift $ setPeerActiveState a b c
+  setPeerActiveStateByKey a b c = lift $ setPeerActiveStateByKey a b c
+  insertPeer a = lift $ insertPeer a
   getActivePeers = lift getActivePeers
   setPeerBondingState a b c = lift $ setPeerBondingState a b c
   getPeerBondingState a b = lift $ getPeerBondingState a b
@@ -208,6 +222,13 @@ instance {-# OVERLAPPING #-} (MemPeerDBEnv :> es) => A.Selectable IP PPeer (Eff 
     pure . listToMaybe $ filter f $ M.elems peerMap
     where
       f p = pPeerIp p == Just ip
+
+-- | A record of the peer with this key at this address: stored under the
+-- address itself or under a name resolving to it.
+sameAddressAndKey :: Host -> Point -> PPeer -> Bool
+sameAddressAndKey host point p =
+  pPeerPubkey p == Just point
+    && (pPeerHost p == host || maybe False ((== pPeerIp p) . Just) (readMaybe $ hostToString host))
 
 toActivityState :: Int -> ActivityState
 toActivityState 1 = Active

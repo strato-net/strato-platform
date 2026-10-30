@@ -42,13 +42,13 @@ import           Control.Lens                          ((^.))
 import           Control.Monad
 import           Control.Monad.Composable.Vault
 import           Control.Monad.Trans.Resource
+import           Crypto.Types.PubKey.ECC               (Point)
 import qualified Data.ByteString                       as B
 import qualified Data.Conduit.List                     as CL
 import           Data.Default                          (def)
 import           Data.Either.Combinators
 import qualified Data.Text                             as T
 import           Data.Time.Clock (NominalDiffTime)
-import           GHC.IO.Exception
 import qualified Text.Colors                           as C
 import           Text.Read                             (readMaybe)
 import           UnliftIO
@@ -74,85 +74,62 @@ ethServerHandler pSource pSink seqSrc host (TCPPort port) = do
   let peerStr = "<" ++ hostToString host
   ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow peerStr
   void $ register ender
+  -- The peer as this connection presents it, with its source port; the
+  -- session is recorded against the stored peers once the handshake has
+  -- proven the key, inside runEthServerConduit.
   p <- getPeerByIP host >>= \case
     Nothing -> pure def{pPeerHost = host, pPeerIp = readMaybe (hostToString host), pPeerTcpPort = port}
     Just p -> pure p{pPeerTcpPort = port}
-  (p', attempt) <- withActivePeer p $ runEthServerConduit p pSource pSink seqSrc peerStr
+  (p', attempt) <- runEthServerConduit host p pSource pSink seqSrc peerStr
   case (,) <$> pPeerPubkey p' <*> attempt of
     Nothing  -> $logDebugS "runEthServer" "Peer ran successfully!"
     Just (pubkey, err) -> do
       $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
-      _ <- case err of
-        e' | Just WrongGenesisBlock <- fromException e' -> do
-          udpErr <- disableUDPPeerForSeconds p 86400
-          whenLeft udpErr $ \theUDPErr -> do
-            $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
-          disErr <- storeDisableException p (T.pack "WrongGenesisBlock")
-          whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-          _ <- setPeerBondingState (pPeerHost p) pubkey 3 -- 3 indicates wrong genesis block/networkID
-          logAndLengthenPeerDisableBy (24 * 60 * 60) p
-        e' | Just HeadMacIncorrect <- fromException e' -> do
-          disErr <- storeDisableException p (T.pack "HeadMacIncorrect")
-          whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-          logAndLengthenPeerDisableBy (fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) p
-        e' | Just NetworkIDMismatch <- fromException e' -> do
-          udpErr <- disableUDPPeerForSeconds p 86400
-          whenLeft udpErr $ \theUDPErr -> do
-            $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
-          disErr <- storeDisableException p (T.pack "NetworkIDMismatch")
-          whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-          _ <- setPeerBondingState (pPeerHost p) pubkey 3 -- 3 indicates wrong genesis block/networkID
-          logAndLengthenPeerDisableBy (24 * 60 * 60) p
-        e' | Just PeerDisconnected <- fromException e' -> do
-          disErr <- storeDisableException p (T.pack "PeerDisconnected")
-          whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-          logAndLengthenPeerDisableBy (fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) p
-        e' | Just CurrentlyTooManyPeers <- fromException e' -> do
-          disErr <- storeDisableException p (T.pack "CurrentlyTooManyPeers")
-          whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-          logAndLengthenPeerDisableBy (fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) p
-        e' | Just NoPeerCertificate <- fromException e' -> do
-          disErr <- storeDisableException p (T.pack "NoPeerCertificate")
-          whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
-          udpErr <- disableUDPPeerForSeconds p 86400
-          whenLeft udpErr $ \theUDPErr -> do
-            $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
-          logAndLengthenPeerDisableBy (24 * 60 * 60) p
+      -- p carries this connection's source port, but stored peers are matched
+      -- by (host, listening port), so a disable through p reaches no record.
+      -- The stored records are found by the address and the key instead.
+      case err of
+        e' | Just WrongGenesisBlock <- fromException e' ->
+          disableStoredInboundPeer host pubkey "WrongGenesisBlock" True
+        e' | Just NetworkIDMismatch <- fromException e' ->
+          disableStoredInboundPeer host pubkey "NetworkIDMismatch" True
+        e' | Just NoPeerCertificate <- fromException e' ->
+          disableStoredInboundPeer host pubkey "NoPeerCertificate" False
         e' | Just SelfConnection <- fromException e' -> do
           $logErrorS "runEthServer" . T.pack $ "Inbound peer " ++ hostToString host ++ " presents this node's key: our own public address, or another node running with this node's key"
-          -- p carries this connection's source port, but stored peers are
-          -- matched by (host, listening port), so disable the stored records:
-          -- the address may be stored under a DNS name and under its IP.
+          -- Every record of the address is banned, whatever key it carries:
+          -- the self endpoint may be stored under a DNS name and under its
+          -- IP, with this node's key or with none.
           stored <- getPeersByIP host
-          fmap sequence_ . forM stored $ \s -> do
+          forM_ stored $ \s -> do
             disErr <- storeDisableException s (T.pack "SelfConnection")
             whenLeft disErr $ \err2 -> $logErrorS "stratoP2PServer/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
             selfErr <- disableTCPPeerForSeconds s 86400
             whenLeft selfErr $ \theSelfErr -> do
               $logErrorLS "stratoP2PServer/runEthServer" theSelfErr
-            return selfErr
-        e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
-          case ioErrType of
-            NoSuchThing -> do
-              udpErr <- disableUDPPeerForSeconds p 86400
-              whenLeft udpErr $ \theUDPErr -> do
-                $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
-              disErr <- storeDisableException p (T.pack "TimeoutException")
-              whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-              logAndLengthenPeerDisableBy (fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) p
-            _ -> return $ Right ()
-        _ -> return $ Right ()
+        -- Anything else says nothing against dialing the stored peer, so it
+        -- gets no disable and this node's own dials to it stay on the client
+        -- loop's schedule: PeerDisconnected (the peer hung up, perhaps to
+        -- restart), CurrentlyTooManyPeers (this node is full; the peer is
+        -- fine, and it backs off on its own side), HeadMacIncorrect (a frame
+        -- failed to authenticate, so the key is a claim and no stored record
+        -- is known to be the sender's), an IOError (the path to the peer
+        -- failed) and a handshake timeout.
+        _ -> return ()
       throwIO err
 
+-- | Run an accepted connection from the given remote address, whose stored
+-- peer (if any) is @p@.
 runEthServerConduit ::
   MonadP2P m =>
+  Host ->
   PPeer ->
   ConduitM () B.ByteString m () ->
   ConduitM B.ByteString Void m () ->
   ConduitM () P2pEvent m () ->
   String ->
   m (PPeer, Maybe SomeException)
-runEthServerConduit p pSource pSink seqSrc peerStr = labelPeerThread peerStr "Peer Manager" (Just "HANDSHAKING") $ do
+runEthServerConduit remote p pSource pSink seqSrc peerStr = labelPeerThread peerStr "Peer Manager" (Just "HANDSHAKING") $ do
   myPubKey' <- getPub
   let myPubkey = secPubKeyToPoint myPubKey'
   mConnectionResult <- timeout 2000000 $ pSource $$+ ethCryptAccept `fuseUpstream` pSink
@@ -161,8 +138,15 @@ runEthServerConduit p pSource pSink seqSrc peerStr = labelPeerThread peerStr "Pe
     Just (_, (otherPubKey, outCtx, inCtx)) -> do
       changeLabelStatusM "CONNECTED"
       let p' = p{pPeerPubkey = Just otherPubKey}
+          -- The peer is in session from here, and its stored records are
+          -- held active by the key the handshake proved, at the address the
+          -- socket reports. A peer presenting this node's own key is refused
+          -- at its Hello (SelfConnection) and gets no record.
+          holdActive
+            | otherPubKey == myPubkey = id
+            | otherwise = withActiveInboundPeer remote otherPubKey
       ret <-
-        fmap (either Just (const Nothing)) . try $
+        holdActive . fmap (either Just (const Nothing)) . try $
         [ labelPeerThread peerStr "Peer Source" Nothing $
           pSource
           .| ethDecrypt inCtx
@@ -207,3 +191,32 @@ logAndLengthenPeerDisableBy disableBy peer = do
   $logInfoS "logAndLengthenPeerDisableBy" $ T.pack $ "Disabling Peer " ++ show (pPeerHost peer) ++ ", exponential reset will occur in " ++ show disableBy ++ " seconds"
   lengthenPeerDisableBy disableBy peer
 
+-- | The stored records of the peer with this key at this address: under the
+-- address itself and under any name stored for it (a peer can be stored
+-- under both), never a record with another key, since several peers can
+-- share a host. Each record carries its own listening port, which the
+-- disable helpers match on.
+storedPeersWithKey :: MonadP2P m => Host -> Point -> m [PPeer]
+storedPeersWithKey host pubkey = filter ((== Just pubkey) . pPeerPubkey) <$> getPeersByIP host
+
+-- | Disable the stored records of an accepted peer that the ETH handshake
+-- proved is no peer for this node, as the client loop disables a dialed one
+-- it proves the same about: a day without discovery pings, the exponential
+-- TCP disable with its day-long window, and bond state 3 for a peer on
+-- another chain. A peer with no record is left without one: it is not
+-- dialed anyway.
+disableStoredInboundPeer :: MonadP2P m => Host -> Point -> T.Text -> Bool -> m ()
+disableStoredInboundPeer host pubkey why wrongChain = do
+  stored <- storedPeersWithKey host pubkey
+  when (null stored) $
+    $logInfoS "stratoP2PServer/runEthServer" . T.pack $ "No stored record of the peer at " ++ hostToString host ++ " under its key; nothing to disable for " ++ T.unpack why
+  forM_ stored $ \s -> do
+    disErr <- storeDisableException s why
+    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PServer/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
+    udpErr <- disableUDPPeerForSeconds s 86400
+    whenLeft udpErr $ \theUDPErr -> do
+      $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
+    when wrongChain $ do
+      bondErr <- setPeerBondingState (pPeerHost s) pubkey 3 -- 3 indicates wrong genesis block/networkID
+      whenLeft bondErr $ \err2 -> $logErrorS "stratoP2PServer/runEthServer" . T.pack $ "Unable to set peer bonding state: " ++ show err2
+    void $ logAndLengthenPeerDisableBy (24 * 60 * 60) s
