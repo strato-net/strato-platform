@@ -217,6 +217,11 @@ async function vote(context, artifacts, inspection, approval, options = {}) {
   const expectedExecutions = new Set();
   let indexingWaitMs = 0;
   let indexingStartedAt;
+  let submittedVoteAwaitingIndex = false;
+  const resetIndexingWait = () => {
+    indexingWaitMs = 0;
+    indexingStartedAt = undefined;
+  };
   const waitForIndexing = async () => {
     indexingStartedAt ??= Date.now();
     indexingWaitMs = Math.max(indexingWaitMs, Date.now() - indexingStartedAt);
@@ -244,8 +249,9 @@ async function vote(context, artifacts, inspection, approval, options = {}) {
       }
       fresh = refreshed?.source || await withDeadline("Governance state recheck", () => (options.sourceState || sourceState)(context, artifacts), CHECK_TIMEOUT_MS);
       if (fresh.inactiveTokens?.length) throw new Error("Token status changed; stop and review before voting");
-      if (fresh.liveVoteCountsError && expectedExecutions.size && await waitForIndexing()) continue;
+      if (fresh.liveVoteCountsError && (submittedVoteAwaitingIndex || expectedExecutions.size) && await waitForIndexing()) continue;
       requireLiveAdminVoteCounts(fresh, refreshed?.report);
+      submittedVoteAwaitingIndex = false;
       liveCall = fresh.calls.find(({ id }) => id === item.id);
       const eligible = governanceBatch({ ...inspection.report, calls: fresh.calls }).calls.some(({ id }) => id === item.id);
       if (!liveCall || digest(liveCall.call) !== digest(item.call) ||
@@ -320,6 +326,8 @@ async function vote(context, artifacts, inspection, approval, options = {}) {
       journal[item.id] = { ...journal[item.id], status: "VOTED", receipt };
       writeJson(journalFile, journal);
       if (Number.isSafeInteger(liveCall.requiredAdminVotes) && (liveCall.recordedAdminVotes || 0) + 1 >= liveCall.requiredAdminVotes) expectedExecutions.add(item.id);
+      submittedVoteAwaitingIndex = true;
+      resetIndexingWait();
       submitted.push({ id: item.id, ...receipt, note: "Vote succeeded; execution is established by the next live reconciliation" });
     } catch (error) {
       journal[item.id].error = redactFor(context, error.message);

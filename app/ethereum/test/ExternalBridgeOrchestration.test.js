@@ -1730,7 +1730,7 @@ test("an active combined rollout refreshes native progress only after read-only 
 });
 
 
-function remainingConfiguration(t, { required = () => 2, lag = false } = {}) {
+function remainingConfiguration(t, { required = () => 2, lag = false, voteCountLag = false } = {}) {
   const { governanceBatch } = require("../scripts/lib/externalBridgeOrchestration");
   const f = fixture(t); configured(f);
   const chain = f.config.chains[0];
@@ -1739,7 +1739,7 @@ function remainingConfiguration(t, { required = () => 2, lag = false } = {}) {
   f.state.routes.chains.clear(); f.state.routes.routes.clear(); f.state.routes.rebaseRequired.clear();
   const admins = [addr("8").slice(2), addr("9").slice(2), addr("a").slice(2)];
   const votes = new Map(), sends = [], executions = [];
-  let actor = admins[0], staleState, waitCount = 0;
+  let actor = admins[0], staleState, voteCountIndexPending = false, waitCount = 0;
   const read = async () => {
     const calls = governanceProgress(f.config, staleState || f.state, { stage: "activation", activationErrors: [] });
     for (const item of calls) {
@@ -1748,7 +1748,8 @@ function remainingConfiguration(t, { required = () => 2, lag = false } = {}) {
       item.requiredAdminVotes = required(item);
       item.recordedAdminVotes = item.governanceVoters.length;
     }
-    return { calls, inactiveTokens: [] };
+    return { calls, inactiveTokens: [],
+      ...(voteCountIndexPending ? { liveVoteCountsError: "Live governance vote verification failed" } : {}) };
   };
   const inspect = async () => {
     const source = await read();
@@ -1760,7 +1761,11 @@ function remainingConfiguration(t, { required = () => 2, lag = false } = {}) {
     stateless: true, indexWaitMs: 1000,
     fetchImpl: async () => ({ ok: true, json: async () => ({ address: `0x${actor}` }) }),
     sourceState: read,
-    wait: async () => { waitCount++; staleState = undefined; },
+    wait: async () => {
+      waitCount++;
+      staleState = undefined;
+      if (voteCountLag !== "persistent") voteCountIndexPending = false;
+    },
     submit: async (_user, call, record) => {
       const id = digest(call), item = (await read()).calls.find(item => item.id === id);
       assert(item, "only a call from the reviewed configuration can be submitted");
@@ -1783,6 +1788,7 @@ function remainingConfiguration(t, { required = () => 2, lag = false } = {}) {
         votes.delete(id); executions.push(call.args._func);
       }
       await record([`tx-${sends.length}`]);
+      voteCountIndexPending = !!voteCountLag;
       return { status: "VOTED", hashes: [`tx-${sends.length}`] };
     },
   };
@@ -1822,6 +1828,26 @@ test("batch waits briefly for indexed prerequisite execution and then finishes i
   h.setActor(h.admins[1]);
   const second = await h.inspect(); await vote(h.f.context, h.f.artifacts, second, "batch", h.options);
   assert.equal(h.waitCount(), 1); assert.equal(h.executions.length, 3); assert.equal(h.sends.length, 6);
+});
+
+test("batch retries Cirrus indexing after each non-quorum vote", async t => {
+  const h = remainingConfiguration(t, { voteCountLag: true });
+  const inspection = await h.inspect();
+  const result = await vote(h.f.context, h.f.artifacts, inspection, "batch", h.options);
+  assert.equal(result.length, 3);
+  assert.equal(h.sends.length, 3);
+  assert.equal(h.executions.length, 0);
+  assert.equal(h.waitCount(), 2);
+});
+
+test("batch stops without duplicate votes when Cirrus remains unavailable", async t => {
+  const h = remainingConfiguration(t, { voteCountLag: "persistent" });
+  h.options.indexWaitMs = 1;
+  const inspection = await h.inspect();
+  await assert.rejects(vote(h.f.context, h.f.artifacts, inspection, "batch", h.options),
+    /Live AdminRegistry vote counts are unavailable/);
+  assert.equal(h.sends.length, 1);
+  assert.equal(h.waitCount(), 1);
 });
 
 test("dependent votes that would execute under a lower threshold wait for prerequisites", async t => {
