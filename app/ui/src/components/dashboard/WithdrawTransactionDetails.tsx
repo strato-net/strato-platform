@@ -1,9 +1,12 @@
+import { Button } from "@/components/ui/button";
+import WithdrawalCancellation from "@/components/bridge/WithdrawalCancellation";
+import { useUser } from "@/context/UserContext";
 import { useEffect, useState, useMemo } from 'react';
 import { Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Table, Select, Space, Card } from 'antd';
 import { CopyOutlined, FrownOutlined } from '@ant-design/icons';
 import { useBridgeContext } from '@/context/BridgeContext';
-import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, CHAIN_OPTIONS, handleCopyToClipboard, getExplorerUrl } from '@/lib/bridge/utils';
+import { formatDate, getChainName, WITHDRAWAL_STATUS_LABELS, WITHDRAWAL_STATUS_OPTIONS, CHAIN_OPTIONS, ExternalBridgeStatus, handleCopyToClipboard, getExplorerUrl } from '@/lib/bridge/utils';
 import { renderTruncatedAddressWithCopy } from '@/lib/bridge/components';
 import { ITEMS_PER_PAGE } from '@/lib/bridge/constants';
 import { formatWeiToDecimalHP } from '@/utils/numberUtils';
@@ -16,6 +19,9 @@ const normalizeStratoAccount = (account?: string) => (account || '').replace(/^0
 
 const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
   const isMobile = useIsMobile();
+  const { userAddress } = useUser();
+  const [historyError, setHistoryError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [withdrawalStatus, setWithdrawalStatus] = useState<number>(0);
@@ -28,6 +34,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
     fetchWithdrawTransactions,
     availableNetworks,
     withdrawalRefreshKey,
+    triggerWithdrawalRefresh,
     bridgeableTokens,
   } = useBridgeContext();
 
@@ -43,6 +50,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
 
   useEffect(() => {
     const loadTransactions = async () => {
+      setHistoryError(false);
       setIsLoading(true);
       try {
         const params: Record<string, string> = {
@@ -69,7 +77,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
         setTransactions(result.data);
         setTotalCount(result.totalCount);
       } catch (error) {
-        console.error('Error loading transactions:', error);
+        setHistoryError(true);
         setTransactions([]);
         setTotalCount(0);
       } finally {
@@ -78,7 +86,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
     };
 
     loadTransactions();
-  }, [currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions, context, selectedType, withdrawalRefreshKey]);
+  }, [retryKey, currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions, context, selectedType, withdrawalRefreshKey]);
 
   const columns = [
     {
@@ -179,30 +187,50 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
       render: (_: any, record: any) => {
         const statusStr = record?.WithdrawalInfo?.bridgeStatus || '0';
         const statusNum = parseInt(statusStr);
-        if (statusNum === 1) {
+        const statusLabel = WITHDRAWAL_STATUS_LABELS[statusNum];
+        if (statusNum === ExternalBridgeStatus.INITIATED) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
               <Clock className="h-3 w-3 mr-1" />
-              Initiated
+              {statusLabel}
             </span>
           );
-        } else if (statusNum === 2) {
+        } else if (statusNum === ExternalBridgeStatus.PENDING_REVIEW) {
           return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+            <span
+              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800"
+            >
               <CheckCircle2 className="h-3 w-3 mr-1" />
-              Pending Review
+              {statusLabel}
             </span>
           );
-        } else if (statusNum === 3) {
+        } else if (statusNum === ExternalBridgeStatus.READY || statusNum === ExternalBridgeStatus.CANCELLATION_PENDING) {
+          return (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              <Clock className="h-3 w-3 mr-1" />
+              {statusLabel}
+            </span>
+          );
+        } else if (statusNum === ExternalBridgeStatus.COMPLETED) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              Completed
+              {statusLabel}
             </span>
           );
-        } else if (statusNum === 4) {
+        } else if (statusNum === ExternalBridgeStatus.REFUNDED) {
+          return (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              {statusLabel}
+            </span>
+          );
+        } else if (
+          statusNum === ExternalBridgeStatus.CANCELLED ||
+          statusNum === ExternalBridgeStatus.ABORTED
+        ) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-              Aborted
+              {statusLabel}
             </span>
           );
         }
@@ -221,6 +249,13 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
       key: 'block_timestamp',
       render: (text: string) => formatDate(text),
       width: 200,
+    },
+    {
+      title: 'Action', key: 'cancel', render: (_: unknown, record: any) =>
+        ['external', 'native'].includes(record.bridgeSource) &&
+        normalizeStratoAccount(record.WithdrawalInfo?.stratoSender).toLowerCase() === normalizeStratoAccount(userAddress).toLowerCase() &&
+        (String(record.WithdrawalInfo?.bridgeStatus) === '1' || String(record.WithdrawalInfo?.bridgeStatus) === '2')
+          ? <WithdrawalCancellation source={record.bridgeSource} withdrawalId={String(record.withdrawalId)} onCanceled={triggerWithdrawalRefresh} /> : null,
     },
   ];
 
@@ -262,7 +297,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
                 setCurrentPage(1);
               }}
               style={{ width: isMobile ? '100%' : 150 }}
-              options={BRIDGE_STATUS_OPTIONS}
+              options={WITHDRAWAL_STATUS_OPTIONS}
             />
           </div>
           <div className={isMobile ? "w-full" : ""}>
@@ -285,7 +320,10 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
         </Space>
       </Card>
       
-      <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
+      {historyError ? <div role="alert" className="rounded-lg border border-destructive/40 p-4 text-destructive">
+        <p>Unable to load transaction history. Please try again.</p>
+        <Button variant="outline" className="mt-2" onClick={() => setRetryKey(value => value + 1)}>Retry</Button>
+      </div> : <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
         <Table
           columns={columns}
           dataSource={transactions}
@@ -314,7 +352,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
           }}
           rowKey={(_, index) => index}
         />
-      </div>
+      </div>}
     </div>
   );
 };

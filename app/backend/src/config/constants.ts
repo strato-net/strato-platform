@@ -1,4 +1,4 @@
-import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataGovernance, mercataBridge, cdpRegistry, voucher, safetyModule, sToken, priceOracle, liquidityPool, lendingPool } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataGovernance, cdpRegistry, voucher, safetyModule, sToken, priceOracle, liquidityPool, lendingPool } from "./config";
 import * as config from "./config";
 import {
   SWAP_CONTRACTS,
@@ -6,6 +6,17 @@ import {
   SWAP_POOL_SELECT_FIELDS,
   SWAP_HISTORY_SELECT_FIELDS
 } from "./swapConstants";
+
+export const MAX_UINT256 = (1n << 256n) - 1n;
+
+export const ANONYMOUS_QUOTE_TTL_MS = 1_000;
+export const ANONYMOUS_QUOTE_CACHE_SIZE = 128;
+export const ROUTE_TOPOLOGY_TTL_MS = 5_000;
+export const ROUTE_QUOTE_CONCURRENCY = 4;
+export const BRIDGE_REVIEW_PAGE_SIZE = 200;
+export const BRIDGE_REVIEW_ID_BATCH_SIZE = 20;
+// Maximum output sacrificed for fewer route steps; 0 selects strictly by output.
+export const ROUTE_OUTPUT_TOLERANCE_BPS = 5n;
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -32,6 +43,7 @@ export const constants = (() => {
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
   const MercataBridge = `${CONTRACT_PREFIX}MercataBridge`;
+  const ExternalAssetBridge = `${CONTRACT_PREFIX}ExternalAssetBridge`;
   const StratoNativeBridge = `${CONTRACT_PREFIX}StratoNativeBridge`;
   const StratoNativeCustodyVault = `${CONTRACT_PREFIX}StratoNativeCustodyVault`;
   const StratoStaking = `${CONTRACT_PREFIX}StratoStaking`;
@@ -48,6 +60,7 @@ export const constants = (() => {
   const MetalForge = `${CONTRACT_PREFIX}MetalForge`;
   const SafetyModule = `${CONTRACT_PREFIX}SafetyModule`;
   const DirectMintPSM = `${CONTRACT_PREFIX}DirectMintPSM`;
+  const TokenRouter = `${CONTRACT_PREFIX}TokenRouter`;
   const Event = "event";
     
   const tokenSelectFields = [
@@ -153,6 +166,7 @@ export const constants = (() => {
     PoolConfigurator,
     AdminRegistry,
     MercataBridge,
+    ExternalAssetBridge,
     StratoNativeBridge,
     StratoNativeCustodyVault,
     StratoStaking,
@@ -169,7 +183,9 @@ export const constants = (() => {
     MetalForge,
     SafetyModule,
     DirectMintPSM,
+    TokenRouter,
     get directMintPsm() { return config.directMintPsm; },
+    get tokenRouter() { return config.tokenRouter; },
     get metalForge() { return config.metalForge; },
     get saveUsdstVault() { return config.saveUsdstVault; },
     get vaultFactory() { return config.vaultFactory; },  // Use getter to get current value after init
@@ -178,7 +194,8 @@ export const constants = (() => {
     lendingPool,
     safetyModule,
     sToken,
-    mercataBridge,
+    get mercataBridge() { return config.mercataBridge; },
+    get externalAssetBridge() { return config.externalAssetBridge; },
     get stratoNativeBridge() { return config.stratoNativeBridge; },
     get stratoNativeCustodyVault() { return config.stratoNativeCustodyVault; },
     get stratoToken() { return config.stratoToken; },
@@ -212,3 +229,6 @@ export const constants = (() => {
     voucher,
   };
 })();
+
+export const EVENT_ENRICHMENT_HASH_BATCH_SIZE = 20;
+export const EVENT_ENRICHMENT_PAGE_SIZE = 200;

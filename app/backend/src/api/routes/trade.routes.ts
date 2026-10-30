@@ -1,9 +1,18 @@
 import { Router } from "express";
 import authHandler from "../middleware/authHandler";
 import TradeController from "../controllers/trade.controller";
+import { TradeBridgeController } from "../controllers/bridge.controller";
 
 const router = Router();
 const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
+
+router.get("/bridge/networkConfigs", authHandler.authorizeRequest(true), TradeBridgeController.getNetworkConfigs);
+router.get("/bridge/bridgeableTokens/:chainId", authHandler.authorizeRequest(true), TradeBridgeController.getBridgeableTokens);
+router.get("/bridge/depositActions", authHandler.authorizeRequest(), TradeBridgeController.getDepositActions);
+router.get("/bridge/transactions/:type", walletAuth, TradeBridgeController.getTransactions);
+router.get("/bridge/withdrawalSummary", authHandler.authorizeRequest(), TradeBridgeController.getWithdrawalSummary);
+router.post("/bridge/requestWithdrawal", walletAuth, TradeBridgeController.requestWithdrawal);
+router.post("/bridge/requestNativeWithdrawal", walletAuth, TradeBridgeController.requestNativeWithdrawal);
 
 /**
  * @openapi
@@ -94,6 +103,22 @@ router.get("/pools/:tokenAddress1/:tokenAddress2", authHandler.authorizeRequest(
  *         description: Per-pool quotes plus the best executable pool address
  */
 router.get("/quote", authHandler.authorizeRequest(true), TradeController.quote);
+router.get(
+  "/route/assets",
+  authHandler.authorizeRequest(true),
+  TradeController.routeAssets
+);
+router.get("/route/pool/:poolAddress", authHandler.authorizeRequest(true), TradeController.routePoolTokens);
+router.get(
+  "/route/quote",
+  authHandler.authorizeRequest(true),
+  TradeController.routeQuote
+);
+router.get(
+  "/bridge-route/quote",
+  authHandler.authorizeRequest(true),
+  TradeController.compositeRouteQuote
+);
 
 /**
  * @openapi
@@ -131,6 +156,7 @@ router.get("/quote", authHandler.authorizeRequest(true), TradeController.quote);
  *         description: Swap transaction payload
  */
 router.post("/swap", walletAuth, TradeController.swap);
+router.post("/route", walletAuth, TradeController.route);
 
 /**
  *

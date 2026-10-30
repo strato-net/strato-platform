@@ -16,9 +16,42 @@ import type {
   PoolV3CollectParams,
   PoolV3CreateParams,
   PoolV3FeeTier,
+  RouteQuoteResponse,
+  CompositeRouteQuoteResponse,
+  RouteDestination,
 } from '@strato/shared-types';
 
+import type { WalletTxProgressEvent } from '@/lib/axios';
+
 export * from '@strato/shared-types';
+export interface RouteTransactionProgress extends WalletTxProgressEvent {
+  submittedHash?: string;
+}
+
+export interface RouteExecutionProgress {
+  status: 'pending' | 'success' | 'error' | 'unconfirmed';
+  message: string;
+  transactions: RouteTransactionProgress[];
+  hash?: string;
+}
+
+export interface RouteConfirmation {
+  selectionKey: string;
+  quote: RouteQuoteResponse | CompositeRouteQuoteResponse;
+  inputSymbol: string;
+  inputDecimals: number;
+  inputAmount: string;
+  outputToken: SwapToken;
+  tokens: SwapToken[];
+  recipient: string;
+  networkName: string;
+}
+
+export interface RouteTokenSelection {
+  tokenIn?: SwapToken;
+  tokenOut?: SwapToken;
+  error?: string;
+}
 // UI-SPECIFIC SWAP INTERFACES
 // ============================================================================
 
@@ -269,4 +302,18 @@ export interface LiquidityFormState {
   isAToB: boolean;
   loading: boolean;
   error: string | null;
+}
+
+export interface RoutePickerToken {
+  id: string;
+  address: string;
+  symbol: string;
+  name: string;
+  image?: string;
+  decimals: number;
+  balance?: string;
+  price?: string;
+  metalFeeBps?: string;
+  detail?: string;
+  routeDestination?: RouteDestination;
 }
