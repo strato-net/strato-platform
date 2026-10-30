@@ -125,7 +125,8 @@ export const defaultVaultFactoryFor: Record<string, string> = {
 
 export const defaultPoolV3FactoryFor: Record<string, string> = {
   "114784819836269": "e6b6f05a88e649e4102a801aade9a6bae02f352d", // Helium testnet
-  "33056204878082667": "5d630126d908b46bcf8d00bc15e591a459375809" // Upquark mainnet
+  "33056204878082667": "5d630126d908b46bcf8d00bc15e591a459375809", // Upquark mainnet
+  "7381244120123405172": "ddf7c27f27ac43b25043e100c2076e515526b9ae" // Forktest rehearsal
 };
 
 // PositionManagerV3 (V3 position NFTs). Deployed once per network behind a Proxy; its

@@ -68,6 +68,8 @@ export interface AggregatedProtocolRevenue {
     yieldVault: ProtocolRevenue;
   };
   aggregated: RevenueByPeriod;
+  /** STRATO the fee router burned for transaction fees: destroyed, so never revenue. */
+  stratoBurned: ProtocolRevenue;
 }
 
 /**
@@ -1145,6 +1147,57 @@ export const getGasCostRevenue = async (
 };
 
 /**
+ * Get the STRATO burned for transaction fees, by period. The fee router emits FeePaid
+ * from the payer's own context, so the events carry no contract address to filter on;
+ * the burn methods do (vouchers are a separate token).
+ */
+export const getStratoBurned = async (
+  accessToken: string,
+): Promise<ProtocolRevenue> => {
+  try {
+    const { data: feeEvents } = await cirrus.get(accessToken, `/event`, {
+      params: {
+        event_name: "eq.FeePaid",
+        "attributes->>method": "in.(FeeMethod.STRATO_BURN,FeeMethod.USDST_SWAP_BURN)",
+        select: "amount:attributes->>amount,block_timestamp",
+        order: "block_timestamp.desc"
+      }
+    });
+    const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = getTimeCutoffs();
+
+    let daily = 0n, weekly = 0n, monthly = 0n, ytd = 0n, allTime = 0n;
+    for (const event of feeEvents || []) {
+      const ts = parseTimestamp(event.block_timestamp);
+      const amount = BigInt(event.amount || "0");
+      allTime += amount;
+      if (ts >= oneDayAgo) daily += amount;
+      if (ts >= oneWeekAgo) weekly += amount;
+      if (ts >= oneMonthAgo) monthly += amount;
+      if (ts >= ytdCutoff) ytd += amount;
+    }
+
+    const buildByAsset = (total: bigint): RevenueByAsset[] =>
+      total > 0n ? [{ asset: constants.stratoToken, symbol: "STRATO", revenue: total.toString() }] : [];
+
+    return {
+      totalRevenue: allTime.toString(),
+      revenueByPeriod: {
+        daily: { total: daily.toString(), byAsset: buildByAsset(daily) },
+        weekly: { total: weekly.toString(), byAsset: buildByAsset(weekly) },
+        monthly: { total: monthly.toString(), byAsset: buildByAsset(monthly) },
+        ytd: { total: ytd.toString(), byAsset: buildByAsset(ytd) },
+        allTime: { total: allTime.toString(), byAsset: buildByAsset(allTime) }
+      }
+    };
+  } catch (error: any) {
+    console.error("Error fetching STRATO burned:", {
+      error: error.response?.data || error.message
+    });
+    throw new Error("Failed to fetch STRATO burned");
+  }
+};
+
+/**
  * Get protocol revenue from MetalForge mint fees
  * Revenue = Σ(feeAmount) from MetalMinted events, converted to USD
  */
@@ -1690,7 +1743,7 @@ export const getAggregatedProtocolRevenue = async (
 ): Promise<AggregatedProtocolRevenue> => {
   try {
     // Fetch revenue data from all protocols in parallel
-    const [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, poolV3Revenue, metalForgeRevenue, gasRevenue, yieldVaultRevenue] = await Promise.all([
+    const [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, poolV3Revenue, metalForgeRevenue, gasRevenue, yieldVaultRevenue, stratoBurned] = await Promise.all([
       getCDPProtocolRevenue(accessToken, userAddress),
       getLendingProtocolRevenue(accessToken),
       getSwapProtocolRevenue(accessToken),
@@ -1698,7 +1751,8 @@ export const getAggregatedProtocolRevenue = async (
       getPoolV3ProtocolRevenue(accessToken),
       getMetalForgeProtocolRevenue(accessToken),
       getGasCostRevenue(accessToken),
-      getYieldVaultProtocolRevenue(accessToken)
+      getYieldVaultProtocolRevenue(accessToken),
+      getStratoBurned(accessToken)
     ]);
 
     const allProtocols = [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, poolV3Revenue, metalForgeRevenue, gasRevenue, yieldVaultRevenue];
@@ -1760,7 +1814,8 @@ export const getAggregatedProtocolRevenue = async (
         gas: gasRevenue,
         yieldVault: yieldVaultRevenue
       },
-      aggregated
+      aggregated,
+      stratoBurned
     };
   } catch (error: any) {
     console.error("Error fetching aggregated protocol revenue:", {

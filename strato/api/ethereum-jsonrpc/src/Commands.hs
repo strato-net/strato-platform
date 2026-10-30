@@ -16,19 +16,19 @@ import CallTrace (BlockTrace(..), mkCallFrame)
 import EthBlock (EthBlock(..), txToEthValue)
 import EthLog (EthLog, eventRowToLogMaybe, ethLogsBloom, matchesTopics)
 import Blockchain.Data.LogsBloom (emptyLogsBloom)
-import TransactionReceipt (TransactionReceipt, EthHex(..), mkTransactionReceipt, transactionIndex)
+import TransactionReceipt (TransactionReceipt, EthHex(..), mkTransactionReceipt, transactionIndex, walletGasEstimate)
 import ResponseDispatcher (withPendingResponse)
 import Strato.Version (stratoVersion)
 import Blockchain.CommunicationConduit (ethVersion)
 import Blockchain.EthConf (runStreamMPooled, ethConf)
 import qualified Blockchain.EthConf.Model as EthConf
-import Blockchain.EthConf.Model (networkConfig, networkID, contractsConfig, nativeTokenAddress)
+import Blockchain.EthConf.Model (networkConfig, networkID, contractsConfig, nativeTokenAddress, stratoGasForkBlock)
 import Blockchain.Data.Block (Block, blockBlockData, blockReceiptTransactions)
 import qualified Blockchain.Strato.Model.Class as Class
 import Blockchain.Data.AddressStateDB (AddressState (..), blankAddressState, codePtrToSHA)
 import Blockchain.Data.BlockHeader (BlockHeader (..), clearBlockSignatures, getBlockSignatures)
 import Blockchain.Data.DataDefs (AddressStateRef (..), TransactionResult(..))
-import Blockchain.Data.RLP (rlpDecode, rlpDeserialize, rlpEncode, rlpSerialize)
+import Blockchain.Data.RLP (RLPObject (..), rlpDecode, rlpDeserialize, rlpEncode, rlpSerialize)
 import Blockchain.Strato.Model.Secp256k1 (exportSignature)
 import Data.Aeson (ToJSON(..), (.=), object)
 import Blockchain.Data.Transaction (Transaction(..), transactionHash, txAndTime2RawTX)
@@ -85,8 +85,8 @@ import LocalApi (formatClientError, runLocal, sharedManager)
 import Network.HTTP.Client (RequestBody (..), httpLbs, method, parseRequest, requestBody, requestHeaders, responseBody, responseStatus, responseTimeout, responseTimeoutMicro)
 import Network.HTTP.Types (statusCode)
 import qualified Strato.Tracing as Tr
-import SqlState (NativeBalance (..), nativeBalanceFromSql, storageAtFromSql)
-import Control.Monad.Composable.CodeDB (runCodeDBM, lookupCode, queryEvents, queryEventsByTxHash)
+import SqlState (NativeBalance (..), feeQuoteFromSql, nativeBalanceFromSql, nativeToken, storageAtFromSql)
+import Control.Monad.Composable.CodeDB (EventRow (..), runCodeDBM, lookupCode, queryEvents, queryEventsByTxHash)
 
 type Server = IO
 
@@ -109,6 +109,7 @@ methods =
     eth_mining,
     eth_hashrate,
     eth_gasPrice,
+    eth_maxPriorityFeePerGas,
     eth_accounts,
     eth_blockNumber,
     eth_getBalance,
@@ -241,15 +242,85 @@ eth_hashrate = toMethod "eth_hashrate" f ()
     f :: RpcResult Server String
     f = return "0x0"
 
-walletGasEstimate :: Integer
-walletGasEstimate = 21000
+-- | The flat fee of DeciderState's own payFees: 0.01 USDST, the native
+-- currency before the STRATO-gas fork.
+legacyFee :: Integer
+legacyFee = 10000000000000000
+
+-- | A selector call against the latest state on vm-runner: the raw return
+-- data, or Nothing when the call fails.
+callVmRaw :: String -> Address -> B.ByteString -> RpcResult Server (Maybe B.ByteString)
+callVmRaw label to calldata = do
+  rpcId <- mkRpcId label
+  resp <- liftIO $ callVM $ JRCCall txObj rpcId "latest"
+  return $ case resp of
+    Success _ result -> Just result
+    _ -> Nothing
+  where
+    txObj = TxCallObject
+      { TxCall.from = Address 0
+      , TxCall.to = Just to
+      , TxCall.gas = "0x0"
+      , TxCall.gasPrice = "0x0"
+      , TxCall.value = "0x0"
+      , TxCall.data_ = HexData calldata
+      }
+
+-- | The i-th 32-byte word of ABI return data as an unsigned integer.
+wordAt :: Int -> B.ByteString -> Integer
+wordAt i = B.foldl' (\acc b -> acc * 256 + fromIntegral b) 0 . B.take 32 . B.drop (32 * i)
+
+-- The platform charges one flat fee per transaction and ignores the gas fields,
+-- so wallets are quoted that fee spread across the fixed gas estimate, rounding
+-- up: the STRATO fee the installed FeeRouter froze for the current block, or
+-- 0.01 USDST where DeciderState still runs its own legacy payFees.
+-- | The flat per-transaction fee spread over the fixed billable gas units,
+-- rounded up: the installed fee implementation's frozen quote for the current
+-- block, or the legacy 0.01 USDST where the implementation keeps no quote.
+feePerGas :: RpcResult Server Integer
+feePerGas = do
+  fromSql <- liftIO feeQuoteFromSql
+  fee <- case fromSql of
+    Right quote -> return $ fromMaybe legacyFee quote
+    Left why -> do
+      liftIO . putStrLn $ "feePerGas: falling back to vm-runner: " ++ why
+      viaVm
+  return $ (fee + walletGasEstimate - 1) `div` walletGasEstimate
+  where
+    -- DeciderState.getImplContract(), then stratoFeeQuote() on what it names;
+    -- an implementation without a quote is the legacy one.
+    viaVm :: RpcResult Server Integer
+    viaVm = do
+      impl <- callVmRaw "eth_gasPrice_impl" (Address 0xDEC1DE02) (selector "56557016")
+      quote <- case impl of
+        Just w | B.length w == 32 -> callVmRaw "eth_gasPrice_quote" (Address $ fromInteger $ wordAt 0 w) (selector "462d073f")
+        _ -> return Nothing
+      return $ case quote of
+        Just w | B.length w == 96, wordAt 0 w > 0 -> wordAt 0 w
+        _ -> legacyFee
+
+    selector hex = either (const B.empty) id (B16.decode hex)
 
 eth_gasPrice :: Method Server
 eth_gasPrice = toMethod "eth_gasPrice" f ()
   where
     f :: RpcResult Server String
-    -- Quote the fixed 0.01 USDST fee across the wallet's gas estimate, rounding up.
-    f = return $ "0x" ++ showHex ((10000000000000000 + walletGasEstimate - 1) `div` walletGasEstimate) ""
+    f = (\fee -> "0x" ++ showHex fee "") <$> feePerGas
+
+-- | The whole per-unit price is the base fee (see 'blockBaseFee'); no tip.
+eth_maxPriorityFeePerGas :: Method Server
+eth_maxPriorityFeePerGas = toMethod "eth_maxPriorityFeePerGas" f ()
+  where
+    f :: RpcResult Server String
+    f = return "0x0"
+
+-- | From the STRATO-gas fork a block carries a base fee, which is what makes
+-- wallets send type-2 envelopes; before it there is none, so they keep
+-- sending legacy ones. Historical blocks answer for their own height.
+blockBaseFee :: Block' -> RpcResult Server (Maybe Integer)
+blockBaseFee blk
+  | getBlockNumber blk >= stratoGasForkBlock (EthConf.network $ networkConfig ethConf) = Just <$> feePerGas
+  | otherwise = return Nothing
 
 eth_accounts :: Method Server
 eth_accounts = toMethod "eth_accounts" f ()
@@ -390,8 +461,6 @@ eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "b
   where
     balanceOfSelector = "70a08231"
 
-    nativeAddr = nativeTokenAddress (contractsConfig ethConf)
-
     f :: Address -> String -> RpcResult Server String
     f addr _blockString = do
       -- Served from the SQL state mirror (latest block); the vm-runner round
@@ -405,26 +474,15 @@ eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "b
 
     viaVm :: Address -> RpcResult Server String
     viaVm addr = do
-          let padding = BC.replicate 24 '0'
-              calldataHex = balanceOfSelector <> padding <> addressToHex addr
-              calldata = case B16.decode calldataHex of
-                Right bs -> bs
-                Left _ -> B.empty
-              txObj = TxCallObject
-                { TxCall.from = Address 0
-                , TxCall.to = Just nativeAddr
-                , TxCall.gas = "0x0"
-                , TxCall.gasPrice = "0x0"
-                , TxCall.value = "0x0"
-                , TxCall.data_ = HexData calldata
-                }
-          rpcId <- mkRpcId $ "eth_getBalance_" ++ showHex addr ""
-          resp <- liftIO $ callVM $ JRCCall txObj rpcId "latest"
-          case resp of
-            Success _ result | B.length result == 32 -> do
-              let balance = foldl (\acc b -> acc * 256 + fromIntegral b) (0 :: Integer) (B.unpack result)
-              return $ "0x" ++ showHex balance ""
-            _ -> return "0x0"
+          -- With strato-api unreachable the fork state is unknown as well; the
+          -- configured (pre-fork) token is the best guess.
+          nativeAddr <- liftIO $ either (const $ nativeTokenAddress (contractsConfig ethConf)) id <$> nativeToken
+          let calldata = either (const B.empty) id $
+                B16.decode (balanceOfSelector <> BC.replicate 24 '0' <> addressToHex addr)
+          resp <- callVmRaw ("eth_getBalance_" ++ showHex addr "") nativeAddr calldata
+          return $ case resp of
+            Just result | B.length result == 32 -> "0x" ++ showHex (wordAt 0 result) ""
+            _ -> "0x0"
 
 eth_getCode :: Method Server
 eth_getCode = toMethod "eth_getCode" f (Required "address" :+: Required "block" :+: ())
@@ -793,7 +851,12 @@ eth_sendRawTransaction = toMethod "eth_sendRawTransaction" f (Required "data" :+
     f :: HexData -> RpcResult Server Keccak256
     f (HexData rawTxBytes) = do
       liftIO $ putStrLn $ "eth_sendRawTransaction received " ++ show (B.length rawTxBytes) ++ " bytes"
-      let ethTx = rlpDecode (rlpDeserialize rawTxBytes) :: Transaction
+      -- An EIP-2718 typed envelope (type byte, then payload) is not itself
+      -- an RLP item; the decoder takes it as the string it travels as.
+      let envelope = case B.uncons rawTxBytes of
+            Just (typeByte, _) | typeByte > 0 && typeByte < 0x80 -> RLPString rawTxBytes
+            _ -> rlpDeserialize rawTxBytes
+          ethTx = rlpDecode envelope :: Transaction
           rawTx = txAndTime2RawTX API ethTx (-1) (UTCTime (fromGregorian 2000 1 1) 0)
           tx = RawTransaction' rawTx
           h = transactionHash ethTx
@@ -817,7 +880,7 @@ eth_getBlockByHash = toMethod "eth_getBlockByHash" f (Required "blockHash" :+: R
     f :: EthHex Keccak256 -> Bool -> RpcResult Server (Maybe EthBlock)
     f (EthHex blockHash) fullTxs = do
       mBlk <- liftIO $ fetchBlockByHash (keccak256ToHex blockHash)
-      return $ (\blk -> toEthBlock (blockBloom blk) fullTxs blk) <$> mBlk
+      traverse (toEthBlock fullTxs) mBlk
 
 eth_getBlockByNumber :: Method Server
 eth_getBlockByNumber = toMethod "eth_getBlockByNumber" f (Required "blockNumber" :+: Required "fullTransactions" :+: ())
@@ -825,11 +888,13 @@ eth_getBlockByNumber = toMethod "eth_getBlockByNumber" f (Required "blockNumber"
     f :: String -> Bool -> RpcResult Server (Maybe EthBlock)
     f blockNumber fullTxs = do
       mBlk <- liftIO $ fetchBlockByNumber blockNumber
-      return $ (\blk -> toEthBlock (blockBloom blk) fullTxs blk) <$> mBlk
+      traverse (toEthBlock fullTxs) mBlk
 
 -- | Select the Ethereum block representation based on the @fullTransactions@ flag.
-toEthBlock :: B.ByteString -> Bool -> Block' -> EthBlock
-toEthBlock bloom fullTxs = (if fullTxs then EthBlockWithFullTxs else EthBlockWithTxHashes) bloom . bPrimeToB
+toEthBlock :: Bool -> Block' -> RpcResult Server EthBlock
+toEthBlock fullTxs blk = do
+  baseFee <- blockBaseFee blk
+  return $ (if fullTxs then EthBlockWithFullTxs else EthBlockWithTxHashes) (blockBloom blk) baseFee (bPrimeToB blk)
 
 -- | Resolve a block's @logsBloom@ for the Ethereum RPC shape. STRATO
 -- historically stored a dummy bloom in block headers; serve the stored value
@@ -845,10 +910,29 @@ blockBloom blk =
 -- | Reconstruct a transaction's logs from the Cirrus @event@ table, skipping any
 -- event that cannot be resolved (missing code / event def) so one bad event does
 -- not fail the whole receipt.
-txEthLogs :: Keccak256 -> RpcResult Server [EthLog]
-txEthLogs txHash = do
+-- | The transaction's events as Ethereum logs, and what its payer was charged
+-- in the native currency: the STRATO a FeePaid event reports burning, nothing
+-- when it reports a voucher, and the legacy flat fee where the fee
+-- implementation emits no FeePaid at all. FeePaid is emitted inside the fee
+-- DELEGATECALL, so it is attributed to the payer and matched by name only.
+txLogsAndFee :: Keccak256 -> RpcResult Server ([EthLog], Integer)
+txLogsAndFee txHash = do
   rows <- runCodeDBM $ queryEventsByTxHash (T.pack (keccak256ToHex txHash)) (maxLogResults + 1)
-  catMaybes <$> runCodeDBM (mapM eventRowToLogMaybe rows)
+  ethLogs <- catMaybes <$> runCodeDBM (mapM eventRowToLogMaybe rows)
+  return (ethLogs, feeCharged rows)
+  where
+    feeCharged rows = case find ((== "FeePaid") . erEventName) rows of
+      Nothing -> legacyFee
+      Just row -> case (attr "method" row, attr "amount" row >>= readInteger) of
+        (Just "FeeMethod.VOUCHER", _) -> 0
+        (_, Just amount) -> amount
+        _ -> legacyFee
+    attr name row = case M.lookup name (erAttributes row) of
+      Just (String s) -> Just s
+      _ -> Nothing
+    readInteger s = case reads (T.unpack s) of
+      [(n, "")] -> Just n
+      _ -> Nothing
 
 -- | Hex-encoded (@0x@-prefixed) Ethereum logs bloom for a set of logs.
 logsBloomHex :: [EthLog] -> String
@@ -928,8 +1012,8 @@ eth_getTransactionReceipt = toMethod "eth_getTransactionReceipt" f (Required "tx
           txs = maybe [] (blockReceiptTransactions . bPrimeToB) mBlk
       case find (\t -> transactionHash t == transactionResultTransactionHash tr) txs of
         Just tx -> do
-          ethLogs <- txEthLogs (transactionResultTransactionHash tr)
-          return $ mkTransactionReceipt tr tx blkNum (map toJSON ethLogs) (logsBloomHex ethLogs)
+          (ethLogs, fee) <- txLogsAndFee (transactionResultTransactionHash tr)
+          return $ mkTransactionReceipt tr tx blkNum fee (map toJSON ethLogs) (logsBloomHex ethLogs)
         Nothing -> throwError $ rpcError (-32603) "Transaction not found in block"
 
 -- | All transaction receipts for a block. The block parameter is a 32-byte
@@ -963,8 +1047,8 @@ eth_getBlockReceipts = toMethod "eth_getBlockReceipts" f (Required "block" :+: (
       response <- liftIO $ runLocal $ TxResults.getTransactionResultClient (transactionHash tx)
       case response of
         Right (tr : _) -> do
-          ethLogs <- txEthLogs (transactionHash tx)
-          return $ (mkTransactionReceipt tr tx blkNum (map toJSON ethLogs) (logsBloomHex ethLogs)) { transactionIndex = EthHex idx }
+          (ethLogs, fee) <- txLogsAndFee (transactionHash tx)
+          return $ (mkTransactionReceipt tr tx blkNum fee (map toJSON ethLogs) (logsBloomHex ethLogs)) { transactionIndex = EthHex idx }
         Right []       -> throwError $ rpcError (-32603) "receipt not found for transaction in block"
         Left err       -> throwError $ rpcError (-32603) (formatClientError err)
 

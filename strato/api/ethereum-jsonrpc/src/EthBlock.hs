@@ -34,23 +34,26 @@ import Data.Word (Word64)
 import Numeric (showHex)
 
 data EthBlock
-  = EthBlockWithTxHashes B.ByteString Block  -- ^ @transactions@ rendered as tx hashes (@fullTransactions = false@)
-  | EthBlockWithFullTxs  B.ByteString Block  -- ^ @transactions@ rendered as full tx objects (@fullTransactions = true@)
+  = EthBlockWithTxHashes B.ByteString (Maybe Integer) Block  -- ^ @transactions@ rendered as tx hashes (@fullTransactions = false@)
+  | EthBlockWithFullTxs  B.ByteString (Maybe Integer) Block  -- ^ @transactions@ rendered as full tx objects (@fullTransactions = true@)
   -- ^ The 'B.ByteString' is the resolved 256-byte @logsBloom@ (stored value when
-  -- real, otherwise a null bloom); see 'Commands.blockBloom'.
+  -- real, otherwise a null bloom); see 'Commands.blockBloom'. The 'Maybe Integer'
+  -- is the block's @baseFeePerGas@, present from the STRATO-gas fork; see
+  -- 'Commands.blockBaseFee'.
 
 instance ToJSON EthBlock where
-  toJSON (EthBlockWithTxHashes bloom blk@(Block _ txs _)) =
-    object $ headerPairs bloom blk ++ [ "transactions" .= map (hexHash . txHash) txs ]
-  toJSON (EthBlockWithFullTxs bloom blk@(Block bd txs _)) =
-    object $ headerPairs bloom blk ++
+  toJSON (EthBlockWithTxHashes bloom baseFee blk@(Block _ txs _)) =
+    object $ headerPairs bloom baseFee blk ++ [ "transactions" .= map (hexHash . txHash) txs ]
+  toJSON (EthBlockWithFullTxs bloom baseFee blk@(Block bd txs _)) =
+    object $ headerPairs bloom baseFee blk ++
       [ "transactions" .=
           zipWith (txToEthValue (blockHeaderHash bd) (blockHeaderBlockNumber bd)) [0 ..] txs
       ]
 
 -- | Shared Ethereum block header fields, identical for both representations.
-headerPairs :: B.ByteString -> Block -> [Pair]
-headerPairs bloom blk@(Block bd _ uncles) =
+headerPairs :: B.ByteString -> Maybe Integer -> Block -> [Pair]
+headerPairs bloom baseFee blk@(Block bd _ uncles) =
+  maybe [] (\fee -> [ "baseFeePerGas" .= hexQuantity fee ]) baseFee ++
   [ "number"           .= hexQuantity (blockHeaderBlockNumber bd)
   , "hash"             .= hexHash (blockHeaderHash bd)
   , "parentHash"       .= hexHash (blockHeaderParentHash bd)
@@ -73,7 +76,7 @@ headerPairs bloom blk@(Block bd _ uncles) =
 
 -- | Ethereum-shaped transaction object, with block context injected.
 txToEthValue :: TransactionLike t => Keccak256 -> Integer -> Integer -> t -> Value
-txToEthValue blkHash blkNum idx tx = object
+txToEthValue blkHash blkNum idx tx = object $
   [ "hash"             .= hexHash (txHash tx)
   , "nonce"            .= hexQuantity (txNonce tx)
   , "blockHash"        .= hexHash blkHash
@@ -88,7 +91,15 @@ txToEthValue blkHash blkNum idx tx = object
   , "v"                .= hexQuantity (txSigV tx)
   , "r"                .= hexQuantity (txSigR tx)
   , "s"                .= hexQuantity (txSigS tx)
+  , "type"             .= hexQuantity (toInteger envelopeType)
+  ] ++ if envelopeType /= 2 then [] else
+  [ "chainId"              .= hexQuantity (maybe 0 id (txChainId tx))
+  , "maxFeePerGas"         .= hexQuantity (txGasPrice tx)
+  , "maxPriorityFeePerGas" .= hexQuantity (txMaxPriorityFeePerGas tx)
+  , "accessList"           .= ([] :: [Value])
   ]
+  where
+    envelopeType = txEnvelopeType tx
 
 -- Dummy values for fields STRATO does not maintain in an Ethereum-compatible form.
 

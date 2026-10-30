@@ -224,7 +224,9 @@ data QuarryConf = QuarryConf
 
 data ContractsConf = ContractsConf
   { railgunProxy :: Maybe Address  -- ^ RailgunSmartWallet proxy contract address
-  , nativeTokenAddress :: Address  -- ^ ERC20 treated as native token (e.g. USDST)
+  , nativeTokenAddress :: Address
+    -- ^ ERC20 treated as native token (USDST on the live networks) until the
+    -- STRATO-gas fork; see 'nativeTokenAt'.
   , nativeTokenBalancesField :: Maybe String
     -- ^ Name of the native token's balances mapping in SolidVM storage, so
     -- eth_getBalance can be answered from the SQL state mirror instead of a
@@ -372,6 +374,40 @@ stakeEventSourceAt :: NetworkConf -> Integer -> Maybe Address
 stakeEventSourceAt conf height
   | maybe False (height >=) (stakingEventsFromGovernanceBlock conf) = Just governanceAddress
   | otherwise = stakingContractAddress conf
+
+-- | The STRATO token on the networks whose native currency migrates to it.
+stratoTokenAddress :: String -> Maybe Address
+stratoTokenAddress net
+  | take 6 net == "helium" = Just 0x8ee9a3391e38176feebf5d43cb2c1d6c4f728b04
+  | net == "upquark" = Just 0x2ca3e170e6714282da77815f7864b17f612f5f83
+  | net == "forktest" = Just 0xac621a150f49198036f84ffe90b4f2286b623583
+  | otherwise = Nothing
+
+-- | Block from which STRATO is the native currency: what eth_getBalance
+-- reports and what a native-value transfer moves. Fees already burn STRATO
+-- wherever DeciderState points at a FeeRouter; the native-token switch is
+-- consensus-visible, so a live network keeps the configured token until its
+-- flag day (helium: 2026-10-19 tip 804099 + 50000, rounded up to 900000;
+-- upquark: the same block staking activates at, so the two switch together;
+-- forktest: the mainnet-activation rehearsal, far enough past its idle tip
+-- that the lazy-block network only reaches it when driven there).
+-- A network without a STRATO token never leaves it.
+stratoGasForkBlock :: String -> Integer
+stratoGasForkBlock net
+  | take 6 net == "helium" = 900000
+  | net == "upquark" = 2000000
+  | net == "forktest" = 1000
+  | otherwise = 0
+
+-- | The token native balances and native-value transfers refer to at this
+-- height. Proposer, verifier and the RPC all go through this, so every side
+-- switches at the same block.
+nativeTokenAt :: EthConf -> Integer -> Address
+nativeTokenAt conf height
+  | height >= stratoGasForkBlock net, Just strato <- stratoTokenAddress net = strato
+  | otherwise = nativeTokenAddress (contractsConfig conf)
+  where
+    net = network (networkConfig conf)
 
 -- EIP-155 chain ID: keccak256(networkName), first 6 bytes (48 bits).
 -- Fits in JS Number.MAX_SAFE_INTEGER with room for v = chainId * 2 + 35.

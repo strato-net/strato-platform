@@ -14,8 +14,8 @@ export const WAD_UNIT = 10n ** 18n;
 export const INF = 2n ** 255n;  // Used as infinity for CR calculations (WAD-scaled)
 
 // Fee constants
-export const DEPOSIT_FEE_USDST = 0.02;
-export const MINT_FEE_USDST = 0.01;
+export const DEPOSIT_CALLS = 2;
+export const MINT_CALLS = 1;
 export const SAFETY_BUFFER_BPS = 5n;
 export const BPS_SCALE = 10000n;
 
@@ -297,11 +297,11 @@ export const calculateTransactionCount = (vaultCandidates: VaultCandidate[]): nu
   }, 0);
 };
 
-export const calculateTotalFees = (vaultCandidates: VaultCandidate[]): number => {
-  return vaultCandidates.reduce((fees, v) => {
+export const calculateTotalCalls = (vaultCandidates: VaultCandidate[]): number => {
+  return vaultCandidates.reduce((calls, v) => {
     const hasDeposit = v.allocation && v.allocation.depositAmount > 0n;
     const hasMint = v.allocation && v.allocation.mintAmount > 0n;
-    return fees + (hasDeposit ? DEPOSIT_FEE_USDST : 0) + (hasMint ? MINT_FEE_USDST : 0);
+    return calls + (hasDeposit ? DEPOSIT_CALLS : 0) + (hasMint ? MINT_CALLS : 0);
   }, 0);
 };
 

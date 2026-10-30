@@ -120,13 +120,13 @@ getBlockBodies hashes = do
            tx E.^. RawTransactionR, tx E.^. RawTransactionS, tx E.^. RawTransactionV, tx E.^. RawTransactionTxVersion),
           (tx E.^. RawTransactionToAddress, tx E.^. RawTransactionFuncName, tx E.^. RawTransactionContractName,
            tx E.^. RawTransactionArgs, tx E.^. RawTransactionNetwork, tx E.^. RawTransactionCode, tx E.^. RawTransactionAttribution),
-          (tx E.^. RawTransactionGasPrice, tx E.^. RawTransactionValue, tx E.^. RawTransactionTxData))
+          (tx E.^. RawTransactionGasPrice, tx E.^. RawTransactionValue, tx E.^. RawTransactionTxData, tx E.^. RawTransactionMaxPriorityFeePerGas))
       let transaction (_, (E.Value nonce', E.Value gas, E.Value cid, E.Value r', E.Value s', E.Value v', E.Value txVersion),
             (E.Value to', E.Value func, E.Value cname, E.Value args', E.Value net, E.Value code', E.Value attr),
-            (E.Value gasprice, E.Value value', E.Value txdata)) = case (to', func, cname, code', args') of
+            (E.Value gasprice, E.Value value', E.Value txdata, E.Value priority)) = case (to', func, cname, code', args') of
               (Just dest, Just fn, Nothing, Nothing, _) -> MessageTX nonce' gas dest fn args' net cid r' s' v' txVersion (fromMaybe B.empty attr)
               (Nothing, Nothing, Just contract, Just source, _) -> ContractCreationTX nonce' gas contract args' net source cid r' s' v' txVersion
-              (_, Nothing, Nothing, Nothing, []) -> EthereumTX nonce' (fromMaybe 0 gasprice) gas to' (fromMaybe 0 value') (fromMaybe B.empty txdata) cid r' s' v'
+              (_, Nothing, Nothing, Nothing, []) -> EthereumTX nonce' (fromMaybe 0 gasprice) gas to' (fromMaybe 0 value') (fromMaybe B.empty txdata) cid r' s' v' txVersion (fromMaybe 0 priority)
               _ -> error "invalid stored transaction shape"
           txs = M.fromListWith (++) [(E.unValue key, [transaction row]) | row@(key, _, _, _) <- rows]
       return $ M.fromList [(E.unValue sha, reverse $ M.findWithDefault [] (E.unValue key) txs) | (key, sha) <- blocks]) pool

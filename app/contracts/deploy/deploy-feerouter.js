@@ -12,10 +12,10 @@ const fs = require('fs');
 const { rest, util } = require('blockapps-rest');
 const { getCreatedAddress, getIssueId, pollForCreateIssueExecution } = require('./util');
 
-const NAME = process.env.FEE_ROUTER_NAME || 'HeliumFeeRouter';
-
 (async () => {
   const source = fs.readFileSync('feerouter-source.txt', 'utf8');
+  // The generator's per-network subclass is the last contract in the file.
+  const NAME = [...source.matchAll(/^contract(?: record)? (\w+)/gm)].pop()[1];
   const user = process.env.GLOBAL_ADMIN_NAME;
   const token = await auth.getUserToken(user, process.env.GLOBAL_ADMIN_PASSWORD);
   const tokenObj = { token };

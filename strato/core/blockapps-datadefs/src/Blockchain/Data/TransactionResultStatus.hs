@@ -35,6 +35,8 @@ data TransactionFailureType
   | ExecutionFailure String
   | TXSizeLimitError
   | AdminFlushedError
+  | InvalidEnvelopeError
+  | FeeBoundExceededError
   deriving (Eq, Read, Show, Generic, NFData)
 
 derivePersistField "TransactionResultStatus"

@@ -47,26 +47,25 @@ export const DECIMAL_PATTERN = /^\d*\.?\d*$/;
 // ============================================
 // Transaction fees
 // ============================================
-export const VOUCHER_TO_USDST_FACTOR = 100n; // 1 voucher (1e18) = 0.01 USDST (1e16)
-export const SWAP_FEE = "0.02"; // USDST fee for swap transactions
-export const TRANSFER_FEE = "0.01"; // USDST fee for transfer transactions
-export const BORROW_FEE = "0.01"; // USDST fee for borrow transactions
-export const REPAY_FEE = "0.02"; // USDST fee for repay transactions
-export const SUPPLY_COLLATERAL_FEE = "0.02"; // USDST fee for supply collateral transactions
-export const WITHDRAW_COLLATERAL_FEE = "0.01"; // USDST fee for withdraw collateral transactions
-export const DEPOSIT_FEE = "0.03"; // USDST fee for deposit transactions
-export const WITHDRAW_FEE = "0.01"; // USDST fee for withdraw transactions
-export const LENDING_DEPOSIT_FEE = "0.02"; // USDST fee for lending pool deposit transactions
-export const LENDING_WITHDRAW_FEE = "0.01"; // USDST fee for lending pool withdraw transactions
-export const WITHDRAW_USDST_FEE = "0.02"; // USDST fee for withdraw USDST transactions
-export const BRIDGE_OUT_FEE = "0.02"; // USDST fee for bridge out transactions
-export const SAFETY_STAKE_FEE = "0.02"; // USDST fee for SafetyModule stake transactions
-export const SAFETY_REDEEM_FEE = "0.01"; // USDST fee for SafetyModule redeem transactions
-export const STAKING_STAKE_FEE = "0.02"; // USDST fee for STRATO staking (approve + stake = 2 calls)
-export const STAKING_ACTION_FEE = "0.01"; // USDST fee for STRATO claim/unstake/withdraw (1 call)
-export const METAL_BUY_FEE = "0.02"; // USDST fee for metal buy (approve + mintMetal = 2 calls)
-export const PSM_MINT_FEE = "0.02"; // USDST fee for PSM mint / mintAndSave (approve + mint = 2 calls)
-export const PSM_REDEEM_FEE = "0.02"; // USDST fee for PSM redeem (approve + redeem = 2 calls)
+// Contract calls each action makes; the per-call network fee comes from /fees/quote.
+export const SWAP_CALLS = 2;
+export const TRANSFER_CALLS = 1;
+export const BORROW_CALLS = 1;
+export const REPAY_CALLS = 2;
+export const SUPPLY_COLLATERAL_CALLS = 2;
+export const WITHDRAW_COLLATERAL_CALLS = 1;
+export const DEPOSIT_CALLS = 3;
+export const WITHDRAW_CALLS = 1;
+export const LENDING_DEPOSIT_CALLS = 2;
+export const LENDING_WITHDRAW_CALLS = 1;
+export const BRIDGE_OUT_CALLS = 2;
+export const SAFETY_STAKE_CALLS = 2; // approve + stake
+export const SAFETY_REDEEM_CALLS = 1;
+export const STAKING_STAKE_CALLS = 2; // approve + stake
+export const STAKING_ACTION_CALLS = 1; // claim/unstake/withdraw
+export const METAL_BUY_CALLS = 2; // approve + mintMetal
+export const PSM_MINT_CALLS = 2; // approve + mint
+export const PSM_REDEEM_CALLS = 2; // approve + redeem
 
 // ============================================
 // Withdrawal limits

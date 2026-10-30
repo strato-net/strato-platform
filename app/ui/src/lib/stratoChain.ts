@@ -110,6 +110,22 @@ export async function ensureStratoChainInWallet(walletClient: WalletLike | null 
   }
 }
 
+// From the STRATO-gas fork the node's blocks carry a base fee, and balances,
+// native transfers and fees are STRATO; before it they are USDST.
+async function nodeChargesStrato(): Promise<boolean> {
+  try {
+    const res = await fetch(rpcUrl || "/rpc", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber", params: ["latest", false] }),
+    });
+    const json = await res.json();
+    return Boolean(json?.result?.baseFeePerGas);
+  } catch {
+    return false;
+  }
+}
+
 export async function initStratoChain(): Promise<Chain | null> {
   if (_chain) return _chain;
   try {
@@ -127,10 +143,11 @@ export async function initStratoChain(): Promise<Chain | null> {
       ? "https://stratoscan.strato.nexus"
       : "https://stratoscan.testnet.strato.nexus";
 
+    const symbol = (await nodeChargesStrato()) ? "STRATO" : "USDST";
     _chain = defineChain({
       id: _chainId,
       name: chainLabel,
-      nativeCurrency: { decimals: 18, name: "USDST", symbol: "USDST" },
+      nativeCurrency: { decimals: 18, name: symbol, symbol },
       rpcUrls: { default: { http: [rpcUrl || "/rpc"] } },
       blockExplorers: { default: { name: "Stratoscan", url: explorerUrl } },
     });

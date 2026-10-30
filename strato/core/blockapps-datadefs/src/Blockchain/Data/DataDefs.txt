@@ -101,6 +101,7 @@ RawTransaction
     txData BS.ByteString Maybe
     txVersion Word8
     attribution BS.ByteString Maybe
+    maxPriorityFeePerGas Integer Maybe sqltype=numeric(1000,0)
     UniqueTXHash txHash
     deriving Eq Generic Read Show
 

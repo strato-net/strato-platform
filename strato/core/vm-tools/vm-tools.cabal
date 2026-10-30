@@ -103,6 +103,7 @@ test-suite contextm-test
       CrossLangFixtureSpec
       ReceiptSpec
       ReplayProtectionSpec
+      StratoGasEnvelopeSpec
       TypedArgConversionSpec
       Paths_vm_tools
   hs-source-dirs:
@@ -126,6 +127,7 @@ test-suite contextm-test
     , quickcheck-instances
     , solid-vm-model
     , statedb-monad
+    , strato-conf
     , strato-model
     , text
     , time
