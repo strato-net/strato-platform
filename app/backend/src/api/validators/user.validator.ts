@@ -1,4 +1,4 @@
-import Joi from "@hapi/joi";
+import Joi from "joi";
 import { numericStringField } from "./common.validators";
 
 export function validateIssuesQuery(query: any) {

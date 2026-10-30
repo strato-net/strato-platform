@@ -1,7 +1,7 @@
 # APEX (an SMD backend server)
 
 ## Prepare to run server/tests locally (development mode):
-0. Use the same NodeJS version as in Dockerfile (e.g. `nvm install 21.7.1 && nvm use 21`).
+0. Use the same NodeJS version as in Dockerfile (e.g. `nvm install 22 && nvm use 22`).
 1. Run strato-getting-started single node locally with ports proxied (by changing docker-compose.yml):
     1. postgres (15433:5432)
     2. prometheus (9090:9090)

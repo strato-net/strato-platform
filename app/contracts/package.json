@@ -45,5 +45,15 @@
         "deployment"
     ],
     "author": "",
-    "license": "MIT"
+    "license": "MIT",
+    "overrides": {
+        "blockapps-rest": {
+            "axios": "^0.33.0",
+            "jsonwebtoken": "^9.0.3"
+        }
+    },
+    "resolutions": {
+        "blockapps-rest/axios": "^0.33.0",
+        "blockapps-rest/jsonwebtoken": "^9.0.3"
+    }
 }
