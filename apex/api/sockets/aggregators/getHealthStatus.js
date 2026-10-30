@@ -9,6 +9,7 @@ const models = require("../../models");
 const config = require("../../config/app.config");
 const { Prometheus } = require("../../lib/promClient");
 const utils = require("../../lib/utils");
+const winston = require("winston-color");
 
 let healthBody = {
   healthStatus: null,
@@ -95,8 +96,12 @@ async function getHealthStatus() {
   }
 }
 
-getHealthStatus();
-setInterval(getHealthStatus, config.webSockets.dbPollFrequency);
+const pollHealthStatus = () => getHealthStatus().catch((err) => {
+  winston.warn(`Could not fetch health status, retrying next poll: ${err.message}`);
+});
+
+pollHealthStatus();
+setInterval(pollHealthStatus, config.webSockets.dbPollFrequency);
 
 function initialHydrateHealthStatus(socket) {
   socket.emit(`PRELOAD_${GET_HEALTH}`, {

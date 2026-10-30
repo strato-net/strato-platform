@@ -308,7 +308,7 @@ async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics) {
   let currentTime = Date.now();
   let failedChecks = [];
 
-  Object.keys(prometheusHealthMetrics).forEach(async (keyProcess) => {
+  for (const keyProcess of Object.keys(prometheusHealthMetrics)) {
     if (!prometheusHealthMetrics[keyProcess]) {
       failedChecks.push(`${keyProcess} is unavailable`);
     }
@@ -318,7 +318,7 @@ async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics) {
       HealthStatus: prometheusHealthMetrics[keyProcess],
       timestamp: currentTime,
     });
-  });
+  }
 
   if (!process.env.vaultUrl) {
     winston.error('Vault URL not configured!');

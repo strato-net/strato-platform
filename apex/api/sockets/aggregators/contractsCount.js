@@ -4,6 +4,7 @@ const AddressStateRef = require('../../models/strato/eth/addressStateRef');
 const config = require('../../config/app.config');
 const db = require('../../models/strato/eth/connection');
 const { hasBlockIndex } = require('../../lib/strato-db-data/block-index');
+const winston = require('winston-color');
 
 let contractsCount
 
@@ -14,6 +15,8 @@ async function getContractsCount() {
   return AddressStateRef.count({ where: { code_hash: { [db.Sequelize.Op.ne]: emptyCodeHash } } }).then(result => {
     contractsCount = result
     return emitter.emit(ON_SOCKET_PUBLISH_EVENTS, CONTRACTS_COUNT, contractsCount)
+  }).catch((err) => {
+    winston.warn(`Could not fetch contract count, retrying next poll: ${err.message}`);
   })
 }
 
