@@ -18,7 +18,7 @@ require('dotenv').config();
 const config = require('./config');
 const path = require('path');
 const fs = require('fs');
-const { rest, util, importer } = require('blockapps-rest');
+const { rest, util, importer } = require('./strato');
 
 const TARGETS = {
   staking: {

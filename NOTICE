@@ -5175,12 +5175,6 @@ Licensed under the ISC License (per npm registry metadata).
 See smd-ui/package-lock.json:12813.
 https://www.npmjs.com/package/block-stream
 
-blockapps-rest
-Copyright information is provided by the upstream package authors.
-Licensed under the ISC License (per package-lock metadata).
-See app/contracts/package-lock.json:195.
-https://www.npmjs.com/package/blockapps-rest
-
 bloomfilter
 Copyright 2008 Bryan O'Sullivan <bos@serpentine.com>.
 Licensed under the BSD License.

@@ -3,7 +3,7 @@
  */
 const fs = require("fs-extra");
 const path = require("path");
-const { rest, importer, util } = require("blockapps-rest");
+const { rest, importer, util } = require("./strato");
 const { createContract, getState } = rest;
 const config = require("./config");
 

@@ -1,11 +1,10 @@
 /**
  * Authentication utilities for BlockApps
  */
-const { rest, oauthUtil } = require('blockapps-rest');
 const axios = require('axios');
 const config = require('./config');
 
-async function getUserTokenWithTotp(username, password, totp) {
+async function getUserTokenFromCredentials(username, password, totp) {
   const oauthConfig = config.nodes[0].oauth;
   const discovery = await axios.get(oauthConfig.openIdDiscoveryUrl);
   const tokenEndpoint = discovery.data && discovery.data.token_endpoint;
@@ -19,13 +18,12 @@ async function getUserTokenWithTotp(username, password, totp) {
     client_id: oauthConfig.clientId,
     client_secret: oauthConfig.clientSecret,
     username,
-    password,
-    totp
+    password
   });
 
-  if (process.env.OAUTH_SCOPE) {
-    body.set('scope', process.env.OAUTH_SCOPE);
-  }
+  if (totp) body.set('totp', totp);
+
+  body.set('scope', process.env.OAUTH_SCOPE || oauthConfig.scope || 'email openid');
 
   const response = await axios.post(tokenEndpoint, body.toString(), {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -42,39 +40,13 @@ async function getUserTokenWithTotp(username, password, totp) {
  */
 async function getUserToken(username, password) {
   try {
-    if (process.env.OAUTH_TOTP && process.env.OAUTH_TOTP.trim() !== '') {
-      return getUserTokenWithTotp(username, password, process.env.OAUTH_TOTP.trim());
-    }
-
-    const oauth = await oauthUtil.init(config.nodes[0].oauth);
-    const tokenObj = await oauth.getAccessTokenByResourceOwnerCredential(
-      username,
-      password
-    );
-    const tokenField = config.nodes[0].oauth.tokenField || 'access_token';
-    return tokenObj.token[tokenField];
+    return await getUserTokenFromCredentials(username, password, process.env.OAUTH_TOTP?.trim());
   } catch (error) {
     console.error('Error getting user token:', error);
     throw error;
   }
 }
 
-/**
- * Get user info from token
- * @param {string} token - The access token
- * @returns {Promise<object>} User information
- */
-async function getUserInfo(token) {
-  try {
-    const response = await rest.getStratoUserFromToken(token, { config });
-    return response.user;
-  } catch (error) {
-    console.error('Error getting user info:', error);
-    throw error;
-  }
-}
-
 module.exports = {
-  getUserToken,
-  getUserInfo
+  getUserToken
 };

@@ -19,7 +19,7 @@ const axios = require("axios");
 const { ethers } = require("ethers");
 const config = require("../config");
 const auth = require("../auth");
-const { rest, util } = require("blockapps-rest");
+const { rest, util } = require("../strato");
 
 const DEFAULT_EXTERNAL_CHAIN_ID = "11155111";
 const ETH_EXTERNAL_TOKEN = "0x0000000000000000000000000000000000000000";

@@ -23,12 +23,12 @@
         "bridge:ops": "node deploy/bridge-usdc-route-migration.js",
         "bridge:ops:testnet": "node deploy/bridge-usdc-route-migration.js --env testnet",
         "bridge:ops:prod": "node deploy/bridge-usdc-route-migration.js --env prod",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "node --test test/*.test.js"
     },
     "dependencies": {
         "@openzeppelin/contracts": "^5.4.0",
         "@openzeppelin/contracts-upgradeable": "^5.4.0",
-        "blockapps-rest": "^8.4.0",
+        "axios": "^1.13.6",
         "dotenv": "^10.0.0",
         "ethers": "^6.15.0",
         "fs-extra": "^10.0.0",
@@ -45,15 +45,5 @@
         "deployment"
     ],
     "author": "",
-    "license": "MIT",
-    "overrides": {
-        "blockapps-rest": {
-            "axios": "^0.33.0",
-            "jsonwebtoken": "^9.0.3"
-        }
-    },
-    "resolutions": {
-        "blockapps-rest/axios": "^0.33.0",
-        "blockapps-rest/jsonwebtoken": "^9.0.3"
-    }
+    "license": "MIT"
 }

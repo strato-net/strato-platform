@@ -14,7 +14,7 @@ require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
 const axios = require('axios');
-const { rest, util } = require('blockapps-rest');
+const { rest, util } = require('./strato');
 
 const DECIDER_STATE = '00000000000000000000000000000000dec1de02';
 const FEE_ROUTER = '44769a27b4339f1dbdab8920be9b5689b6652178'; // payFees + payBlockRewards

@@ -1,5 +1,5 @@
 const config = require('./config');
-const { rest, util } = require('blockapps-rest');
+const { rest, util } = require('./strato');
 const auth = require('./auth');
 const path = require('path');
 const fs = require('fs');

@@ -50,7 +50,7 @@ function applyEnvProfile(profile) {
 
 const ENV_PROFILE = applyEnvProfile(getArgValue(process.argv.slice(2), "--env"));
 
-const { rest } = require("blockapps-rest");
+const { rest } = require("../strato");
 const auth = require("../auth");
 const config = require("../config");
 const { callListAndWait } = require("../util");

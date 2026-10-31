@@ -212,7 +212,7 @@ These services are not part of the node's generated compose file. They are deplo
 |-----------|----------|---------------------|
 | Core node processes | Haskell | Stack |
 | Contract execution | Haskell | SolidVM |
-| Smart contracts | Solidity syntax (SolidVM dialect) | `solid-vm-cli` tests; Node.js deploy scripts (`blockapps-rest`, ethers) |
+| Smart contracts | Solidity syntax (SolidVM dialect) | `solid-vm-cli` tests; Node.js deploy scripts (Axios REST helpers, ethers) |
 | Edge proxy | Lua | OpenResty, lua-resty-openidc |
 | App backend | TypeScript | Node.js 22, Express 5 |
 | App UI | TypeScript | React 18, Vite, Tailwind/shadcn-ui, wagmi/viem |

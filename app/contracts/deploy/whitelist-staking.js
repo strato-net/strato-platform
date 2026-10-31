@@ -5,7 +5,7 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
-const { rest } = require('blockapps-rest');
+const { rest } = require('./strato');
 
 const REGISTRY = '000000000000000000000000000000000000100c';
 const GOVERNANCE = '0000000000000000000000000000000000000100';
@@ -16,7 +16,7 @@ async function callAsync(tokenObj, callArgs) {
   const arr = Array.isArray(resp) ? resp : [resp];
   const hashes = arr.map(r => r && r.hash).filter(Boolean);
   if (!hashes.length) throw new Error('no tx hash: ' + JSON.stringify(resp));
-  const { util } = require('blockapps-rest');
+  const { util } = require('./strato');
   const results = await util.until(
     rs => Array.isArray(rs) && rs.length > 0 && rs.every(r => r && r.status && r.status !== 'Pending'),
     opts => rest.getBlocResults(tokenObj, hashes, opts),

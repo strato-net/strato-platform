@@ -17,7 +17,7 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
-const { rest, util } = require('blockapps-rest');
+const { rest, util } = require('./strato');
 
 const DEFAULT_ADMIN_REGISTRY = '000000000000000000000000000000000000100c';
 const DEFAULT_METHODS = ['depositWithAction', 'depositBatchWithAction'];

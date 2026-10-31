@@ -58,7 +58,7 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
-const { rest, importer, util } = require('blockapps-rest');
+const { rest, importer, util } = require('./strato');
 const fs = require('fs-extra');
 const path = require('path');
 const axios = require('axios');

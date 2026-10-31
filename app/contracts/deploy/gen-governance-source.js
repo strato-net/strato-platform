@@ -4,7 +4,7 @@
 const config = require('./config');
 const path = require('path');
 const fs = require('fs');
-const { importer } = require('blockapps-rest');
+const { importer } = require('./strato');
 
 const stripComments = (str) => {
   let out = str.replace(/\/\*[\s\S]*?\*\//g, '');

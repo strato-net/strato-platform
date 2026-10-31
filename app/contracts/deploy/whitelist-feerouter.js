@@ -10,7 +10,7 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
-const { rest, util } = require('blockapps-rest');
+const { rest, util } = require('./strato');
 
 const REGISTRY = '000000000000000000000000000000000000100c';
 const STRATO_TOKEN = '8ee9a3391e38176feebf5d43cb2c1d6c4f728b04';
