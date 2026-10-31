@@ -1,3 +1,5 @@
+require-stack-version: ">= 2.15.1"
+
 packages:
 - libs/poseidon-hash
 - libs/baby-jubjub
