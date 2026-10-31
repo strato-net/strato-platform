@@ -172,6 +172,9 @@ dockerComposeUp = do
     ExitSuccess -> say "Docker containers started."
     ExitFailure code -> do
       say $ "ERROR: docker compose up failed with exit code " ++ show code
+      -- Compose can leave running containers behind when startup fails.
+      dockerComposeDown `catch` \e ->
+        say $ "ERROR: Docker cleanup failed: " ++ show (e :: IOException)
       exitWith ec
 
 -- Stop docker compose containers
@@ -182,8 +185,11 @@ dockerComposeDown = do
   let cp = (proc "docker" ["compose", "-p", "strato", "down"])
              { std_err = UseHandle stdout }
   (_, _, _, ph) <- createProcess cp
-  _ <- waitForProcess ph
-  say "Docker containers stopped."
+  ec <- waitForProcess ph
+  case ec of
+    ExitSuccess -> say "Docker containers stopped."
+    ExitFailure code ->
+      say $ "ERROR: docker compose down failed with exit code " ++ show code
 
 -- | Children inherit convoke's open-file limit, and the usual soft default of
 -- 1024 is too low: ethereum-jsonrpc opens a fresh Kafka connection per callVM
