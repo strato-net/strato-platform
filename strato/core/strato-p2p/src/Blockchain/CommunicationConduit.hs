@@ -132,8 +132,12 @@ handleMsgServerConduit ::
   MonadP2P m =>
   Point ->
   PPeer ->
+  -- Run once the peer's Hello has authenticated the key the handshake
+  -- claimed and the connection is admitted: the session is recorded against
+  -- the stored peers from here.
+  m () ->
   ConduitM Event (Either P2PCNC Message) m ()
-handleMsgServerConduit myPubkey peer = do
+handleMsgServerConduit myPubkey peer recordSession = do
   $logDebugS "handleMsgServerConduit" "about to parse message"
 
   lift clearAllSyncTasks
@@ -156,6 +160,7 @@ handleMsgServerConduit myPubkey peer = do
       -- This is the only place that bans for it: a self-dial always lands
       -- here, and only here is the key proven rather than claimed.
       when (pPeerPubkey peer == Just myPubkey) $ throwIO SelfConnection
+      lift recordSession
       let helloMsg' =
             Hello
               { version = 4,

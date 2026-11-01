@@ -134,10 +134,12 @@ instance FromJSON PeerDirection where
 
 -- | One live connection, as the peer threads' labels describe it (see
 -- "Blockchain.Threads"): an accepted peer is known by its source address
--- alone ("<host"), a dialed one by the address and listening port it was
--- dialed at (">host:port"). The state is the status those labels carry,
--- "CONNECTED" once the RLPx handshake is through; the entries in that state
--- are the ones the connection limit counts.
+-- and source port ("<host:port"), a dialed one by the address and listening
+-- port it was dialed at (">host:port"). The source port is the connection's,
+-- not one the peer listens on, so an accepted peer reports no port. The
+-- state is the status those labels carry, "CONNECTED" once the RLPx
+-- handshake is through; the entries in that state are the ones the
+-- connection limit counts.
 data PeerInfo = PeerInfo
   { peerHost :: String,
     peerPort :: Maybe Int,
@@ -156,12 +158,16 @@ instance FromJSON PeerInfo where
 
 -- | The connection a peer thread group's label and status describe.
 peerInfoFromLabel :: (String, String) -> Maybe PeerInfo
-peerInfoFromLabel ('<' : remote, state) = Just $ PeerInfo remote Nothing PeerInbound state
-peerInfoFromLabel ('>' : dialed, state) = Just $ case break (== ':') (reverse dialed) of
-  -- The port follows the last colon, so an IPv6 address keeps its own.
-  (portR, ':' : remoteR) | Just portNum <- readMaybe (reverse portR) -> PeerInfo (reverse remoteR) (Just portNum) PeerOutbound state
-  _ -> PeerInfo dialed Nothing PeerOutbound state
+peerInfoFromLabel ('<' : accepted, state) = Just $ PeerInfo (fst $ splitPort accepted) Nothing PeerInbound state
+peerInfoFromLabel ('>' : dialed, state) = Just $ uncurry PeerInfo (splitPort dialed) PeerOutbound state
 peerInfoFromLabel _ = Nothing
+
+-- | An address and the port after its last colon, so an IPv6 address keeps
+-- its own; the whole string and no port when nothing numeric follows one.
+splitPort :: String -> (String, Maybe Int)
+splitPort addressAndPort = case break (== ':') (reverse addressAndPort) of
+  (portR, ':' : addressR) | Just portNum <- readMaybe (reverse portR) -> (reverse addressR, Just portNum)
+  _ -> (addressAndPort, Nothing)
 
 -- | The live connections as JSON: what \/health reports as the node's peers.
 getConnections :: Handler [PeerInfo]

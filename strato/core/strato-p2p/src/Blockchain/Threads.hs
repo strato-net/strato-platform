@@ -85,9 +85,11 @@ getPeersByThreads = do
 
   return $ map (fmap (summarizeThreadState . sort)) $ filter (isPeerLabel . fst) $ peerThreadGroups
 
--- | Peer threads are labelled "<host" (inbound) or ">host:port" (outbound).
--- Any other label with a slash in it, such as warp's "Warp HTTP/1.1 client"
--- on the p2p API's threads, is not a peer and must not take a connection slot.
+-- | Peer threads are labelled "<host:port" (accepted, with the connection's
+-- source port, so two connections from one address are two peers here) or
+-- ">host:port" (dialed, at the peer's listening port). Any other label with
+-- a slash in it, such as warp's "Warp HTTP/1.1 client" on the p2p API's
+-- threads, is not a peer and must not take a connection slot.
 isPeerLabel :: String -> Bool
 isPeerLabel (c : _) = c == '<' || c == '>'
 isPeerLabel []      = False

@@ -71,12 +71,16 @@ ethServerHandler ::
   TCPPort ->
   m ()
 ethServerHandler pSource pSink seqSrc host (TCPPort port) = do
-  let peerStr = "<" ++ hostToString host
+  -- The label carries the connection's source port, so two connections from
+  -- one address (a peer reconnecting while its last session winds down, two
+  -- nodes behind one NAT) are two peers to "Blockchain.Threads", not one
+  -- mangled group that the connection limit and /connections count as none.
+  let peerStr = "<" ++ hostToString host ++ ":" ++ show port
   ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow peerStr
   void $ register ender
   -- The peer as this connection presents it, with its source port; the
-  -- session is recorded against the stored peers once the handshake has
-  -- proven the key, inside runEthServerConduit.
+  -- session is recorded against the stored peers once its Hello has
+  -- authenticated the key, inside runEthServerConduit.
   p <- getPeerByIP host >>= \case
     Nothing -> pure def{pPeerHost = host, pPeerIp = readMaybe (hostToString host), pPeerTcpPort = port}
     Just p -> pure p{pPeerTcpPort = port}
@@ -137,16 +141,23 @@ runEthServerConduit remote p pSource pSink seqSrc peerStr = labelPeerThread peer
     Nothing -> pure (p, Just $ toException $ HandshakeException "handshake timed out")
     Just (_, (otherPubKey, outCtx, inCtx)) -> do
       changeLabelStatusM "CONNECTED"
+      -- The key is a claim until the first frame authenticates it, which the
+      -- Hello does, so the handler records the session against the stored
+      -- peers only then (see 'markInboundPeerActive'), once the connection
+      -- is admitted and the key is not this node's own. The mark is dropped
+      -- on the way out only if it was set: a connection that failed before
+      -- its Hello proved nothing about any stored record, and another
+      -- session with the peer may be holding the mark.
+      inSession <- newIORef False
       let p' = p{pPeerPubkey = Just otherPubKey}
-          -- The peer is in session from here, and its stored records are
-          -- held active by the key the handshake proved, at the address the
-          -- socket reports. A peer presenting this node's own key is refused
-          -- at its Hello (SelfConnection) and gets no record.
-          holdActive
-            | otherPubKey == myPubkey = id
-            | otherwise = withActiveInboundPeer remote otherPubKey
+          recordSession = do
+            markInboundPeerActive remote otherPubKey
+            writeIORef inSession True
+          endSession = do
+            recorded <- readIORef inSession
+            when recorded $ markInboundPeerInactive remote otherPubKey
       ret <-
-        holdActive . fmap (either Just (const Nothing)) . try $
+        (`finally` endSession) . fmap (either Just (const Nothing)) . try $
         [ labelPeerThread peerStr "Peer Source" Nothing $
           pSource
           .| ethDecrypt inCtx
@@ -160,7 +171,7 @@ runEthServerConduit remote p pSource pSink seqSrc peerStr = labelPeerThread peer
         , labelPeerThread peerStr "Timer Source" Nothing timerSource
         ] `mergeConnect` (
         CL.iterM recordEvent
-          .| labelPeerThread peerStr "P2P Handler" Nothing (handleMsgServerConduit myPubkey p')
+          .| labelPeerThread peerStr "P2P Handler" Nothing (handleMsgServerConduit myPubkey p' recordSession)
           .| debounceTxSendsAndUnseq
           .| CL.iterM recordMessage
           .| CL.iterM (displayMessage Outbound peerStr)
@@ -201,10 +212,13 @@ storedPeersWithKey host pubkey = filter ((== Just pubkey) . pPeerPubkey) <$> get
 
 -- | Disable the stored records of an accepted peer that the ETH handshake
 -- proved is no peer for this node, as the client loop disables a dialed one
--- it proves the same about: a day without discovery pings, the exponential
--- TCP disable with its day-long window, and bond state 3 for a peer on
--- another chain. A peer with no record is left without one: it is not
--- dialed anyway.
+-- it proves the same about: the exponential TCP disable with its day-long
+-- window, bond state 3 for a peer on another chain, and a day without
+-- discovery pings. The UDP disable goes last, as in the client loop: the
+-- TCP disable writes its own deadline into udp_enable_time as well, and
+-- would cut the day down to the first five-second window, after which
+-- discovery's next Pong bonds the peer again. A peer with no record is left
+-- without one: it is not dialed anyway.
 disableStoredInboundPeer :: MonadP2P m => Host -> Point -> T.Text -> Bool -> m ()
 disableStoredInboundPeer host pubkey why wrongChain = do
   stored <- storedPeersWithKey host pubkey
@@ -213,10 +227,10 @@ disableStoredInboundPeer host pubkey why wrongChain = do
   forM_ stored $ \s -> do
     disErr <- storeDisableException s why
     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PServer/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-    udpErr <- disableUDPPeerForSeconds s 86400
-    whenLeft udpErr $ \theUDPErr -> do
-      $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
+    void $ logAndLengthenPeerDisableBy (24 * 60 * 60) s
     when wrongChain $ do
       bondErr <- setPeerBondingState (pPeerHost s) pubkey 3 -- 3 indicates wrong genesis block/networkID
       whenLeft bondErr $ \err2 -> $logErrorS "stratoP2PServer/runEthServer" . T.pack $ "Unable to set peer bonding state: " ++ show err2
-    void $ logAndLengthenPeerDisableBy (24 * 60 * 60) s
+    udpErr <- disableUDPPeerForSeconds s 86400
+    whenLeft udpErr $ \theUDPErr -> do
+      $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
