@@ -319,7 +319,12 @@ slipstreamQueryText _ CreateView{..} =
         , wrapEscapeSingle body
         , ");\n"
         ]
-   in upsertView . T.concat $
+      -- A rewritten storage view can change the expression of a field that has
+      -- an index; the index follows the view (see viewIndexSQL).
+      syncViewIndexes
+        | sourceTableName == storageTableName = "CALL slipstream_sync_view_indexes();\n"
+        | otherwise = ""
+   in (<> syncViewIndexes) . upsertView . T.concat $
         [ "SELECT "
         , T.intercalate ", " $
             (("s." <>) <$> sourceTableColumns)
@@ -1381,6 +1386,8 @@ initialSlipstreamQueries =
   , RawSQL jsonbMergeDeepSQL
   , RawSQL jsonbObjToArraySQL
   , RawSQL upsertViewSQL
+  , RawSQL viewIndexSQL
+  , RawSQL syncViewIndexesSQL
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "event") (indexTableName "" "storage") False "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "event" (indexTableName "" "storage") (indexTableName "" "event") True "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "mapping") (indexTableName "" "storage") False "address" SqlText
@@ -1521,6 +1528,85 @@ upsertViewSQL = T.unlines
   , "  END LOOP;"
   , "END;"
   , "$fn$ LANGUAGE plpgsql;"
+  ]
+
+-- | Indexes for Cirrus queries that filter a storage view by its fields. Each
+-- field of the view is a CASE expression over storage.data, and Postgres uses an
+-- index only when its expression is the view's own, so an index on the raw
+-- data->>'field' never serves a view query. The fields to index are listed in
+-- slipstream_view_index; slipstream_sync_view_indexes copies each listed field's
+-- expression from the view's current definition into an index on storage, so it
+-- matches whichever slipstream version wrote the view. The index name hashes the
+-- expressions, and the indexes of removed entries and of expressions a view no
+-- longer has are dropped. A listed field that is not a storage field of the view,
+-- or whose expression cannot be indexed (jsonb fields use to_jsonb, which is not
+-- immutable), gets a warning and no index.
+--
+-- Every index adds work to every storage write, so they are listed per
+-- deployment rather than made for every field. The first column should be one
+-- that queries always filter on. To add one:
+--   INSERT INTO slipstream_view_index VALUES ('mmoddsbot-Offer', '{market,book}');
+--   CALL slipstream_sync_view_indexes();
+-- The sync builds without CONCURRENTLY, which a procedure cannot run: it blocks
+-- storage writes, which only slipstream makes, while it builds, and readers
+-- carry on. Runs at every start and after every storage view is written.
+viewIndexSQL :: Text
+viewIndexSQL = T.unlines
+  [ "CREATE TABLE IF NOT EXISTS slipstream_view_index ("
+  , "  view_name text NOT NULL,"
+  , "  columns text[] NOT NULL,"
+  , "  PRIMARY KEY (view_name, columns)"
+  , ");"
+  , "CREATE OR REPLACE PROCEDURE slipstream_sync_view_indexes() AS $fn$"
+  , "DECLARE r record; col text; def text; expr text; exprs text[]; iname text; wanted text[] := '{}';"
+  , "BEGIN"
+  , "  PERFORM pg_advisory_xact_lock(hashtext('slipstream_sync_view_indexes'));"
+  , "  FOR r IN SELECT view_name, columns FROM slipstream_view_index ORDER BY view_name, columns LOOP"
+  , "    BEGIN"
+  , "      def := regexp_replace(pg_get_viewdef(format('%I', r.view_name)::regclass), '\\s+', ' ', 'g');"
+  , "      exprs := '{}';"
+  , "      FOREACH col IN ARRAY r.columns LOOP"
+  , "        IF col !~ '^[A-Za-z_][A-Za-z0-9_]*$' THEN"
+  , "          RAISE EXCEPTION 'column % is not a contract field name', col;"
+  , "        END IF;"
+  , "        expr := (regexp_match(def, '(CASE WHEN (jsonb_exists|\\(jsonb_exists)\\(s\\.data, ''' || col || '''::text\\).* END) AS '"
+  , "                                   || quote_ident(col) || '(,| FROM )'))[1];"
+  , "        IF expr IS NULL THEN"
+  , "          RAISE EXCEPTION 'column % is not a storage field of the view', col;"
+  , "        END IF;"
+  , "        exprs := exprs || ('(' || regexp_replace(expr, '\\ms\\.data\\M', 'data', 'g') || ')');"
+  , "      END LOOP;"
+  , "      iname := 'slipstream_vidx_' || left(md5(r.view_name || '|' || array_to_string(exprs, '|')), 16);"
+  , "      IF to_regclass(format('%I', iname)) IS NULL THEN"
+  , "        EXECUTE format('CREATE INDEX %I ON storage (%s)', iname, array_to_string(exprs, ', '));"
+  , "        EXECUTE format('COMMENT ON INDEX %I IS %L', iname, format('%s (%s)', r.view_name, array_to_string(r.columns, ', ')));"
+  , "      END IF;"
+  , "      wanted := wanted || iname;"
+  , "    EXCEPTION WHEN OTHERS THEN"
+  , "      RAISE WARNING 'slipstream_sync_view_indexes: no index for % (%): %', r.view_name, array_to_string(r.columns, ', '), SQLERRM;"
+  , "    END;"
+  , "  END LOOP;"
+  , "  FOR iname IN"
+  , "    SELECT i.relname FROM pg_index x JOIN pg_class i ON i.oid = x.indexrelid"
+  , "     WHERE x.indrelid = to_regclass('storage') AND i.relname LIKE 'slipstream\\_vidx\\_%' AND NOT i.relname = ANY (wanted)"
+  , "  LOOP"
+  , "    EXECUTE format('DROP INDEX %I', iname);"
+  , "  END LOOP;"
+  , "END;"
+  , "$fn$ LANGUAGE plpgsql;"
+  ]
+
+-- | Brings the listed view indexes up to date at startup (see viewIndexSQL). It
+-- must never stop slipstream from starting.
+syncViewIndexesSQL :: Text
+syncViewIndexesSQL = T.unlines
+  [ "DO $fn$"
+  , "BEGIN"
+  , "  CALL slipstream_sync_view_indexes();"
+  , "EXCEPTION WHEN OTHERS THEN"
+  , "  RAISE WARNING 'slipstream_sync_view_indexes skipped: %', SQLERRM;"
+  , "END;"
+  , "$fn$;"
   ]
 
 -- | Views created before the inheritance table existed carry their derived

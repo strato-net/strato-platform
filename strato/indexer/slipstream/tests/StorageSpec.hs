@@ -96,3 +96,29 @@ spec = do
     it "creates the history tables without a primary key" $
       [pk | CreateTable {tableName = HistoryTableName {}, primaryKeyColumns = pk} <- initialSlipstreamQueries]
         `shouldBe` [[], []]
+
+  describe "view indexes" $ do
+    let syncCall = "CALL slipstream_sync_view_indexes();\n"
+    it "syncs the view indexes after writing a storage view, not a collection view" $ do
+      storageViews <- runNoLoggingT . runConduit $
+        (createIndexTable def emptyCodeCollection ("Test", "Book") >> pure ()) .| sinkList
+      collectionViews <- runNoLoggingT . runConduit $
+        (createCollectionTable ("Test", "Book") def emptyCodeCollection
+          ("offers", [SVMType.Int Nothing Nothing], SVMType.Int Nothing Nothing) >> pure ()) .| sinkList
+      map slipstreamQueryPostgres storageViews `shouldSatisfy` \case
+        [sql] -> syncCall `T.isSuffixOf` sql && "CALL slipstream_upsert_view(" `T.isPrefixOf` sql
+        _ -> False
+      map (T.isInfixOf syncCall . slipstreamQueryPostgres) collectionViews `shouldBe` [False]
+
+    it "creates the procedure and syncs at startup without failing it" $ do
+      let startup = slipstreamQueryPostgres <$> initialSlipstreamQueries
+          procedureAt = length $ takeWhile (not . T.isInfixOf "CREATE OR REPLACE PROCEDURE slipstream_sync_view_indexes()") startup
+          syncAt = length $ takeWhile (not . T.isInfixOf "  CALL slipstream_sync_view_indexes();") startup
+      procedureAt `shouldSatisfy` (< length startup)
+      syncAt `shouldSatisfy` (\i -> i > procedureAt && i < length startup)
+      T.isInfixOf "EXCEPTION WHEN OTHERS THEN" (startup !! syncAt) `shouldBe` True
+
+    -- pgQuery reads a lone '?' as a parameter placeholder ('??' is a literal one),
+    -- so startup SQL must have none.
+    it "has no parameter placeholder in any startup query" $
+      filter (T.any (== '?') . T.replace "??" "") (slipstreamQueryPostgres <$> initialSlipstreamQueries) `shouldBe` []
