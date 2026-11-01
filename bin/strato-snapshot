@@ -652,8 +652,14 @@ make_archive() {
 
   case "$output" in
     *.tar.zst|*.tzst)
+      # -9 --long=27 (128 MiB match window) is ~16% smaller than the default
+      # level on a real payload: the state LevelDB, ~80% of the bytes, shares a
+      # lot across its .ldb files, and the long window lets zstd find it. It
+      # costs ~2x CPU at create time only; a 128 MiB window is within what
+      # zstd -d accepts without flags, so restore and extract_archive are
+      # unchanged.
       if command -v zstd >/dev/null 2>&1; then
-        (cd "$staging" && tar_without_appledouble -cf - .) | zstd -T0 -q -o "$output"
+        (cd "$staging" && tar_without_appledouble -cf - .) | zstd -T0 -q -9 --long=27 -o "$output"
       else
         (cd "$staging" && tar_without_appledouble --zstd -cpf "$output" .)
       fi
