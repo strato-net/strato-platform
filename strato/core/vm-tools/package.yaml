@@ -96,6 +96,7 @@ tests:
     dependencies:
       - hspec
       - QuickCheck
+      - aeson
       - blockapps-data
       - blockDB
       - containers

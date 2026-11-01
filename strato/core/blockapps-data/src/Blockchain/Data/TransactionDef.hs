@@ -266,7 +266,7 @@ instance RLPSerializable Transaction where
         in case inner of
             -- EIP-1559 (type 2) Ethereum envelope; the access list must be empty.
             RLPArray [cid, n, prio, fee, gl, toAddr, val, dat, RLPArray [], yParity, rVal, sVal]
-              | typeByte == 2 ->
+              | typeByte == 2, parity <- rlpDecode yParity :: Integer, parity == 0 || parity == 1 ->
                   EthereumTX
                     { nonce = rlpDecode n,
                       gasPrice = rlpDecode fee,
@@ -279,10 +279,12 @@ instance RLPSerializable Transaction where
                       chainId = Just (rlpDecode cid),
                       r = rlpDecode rVal,
                       s = rlpDecode sVal,
-                      v = fromInteger (rlpDecode yParity),
+                      v = fromInteger parity,
                       txVersion = 2,
                       maxPriorityFeePerGas = rlpDecode prio
                     }
+            RLPArray [_, _, _, _, _, _, _, _, RLPArray [], _, _, _]
+              | typeByte == 2 -> error "rlpDecode Transaction: type-2 yParity must be 0 or 1"
             RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, vVal, rVal, sVal] ->
               let partial = partialRLPDecode $ RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7]
               in case partial of

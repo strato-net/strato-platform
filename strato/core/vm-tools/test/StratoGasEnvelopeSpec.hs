@@ -8,9 +8,13 @@ import Blockchain.Data.Transaction (transactionHash, whoSignedThisTransaction)
 import Blockchain.Data.TransactionDef (Transaction (..))
 import Blockchain.EthConf.Model (stratoGasForkBlock)
 import Blockchain.Forks (isStratoGasForkActive)
+import Blockchain.Model.JsonBlock (Transaction' (..))
 import Blockchain.Strato.Model.Keccak256 (keccak256ToHex)
+import Control.Exception (evaluate)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
+import Data.Aeson (eitherDecode)
+import Data.Either (isLeft, isRight)
 import Data.Maybe (isJust, isNothing)
 import Test.Hspec
 
@@ -71,6 +75,14 @@ spec = describe "STRATO-gas envelope boundary" $ do
     case rlpEncode valueTransfer of
       RLPString bytes -> B.take 1 bytes `shouldBe` "\x02"
       other -> expectationFailure $ "expected an envelope string, got " ++ show other
+  it "rejects a type-2 envelope whose yParity is not 0 or 1" $
+    mapM_ (\parity -> evaluate (rlpDecode (rlpEncode valueTransfer {v = parity}) :: Transaction) `shouldThrow` anyErrorCall) [2, 255]
+  it "rejects a JSON type-2 transaction whose v is not 0 or 1" $ do
+    let json parity = "{\"nonce\":9,\"gasPrice\":2,\"gasLimit\":21000,\"value\":0,\"txVersion\":2,\"maxPriorityFeePerGas\":1,\"chainId\":1,"
+          <> "\"r\":\"c5c01a34\",\"s\":\"40bcb371\",\"v\":\"" <> parity <> "\"}"
+        decoded parity = eitherDecode (json parity) :: Either String Transaction'
+    decoded "1" `shouldSatisfy` isRight
+    decoded "100" `shouldSatisfy` isLeft
   it "accepts only legacy envelopes before the fork" $ do
     envelopeRejection False legacyTransfer `shouldSatisfy` isNothing
     envelopeRejection False (legacy 1000000000000000000 "\xa9") `shouldSatisfy` isNothing

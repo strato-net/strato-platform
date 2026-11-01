@@ -58,6 +58,7 @@ const stratoQuote = async (): Promise<{ fee: bigint; version: bigint; valid: boo
 
 export const getFeeQuote = async (accessToken: string, userAddress: string): Promise<FeeQuote> => {
   const quote = await stratoQuote();
+  if (quote && !constants.stratoToken) throw new Error("STRATO fee token address is not configured for this network");
   const currency = quote ? "STRATO" : "USDST";
   const currencyAddress = quote ? constants.stratoToken : constants.USDST;
   const [vouchers, balance, usdst] = await Promise.all([

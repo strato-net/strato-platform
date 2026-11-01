@@ -34,7 +34,7 @@ import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Validator
 import           Control.Applicative                   ((<|>))
 import           Control.DeepSeq
-import           Control.Monad                        (join)
+import           Control.Monad                        (join, when)
 import           Data.Aeson
 import           Data.Aeson.Types                     (Parser)
 import qualified Data.ByteString                      as B
@@ -356,6 +356,7 @@ instance FromJSON Transaction' where
             ver <- t .:? "txVersion" .!= 0
             prio <- t .:? "maxPriorityFeePerGas" .!= 0
             cid <- t .:? "chainId"
+            when (ver == 2 && rawV > 1) $ fail "type-2 transaction 'v' is a yParity and must be 0 or 1"
             return . Transaction' $ if ver == 2
               then EthereumTX n gp gl eto val txData cid tr ts (fromInteger rawV) ver prio
               else EthereumTX n gp gl eto val txData (ethVToChainId rawV) tr ts (ethVToRecoveryId rawV) 0 0
