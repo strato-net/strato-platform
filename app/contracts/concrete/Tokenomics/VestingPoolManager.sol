@@ -15,11 +15,14 @@ import "../../abstract/ERC20/access/Ownable.sol";
 //   - everything else is a one-line forward with the pool's own names and parameters.
 //
 // The manager holds no state of its own besides the immutable `pool`, and every
-// owner-only body only forwards, so the repo Ownable's behaviour of catching a failing
-// body (and routing it into AdminRegistry.castVoteOnIssue) can never leave partial
-// state here: either the pool call succeeded in full or nothing changed. Operators
-// should still verify pool state after each admin action (section "Ownable" of the
-// handoff), because a failed forward does not surface the pool's revert message.
+// owner-only body only forwards, so either the pool call succeeded in full or nothing
+// changed. The owner is the AdminRegistry (decided 2026-11-02): an admin's call is a
+// vote, and at quorum the registry calls back as owner. Verified on solid-vm-cli
+// (tests/Tokenomics/VestingPoolManagerGovernance.test.sol): a pool rejection during
+// that execution reverts the quorum vote's transaction WITH the pool's own message
+// (e.g. "Not enough tokens available"), earlier votes stand, and one re-vote executes
+// once the cause is fixed; a late vote on an executed issue opens a new issue and
+// never re-executes; array arguments survive the vote path.
 //
 // Beneficiaries never touch this contract: they call `claimVestedTokens` on the pool.
 contract record VestingPoolManager is Ownable {

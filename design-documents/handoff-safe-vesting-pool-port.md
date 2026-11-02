@@ -122,9 +122,17 @@ Decision: the pool's manager is a contract, `app/contracts/concrete/Tokenomics/V
 - Rotation comes for free through `transferOwnership`.
 - Holds no state of its own.
 
-This closes all three gaps with zero edits to the audited file. The cost is the repo Ownable's behaviour: when a forwarded pool call fails (for example "Not enough tokens available"), the modifier catches it and routes into `AdminRegistry.castVoteOnIssue` instead of reverting with the message. Because the manager keeps no state and the pool checks before it writes, nothing partial is left behind, but **operators must verify pool state after every admin action** (section 7).
+This closes all three gaps with zero edits to the audited file.
 
-**Open question (owner decides):** the manager's owner is `AdminRegistry` (every create, cancel and pause becomes a recorded admin vote) or a single key. Either way `transferOwnership` changes it later.
+**Decision (2026-11-02): the manager's owner is the `AdminRegistry`** (the backend's default genesis address is `000000000000000000000000000000000000100c`; confirm per network). Every create, cancel, pause and ownership change is therefore an admin vote. How the path works, as verified by `VestingPoolManagerGovernance.test.sol` against a real `AdminRegistry` with three admins and the default 60 % threshold:
+
+- An admin calls the manager directly, e.g. `manager.addVestings(...)`. The repo Ownable's owner check fails, its `catch` calls `AdminRegistry.castVoteOnIssue`, and the registry records a vote on an issue keyed by the manager address, the function and the exact arguments. Below quorum the call returns the issue id and nothing happens on the pool.
+- The vote that reaches quorum (2 of 3 here) executes inside its own transaction: the registry calls the manager as owner, the manager forwards to the pool. One of three admins cannot act alone; one of one executes immediately.
+- Arguments must be byte-identical across the admins' calls, including `startDate`: a different value is a different issue. Array arguments (`addVestings`) survive the round trip.
+- A late vote on an already executed issue opens a new issue; it never re-executes, so a third admin cannot create a duplicate vesting by voting late.
+- **If the pool rejects the call at execution time, the quorum vote's transaction reverts with the pool's own message** (verified with "Not enough tokens available" and "Only managed vestings can be cancelled"); nothing is recorded for that vote, earlier votes stand, and once the cause is fixed a single re-vote executes the same issue. The repo Ownable does not swallow these; the earlier concern about silent no-ops does not apply on this path.
+- Non-admins are refused by the registry and change nothing.
+- `transferOwnership` is itself a vote; after it executes the new owner acts directly and the admins lose control, so treat it as the emergency hand-over, not a routine operation.
 
 ## 7. Schedule mapping for the STRATO tokenomics sheet
 
@@ -147,11 +155,11 @@ Checks before any creation: `amount > 0` fits `uint128`, the pool already holds 
 
 ## 8. Operations runbook
 
-1. **Deploy** `VestingPoolManager(token, owner)` with the $STRATO `Token` address (upquark `2ca3e170e6714282da77815f7864b17f612f5f83`; mainnet address from `app/ui/src/lib/constants.ts`) and the chosen owner (section 6). It deploys the pool; record `manager.pool()`.
+1. **Deploy** `VestingPoolManager(token, adminRegistry)` with the $STRATO `Token` address (upquark `2ca3e170e6714282da77815f7864b17f612f5f83`; mainnet address from `app/ui/src/lib/constants.ts`) and the network's `AdminRegistry` address as owner (section 6). It deploys the pool; record `manager.pool()`.
 2. **Fund the pool in step with creation.** Everything above `totalTokensInVesting` is available for new vestings and can be swept out with a zero-week vesting, so do not pre-fund the full 80 M. Mint or transfer the amount about to be committed, create, verify, repeat per category.
-3. **Create** with `manager.addVestings(...)` per row of section 7. Compute and record each id with `pool.vestingHash(params)` before or after the call. Verify every entry with `pool.calculateVestedAmount(id)` once active (it reverts with "Vesting not found" for an id that was not created) or through Cirrus, because failures through the manager are not loud (section 6) and the `vestings(id)` getter is unreliable on SolidVM (section 9). Cirrus indexes the `vestings` mapping and the `AddedVesting` events.
+3. **Create** with `manager.addVestings(...)` per row of section 7, one call per admin with byte-identical arguments until quorum; the executing admin's transaction either creates every entry of the batch or reverts with the pool's message (section 6). Compute and record each id with `pool.vestingHash(params)`. Verify entries with `pool.calculateVestedAmount(id)` once active (it reverts with "Vesting not found" for an id that was not created) or through Cirrus; do not rely on the `vestings(id)` getter on SolidVM (section 9). Cirrus indexes the `vestings` mapping, the `AddedVesting` events and the registry's issue tables.
 4. **Beneficiaries claim** with `pool.claimVestedTokens(id, beneficiary, amount)`; `amount = 340282366920938463463374607431768211455` claims everything available. The claimant may name any beneficiary address.
-5. **Revoke a leaver (team only).** `manager.cancelVesting(id)`. The vested part stays claimable by the leaver; the rest returns to the pool's available balance. Sweep it to treasury with `manager.addVesting(treasury, 0, false, 0, now, amount)` and a claim from the treasury account; use a fresh `startDate` or amount each time because ids are parameter hashes. Confirm the cancel afterwards: `calculateVestedAmount(id)` stops growing, `totalTokensInVesting` dropped by the unvested remainder, and `unpauseVesting(id)` is refused; do not rely on the `vestings(id)` getter (section 9).
+5. **Revoke a leaver (team only).** `manager.cancelVesting(id)`, voted to quorum. The vested part stays claimable by the leaver; the rest returns to the pool's available balance. Sweep it to treasury with `manager.addVesting(treasury, 0, false, 0, now, amount)` and a claim from the treasury account; use a fresh `startDate` or amount each time because ids are parameter hashes. Confirm the cancel afterwards: `calculateVestedAmount(id)` stops growing, `totalTokensInVesting` dropped by the unvested remainder, and `unpauseVesting(id)` is refused; do not rely on the `vestings(id)` getter (section 9).
 6. **Leave of absence.** `manager.pauseVesting(id)` and later `unpauseVesting(id)`; accrual stops while paused and the start date shifts by the paused time.
 7. **What this contract cannot promise.** The $STRATO `Token` owner can `burn(address, amount)` and `pause()` any balance, including the pool's. Investor non-revocability is enforced by the pool's `managed == false`, not by the chain. State that in investor documentation.
 8. **Licence.** LGPL-3.0-only: keep the SPDX line on the ported file and publish the modified source. The repository is public, which satisfies the obligation; legal should confirm.
@@ -162,14 +170,15 @@ Test files in `app/contracts/tests/Tokenomics`, run from that directory with `so
 
 - `VestingPoolSolidVM.test.sol`: the six SolidVM probes of section 5 against the port, plus a `BatchPool` subclass fixture.
 - `VestingPoolSetup.test.sol`, `VestingPoolHash.test.sol`, `VestingPoolClaim.test.sol`, `VestingPoolManage.test.sol`, `VestingPoolCurves.test.sol`: port of the upstream Hardhat specs (`test/vesting/*.spec.ts`: 10, 4, 11, 20 and 17 upstream cases; the Hash port adds one). Events become state and balance assertions; upstream's exact-hash checks are recomputed in Solidity from the type strings, `block.chainid` and the pool address rather than hardcoded from an EVM chain.
-- `VestingPoolManager.test.sol`: forwarding, batch creation, non-owner rejection, ownership rotation.
+- `VestingPoolManager.test.sol`: forwarding, batch creation, non-owner rejection, ownership rotation (owner = a plain account).
+- `VestingPoolManagerGovernance.test.sol`: the manager owned by a real `AdminRegistry` (three admins, 60 % threshold): quorum execution, late votes, batches through the vote path, non-admin refusal, cancel by vote, pool rejection at execution reverting the quorum vote with the pool's message plus recovery by re-vote, single-admin immediate execution, ownership rotation by vote.
 
 **Two SolidVM discrepancies found while porting the suites (contract logic unaffected):**
 
 - **The public struct-mapping getter returns empty values.** `pool.vestings(id)` compiles as a 9-tuple but every field reads back zero or empty on the CLI for an id that `calculateVestedAmount(id)` resolves correctly. Do not rely on `vestings(id)` over RPC; read vesting state through `calculateVestedAmount`, Cirrus (the contract is a `record`), or a reader subclass like the test suite's `InspectablePool`. Whether a live node behaves the same is unverified; treat it as untrusted until checked.
 - **Doubly nested revert messages are not delivered as `Error(string)`.** When the token called by the pool reverts with its own message, the caller's frame receives a raw revert that only a generic `catch` matches. The pool's own requires, including "Token transfer failed" when `transfer` returns false, propagate normally.
 
-CLI quirks the suites work around: `type(T).max` is unsupported; `bytes32` hex constants need a `bytes32(...)` cast; re-assigning destructured tuple locals is "Cannot mutate immutable value"; named mapping keys and custom-error `catch` clauses are rejected; a failing `require` inside a repo-`Ownable` body surfaces as a generic revert or a no-op, so manager tests assert state, not messages. `fastForward(seconds)` is the harness clock.
+CLI quirks the suites work around: `type(T).max` is unsupported; `bytes32` hex constants need a `bytes32(...)` cast; re-assigning destructured tuple locals is "Cannot mutate immutable value"; named mapping keys and custom-error `catch` clauses are rejected; with a plain account as owner, a failing `require` inside a repo-`Ownable` body surfaces as a generic revert, so `VestingPoolManager.test.sol` asserts state, not messages; with `AdminRegistry` as owner the pool's message propagates (section 6). `fastForward(seconds)` is the harness clock.
 
 ### Results
 
@@ -182,10 +191,11 @@ CLI quirks the suites work around: `type(T).max` is unsupported; `bytes32` hex c
 | `VestingPoolManage.test.sol` | 2026-10-30 | solid-vm-cli 2026-03 (local) | 20 / 20 | pause ×6, unpause ×6, cancel ×8 |
 | `VestingPoolCurves.test.sol` | 2026-10-30 | solid-vm-cli 2026-03 (local) | 17 / 17 | linear and exponential at 10/25/50/66/75/99/100 %, with pauses |
 | `VestingPoolManager.test.sol` | 2026-10-30 | solid-vm-cli 2026-03 (local) | 11 / 11 | forwarding, batch, non-owner rejection, rotation, zero-week sweep |
+| `VestingPoolManagerGovernance.test.sol` | 2026-11-02 | solid-vm-cli 2026-03 (local) | 8 / 8 | real AdminRegistry votes; pool rejection at execution reverts the quorum vote with the pool's message |
 
 ## 10. Open items and follow-ups
 
-- **Owner of the manager** (section 6): `AdminRegistry` governance or a single key.
+- **AdminRegistry address per network** for the manager's constructor (section 6 names the backend default); confirm before deployment.
 - **Deploy and schedule-creation script**: not written. It should read the sheet-derived amounts, fund per batch, call `addVestings` once per row of section 7, compute the ids, and verify each vesting (runbook step 3).
 - **Audit of the port**: `VestingPool.sol` (SolidVM semantics, section 5's unprobed list) and `VestingPoolManager.sol`. Give the auditor this document, the D-list and the repo's SolidVM semantics notes; EVM auditors will not know the traps.
 - **Cirrus reads**: confirm the column shapes of the `vestings` struct mapping and the event tables under the `BlockApps-VestingPool` naming before wiring a page.
