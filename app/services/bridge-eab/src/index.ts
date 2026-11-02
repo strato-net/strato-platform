@@ -1,0 +1,261 @@
+import dotenv from "dotenv";
+dotenv.config();
+
+import express from "express";
+import { serviceTokenAccessControl } from "./signer/accessControl";
+import cors from "cors";
+import bodyParser from "body-parser";
+import { logInfo, logError } from "./utils/logger";
+import { validateBridgeConfig } from "./utils/configValidator";
+import {
+  reconcileExternalDeposits,
+  startMultiChainDepositPolling,
+} from "./polling/alchemyPolling";
+import { startNativeRedemptionPolling } from "./polling/nativeRedemptionPolling";
+import { initializeStratoPolling } from "./polling/stratoPolling";
+import { initOpenIdConfig} from "./auth";
+import { healthMonitor } from "./utils/healthMonitor";
+import { depositMetricsService } from "./services/depositMetricsService";
+import { confirmReviewedDeposit } from "./services/bridgeService";
+import { depositStateService } from "./services/depositStateService";
+import { getDepositStatusByIdentity } from "./services/cirrusService";
+import { prepareBridgeOperation } from "./services/bridgeReviewService";
+import { processingIssueService } from "./services/processingIssueService";
+import { nativeBlockTrackingService } from "./services/nativeBlockTrackingService";
+import { NativeRedemptionHealth } from "./types";
+import { getExternalBridgeVerifierUrls } from "./config";
+
+const app = express();
+const port = process.env.PORT || 3003;
+
+app.set("env", "production");
+app.use(cors());
+app.use("/webhooks/deposits", serviceTokenAccessControl(process.env.DEPOSIT_WEBHOOK_TOKEN));
+app.use("/operations/deposits", serviceTokenAccessControl(process.env.DEPOSIT_OPERATIONS_TOKEN));
+app.use("/operations/reviews", serviceTokenAccessControl(process.env.DEPOSIT_OPERATIONS_TOKEN));
+app.use(bodyParser.json());
+
+// Global error handler
+app.use(
+  (
+    error: any,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    logError("BridgeService", error, { operation: "request" });
+
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// Exposed Routes
+app.get("/operations/reviews/processing-issues", async (req, res) => {
+  const state = req.query.state ?? "active";
+  const offset = req.query.offset === undefined ? 0 : Number(req.query.offset);
+  const limit = req.query.limit === undefined ? 25 : Number(req.query.limit);
+  if ((state !== "active" && state !== "cleared") ||
+      [req.query.offset, req.query.limit].some(value => value !== undefined && (typeof value !== "string" || !/^\d+$/.test(value))) || !Number.isSafeInteger(offset) || offset < 0 ||
+      !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    res.status(400).json({ error: "Invalid processing issue pagination" }); return;
+  }
+  try { res.json(await processingIssueService.list(state, offset, limit)); }
+  catch { res.status(503).json({ error: "Processing records are unavailable" }); }
+});
+
+app.post("/operations/reviews/prepare", async (req, res) => {
+  if (typeof req.body?.id !== "string" || req.body.id.length > 256 || req.body?.action !== "refund") {
+    res.status(400).json({ error: "Invalid review action" });
+    return;
+  }
+  try { res.json(await prepareBridgeOperation(req.body.id, req.body.action)); }
+  catch (error) {
+    logError("BridgeReviews", error as Error, { operation: req.body.action, reviewId: req.body.id });
+    res.status(409).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/health", async (req, res) => {
+  const deploymentChainId = typeof req.query?.deploymentChainId === "string" &&
+    /^\d+$/.test(req.query.deploymentChainId) ? req.query.deploymentChainId : undefined;
+  if (req.query?.deploymentChainId !== undefined && !deploymentChainId) {
+    res.status(400).json({ status: false, message: "Invalid deployment chain ID" });
+    return;
+  }
+  let nativeRedemptions: Record<string, NativeRedemptionHealth>;
+  try { nativeRedemptions = await nativeBlockTrackingService.getHealth(); }
+  catch {
+    const health = healthMonitor.snapshot();
+    res.status(503).json({ ...health, status: false, message: 'pong',
+      checks: { ...health.checks, nativeRedemptionJournal: "failed" } });
+    return;
+  }
+  const health = healthMonitor.snapshot(nativeRedemptions);
+  const errorLogPresent = await healthMonitor.errorFileExists();
+  if (!deploymentChainId) {
+    res.status(health.status ? 200 : 503).json({ ...health, message: 'pong', errorLogPresent });
+    return;
+  }
+  try {
+    const verifiers = await Promise.all(getExternalBridgeVerifierUrls(BigInt(deploymentChainId)).map(async (url) => {
+      const response = await fetch(`${url}/health`, { signal: AbortSignal.timeout(10_000) });
+      if (!response.ok) throw new Error(`Verifier health returned HTTP ${response.status}`);
+      return response.json();
+    }));
+    res.status(health.status ? 200 : 503).json({
+      ...health, message: "pong", errorLogPresent,
+      deployment: { chainId: deploymentChainId, verifiers },
+    });
+  } catch {
+    res.status(503).json({
+      ...health, status: false, message: "pong", errorLogPresent,
+      deployment: { chainId: deploymentChainId, error: "Verifier health is unavailable from Runtime" },
+    });
+  }
+});
+
+app.get("/metrics/deposits", (_, res) => {
+  res.json(depositMetricsService.snapshot());
+});
+
+app.post("/webhooks/deposits/:chainId", async (req, res) => {
+  const chainId = Number(req.params.chainId);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+    res.status(400).json({ error: "Invalid chain ID" });
+    return;
+  }
+  try {
+    await reconcileExternalDeposits(chainId);
+    res.status(202).json({ accepted: true });
+  } catch (error) {
+    logError("DepositWebhook", error as Error, { chainId });
+    res.status(503).json({ error: "Reconciliation failed" });
+  }
+});
+
+app.post(
+  "/operations/deposits/:chainId/:depositRouter/:depositId/confirm",
+  async (req, res) => {
+    const chainId = Number(req.params.chainId);
+    const depositId = req.params.depositId;
+    const depositRouter = req.params.depositRouter.replace(/^0x/i, "");
+    if (
+      !Number.isSafeInteger(chainId) ||
+      chainId <= 0 ||
+      !/^[1-9][0-9]*$/.test(depositId) ||
+      !/^[0-9a-fA-F]{40}$/.test(depositRouter)
+    ) {
+      res.status(400).json({ error: "Invalid deposit identity" });
+      return;
+    }
+    try {
+      const transactionHash = await confirmReviewedDeposit(
+        chainId,
+        depositRouter,
+        depositId,
+      );
+      try {
+        await depositStateService.markSettledByIdentity(
+          chainId,
+          depositRouter,
+          depositId,
+        );
+      } catch (error) {
+        logError("DepositOperations", error as Error, {
+          operation: "markReviewedDepositSettled",
+          chainId,
+          depositRouter,
+          depositId,
+        });
+      }
+      res.status(200).json({ transactionHash });
+    } catch (error) {
+      logError("DepositOperations", error as Error, {
+        chainId,
+        depositRouter,
+        depositId,
+      });
+      res.status(503).json({ error: "Deposit confirmation failed" });
+    }
+  },
+);
+
+app.post(
+  "/operations/deposits/:chainId/:depositRouter/:depositId/reset",
+  async (req, res) => {
+    const chainId = Number(req.params.chainId);
+    const depositId = req.params.depositId;
+    const depositRouter = req.params.depositRouter.replace(/^0x/i, "");
+    if (
+      !Number.isSafeInteger(chainId) ||
+      chainId <= 0 ||
+      !/^[1-9][0-9]*$/.test(depositId) ||
+      !/^[0-9a-fA-F]{40}$/.test(depositRouter)
+    ) {
+      res.status(400).json({ error: "Invalid deposit identity" });
+      return;
+    }
+    try {
+      const onchainStatus = await getDepositStatusByIdentity(
+        chainId,
+        depositRouter,
+        depositId,
+      );
+      if (onchainStatus !== undefined && onchainStatus !== "0") {
+        res.status(409).json({
+          error: `Deposit reuse must be owner-authorized before reset (status ${onchainStatus})`,
+        });
+        return;
+      }
+      await depositStateService.resetForRetryByIdentity(
+        chainId,
+        depositRouter,
+        depositId,
+      );
+      res.status(202).json({ reset: true });
+    } catch (error) {
+      logError("DepositOperations", error as Error, {
+        operation: "resetDepositForRetry",
+        chainId,
+        depositRouter,
+        depositId,
+      });
+      res.status(503).json({ error: "Deposit reset failed" });
+    }
+  },
+);
+
+app.listen(port, async () => {
+  try {
+    logInfo("BridgeService", "Starting bridge service...");
+
+    // Validate configuration before starting
+    const configValid = await validateBridgeConfig();
+    if (!configValid) {
+      const error = new Error(
+        "Configuration validation failed - service cannot start",
+      );
+      logError("BridgeService", error);
+      process.exit(1);
+    }
+
+    // Initialize OAuth
+    await initOpenIdConfig();
+
+    // Start polling services
+    startMultiChainDepositPolling();
+    startNativeRedemptionPolling();
+    await initializeStratoPolling();
+    healthMonitor.markReady();
+
+    logInfo(
+      "BridgeService",
+      `Bridge service started successfully on port ${port}`,
+    );
+  } catch (error) {
+    logError("BridgeService", error as Error, { operation: "startup" });
+    process.exit(1);
+  }
+});

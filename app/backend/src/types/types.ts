@@ -1,4 +1,7 @@
 // ---------------- Oauth Types ----------------
+export type BridgeProtocol = "legacy" | "external";
+export type BridgeHistorySource = BridgeProtocol | "all";
+
 export interface TokenCache {
   serviceToken?: string;
   expiresAt?: number;
@@ -51,3 +54,61 @@ export interface FunctionInput {
   args: TxPayloadArgs;
 }
 export type TxInput = DeployInput | FunctionInput;
+
+export type EdgeKind =
+  | "SWAP"
+  | "PSM_MINT"
+  | "FORGE"
+  | "SAVE"
+  | "YIELD_VAULT_DEPOSIT";
+
+export type StratoRouteStep = Omit<import("@strato/shared-types").RouteStep, "action"> & {
+  action: string;
+};
+
+export interface RouteEdge {
+  kind: EdgeKind;
+  tokenIn: string;
+  tokenOut: string;
+  target?: string;
+  feeBps?: number;
+  maxBalance?: string;
+  mintCap?: string;
+  totalMinted?: string;
+  priceIn?: string;
+  priceOut?: string;
+  vaultDeposit?: VaultDepositState;
+  outputName?: string;
+  outputSymbol?: string;
+  outputDecimals?: number;
+}
+
+export interface RouteStepCandidate {
+  pool?: string;
+  getStep: () => Promise<import("@strato/shared-types").RouteStepQuote>;
+}
+
+export interface RouteQuoteRejection {
+  tokenIn: string;
+  tokenOut: string;
+  pool?: string;
+  reason: "PARTIAL_FILL" | "INSUFFICIENT_LIQUIDITY" | "CAPACITY_LIMIT" |
+    "AMOUNT_TOO_SMALL" | "POOL_UNAVAILABLE" | "NO_POOL" | "QUOTE_UNAVAILABLE" | "POOL_REUSE";
+}
+
+export interface RouteTopologyCache {
+  key: string;
+  expiresAt: number;
+  edges: Promise<RouteEdge[]>;
+}
+
+export interface VaultDepositState {
+  totalShares: string;
+  pricingAssets: string;
+  maxDeposit: string;
+}
+
+export interface AnonymousQuoteCacheEntry {
+  expiresAt: number;
+  result: Promise<unknown>;
+}

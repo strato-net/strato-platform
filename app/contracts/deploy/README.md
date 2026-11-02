@@ -196,10 +196,13 @@ npm run configure:native-route -- \
   --max-per-withdrawal <amount> \
   [--instant-withdrawal-threshold <amount>] \
   --strato-token <strato-token> \
+  [--settlement-verifiers <verifier-1,verifier-2,...> \
+   --settlement-verifier-threshold <count>] \
   [--enabled <true|false>] \
   [--deposits-disabled <true|false> \
    --withdrawals-disabled <true|false> \
-   --max-outstanding-withdrawal <amount>]
+   --max-outstanding-withdrawal <amount>] \
+  [--execute]
 ```
 
 **Required Arguments**:
@@ -218,13 +221,35 @@ npm run configure:native-route -- \
 - `--deposits-disabled` - Blocks new deposits for the STRATO token without affecting withdrawals
 - `--withdrawals-disabled` - Blocks new withdrawals for the STRATO token without affecting deposits
 - `--max-outstanding-withdrawal` - Maximum amount of the STRATO token that may be locked in native bridge custody (`0` disables the aggregate cap)
+- `--settlement-verifiers` - Comma-separated STRATO settlement-attestor accounts; configure at least two before enabling a route
+- `--settlement-verifier-threshold` - Required source settlement attestations; must be at least `2` and no greater than the verifier count
+- `--execute` - Submit governance votes; without this flag the command only prints the plan
 
-The three token bridge configuration arguments must be provided together.
+The three token bridge configuration arguments must be provided together. The
+two settlement verifier arguments must also be provided together.
 
 **What it does**:
-- Calls `StratoNativeBridge.setAsset(enabled, externalChainId, externalBridge, representationToken, externalName, externalSymbol, maxPerWithdrawal, instantWithdrawalThreshold, stratoToken)`
-- Calls `StratoNativeBridge.setTokenBridgeConfig(stratoToken, depositsDisabled, withdrawalsDisabled, maxOutstandingWithdrawal)` when the token bridge configuration arguments are provided
-- Prints a governance vote ID if the route update requires approval
+- Builds `AdminRegistry.castVoteOnIssue` calls for every owner-only change
+- Configures settlement verifiers and their threshold before the route call when supplied
+- Configures `setAsset`, optional token bridge limits, TokenRouter, and auto-route state
+- Prints each governance transaction hash and issue ID when `--execute` is supplied; every required administrator must submit the same plan
+
+#### `refund-external-withdrawal.js`
+Submit an `AdminRegistry` governance vote to refund an expired unreserved or cancelled `ExternalAssetBridge` withdrawal.
+
+```bash
+npm run refund:external-withdrawal -- \
+  --bridge-address <external-asset-bridge> \
+  --withdrawal-id <id> \
+  [--admin-registry <address>] \
+  [--execute]
+```
+
+The command is a dry run unless `--execute` is supplied. Each required administrator must submit the same vote before the refund executes.
+
+**What it does**:
+- Verifies confirmed non-payment on the original destination vault, using `SOURCE_CHAIN_ID`, `CHAIN_<chainId>_RPC_URL` and `CHAIN_<chainId>_DEPOSIT_CONFIRMATIONS`
+- With `--execute`, requires that STRATO records at least the settlement verifier threshold of refund attestations for the expected refund digest, then submits the vote. The tool does not call the verifiers: the bridge runtime collects the `/v1/attest-refund` quorum while it prepares the refund (processing stage `withdrawal-refund`). If fewer are recorded, it submits no vote; wait for the runtime to prepare the refund and retry
 
 #### `smoke-native-bridge.js`
 Run a read-only smoke check against the deployed native STRATO bridge route.

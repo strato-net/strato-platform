@@ -1,5 +1,10 @@
 import Joi from "@hapi/joi";
-import { validateAddressField, numericStringField } from "./common.validators";
+import { StratoError } from "../../errors";
+import {
+  validateAddressField,
+  numericStringField,
+  uintStringField,
+} from "./common.validators";
 
 export function validateTradeTokenArgs(args: any) {
   const schema = Joi.object({
@@ -8,7 +13,7 @@ export function validateTradeTokenArgs(args: any) {
 
   const { error } = schema.validate(args);
   if (error) {
-    throw new Error("Trade Token Argument Validation Error: " + error.message);
+    throw new StratoError("Trade Token Argument Validation Error: " + error.message);
   }
 }
 
@@ -20,7 +25,7 @@ export function validateTradePairArgs(args: any) {
 
   const { error } = schema.validate(args);
   if (error) {
-    throw new Error("Trade Pair Argument Validation Error: " + error.message);
+    throw new StratoError("Trade Pair Argument Validation Error: " + error.message);
   }
 }
 
@@ -34,10 +39,10 @@ export function validateTradeQuoteArgs(args: any) {
 
   const { error } = schema.validate(args);
   if (error) {
-    throw new Error("Trade Quote Argument Validation Error: " + error.message);
+    throw new StratoError("Trade Quote Argument Validation Error: " + error.message);
   }
   if (String(args.tokenIn).toLowerCase() === String(args.tokenOut).toLowerCase()) {
-    throw new Error("Trade Quote Argument Validation Error: tokenIn and tokenOut must differ");
+    throw new StratoError("Trade Quote Argument Validation Error: tokenIn and tokenOut must differ");
   }
 }
 
@@ -52,7 +57,62 @@ export function validateTradeSwapArgs(args: any) {
 
   const { error } = schema.validate(args);
   if (error) {
-    throw new Error("Trade Swap Argument Validation Error: " + error.message);
+    throw new StratoError("Trade Swap Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateRouteQuoteArgs(args: any) {
+  const schema = Joi.object({
+    tokenIn: validateAddressField("tokenIn").required(),
+    tokenOut: validateAddressField("tokenOut").required(),
+    amount: uintStringField("amount"),
+    slippageBps: Joi.number().integer().min(1).max(9999).optional(),
+  });
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new StratoError("Route Quote Argument Validation Error: " + error.message);
+  }
+  if (String(args.tokenIn).toLowerCase() === String(args.tokenOut).toLowerCase()) {
+    throw new StratoError(
+      "Route Quote Argument Validation Error: tokenIn and tokenOut must differ"
+    );
+  }
+}
+
+export function validateCompositeRouteQuoteArgs(args: any) {
+  const schema = Joi.object({
+    externalChainId: uintStringField("externalChainId"),
+    externalToken: validateAddressField("externalToken").required(),
+    targetStratoToken: validateAddressField("targetStratoToken").required(),
+    tokenOut: validateAddressField("tokenOut").required(),
+    amount: uintStringField("amount"),
+    slippageBps: Joi.number().integer().min(1).max(9999).optional(),
+  });
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new StratoError(
+      "Composite Route Quote Argument Validation Error: " + error.message
+    );
+  }
+}
+
+export function validateRouteExecuteArgs(args: any) {
+  const schema = Joi.object({
+    tokenIn: validateAddressField("tokenIn").required(),
+    tokenOut: validateAddressField("tokenOut").required(),
+    amountIn: uintStringField("amountIn"),
+    minFinalOut: uintStringField("minFinalOut"),
+    slippageBps: Joi.number().integer().min(1).max(9999).optional(),
+    recipient: validateAddressField("recipient").optional(),
+  });
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new StratoError("Route Execute Argument Validation Error: " + error.message);
+  }
+  if (String(args.tokenIn).toLowerCase() === String(args.tokenOut).toLowerCase()) {
+    throw new StratoError(
+      "Route Execute Argument Validation Error: tokenIn and tokenOut must differ"
+    );
   }
 }
 
@@ -65,6 +125,6 @@ export function validateTradeHistoryQuery(args: any) {
 
   const { error } = schema.validate(args);
   if (error) {
-    throw new Error("Trade History Argument Validation Error: " + error.message);
+    throw new StratoError("Trade History Argument Validation Error: " + error.message);
   }
 }

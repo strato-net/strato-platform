@@ -13,7 +13,7 @@ const path = require("path");
 require("dotenv").config({
   path:
     process.env.HAPPY_NATIVE_WITHDRAWAL_ENV_FILE ||
-    path.resolve(__dirname, "../.env.happy-native-withdrawal"),
+    path.resolve(__dirname, "../../.env.happy-native-withdrawal"),
 });
 
 const axios = require("axios");

@@ -1,9 +1,10 @@
 import Joi from "@hapi/joi";
-import { validateAddressField, numericStringField } from "./common.validators";
+import { StratoError } from "../../errors";
+import { validateAddressField, uintStringField } from "./common.validators";
 
 export function validateRequestWithdrawal(args: any) {
   if (!args || typeof args !== "object") {
-    throw new Error("Invalid input: args must be an object.");
+    throw new StratoError("Invalid input: args must be an object.");
   }
 
   const isNative = args.routeType === "native";
@@ -20,7 +21,7 @@ export function validateRequestWithdrawal(args: any) {
 
   const { error: baseError } = baseSchema.validate(args);
   if (baseError) {
-    throw new Error("RequestWithdrawal Argument Validation Error: " + baseError.message);
+    throw new StratoError("RequestWithdrawal Argument Validation Error: " + baseError.message);
   }
 
   // Step 2: Format and logic checks
@@ -49,23 +50,24 @@ export function validateRequestWithdrawal(args: any) {
         })
       : validateAddressField("externalToken"),
     stratoToken: validateAddressField("stratoToken"),
-    stratoTokenAmount: numericStringField("stratoTokenAmount"),
+    // Withdrawal amounts are raw integer base units; BigInt() downstream rejects decimals.
+    stratoTokenAmount: uintStringField("stratoTokenAmount"),
     externalRecipient: validateAddressField("externalRecipient"),
   }).strict();
 
   const { error } = finalSchema.validate(args);
   if (error) {
-    throw new Error("RequestWithdrawal Argument Validation Error: " + error.message);
+    throw new StratoError("RequestWithdrawal Argument Validation Error: " + error.message);
   }
 }
 
 export function validateTransactionType(type: string): 'withdrawal' | 'deposit' {
   if (!type || typeof type !== 'string') {
-    throw new Error("Transaction type is required and must be a string");
+    throw new StratoError("Transaction type is required and must be a string");
   }
 
   if (!['withdrawal', 'deposit'].includes(type)) {
-    throw new Error("Invalid transaction type. Must be 'withdrawal' or 'deposit'");
+    throw new StratoError("Invalid transaction type. Must be 'withdrawal' or 'deposit'");
   }
 
   return type as 'withdrawal' | 'deposit';

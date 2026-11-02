@@ -42,6 +42,22 @@ export const loadAttributeMapping = (): AttributeMapping => {
     const mappingPath = join(__dirname, "../../infra/config/attributeMapping.json");
     const fileContent = readFileSync(mappingPath, "utf-8");
     attributeMapping = JSON.parse(fileContent) as AttributeMapping;
+    const externalAssetBridge = (config.externalAssetBridge.address || "")
+      .replace(/^0x/i, "")
+      .toLowerCase();
+    if (externalAssetBridge) {
+      attributeMapping[externalAssetBridge] = {
+        ...attributeMapping[externalAssetBridge],
+        DepositCompleted: {
+          amount: "stratoTokenAmount",
+          user: "stratoRecipient",
+        },
+        WithdrawalCompleted: {
+          amount: "stratoTokenAmount",
+          user: "stratoSender",
+        },
+      };
+    }
     logInfo("AttributeMapping", "Loaded attribute mapping from config");
     return attributeMapping;
   } catch (error) {

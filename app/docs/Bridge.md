@@ -1,71 +1,107 @@
 ## Bridge
 
-Purpose: Cross-system token bridging into/out of STRATO.
+Purpose: cross-system token bridging into and out of STRATO.
 
-Functional summary:
-- Bridge-in (deposit): Off-chain relayer attests an external-chain deposit. The bridge records the deposit with replay protection and, upon confirmation, mints either USDST or the wrapped STRATO token to the recipient.
-- Bridge-out (withdrawal): User escrows tokens on STRATO. Relayer creates and executes the custody transaction on the external chain; the bridge burns escrowed tokens and finalizes. A deterministic abort path refunds escrowed tokens if unprocessed after a timeout.
+This page describes the bridge architecture. For deployment commands, roles,
+approval files, recovery and canaries, use the single canonical runbook:
+[`EAB_DEPLOYMENT.md`](../../EAB_DEPLOYMENT.md). Do not use older
+`setup`, `bundle`, `status`, `resume`, `vote` or `activate --approve` rollout
+instructions.
 
-Key contracts:
-- MercataBridge.sol: Handles deposit/withdraw workflows, tracking and mint/burn or escrow logic.
+### Components
 
-Trust model & guarantees:
-- Trust model: A designated relayer coordinates verification and execution. No light-client; external finality and replay protection are enforced by the relayer and on-chain checks.
-- Guarantees:
-  - Canonical mint once per `(externalChainId, externalTxHash)` via replay protection
-  - Escrowed withdrawal funds remain safe and are refundable via abort if not progressed
-  - Independent circuit breakers for deposit and withdrawal legs
+- `ExternalAssetBridge`: STRATO coordinator for non-native assets.
+- `ExternalBridgeVault`: external-chain custody and threshold-authorized release.
+- `ExternalAssetDepositRouter`: external deposits and route intent.
+- `TokenRouter`: bounded STRATO route execution.
+- `StratoNativeBridge`: native-asset coordinator.
+- `StratoNativeCustodyVault`: native custody on STRATO.
+- `StratoNativeRepresentationBridge`: destination mint and redemption.
+- `MercataBridge`: independent legacy bridge; it is not configured by the EAB rollout.
 
-Flows and events:
-- Deposit (Bridge-in):
-  1) Relayer observes external deposit and calls `deposit(externalChainId, externalSender, externalTxHash, stratoToken, amount, stratoRecipient, mintUSDST)`
-     - Checks: chain enabled; asset permissions; token active (or USDST mint path); unique `(chainId, txHash)`
-     - Emits: `DepositInitiated(externalChainId, externalTxHash, stratoToken, amount, stratoRecipient, externalSender, mintUSDST)`
-  2a) If verified OK: `confirmDeposit(externalChainId, externalTxHash)` → mints `USDST_ADDRESS` or `stratoToken` → `DepositCompleted`
-  2b) If verification fails: `reviewDeposit(externalChainId, externalTxHash)` → `DepositPendingReview`
+### Non-native bridge-in
 
-- Withdrawal (Bridge-out):
-  1) User calls `requestWithdrawal(externalChainId, externalRecipient, stratoToken, amount, mintUSDST)`
-     - Pulls escrow: `transferFrom(msg.sender, bridge, amount)` for USDST or `stratoToken`
-     - Creates deterministic `withdrawalId` and stores `WithdrawalInfo`
-     - Emits: `WithdrawalRequested(withdrawalId, destChainId, token, amount, user, dest, mint)`
-  2) Relayer creates custody tx off-chain and calls `confirmWithdrawal(id, custodyTxHash)` → status `PENDING_REVIEW` → `WithdrawalPending`
-  3) After execution on custody: `finaliseWithdrawal(id, custodyTxHash)` → burns escrow (USDST or token) → `WithdrawalCompleted`
-  4) Abort path: `abortWithdrawal(id)`
-     - Relayer may abort while `INITIATED|PENDING_REVIEW`
-     - User may abort only while `INITIATED` and after `requestedAt + WITHDRAWAL_ABORT_DELAY (172800s)`
-     - Refunds escrowed tokens and emits `WithdrawalAborted`
-  5) Incident path: `cancelAndSweepWithdrawal(id, triageWallet)` / `cancelAndSweepWithdrawalBatch(ids, triageWallet)`
-     - Owner (AdminRegistry governance) only; never whitelist the relayer for it
-     - Allowed while `INITIATED|PENDING_REVIEW`; not blocked by the withdrawal pause
-     - Moves the escrow to `triageWallet` (not back to the sender), sets status `SWEPT`, records `withdrawalSweptTo[id]`, emits `WithdrawalSwept`
-     - From `PENDING_REVIEW` the proposed custody (Safe) transaction must be rejected on the external chain too; the event carries its hash
+1. Runtime detects a router event keyed by `(externalChainId, depositRouter, depositId)`.
+2. Runtime and independent verifiers require the configured confirmation floor,
+   canonical receipt/event evidence and finalized-chain evidence.
+3. Verifiers record attestations for the exact settlement digest on STRATO.
+4. Quorum allows the EAB to mint the reviewed representation amount. Routed
+   deposits execute only through approved TokenRouter dependencies and preserve
+   source-token fallback.
+5. Duplicate, missing, conflicting or ambiguous evidence is rejected or sent to
+   review; it cannot create a second settlement.
 
-Permissions & registries:
-- Assets are registered per `(stratoToken, externalChainId)` with:
-  - `permissions` bitmask: `PERMISSION_WRAP=0b01`, `PERMISSION_MINT=0b10`
-  - `maxPerTx` hard cap (0 = unlimited)
-- Chains include custody, deposit router, `enabled`, and `lastProcessedBlock` hints.
+### Non-native bridge-out
 
-Replay protection:
-- Deposits keyed by `(externalChainId, externalTxHash)` must be unique; duplicates revert.
+1. `requestWithdrawal` escrows the STRATO token.
+2. Routine withdrawals receive short-lived authorization from independent signers.
+3. The executor reserves and releases route-local vault liquidity.
+4. Independent verifiers attest the exact external release.
+5. STRATO burns escrow only after attestation quorum. Large withdrawals also
+   require Safe review; expired unpaid reservations use the attested refund flow.
 
-Pause & admin controls:
-- `setPause(depositsPaused, withdrawalsPaused)`; `setRelayer`; `setTokenFactory`; `setUSDSTAddress`.
-- Incident response: `cancelAndSweepWithdrawal(Batch)` captures in-flight withdrawal escrow to a triage wallet for redistribution to victims (see Withdrawal step 5).
+### Native flows
 
-USDST vs wrapped tokens:
-- `mintUSDST=true`: USDST minted/burned; otherwise the configured `stratoToken`.
+Native flows use the same verifier workloads with separate native policies and
+destination signing keys. Destination mint/refund attestations bind the signer-set
+version. Every source-side custody release requires the configured
+`StratoNativeBridge` verifier threshold.
 
-Batch ops:
-- `depositBatch`, `confirmDepositBatch`, `reviewDepositBatch`, `confirmWithdrawalBatch`, `finaliseWithdrawalBatch`, `abortWithdrawalBatch`.
+### Operational invariants
 
-Constraints & checks (selected):
-- Chain enabled; asset exists; correct permissions for path; token activity rules; per-tx cap.
+- Deposit and withdrawal pause controls are independent.
+- Every mint path consumes the reviewed token mint bucket.
+- Testnet uses the configured testnet verifier quorum; production uses the
+  configured production quorum. The rollout verifies the actual count rather than
+  assuming three verifiers.
+- Runtime and every verifier need explicit per-chain confirmation policies and
+  independent RPC evidence. Numeric depth is a floor; settlement also requires
+  canonical evidence at or below the finalized head.
+- A new EAB chain is configured disabled. Services and readiness are verified
+  before the separate activation approval.
+- Native destination activation precedes source intake activation.
+- Safe proposal journals and Runtime cursors live on persistent storage and must
+  survive replacement.
+- Run one proposal writer per shared Safe.
+- Public intake stays closed until deposit and withdrawal canaries reconcile
+  custody, escrow, representation supply and recipient balances.
 
-- Simulate full flows; verify event sequences, replay protection, permissions, and pause/abort.
+### Deployment interface
 
-Prod:
-- Connect relayer and custody; enforce confirmation windows, review process, and monitor for anomalies. Use pause toggles during incidents.
+The supported rollout commands are:
 
+```bash
+npm run external:rollout -- init --manifest <deployment.json> ...
+npm run external:rollout -- preflight --manifest <deployment.json>
+npm run external:rollout -- generate --manifest <deployment.json>
+npm run external:rollout -- approve --file <admin-approval-ID.json>
+npm run external:rollout -- verify --manifest <deployment.json>
+npm run external:rollout -- activate --manifest <deployment.json>
+```
 
+`generate` reconciles live AdminRegistry, Cirrus, Safe and contract state, then
+replaces `.deployment/current/` with only the current handoffs. Admin approval files
+contain the exact current calls and expire after two hours. `approve --file`
+rechecks live state, prints decoded calls and vote counts, and requires
+`APPROVE <short-id>` before submission.
+
+Admins keep no rollout history or activity trace. If a sequential governance
+batch is interrupted, the Coordinator reruns `generate`; completed calls are
+derived from live evidence and the replacement approval file contains only
+incomplete calls. Safe MultiSend batches remain atomic and are regenerated
+against the current Safe nonce after a failure.
+
+### Security and configuration checks
+
+- Verify source and destination chain IDs from live endpoints.
+- Verify proxy implementations, owners, Safe threshold and every role address.
+- Use at least two independent RPC hosts per verifier.
+- Match Runtime/verifier policy hashes, confirmation floors, signer identities and
+  on-chain thresholds before activation.
+- Keep withdrawals disabled until a separate reviewed enablement change and
+  withdrawal canary.
+- Keep credentials, KMS references and bearer tokens in role-local secret stores;
+  manifests and approval files contain no secrets.
+- Preserve old signer versions until pending work is reconciled. A real
+  membership or threshold change is required to rotate an on-chain version;
+  writing an unchanged value does not rotate it.

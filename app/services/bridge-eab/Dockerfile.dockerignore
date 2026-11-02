@@ -1,0 +1,17 @@
+**
+!services/
+!services/bridge-eab/
+!services/bridge-eab/package.json
+!services/bridge-eab/package-lock.json
+!services/bridge-eab/tsconfig.json
+!services/bridge-eab/src/
+!services/bridge-eab/src/**
+!packages/
+!packages/shared-types/
+!packages/shared-types/package.json
+!packages/shared-types/tsconfig.json
+!packages/shared-types/src/
+!packages/shared-types/src/**
+**/node_modules
+**/dist
+**/.env*

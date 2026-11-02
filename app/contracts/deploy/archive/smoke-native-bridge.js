@@ -13,7 +13,7 @@
  */
 const path = require("path");
 require("dotenv").config({
-  path: process.env.SMOKE_NATIVE_BRIDGE_ENV_FILE || path.resolve(__dirname, "../.env.smoke-native-bridge"),
+  path: process.env.SMOKE_NATIVE_BRIDGE_ENV_FILE || path.resolve(__dirname, "../../.env.smoke-native-bridge"),
 });
 
 const axios = require("axios");
@@ -206,7 +206,7 @@ async function fetchStratoBridgeState(bridgeAddress) {
     {
       address: `eq.${toCirrusAddress(bridgeAddress, "STRATO native bridge address")}`,
       select:
-        "_owner,tokenFactory,custodyVault,bridgeOperator,guardian,depositsPaused,withdrawalsPaused",
+        "_owner,tokenFactory,custodyVault,bridgeOperator,guardian,depositsPaused,withdrawalsPaused,settlementVerifierThreshold,settlementVerifierCount",
     },
     `native bridge ${bridgeAddress}`
   );
@@ -318,6 +318,14 @@ async function runStratoChecks({
     vaultState.paused === false,
     "STRATO native custody vault is not paused",
     `vault.paused=${String(vaultState.paused)}`
+  );
+  pushCheck(
+    checks,
+    Number(bridgeState.settlementVerifierThreshold) >= 2 &&
+      Number(bridgeState.settlementVerifierThreshold) <=
+        Number(bridgeState.settlementVerifierCount),
+    "STRATO bridge has a satisfiable settlement verifier quorum",
+    `settlementVerifierThreshold=${String(bridgeState.settlementVerifierThreshold)}, settlementVerifierCount=${String(bridgeState.settlementVerifierCount)}`
   );
 
   if (expectedBridgeOperator) {
@@ -482,7 +490,7 @@ async function runSepoliaChecks({
 
   pushCheck(
     checks,
-    BigInt(attestationThreshold) > 0n &&
+    BigInt(attestationThreshold) >= 2n &&
       BigInt(attestationThreshold) <= BigInt(attestationSignerCount),
     "Sepolia bridge has a satisfiable native mint attestation threshold",
     `attestationThreshold=${String(attestationThreshold)}, attestationSignerCount=${String(attestationSignerCount)}`

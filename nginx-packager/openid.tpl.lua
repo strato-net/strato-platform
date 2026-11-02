@@ -74,6 +74,7 @@ local authenticate_opts = {
 }
 
 local wallet_auth_routes = {
+  ["/api/bridge/withdrawalCancellation"] = true,
   ["/api/bridge/requestNativeWithdrawal"] = true,
   ["/api/bridge/requestWithdrawal"] = true,
   ["/api/metal-forge/buy"] = true,

@@ -1,10 +1,12 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/utils/StringUtils.sol";
-import "../../libraries/Bridge/BridgeTypes.sol";
+import "../../libraries/Bridge/NativeBridgeTypes.sol";
 import "../Admin/AdminRegistry.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
 import "./StratoNativeCustodyVault.sol";
+import "../Router/TokenRouter.sol";
+import "../../libraries/Router/RouterTypes.sol";
 
 /**
  * @title StratoNativeBridge
@@ -12,7 +14,8 @@ import "./StratoNativeCustodyVault.sol";
  * @notice Keeps native lock/unlock liabilities isolated from the existing MercataBridge flow.
  */
 contract record StratoNativeBridge is Ownable {
-    using BridgeTypes for *;
+    using NativeBridgeTypes for *;
+    using RouterTypes for *;
     using StringUtils for string;
 
     struct NativeAssetConfig {
@@ -34,7 +37,7 @@ contract record StratoNativeBridge is Ownable {
     }
 
     struct NativeDepositInfo {
-        BridgeStatus bridgeStatus;
+        NativeBridgeStatus bridgeStatus;
         string depositId;
         address externalBridge;
         address externalSender;
@@ -47,10 +50,12 @@ contract record StratoNativeBridge is Ownable {
         address stratoToken;
         uint256 stratoTokenAmount;
         uint256 timestamp;
+        address actionToken;
+        uint256 minFinalOut;
     }
 
     struct NativeWithdrawalInfo {
-        BridgeStatus bridgeStatus;
+        NativeBridgeStatus bridgeStatus;
         string externalTxHash;
         uint256 externalChainId;
         address externalBridge;
@@ -65,6 +70,8 @@ contract record StratoNativeBridge is Ownable {
         string nativeMintProposalHash;
         uint256 nativeMintNotBefore;
         bool useInstantPath;
+        string cancellationProposalHash;
+        string cancellationTxHash;
     }
 
     event PauseToggled(bool depositsPaused, bool withdrawalsPaused);
@@ -157,6 +164,65 @@ contract record StratoNativeBridge is Ownable {
     mapping(uint256 => NativeWithdrawalInfo) public record withdrawals;
     mapping(address => NativeTokenBridgeConfig) public record tokenBridgeConfigs;
 
+    address public tokenRouter;
+    bool private depositLocked;
+    uint256 public constant MAX_ROUTE_STEPS = 6;
+    uint256 public constant ROUTE_EXECUTION_DEADLINE = 300;
+    mapping(address => mapping(uint256 => bool)) public record autoRouteEnabled;
+    mapping(string => string) public record depositRefundTransactions;
+    mapping(string => string) public record depositRefundProposals;
+    mapping(string => string) public record depositRefundEvidence;
+    event NativeDepositRefundEvidence(string depositId, string refundTxHash);
+    event NativeDepositReopened(string depositId);
+    event NativeDepositRejectedNoFunds(string depositId);
+    event NativeDepositRefundRequested(string depositId);
+    event NativeDepositRefunded(string depositId, string refundTxHash);
+    event NativeDepositRefundProposal(string depositId, string proposalHash);
+
+    event TokenRouterUpdated(address tokenRouter);
+    event AutoRouteAvailabilityUpdated(address stratoToken, uint256 externalChainId, bool enabled);
+    event AutoRouted(string depositId, string externalTxHash, address stratoRecipient, address sourceToken, uint256 sourceAmount, address finalToken, uint256 finalAmount);
+    event DepositActionFailed(string depositId, string externalTxHash, address actionToken, string reason);
+    event DepositActionFallback(string depositId, string externalTxHash, address fallbackToken, uint256 fallbackAmount);
+
+    modifier nonReentrantDeposit() {
+        require(!depositLocked, "SNB: reentrant deposit");
+        depositLocked = true;
+        _;
+        depositLocked = false;
+    }
+
+    function setTokenRouter(address newTokenRouter) external onlyOwner {
+        require(newTokenRouter != address(0), "SNB: zero router");
+        tokenRouter = newTokenRouter;
+        emit TokenRouterUpdated(newTokenRouter);
+    }
+
+    function setAutoRouteEnabled(address stratoToken, uint256 externalChainId, bool enabled) external onlyOwner {
+        NativeAssetConfig asset = assets[stratoToken][externalChainId];
+        require(asset.stratoToken != address(0), "SNB: asset missing");
+        if (enabled) {
+            require(asset.enabled, "SNB: asset disabled");
+            require(!tokenBridgeConfigs[stratoToken].depositsDisabled, "SNB: token deposits disabled");
+            require(tokenRouter != address(0), "SNB: router not set");
+            require(TokenRouter(tokenRouter).initialized(), "SNB: router not initialized");
+        }
+        autoRouteEnabled[stratoToken][externalChainId] = enabled;
+        emit AutoRouteAvailabilityUpdated(stratoToken, externalChainId, enabled);
+    }
+
+    // Settlement verifier state is independent of solver functionality.
+    mapping(address => bool) public record settlementVerifiers;
+    uint8 public settlementVerifierCount;
+    uint8 public settlementVerifierThreshold;
+    uint256 public settlementVerifierSetVersion;
+    mapping(bytes32 => mapping(address => bool)) public record settlementAttestations;
+    mapping(bytes32 => uint8) public record settlementAttestationCounts;
+
+    event SettlementVerifierUpdated(address verifier, bool enabled, uint256 verifierSetVersion);
+    event SettlementVerifierThresholdUpdated(uint8 threshold, uint256 verifierSetVersion);
+    event SettlementAttested(bytes32 digest, address verifier, uint8 attestationCount);
+
     modifier whenDepositsOpen() {
         require(!depositsPaused, "SNB: deposits paused");
         _;
@@ -216,7 +282,42 @@ contract record StratoNativeBridge is Ownable {
         guardian = newGuardian;
     }
 
+    function setSettlementVerifier(address verifier, bool enabled) external onlyOwner {
+        require(verifier != address(0), "SNB: zero verifier");
+        bool currentlyEnabled = settlementVerifiers[verifier];
+        if (currentlyEnabled == enabled) {
+            return;
+        }
+        if (enabled) {
+            require(settlementVerifierCount < 255, "SNB: too many verifiers");
+            settlementVerifierCount++;
+        } else {
+            require(
+                settlementVerifierThreshold < settlementVerifierCount,
+                "SNB: threshold exceeds verifiers"
+            );
+            settlementVerifierCount--;
+        }
+        settlementVerifiers[verifier] = enabled;
+        settlementVerifierSetVersion++;
+        emit SettlementVerifierUpdated(verifier, enabled, settlementVerifierSetVersion);
+    }
+
+    function setSettlementVerifierThreshold(uint8 threshold) external onlyOwner {
+        require(
+            threshold > 1 && threshold <= settlementVerifierCount,
+            "SNB: invalid verifier threshold"
+        );
+        if (threshold == settlementVerifierThreshold) {
+            return;
+        }
+        settlementVerifierThreshold = threshold;
+        settlementVerifierSetVersion++;
+        emit SettlementVerifierThresholdUpdated(threshold, settlementVerifierSetVersion);
+    }
+
     function setInstantWithdrawalDelaySeconds(uint256 newDelaySeconds) external onlyOwner {
+        // Compatibility-only setter. This value no longer controls mint timing.
         uint256 previousDelaySeconds = INSTANT_WITHDRAWAL_DELAY_SECONDS;
         INSTANT_WITHDRAWAL_DELAY_SECONDS = newDelaySeconds;
         emit InstantWithdrawalDelayUpdated(previousDelaySeconds, newDelaySeconds);
@@ -296,7 +397,7 @@ contract record StratoNativeBridge is Ownable {
     function getWithdrawalInfo(
         uint256 id
     ) public returns (
-        BridgeStatus bridgeStatus,
+        NativeBridgeStatus bridgeStatus,
         string externalTxHash,
         uint256 externalChainId,
         address externalBridge,
@@ -329,7 +430,7 @@ contract record StratoNativeBridge is Ownable {
     function getDepositInfo(
         string depositId
     ) public returns (
-        BridgeStatus bridgeStatus,
+        NativeBridgeStatus bridgeStatus,
         string storedDepositId,
         address externalBridge,
         address externalSender,
@@ -472,7 +573,7 @@ contract record StratoNativeBridge is Ownable {
 
         id = ++withdrawalCounter;
         withdrawals[id] = NativeWithdrawalInfo(
-            BridgeStatus.INITIATED,
+            NativeBridgeStatus.INITIATED,
             "",
             externalChainId,
             asset.externalBridge,
@@ -486,7 +587,9 @@ contract record StratoNativeBridge is Ownable {
             block.timestamp,
             "",
             0,
-            useInstantPath
+            useInstantPath,
+            "",
+            ""
         );
 
         emit NativeWithdrawalRequested(
@@ -506,11 +609,11 @@ contract record StratoNativeBridge is Ownable {
         require(id > 0, "SNB: invalid withdrawal id");
 
         NativeWithdrawalInfo w = withdrawals[id];
-        require(w.bridgeStatus == BridgeStatus.INITIATED, "SNB: bad state");
+        require(w.bridgeStatus == NativeBridgeStatus.INITIATED, "SNB: bad state");
 
-        w.bridgeStatus = BridgeStatus.PENDING_REVIEW;
+        w.bridgeStatus = NativeBridgeStatus.PENDING_REVIEW;
         w.timestamp = block.timestamp;
-        w.nativeMintNotBefore = block.timestamp + INSTANT_WITHDRAWAL_DELAY_SECONDS;
+        w.nativeMintNotBefore = block.timestamp;
 
         emit NativeWithdrawalPending(id, w.externalTxHash);
     }
@@ -520,7 +623,7 @@ contract record StratoNativeBridge is Ownable {
         require(bytes(nativeMintProposalHash).length > 0, "SNB: invalid proposal hash");
 
         NativeWithdrawalInfo w = withdrawals[id];
-        require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "SNB: bad state");
+        require(w.bridgeStatus == NativeBridgeStatus.PENDING_REVIEW, "SNB: bad state");
         require(bytes(w.externalTxHash).length == 0, "SNB: tx hash already set");
         require(bytes(w.nativeMintProposalHash).length == 0, "SNB: proposal already set");
 
@@ -530,17 +633,74 @@ contract record StratoNativeBridge is Ownable {
         emit NativeWithdrawalProposalRecorded(id, w.nativeMintProposalHash);
     }
 
+    function getWithdrawalSettlementDigest(
+        uint256 id,
+        string externalTxHash,
+        string nativeMintProposalHash
+    ) public returns (bytes32) {
+        NativeWithdrawalInfo w = withdrawals[id];
+        bytes32 externalTxHashDigest = bytes(externalTxHash).length == 0
+            ? keccak256(bytes(""))
+            : keccak256(bytes(externalTxHash.normalizeHex()));
+        bytes32 proposalHashDigest = bytes(nativeMintProposalHash).length == 0
+            ? keccak256(bytes(""))
+            : keccak256(bytes(nativeMintProposalHash.normalizeHex()));
+        return keccak256(abi.encode(
+            keccak256("SNB_WITHDRAWAL_SETTLEMENT_V1"),
+            block.chainid,
+            address(this),
+            settlementVerifierSetVersion,
+            id,
+            w.externalChainId,
+            w.externalBridge,
+            w.externalRecipient,
+            w.representationToken,
+            w.externalTokenAmount,
+            w.stratoSender,
+            w.stratoToken,
+            w.stratoTokenAmount,
+            externalTxHashDigest,
+            proposalHashDigest
+        ));
+    }
+
+    function attestWithdrawalSettlement(
+        uint256 id,
+        string externalTxHash,
+        string nativeMintProposalHash
+    ) external {
+        NativeWithdrawalInfo w = withdrawals[id];
+        require(
+            w.bridgeStatus == NativeBridgeStatus.PENDING_REVIEW ||
+                w.bridgeStatus == NativeBridgeStatus.CANCELLATION_PENDING,
+            "SNB: bad state"
+        );
+        require(bytes(externalTxHash).length > 0, "SNB: invalid external tx hash");
+        if (bytes(w.nativeMintProposalHash).length > 0) {
+            require(
+                w.nativeMintProposalHash == nativeMintProposalHash.normalizeHex(),
+                "SNB: proposal mismatch"
+            );
+        }
+        _recordSettlementAttestation(
+            getWithdrawalSettlementDigest(id, externalTxHash, nativeMintProposalHash)
+        );
+    }
+
     function finalizeWithdrawal(
         uint256 id,
         string externalTxHash,
         string nativeMintProposalHash
-    ) public onlyBridgeOperator whenWithdrawalsOpen {
+    ) public whenWithdrawalsOpen {
         require(id > 0, "SNB: invalid withdrawal id");
         require(bytes(externalTxHash).length > 0, "SNB: invalid external tx hash");
 
         NativeWithdrawalInfo w = withdrawals[id];
-        require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "SNB: bad state");
+        require(w.bridgeStatus == NativeBridgeStatus.PENDING_REVIEW || w.bridgeStatus == NativeBridgeStatus.CANCELLATION_PENDING, "SNB: bad state");
         require(bytes(w.externalTxHash).length == 0, "SNB: tx hash already set");
+        _requireSettlementAttestations(
+            getWithdrawalSettlementDigest(id, externalTxHash, nativeMintProposalHash)
+        );
 
         string normalizedExternalTxHash = externalTxHash.normalizeHex();
         w.externalTxHash = normalizedExternalTxHash;
@@ -555,13 +715,110 @@ contract record StratoNativeBridge is Ownable {
             }
         }
 
-        w.bridgeStatus = BridgeStatus.COMPLETED;
+        w.bridgeStatus = NativeBridgeStatus.COMPLETED;
         w.timestamp = block.timestamp;
 
         emit NativeWithdrawalCompleted(id, w.externalTxHash, w.nativeMintProposalHash);
     }
 
-    function abortWithdrawal(uint256 id) public whenWithdrawalsOpen {
+    event NativeWithdrawalCancellationRequested(uint256 id);
+    event NativeWithdrawalCancellationProposal(uint256 id, string proposalHash);
+    event NativeWithdrawalCancellationEvidence(uint256 id, string txHash);
+
+    function requestWithdrawalCancellation(uint256 id) external onlyOwner {
+        _requestWithdrawalCancellation(id);
+    }
+
+    function requestUserWithdrawalCancellation(uint256 id) external {
+        NativeWithdrawalInfo w = withdrawals[id];
+        require(msg.sender == w.stratoSender, "SNB: not sender");
+        require(block.timestamp >= w.requestedAt + WITHDRAWAL_ABORT_DELAY, "SNB: wait 48h");
+        _requestWithdrawalCancellation(id);
+    }
+
+    function _requestWithdrawalCancellation(uint256 id) internal {
+        NativeWithdrawalInfo w = withdrawals[id];
+        require(w.bridgeStatus == NativeBridgeStatus.PENDING_REVIEW, "SNB: not pending");
+        require(bytes(w.externalTxHash).length == 0, "SNB: external tx set");
+        w.bridgeStatus = NativeBridgeStatus.CANCELLATION_PENDING;
+        w.timestamp = block.timestamp;
+        emit NativeWithdrawalCancellationRequested(id);
+    }
+
+    function recordWithdrawalCancellationProposal(uint256 id, string proposalHash) external onlyBridgeOperator {
+        NativeWithdrawalInfo w = withdrawals[id];
+        require(w.bridgeStatus == NativeBridgeStatus.CANCELLATION_PENDING, "SNB: no cancellation requested");
+        require(bytes(proposalHash).length > 0, "SNB: missing proposal");
+        w.cancellationProposalHash = proposalHash.normalizeHex();
+        emit NativeWithdrawalCancellationProposal(id, w.cancellationProposalHash);
+    }
+
+    function recordWithdrawalCancellationEvidence(uint256 id, string txHash) external onlyBridgeOperator {
+        NativeWithdrawalInfo w = withdrawals[id];
+        require(w.bridgeStatus == NativeBridgeStatus.CANCELLATION_PENDING, "SNB: no cancellation requested");
+        require(bytes(txHash).length == 64 || bytes(txHash).length == 66, "SNB: invalid cancellation hash");
+        w.cancellationTxHash = txHash.normalizeHex();
+        emit NativeWithdrawalCancellationEvidence(id, w.cancellationTxHash);
+    }
+
+    function getWithdrawalCancellationDigest(
+        uint256 id,
+        string cancellationTxHash
+    ) public returns (bytes32) {
+        NativeWithdrawalInfo w = withdrawals[id];
+        return keccak256(abi.encode(
+            keccak256("SNB_WITHDRAWAL_CANCELLATION_V1"),
+            block.chainid,
+            address(this),
+            settlementVerifierSetVersion,
+            id,
+            w.externalChainId,
+            w.externalBridge,
+            w.externalRecipient,
+            w.representationToken,
+            w.externalTokenAmount,
+            w.stratoSender,
+            w.stratoToken,
+            w.stratoTokenAmount,
+            keccak256(bytes(cancellationTxHash.normalizeHex()))
+        ));
+    }
+
+    function attestWithdrawalCancellation(
+        uint256 id,
+        string cancellationTxHash
+    ) external {
+        NativeWithdrawalInfo w = withdrawals[id];
+        require(
+            w.bridgeStatus == NativeBridgeStatus.CANCELLATION_PENDING,
+            "SNB: no cancellation requested"
+        );
+        require(
+            bytes(w.cancellationTxHash).length > 0 &&
+                w.cancellationTxHash == cancellationTxHash.normalizeHex(),
+            "SNB: cancellation evidence mismatch"
+        );
+        _recordSettlementAttestation(
+            getWithdrawalCancellationDigest(id, cancellationTxHash)
+        );
+    }
+
+    function refundCanceledWithdrawal(uint256 id, string cancellationTxHash) external {
+        NativeWithdrawalInfo w = withdrawals[id];
+        require(w.bridgeStatus == NativeBridgeStatus.CANCELLATION_PENDING, "SNB: no cancellation requested");
+        require(bytes(w.cancellationTxHash).length > 0 && w.cancellationTxHash == cancellationTxHash.normalizeHex(), "SNB: cancellation evidence mismatch");
+        require(bytes(w.externalTxHash).length == 0, "SNB: external tx set");
+        _requireSettlementAttestations(
+            getWithdrawalCancellationDigest(id, cancellationTxHash)
+        );
+        w.bridgeStatus = NativeBridgeStatus.ABORTED;
+        w.timestamp = block.timestamp;
+        uint256 amount = StratoNativeCustodyVault(custodyVault).unlock(w.stratoToken, w.stratoSender, w.stratoTokenAmount);
+        require(amount > 0, "SNB: no tokens unlocked");
+        emit NativeWithdrawalAborted(id);
+    }
+
+    function abortWithdrawal(uint256 id) public {
         require(id > 0, "SNB: invalid withdrawal id");
         require(custodyVault != address(0), "SNB: vault not set");
 
@@ -571,17 +828,17 @@ contract record StratoNativeBridge is Ownable {
         AdminRegistry admin = AdminRegistry(owner());
         if (admin.whitelist(address(this), "abortWithdrawal", msg.sender)) {
             require(
-                w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW,
+                w.bridgeStatus == NativeBridgeStatus.INITIATED,
                 "SNB: not abortable"
             );
         } else {
             require(msg.sender == w.stratoSender, "SNB: not sender");
-            require(w.bridgeStatus == BridgeStatus.INITIATED, "SNB: not abortable");
+            require(w.bridgeStatus == NativeBridgeStatus.INITIATED, "SNB: not abortable");
             require(currentTimestamp >= w.requestedAt + WITHDRAWAL_ABORT_DELAY, "SNB: wait 48h");
         }
         require(bytes(w.externalTxHash).length == 0, "SNB: external tx set");
 
-        w.bridgeStatus = BridgeStatus.ABORTED;
+        w.bridgeStatus = NativeBridgeStatus.ABORTED;
         w.timestamp = currentTimestamp;
 
         uint256 actualUnlockedAmount = StratoNativeCustodyVault(custodyVault).unlock(
@@ -603,7 +860,7 @@ contract record StratoNativeBridge is Ownable {
         address representationToken,
         address stratoRecipient,
         uint256 stratoTokenAmount
-    ) external onlyBridgeOperator whenDepositsOpen {
+    ) public onlyBridgeOperator whenDepositsOpen {
         require(externalChainId > 0, "SNB: invalid external chain id");
         require(externalBridge != address(0), "SNB: invalid external bridge");
         require(externalRedemptionId > 0, "SNB: invalid redemption id");
@@ -620,7 +877,7 @@ contract record StratoNativeBridge is Ownable {
         );
         string normalizedTxHash = externalTxHash.normalizeHex();
         NativeDepositInfo existingDeposit = deposits[depositId];
-        require(existingDeposit.bridgeStatus == BridgeStatus.NONE, "SNB: duplicate deposit");
+        require(existingDeposit.bridgeStatus == NativeBridgeStatus.NONE, "SNB: duplicate deposit");
 
         address stratoToken = stratoTokenByRepresentation[representationToken][externalChainId];
         require(stratoToken != address(0), "SNB: asset missing");
@@ -632,7 +889,7 @@ contract record StratoNativeBridge is Ownable {
         require(asset.representationToken == representationToken, "SNB: wrong representation token");
 
         deposits[depositId] = NativeDepositInfo(
-            BridgeStatus.INITIATED,
+            NativeBridgeStatus.INITIATED,
             depositId,
             externalBridge,
             externalSender,
@@ -644,7 +901,9 @@ contract record StratoNativeBridge is Ownable {
             stratoRecipient,
             stratoToken,
             stratoTokenAmount,
-            block.timestamp
+            block.timestamp,
+            address(0),
+            0
         );
 
         emit NativeDepositInitiated(
@@ -660,6 +919,26 @@ contract record StratoNativeBridge is Ownable {
         );
     }
 
+    function recordDepositWithRoute(
+        uint256 externalChainId,
+        address externalBridge,
+        uint256 externalRedemptionId,
+        address externalSender,
+        string externalTxHash,
+        address representationToken,
+        address stratoRecipient,
+        uint256 stratoTokenAmount,
+        address actionToken,
+        uint256 minFinalOut
+    ) external onlyBridgeOperator whenDepositsOpen {
+        require(actionToken != address(0) && minFinalOut > 0, "SNB: invalid route intent");
+        recordDeposit(externalChainId, externalBridge, externalRedemptionId, externalSender,
+            externalTxHash, representationToken, stratoRecipient, stratoTokenAmount);
+        NativeDepositInfo d = deposits[getDepositId(externalChainId, externalBridge, externalRedemptionId)];
+        d.actionToken = actionToken;
+        d.minFinalOut = minFinalOut;
+    }
+
     function reviewDeposit(
         uint256 externalChainId,
         address externalBridge,
@@ -671,9 +950,9 @@ contract record StratoNativeBridge is Ownable {
             externalRedemptionId
         );
         NativeDepositInfo d = deposits[depositId];
-        require(d.bridgeStatus == BridgeStatus.INITIATED, "SNB: bad state");
+        require(d.bridgeStatus == NativeBridgeStatus.INITIATED, "SNB: bad state");
 
-        d.bridgeStatus = BridgeStatus.PENDING_REVIEW;
+        d.bridgeStatus = NativeBridgeStatus.PENDING_REVIEW;
         d.timestamp = block.timestamp;
 
         emit NativeDepositPendingReview(
@@ -684,45 +963,264 @@ contract record StratoNativeBridge is Ownable {
         );
     }
 
+    function getDepositSettlementDigest(
+        string depositId
+    ) public returns (bytes32) {
+        NativeDepositInfo d = deposits[depositId];
+        return keccak256(abi.encode(
+            keccak256("SNB_DEPOSIT_SETTLEMENT_V1"),
+            block.chainid,
+            address(this),
+            settlementVerifierSetVersion,
+            keccak256(bytes(depositId)),
+            d.externalChainId,
+            d.externalBridge,
+            d.externalRedemptionId,
+            d.externalSender,
+            keccak256(bytes(d.externalTxHash)),
+            d.representationToken,
+            d.requestedAt,
+            d.stratoRecipient,
+            d.stratoToken,
+            d.stratoTokenAmount,
+            d.actionToken,
+            d.minFinalOut
+        ));
+    }
+
+    function attestDepositSettlement(string depositId) external {
+        NativeDepositInfo d = deposits[depositId];
+        require(
+            d.bridgeStatus == NativeBridgeStatus.INITIATED ||
+                d.bridgeStatus == NativeBridgeStatus.PENDING_REVIEW,
+            "SNB: bad state"
+        );
+        _recordSettlementAttestation(getDepositSettlementDigest(depositId));
+    }
+
     function confirmDeposit(
         uint256 externalChainId,
         address externalBridge,
         uint256 externalRedemptionId
-    ) external onlyBridgeOperator whenDepositsOpen {
-        require(custodyVault != address(0), "SNB: vault not set");
-
-        string depositId = getDepositId(
-            externalChainId,
-            externalBridge,
-            externalRedemptionId
-        );
-        NativeDepositInfo d = deposits[depositId];
-        require(
-            d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW,
-            "SNB: bad state"
-        );
-
+    ) external onlyBridgeOperator whenDepositsOpen nonReentrantDeposit {
+        NativeDepositInfo d = deposits[getDepositId(externalChainId, externalBridge, externalRedemptionId)];
+        require(d.actionToken == address(0), "SNB: routed confirmation required");
+        _requireConfirmable(d);
+        _requireSettlementAttestations(getDepositSettlementDigest(d.depositId));
         uint256 actualUnlockedAmount = StratoNativeCustodyVault(custodyVault).unlock(
-            d.stratoToken,
-            d.stratoRecipient,
-            d.stratoTokenAmount
+            d.stratoToken, d.stratoRecipient, d.stratoTokenAmount
         );
-        require(actualUnlockedAmount > 0, "SNB: no tokens unlocked");
+        _completeDeposit(d, actualUnlockedAmount);
+    }
 
-        d.bridgeStatus = BridgeStatus.COMPLETED;
-        d.timestamp = block.timestamp;
+    function confirmDepositWithRoute(
+        uint256 externalChainId,
+        address externalBridge,
+        uint256 externalRedemptionId,
+        RouteStep[] steps
+    ) external onlyBridgeOperator whenDepositsOpen nonReentrantDeposit {
+        string depositId = getDepositId(externalChainId, externalBridge, externalRedemptionId);
+        NativeDepositInfo d = deposits[depositId];
+        _requireConfirmable(d);
+        _requireSettlementAttestations(getDepositSettlementDigest(depositId));
+        require(d.actionToken != address(0) && d.minFinalOut > 0, "SNB: no route intent");
+        // Custody failures must revert settlement; only routing failures may fall back.
+        uint256 sourceAmount = StratoNativeCustodyVault(custodyVault).unlock(
+            d.stratoToken, address(this), d.stratoTokenAmount
+        );
+        require(sourceAmount > 0, "SNB: no tokens unlocked");
+        d.bridgeStatus = NativeBridgeStatus.COMPLETED;
+        try _executeDepositRoute(d, sourceAmount, steps) returns (uint256 finalAmount) {
+            emit AutoRouted(d.depositId, d.externalTxHash, d.stratoRecipient,
+                d.stratoToken, sourceAmount, d.actionToken, finalAmount);
+        } catch Error(string reason) {
+            _routeFallback(d, sourceAmount, reason);
+        } catch {
+            _routeFallback(d, sourceAmount, "Unknown token router error");
+        }
+        _completeDeposit(d, sourceAmount);
+    }
 
-        emit NativeDepositCompleted(
-            depositId,
-            externalChainId,
-            externalBridge,
-            externalRedemptionId,
-            d.externalSender,
+    function confirmDepositFallback(
+        uint256 externalChainId,
+        address externalBridge,
+        uint256 externalRedemptionId
+    ) external onlyBridgeOperator whenDepositsOpen nonReentrantDeposit {
+        string depositId = getDepositId(externalChainId, externalBridge, externalRedemptionId);
+        NativeDepositInfo d = deposits[depositId];
+        _requireConfirmable(d);
+        _requireSettlementAttestations(getDepositSettlementDigest(depositId));
+        require(d.actionToken != address(0) && d.minFinalOut > 0, "SNB: no route intent");
+        uint256 actualUnlockedAmount = StratoNativeCustodyVault(custodyVault).unlock(
+            d.stratoToken, d.stratoRecipient, d.stratoTokenAmount
+        );
+        emit DepositActionFailed(
+            d.depositId,
             d.externalTxHash,
-            d.stratoRecipient,
+            d.actionToken,
+            "SNB: route unavailable"
+        );
+        emit DepositActionFallback(
+            d.depositId,
+            d.externalTxHash,
             d.stratoToken,
             actualUnlockedAmount
         );
+        _completeDeposit(d, actualUnlockedAmount);
+    }
+
+    function _executeDepositRoute(NativeDepositInfo d, uint256 sourceAmount, RouteStep[] steps) internal returns (uint256) {
+        require(autoRouteEnabled[d.stratoToken][d.externalChainId], "SNB: auto route disabled");
+        require(tokenRouter != address(0), "SNB: router not set");
+        require(steps.length > 0 && steps.length <= MAX_ROUTE_STEPS, "SNB: route unavailable");
+        require(IERC20(d.stratoToken).approve(tokenRouter, sourceAmount), "SNB: approval failed");
+        RouteStepData[] data = new RouteStepData[](steps.length);
+        for (uint256 i = 0; i < steps.length; i++) {
+            data[i] = RouterTypes.toStepData(steps[i]);
+        }
+        uint256 finalAmount = TokenRouter(tokenRouter).executeRouteWithActions(
+            d.stratoToken, d.actionToken, sourceAmount, d.stratoRecipient, data,
+            block.timestamp + ROUTE_EXECUTION_DEADLINE, d.minFinalOut
+        );
+        require(finalAmount >= d.minFinalOut, "SNB: route under minimum");
+        require(IERC20(d.stratoToken).approve(tokenRouter, 0), "SNB: approval cleanup failed");
+        return finalAmount;
+    }
+
+    function _routeFallback(NativeDepositInfo d, uint256 amount, string reason) internal {
+        emit DepositActionFailed(d.depositId, d.externalTxHash, d.actionToken, reason);
+        uint256 beforeBalance = IERC20(d.stratoToken).balanceOf(d.stratoRecipient);
+        require(IERC20(d.stratoToken).transfer(d.stratoRecipient, amount), "SNB: fallback transfer failed");
+        uint256 received = IERC20(d.stratoToken).balanceOf(d.stratoRecipient) - beforeBalance;
+        require(received > 0, "SNB: empty fallback");
+        emit DepositActionFallback(d.depositId, d.externalTxHash, d.stratoToken, received);
+    }
+
+    function _requireConfirmable(NativeDepositInfo d) internal {
+        require(custodyVault != address(0), "SNB: vault not set");
+        require(d.bridgeStatus == NativeBridgeStatus.INITIATED || d.bridgeStatus == NativeBridgeStatus.PENDING_REVIEW, "SNB: bad state");
+    }
+
+    function _completeDeposit(NativeDepositInfo d, uint256 amount) internal {
+        require(amount > 0, "SNB: no tokens unlocked");
+        d.bridgeStatus = NativeBridgeStatus.COMPLETED;
+        d.timestamp = block.timestamp;
+        emit NativeDepositCompleted(d.depositId, d.externalChainId, d.externalBridge,
+            d.externalRedemptionId, d.externalSender, d.externalTxHash, d.stratoRecipient,
+            d.stratoToken, amount);
+    }
+
+    function rejectDepositNoFunds(string depositId) external onlyOwner {
+        NativeDepositInfo d = deposits[depositId];
+        require(d.bridgeStatus == NativeBridgeStatus.PENDING_REVIEW || d.bridgeStatus == NativeBridgeStatus.ABORTED, "SNB: not reviewable");
+        d.bridgeStatus = NativeBridgeStatus.REJECTED_NO_FUNDS;
+        d.timestamp = block.timestamp;
+        emit NativeDepositRejectedNoFunds(depositId);
+    }
+
+    function reopenDeposit(string depositId) external onlyOwner {
+        NativeDepositInfo d = deposits[depositId];
+        require(d.bridgeStatus == NativeBridgeStatus.ABORTED, "SNB: not rejected");
+        d.bridgeStatus = NativeBridgeStatus.PENDING_REVIEW;
+        d.timestamp = block.timestamp;
+        emit NativeDepositReopened(depositId);
+    }
+
+    function requestDepositRefund(string depositId) external onlyOwner {
+        NativeDepositInfo d = deposits[depositId];
+        require(d.bridgeStatus == NativeBridgeStatus.INITIATED || d.bridgeStatus == NativeBridgeStatus.PENDING_REVIEW ||
+            d.bridgeStatus == NativeBridgeStatus.ABORTED, "SNB: not refundable");
+        d.bridgeStatus = NativeBridgeStatus.REFUND_PENDING;
+        d.timestamp = block.timestamp;
+        emit NativeDepositRefundRequested(depositId);
+    }
+
+    function recordDepositRefundEvidence(string depositId, string refundTxHash) external onlyBridgeOperator {
+        require(deposits[depositId].bridgeStatus == NativeBridgeStatus.REFUND_PENDING, "SNB: not refund pending");
+        require(refundTxHash.length > 0, "SNB: empty refund hash");
+        depositRefundEvidence[depositId] = refundTxHash.normalizeHex();
+        emit NativeDepositRefundEvidence(depositId, refundTxHash.normalizeHex());
+    }
+
+    function getDepositRefundDigest(
+        string depositId,
+        string refundTxHash
+    ) public returns (bytes32) {
+        NativeDepositInfo d = deposits[depositId];
+        return keccak256(abi.encode(
+            keccak256("SNB_DEPOSIT_REFUND_V1"),
+            block.chainid,
+            address(this),
+            settlementVerifierSetVersion,
+            depositId,
+            d.externalChainId,
+            d.externalBridge,
+            d.externalRedemptionId,
+            d.representationToken,
+            d.externalSender,
+            d.stratoToken,
+            d.stratoTokenAmount,
+            refundTxHash.normalizeHex()
+        ));
+    }
+
+    function attestDepositRefund(string depositId, string refundTxHash) external {
+        require(
+            deposits[depositId].bridgeStatus == NativeBridgeStatus.REFUND_PENDING,
+            "SNB: not refund pending"
+        );
+        require(refundTxHash.length > 0, "SNB: empty refund hash");
+        require(
+            depositRefundEvidence[depositId] == refundTxHash.normalizeHex(),
+            "SNB: refund evidence changed"
+        );
+        _recordSettlementAttestation(
+            getDepositRefundDigest(depositId, refundTxHash)
+        );
+    }
+
+    function finalizeDepositRefund(string depositId, string refundTxHash) external {
+        NativeDepositInfo d = deposits[depositId];
+        require(d.bridgeStatus == NativeBridgeStatus.REFUND_PENDING, "SNB: not refund pending");
+        require(refundTxHash.length > 0, "SNB: empty refund hash");
+        require(depositRefundEvidence[depositId] == refundTxHash.normalizeHex(), "SNB: refund evidence changed");
+        _requireSettlementAttestations(
+            getDepositRefundDigest(depositId, refundTxHash)
+        );
+        d.bridgeStatus = NativeBridgeStatus.REFUNDED;
+        d.timestamp = block.timestamp;
+        depositRefundTransactions[depositId] = refundTxHash.normalizeHex();
+        // Restoring the external representation keeps the original STRATO custody locked.
+        emit NativeDepositRefunded(depositId, refundTxHash.normalizeHex());
+    }
+
+    function _requireSettlementAttestations(bytes32 digest) internal {
+        require(
+            settlementVerifierThreshold > 1,
+            "SNB: verifier threshold not set"
+        );
+        require(
+            settlementAttestationCounts[digest] >= settlementVerifierThreshold,
+            "SNB: insufficient verifier attestations"
+        );
+    }
+
+    function _recordSettlementAttestation(bytes32 digest) internal {
+        require(settlementVerifiers[msg.sender], "SNB: not settlement verifier");
+        if (settlementAttestations[digest][msg.sender]) {
+            return;
+        }
+        settlementAttestations[digest][msg.sender] = true;
+        uint8 count = settlementAttestationCounts[digest] + 1;
+        settlementAttestationCounts[digest] = count;
+        emit SettlementAttested(digest, msg.sender, count);
+    }
+
+    function recordDepositRefundProposal(string depositId, string proposalHash) external onlyBridgeOperator {
+        require(deposits[depositId].bridgeStatus == NativeBridgeStatus.REFUND_PENDING, "SNB: not refund pending");
+        require(proposalHash.length > 0, "SNB: empty proposal hash");
+        depositRefundProposals[depositId] = proposalHash.normalizeHex();
+        emit NativeDepositRefundProposal(depositId, proposalHash.normalizeHex());
     }
 
     function abortDeposit(
@@ -737,11 +1235,11 @@ contract record StratoNativeBridge is Ownable {
         );
         NativeDepositInfo d = deposits[depositId];
         require(
-            d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW,
+            d.bridgeStatus == NativeBridgeStatus.INITIATED || d.bridgeStatus == NativeBridgeStatus.PENDING_REVIEW,
             "SNB: bad state"
         );
 
-        d.bridgeStatus = BridgeStatus.ABORTED;
+        d.bridgeStatus = NativeBridgeStatus.ABORTED;
         d.timestamp = block.timestamp;
 
         emit NativeDepositAborted(

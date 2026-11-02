@@ -13,6 +13,7 @@ import { capture, identifyUser, resetUser } from "@/lib/analytics";
 import { ensureStratoChainInWallet } from "@/lib/stratoChain";
 import { clearExternalWalletActive } from "@/lib/stratoWallet";
 import { ensureHexPrefix } from "@/utils/numberUtils";
+import type { AdminGovernanceVoteResult } from "@strato/shared-types";
 
 interface UserContextType {
   userAddress: string | null;
@@ -43,7 +44,7 @@ interface UserContextType {
   contractDetailsResults: object;
   contractDetailsResultsLoading: boolean;
   getContractDetails: (address: string) => Promise<void>;
-  castVoteOnIssue: (target: string, func: string, args: string[]) => Promise<void>;
+  castVoteOnIssue: (target: string, func: string, args: string[], requireGovernance?: boolean) => Promise<AdminGovernanceVoteResult>;
   castVoteOnIssueById: (issueId: string) => Promise<void>;
   dismissIssue: (issueId: string) => Promise<void>;
   addAdmin: (userAddress: string) => Promise<void>;
@@ -205,12 +206,18 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const castVoteOnIssue = async (target: string, func: string, args: any[]) => {
+  const castVoteOnIssue = async (target: string, func: string, args: any[], requireGovernance = false): Promise<AdminGovernanceVoteResult> => {
     try {
-      await api.post('/user/admin/vote', { target, func, args }, { walletAuth: false } as any);
+      const { data } = await api.post<AdminGovernanceVoteResult>(
+        '/user/admin/vote', { target, func, args, requireGovernance }, { walletAuth: false } as any,
+      );
+      if (requireGovernance && (data.status !== 'Success' || !data.governed || !data.issueId)) {
+        throw new Error(data.message || `Governance vote ${data.hash || ''} was not recorded`);
+      }
       await getOpenIssues();
       // Show the recently executed issue
       await getExecutedIssues(1, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
+      return data;
     } catch (error) {
       await getOpenIssues();
       throw error;

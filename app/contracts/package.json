@@ -5,15 +5,17 @@
     "main": "deploy/deploy.js",
     "scripts": {
         "configure:native-route": "node deploy/configure-native-route.js",
+        "configure:external-bridge": "node deploy/configure-external-bridge.js",
         "configure:hype-yield-vault": "node deploy/configure-hype-yield-vault.js",
         "deploy": "node deploy/deploy.js",
         "deployProxy": "node deploy/deployProxy.js",
         "happy:eth-deposit": "node deploy/happy-eth-deposit.js",
         "happy:eth-withdrawal": "node deploy/happy-eth-withdrawal.js",
-        "happy:native-redemption": "node deploy/happy-native-redemption.js",
-        "happy:native-withdrawal": "node deploy/happy-native-withdrawal.js",
-        "initialize:native-bridge": "node deploy/initialize-native-bridge.js",
-        "smoke:native-bridge": "node deploy/smoke-native-bridge.js",
+        "happy:native-redemption": "node deploy/archive/happy-native-redemption.js",
+        "happy:native-withdrawal": "node deploy/archive/happy-native-withdrawal.js",
+        "initialize:native-bridge": "node deploy/archive/initialize-native-bridge.js",
+        "refund:external-withdrawal": "node deploy/refund-external-withdrawal.js",
+        "smoke:native-bridge": "node deploy/archive/smoke-native-bridge.js",
         "upgrade": "node deploy/upgrade.js",
         "upgrade:poolv3-nft": "node deploy/upgrade-poolv3-nft.js",
         "upgrade:stablepools": "node deploy/upgrade-stablepools.js",
@@ -23,7 +25,10 @@
         "bridge:ops": "node deploy/bridge-usdc-route-migration.js",
         "bridge:ops:testnet": "node deploy/bridge-usdc-route-migration.js --env testnet",
         "bridge:ops:prod": "node deploy/bridge-usdc-route-migration.js --env prod",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "test:external-withdrawal-refund": "node --test deploy/refund-external-withdrawal.test.js",
+        "test:external-bridge-config": "node --test deploy/configure-external-bridge.test.js",
+        "test:native-route-config": "node --test deploy/configure-native-route.test.js"
     },
     "dependencies": {
         "@openzeppelin/contracts": "^5.4.0",

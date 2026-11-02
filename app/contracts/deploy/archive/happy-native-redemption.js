@@ -13,7 +13,7 @@ const path = require("path");
 require("dotenv").config({
   path:
     process.env.HAPPY_NATIVE_REDEMPTION_ENV_FILE ||
-    path.resolve(__dirname, "../.env.happy-native-redemption"),
+    path.resolve(__dirname, "../../.env.happy-native-redemption"),
 });
 
 const axios = require("axios");

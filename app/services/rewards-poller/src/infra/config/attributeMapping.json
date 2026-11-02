@@ -39,7 +39,8 @@
   },
   "0000000000000000000000000000000000001017": {
     "Swap": {
-      "amount": "amountIn"
+      "amount": "amountIn",
+      "user": "sender"
     }
   },
   "0000000000000000000000000000000000001018": {
@@ -52,7 +53,8 @@
   },
   "0000000000000000000000000000000000001019": {
     "Swap": {
-      "amount": "amountIn"
+      "amount": "amountIn",
+      "user": "sender"
     }
   },
   "000000000000000000000000000000000000101a": {
@@ -65,7 +67,8 @@
   },
   "000000000000000000000000000000000000101b": {
     "Swap": {
-      "amount": "amountIn"
+      "amount": "amountIn",
+      "user": "sender"
     }
   },
   "000000000000000000000000000000000000101c": {
@@ -78,7 +81,8 @@
   },
   "000000000000000000000000000000000000101d": {
     "Swap": {
-      "amount": "amountIn"
+      "amount": "amountIn",
+      "user": "sender"
     }
   },
   "000000000000000000000000000000000000101e": {
@@ -91,7 +95,8 @@
   },
   "cb85e12ca5d98de95715fc75ae251a66b662ea06": {
     "Swap": {
-      "amount": "amountIn"
+      "amount": "amountIn",
+      "user": "sender"
     }
   },
   "ac621a150f49198036f84ffe90b4f2286b623583": {
@@ -104,7 +109,8 @@
   },
   "34d7caf576cf9493f054d9eced99dcd463eba4b7": {
     "Swap": {
-      "amount": "amountIn"
+      "amount": "amountIn",
+      "user": "sender"
     }
   },
   "69010124cdaa64286f6e413267a7001ea9379df4": {
@@ -117,7 +123,8 @@
   },
   "72f029994b1003447b4fcae5025ae78fcbec258e": {
     "Swap": {
-      "amount": "amountIn"
+      "amount": "amountIn",
+      "user": "sender"
     }
   },
   "2e99b16c78474c437c7003c814ca79a3ba50e5d8": {

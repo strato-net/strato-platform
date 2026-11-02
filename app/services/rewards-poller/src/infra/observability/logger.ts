@@ -43,6 +43,12 @@ const write = async (data: object, isError: boolean) => {
   }
 };
 
+export const logDebug = (context: string, message: string, data?: any) => {
+  if (process.env.LOG_LEVEL !== "debug") return;
+  void write({ ts: new Date().toISOString(), level: "debug", context, msg: redact(message), data: redact(data) }, false)
+    .catch(err => console.error("Failed to write debug log", err));
+};
+
 export const logInfo = (context: string, message: string, data?: any) =>
   write(
     {
