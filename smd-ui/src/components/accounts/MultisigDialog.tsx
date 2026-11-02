@@ -50,7 +50,6 @@ import { SimulateButton } from "@/components/simulation/SimulateButton";
 import { SimulationResultPanel } from "@/components/simulation/SimulationResultPanel";
 import type { UserWallet } from "@/services/userWallets";
 import {
-  useAdminRegistryLogic,
   useIsMultisig,
   useSigners,
   useVotingThresholds,
@@ -62,7 +61,6 @@ import {
   multisigDisplayName,
   votesNeeded,
   strip0x,
-  isZeroAddr,
   type OpenIssue,
 } from "@/services/multisig";
 
@@ -286,18 +284,17 @@ function EnablePanel({
   partiallyEnabled: boolean;
 }) {
   const { userAddress } = useUser();
-  const { canSubmit } = useSubmitTransaction();
+  const { canSubmit, isAppAuthenticated } = useSubmitTransaction();
   const queryClient = useQueryClient();
-  const { logic: adminLogic, isLoading: logicLoading } = useAdminRegistryLogic();
   const { config, selfOwned, initialized } = useIsMultisig(wallet.address);
-  const { enableMultisig } = useMultisigActions({ walletAddress: wallet.address });
+  const { ensureMultisigLogic, enableMultisig } = useMultisigActions({ walletAddress: wallet.address });
 
   const me = strip0x(userAddress ?? "");
   const [extra, setExtra] = useState<{ text: string; addr: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState("");
 
-  const logicSet = !isZeroAddr(config.logicContract) && eq(config.logicContract, adminLogic);
+  const logicSet = config.runsMultisigLogic;
 
   const run = async () => {
     if (!me) {
@@ -314,7 +311,10 @@ function EnablePanel({
     const signers = [me, ...extra.map((e) => e.addr).filter(Boolean)];
     setBusy(true);
     try {
-      await enableMultisig(adminLogic, signers, { logicSet, initialized, selfOwned });
+      const logic = logicSet
+        ? config.logicContract
+        : await ensureMultisigLogic(isAppAuthenticated ? undefined : wallet.username);
+      await enableMultisig(logic, signers, { logicSet, initialized, selfOwned });
       queryClient.invalidateQueries({ queryKey: ["multisig-config", wallet.address] });
       queryClient.invalidateQueries({ queryKey: ["multisig-signers", wallet.address] });
       toast.success("Multisig enabled", {
@@ -335,8 +335,8 @@ function EnablePanel({
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Finish enabling</AlertTitle>
           <AlertDescription>
-            This wallet already delegates to the AdminRegistry logic but isn't fully locked
-            yet. Running the remaining steps below will complete setup.
+            This wallet already delegates to multisig logic but isn't fully locked yet.
+            Running the remaining steps below will complete setup.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -345,7 +345,8 @@ function EnablePanel({
         <p>Enabling multisig runs up to three transactions on this wallet:</p>
         <ol className="ml-4 list-decimal space-y-1">
           <li className={logicSet ? "line-through" : ""}>
-            Point the wallet's logic contract at the AdminRegistry governance logic.
+            Point the wallet's logic contract at the Multisig logic (deployed first if this
+            network doesn't have it yet).
           </li>
           <li className={initialized ? "line-through" : ""}>Set the initial signer(s).</li>
           <li className={selfOwned ? "line-through" : ""}>
@@ -413,7 +414,7 @@ function EnablePanel({
 
       <Button
         onClick={run}
-        disabled={busy || logicLoading || !canSubmit || !me}
+        disabled={busy || !canSubmit || !me}
         className="w-full"
       >
         {busy ? step || "Working…" : partiallyEnabled ? "Finish enabling" : "Enable multisig"}
@@ -438,6 +439,7 @@ function EnabledView({ wallet, route }: { wallet: UserWallet; route?: UserWallet
   );
   return (
     <>
+      <UpgradeLogicPanel wallet={wallet} fullRoute={fullRoute} />
       <MemberOfPanel fullRoute={fullRoute} />
       <Tabs defaultValue={fullRoute.length > 1 ? "issues" : "treasury"} className="mt-1">
       <TabsList className="grid w-full grid-cols-4">
@@ -460,6 +462,59 @@ function EnabledView({ wallet, route }: { wallet: UserWallet; route?: UserWallet
       </TabsContent>
       </Tabs>
     </>
+  );
+}
+
+/**
+ * User wallets enabled before the Multisig logic existed run the AdminRegistry logic,
+ * which keeps counting votes from replaced signers and lets whitelisted accounts act
+ * without a vote. Offer their signers a vote to switch; signers, threshold and funds
+ * stay. Registries without a username (the global 0x100c) keep their logic.
+ */
+function UpgradeLogicPanel({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserWallet[] }) {
+  const { userAddress } = useUser();
+  const { canSubmit } = useSubmitTransaction();
+  const queryClient = useQueryClient();
+  const { config, isLoading } = useIsMultisig(wallet.address);
+  const { data: signers = [] } = useSigners(wallet.address);
+  const { ensureMultisigLogic, castVote } = useMultisigActions({
+    walletAddress: wallet.address,
+    route: fullRoute.map((w) => w.address),
+  });
+  const [busy, setBusy] = useState(false);
+  const canVote = fullRoute.length > 1 || signers.some((s) => eq(s, userAddress ?? ""));
+  if (!wallet.username || isLoading || config.runsMultisigLogic || !canVote) return null;
+
+  const propose = async () => {
+    setBusy(true);
+    try {
+      await castVote("setLogicContract", [await ensureMultisigLogic()]);
+      queryClient.invalidateQueries({ queryKey: ["multisig-open-issues", wallet.address] });
+      toast.success("Upgrade proposed", {
+        description: "It runs once enough signers vote for it under Issues.",
+      });
+    } catch (err: any) {
+      toast.error("Upgrade proposal failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Alert className="mb-3">
+      <AlertTriangle className="h-4 w-4" />
+      <AlertTitle>Older multisig logic</AlertTitle>
+      <AlertDescription className="space-y-2">
+        <p>
+          This wallet runs the AdminRegistry logic, which keeps counting votes from signers who
+          have since been replaced and lets whitelisted accounts act without a vote. Switching
+          to the Multisig logic keeps its signers, threshold and funds.
+        </p>
+        <Button size="sm" onClick={propose} disabled={busy || !canSubmit}>
+          {busy ? "Proposing…" : "Propose upgrade"}
+        </Button>
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -902,16 +957,21 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
         <div className="space-y-3">
           {issues.map((issue) => {
         const label = labelForIssue(issue, tokenMeta, signers.length);
-        const count = issue.voters.length;
-        const needed = votesNeeded(signers.length,
-          thresholds[`${issue.target}|${issue.func}`] || config.defaultThresholdBps || 6000);
+        const count = issue.invalidated ? 0 : issue.voters.length;
+        // The Multisig logic has one threshold, except that handing the wallet to a new
+        // owner takes every signer
+        const bps = (!config.runsMultisigLogic && thresholds[`${issue.target}|${issue.func}`]) ||
+          config.defaultThresholdBps || 6000;
+        const unanimous = config.runsMultisigLogic && issue.func === "transferOwnership" &&
+          eq(issue.target, wallet.address);
+        const needed = unanimous ? signers.length : votesNeeded(signers.length, bps);
         const remaining = Math.max(0, needed - count);
-        const iVoted = issue.voters.some((v) => eq(v, voterAddr));
+        const iVoted = !issue.invalidated && issue.voters.some((v) => eq(v, voterAddr));
         const pct = needed > 0 ? Math.min(100, (count / needed) * 100) : 0;
         // Mirrors the contract's dismissIssue gate: a single vote, cast by the caller.
-        const canDismiss = count === 1 && eq(issue.voters[0], me);
+        const canDismiss = issue.voters.length === 1 && eq(issue.voters[0], me);
         const dismissHint =
-          count !== 1
+          issue.voters.length !== 1
             ? "Only issues with a single vote can be dismissed"
             : !canDismiss
               ? "Only the proposer can dismiss this issue"
@@ -982,6 +1042,12 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
               </div>
               {issue.indexing ? (
                 <p className="mt-1 text-xs text-muted-foreground">Proposal confirmed; syncing the issue list.</p>
+              ) : null}
+              {issue.invalidated ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Invalidated by a signer or threshold change: earlier votes no longer count.
+                  Voting starts it again.
+                </p>
               ) : null}
             </div>
             {simFor === issue.issueId ? (
