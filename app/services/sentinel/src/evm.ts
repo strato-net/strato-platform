@@ -1,16 +1,21 @@
 import { Interface, JsonRpcProvider, Log, LogDescription, ZeroHash, id } from "ethers";
-import { Config, Severity, normalize } from "./config";
-import { Alert } from "./rules";
+import { CATCH_UP_MS, CHAIN_NAMES, Config, Severity, normalize } from "./config";
+import { Alert, brief, short, units } from "./rules";
 import { cirrus } from "./strato";
 import { notify } from "./notify";
 import { StateStore } from "./state";
 
 const log = (msg: string) => console.log(`${new Date().toISOString()} [evm] ${msg}`);
 
-/** StratoNativeRepresentationBridge + its OpenZeppelin AccessControl / UUPS / Pausable bases */
+/** StratoNativeRepresentationBridge + its OpenZeppelin AccessControl / UUPS / Pausable bases.
+ *  The routed-redemption, redemption-refund and mint-cancel events come from the newer bridge
+ *  version (feature/extassetbridge) already deployed on testnet. */
 export const iface = new Interface([
   "event RepresentationMinted(uint256 sourceChainId, address indexed sourceBridge, uint256 indexed sourceWithdrawalId, address indexed stratoToken, address representationToken, address recipient, uint256 amount, bytes32 mintId)",
   "event RedemptionRequested(address indexed representationToken, uint256 amount, address indexed sender, address indexed stratoRecipient, uint96 redemptionId)",
+  "event RedemptionRequestedWithRoute(address indexed representationToken, uint256 amount, address indexed sender, address indexed stratoRecipient, uint96 redemptionId, address actionToken, uint256 minFinalOut)",
+  "event RedemptionRefunded(uint256 indexed redemptionId, address indexed representationToken, address indexed recipient, uint256 amount)",
+  "event NativeMintCanceled(bytes32 indexed mintId, uint256 sourceChainId, address sourceBridge, uint256 sourceWithdrawalId)",
   "event TokenMappingRegistered(address indexed stratoToken, address indexed representationToken, bool frozen)",
   "event TokenMappingDisabled(address indexed stratoToken, address indexed representationToken)",
   "event TokenMappingEnabled(address indexed stratoToken, address indexed representationToken)",
@@ -33,6 +38,9 @@ export const iface = new Interface([
 const SEVERITY: Record<string, Severity | null> = {
   RepresentationMinted: null, // checked against STRATO below
   RedemptionRequested: null, // normal user flow
+  RedemptionRequestedWithRoute: null, // normal user flow
+  RedemptionRefunded: null, // checked against STRATO below
+  NativeMintCanceled: "high",
   RoleGranted: "critical",
   RoleRevoked: "critical",
   RoleAdminChanged: "critical",
@@ -51,13 +59,11 @@ const ROLE_NAMES: Record<string, string> = Object.fromEntries([
 ]);
 
 const argsOf = (d: LogDescription) =>
-  JSON.stringify(
-    Object.fromEntries(
-      d.fragment.inputs.map((input, i) => {
-        const v = String(d.args[i]);
-        return [input.name, input.type === "bytes32" ? ROLE_NAMES[v] || v : v];
-      })
-    )
+  Object.fromEntries(
+    d.fragment.inputs.map((input, i) => {
+      const v = String(d.args[i]);
+      return [input.name, input.type === "bytes32" ? ROLE_NAMES[v] || v : v];
+    })
   );
 
 /** A representation mint must mirror a non-aborted STRATO withdrawal field for field. */
@@ -78,6 +84,19 @@ async function checkMint(cfg: Config, chainId: string, l: Log, d: LogDescription
   if (String(w.externalTokenAmount) !== d.args.amount.toString()) problems.push(`amount differs (STRATO ${w.externalTokenAmount})`);
   if (String(w.bridgeStatus) === "4") problems.push("STRATO withdrawal was aborted and refunded");
   return problems;
+}
+
+/** A refund re-mints a redemption the STRATO side never credited; if STRATO did credit it, the user is paid twice. */
+async function refundDoubleSpent(cfg: Config, chainId: string, d: LogDescription): Promise<boolean> {
+  const [deposit] = await cirrus(cfg, "/event", {
+    address: `eq.${cfg.stratoNativeBridge}`,
+    event_name: "eq.NativeDepositCompleted",
+    "attributes->>externalChainId": `eq.${chainId}`,
+    "attributes->>externalRedemptionId": `eq.${d.args.redemptionId}`,
+    limit: 1,
+    select: "id",
+  });
+  return !!deposit;
 }
 
 const providers = new Map<string, JsonRpcProvider>();
@@ -103,28 +122,48 @@ export async function scanEvm(cfg: Config, store: StateStore): Promise<void> {
     }
 
     if (blocks[chain.chainId] >= head) log(`chain ${chain.chainId}: no new blocks after ${blocks[chain.chainId]}`);
-    while (blocks[chain.chainId] < head) {
+    const name = CHAIN_NAMES[chain.chainId] || `chain ${chain.chainId}`;
+    const deadline = Date.now() + CATCH_UP_MS;
+    while (blocks[chain.chainId] < head && Date.now() < deadline) {
       const from = blocks[chain.chainId] + 1;
       const to = Math.min(head, from + cfg.evmLogChunk - 1);
       const logs = await provider.getLogs({ address: chain.bridges.map((b) => `0x${b}`), fromBlock: from, toBlock: to });
 
       const alerts: Alert[] = [];
       for (const l of logs) {
-        const base = { chain: chain.chainId, contract: l.address, block: l.blockNumber, tx: l.transactionHash };
+        const base = { chain: name, contract: l.address, block: l.blockNumber, tx: l.transactionHash };
         const d = iface.parseLog(l);
         if (!d) {
-          alerts.push({ severity: "high", title: "Unrecognized event on bridge contract", fields: { ...base, topic: l.topics[0] } });
+          alerts.push({ severity: "high", title: `Unrecognized event on ${name} bridge ${short(l.address)}`, fields: { ...base, topic: l.topics[0] } });
           continue;
         }
-        const fields = { ...base, event: d.name, args: argsOf(d) };
+        const args = argsOf(d);
+        const fields = { ...base, event: d.name, args: JSON.stringify(args) };
         if (d.name === "RepresentationMinted") {
           const problems = await checkMint(cfg, chain.chainId, l, d);
           if (problems.length)
-            alerts.push({ severity: "critical", title: "Bridge mint without a matching STRATO withdrawal", fields: { ...fields, problems: problems.join("; ") } });
+            alerts.push({
+              severity: "critical",
+              title:
+                `Bridge mint of ${units(d.args.amount)} on ${name} to ${short(d.args.recipient)} without a matching ` +
+                `STRATO withdrawal #${d.args.sourceWithdrawalId}: ${problems.join("; ")}`,
+              fields,
+            });
+          continue;
+        }
+        if (d.name === "RedemptionRefunded") {
+          if (await refundDoubleSpent(cfg, chain.chainId, d))
+            alerts.push({
+              severity: "critical",
+              title:
+                `Redemption #${d.args.redemptionId} refunded on ${name} (${units(d.args.amount)} to ${short(d.args.recipient)}) ` +
+                `although STRATO already completed its deposit`,
+              fields,
+            });
           continue;
         }
         const severity = d.name in SEVERITY ? SEVERITY[d.name] : "high";
-        if (severity) alerts.push({ severity, title: `Bridge ${d.name} on chain ${chain.chainId}`, fields });
+        if (severity) alerts.push({ severity, title: `${d.name} on ${name} bridge ${short(l.address)}: ${brief(args)}`, fields });
       }
 
       await notify(cfg, alerts);

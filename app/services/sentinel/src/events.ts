@@ -1,6 +1,6 @@
 import { ADMIN_REGISTRY, Config, MERCATA_BRIDGE, isZeroAddress } from "./config";
-import { Alert, CirrusEvent, MINT_CAP_EVENTS, evaluate, eventFields } from "./rules";
-import { cirrus, chunk } from "./strato";
+import { Alert, CirrusEvent, MINT_CAP_EVENTS, contractLabel, evaluate, eventFields, short, units } from "./rules";
+import { cirrus, chunk, stratoApi } from "./strato";
 import { bridgeFilter, checkBridge } from "./bridge";
 import { notify } from "./notify";
 import { StateStore } from "./state";
@@ -8,7 +8,7 @@ import { StateStore } from "./state";
 const log = (msg: string) => console.log(`${new Date().toISOString()} [events] ${msg}`);
 
 const SELECT =
-  "id,address,event_name,attributes,block_number,block_timestamp,transaction_hash,transaction_sender";
+  "id,address,contract_name,event_name,attributes,block_number,block_timestamp,transaction_hash,transaction_sender";
 const ZERO = "(0,0000000000000000000000000000000000000000)";
 
 /** only the events the rules look at — ownership, AdminRegistry, mints, mint caps, and bridge flows */
@@ -20,48 +20,60 @@ const filter = (cfg: Config) =>
 const txKey = (hash: string, address: string) => `${hash}:${address}`;
 const unique = (xs: string[]) => [...new Set(xs)];
 
-/** (tx, contract) pairs where the contract got its first owner — i.e. was deployed — in that tx */
+/** (tx, contract) pairs where the contract was deployed in that tx — factories and UserRegistry
+ *  deploy a contract and hand its ownership on in the same tx */
 async function deployedInTx(cfg: Config, events: CirrusEvent[]): Promise<Set<string>> {
   const born = new Set<string>();
-  for (const part of chunk(unique(events.map((e) => e.transaction_hash)), 50)) {
-    const rows = await cirrus(cfg, "/event", {
-      event_name: "eq.OwnershipTransferred",
-      "attributes->>previousOwner": `in.${ZERO}`,
-      transaction_hash: `in.(${part.join(",")})`,
-      select: "transaction_hash,address",
-    });
-    for (const r of rows) born.add(txKey(r.transaction_hash, r.address));
+  for (const part of chunk(unique(events.map((e) => e.transaction_hash)), 250)) {
+    const results: Record<string, { contractsCreated?: string[] }[]> = await stratoApi(cfg, "/transactionResult/batch", part);
+    for (const [hash, [r]] of Object.entries(results))
+      for (const address of r?.contractsCreated || []) born.add(txKey(hash, address));
   }
   return born;
 }
 
-/** An owner change outside deployment re-assigns a live contract — the exploit pattern. */
+/** An owner change outside deployment re-assigns a live contract — the exploit pattern.
+ *  previousOwner == newOwner is a no-op (seen in deployment helpers) and is skipped. */
 async function checkOwnership(cfg: Config, events: CirrusEvent[]): Promise<Alert[]> {
   const changes = events.filter(
-    (e) => e.event_name === "OwnershipTransferred" && !isZeroAddress(e.attributes.previousOwner)
+    (e) =>
+      e.event_name === "OwnershipTransferred" &&
+      !isZeroAddress(e.attributes.previousOwner) &&
+      e.attributes.previousOwner !== e.attributes.newOwner
   );
   if (changes.length === 0) return [];
   const born = await deployedInTx(cfg, changes);
   return changes
     .filter((e) => !born.has(txKey(e.transaction_hash, e.address)))
-    .map((e) => ({ severity: "critical", title: "Owner changed on an existing contract", fields: eventFields(e) }));
+    .map((e) => ({
+      severity: "critical",
+      title:
+        `Owner of ${contractLabel(e)} changed from ${short(e.attributes.previousOwner)} to ` +
+        `${short(e.attributes.newOwner)} (tx sender ${short(e.transaction_sender)})`,
+      fields: eventFields(e),
+    }));
 }
 
 /** Token and Voucher mint is onlyOwner; with AdminRegistry as owner every mint must come
- *  through an IssueExecuted(mint) in the same tx. ERC721 mints (tokenId) are public and skipped. */
+ *  through an IssueExecuted(mint) in the same tx. ERC721 mints (tokenId) are public and skipped,
+ *  as are zero-amount mints. */
 async function checkMints(cfg: Config, events: CirrusEvent[]): Promise<Alert[]> {
-  const mints = events.filter((e) => e.event_name === "Transfer" && e.attributes.value !== undefined);
+  const mints = events.filter((e) => e.event_name === "Transfer" && Number(e.attributes.value) > 0);
   if (mints.length === 0) return [];
 
   const supply = new Map<string, number>();
+  const symbols = new Map<string, string>();
   for (const table of ["BlockApps-Token", "BlockApps-Voucher"]) {
     for (const part of chunk(unique(mints.map((e) => e.address)), 50)) {
       const rows = await cirrus(cfg, `/${table}`, {
         address: `in.(${part.join(",")})`,
         _owner: `eq.${ADMIN_REGISTRY}`,
-        select: "address,_totalSupply",
+        select: "address,_totalSupply,_symbol",
       });
-      for (const r of rows) supply.set(r.address, Number(r._totalSupply));
+      for (const r of rows) {
+        supply.set(r.address, Number(r._totalSupply));
+        symbols.set(r.address, r._symbol);
+      }
     }
   }
   const governed = mints.filter((e) => supply.has(e.address));
@@ -85,13 +97,18 @@ async function checkMints(cfg: Config, events: CirrusEvent[]): Promise<Alert[]> 
   for (const e of governed) {
     const key = txKey(e.transaction_hash, e.address);
     if (born.has(key)) continue;
+    const minted = `${units(e.attributes.value)} ${symbols.get(e.address) || short(e.address)} to ${short(e.attributes.to)}`;
     if (!approved.has(key)) {
-      alerts.push({ severity: "critical", title: "Mint without a governance call", fields: eventFields(e) });
+      alerts.push({
+        severity: "critical",
+        title: `Mint of ${minted} without a governance vote (tx sender ${short(e.transaction_sender)})`,
+        fields: eventFields(e),
+      });
       continue;
     }
     const pct = (Number(e.attributes.value) / supply.get(e.address)!) * 100;
     if (pct >= cfg.mintAlertPct)
-      alerts.push({ severity: "high", title: `Large mint: ${pct.toFixed(1)}% of supply`, fields: eventFields(e) });
+      alerts.push({ severity: "high", title: `Large governance mint of ${minted}: ${pct.toFixed(1)}% of supply`, fields: eventFields(e) });
   }
   return alerts;
 }

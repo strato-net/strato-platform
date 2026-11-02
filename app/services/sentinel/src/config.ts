@@ -11,6 +11,19 @@ export const MERCATA_BRIDGE = "0000000000000000000000000000000000001008";
 /** default price oracle system contract */
 export const PRICE_ORACLE = "0000000000000000000000000000000000001002";
 
+/** Block-range watchers stop catching up after this long so one long backlog never
+ *  delays the event scan; they continue from their cursor next cycle. */
+export const CATCH_UP_MS = 20_000;
+
+/** names shown in alerts for the external chains the bridges serve */
+export const CHAIN_NAMES: Record<string, string> = {
+  "1": "Ethereum",
+  "8453": "Base",
+  "11155111": "Sepolia",
+  "84532": "Base Sepolia",
+  "46630": "Robinhood Testnet",
+};
+
 /** Cirrus writes the zero address as either "0" or 40 zeros */
 export const isZeroAddress = (a?: string) => /^0+$/.test(a || "0");
 
@@ -27,6 +40,8 @@ export interface Config {
   mintAlertPct: number;
   /** failed transactions from one sender within one cycle that raise a high alert */
   failBurst: number;
+  /** automation accounts whose retries never count as a failure burst (KNOWN_EXECUTORS are included) */
+  failBurstIgnore: Set<string>;
   proxySnapshotSeconds: number;
   /** a governed token's supply growing by at least this % between snapshots raises a high alert */
   supplyJumpPct: number;
@@ -91,6 +106,12 @@ export function loadConfig(): Config {
     rpcUrl: required(`CHAIN_${chainId}_RPC_URL`),
     bridges: bridges.map((b) => address("EVM_BRIDGES", b)),
   }));
+  // FAIL_BURST_IGNORE="<account>,<account>"
+  const failBurstIgnore = new Set([
+    ...Object.keys(knownExecutors),
+    ...(process.env.FAIL_BURST_IGNORE || "").split(",").filter((a) => a.trim()).map((a) => address("FAIL_BURST_IGNORE", a)),
+  ]);
+
   const stratoNativeBridge = process.env.STRATO_NATIVE_BRIDGE
     ? address("STRATO_NATIVE_BRIDGE", process.env.STRATO_NATIVE_BRIDGE)
     : undefined;
@@ -116,6 +137,7 @@ export function loadConfig(): Config {
     knownExecutors,
     mintAlertPct: num("MINT_ALERT_PCT", 5),
     failBurst: num("FAIL_BURST", 20),
+    failBurstIgnore,
     proxySnapshotSeconds: num("PROXY_SNAPSHOT_SECONDS", 300),
     supplyJumpPct: num("SUPPLY_JUMP_PCT", 10),
     supplySnapshotSeconds: num("SUPPLY_SNAPSHOT_SECONDS", 3600),

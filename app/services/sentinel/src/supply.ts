@@ -1,5 +1,5 @@
 import { ADMIN_REGISTRY, Config } from "./config";
-import { Alert } from "./rules";
+import { Alert, short, units } from "./rules";
 import { cirrus } from "./strato";
 import { notify } from "./notify";
 import { StateStore } from "./state";
@@ -13,16 +13,20 @@ export async function snapshotSupply(cfg: Config, store: StateStore): Promise<vo
   if (s.lastSupplySnapshotAt && Date.now() - s.lastSupplySnapshotAt < cfg.supplySnapshotSeconds * 1000) return;
 
   const current: Record<string, string> = {};
+  const symbols: Record<string, string> = {};
   for (const table of ["BlockApps-Token", "BlockApps-Voucher"]) {
     for (let offset = 0; ; offset += cfg.pageSize) {
       const rows = await cirrus(cfg, `/${table}`, {
         _owner: `eq.${ADMIN_REGISTRY}`,
-        select: "address,_totalSupply",
+        select: "address,_totalSupply,_symbol",
         order: "address.asc",
         limit: cfg.pageSize,
         offset,
       });
-      for (const r of rows) current[r.address] = String(r._totalSupply);
+      for (const r of rows) {
+        current[r.address] = String(r._totalSupply);
+        symbols[r.address] = r._symbol;
+      }
       if (rows.length < cfg.pageSize) break;
     }
   }
@@ -36,7 +40,9 @@ export async function snapshotSupply(cfg: Config, store: StateStore): Promise<vo
       if (pct >= cfg.supplyJumpPct)
         alerts.push({
           severity: "high",
-          title: `Supply jump: +${pct.toFixed(1)}% since last snapshot`,
+          title:
+            `${symbols[token] || short(token)} supply up ${pct.toFixed(1)}% in ${cfg.supplySnapshotSeconds}s: ` +
+            `${units(previous)} → ${units(supply)}`,
           fields: { token, previousSupply: s.supplies[token], supply, window: `${cfg.supplySnapshotSeconds}s` },
         });
     }

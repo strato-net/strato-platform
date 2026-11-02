@@ -9,14 +9,14 @@ Each runs every cycle with its own cursor in `STATE_FILE`; one failing watcher d
 | Watcher | Source | Rule | Severity |
 |---|---|---|---|
 | events | Cirrus `event` | `OwnershipTransferred` on a contract not deployed in the same tx | 🔴 |
-| | | AdminRegistry `AdminAdded` / `AdminRemoved` / `AdminSwapped` / `VotingThresholdSet` / `DefaultVotingThresholdSet` | 🔴 |
+| | | AdminRegistry `_addAdmin` / `_removeAdmin` / `_swapAdmin` / `setVotingThreshold` / `setDefaultVotingThresholdBps` executed | 🔴 |
 | | | Token/Voucher owned by AdminRegistry minted without `IssueExecuted(mint)` in the same tx | 🔴 |
-| | | AdminRegistry `WhitelistGranted` / `ContractCreated` | 🟠 |
+| | | AdminRegistry `addWhitelist` / `createContract` / `createSaltedContract` executed | 🟠 |
 | | | `IssueExecuted` by an executor/function not in `KNOWN_EXECUTORS` | 🟠 |
 | | | Governed mint ≥ `MINT_ALERT_PCT` of supply | 🟠 |
 | | | Mint cap change: CDP `CollateralConfigured`, PSM `MintConfigSet`, MetalForge `MetalConfigUpdated` / `MintCapUpdated`, FlashMint `MaxLoanSet` | 🟠 |
-| | | AdminRegistry `WhitelistRevoked` / `IssueCreated` | 🟡 |
-| | | `NativeDepositCompleted` without an identical `RedemptionRequested` in the external tx | 🔴 |
+| | | AdminRegistry `removeWhitelist` executed, `IssueCreated` | 🟡 |
+| | | `NativeDepositCompleted` without an identical `RedemptionRequested` / `RedemptionRequestedWithRoute` in the external tx | 🔴 |
 | | | Native deposit that cannot be verified (chain not monitored, tx not found by the RPC) | 🟠 |
 | | | Bridge withdrawal refunded after its Safe tx / mint proposal was created | 🟠 |
 | | | Bridge-out > `BRIDGE_OUT_ALERT_USD` | 🔴 |
@@ -28,10 +28,11 @@ Each runs every cycle with its own cursor in `STATE_FILE`; one failing watcher d
 | supply | Cirrus `BlockApps-Token` / `BlockApps-Voucher` | Governed token supply up ≥ `SUPPLY_JUMP_PCT` since the last snapshot | 🟠 |
 | txs | strato-api transactions + results | Failed call to `<constructor>` on a deployed contract | 🔴 |
 | | | Failed with a permission error (onlyOwner, whitelist, admin vote, …) | 🟠 |
-| | | ≥ `FAIL_BURST` failures from one sender | 🟠 |
+| | | ≥ `FAIL_BURST` failures from one sender (not in `KNOWN_EXECUTORS` / `FAIL_BURST_IGNORE`) | 🟠 |
 | evm | `eth_getLogs` on `EVM_BRIDGES` | `RepresentationMinted` without an identical, non-aborted STRATO withdrawal | 🔴 |
+| | | `RedemptionRefunded` for a redemption STRATO already credited | 🔴 |
 | | | Role, upgrade, initializer or attestor/threshold/validity change | 🔴 |
-| | | Token mapping, pause or any unrecognized event | 🟠 |
+| | | Token mapping, pause, `NativeMintCanceled` or any unrecognized event | 🟠 |
 
 ## Run
 

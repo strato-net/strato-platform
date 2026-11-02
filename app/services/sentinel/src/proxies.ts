@@ -1,5 +1,5 @@
 import { ADMIN_REGISTRY, Config, normalize } from "./config";
-import { Alert } from "./rules";
+import { Alert, short } from "./rules";
 import { cirrus } from "./strato";
 import { notify } from "./notify";
 import { StateStore } from "./state";
@@ -52,11 +52,12 @@ export async function snapshotProxies(cfg: Config, store: StateStore): Promise<v
       const previous = s.proxies[p.address];
       if (previous === undefined || previous === p.logicContract) continue;
       const fields = { proxy: p.address, owner: p._owner, previousLogic: previous, newLogic: p.logicContract };
+      const change = `Proxy ${short(p.address)} logic changed ${short(previous)} → ${short(p.logicContract)}`;
       if (await viaGovernance(cfg, p.address, p.logicContract))
-        alerts.push({ severity: "info", title: "Proxy upgraded through governance", fields });
+        alerts.push({ severity: "info", title: `${change} through governance`, fields });
       else if (p._owner === ADMIN_REGISTRY)
-        alerts.push({ severity: "critical", title: "Proxy logic changed without a governance call", fields });
-      else alerts.push({ severity: "high", title: "Proxy logic changed by its owner", fields });
+        alerts.push({ severity: "critical", title: `${change} without a governance vote (owner AdminRegistry)`, fields });
+      else alerts.push({ severity: "high", title: `${change} by its owner ${short(p._owner)}`, fields });
     }
   }
 

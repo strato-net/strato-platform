@@ -1,5 +1,5 @@
-import { Config } from "./config";
-import { Alert } from "./rules";
+import { CATCH_UP_MS, Config } from "./config";
+import { Alert, short } from "./rules";
 import { chunk, stratoApi } from "./strato";
 import { notify } from "./notify";
 import { StateStore } from "./state";
@@ -71,9 +71,11 @@ async function scanRange(cfg: Config, from: number, to: number): Promise<{ alert
       g.count++;
       continue;
     }
+    const call = `${t.funcName || "call"} on ${short(t.to)} by ${short(t.from)}`;
+    const reason = r.message.length > 120 ? `${r.message.slice(0, 120)}…` : r.message;
     grouped.set(key, {
       severity,
-      title: severity === "critical" ? "Constructor call on a deployed contract" : "Permission-denied transaction",
+      title: severity === "critical" ? `Constructor re-call: ${call}` : `Permission denied: ${call}: "${reason}"`,
       fields: { sender: t.from, contract: t.to, function: t.funcName, message: r.message, tx: t.hash, block: t.blockNumber },
       count: 1,
     });
@@ -81,8 +83,12 @@ async function scanRange(cfg: Config, from: number, to: number): Promise<{ alert
 
   const alerts: Alert[] = [...grouped.values()].map(({ count, ...a }) => ({ ...a, fields: { ...a.fields, count } }));
   for (const [sender, count] of failuresBySender)
-    if (count >= cfg.failBurst)
-      alerts.push({ severity: "high", title: "Burst of failed transactions", fields: { sender, count, blocks: `${from}-${to}` } });
+    if (count >= cfg.failBurst && !cfg.failBurstIgnore.has(sender))
+      alerts.push({
+        severity: "high",
+        title: `${count} failed transactions from ${short(sender)} in blocks ${from}-${to}`,
+        fields: { sender, count, blocks: `${from}-${to}` },
+      });
   const failed = [...failuresBySender.values()].reduce((n, c) => n + c, 0);
   return { alerts, txs: txs.length, failed };
 }
@@ -100,7 +106,8 @@ export async function scanTxs(cfg: Config, store: StateStore): Promise<void> {
   }
 
   if (s.lastTxBlock >= head) log(`no new blocks after ${s.lastTxBlock}`);
-  while (s.lastTxBlock < head) {
+  const deadline = Date.now() + CATCH_UP_MS;
+  while (s.lastTxBlock < head && Date.now() < deadline) {
     const from = s.lastTxBlock + 1;
     const to = Math.min(head, from + MAX_BLOCKS - 1);
     const { alerts, txs, failed } = await scanRange(cfg, from, to);
