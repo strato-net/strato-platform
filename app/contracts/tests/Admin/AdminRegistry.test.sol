@@ -668,6 +668,19 @@ contract Describe_AdminRegistry {
         require(reentrant.executions() == 1, "Issue should execute once even when its target re-enters");
     }
 
+    function it_admin_registry_drops_votes_cast_before_an_admin_change() {
+        // admin1 votes to mint, then admin1 and user1 replace admin1 with user2
+        adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+        adminRegistry.swapAdmin(admin1, address(user2));
+        user1.do(address(adminRegistry), "swapAdmin", admin1, address(user2));
+        require(!adminRegistry.isAdminAddress(admin1), "admin1 should have been replaced");
+
+        (bool executed, variadic ret) = user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
+        require(!executed, "A vote cast before the admin change should not count");
+        (executed, ret) = user2.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
+        require(executed && ERC20(token).balanceOf(admin3) == 1000e18, "Fresh votes from current admins should execute");
+    }
+
     function it_cannot_execute_internal_functions() {
         adminRegistry.castVoteOnIssue(address(adminRegistry), "setVotingThreshold", address(adminRegistry), "_getIssueId", 5000);
         user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setVotingThreshold", address(adminRegistry), "_getIssueId", 5000);
@@ -731,6 +744,39 @@ contract Describe_AdminRegistry {
         require(adminRegistry.isAdminAddress(admin1), "Admin1 should still be an admin after the failed swap");
         require(!adminRegistry.isAdminAddress(zeroAddress), "Zero address should never become an admin");
         require(adminRegistry.admins(0) == admin1, "Admin slot should be unchanged");
+    }
+
+    // An Ownable whose onlyOwner falls back to a vote (the genesis Proxy at 0x100c) votes
+    // as the registry itself, so the registry as an admin would let anyone vote
+    function it_admin_registry_cannot_be_its_own_admin() {
+        address self = address(adminRegistry);
+        adminRegistry.addAdmin(self);
+        bool addReverted = false;
+        try {
+            user1.do(self, "addAdmin", self);
+        } catch {
+            addReverted = true;
+        }
+        require(addReverted, "Should revert when adding the registry as its own admin");
+
+        adminRegistry.swapAdmin(admin1, self);
+        bool swapReverted = false;
+        try {
+            user1.do(self, "swapAdmin", admin1, self);
+        } catch {
+            swapReverted = true;
+        }
+        require(swapReverted, "Should revert when swapping in the registry as its own admin");
+        require(!adminRegistry.isAdminAddress(self), "Registry should never be its own admin");
+
+        AdminRegistry fresh = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
+        bool initReverted = false;
+        try {
+            fresh.initialize([admin1, address(fresh)]);
+        } catch {
+            initReverted = true;
+        }
+        require(initReverted, "Should revert when initializing the registry as its own admin");
     }
 
     // ============ ISSUE DISMISSAL TESTS ============
