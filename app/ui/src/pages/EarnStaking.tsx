@@ -134,6 +134,9 @@ type StakingInfo = {
   minStake: string;
   proposerFeeBps: string;
   joinsPaused: boolean;
+  // V2: whether a waiter can activate right now (joinsPaused plus the block joins open from).
+  // Absent on older backends.
+  joinsOpen?: boolean;
   validatorCount: string;
   maxActiveValidators: string;
   hardCapActiveValidators: string;
@@ -168,6 +171,9 @@ const formatToken = (value: string | undefined, decimals: number, maxFractionDig
     return "0";
   }
 };
+
+const joinsPausedNow = (info: StakingInfo | null | undefined): boolean =>
+  info?.joinsOpen === undefined ? Boolean(info?.joinsPaused) : !info.joinsOpen;
 
 const formatAmountInput = (value: bigint, decimals: number): string => {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -1269,7 +1275,7 @@ const EarnStaking = () => {
       selfBondRuleActive={Boolean(info?.selfBondRuleActive)}
       validatorSetDeployed={validatorSetDeployed}
       canManage={isLoggedIn && (isV2 || !!info?.isOperator)}
-      joinsPaused={Boolean(info?.joinsPaused)}
+      joinsPaused={joinsPausedNow(info)}
       canCoverActionFee={canCoverActionFee}
       submitting={submitting}
       processing={processingTarget === key ? processingAction : null}
@@ -1321,7 +1327,7 @@ const EarnStaking = () => {
           <StatCard
             label="APY"
             tooltip={isV2
-              ? "Annual yield delegators realized over the last 7 days from STRATO block rewards, net of validator commission. Rewards APY comes from platform reward emissions."
+              ? "Annual yield for delegators: the staking emission schedule at the current stake and reserve plus STRATO block rewards realized over the last 7 days, net of validator commission. Rewards APY comes from platform reward emissions."
               : "Estimated annual yield for delegating STRATO. Native APY comes from the staking reward schedule, net of validator commission. Rewards APY comes from platform reward emissions."}
             value={apyWithBreakdown(info.estimatedApy)}
             icon={TrendingUp}
@@ -1365,10 +1371,10 @@ const EarnStaking = () => {
               {isV2 ? (
                 <>
                   <p className="text-xs text-muted-foreground">Staking Rewards</p>
-                  <p className="mt-1 text-lg font-semibold">STRATO block rewards</p>
+                  <p className="mt-1 text-lg font-semibold">STRATO emissions and block rewards</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Validators earn STRATO for each block they propose plus USDST proposer fees, split between the
-                    operator's self-bond and delegators after commission. APY is what delegators realized over the last 7 days.
+                    Validators in the set earn STRATO from the emission schedule, plus STRATO for each block they propose and
+                    USDST proposer fees, split between the operator's self-bond and delegators after commission.
                   </p>
                 </>
               ) : (
@@ -1448,7 +1454,7 @@ const EarnStaking = () => {
             onChangeOperator={isV2 ? handleChangeOperator : undefined}
             validators={validators}
             minStakeRaw={info.minStake}
-            joinsPaused={Boolean(info.joinsPaused)}
+            joinsPaused={joinsPausedNow(info)}
             errorMessage={bindingError}
             {...deepLinkProps}
           />
@@ -1665,7 +1671,7 @@ const EarnStaking = () => {
                         <TipLabel
                           label={apyLabel}
                           tooltip={isV2
-                            ? "Annual yield this validator's delegators realized from STRATO block rewards over the last 7 days, after its commission, plus platform Rewards APY when active."
+                            ? "Annual yield for this validator's delegators: the emission schedule while it is in the set plus STRATO block rewards realized over the last 7 days, after its commission, plus platform Rewards APY when active."
                             : "Estimated annual yield from this validator: Native APY after its commission, plus platform Rewards APY when active."}
                         />
                       </th>

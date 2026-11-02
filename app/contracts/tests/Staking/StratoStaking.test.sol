@@ -1035,4 +1035,192 @@ contract Describe_StratoStaking {
         fresh.processBlock();
         require(fresh.lastProcessedBlock() == 0, "nothing processed");
     }
+
+    // ---- emission schedule ---------------------------------------------------------------
+
+    uint256 constant YEAR = 31536000;
+
+    function _fundReserve(uint256 amount) internal {
+        funder.doSuccessfully(address(staking), "fundRewardReserve(uint256)", amount);
+    }
+
+    function _claimOperator(User operator, address validator) internal returns (uint256) {
+        uint256 before = strato.balanceOf(address(operator));
+        operator.doSuccessfully(address(staking), "claimOperatorRewards(address)", validator);
+        return strato.balanceOf(address(operator)) - before;
+    }
+
+    function it_releases_the_schedule_across_the_set_by_stake() public {
+        _bondBoth();                          // A: 1000 self-bond at 5% commission; B: 2000
+        _stake(user1, VALIDATOR_A, 1000e18);  // S = 4000
+        _fundReserve(10000e18);
+        require(staking.rewardReserve() == 10000e18, "reserve funded");
+        require(staking.recoverableUntrackedStrato() == 0, "the reserve is not untracked STRATO");
+
+        // 1000 a year at 4000 of eligible stake with 10000 in reserve, from now
+        staking.setEmissionSchedule(1000e18, 4000e18, 10000e18, 0);
+        fastForward(YEAR, 1);
+        staking.processBlock();
+        require(staking.totalEmitted() == 1000e18, "a year released");
+        require(staking.rewardReserve() == 9000e18, "taken from the reserve");
+        require(staking.allocatedRewardLiability() == 1000e18, "owed to the set");
+
+        // A (2000 of 4000) earns 500: self-bond 1000 of 2000 -> 250; delegators 250 gross, 5% -> 12.5 + 237.5
+        require(_claimOperator(operatorA, VALIDATOR_A) == 2625e17, "A's operator: self-bond share + commission");
+        uint256 before = strato.balanceOf(address(user1));
+        user1.doSuccessfully(address(staking), "claimRewards", _list(VALIDATOR_A));
+        require(strato.balanceOf(address(user1)) - before == 2375e17, "A's delegator, net of commission");
+        // B (2000 of 4000) earns 500, all on its self-bond
+        require(_claimOperator(operatorB, VALIDATOR_B) == 500e18, "B's operator");
+        require(staking.allocatedRewardLiability() == 0, "all paid out");
+        require(staking.rewardReserve() == 9000e18, "claims never touch the reserve");
+    }
+
+    function it_scales_the_release_with_the_root_of_the_stake_and_the_reserve_left() public {
+        _selfBond(operatorA, VALIDATOR_A, 1000e18);
+        _activate(VALIDATOR_A);               // S = 1000
+        _fundReserve(10000e18);
+        staking.setEmissionSchedule(1000e18, 4000e18, 10000e18, 0);
+
+        // sqrt(1000 / 4000) = 1/2 at a full reserve: 500 the first year
+        fastForward(YEAR, 1);
+        staking.processBlock();
+        require(staking.totalEmitted() == 500e18, "a quarter of the calibration stake releases half the rate");
+        // 9500 of 10000 left: 475 the second year
+        fastForward(YEAR, 1);
+        staking.processBlock();
+        require(staking.totalEmitted() == 975e18, "the rate falls with the reserve");
+        require(staking.rewardReserve() == 9025e18, "reserve left");
+
+        // Any touch accrues, not only processBlock: a quarter year at 9025 left = 451.25 / 4
+        fastForward(YEAR / 4, 1);
+        _stake(user1, VALIDATOR_A, 100e18);
+        require(staking.totalEmitted() == 975e18 + 1128125e14, "accrued by the stake change");
+    }
+
+    function it_pays_the_schedule_only_to_the_set_and_only_from_the_start() public {
+        _selfBond(operatorA, VALIDATOR_A, 1000e18);
+        _activate(VALIDATOR_A);
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 3000e18);   // eligible, not in the set
+        _fundReserve(10000e18);
+        staking.setEmissionSchedule(1000e18, 4000e18, 10000e18, block.timestamp + 1000);
+
+        fastForward(500, 1);
+        staking.processBlock();
+        require(staking.totalEmitted() == 0, "nothing before the start");
+        fastForward(500 + YEAR, 1);
+        staking.processBlock();
+        require(staking.eligibleStake() == 1000e18, "a waiter's stake does not count");
+        require(staking.totalEmitted() == 500e18, "a year from the start, on A's 1000 alone");
+        validatorC.doExpectingFailure(address(staking), "claimOperatorRewards(address)", "SS: no rewards", address(validatorC));
+
+        // C joins: it earns from now on, and the stake it brings raises the rate
+        staking.tryActivate(address(validatorC));
+        fastForward(YEAR, 1);
+        staking.processBlock();
+        // 1000 * sqrt(4000 / 4000) * 9500 / 10000 = 950, of which C takes 3000 / 4000
+        require(staking.totalEmitted() == 1450e18, "year two at the calibration stake");
+        require(_claimOperator(validatorC, address(validatorC)) == 7125e17, "C: three quarters of year two");
+        require(_claimOperator(operatorA, VALIDATOR_A) == 7375e17, "A: year one and a quarter of year two");
+
+        // Leaving the set stops it: A exits and only C earns the next year.
+        operatorA.do(address(staking), "requestExit(address)", VALIDATOR_A);
+        fastForward(101, 1);
+        staking.syncValidator(VALIDATOR_A);
+        require(!gov.isValidator(VALIDATOR_A), "A left");
+        require(_claimOperator(operatorA, VALIDATOR_A) > 0, "paid up to the moment it left");
+        fastForward(YEAR, 1);
+        staking.processBlock();
+        require(staking.eligibleStake() == 3000e18, "only C counts");
+        operatorA.doExpectingFailure(address(staking), "claimOperatorRewards(address)", "SS: no rewards", VALIDATOR_A);
+    }
+
+    function it_keeps_the_reserve_out_of_recovery_and_claims() public {
+        _selfBond(operatorA, VALIDATOR_A, 1000e18);
+        _stake(user1, VALIDATOR_A, 1000e18);
+        _fundReserve(100e18);
+        require(staking.rewardReserve() == 100e18 && staking.recoverableUntrackedStrato() == 0, "funded, not recoverable");
+        bool rejected = false;
+        try staking.recoverUntrackedStrato(address(user2), 1e18) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "the owner cannot recover the reserve");
+
+        // Rewards on the books that only the reserve could cover are not paid out of it.
+        staking.seedRetiredCheckpoints(VALIDATOR_A, 0, 0, 5e18);
+        operatorA.doExpectingFailure(address(staking), "claimOperatorRewards(address)", "SS: rewards unavailable", VALIDATOR_A);
+        require(strato.balanceOf(address(staking)) == 2100e18, "principal and reserve intact");
+
+        funder.doExpectingFailure(address(staking), "fundRewardReserve(uint256)", "SS: amount=0", uint256(0));
+        rejected = false;
+        try staking.setEmissionSchedule(1e18, 0, 1e18, 0) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "a schedule needs a calibration stake and reserve");
+    }
+
+    function it_stops_when_the_reserve_is_spent_and_pauses_at_a_zero_rate() public {
+        _selfBond(operatorA, VALIDATOR_A, 1000e18);
+        _activate(VALIDATOR_A);
+        _fundReserve(10e18);
+        staking.setEmissionSchedule(1000e18, 1000e18, 10e18, 0);   // 1000 a year against 10 in reserve
+
+        fastForward(YEAR, 1);
+        staking.processBlock();
+        require(staking.totalEmitted() == 10e18 && staking.rewardReserve() == 0, "capped at the reserve");
+        fastForward(YEAR, 1);
+        staking.processBlock();
+        require(staking.totalEmitted() == 10e18, "nothing left to release");
+
+        _fundReserve(10e18);
+        staking.setEmissionSchedule(0, 1000e18, 10e18, 0);   // paused
+        fastForward(YEAR, 1);
+        staking.processBlock();
+        require(staking.totalEmitted() == 10e18 && staking.rewardReserve() == 10e18, "a zero rate releases nothing");
+
+        staking.setEmissionSchedule(4e18, 1000e18, 10e18, 0);   // 4 a year, resumed
+        fastForward(YEAR / 2, 1);
+        staking.processBlock();
+        require(staking.totalEmitted() == 12e18 && staking.rewardReserve() == 8e18, "resumes from the resume, not from the pause");
+    }
+
+    // ---- admission -------------------------------------------------------------------
+
+    function it_opens_permissionless_joins_from_the_agreed_block() public {
+        staking.setSetParams(50, 50, 500, 10, 100, 100, 0, false);
+        staking.setJoinsOpenFromBlock(block.number + 3);
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1000e18);
+        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: joins not yet open", address(validatorC));
+        validatorC.doExpectingFailure(address(staking), "reconcileSet", "SS: joins not yet open", _list(address(validatorC)));
+
+        _selfBond(operatorA, VALIDATOR_A, 1000e18);
+        _activate(VALIDATOR_A);
+        require(gov.isValidator(VALIDATOR_A), "the owner activates ahead of the height");
+
+        fastForward(1, 3);
+        validatorC.doSuccessfully(address(staking), "tryActivate(address)", address(validatorC));
+        require(gov.isValidator(address(validatorC)), "open from the agreed block");
+    }
+
+    function it_reconciles_only_within_the_operator_stake_cap() public {
+        staking.setSetParams(50, 50, 500, 10, 100, 100, 0, false);
+        _selfBond(operatorA, VALIDATOR_A, 1000e18);
+        _selfBond(operatorB, VALIDATOR_B, 2000e18);
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 4000e18);
+        _activate(VALIDATOR_A);
+        _activate(VALIDATOR_B);                                       // set: 3000
+        staking.setSetParams(50, 50, 500, 10, 100, 100, 5000, false); // C would hold 4000 of 7000
+
+        user2.doSuccessfully(address(staking), "reconcileSet", _list(address(validatorC)));
+        require(!gov.isValidator(address(validatorC)), "reconciliation skips a waiter over the cap");
+
+        _stake(user1, VALIDATOR_A, 1000e18);                          // set: 4000; C would hold 4000 of 8000
+        user2.doSuccessfully(address(staking), "reconcileSet", _list(address(validatorC)));
+        require(gov.isValidator(address(validatorC)), "promoted once it fits under the cap");
+    }
 }
