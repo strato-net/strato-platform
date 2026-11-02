@@ -50,6 +50,7 @@ contract UpgradedInPlaceStaking is StratoStaking {
 
 contract Describe_StratoStaking {
     uint256 public INFINITY = 2 ** 256 - 1;
+    uint256 constant YEAR = 31536000;
     address constant VALIDATOR_A = address(0xaaaa);
     address constant VALIDATOR_B = address(0xbbbb);
 
@@ -1037,8 +1038,6 @@ contract Describe_StratoStaking {
     }
 
     // ---- emission schedule ---------------------------------------------------------------
-
-    uint256 constant YEAR = 31536000;
 
     function _fundReserve(uint256 amount) internal {
         funder.doSuccessfully(address(staking), "fundRewardReserve(uint256)", amount);
