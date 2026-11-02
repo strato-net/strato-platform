@@ -334,7 +334,7 @@ defaultMaxTimestampDriftS = 15
 -- dev/test networks) activates from genesis.
 defaultStakingActivationBlock :: String -> Maybe Integer
 defaultStakingActivationBlock net
-  | net == "upquark" = Just 1000000
+  | net == "upquark" = Just 2000000
   | net `elem` ["lithium", "mercata", "mercata-hydrogen", "uranium"] = Just stakingNotScheduled
   | take 6 net == "helium" = Just 250000
   | otherwise = Nothing
