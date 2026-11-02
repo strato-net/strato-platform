@@ -51,8 +51,8 @@ enum FeeMethod { NONE, VOUCHER, STRATO_BURN, USDST_SWAP_BURN, USDST_COLLECTED }
 //
 // Fee policy, $0.01 per submitted transaction, paid with the first of:
 //   1. one whole voucher;
-//   2. STRATO worth 0.01 USDST, moved from the signer to the burn address, so
-//      totalSupply stays fixed. Nothing is collected or split.
+//   2. STRATO worth 0.01 USDST, transferred from the signer to FEE_ADDRESS, so
+//      totalSupply stays fixed. Nothing is split.
 //      A signer short of STRATO first buys exactly the shortfall from the canonical pool
 //      with its own USDST, paying at most the shortfall's time-weighted value plus a
 //      bounded premium, so a USDST-only account keeps transacting through the switch.
@@ -76,7 +76,7 @@ contract record FeeRouter {
     function _deciderState() internal view virtual returns (address) { return address(0xDEC1DE02); }
     function _feeCollector() internal view virtual returns (address) { return address(0x000000000000000000000000000000000000100d); }
 
-    // Block from which fees burn STRATO and block rewards are paid. Before it the
+    // Block from which fees are paid in STRATO and block rewards are paid. Before it the
     // router charges exactly what DeciderState's own payFees charges (one whole
     // voucher, else 0.01 USDST to FeeCollector), quotes nothing and pays nothing, so
     // it can be installed ahead of the platform's native-token flag day and the two
@@ -128,7 +128,7 @@ contract record FeeRouter {
 
     uint constant USD_FEE = 1e16; // $0.01, in 18-decimal USDST
     uint constant VOUCHER_FEE = 1e18; // one whole voucher
-    address constant BURN_ADDRESS = address(0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddead);
+    address constant FEE_ADDRESS = address(0xdead5712a70000000000000000000dead5712a70);
     uint constant Q192 = 6277101735386680763835789423207666416102355444464034512896; // 2**192: sqrtPriceX96 squared is Q192
 
     // ---- Router storage. Only payBlockRewards and the views may touch it: those are
@@ -146,8 +146,8 @@ contract record FeeRouter {
     // Flat reward per block for the proposer, paid out of this contract's own
     // STRATO balance into staking, which splits it between the proposer's operator
     // and its delegators. Fund the router to switch it on: an unfunded router pays
-    // nothing rather than stalling the chain. Burning the fee leaves this as the
-    // validators' funding. Zero switches rewards off for good.
+    // nothing rather than stalling the chain. Fees go to FEE_ADDRESS, which leaves this
+    // as the validators' funding. Zero switches rewards off for good.
     function _blockReward() internal view virtual returns (uint) { return 1e16; } // 0.01 STRATO
     function blockReward() external view returns (uint) { return _blockReward(); }
 
@@ -331,9 +331,9 @@ contract record FeeRouter {
 
     // The STRATO leg of payFees, as a plain call so the token sees the router as the
     // caller. It only ever moves the caller's own STRATO, out of the allowance the
-    // caller just gave, and only to the burn address.
+    // caller just gave, and only to FEE_ADDRESS.
     function sinkFee(uint amount) external {
-        ERC20_Template(_strato()).transferFrom(msg.sender, BURN_ADDRESS, amount);
+        ERC20_Template(_strato()).transferFrom(msg.sender, FEE_ADDRESS, amount);
     }
 
     // Buy exactly `shortfall` STRATO from the canonical pool with the signer's USDST.

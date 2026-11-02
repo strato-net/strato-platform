@@ -1149,7 +1149,7 @@ export const getGasCostRevenue = async (
 
 /**
  * Get the STRATO burned for transaction fees, by period: the STRATO token's own Transfer
- * events to the burn address, where the fee router sends every STRATO fee. FeePaid is no
+ * events to FEE_ADDRESS, where the fee router sends every STRATO fee. FeePaid is no
  * proof on its own: it is emitted from the payer's context, so any contract can emit one.
  * Summed in Cirrus, with ::text keeping 18-decimal totals exact through JSON.
  */
@@ -1163,7 +1163,7 @@ export const getStratoBurned = async (
         params: {
           address: `eq.${constants.stratoToken}`,
           event_name: "eq.Transfer",
-          "attributes->>to": `eq.${constants.BURN_ADDRESS}`,
+          "attributes->>to": `eq.${constants.FEE_ADDRESS}`,
           ...(since !== undefined && { block_timestamp: `gte.${toUTCTime(new Date(since * 1000))}` }),
           select: "total:attributes->>value::numeric.sum()::text"
         }

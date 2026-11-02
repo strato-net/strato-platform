@@ -115,7 +115,7 @@ contract record Signer is FeeRouterHarness {
 
 contract Describe_FeeRouter {
     address constant PROPOSER = address(0xaaaa);
-    address constant BURN_ADDRESS = address(0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddead);
+    address constant FEE_ADDRESS = address(0xdead5712a70000000000000000000dead5712a70);
     uint constant Q192 = 6277101735386680763835789423207666416102355444464034512896;
     uint constant WINDOW = 1800; // FeeRouter._twapWindow
     int constant FULL_RANGE = 887220; // widest tick multiple of the 0.30% tier's spacing
@@ -372,7 +372,7 @@ contract Describe_FeeRouter {
         signer.pay(address(router));
     }
 
-    // ---- payment: one whole voucher, else STRATO to the burn address ----
+    // ---- payment: one whole voucher, else STRATO to the fee address ----
 
     function it_sends_the_strato_fee_to_the_burn_address() public {
         _pricedPool(0, true);
@@ -380,7 +380,7 @@ contract Describe_FeeRouter {
 
         signer.pay(address(router));
         require(strato.balanceOf(address(signer)) == 1e18 - 1e16, "signer paid 0.01 STRATO");
-        require(strato.balanceOf(BURN_ADDRESS) == 1e16, "the fee sits at the burn address");
+        require(strato.balanceOf(FEE_ADDRESS) == 1e16, "the fee sits at the fee address");
         require(strato.totalSupply() == supply, "moved, not burned");
         require(strato.balanceOf(address(feeCollector)) == 0, "nothing to the collector");
         require(strato.balanceOf(address(router)) == 0, "nothing to the router");
@@ -438,7 +438,7 @@ contract Describe_FeeRouter {
         admin.castVoteOnIssue(address(admin), "addWhitelist", address(strato), "transferFrom", address(router));
         signer.pay(address(router));
         require(strato.balanceOf(address(signer)) == 1e18 - 1e16, "paid while paused");
-        require(strato.balanceOf(BURN_ADDRESS) == 1e16, "to the burn address");
+        require(strato.balanceOf(FEE_ADDRESS) == 1e16, "to the fee address");
     }
 
     function it_reverts_when_strato_is_short_and_there_is_no_voucher() public {
@@ -557,7 +557,7 @@ contract Describe_FeeRouter {
 
         s.pay(address(router));
         require(strato.balanceOf(address(s)) == 0, "exactly the shortfall bought, then the fee burned");
-        require(strato.balanceOf(BURN_ADDRESS) == 1e16, "the whole fee goes to the burn address");
+        require(strato.balanceOf(FEE_ADDRESS) == 1e16, "the whole fee goes to the fee address");
         require(strato.totalSupply() == supply, "nothing burned");
         uint spent = 1e18 - usdst.balanceOf(address(s));
         require(spent >= 5e15 && spent <= 5e15 * 101 / 100, "shortfall bought at the pool price plus its fee");
