@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { api } from '@/lib/axios';
 import { Token, CreateTokenPayload } from '@/interface';
-import { Token as TokenType, EarningAsset, BalanceSnapshot } from '@strato/shared-types';
+import { Token as TokenType, EarningAsset, BalanceSnapshot, FeeQuote } from '@strato/shared-types';
 import { cataAddress, usdstAddress } from '@/lib/constants';
 import { useUser } from '@/context/UserContext';
 import { isTxSubmitted } from '@/utils/transactionStatus';
@@ -65,7 +65,7 @@ type TokenContextType = {
   setTokenStatus: (payload: { address: string; status: number }) => Promise<void>;
   // USDST balance
   usdstBalance: string;
-  voucherBalance: string;
+  feeQuote: FeeQuote | null;
   loadingUsdstBalance: boolean;
   fetchUsdstBalance: (signal?: AbortSignal) => Promise<void>;
   // Net balance (current snapshot)
@@ -102,7 +102,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
 
   // USDST balance state
   const [usdstBalance, setUsdstBalance] = useState("0");
-  const [voucherBalance, setVoucherBalance] = useState("0");
+  const [feeQuote, setFeeQuote] = useState<FeeQuote | null>(null);
   const [loadingUsdstBalance, setLoadingUsdstBalance] = useState(false);
 
   // Balance history caches
@@ -219,12 +219,12 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const fetchUsdstBalance = useCallback(async (signal?: AbortSignal) => {
     setLoadingUsdstBalance(true);
     try {
-      const [usdstResponse, voucherResponse] = await Promise.all([
+      const [usdstResponse, quoteResponse] = await Promise.all([
         api.get(`/tokens/balance`, {
           signal,
           params: { address: `eq.${usdstAddress}` },
         }),
-        api.get(`/vouchers/balance`, {
+        api.get<FeeQuote>(`/fees/quote`, {
           signal,
         }),
       ]);
@@ -232,11 +232,11 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
       if (signal?.aborted) return;
 
       setUsdstBalance(usdstResponse?.data?.[0]?.balance || "0");
-      setVoucherBalance(voucherResponse?.data?.balance || "0");
+      setFeeQuote(quoteResponse.data);
     } catch (err) {
       if (signal?.aborted) return;
       setUsdstBalance("0");
-      setVoucherBalance("0");
+      setFeeQuote(null);
     } finally {
       if (!signal?.aborted) {
         setLoadingUsdstBalance(false);
@@ -555,7 +555,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         loadingEarningAssets,
         loadingInactiveTokens,
         usdstBalance,
-        voucherBalance,
+        feeQuote,
         loadingUsdstBalance,
         fetchUsdstBalance,
         netBalance,

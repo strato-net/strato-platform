@@ -170,6 +170,14 @@ class (RLPSerializable t) => TransactionLike t where
   txAttribution :: t -> B.ByteString
   txAttribution _ = B.empty
 
+  -- | The EIP-2718 type of an Ethereum envelope (0 legacy, 2 EIP-1559) and
+  -- the priority fee a type-2 envelope carries; 0 for anything else.
+  txEnvelopeType :: t -> Word8
+  txEnvelopeType _ = 0
+
+  txMaxPriorityFeePerGas :: t -> Integer
+  txMaxPriorityFeePerGas _ = 0
+
   txSigR :: t -> Integer
   txSigR t = let (r, _, _) = txSignature t in r
 

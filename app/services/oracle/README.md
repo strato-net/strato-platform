@@ -81,6 +81,7 @@ USDST_ADDRESS=86a5ae535ded415203c3e27d654f9a1d454c553b  # USDST contract address
 GAS_FEE_USDST=1  # Gas fee in USDST (0.01 = 1, default: 1)
 VOUCHER_ADDRESS=000000000000000000000000000000000000100e  # Voucher contract address
 GAS_FEE_VOUCHER=100  # Gas fee in Vouchers (1 = 100, default: 100)
+STRATO_TOKEN_ADDRESS=  # STRATO token address, counted toward the gas balance once the fee router charges STRATO
 MIN_TRANSACTIONS_THRESHOLD=12000  # Total possible transactions threshold (balance check), default: 12000
 
 # AWS Configuration (for CloudWatch Metrics - Optional)
@@ -114,7 +115,8 @@ The service automatically marks itself as unhealthy when:
 - Transaction submission fails twice in a row  
 - USDST balance check fails twice in a row
 
-Each cycle also checks the Voucher and USDST balances and estimates the transactions left
-(`voucher / GAS_FEE_VOUCHER + usdst / GAS_FEE_USDST`):
+Each cycle also checks the Voucher, STRATO and USDST balances and estimates the transactions left
+(`voucher / GAS_FEE_VOUCHER + strato / fee router's STRATO quote + usdst / GAS_FEE_USDST`; under the
+STRATO router USDST counts at half, since it buys STRATO at up to twice the call's value):
 - At or below `MIN_TRANSACTIONS_THRESHOLD` (default 12000, ~5.5 days at 90 tx/hour) it logs an error (and Slack alert, if configured)
 - Below 1 transaction the process exits with code 1
