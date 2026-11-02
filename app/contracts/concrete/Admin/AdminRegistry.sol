@@ -7,12 +7,16 @@ contract record AdminRegistry is Ownable {
     mapping (string => address[]) public record votes;
     mapping (string => mapping (address => uint)) public record votesMap;
     mapping (string => bool) public record currentIssues;
+    mapping (string => uint) public record issueConfigVersions;
 
     mapping (address => mapping (string => mapping (address => bool))) public record whitelist;
 
     mapping (address => mapping (string => uint)) public record votingThresholds;
 
     uint public defaultVotingThresholdBps = 6000; // 3/5
+
+    // Bumped by every admin or threshold change; votes cast under an older version never count
+    uint public configVersion;
 
     event IssueCreated(address creator, string issueId, address target, string func, variadic args);
     event IssueVoted(address voter, string issueId, address target, string func, variadic args);
@@ -43,8 +47,10 @@ contract record AdminRegistry is Ownable {
         defaultVotingThresholdBps = 6000; // 3/5
         require(admins.length == 0, "AdminRegistry is already initialized");
         require(_initialAdmins.length > 0, "At least one admin is required");
+        configVersion = 1;
         for (uint i = 0; i < _initialAdmins.length; i++) {
             require(_initialAdmins[i] != address(0), "Invalid admin address");
+            require(_initialAdmins[i] != address(this), "AdminRegistry cannot be its own admin");
             require(adminMap[_initialAdmins[i]] == 0, "Duplicate admin address");
             admins.push(_initialAdmins[i]);
             adminMap[_initialAdmins[i]] = admins.length;
@@ -72,13 +78,7 @@ contract record AdminRegistry is Ownable {
         require(currentIssues[_issueId], "Issue does not exist or is not active");
         require(votes[_issueId].length == 1, "Only issues with a single vote can be dismissed");
         require(votes[_issueId][0] == msg.sender, "Only the proposer can dismiss their issue");
-
-        for (uint i = 0; i < votes[_issueId].length; i++) {
-            votesMap[_issueId][votes[_issueId][i]] = 0;
-            votes[_issueId][i] = address(0);
-        }
-        votes[_issueId].length = 0;
-        delete currentIssues[_issueId];
+        _clearVotes(_issueId);
         emit IssueDismissed(msg.sender, _issueId);
     }
 
@@ -90,6 +90,13 @@ contract record AdminRegistry is Ownable {
         }
         string issueId = _getIssueId(_target, _func, _args);
         if (adminMap[msg.sender] != 0) {
+            // A registry upgraded from logic without config versions starts at version 0, so
+            // its older issues are stale
+            if (configVersion == 0) configVersion = 1;
+            if (issueConfigVersions[issueId] != configVersion) {
+                _clearVotes(issueId);
+                issueConfigVersions[issueId] = configVersion;
+            }
             bool hasVoted = votesMap[issueId][msg.sender] != 0;
 
             _createIssue(issueId, _target, _func, _args);
@@ -148,22 +155,28 @@ contract record AdminRegistry is Ownable {
     }
 
     function _executeIssue(string _issueId, address _target, string _func, variadic _args) internal returns (variadic) {
+        _clearVotes(_issueId);
+        variadic ret = _target.call(_func, _args);
+        emit IssueExecuted(msg.sender, _issueId, _target, _func, _args);
+        return ret;
+    }
+
+    function _clearVotes(string _issueId) internal {
         for (uint i = 0; i < votes[_issueId].length; i++) {
             votesMap[_issueId][votes[_issueId][i]] = 0;
             votes[_issueId][i] = address(0);
         }
         votes[_issueId].length = 0;
         delete currentIssues[_issueId];
-        variadic ret = _target.call(_func, _args);
-        emit IssueExecuted(msg.sender, _issueId, _target, _func, _args);
-        return ret;
     }
 
     function _addAdmin(address _admin) external onlyOwner {
         require(_admin != address(0), "Invalid admin address");
+        require(_admin != address(this), "AdminRegistry cannot be its own admin");
         require(adminMap[_admin] == 0, "Account is already an admin");
         admins.push(_admin);
         adminMap[_admin] = admins.length;
+        configVersion++;
         emit AdminAdded(_admin);
     }
 
@@ -177,11 +190,13 @@ contract record AdminRegistry is Ownable {
         adminMap[_admin] = 0;
         admins[admins.length - 1] = address(0);
         admins.length -= 1;
+        configVersion++;
         emit AdminRemoved(_admin);
     }
 
     function _swapAdmin(address _adminToReplace, address _admin) external onlyOwner {
         require(_admin != address(0), "Invalid admin address");
+        require(_admin != address(this), "AdminRegistry cannot be its own admin");
         uint index = adminMap[_admin];
         require(index == 0, "Account is already an admin");
         index = adminMap[_adminToReplace];
@@ -189,6 +204,7 @@ contract record AdminRegistry is Ownable {
         admins[index - 1] = _admin;
         adminMap[_admin] = index;
         adminMap[_adminToReplace] = 0;
+        configVersion++;
         emit AdminSwapped(_adminToReplace, _admin);
     }
 
@@ -224,6 +240,7 @@ contract record AdminRegistry is Ownable {
         require(_votingThresholdBps > 0, "Voting threshold must be greater than 0");
         require(_votingThresholdBps <= 10000, "Voting threshold must be less than 100%");
         votingThresholds[_target][_func] = _votingThresholdBps;
+        configVersion++;
         emit VotingThresholdSet(_target, _func, _votingThresholdBps);
     }
 
@@ -231,6 +248,7 @@ contract record AdminRegistry is Ownable {
         require(_defaultVotingThresholdBps > 0, "Default voting threshold must be greater than 0");
         require(_defaultVotingThresholdBps <= 10000, "Default voting threshold must be less than 100%");
         defaultVotingThresholdBps = _defaultVotingThresholdBps;
+        configVersion++;
         emit DefaultVotingThresholdSet(_defaultVotingThresholdBps);
     }
 

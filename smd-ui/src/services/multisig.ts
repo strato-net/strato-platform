@@ -1,11 +1,13 @@
 import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keccak256, stringToBytes } from "viem";
 import { api } from "@/lib/api";
 import { formatVariadicArg, parseJsonExact } from "@/lib/args";
 import { env } from "@/lib/env";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { useUser } from "@/context/UserContext";
 import { strip0x, ZERO_ADDRESS, type UserWallet } from "@/services/userWallets";
+import multisigSource from "../contracts/Multisig.sol?raw";
 
 /**
  * The AdminRegistry proxy is deployed at 0x100c in genesis. It owns itself and
@@ -17,6 +19,15 @@ import { strip0x, ZERO_ADDRESS, type UserWallet } from "@/services/userWallets";
 export const ADMIN_REGISTRY_ADDRESS = "000000000000000000000000000000000000100c";
 /** Genesis address of the AdminRegistry logic code; last-resort fallback only. */
 export const ADMIN_REGISTRY_IMPL_FALLBACK = "000000000000000000000000000000000000110c";
+
+/**
+ * Logic for new multisig wallets (app/contracts/concrete/Admin/Multisig.sol). It holds
+ * no state of its own and can't be initialized, so any deployment of this exact source
+ * will do: SMD finds one by code hash (keccak256 of the source) and deploys it if none
+ * exists yet.
+ */
+export const MULTISIG_SOURCE = multisigSource;
+export const MULTISIG_CODE_HASH = strip0x(keccak256(stringToBytes(multisigSource)));
 
 /** thresholds are stored in basis points: 6000 = 60%. */
 export const bpsToPct = (bps: number) => Math.round((bps / 100) * 10) / 10;
@@ -36,6 +47,15 @@ async function fetchStorageData(address: string): Promise<Record<string, any>> {
   const rows = await cirrusGet("storage", `address=eq.${strip0x(address)}&select=data`);
   const data = rows[0]?.data;
   return data && typeof data === "object" ? data : {};
+}
+
+/** An account running the Multisig logic: `address` if it does, or any one. "" if none. */
+async function findMultisigLogic(address?: string): Promise<string> {
+  const filter = address ? `&address=${strip0x(address)}` : "";
+  const { data } = await api.get(
+    `${env.STRATO_URL}/account?codeHash=${MULTISIG_CODE_HASH}${filter}&limit=1`
+  );
+  return Array.isArray(data) && data[0]?.address ? strip0x(String(data[0].address)) : "";
 }
 
 // ---- Reads --------------------------------------------------------------------------
@@ -87,6 +107,10 @@ export interface MultisigConfig {
   owner: string;
   /** default voting threshold in basis points (e.g. 6000 = 60%). */
   defaultThresholdBps: number;
+  /** true when the wallet delegates to the Multisig logic rather than AdminRegistry's. */
+  runsMultisigLogic: boolean;
+  /** Bumped by every signer or threshold change; 0 on logic that doesn't track it. */
+  configVersion: number;
 }
 
 /** A User wallet's multisig-relevant state, read from its cirrus storage blob. */
@@ -97,11 +121,14 @@ export function useMultisigConfig(walletAddress?: string | null) {
     refetchInterval: 12_000,
     queryFn: async (): Promise<MultisigConfig> => {
       const data = await fetchStorageData(walletAddress!);
+      const logicContract = strip0x(String(data["logicContract"] ?? ""));
       return {
-        logicContract: strip0x(String(data["logicContract"] ?? "")),
+        logicContract,
         initialized: data["initialized"] === true || data["initialized"] === "true",
         owner: strip0x(String(data["_owner"] ?? data["owner"] ?? "")),
         defaultThresholdBps: Number(data["defaultVotingThresholdBps"] ?? 0) || 0,
+        runsMultisigLogic: !isZeroAddr(logicContract) && !!(await findMultisigLogic(logicContract)),
+        configVersion: Number(data["configVersion"] ?? 0) || 0,
       };
     },
   });
@@ -110,13 +137,15 @@ export function useMultisigConfig(walletAddress?: string | null) {
     initialized: false,
     owner: "",
     defaultThresholdBps: 0,
+    runsMultisigLogic: false,
+    configVersion: 0,
   };
   return { config, ...q };
 }
 
 /**
- * Whether a User wallet is running as a multisig (it delegates to the AdminRegistry
- * logic). `fullyEnabled` additionally requires the wallet to own itself and be
+ * Whether a User wallet is running as a multisig (it delegates to the Multisig or the
+ * AdminRegistry logic). `fullyEnabled` additionally requires the wallet to own itself and be
  * initialized — the state in which signer votes can actually execute. A fully enabled
  * wallet keeps the logic it was enabled with, which may predate an AdminRegistry
  * upgrade, so that state doesn't require matching the current logic.
@@ -130,7 +159,7 @@ export function useIsMultisig(walletAddress?: string | null) {
   const selfOwned = !!walletAddress && strip0x(config.owner) === strip0x(walletAddress);
   const fullyEnabled = hasLogic && selfOwned && config.initialized;
   return {
-    isMultisig: delegatesToAdmin || fullyEnabled,
+    isMultisig: delegatesToAdmin || config.runsMultisigLogic || fullyEnabled,
     fullyEnabled,
     selfOwned,
     initialized: config.initialized,
@@ -320,6 +349,8 @@ export interface OpenIssue {
   args: string[];
   /** Addresses that have voted so far. */
   voters: string[];
+  /** Its votes predate a signer or threshold change, so they no longer count. */
+  invalidated?: boolean;
   createdBlock?: number;
   indexing?: boolean;
   transactionHash?: string;
@@ -346,7 +377,11 @@ export function normalizeArgs(raw: unknown): string[] {
   return [String(raw)];
 }
 
-export function buildOpenIssues(voteRows: any[], created: any[]): OpenIssue[] {
+export function buildOpenIssues(
+  voteRows: any[],
+  created: any[],
+  versions?: { current: number; byIssue: Map<string, number> }
+): OpenIssue[] {
   // Group live votes by issueId (drop zeroed-out / cleared entries).
   const votersByIssue = new Map<string, string[]>();
   for (const r of voteRows) {
@@ -380,6 +415,8 @@ export function buildOpenIssues(voteRows: any[], created: any[]): OpenIssue[] {
       (ev.event_name === "IssueExecuted" || ev.event_name === "IssueDismissed") &&
       ev.attributes?.issueId === issueId && Number(ev.block_number) >= (d?.block ?? 0)
     )) continue;
+    const invalidated =
+      !!versions && versions.current > 0 && versions.byIssue.get(issueId) !== versions.current;
     issues.push({
       issueId,
       target: d?.target ?? "",
@@ -387,6 +424,7 @@ export function buildOpenIssues(voteRows: any[], created: any[]): OpenIssue[] {
       args: d?.args ?? [],
       voters,
       createdBlock: d?.block,
+      ...(invalidated ? { invalidated } : {}),
     });
   }
   issues.sort((a, b) => (b.createdBlock ?? 0) - (a.createdBlock ?? 0));
@@ -445,7 +483,8 @@ export function applyConfirmedVote(cached: OpenIssue[], result: any, proposal: O
 /**
  * Open (unexecuted) issues for a multisig wallet. Derived from the `votes` collection
  * — an issue is open while it still has non-zero voters (execution/dismissal clears
- * them) — joined to its `IssueCreated` event for target/func/args.
+ * them) — joined to its `IssueCreated` event for target/func/args, and marked
+ * invalidated when its `issueConfigVersions` entry isn't the wallet's `configVersion`.
  */
 export function useOpenIssues(walletAddress?: string | null) {
   const queryClient = useQueryClient();
@@ -457,16 +496,27 @@ export function useOpenIssues(walletAddress?: string | null) {
     refetchIntervalInBackground: true,
     queryFn: async (): Promise<OpenIssue[]> => {
       const addr = strip0x(walletAddress!);
-      const [voteRows, created] = await Promise.all([
-        cirrusGet("mapping", `collection_name=eq.votes&address=eq.${addr}&select=key,value`),
+      const [mappingRows, created, data] = await Promise.all([
+        cirrusGet(
+          "mapping",
+          `collection_name=in.(votes,issueConfigVersions)&address=eq.${addr}&select=collection_name,key,value`
+        ),
         cirrusGet(
           "event",
           `address=eq.${addr}&event_name=in.(IssueCreated,IssueExecuted,IssueDismissed)&order=block_number.desc` +
             `&select=event_name,attributes,block_number,transaction_hash`
         ),
+        fetchStorageData(addr),
       ]);
+      const voteRows = mappingRows.filter((r) => r?.collection_name === "votes");
+      const byIssue = new Map(
+        mappingRows
+          .filter((r) => r?.collection_name === "issueConfigVersions")
+          .map((r): [string, number] => [String(r?.key?.key ?? ""), Number(r?.value ?? 0)])
+      );
+      const versions = { current: Number(data["configVersion"] ?? 0) || 0, byIssue };
 
-      return mergeIndexedIssues(buildOpenIssues(voteRows, created), queryClient.getQueryData(queryKey), created);
+      return mergeIndexedIssues(buildOpenIssues(voteRows, created, versions), queryClient.getQueryData(queryKey), created);
     },
   });
 }
@@ -620,9 +670,36 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
     [submit, walletAddress]
   );
 
-  /** Step 1: delegate the wallet's governance to the AdminRegistry logic. */
+  /**
+   * A Multisig logic contract to point wallets at: an existing deployment found by code
+   * hash, or a new one. External wallets deploy through a User wallet they own
+   * (`username`), whose createContract returns nothing, so the new contract is then
+   * looked up by code hash once it's indexed.
+   */
+  const ensureMultisigLogic = useCallback(
+    async (username?: string): Promise<string> => {
+      const existing = await findMultisigLogic();
+      if (existing) return existing;
+      const result: any = await submit(
+        "CONTRACT",
+        { contract: "Multisig", src: MULTISIG_SOURCE, args: {}, metadata: { VM: "SolidVM" } },
+        username ? { username } : undefined
+      );
+      const deployed = result?.data?.contents?.address ?? result?.address ?? result?.contents?.address;
+      if (deployed) return strip0x(String(deployed));
+      for (let i = 0; i < 10; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        const found = await findMultisigLogic();
+        if (found) return found;
+      }
+      throw new Error("Deployed the Multisig logic, but it isn't indexed yet. Try again in a minute.");
+    },
+    [submit]
+  );
+
+  /** Step 1: delegate the wallet's governance to the Multisig logic. */
   const setLogic = useCallback(
-    (adminLogic: string) => callWallet("setLogicContract", { _logicContract: strip0x(adminLogic) }),
+    (logic: string) => callWallet("setLogicContract", { _logicContract: strip0x(logic) }),
     [callWallet]
   );
 
@@ -651,15 +728,15 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
   /**
    * Turn the wallet into a self-governed multisig, running only the steps still
    * needed given `have` (so a partially-enabled wallet can be resumed safely):
-   *  1. setLogicContract(adminLogic)  2. initialize([signers])  3. transferOwnership(self)
+   *  1. setLogicContract(logic)  2. initialize([signers])  3. transferOwnership(self)
    */
   const enableMultisig = useCallback(
     async (
-      adminLogic: string,
+      logic: string,
       signers: string[],
       have?: { logicSet?: boolean; initialized?: boolean; selfOwned?: boolean }
     ) => {
-      if (!have?.logicSet) await setLogic(adminLogic);
+      if (!have?.logicSet) await setLogic(logic);
       if (!have?.initialized) await initializeSigners(signers);
       if (!have?.selfOwned) await lockToSelf();
     },
@@ -759,6 +836,7 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
   );
 
   return {
+    ensureMultisigLogic,
     enableMultisig,
     setLogic,
     initializeSigners,
