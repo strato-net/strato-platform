@@ -152,6 +152,8 @@ class HasPeerDB m where
   getUnbondedPeers :: m [PPeer]
   getClosestPeers :: Point -> Natural -> m [PPeer]
 
+  -- | Move the peer's UDP deadline out to this time; a later stored
+  -- deadline stands.
   updateUdpEnableTime :: PPeer -> UTCTime -> m ()
   updateIP :: PPeer -> IP -> m ()
   updateTcpPort :: PPeer -> TCPPort -> m ()
@@ -234,6 +236,13 @@ thisPeer peer = [PPeerHost SQL.==. pPeerHost peer, PPeerTcpPort SQL.==. pPeerTcp
 thisOr100Years :: Int -> Int
 thisOr100Years = min (100 * 365 * 24 * 60 * 60) -- there is no need to be disabling peers for > 100 years y'all
 
+-- | Keep discovery from pinging a peer for at least this long: the stored
+-- deadline is moved out to now plus the seconds given, and never moved
+-- closer, so a longer disable already in place stands. The comparison is
+-- made against the stored deadline, not the row handed in, which may be a
+-- snapshot taken before another write (the exponential TCP disable writes
+-- udp_enable_time as well): checked against the snapshot, a short backoff
+-- in force when the row was read stood in for the day asked for.
 disableUDPPeerForSeconds ::
   (MonadUnliftIO m, HasPeerDB m) =>
   PPeer ->
@@ -241,12 +250,8 @@ disableUDPPeerForSeconds ::
   m (Either SomeException ())
 disableUDPPeerForSeconds peer seconds = try $ do
   currentTime <- liftIO getCurrentTime
-  if currentTime < pPeerUdpEnableTime peer
-    then return ()
-    else
-      let seconds' = thisOr100Years seconds
-          enableTime = fromIntegral seconds' `addUTCTime` currentTime
-       in updateUdpEnableTime peer enableTime
+  let enableTime = fromIntegral (thisOr100Years seconds) `addUTCTime` currentTime
+  updateUdpEnableTime peer enableTime
 
 -- | Keep a peer from being dialed for a fixed time. Unlike
 -- 'lengthenPeerDisableBy', which starts a fresh peer's exponential backoff at

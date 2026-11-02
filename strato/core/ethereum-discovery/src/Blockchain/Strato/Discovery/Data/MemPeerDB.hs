@@ -113,7 +113,7 @@ instance {-# OVERLAPPING #-} (MemPeerDBEnv :> es) => HasPeerDB (Eff es) where
 
   updateUdpEnableTime peer' enableTime = do
     peerMap <- fmap stringPPeerMap accessEnv
-    atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerUdpEnableTime = enableTime}))
+    atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> if pPeerUdpEnableTime p < enableTime then p {pPeerUdpEnableTime = enableTime} else p))
 
   updateIP peer' ip = do
     peerMap <- fmap stringPPeerMap accessEnv

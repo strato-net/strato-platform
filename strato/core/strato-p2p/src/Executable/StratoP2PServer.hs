@@ -147,10 +147,13 @@ runEthServerConduit remote p pSource pSink seqSrc peerStr = labelPeerThread peer
       -- is admitted and the key is not this node's own. The mark is dropped
       -- on the way out only if it was set: a connection that failed before
       -- its Hello proved nothing about any stored record, and another
-      -- session with the peer may be holding the mark.
+      -- session with the peer may be holding the mark. Mark and flag are
+      -- set under mask: a source failing in the merge cancels the handler,
+      -- and a cancellation between the two would leave the mark in place
+      -- after the session, with the peer never dialed again.
       inSession <- newIORef False
       let p' = p{pPeerPubkey = Just otherPubKey}
-          recordSession = do
+          recordSession = mask_ $ do
             markInboundPeerActive remote otherPubKey
             writeIORef inSession True
           endSession = do
@@ -217,8 +220,9 @@ storedPeersWithKey host pubkey = filter ((== Just pubkey) . pPeerPubkey) <$> get
 -- discovery pings. The UDP disable goes last, as in the client loop: the
 -- TCP disable writes its own deadline into udp_enable_time as well, and
 -- would cut the day down to the first five-second window, after which
--- discovery's next Pong bonds the peer again. A peer with no record is left
--- without one: it is not dialed anyway.
+-- discovery's next Pong bonds the peer again; the UDP disable then moves
+-- the stored deadline out to the day whatever the row showed when it was
+-- read. A peer with no record is left without one: it is not dialed anyway.
 disableStoredInboundPeer :: MonadP2P m => Host -> Point -> T.Text -> Bool -> m ()
 disableStoredInboundPeer host pubkey why wrongChain = do
   stored <- storedPeersWithKey host pubkey

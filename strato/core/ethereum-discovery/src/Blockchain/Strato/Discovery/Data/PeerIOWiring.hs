@@ -105,7 +105,7 @@ instance MonadIO m => HasPeerDB m where
 
   updateUdpEnableTime peer enableTime = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
-      SQL.updateWhere (thisPeer peer) [PPeerUdpEnableTime SQL.=. enableTime]
+      SQL.updateWhere (thisPeer peer ++ [PPeerUdpEnableTime SQL.<. enableTime]) [PPeerUdpEnableTime SQL.=. enableTime]
 
   updateIP peer ip = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $

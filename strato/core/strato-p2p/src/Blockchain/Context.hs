@@ -108,12 +108,13 @@ import           Blockchain.Strato.Model.Keccak256
 
 import qualified Blockchain.Strato.RedisBlockDB          as RBDB
 import           Blockchain.SyncDB
-import           Control.Monad                           (forM_, unless, void, when)
+import           Control.Monad                           (forM_, unless, void)
 import           Control.Monad.Composable.Base
 import           Control.Monad.Composable.BlockDB (BlockDBEnv, HasBlockDB, runBlockDB)
 import qualified Database.Persist.Sql                    as SQL
 import qualified Database.Redis                          as Redis
 import           Network.Wai.Handler.Warp.Internal       (setSocketCloseOnExec)
+import           System.IO.Unsafe                        (unsafePerformIO)
 import           Text.Read                               (readMaybe)
 import           UnliftIO
 
@@ -638,6 +639,15 @@ withActivePeer p = bracket a b . const
     a = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Active
     b _ = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Inactive
 
+-- | Serialises 'markInboundPeerActive' across the connections this process
+-- accepts: its lookup and insert are separate statements, and the peer
+-- table has no uniqueness constraint, so two first connections from one
+-- unknown peer arriving together would each store it. Discovery's own
+-- lookup-then-insert runs in another process and is not covered.
+inboundPeerRecordLock :: MVar ()
+inboundPeerRecordLock = unsafePerformIO $ newMVar ()
+{-# NOINLINE inboundPeerRecordLock #-}
+
 -- | Record that an accepted peer is in session, once its Hello has
 -- authenticated the key the RLPx handshake claimed. 'withActivePeer' finds
 -- a peer by host and listening port, which a dialed peer has and an accepted
@@ -645,36 +655,34 @@ withActivePeer p = bracket a b . const
 -- ephemeral source port, which matches no stored row, so until now no
 -- inbound peer was ever active in the table. Such a peer is known by its
 -- source address (the IP the socket reports) and by its key. Every record
--- of that key at that address is marked, under the address and under any
--- name stored for it, so the client loop does not dial a peer this node is
--- already in session with. A record of the address that carries no key yet
--- (a seeded bootnode discovery has not bonded with) or another key (the
--- address changed hands) is this peer's and is given the key, as discovery
--- gives the address's record the key of every Pong: the table holds one
--- peer per address, and a sibling row would be bonded and dialed twice over.
--- A peer with no record at all gets one under its address, unbonded and
--- with the default ports, for discovery to bond like any other newcomer;
--- its real ports arrive with its Pong. 'markInboundPeerInactive' drops the
--- mark when the session ends.
+-- of the address, under the address itself and under any name stored for
+-- it, is given the key and marked, so the client loop does not dial a peer
+-- this node is already in session with under any of its names. The table
+-- holds one peer per address: a record with no key yet (a seeded bootnode
+-- discovery has not bonded with) or another key (the address changed
+-- hands) is this peer's, as it is to discovery, which gives the address's
+-- record the key of every Pong; a record left out would be bonded under
+-- its own name and dialed despite the session. A peer with no record at all
+-- gets one under its address, unbonded and with the default ports, for
+-- discovery to bond like any other newcomer; its real ports arrive with its
+-- Pong. 'markInboundPeerInactive' drops the mark when the session ends.
 markInboundPeerActive ::
-  ( MonadIO m,
+  ( MonadUnliftIO m,
     HasPeerDB m,
     A.Selectable Host [PPeer] m
   ) =>
   Host ->
   Point ->
   m ()
-markInboundPeerActive remote pubkey = do
-  marked <- setPeerActiveStateByKey remote pubkey Active
-  when (marked == 0) $ do
-    stored <- getPeersByIP remote
-    case stored of
-      [] -> do
-        newcomer <- mkPeer (Just pubkey) remote (readMaybe $ hostToString remote) (UDPPort $ pPeerUdpPort def) (TCPPort $ pPeerTcpPort def)
-        insertPeer newcomer {pPeerActiveState = fromEnum Active}
-      records -> do
-        forM_ records $ \record -> setPeerPubkey record pubkey
-        void $ setPeerActiveStateByKey remote pubkey Active
+markInboundPeerActive remote pubkey = withMVar inboundPeerRecordLock . const $ do
+  stored <- getPeersByIP remote
+  case stored of
+    [] -> do
+      newcomer <- mkPeer (Just pubkey) remote (readMaybe $ hostToString remote) (UDPPort $ pPeerUdpPort def) (TCPPort $ pPeerTcpPort def)
+      insertPeer newcomer {pPeerActiveState = fromEnum Active}
+    records -> do
+      forM_ records $ \record -> setPeerPubkey record pubkey
+      void $ setPeerActiveStateByKey remote pubkey Active
 
 -- | Drop the mark 'markInboundPeerActive' set, at the end of the session.
 markInboundPeerInactive ::
