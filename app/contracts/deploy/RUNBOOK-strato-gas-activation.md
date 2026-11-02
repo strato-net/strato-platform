@@ -94,8 +94,8 @@ Preconditions, in order. "Vote" = one AdminRegistry issue, run once per admin.
    `strato/core/strato-conf/src/Blockchain/EthConf/Model.hs` is 2000000, the block
    staking activates at, so the two switch together. Release and upgrade every
    validator and the app before A. Mixed builds agree until A; at A a validator on
-   the old build forks off. The router's activation block (step 4) must be the same
-   number.
+   the old build forks off. The router's activation block (step 4) is `fork` in
+   `networks.js`, which must be the same number.
 2. **Token.** Upgrade the STRATO proxy to the burnable logic (`upgrade.js`, vote). Transfers
    stay paused until TGE: the router moves each fee to the burn address with `transferFrom`,
    so whitelist it for `transferFrom` (`whitelist-feerouter.js upquark <router>`, vote) before
@@ -112,7 +112,7 @@ Preconditions, in order. "Vote" = one AdminRegistry issue, run once per admin.
    of it (a tenth keeps ordinary LP churn from stopping pricing; a drained pool must
    fall below it). Below the floor the router stops quoting and the last quote stays
    frozen until the pool refills.
-4. **Router.** `gen-feerouter-source.js upquark --pool <pool> --activate 2000000 --min-liquidity <L>`
+4. **Router.** `gen-feerouter-source.js upquark --pool <pool> --min-liquidity <L>` (it activates at the network's fork, 2000000)
    (the generator refuses upquark without a floor; `--block-reward 0` switches rewards off, as on helium),
    `deploy-feerouter.js` as both admins (it deploys the generated `UpquarkFeeRouter`), fund it with STRATO for block rewards, and
    decide what tops it up: the router pays 0.01 STRATO per block from its own balance

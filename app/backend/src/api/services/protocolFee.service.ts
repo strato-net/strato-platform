@@ -3,6 +3,7 @@
  */
 
 import { cirrus } from "../../utils/appApiHelper";
+import { toUTCTime } from "../helpers/cirrusHelpers";
 import { constants } from "../../config/constants";
 import { POOL_V3_CONTRACTS } from "../../config/poolV3Constants";
 import { getCDPRegistry } from "./cdp.service";
@@ -1147,34 +1148,35 @@ export const getGasCostRevenue = async (
 };
 
 /**
- * Get the STRATO burned for transaction fees, by period. The fee router emits FeePaid
- * from the payer's own context, so the events carry no contract address to filter on;
- * the burn methods do (vouchers are a separate token).
+ * Get the STRATO burned for transaction fees, by period: the STRATO token's own Transfer
+ * events to the burn address, where the fee router sends every STRATO fee. FeePaid is no
+ * proof on its own: it is emitted from the payer's context, so any contract can emit one.
+ * Summed in Cirrus, with ::text keeping 18-decimal totals exact through JSON.
  */
 export const getStratoBurned = async (
   accessToken: string,
 ): Promise<ProtocolRevenue> => {
   try {
-    const { data: feeEvents } = await cirrus.get(accessToken, `/event`, {
-      params: {
-        event_name: "eq.FeePaid",
-        "attributes->>method": "in.(FeeMethod.STRATO_BURN,FeeMethod.USDST_SWAP_BURN)",
-        select: "amount:attributes->>amount,block_timestamp",
-        order: "block_timestamp.desc"
-      }
-    });
     const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = getTimeCutoffs();
-
-    let daily = 0n, weekly = 0n, monthly = 0n, ytd = 0n, allTime = 0n;
-    for (const event of feeEvents || []) {
-      const ts = parseTimestamp(event.block_timestamp);
-      const amount = BigInt(event.amount || "0");
-      allTime += amount;
-      if (ts >= oneDayAgo) daily += amount;
-      if (ts >= oneWeekAgo) weekly += amount;
-      if (ts >= oneMonthAgo) monthly += amount;
-      if (ts >= ytdCutoff) ytd += amount;
-    }
+    const burnedSince = async (since?: number): Promise<bigint> => {
+      const { data } = await cirrus.get(accessToken, `/event`, {
+        params: {
+          address: `eq.${constants.stratoToken}`,
+          event_name: "eq.Transfer",
+          "attributes->>to": `eq.${constants.BURN_ADDRESS}`,
+          ...(since !== undefined && { block_timestamp: `gte.${toUTCTime(new Date(since * 1000))}` }),
+          select: "total:attributes->>value::numeric.sum()::text"
+        }
+      });
+      return BigInt(data?.[0]?.total ?? "0");
+    };
+    const [daily, weekly, monthly, ytd, allTime] = await Promise.all([
+      burnedSince(oneDayAgo),
+      burnedSince(oneWeekAgo),
+      burnedSince(oneMonthAgo),
+      burnedSince(ytdCutoff),
+      burnedSince(),
+    ]);
 
     const buildByAsset = (total: bigint): RevenueByAsset[] =>
       total > 0n ? [{ asset: constants.stratoToken, symbol: "STRATO", revenue: total.toString() }] : [];

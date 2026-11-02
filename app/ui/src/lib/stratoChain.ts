@@ -99,6 +99,7 @@ async function addWalletChain(walletClient: WalletLike, chain: Chain) {
 export async function ensureStratoChainInWallet(walletClient: WalletLike | null | undefined) {
   if (!walletClient) throw new Error("No wallet client available");
   const chain = getInitializedStratoChain();
+  await refreshNativeCurrency(chain);
   if (walletClient.chain?.id === chain.id) return;
 
   try {
@@ -124,6 +125,14 @@ async function nodeChargesStrato(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// Once the node charges STRATO it always does, so a chain defined before the fork,
+// or while the node was unreachable, is checked again before a wallet records its
+// currency. Updated in place: the wagmi config holds this same chain object.
+async function refreshNativeCurrency(chain: Chain) {
+  if (chain.nativeCurrency.symbol === "STRATO" || !(await nodeChargesStrato())) return;
+  Object.assign(chain.nativeCurrency, { name: "STRATO", symbol: "STRATO" });
 }
 
 export async function initStratoChain(): Promise<Chain | null> {

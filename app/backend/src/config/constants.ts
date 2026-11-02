@@ -204,6 +204,7 @@ export const constants = (() => {
     GAS_FEE: 0.01,
     USDST: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
     ZERO_ADDRESS: "0000000000000000000000000000000000000000",
+    BURN_ADDRESS: "deaddeaddeaddeaddeaddeaddeaddeaddeaddead", // where the fee router sends STRATO fees
     DAY_MS: 24 * 60 * 60 * 1000,
     // Use getter to get current value after init
     get EXECUTED_ISSUES_LOOKBACK_DAYS() { return config.executedIssuesLookbackDays; },

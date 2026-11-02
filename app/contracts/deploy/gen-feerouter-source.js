@@ -14,13 +14,13 @@
 // None of these can live in storage — payFees is DELEGATECALLed and SolidVM storage
 // is name-keyed, so a state read there resolves against the signer, not the router.
 //
-//   node gen-feerouter-source.js [helium|upquark] --pool <poolAddress> [--activate <block>] [--min-liquidity <L>] [contractName]
+//   node gen-feerouter-source.js [helium|upquark] --pool <poolAddress> [--min-liquidity <L>] [contractName]
 //   node gen-feerouter-source.js <stakingAddress> --pool <poolAddress> [contractName]   (helium STRATO)
 //
-// --activate: the block from which the router burns STRATO and pays rewards; before
-// it the router charges the legacy fee (voucher, else 0.01 USDST to FeeCollector)
-// and can be installed early. It must equal that network's `stratoGasForkBlock`
-// (strato-conf Model.hs), so fees and the native token switch at the same block.
+// The router burns STRATO and pays rewards from the network's `stratoGasForkBlock`
+// (`fork` in networks.js); before it the router charges the legacy fee (voucher,
+// else 0.01 USDST to FeeCollector) and can be installed early. Fees and the native
+// token switch at the same block, so the activation is never a flag.
 //
 // --min-liquidity: the pool liquidity (PoolV3 `liquidity()`, about sqrt(STRATO wei x
 // USDST wei) for a full-range position) below which the router stops pricing and
@@ -49,12 +49,6 @@ if (!isAddress(pool)) {
   console.error('FAILED: --pool <address> is required: the canonical STRATO/USDST PoolV3 the fee is priced from');
   process.exit(1);
 }
-const activateIdx = argv.indexOf('--activate');
-const activate = activateIdx >= 0 ? argv[activateIdx + 1] : '';
-if (activateIdx >= 0 && !/^[0-9]+$/.test(activate)) {
-  console.error('FAILED: --activate <block> takes a block number');
-  process.exit(1);
-}
 const minLiquidityIdx = argv.indexOf('--min-liquidity');
 const minLiquidity = minLiquidityIdx >= 0 ? argv[minLiquidityIdx + 1] : '';
 if (minLiquidityIdx >= 0 && !/^[1-9][0-9]*$/.test(minLiquidity)) {
@@ -67,8 +61,8 @@ if (blockRewardIdx >= 0 && !/^[0-9]+$/.test(blockReward)) {
   console.error('FAILED: --block-reward <wei> takes a STRATO amount in wei (0 switches rewards off)');
   process.exit(1);
 }
-const flagValues = [poolIdx, activateIdx, minLiquidityIdx, blockRewardIdx].filter(i => i >= 0).map(i => i + 1);
-const positional = argv.filter((a, i) => !['--pool', '--activate', '--min-liquidity', '--block-reward'].includes(a) && !flagValues.includes(i));
+const flagValues = [poolIdx, minLiquidityIdx, blockRewardIdx].filter(i => i >= 0).map(i => i + 1);
+const positional = argv.filter((a, i) => !['--pool', '--min-liquidity', '--block-reward'].includes(a) && !flagValues.includes(i));
 
 const arg = (positional[0] || 'helium').replace(/^0x/, '');
 let network;
@@ -99,13 +93,13 @@ const stakingOverride = network.staking ? `
     }
 ` : '';
 
-const activationOverride = activate ? `
+const activationOverride = `
     // Fees burn STRATO and rewards flow from this block, the network's
     // stratoGasForkBlock; until then the router charges the legacy fee.
     function _activationBlock() internal view override returns (uint) {
-        return ${activate};
+        return ${network.fork};
     }
-` : '';
+`;
 
 const liquidityOverride = minLiquidity ? `
     // Below this pool liquidity the router stops pricing and the last quote stays
@@ -141,4 +135,4 @@ ${stakingOverride}${activationOverride}${liquidityOverride}${rewardOverride}}
 
 fs.writeFileSync(OUT, base.trimEnd() + '\n' + subclass);
 console.log(`${OUT} written: ${fs.statSync(OUT).size} bytes | ${network.label} | contract ${NAME} | ` +
-  `STRATO ${network.strato} | pool ${pool} | staking ${network.staking || '(governance only)'} | activation ${activate || 'genesis'} | liquidity floor ${minLiquidity || 'none'} | block reward ${blockReward || '1e16'}`);
+  `STRATO ${network.strato} | pool ${pool} | staking ${network.staking || '(governance only)'} | activation ${network.fork} | liquidity floor ${minLiquidity || 'none'} | block reward ${blockReward || '1e16'}`);

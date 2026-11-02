@@ -14,7 +14,7 @@ import { useUser } from '@/context/UserContext';
 import { formatUnits } from 'ethers';
 import { useSwapContext } from '@/context/SwapContext';
 import { useEarnContext } from '@/context/EarnContext';
-import { usdstAddress, DEPOSIT_CALLS } from "@/lib/constants";
+import { usdstAddress, DEPOSIT_CALLS, SINGLE_TOKEN_DEPOSIT_CALLS } from "@/lib/constants";
 import NetworkFee, { FeeNotices } from "@/components/NetworkFee";
 import { computeMaxTransferable } from "@/utils/transferValidation";
 import { feeShortfall } from "@/utils/feeUtils";
@@ -59,9 +59,6 @@ const LiquidityDepositModal = ({
   operationInProgressRef,
 }: LiquidityDepositModalProps) => {
   const { feeQuote } = useTokenContext();
-  // What a token balance can fund once the fee is reserved (when that token pays it).
-  const spendable = (balanceWei: string, tokenAddress?: string) =>
-    BigInt(computeMaxTransferable(balanceWei, tokenAddress || "", DEPOSIT_CALLS, feeQuote, () => {}));
   const [token1Amount, setToken1Amount] = useState('');
   const [token2Amount, setToken2Amount] = useState('');
   const [depositLoading, setDepositLoading] = useState(false);
@@ -76,6 +73,14 @@ const LiquidityDepositModal = ({
   const { addLiquidityDualToken, addLiquiditySingleToken, addLiquidityMultiToken, getPoolByAddress, fetchTokenBalances, fetchPools } = useSwapContext();
 
   const isMultiToken = useMemo(() => selectedPool ? isMultiTokenPool(selectedPool) : false, [selectedPool]);
+  // Calls a multi-token deposit submits: one approval per coin deposited, then the deposit.
+  const multiDepositCalls = (amounts: string[]) => amounts.filter(a => safeParseUnits(a || "0", 18) > 0n).length + 1;
+  const depositCalls = isMultiToken
+    ? multiDepositCalls(coinAmounts)
+    : depositMode === 'A&B' ? DEPOSIT_CALLS : SINGLE_TOKEN_DEPOSIT_CALLS;
+  // What a token balance can fund once the fee is reserved (when that token pays it).
+  const spendable = (balanceWei: string, tokenAddress?: string, calls = depositCalls) =>
+    BigInt(computeMaxTransferable(balanceWei, tokenAddress || "", calls, feeQuote, () => {}));
   const { toast } = useToast();
   const { userAddress } = useUser();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
@@ -363,7 +368,7 @@ const LiquidityDepositModal = ({
   const isConfirmButtonDisabled = () => {
     if (depositLoading) return true;
 
-    if (feeQuote && feeShortfall(feeQuote, DEPOSIT_CALLS)) return true;
+    if (feeQuote && feeShortfall(feeQuote, depositCalls)) return true;
 
     // Multi-token pool: at least one amount must be entered and within balance
     if (isMultiToken && selectedPool?.coins) {
@@ -455,7 +460,9 @@ const LiquidityDepositModal = ({
                           className="text-xs text-blue-500"
                           onClick={() => {
                             const newAmounts = [...coinAmounts];
-                            newAmounts[idx] = formatUnits(spendable(coinBalance, coin.address), 18);
+                            // This coin's approval joins those of the coins already entered.
+                            const calls = multiDepositCalls(coinAmounts.filter((_, i) => i !== idx)) + 1;
+                            newAmounts[idx] = formatUnits(spendable(coinBalance, coin.address, calls), 18);
                             setCoinAmounts(newAmounts);
                           }}
                         >
@@ -483,7 +490,7 @@ const LiquidityDepositModal = ({
                 </div>
                 <div className="flex justify-between items-center text-xs md:text-sm mt-2 text-muted-foreground">
                   <span>Transaction fee</span>
-                  <span><NetworkFee calls={DEPOSIT_CALLS} /></span>
+                  <span><NetworkFee calls={depositCalls} /></span>
                 </div>
               </div>
 
@@ -575,7 +582,7 @@ const LiquidityDepositModal = ({
                 <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
               )}
               <FeeNotices
-                calls={DEPOSIT_CALLS}
+                calls={depositCalls}
                 spendingWei={safeParseUnits(token1Amount || "0", 18)}
                 tokenAddress={selectedPool?.tokenA.address}
               />
@@ -665,7 +672,7 @@ const LiquidityDepositModal = ({
                 <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
               )}
               <FeeNotices
-                calls={DEPOSIT_CALLS}
+                calls={depositCalls}
                 spendingWei={safeParseUnits(token2Amount || "0", 18)}
                 tokenAddress={selectedPool?.tokenB.address}
               />
@@ -731,7 +738,7 @@ const LiquidityDepositModal = ({
             </div>
             <div className="flex justify-between items-center text-xs md:text-sm mt-2 text-muted-foreground">
               <span>Transaction fee</span>
-              <span><NetworkFee calls={DEPOSIT_CALLS} /></span>
+              <span><NetworkFee calls={depositCalls} /></span>
             </div>
             {selectedPool && BigInt(selectedPool.lpToken._totalSupply) === BigInt(0) && (
               <div className="flex flex-col md:flex-row md:justify-between md:items-center mt-2 text-xs md:text-sm text-muted-foreground gap-0.5">
