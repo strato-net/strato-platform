@@ -105,7 +105,7 @@ instance MonadIO m => HasPeerDB m where
 
   updateUdpEnableTime peer enableTime = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
-      SQL.updateWhere (thisPeer peer ++ [PPeerUdpEnableTime SQL.<. enableTime]) [PPeerUdpEnableTime SQL.=. enableTime]
+      SQL.updateWhere (thisPeerWithKey peer ++ [PPeerUdpEnableTime SQL.<. enableTime]) [PPeerUdpEnableTime SQL.=. enableTime]
 
   updateIP peer ip = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
@@ -117,14 +117,14 @@ instance MonadIO m => HasPeerDB m where
 
   updateTcpEnableTime peer enableTime = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
-      SQL.updateWhere (thisPeer peer ++ [PPeerEnableTime SQL.<. enableTime]) [PPeerEnableTime SQL.=. enableTime]
+      SQL.updateWhere (thisPeerWithKey peer ++ [PPeerEnableTime SQL.<. enableTime]) [PPeerEnableTime SQL.=. enableTime]
 
   updateUdpPort peer (UDPPort pn) = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerUdpPort SQL.=. pn]
 
   updatePeerDisable peer d = do
-    let selector = thisPeer peer
+    let selector = thisPeerWithKey peer
         TcpEnableTime enableTime = case d of
           ExtendPeerDisableTime t _ -> t
           SetPeerDisableTime t _ _ -> t
@@ -144,7 +144,7 @@ instance MonadIO m => HasPeerDB m where
           ]
     updateTcpEnableTime peer enableTime
   updatePeerUdpDisable peer d = liftIO $ withGlobalSQLPool $ \sqldb -> do
-    let selector = thisPeer peer
+    let selector = thisPeerWithKey peer
     currentTime <- liftIO getCurrentTime
     flip runSqlPool sqldb $ case d of
       ExtendPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindowFactor ->
@@ -177,7 +177,7 @@ instance MonadIO m => HasPeerDB m where
 
   storeDisableException peer exception = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
-      try $ SQL.updateWhere (thisPeer peer) [PPeerDisableException SQL.=. exception]
+      try $ SQL.updateWhere (thisPeerWithKey peer) [PPeerDisableException SQL.=. exception]
 
   updateLastMessage peer message = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $

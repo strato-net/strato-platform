@@ -33,6 +33,7 @@ module Blockchain.Strato.Discovery.Data.Peer
     pointToNodeID,
     nodeIDToPoint,
     thisPeer,
+    thisPeerWithKey,
     lengthenPeerDisable',
     resetPeerUdp,
     getPeersClosestTo,
@@ -152,19 +153,25 @@ class HasPeerDB m where
   getUnbondedPeers :: m [PPeer]
   getClosestPeers :: Point -> Natural -> m [PPeer]
 
-  -- | Move the peer's UDP deadline out to this time; a later stored
-  -- deadline stands.
+  -- | Move the UDP deadline of the record carrying this peer's key (see
+  -- 'thisPeerWithKey') out to this time; a later stored deadline stands.
   updateUdpEnableTime :: PPeer -> UTCTime -> m ()
   updateIP :: PPeer -> IP -> m ()
   updateTcpPort :: PPeer -> TCPPort -> m ()
-  -- Never moves the deadline closer: a fixed ban (disableTCPPeerForSeconds)
-  -- outlives the shorter disables of later failures and courtesy waits.
+  -- | Move the TCP deadline of the record carrying this peer's key out to
+  -- this time. Never moves the deadline closer: a fixed ban
+  -- (disableTCPPeerForSeconds) outlives the shorter disables of later
+  -- failures and courtesy waits.
   updateTcpEnableTime :: PPeer -> UTCTime -> m ()
   updateUdpPort :: PPeer -> UDPPort -> m ()
+  -- | The exponential TCP disable, on the record carrying this peer's key.
   updatePeerDisable :: PPeer -> PeerDisable -> m ()
   updatePeerLastBestBlockHash :: PPeer -> PeerLastBestBlockHash -> m ()
+  -- | The exponential UDP disable and its reset, on the record carrying
+  -- this peer's key.
   updatePeerUdpDisable :: PPeer -> PeerUdpDisable -> m ()
   setPeerPubkey :: PPeer -> Point -> m ()
+  -- | Note why the record carrying this peer's key was disabled.
   storeDisableException :: PPeer -> T.Text -> m (Either SomeException ())
   updateLastMessage :: PPeer -> T.Text -> m ()
 
@@ -230,8 +237,20 @@ mkPeer pubkey host ip (UDPPort udpPort) (TCPPort tcpPort) = do
     , pPeerDisableExpiration = curTime
     }
 
+-- | The stored record at this peer's address and listening port, whatever
+-- key it carries: the selector for the writes that keep a record current
+-- (its ports, its IP, its last message).
 thisPeer :: PPeer -> [SQL.Filter PPeer]
 thisPeer peer = [PPeerHost SQL.==. pPeerHost peer, PPeerTcpPort SQL.==. pPeerTcpPort peer]
+
+-- | 'thisPeer' narrowed to the record carrying the key the value handed in
+-- carries: the selector for every disable, so a disable written for the peer
+-- proven to hold that key reaches no record of another peer at the same
+-- address and port, and none whose key discovery has since rewritten for
+-- another node answering there. A value with no key (a seed record) selects
+-- by address and port alone.
+thisPeerWithKey :: PPeer -> [SQL.Filter PPeer]
+thisPeerWithKey peer = thisPeer peer ++ maybe [] (\key -> [PPeerPubkey SQL.==. Just key]) (pPeerPubkey peer)
 
 thisOr100Years :: Int -> Int
 thisOr100Years = min (100 * 365 * 24 * 60 * 60) -- there is no need to be disabling peers for > 100 years y'all

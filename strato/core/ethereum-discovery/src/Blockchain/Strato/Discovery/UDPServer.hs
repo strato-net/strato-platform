@@ -206,7 +206,9 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
         Just p' -> do
           setPeerPubkey p' otherPubKey
           for_ mOtherTcpPort $ updateTcpPort p'
-          return $ Just p'
+          -- The record carries this key now, and the UDP reset below reaches
+          -- the record carrying the key its value does.
+          return $ Just p'{pPeerPubkey = Just otherPubKey}
     for_ mPeer' $ \peer -> do
       setPeerPubkey peer otherPubKey
       eErr <- resetPeerUdp peer
