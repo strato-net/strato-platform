@@ -1104,6 +1104,38 @@ contract Describe_StratoStaking {
         require(_pendingOperatorRewards(VALIDATOR_A) == 50e18, "no commission under a zero ceiling");
     }
 
+    // What the schedule released is credited to a record only when it is settled. Anyone may
+    // settle a batch, so a rollback can move the whole set's share onto fields the previous
+    // logic pays before the downgrade, without each operator touching its record.
+    function it_lets_anyone_settle_the_set() public {
+        _bondBoth();                          // A: 1000 self-bond at 5% commission; B: 2000
+        _stake(user1, VALIDATOR_A, 1000e18);  // S = 4000
+        _fundReserve(10000e18);
+        staking.setEmissionSchedule(1000e18, 4000e18, 10000e18, 0);
+        fastForward(YEAR, 1);
+        staking.processBlock();
+        require(staking.emissionPerStakeStored() == 25e16, "a year released: 1000 over 4000 of stake");
+        require(staking.emissionPerStakePaid(VALIDATOR_A) == 0 && _pendingOperatorRewards(VALIDATOR_A) == 0, "settled on nobody yet");
+
+        attacker.doSuccessfully(address(staking), "settleValidators", _pair(VALIDATOR_A, VALIDATOR_B));
+        // A (2000 of 4000) earns 500: self-bond 1000 of 2000 -> 250; delegators 250 gross, 5% -> 12.5 + 237.5 over 1000
+        (,,,,,, uint256 index, uint256 selfBondRewards, uint256 commission,,,,,,) = staking.operators(VALIDATOR_A);
+        require(selfBondRewards == 250e18 && commission == 125e17, "A's operator: self-bond share + commission");
+        require(index == 2375e14, "A's delegators: net of commission, per stake");
+        // B (2000 of 4000) earns 500, all on its self-bond
+        require(_pendingOperatorRewards(VALIDATOR_B) == 500e18, "B's operator");
+        require(staking.emissionPerStakePaid(VALIDATOR_A) == 25e16 && staking.emissionPerStakePaid(VALIDATOR_B) == 25e16, "both level with the index");
+        require(staking.allocatedRewardLiability() == 1000e18 && staking.rewardReserve() == 9000e18, "settling moves nothing");
+
+        attacker.doSuccessfully(address(staking), "settleValidators", _pair(VALIDATOR_A, VALIDATOR_B));
+        (,,,,,, uint256 indexAgain,,,,,,,,) = staking.operators(VALIDATOR_A);
+        require(_pendingOperatorRewards(VALIDATOR_A) == 2625e17 && indexAgain == 2375e14, "settling again changes nothing");
+        require(_pendingOperatorRewards(VALIDATOR_B) == 500e18, "B unchanged");
+
+        attacker.doExpectingFailure(address(staking), "settleValidators", "SS: validator missing", _list(address(validatorC)));
+        attacker.doExpectingFailure(address(staking), "settleValidators", "SS: bad batch", new address[](0));
+    }
+
     function it_scales_the_release_with_the_root_of_the_stake_and_the_reserve_left() public {
         _selfBond(operatorA, VALIDATOR_A, 1000e18);
         _activate(VALIDATOR_A);               // S = 1000

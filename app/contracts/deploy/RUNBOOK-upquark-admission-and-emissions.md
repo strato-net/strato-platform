@@ -179,11 +179,31 @@ being paid out until it runs dry (it has no withdrawal function).
 ## 6. Rollback
 
 - Emissions: pause with `emission 0 …` (one vote). The reserve is untouched and stays in the
-  contract.
+  contract; it is never recoverable under this logic, by design.
 - Admission: `setparams` with `joinsPaused = true` (one vote), or `joinsfrom <far future block>`.
-- Logic: `node vote-setlogic.js $STAKING_PROXY <previous logic address>` (two votes). Every
-  field this logic added is extra storage the previous logic never reads; reserve STRATO already
-  funded would then be unaccounted for, so pause and recover before a downgrade is considered.
+- Logic, in this order. The schedule credits a validator only when its record is settled, from
+  indexes (`emissionPerStakeStored`, `emissionPerStakePaid`) the previous logic does not read:
+  downgrading before step 2 strands whatever is unsettled, counted in `allocatedRewardLiability`
+  (so protected from recovery) but claimable by nobody until a re-upgrade. The reserve is
+  recovered under the previous logic, after the downgrade, never before.
+  1. Pause: `node staking-setup.js emission 0 $S0 $R0 0` (one vote). Skip if already paused.
+  2. Settle: `node staking-setup.js settle` (direct, permissionless) with every seated validator
+     in `VALIDATORS`, in batches of at most `maxBatchSize`. Verify `emissionPerStakePaid[v] ==
+     emissionPerStakeStored` for each one. What the schedule owed now lives in
+     `pendingSelfBondRewards`, `pendingCommission` and `delegatorRewardPerStakeStored`, fields the
+     previous logic pays.
+  3. Record `allocatedRewardLiability`, `rewardReserve` and `principalBalance()`.
+  4. Downgrade: `node vote-setlogic.js $STAKING_PROXY <previous logic address>` (two votes).
+  5. Verify under the previous logic: `allocatedRewardLiability` and `principalBalance()` as
+     recorded; a test `claimOperatorRewards` / `claimRewards` of some settled amount succeeds;
+     `recoverableUntrackedStrato()` equals the recorded `rewardReserve` (the previous logic does
+     not know the reserve, so it reads as untracked STRATO).
+  6. The owner may now `recoverUntrackedStrato(FUNDER, <recorded rewardReserve>)` (vote), or
+     leave the STRATO in place for a later re-upgrade, which then reads it as the backed reserve.
+
+  By state: funded but not started — nothing is unsettled, only steps 3–6 matter and the reserve
+  is what §4 funded; running — every step; paused — skip step 1; partially claimed — nothing
+  special, what was paid is already out of the liability.
 
 ## 7. Open items for the business owner
 

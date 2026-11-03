@@ -1441,6 +1441,18 @@ contract  StratoStaking is Ownable {
 
     // ---- claims ----------------------------------------------------------------------
 
+    // Move what the schedule owes the listed validators onto their records, so it is claimable
+    // without the operator touching the record. Settling is idempotent and never harmful, so
+    // anyone may run it. A rollback runs it on the whole set before a downgrade, so nothing is
+    // left in indexes the previous logic cannot read.
+    function settleValidators(address[] calldata validators) external onlyInitialized {
+        require(validators.length > 0 && validators.length <= maxBatchSize, "SS: bad batch");
+        for (uint256 i = 0; i < validators.length; i++) {
+            require(operators[validators[i]].exists, "SS: validator missing");
+            _settle(validators[i], operators[validators[i]]);
+        }
+    }
+
     // Delegators' STRATO rewards, net of commission.
     function claimRewards(address[] calldata validators) public onlyInitialized {
         require(validators.length > 0 && validators.length <= maxBatchSize, "SS: bad batch");
