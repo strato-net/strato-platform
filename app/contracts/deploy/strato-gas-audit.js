@@ -15,7 +15,8 @@ const axios = require('axios');
 
 const DECIDER_STATE = '00000000000000000000000000000000dec1de02';
 const ZERO = '0000000000000000000000000000000000000000';
-const DEAD = 'deaddeaddeaddeaddeaddeaddeaddeaddeaddead'; // FeeRouter.BURN_ADDRESS (V6 on); routers through V5 burned to ZERO
+const DEAD = 'deaddeaddeaddeaddeaddeaddeaddeaddeaddead'; // helium V6's burn address; routers through V5 burned to ZERO
+const FEE = 'dead5712a70000000000000000000dead5712a70'; // FeeRouter.FEE_ADDRESS, every router after helium V6
 const WAD = 10n ** 18n;
 const USD_FEE = 10n ** 16n;
 const FEE_PAID_TOPIC = '0x9766415a366eee49dea2373907d50273c3aefcd4207d8c7063a5bb343305a8e0'; // FeePaid(address,uint8,uint256,uint256)
@@ -148,12 +149,12 @@ const gate = (status, name, detail) => { results.push({ status, name, detail });
   const strato = (await axios.get(`${cirrus}/event`, { params: { event_name: 'eq.FeePaid', 'attributes->>method': 'eq.FeeMethod.STRATO_BURN', select: 'transaction_hash', limit: '1' }, timeout: 60000 })).data[0];
   const stratoTx = strato && strato.transaction_hash;
   const sample = stratoTx && await rpc(node, 'eth_getTransactionReceipt', [`0x${stratoTx}`]);
-  const stratoToken = sample && sample.logs.find(l => [ZERO, DEAD].some(a => l.topics[2] === `0x${'0'.repeat(24)}${a}`))?.address.replace(/^0x/, '');
+  const stratoToken = sample && sample.logs.find(l => [ZERO, DEAD, FEE].some(a => l.topics[2] === `0x${'0'.repeat(24)}${a}`))?.address.replace(/^0x/, '');
   let supplyDetail = 'no STRATO fee found yet';
   let supplyOk = true;
   if (stratoToken) {
     const burns = await page('event', { address: `eq.${stratoToken}`, event_name: 'eq.Transfer', block_number: `gte.${installBlock}`,
-      and: `(block_number.lte.${auditTip})`, 'attributes->>to': `in.(${ZERO},${DEAD})`, select: 'id,transaction_hash,attributes' });
+      and: `(block_number.lte.${auditTip})`, 'attributes->>to': `in.(${ZERO},${DEAD},${FEE})`, select: 'id,transaction_hash,attributes' });
     let feeBurns = 0n, otherBurns = 0n, mismatchedTx = 0;
     const burnByTx = new Map();
     for (const t of burns) burnByTx.set(t.transaction_hash, (burnByTx.get(t.transaction_hash) || 0n) + BigInt(t.attributes.value));
