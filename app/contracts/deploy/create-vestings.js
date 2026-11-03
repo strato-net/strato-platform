@@ -14,14 +14,18 @@
 // schedule.json:
 // {
 //   "manager": "<40 hex>", "pool": "<40 hex>", "token": "<40 hex>", "decimals": 18,
+//   "tge": "2026-12-01T00:00:00Z",            // ISO 8601 UTC, or unix seconds
 //   "categories": [
-//     { "name": "investors", "managed": false, "durationWeeks": 104, "startDate": 1800000000,
+//     { "name": "team", "managed": true, "cliffMonths": 12, "durationWeeks": 104,
 //       "entries": [ { "account": "<40 hex>", "tokens": "1234567.89" }, ... ] }
 //   ]
 // }
-// Amounts are whole tokens in the file and are converted to atoms here (uint128).
-// Each category is ONE addVestings call: same managed flag, duration and start for
-// every entry. An account may appear once per category (ids are parameter hashes).
+// Each category's startDate is derived: TGE plus cliffMonths calendar months (UTC,
+// day-of-month clamped to the shorter month). Nothing vests before that date, which
+// is the sheet's "nothing at the cliff" semantics. Amounts are whole tokens in the
+// file and are converted to atoms here (uint128). Each category is ONE addVestings
+// call: same managed flag, cliff and duration for every entry. An account may appear
+// once per category (ids are parameter hashes).
 require('dotenv').config();
 const config = require('./config');
 const fs = require('fs');
@@ -44,8 +48,36 @@ function toAtoms(tokens, decimals) {
   return atoms;
 }
 
+function parseTge(v) {
+  if (Number.isInteger(v)) {
+    if (v < 1e9 || v > 4e9) throw new Error(`tge ${v} does not look like unix seconds`);
+    return v;
+  }
+  if (typeof v === 'string') {
+    const t = /^\d{4}-\d{2}-\d{2}$/.test(v.trim()) ? v.trim() + 'T00:00:00Z' : v.trim();
+    if (!/(Z|[+-]\d{2}:\d{2})$/.test(t)) throw new Error(`tge "${v}" must carry a timezone (use Z for UTC)`);
+    const ms = Date.parse(t);
+    if (Number.isNaN(ms)) throw new Error(`tge "${v}" is not an ISO 8601 date`);
+    return Math.floor(ms / 1000);
+  }
+  throw new Error('tge must be an ISO 8601 string or unix seconds');
+}
+
+// TGE + n calendar months, in UTC, keeping the time of day and clamping the day of
+// month to the target month's length (Jan 31 + 1 month = Feb 28/29).
+function addMonthsUtc(seconds, months) {
+  const d = new Date(seconds * 1000);
+  const y = d.getUTCFullYear(), m = d.getUTCMonth(), day = d.getUTCDate();
+  const target = new Date(Date.UTC(y, m + months, 1, d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()));
+  const daysInTarget = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(day, daysInTarget));
+  return Math.floor(target.getTime() / 1000);
+}
+
 function loadSchedule(file) {
   const s = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (s.tge === undefined) throw new Error('schedule.tge is required (ISO 8601 UTC or unix seconds)');
+  s.tgeSeconds = parseTge(s.tge);
   for (const k of ['manager', 'pool', 'token']) {
     s[k] = clean(s[k]);
     if (!ADDRESS_RE.test(s[k])) throw new Error(`schedule.${k} must be a 20-byte hex address`);
@@ -56,7 +88,9 @@ function loadSchedule(file) {
     if (!c.name) throw new Error('category without name');
     if (typeof c.managed !== 'boolean') throw new Error(`${c.name}: managed must be true/false`);
     if (!Number.isInteger(c.durationWeeks) || c.durationWeeks < 0 || c.durationWeeks > 65535) throw new Error(`${c.name}: durationWeeks must be 0..65535`);
-    if (!Number.isInteger(c.startDate) || c.startDate <= 0) throw new Error(`${c.name}: startDate must be a unix timestamp (seconds)`);
+    if (c.startDate !== undefined) throw new Error(`${c.name}: startDate is derived from tge + cliffMonths; remove it`);
+    if (!Number.isInteger(c.cliffMonths) || c.cliffMonths < 0 || c.cliffMonths > 1200) throw new Error(`${c.name}: cliffMonths must be an integer 0..1200`);
+    c.startDate = addMonthsUtc(s.tgeSeconds, c.cliffMonths);
     if (!Array.isArray(c.entries) || !c.entries.length) throw new Error(`${c.name}: no entries`);
     const seen = new Set();
     c.accounts = []; c.amounts = []; c.total = 0n;
@@ -85,7 +119,7 @@ function argsFor(c) {
 function describe(s, c) {
   const args = argsFor(c);
   const hash = crypto.createHash('sha256').update(JSON.stringify(args)).digest('hex');
-  console.log(`category ${c.name}: ${c.accounts.length} entries, total ${c.total} atoms (${(Number(c.total) / 10 ** s.decimals).toLocaleString('en-US')} tokens), managed=${c.managed}, durationWeeks=${c.durationWeeks}, startDate=${c.startDate} (${new Date(c.startDate * 1000).toISOString()})`);
+  console.log(`category ${c.name}: ${c.accounts.length} entries, total ${c.total} atoms (${(Number(c.total) / 10 ** s.decimals).toLocaleString('en-US')} tokens), managed=${c.managed}, cliffMonths=${c.cliffMonths} -> startDate=${c.startDate} (${new Date(c.startDate * 1000).toISOString()}), durationWeeks=${c.durationWeeks} (ends ${new Date((c.startDate + c.durationWeeks * 604800) * 1000).toISOString()})`);
   console.log(`args sha256 ${hash}  <- every admin must see the same hash before voting`);
   return args;
 }
@@ -149,7 +183,7 @@ async function verify(tokenObj, s, c) {
     const cats = name ? [pick(s, name)] : s.categories;
     let grand = 0n;
     for (const c of cats) { describe(s, c); grand += c.total; }
-    console.log(`manager ${s.manager}, pool ${s.pool}, token ${s.token}, decimals ${s.decimals}; grand total ${grand} atoms`);
+    console.log(`TGE ${s.tgeSeconds} (${new Date(s.tgeSeconds * 1000).toISOString()}); manager ${s.manager}, pool ${s.pool}, token ${s.token}, decimals ${s.decimals}; grand total ${grand} atoms`);
     return;
   }
   const { user, tokenObj } = await login();

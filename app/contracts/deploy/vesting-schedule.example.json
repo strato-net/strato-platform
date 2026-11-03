@@ -3,11 +3,12 @@
   "pool": "1a5ca5bcde1cf38ae2909f04fdb5c3b1f6998a37",
   "token": "8ee9a3391e38176feebf5d43cb2c1d6c4f728b04",
   "decimals": 18,
+  "tge": "2026-12-01T00:00:00Z",
   "categories": [
-    { "name": "team", "managed": true, "durationWeeks": 104, "startDate": 1793750400,
+    { "name": "team", "managed": true, "cliffMonths": 12, "durationWeeks": 104,
       "entries": [ { "account": "0000000000000000000000000000000000000aa1", "tokens": "1000" },
                    { "account": "0000000000000000000000000000000000000aa2", "tokens": "2500.5" } ] },
-    { "name": "investors", "managed": false, "durationWeeks": 104, "startDate": 1762214400,
+    { "name": "investors", "managed": false, "cliffMonths": 0, "durationWeeks": 104,
       "entries": [ { "account": "0000000000000000000000000000000000000bb1", "tokens": "10000" } ] }
   ]
 }
