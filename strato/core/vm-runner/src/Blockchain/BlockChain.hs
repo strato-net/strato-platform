@@ -25,6 +25,7 @@ module Blockchain.BlockChain
   )
 where
 
+import Control.Exception (displayException)
 import BlockApps.Logging
 import BlockApps.Solidity.ABI (decodeABIArgs, valueToArgText, funcArgTypes)
 import qualified Blockchain.Bagger as Bagger
@@ -513,7 +514,7 @@ recordExecuteSpan started b t availableGas er = do
           ++ maybe [] (\a -> [Tr.attrText "strato.contract_created" (T.pack (format a))]) (erNewContractAddress er)
       )
       []
-      (T.pack . show <$> erException er)
+      (T.pack . either displayException displayException <$> erException er)
 
 runCodeForTransaction ::
   (VMBase m) =>
@@ -746,8 +747,8 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
           Right r -> case erException r of
             Nothing -> (Success, "Success!", erRemainingTxGas r)
             Just ex ->
-              let fmt = either show show ex
-               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
+              let fmt = either displayException displayException ex
+               in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0)
       gasUsed = fromInteger $ TD.gasLimit t - gasRemaining
       etherUsed = gasUsed
 

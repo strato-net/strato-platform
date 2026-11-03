@@ -144,11 +144,11 @@ function getOwnTxs(addr) {
   // (nonce, ts, func, to, block, hash, status)  -- eth DB (node API lacks result detail here)
   return ethSql(
     'select rt.nonce,rt.timestamp,rt.func_name,rt.to_address,rt.block_number,rt.tx_hash,' +
-    "coalesce(res.status,'') from raw_transaction rt " +
+    "coalesce(res.status,''),coalesce(res.message,'') from raw_transaction rt " +
     'left join transaction_result res on res.transaction_hash=rt.tx_hash ' +
     `where rt.from_address='${addr}' order by rt.nonce::int`)
-    .map(([n, ts, fn, to, blk, hash, st]) =>
-      ({ nonce: Number(n), ts, func: fn, to, block: Number(blk), hash, status: st }));
+    .map(([n, ts, fn, to, blk, hash, st, message]) =>
+      ({ nonce: Number(n), ts, func: fn, to, block: Number(blk), hash, status: st, message }));
 }
 function getTxCalls(hashes) {
   const calls = [];
@@ -159,19 +159,6 @@ function getTxCalls(hashes) {
   return calls;
 }
 const latestBlock = () => { const r = ethSql('select max(number) from block_data_ref'); return r.length ? r[0][0] : '?'; };
-
-// parse the Haskell "Success" / "Failure {...}" status string
-function parseStatus(s) {
-  if (!s || s === 'Success') return { ok: true, reason: '' };
-  let m = s.match(/trfDetails = Just "((?:\\.|[^"\\])*)"/);
-  let reason = m ? m[1].replace(/\\"/g, '"') : '';
-  if (!reason) { const t = s.match(/trfType = (\w+)/); reason = t ? t[1] : 'failed'; }
-  reason = reason.replace(/^solidity require failed: /, '')
-    .replace(/^custom user error: /, '')
-    .replace(/^revert: REVERT \[BString "(.*)"\]:?$/, '$1')
-    .replace(/^Reverting based on\s+Error Method: /, '');
-  return { ok: false, reason: reason.trim() };
-}
 
 // -------------------------------------------------------------------- labels
 async function buildLabels(addrs) {
@@ -463,7 +450,7 @@ async function main() {
   };
   for (const t of ownTxs) {
     const e = entry(t.hash, t.ts, t.block);
-    const st = parseStatus(t.status);
+    const st = { ok: !t.status || t.status === 'Success', reason: t.message };
     Object.assign(e, { own: true, nonce: t.nonce, func: t.func, to: t.to, ok: st.ok, reason: st.reason });
   }
   for (const x of xfers) {

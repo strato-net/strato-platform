@@ -7,6 +7,7 @@
 
 module SolidVM.Runtime (compiledContract, compiledFunction, constructorStage, runAction, Host (..)) where
 
+import Text.Format (format)
 import Blockchain.DB.SolidStorageDB
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.SolidVM.CodeCollectionDB (ParseOptions (..))
@@ -43,7 +44,7 @@ data Host = Host
   }
 
 {-# NOINLINE compilationCache #-}
-compilationCache :: IORef (LRU.LRU (Keccak256, Bool, T.Text) (Either T.Text N.CompiledContract))
+compilationCache :: IORef (LRU.LRU (Keccak256, Bool, T.Text) (Either SolidException N.CompiledContract))
 compilationCache = unsafePerformIO $ newIORef $ LRU.newLRU (Just 128)
 
 -- Admit the whole contract before executing any entry. Cache failures as well.
@@ -54,17 +55,23 @@ compiledContract hsh cc contract = do
       duplicateArities f =
         let arities = map (length . CC._funcArgs) (f : CC._funcOverload f)
          in length arities /= M.size (M.fromList [(a, ()) | a <- arities])
+      context = T.unpack $ contract ^. CC.contractName
+      compilationFailure errors =
+        let details = T.unpack $ T.intercalate "; " $ map (N.showErr . snd) errors
+         in if any ((== N.Internal) . N.eKind . snd) errors then InternalError (context ++ ": " ++ details)
+            else if any ((== N.Unsupported) . N.eKind . snd) errors then UnsupportedFeature context details
+            else TypeError context details
   cached <- liftIO $ atomicModifyIORef' compilationCache $ \cache ->
     let (cache', found) = LRU.lookup key cache in (cache', found)
   result <- case cached of
     Just value -> pure value
     Nothing -> do
       let value = if any duplicateArities (M.elems (contract ^. CC.functions))
-            then Left "overloads with the same arity"
-            else either (Left . T.intercalate "; " . map (N.showErr . snd)) Right (N.compileContractChecked cc contract)
+            then Left $ InvalidArguments context "overloads with the same arity"
+            else either (Left . compilationFailure) Right (N.compileContractChecked cc contract)
       liftIO $ atomicModifyIORef' compilationCache $ \cache -> (LRU.insert key value cache, ())
       pure value
-  either (throwIO . N.NativeUnavailable . ((contract ^. CC.contractName <> ": ") <>)) pure result
+  either throwIO pure result
 
 compiledFunction :: Keccak256 -> CC.CodeCollection -> CC.Contract -> T.Text -> CC.Func -> SM N.Fun
 compiledFunction hsh cc contract name selected = do
@@ -73,7 +80,7 @@ compiledFunction hsh cc contract name selected = do
       key = entryName <> "/" <> T.pack (show (length (CC._funcArgs selected)))
   case M.lookup key (N.ccFuns compiled) of
     Just (Right fun) -> pure fun
-    _ -> throwIO $ N.NativeUnavailable ("compiled function unavailable: " <> key)
+    _ -> throwIO $ InternalError ("compiled function unavailable: " ++ T.unpack key)
 
 constructorStage :: Keccak256 -> CC.CodeCollection -> CC.Contract -> T.Text -> SM N.Fun
 constructorStage hsh cc contract stage = do
@@ -84,7 +91,7 @@ constructorStage hsh cc contract stage = do
         parent -> M.lookup parent (N.ccParentArguments compiled)
   case selected of
     Just (Right fun) -> pure fun
-    _ -> throwIO $ N.NativeUnavailable ("compiled constructor stage unavailable: " <> stage)
+    _ -> throwIO $ InternalError ("compiled constructor stage unavailable: " ++ T.unpack stage)
 
 runAction ::
   (Integer -> SM ()) ->
@@ -118,7 +125,7 @@ runAction charge callFunction createContract host emit cc contract name (N.Fun _
           , N.rtGet = \a p -> run $ getSolidStorageKeyVal' a p
           , N.rtPut = \a p v -> run $ do
               ci <- getCurrentCallInfo
-              when (readOnly ci) $ throwIO (InvalidWrite "native write during read-only access" (show p))
+              when (readOnly ci) $ throwIO (InvalidWrite "native write during read-only access" (format p))
               markDiffForAction a p v
               putSolidStorageKeyVal' a p v
           , N.rtEmit = \_ contractName event fields -> run $ emit contractName event =<< traverse (toValue . snd) fields
