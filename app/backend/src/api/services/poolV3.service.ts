@@ -538,7 +538,8 @@ export const getPoolByAddress = async (accessToken: string, poolAddress: string)
   return pools[0] ?? null;
 };
 
-/** All V3 pools (any fee tier, either token order) for a token pair, deepest liquidity first */
+/** All V3 pools (any fee tier, either token order) for a token pair, deepest liquidity
+ *  first; disabled pools and config.hiddenSwapPools are excluded */
 export const getPoolsByPair = async (accessToken: string, tokenA: string, tokenB: string): Promise<PoolV3[]> => {
   const a = normalizeAddress(tokenA);
   const b = normalizeAddress(tokenB);
@@ -547,7 +548,7 @@ export const getPoolsByPair = async (accessToken: string, tokenA: string, tokenB
   });
   const pools = await attachPrices(accessToken, rawPools);
   return pools
-    .filter((p) => !p.isDisabled)
+    .filter((p) => !p.isDisabled && !config.hiddenSwapPools.has(p.address))
     .sort((x, y) => y.totalLiquidityUSD - x.totalLiquidityUSD);
 };
 
