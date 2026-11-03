@@ -160,9 +160,14 @@ activates itself through the staking page; `ValidatorSynced` and governance `Val
    rising by the same amounts; `eligibleStake()` equal to the sum of seated, listed validators'
    `selfBond + delegatedStake`; a validator removed by governance vote leaving the staking set
    and stopping accrual on the next block with transactions (no `syncValidator` needed); the
-   staking page's APY and "current rate" reflecting `emissionAnnualRate`. The first year at the
-   proposed calibration with `S = 5,000,000` and a full reserve releases 500,000 STRATO; with
-   `S = 1,250,000` it releases 250,000; the rate falls in proportion to the reserve as it is spent.
+   staking page's APY and "current rate" reflecting `emissionAnnualRate`. At the proposed
+   calibration with `S = 5,000,000` and a full reserve the starting rate is 500,000 STRATO a year,
+   and 250,000 at `S = 1,250,000`. Accrual recomputes the rate from the reserve at the start of
+   each interval, so with accrual every block expect the first year to release about 487,700
+   STRATO (about 246,900 at `S = 1,250,000`), not the starting rate; a gap without transactions
+   pays the whole gap at the rate the gap started on (capped at the reserve, which at these
+   numbers would take a gap of about twenty years). This reserve-proportional decay is the
+   accepted shape of the schedule.
 4. **Pause / change**: `node staking-setup.js emission 0 $S0 $R0 0` pauses (the reserve stays);
    any later `emission …` vote resumes from that block, not from the pause. Re-calibration is
    the same vote with new numbers; it settles the running interval under the old numbers first.
