@@ -58,18 +58,28 @@ async function buildSource() {
   return source;
 }
 
-async function readManagerRow(tokenObj, address) {
-  // The manager is a `record` contract: Cirrus exposes its state (pool, owner) per address.
-  const url = `${config.nodes[0].url}/cirrus/search/BlockApps-${NAME}`;
-  const deadline = Date.now() + 120000;
+async function cirrus(tokenObj, table, params) {
+  const url = `${config.nodes[0].url}/cirrus/search/${table}`;
+  try {
+    const { data } = await axios.get(url, { headers: { Authorization: `Bearer ${tokenObj.token}` }, params });
+    return Array.isArray(data) ? data : [];
+  } catch (e) { return []; } // table may not exist yet
+}
+
+// The creation transaction creates TWO contracts: the pool (inside the manager's
+// constructor, so it is listed first) and the manager. Whichever address the receipt
+// helper hands back, resolve both through Cirrus: both contracts are `record`s, and
+// the pool row names its manager while the manager row names its pool and _owner.
+async function resolveManagerAndPool(tokenObj, address) {
+  const deadline = Date.now() + 180000;
   while (Date.now() < deadline) {
-    try {
-      const { data } = await axios.get(url, {
-        headers: { Authorization: `Bearer ${tokenObj.token}` },
-        params: { address: `eq.${address}`, select: 'address,pool,owner', limit: '1' },
-      });
-      if (Array.isArray(data) && data.length) return data[0];
-    } catch (e) { /* table may not exist yet */ }
+    const asManager = await cirrus(tokenObj, `BlockApps-${NAME}`, { address: `eq.${address}`, select: 'address,pool,_owner', limit: '1' });
+    if (asManager.length) return { manager: asManager[0].address, pool: asManager[0].pool, owner: asManager[0]._owner };
+    const asPool = await cirrus(tokenObj, 'BlockApps-VestingPool', { address: `eq.${address}`, select: 'address,poolManager', limit: '1' });
+    if (asPool.length) {
+      const mgr = await cirrus(tokenObj, `BlockApps-${NAME}`, { address: `eq.${asPool[0].poolManager}`, select: 'address,pool,_owner', limit: '1' });
+      return { manager: asPool[0].poolManager, pool: asPool[0].address, owner: mgr.length ? mgr[0]._owner : '(manager row not indexed yet)' };
+    }
     await new Promise((r) => setTimeout(r, 5000));
   }
   return null;
@@ -114,14 +124,13 @@ async function readManagerRow(tokenObj, address) {
     const issueId = getIssueId(final);
     if (issueId) addr = await pollForCreateIssueExecution(tokenObj, issueId, final, submittedAt, `${NAME} address`);
   }
-  console.log(`${user} create: ${final && final.status} | ${NAME}: ${addr || '(awaiting another admin\'s vote)'}`);
+  console.log(`${user} create: ${final && final.status} | created contract from receipt: ${addr || '(awaiting another admin\'s vote)'}`);
   if (!addr) return;
 
-  const row = await readManagerRow(tokenObj, addr);
-  if (row) {
-    console.log(`manager ${row.address}: pool=${row.pool} owner=${row.owner}`);
-    if (clean(row.owner).toLowerCase() !== ADMIN_REGISTRY.toLowerCase()) console.error('WARNING: owner is not the AdminRegistry you passed');
-  } else {
-    console.log(`Cirrus row for BlockApps-${NAME} not visible yet; query it later for the pool address.`);
-  }
+  const r = await resolveManagerAndPool(tokenObj, addr);
+  if (!r) { console.log(`Cirrus rows not visible yet; look up BlockApps-VestingPool (poolManager column) for ${addr} later.`); return; }
+  console.log(`VestingPoolManager: ${r.manager}`);
+  console.log(`VestingPool:        ${r.pool}`);
+  console.log(`manager owner:      ${r.owner}`);
+  if (clean(r.owner).toLowerCase() !== ADMIN_REGISTRY.toLowerCase()) console.error('WARNING: manager owner is not the AdminRegistry you passed');
 })().catch(e => { console.error(process.env.GLOBAL_ADMIN_NAME || 'deploy', 'FAILED:', (e.message || String(e)).slice(0, 300)); process.exit(1); });
