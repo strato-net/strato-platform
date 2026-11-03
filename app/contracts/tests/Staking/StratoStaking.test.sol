@@ -46,6 +46,10 @@ contract UpgradedInPlaceStaking is StratoStaking {
         operators[validator].stakeRewardPerTokenPaid = stakePaid;
         operators[validator].pendingBaseRewards = pendingBase;
     }
+
+    function seedRewardReserve(uint256 reserve) public {
+        rewardReserve = reserve;
+    }
 }
 
 contract Describe_StratoStaking {
@@ -1263,6 +1267,29 @@ contract Describe_StratoStaking {
             rejected = true;
         }
         require(rejected, "a schedule needs a calibration stake and reserve");
+    }
+
+    // An upgraded proxy reads the reserve the retired schedule left under the same name, whose
+    // backing the logic in between let the owner recover. Until it is reconciled every claim
+    // fails against it, and funding would add to a number nothing backs.
+    function it_lowers_an_unbacked_reserve_to_what_the_contract_holds() public {
+        _selfBond(operatorA, VALIDATOR_A, 1000e18);
+        _activate(VALIDATOR_A);
+        staking.setEmissionSchedule(1000e18, 1000e18, 100e18, block.timestamp + 1000);
+        _reward(VALIDATOR_A, 10e18);                 // held: 1000 of principal and 10 owed
+        staking.seedRewardReserve(100e18);
+        require(staking.recoverableUntrackedStrato() == 0, "nothing beyond principal and owed rewards");
+        // 1010 held against 1000 of principal, 100 of reserve and the 10 claimed
+        operatorA.doExpectingFailure(address(staking), "claimOperatorRewards(address)", "SS: rewards unavailable", VALIDATOR_A);
+
+        user2.doSuccessfully(address(staking), "reconcileRewardReserve");
+        require(staking.rewardReserve() == 0, "lowered to what is held beyond principal and owed rewards");
+        require(_claimOperator(operatorA, VALIDATOR_A) == 10e18, "the claim goes through");
+
+        _fundReserve(10e18);
+        require(staking.rewardReserve() == 10e18, "funding lands on the reconciled reserve");
+        user2.doSuccessfully(address(staking), "reconcileRewardReserve");
+        require(staking.rewardReserve() == 10e18 && staking.recoverableUntrackedStrato() == 0, "a backed reserve is left alone");
     }
 
     function it_stops_when_the_reserve_is_spent_and_pauses_at_a_zero_rate() public {

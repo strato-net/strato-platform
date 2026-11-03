@@ -73,6 +73,7 @@ contract  StratoStaking is Ownable {
     event JoinsOpenFromBlockSet(uint256 blockNumber);
     event EmissionScheduleSet(uint256 e0, uint256 s0, uint256 r0, uint256 startTime);
     event RewardReserveFunded(address indexed funder, uint256 amount, uint256 reserve);
+    event RewardReserveReconciled(uint256 reserve);
     event EmissionAccrued(uint256 amount, uint256 stake, uint256 reserve, uint256 elapsed);
     event ParamsUpdated(uint256 unbondingSeconds, uint256 maxCommissionBps, uint256 maxBatchSize);
     event ValidatorRecordSynced(address indexed validator, address indexed operator, bool active, uint256 commissionBps);
@@ -1355,9 +1356,30 @@ contract  StratoStaking is Ownable {
     // may fund it; only the schedule ever moves it, into earned rewards.
     function fundRewardReserve(uint256 amount) external onlyInitialized {
         _accrue();
+        _reconcileRewardReserve();
         uint256 received = _pullReward(address(stratoToken), amount);
         rewardReserve += received;
         emit RewardReserveFunded(msg.sender, received, rewardReserve);
+    }
+
+    // The retired schedule kept its own reserve under this name, and the logic that retired
+    // it dropped the field, which let the owner recover the STRATO behind it as untracked. A
+    // proxy upgraded in place can therefore read a reserve nothing backs, against which
+    // _payRewards refuses every claim and funding adds to a fiction. Lower it to what the
+    // contract actually holds beyond principal and owed rewards. Permissionless and
+    // idempotent: it only ever lowers the number, to what is there, moves nothing and leaves
+    // a backed reserve alone, so it can run right after the swap, before anything is funded.
+    function reconcileRewardReserve() external onlyInitialized {
+        _reconcileRewardReserve();
+    }
+
+    function _reconcileRewardReserve() internal {
+        uint256 balance = IERC20(address(stratoToken)).balanceOf(address(this));
+        uint256 owed = principalBalance() + allocatedRewardLiability;
+        uint256 backed = balance > owed ? balance - owed : 0;
+        if (rewardReserve <= backed) return;
+        rewardReserve = backed;
+        emit RewardReserveReconciled(backed);
     }
 
     // Release what the schedule owes for the time since the last accrual, at the rate the

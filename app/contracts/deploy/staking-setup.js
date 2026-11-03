@@ -6,6 +6,7 @@
 //   node staking-setup.js emission <e0Wei> <s0Wei> <r0Wei> <startUnix>   emission schedule
 //   node staking-setup.js fundreserve <amountWei>           (direct) fund the emission reserve
 //   node staking-setup.js index                            (direct) index helium's existing set
+//   node staking-setup.js reconcile                        (direct) lower an unbacked reserve after the swap
 // Addresses default to helium; set STAKING_PROXY, VALIDATOR_REGISTRY_PROXY and STRATO_TOKEN
 // for another network.
 require('dotenv').config();
@@ -99,6 +100,11 @@ const STEPS = {
   // predates StratoStaking.activeValidators. Idempotent.
   index:     { direct: true, target: STAKING, name: 'StratoStaking', func: 'indexValidatorSet',
                args: { validators: VALIDATORS } },
+  // Permissionless, so a direct call rather than a vote: lowers a reserve the retired schedule
+  // left under the same name to what the contract holds beyond principal and owed rewards.
+  // Idempotent; moves nothing.
+  reconcile: { direct: true, target: STAKING, name: 'StratoStaking', func: 'reconcileRewardReserve',
+               args: {} },
   mint:      { target: TOKEN, func: 'mint', args: [FUNDER, FORTY_K] },
   // Fund the fee router so it can pay the flat per-block reward. It pays 0.01
   // STRATO per block (~230/day at the current rate) and silently pays nothing

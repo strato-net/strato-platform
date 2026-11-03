@@ -96,7 +96,16 @@ Verify:
   `totalSelfBond`, `totalRewardableStake`, `allocatedRewardLiability` identical to step 1;
 - governance state identical to step 1 (no `ValidatorAdded` / `ValidatorRemoved` /
   `ValidatorStakeUpdated` events);
-- new fields read as unset: `rewardReserve 0`, `lastEmissionTime 0`, `joinsOpenFromBlock 0`;
+- new fields read as unset: `lastEmissionTime 0`, `joinsOpenFromBlock 0`. `rewardReserve` is
+  not new: the retired schedule kept its own under that name, and the logic in between dropped
+  the field and let `recoverUntrackedStrato` take the STRATO behind it, so the proxy may read a
+  reserve nothing backs, against which every claim fails with `SS: rewards unavailable`. Right
+  after the swap run `node staking-setup.js reconcile` (direct, permissionless:
+  `reconcileRewardReserve()` only ever lowers the reserve to what the contract holds beyond
+  principal and `allocatedRewardLiability`, and moves nothing), then verify `rewardReserve`
+  reads as exactly that amount (0 on Upquark unless the retired schedule left backed tokens
+  behind) and that a test `claimOperatorRewards` / `claimRewards` of some pending amount
+  succeeds before anything is funded;
 - the chain keeps committing; `lastProcessedBlock` keeps advancing (`processBlock` is still
   called every transaction and now also runs `_accrue`, a no-op until a schedule exists).
 
@@ -135,8 +144,10 @@ governance `ValidatorAdded` / `ValidatorStakeUpdated` follow.
 1. **Fund the reserve** (direct transactions by `FUNDER`, which must hold the STRATO; set
    `GLOBAL_ADMIN_NAME` / `GLOBAL_ADMIN_PASSWORD` to that account for this step):
    `node staking-setup.js fundreserve $R0` — approves the staking proxy, then
-   `fundRewardReserve(R0)`. Anyone may fund the reserve; nothing can take it back out. Verify
-   `rewardReserve == R0`, `recoverableUntrackedStrato() == 0`, a `RewardReserveFunded` event.
+   `fundRewardReserve(R0)`. Anyone may fund the reserve; nothing can take it back out. It
+   reconciles first (step 2), so the deposit lands on the backed reserve. Verify
+   `rewardReserve == previous backed value + R0`, `recoverableUntrackedStrato() == 0`, a
+   `RewardReserveFunded` event.
 2. **Set the schedule** (vote): `node staking-setup.js emission $E0 $S0 $R0 $START`
    → `setEmissionSchedule(e0, s0, r0, startTime)`. With `START = 0` accrual starts at the
    block the second vote executes in; a future `START` schedules it and can be moved by another
