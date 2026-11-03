@@ -208,3 +208,45 @@ test('password authentication uses discovery, configured token fields, scope and
     else process.env.OAUTH_TOTP = originalTotp;
   }
 });
+
+test('authentication failures exclude configuration and credentials from logs and thrown errors', async (t) => {
+  const originalNodes = config.nodes;
+  t.after(() => { config.nodes = originalNodes; });
+  const disconnectedServer = http.createServer(req => req.socket.destroy());
+  await new Promise(resolve => disconnectedServer.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => disconnectedServer.close(resolve)));
+  const disconnectedUrl = `http://127.0.0.1:${disconnectedServer.address().port}/token`;
+  const log = t.mock.method(console, 'error', () => {});
+  config.nodes = [{ oauth: {
+    openIdDiscoveryUrl: `${baseUrl}/discovery?private=fixture-discovery-value`,
+    clientId: 'client', clientSecret: 'fixture-client-secret',
+  } }];
+
+  for (const [failure, expectedMessage] of [
+    ['discovery', 'OAuth discovery document missing token_endpoint'],
+    ['http', 'OAuth authentication request failed (HTTP 500)'],
+    ['network', 'OAuth authentication request failed'],
+  ]) {
+    handler = (req) => {
+      if (req.url.pathname === '/discovery') {
+        if (failure === 'discovery') return {};
+        return { token_endpoint: failure === 'network' ? disconnectedUrl : `${baseUrl}/token` };
+      }
+      throw new Error('fixture-response-secret');
+    };
+    await assert.rejects(getUserToken('fixture-user', 'fixture-password'), (error) => {
+      assert.equal(error.message, expectedMessage);
+      assert.equal(error.config, undefined);
+      assert.equal(error.request, undefined);
+      assert.equal(error.response, undefined);
+      assert.equal(error.cause, undefined);
+      const output = require('node:util').inspect(error);
+      for (const secret of ['fixture-discovery-value', 'fixture-client-secret', 'fixture-password', 'fixture-response-secret']) {
+        assert(!output.includes(secret));
+        assert(!JSON.stringify(log.mock.calls.map(call => call.arguments)).includes(secret));
+      }
+      return true;
+    });
+  }
+  assert.equal(log.mock.callCount(), 3);
+});

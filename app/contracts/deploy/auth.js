@@ -10,7 +10,7 @@ async function getUserTokenFromCredentials(username, password, totp) {
   const tokenEndpoint = discovery.data && discovery.data.token_endpoint;
 
   if (!tokenEndpoint) {
-    throw new Error(`OAuth discovery document missing token_endpoint: ${oauthConfig.openIdDiscoveryUrl}`);
+    throw new Error('OAuth discovery document missing token_endpoint');
   }
 
   const body = new URLSearchParams({
@@ -42,8 +42,11 @@ async function getUserToken(username, password) {
   try {
     return await getUserTokenFromCredentials(username, password, process.env.OAUTH_TOTP?.trim());
   } catch (error) {
-    console.error('Error getting user token:', error);
-    throw error;
+    const message = axios.isAxiosError(error)
+      ? `OAuth authentication request failed${error.response ? ` (HTTP ${error.response.status})` : ''}`
+      : error.message;
+    console.error('Error getting user token:', message);
+    throw new Error(message);
   }
 }
 
