@@ -20,6 +20,7 @@ interface IStratoFeeQuote {
 
 interface IFeeSink {
     function sinkFee(uint amount) external;
+    function buyAndSinkFee(uint shortfall) external;
 }
 
 interface ICanonicalPool {
@@ -28,6 +29,7 @@ interface ICanonicalPool {
     function liquidity() external view returns (uint);
     function observe(uint[] secondsAgos) external view returns (int[] tickCumulatives, int[] secondsPerLiquidityCumulativeX128s);
     function getSqrtRatioAtTick(int tick) external pure returns (uint);
+    function quoteGasExactOutput(bool zeroForOne, uint output) external view returns (uint input, uint rounding, bool complete);
     function swap(address recipient, bool zeroForOne, int amountSpecified, uint sqrtPriceLimitX96, uint amountLimit, uint deadline) external returns (int amount0, int amount1);
 }
 
@@ -53,9 +55,9 @@ enum FeeMethod { NONE, VOUCHER, STRATO_BURN, USDST_SWAP_BURN, USDST_COLLECTED }
 //   1. one whole voucher;
 //   2. STRATO worth 0.01 USDST, transferred from the signer to FEE_ADDRESS, so
 //      totalSupply stays fixed. Nothing is split.
-//      A signer short of STRATO first buys exactly the shortfall from the canonical pool
-//      with its own USDST, paying at most the shortfall's time-weighted value plus a
-//      bounded premium, so a USDST-only account keeps transacting through the switch.
+//      A signer short of STRATO buys exactly the shortfall through the router with
+//      its own USDST. The pool sends that STRATO directly to the fee address. The
+//      purchase is capped at its time-weighted value plus a bounded premium.
 // A signer with none of these has not paid, and the platform rejects the transaction
 // before it runs. Included transactions that revert have still paid.
 //
@@ -131,8 +133,11 @@ contract record FeeRouter {
     address constant FEE_ADDRESS = address(0xdead5712a70000000000000000000dead5712a70);
     uint constant Q192 = 6277101735386680763835789423207666416102355444464034512896; // 2**192: sqrtPriceX96 squared is Q192
 
-    // ---- Router storage. Only payBlockRewards and the views may touch it: those are
-    // plain calls, so address(this) is the router and this really is its own state. ----
+    function _burnAddress() internal view virtual returns (address) { return FEE_ADDRESS; }
+    function burnAddress() external view returns (address) { return _burnAddress(); }
+
+    // ---- Router storage. Accessed only by plain calls, including gas settlement:
+    // address(this) is the router and this really is its own state. ----
 
     // Block-number latch for payBlockRewards.
     uint256 public lastRewardedBlock;
@@ -141,7 +146,17 @@ contract record FeeRouter {
     // counter that moves with every new price so receipts can name the rate they paid at.
     uint256 public quotedFee;
     uint256 public quotedAt;
+    uint256 public quotedBlock;
     uint256 public priceVersion;
+
+    bool internal gasSettlementEntered;
+
+    modifier gasSettlementLock() {
+        require(!gasSettlementEntered, "FeeRouter: gas settlement reentry");
+        gasSettlementEntered = true;
+        _;
+        gasSettlementEntered = false;
+    }
 
     // Flat reward per block for the proposer, paid out of this contract's own
     // STRATO balance into staking, which splits it between the proposer's operator
@@ -153,6 +168,17 @@ contract record FeeRouter {
 
     event StratoFeeQuoted(uint256 indexed blockNumber, uint256 fee, uint256 priceVersion);
     event FeePaid(address indexed payer, FeeMethod method, uint256 amount, uint256 priceVersion);
+    // Enum-free native receipt for native event indexers and compatible RPCs.
+    event GasFeeReceipt(address indexed payer, address indexed router, uint256 method, uint256 amount, uint256 priceVersion);
+    event GasCanary(address indexed payer, address indexed router, address indexed feeRouter, uint256 fee, uint256 version, uint256 quoteBlock, uint256 usdAllowance, uint256 poolAllowance, uint256 routerUsd, uint256 payerUsd, uint256 payerStrato, uint256 payerVoucher);
+
+    // A controlled transaction's execution-phase witness, after its native fee.
+    // No historical eth_call or user-supplied event provenance is needed.
+    function gasCanary() external {
+        emit GasCanary(msg.sender, address(this), IFeeContractLookup(_deciderState()).getImplContract(), quotedFee, priceVersion, quotedBlock,
+            ERC20_Template(_usdst()).allowance(msg.sender, address(this)), ERC20_Template(_usdst()).allowance(address(this), _pool()),
+            IGasToken(_usdst()).balanceOf(address(this)), IGasToken(_usdst()).balanceOf(msg.sender), IGasToken(_strato()).balanceOf(msg.sender), IGasToken(_voucher()).balanceOf(msg.sender));
+    }
     event BlockRewardsPaid(uint256 indexed blockNumber, address indexed proposer, uint256 amount);
 
     // Block hook: the platform calls this once per block, before any of the block's
@@ -186,6 +212,7 @@ contract record FeeRouter {
         if (fee == 0) return;
         quotedFee = fee;
         quotedAt = block.timestamp;
+        quotedBlock = block.number;
         priceVersion += 1;
         emit StratoFeeQuoted(block.number, fee, priceVersion);
     }
@@ -276,6 +303,9 @@ contract record FeeRouter {
     }
 
     function payFees() external {
+        // The native DELEGATECALL has both sender and storage context equal to
+        // the signer. A normal public CALL must not spend this router's reserves.
+        require(msg.sender == address(this), "FeeRouter: signer context only");
         address staking = _staking();
 
         FeeMethod method = FeeMethod.VOUCHER;
@@ -305,22 +335,25 @@ contract record FeeRouter {
             require(valid, "FeeRouter: no STRATO price, a voucher is required");
             address strato = _strato();
             uint held = IGasToken(strato).balanceOf(address(this));
+            uint fromHeld = held < fee ? held : fee;
             method = FeeMethod.STRATO_BURN;
             if (held < fee) {
-                _buyStratoShortfall(fee - held, fee);
+                _buyStratoShortfall(router, fee - held, fee);
                 method = FeeMethod.USDST_SWAP_BURN;
             }
             // A paused STRATO lets only whitelisted callers move it, and this runs as
             // the signer, so the signer approves the installed router (whitelisted for
-            // transferFrom) and the router moves the fee. A signer still short reverts
-            // here, and the platform rejects the transaction before it runs: nothing is
-            // paid or swapped for a transaction that is not included.
-            ERC20_Template(strato).approve(router, fee);
-            IFeeSink(router).sinkFee(fee);
+            // transferFrom) and the router sinks the portion already held. Failure
+            // rolls back the purchase too: an unpaid transaction moves nothing.
+            if (fromHeld > 0) {
+                ERC20_Template(strato).approve(router, fromHeld);
+                IFeeSink(router).sinkFee(fromHeld);
+            }
             amount = fee;
             version = ver;
         }
         emit FeePaid(address(this), method, amount, version);
+        emit GasFeeReceipt(address(this), IFeeContractLookup(_deciderState()).getImplContract(), uint(method), amount, version);
 
         if (staking != address(0)) {
             try IStakingFeeHook(staking).processBlock() {
@@ -333,23 +366,54 @@ contract record FeeRouter {
     // caller. It only ever moves the caller's own STRATO, out of the allowance the
     // caller just gave, and only to FEE_ADDRESS.
     function sinkFee(uint amount) external {
-        ERC20_Template(_strato()).transferFrom(msg.sender, FEE_ADDRESS, amount);
+        ERC20_Template(_strato()).transferFrom(msg.sender, _burnAddress(), amount);
     }
 
-    // Buy exactly `shortfall` STRATO from the canonical pool with the signer's USDST.
-    // Still the signer's context: the approval and the swap are the signer's own, and
-    // any allowance the signer already gave the pool is put back afterwards. `fee`
-    // STRATO is worth USD_FEE at the block's quote, which prices the shortfall; the
-    // pool may charge up to that plus the premium, else it reverts and nothing moves.
-    function _buyStratoShortfall(uint shortfall, uint fee) internal {
+    function _maxShortfallInput(uint shortfall, uint fee) internal view returns (uint) {
+        uint proportional = (shortfall * USD_FEE * (10000 + _maxSwapPremiumBps()) + fee * 10000 - 1) / (fee * 10000);
+        ICanonicalPool pool = ICanonicalPool(_pool());
+        (uint input, uint rounding, bool complete) = pool.quoteGasExactOutput(address(pool.token0()) == _usdst(), shortfall);
+        require(complete && input > 0, "FeeRouter: incomplete gas quote");
+        uint fullFeeCap = (USD_FEE * (10000 + _maxSwapPremiumBps()) + 9999) / 10000;
+        uint roundedCap = proportional + rounding;
+        return roundedCap < fullFeeCap ? roundedCap : fullFeeCap;
+    }
+
+    // This still runs as the payer. A normal call makes the pool see the installed
+    // router, so its caller restriction does not need to trust the payer's identity.
+    function _buyStratoShortfall(address router, uint shortfall, uint fee) internal {
+        address usdst = _usdst();
+        uint allowance = ERC20_Template(usdst).allowance(address(this), router);
+        ERC20_Template(usdst).approve(router, _maxShortfallInput(shortfall, fee));
+        IFeeSink(router).buyAndSinkFee(shortfall);
+        ERC20_Template(usdst).approve(router, allowance);
+    }
+
+    // Only the caller funds this bounded purchase, and its only STRATO recipient
+    // is the burn address. Calling this directly cannot buy spendable STRATO or
+    // spend another payer's approval. Router balances and unused input stay intact.
+    function buyAndSinkFee(uint shortfall) external gasSettlementLock {
+        require(address(this) == IFeeContractLookup(_deciderState()).getImplContract(), "FeeRouter: installed router only");
+        require(_active() && quotedFee > 0, "FeeRouter: no active STRATO quote");
+        require(shortfall > 0 && shortfall <= quotedFee, "FeeRouter: invalid gas shortfall");
+
         address pool = _pool();
         address usdst = _usdst();
-        uint maxIn = (shortfall * USD_FEE * (10000 + _maxSwapPremiumBps()) + fee * 10000 - 1) / (fee * 10000);
-        bool usdstIsToken0 = address(ICanonicalPool(pool).token0()) == usdst;
+        uint maxIn = _maxShortfallInput(shortfall, quotedFee);
+        uint available = IGasToken(usdst).balanceOf(msg.sender);
+        uint funded = available < maxIn ? available : maxIn;
+        require(funded > 0, "FeeRouter: no USDST for gas");
 
-        uint allowance = ERC20_Template(usdst).allowance(address(this), pool);
-        ERC20_Template(usdst).approve(pool, allowance + maxIn);
-        ICanonicalPool(pool).swap(address(this), usdstIsToken0, -int(shortfall), 0, maxIn, block.timestamp);
-        ERC20_Template(usdst).approve(pool, allowance);
+        ERC20_Template(usdst).transferFrom(msg.sender, address(this), funded);
+        ERC20_Template(usdst).approve(pool, funded);
+        bool usdstIsToken0 = address(ICanonicalPool(pool).token0()) == usdst;
+        (int amount0, int amount1) = ICanonicalPool(pool).swap(_burnAddress(), usdstIsToken0, -int(shortfall), 0, funded, block.timestamp);
+        require((usdstIsToken0 ? amount1 : amount0) == -int(shortfall), "FeeRouter: incomplete gas purchase");
+        int input = usdstIsToken0 ? amount0 : amount1;
+        require(input > 0 && uint(input) <= funded, "FeeRouter: invalid gas input");
+        ERC20_Template(usdst).approve(pool, 0);
+
+        uint refund = funded - uint(input);
+        if (refund > 0) ERC20_Template(usdst).transfer(msg.sender, refund);
     }
 }
