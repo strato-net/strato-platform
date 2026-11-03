@@ -988,6 +988,8 @@ runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
   setVar dstVar =<< getVar srcVar
   return Nothing
 runStatement st@(CC.EmitStatement eventName exptups pos) = do
+  ro <- readOnly <$> getCurrentCallInfo
+  when ro $ invalidWrite "Invalid event emission during read-only access" eventName
   -- emit MemberAdded(<address>, <enode>);
   solidVMBreakpoint pos
   exps <- mapM (expToVar . snd) exptups
@@ -1731,6 +1733,8 @@ expToVar' (CC.FunctionCall _ e args) = do
             -- TODO: When gas gets more implemented ensure that this function does not
             --       consume more than 2300 gas
             Constant (SContractItem address' "transfer") -> do
+              ro <- readOnly <$> getCurrentCallInfo
+              when ro $ invalidWrite "Invalid balance transfer during read-only access" address'
               from <- getCurrentAddress
               case argVals of
                 [SInteger amount] -> do
@@ -1746,6 +1750,8 @@ expToVar' (CC.FunctionCall _ e args) = do
             -- TODO: When gas gets more implemented ensure that this function does not
             --       consume more than 2300 gas
             Constant (SContractItem address' "send") -> do
+              ro <- readOnly <$> getCurrentCallInfo
+              when ro $ invalidWrite "Invalid balance transfer during read-only access" address'
               from <- getCurrentAddress
               success <- case argVals of
                 [SInteger amount] -> do
@@ -2528,6 +2534,8 @@ callBuiltin ("blockhash") [bNum] = do
   maybeTheHash <- getBlockHashWithNumber blockNum (BlockHeader.parentHash curBlock)
   maybe (invalidArguments "the block number given does not exist" [blockNum]) (return . SString . BC.unpack . keccak256ToByteString) maybeTheHash
 callBuiltin ("selfdestruct") [a'] = do
+  ro <- readOnly <$> getCurrentCallInfo
+  when ro $ invalidWrite "Invalid selfdestruct during read-only access" a'
   a <- getAddressVal a'
   contract' <- getCurrentAddress
   contractBalance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) contract'
@@ -2798,6 +2806,8 @@ callBuiltin "require" (condVar : msg) = do
 callBuiltin "assert" [cond] = pure . const SNULL =<< assert =<< getBoolVal cond
 
 callBuiltin "create" args@(cName : src : argVals) = do
+  ro <- readOnly <$> getCurrentCallInfo
+  when ro $ invalidWrite "Invalid contract creation during read-only access" args
   (contractName', contractSrc) <- (,) <$> getStringVal cName <*> getStringVal src
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create function should not be empty" args
@@ -2823,6 +2833,8 @@ callBuiltin "create" args@(cName : src : argVals) = do
     Just nca -> pure $ ((flip SAddress) False) nca
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin "create2" args@(salt : n : src : argVals) = do
+  ro <- readOnly <$> getCurrentCallInfo
+  when ro $ invalidWrite "Invalid contract creation during read-only access" args
   (contractName', contractSrc) <- (,) <$> getStringVal n <*> getStringVal src
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
