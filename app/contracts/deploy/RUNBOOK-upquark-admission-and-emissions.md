@@ -56,8 +56,10 @@ curl -s "$NODE_URL/strato-api/eth/v1.2/block/last/1" > upquark-head-before.json
 Check, and stop if any of these does not hold — this branch assumes V2 is live and activated:
 
 - the staking state has `creditBlockReward`, `tryActivate`, `activeValidators` (V2 logic), and
-  `activeValidatorCount` equals governance's `validators` length (the set is indexed; if not,
-  `node staking-setup.js index` with the current validators in `VALIDATORS` first);
+  `activeValidators` holds exactly governance's `validators` (same members, no duplicates), every
+  one with `isValidator` true (the set is indexed; if not, `node staking-setup.js index` with the
+  full current set in `VALIDATORS` **before any emission vote**: a seated validator left out of
+  the index earns nothing from the schedule);
 - `governanceSyncEnabled` is `true`, governance `stakingContract` is the staking proxy, and
   `validatorStake` matches `lastSyncedWeight` for every validator;
 - `minStake`, `selfBondGraceUntil`, `joinsPaused`, `maxActiveValidators`,

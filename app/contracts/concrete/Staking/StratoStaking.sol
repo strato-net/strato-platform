@@ -527,11 +527,14 @@ contract  StratoStaking is Ownable {
     // One-time backfill for a proxy upgraded in place, whose consensus set predates
     // activeValidators. Permissionless and idempotent: it only indexes validators that
     // isValidator already records. Until it runs, set-wide passes see no members, which
-    // fails safe (no resync, no eviction).
+    // fails safe (no resync, no eviction), and a member not yet indexed earns nothing from
+    // the schedule: it is settled before it is indexed, as _seat does, so it earns from the
+    // next accrual on.
     function indexValidatorSet(address[] calldata validators) external onlyInitialized {
         for (uint256 i = 0; i < validators.length; i++) {
             address validator = validators[i];
             if (isValidator[validator] && activeValidatorIndex[validator] == 0) {
+                _settleEmissions(validator, operators[validator]);
                 activeValidators.push(validator);
                 activeValidatorIndex[validator] = activeValidators.length;
             }
@@ -1329,7 +1332,7 @@ contract  StratoStaking is Ownable {
     }
 
     function _emissionWeight(address validator, StakingValidator storage v) internal view returns (uint256) {
-        if (!isValidator[validator] || !v.active) return 0;
+        if (activeValidatorIndex[validator] == 0 || !v.active) return 0;
         return _validatorWeight(v);
     }
 

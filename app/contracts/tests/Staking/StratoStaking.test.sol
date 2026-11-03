@@ -1203,6 +1203,42 @@ contract Describe_StratoStaking {
         require(staking.allocatedRewardLiability() == 0, "all paid out");
     }
 
+    // An upgraded proxy's set was backfilled into the index without one of its members. The
+    // schedule follows the index: the member left out neither counts in S nor is credited, so
+    // what is released is exactly what the indexed set can claim; indexing it later pays it
+    // from the next accrual on, not for the time it was missing.
+    function it_pays_the_schedule_only_to_the_indexed_set() public {
+        _selfBond(operatorA, VALIDATOR_A, 3000e18);
+        _selfBond(operatorB, VALIDATOR_B, 1000e18);
+        _activate(VALIDATOR_A);
+        _activate(VALIDATOR_B);
+        staking.forgetSetIndex();
+        user2.doSuccessfully(address(staking), "indexValidatorSet", _list(VALIDATOR_B));
+        require(staking.isValidator(VALIDATOR_A) && staking.activeValidatorIndex(VALIDATOR_A) == 0, "A seated, not indexed");
+        require(staking.eligibleStake() == 1000e18, "only the indexed validator counts");
+        _fundReserve(10000e18);
+        staking.setEmissionSchedule(1000e18, 1000e18, 10000e18, 0);
+
+        // Year one on B's 1000 alone: 1000 released, all of it B's; nothing for A.
+        fastForward(YEAR, 1);
+        staking.processBlock();
+        require(staking.totalEmitted() == 1000e18, "year one released on the indexed stake");
+        require(_claimOperator(operatorB, VALIDATOR_B) == 1000e18, "B claims the whole release");
+        operatorA.doExpectingFailure(address(staking), "claimOperatorRewards(address)", "SS: no rewards", VALIDATOR_A);
+        require(staking.allocatedRewardLiability() == 0, "nothing allocated beyond the release");
+
+        // A is indexed: it earns from here on. Year two at S = 4000: 1000 * sqrt(4000 / 1000)
+        // * 9000 / 10000 = 1800, of which A takes three quarters.
+        user2.doSuccessfully(address(staking), "indexValidatorSet", _list(VALIDATOR_A));
+        require(staking.activeValidatorCount() == 2 && staking.eligibleStake() == 4000e18, "A counts from here");
+        fastForward(YEAR, 1);
+        staking.processBlock();
+        require(staking.totalEmitted() == 2800e18, "year two released on both");
+        require(_claimOperator(operatorA, VALIDATOR_A) == 1350e18, "A: its share of year two, nothing of year one");
+        require(_claimOperator(operatorB, VALIDATOR_B) == 450e18, "B: its quarter of year two");
+        require(staking.allocatedRewardLiability() == 0, "all paid out");
+    }
+
     function it_keeps_the_reserve_out_of_recovery_and_claims() public {
         _selfBond(operatorA, VALIDATOR_A, 1000e18);
         _stake(user1, VALIDATOR_A, 1000e18);
