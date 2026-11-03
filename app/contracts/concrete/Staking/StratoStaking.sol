@@ -718,6 +718,24 @@ contract  StratoStaking is Ownable {
         }
     }
 
+    // Governance decides the set, and an admin vote removes a validator without telling
+    // staking, which would keep paying it the schedule until something touched it. Once per
+    // block, every seated validator governance no longer lists gives up its seat the way a
+    // sync would: settled up to this block, and out of the next accrual. The vote stops its
+    // pay where it landed, not where the validator was next touched. Walks from the end for
+    // the reason _syncAllValidators does.
+    function _reconcileGovernanceSet() internal {
+        if (!governanceSyncEnabled) return;
+        uint256 i = activeValidators.length;
+        while (i > 0) {
+            i -= 1;
+            address validator = activeValidators[i];
+            if (IStakingGovernance(governance).validatorMap(validator) != 0) continue;
+            _unseat(validator);
+            emit ValidatorSynced(operatorOf(validator), validator, false, 0);
+        }
+    }
+
     // Permissionless resync (e.g. once an exit notice is up).
     function syncValidator(address validator) external onlyInitialized onlyListed(validator) {
         _syncValidator(validator);
@@ -1247,11 +1265,13 @@ contract  StratoStaking is Ownable {
             // of this that can throw; the fee path catches that, and a SolidVM catch
             // does not roll back, so latching first would leave the block marked
             // processed with nothing counted and no way for a later transaction to
-            // retry. Everything after this point is local writes.
+            // retry. Everything after this point is local writes, apart from the governance
+            // reads in _reconcileGovernanceSet, a view _syncValidator already calls unguarded.
             address actual = block.prevProposer;
             address intended = block.prevIntendedProposer;
             lastProcessedBlock = block.number;
             _processPrevBlock(actual, intended);
+            _reconcileGovernanceSet();
             _accrue();
         }
     }

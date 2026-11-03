@@ -1160,6 +1160,49 @@ contract Describe_StratoStaking {
         operatorA.doExpectingFailure(address(staking), "claimOperatorRewards(address)", "SS: no rewards", VALIDATOR_A);
     }
 
+    // An admin vote removes a validator in governance without telling staking. The next block
+    // takes the seat away by itself, nobody calling syncValidator: the schedule pays the
+    // validator up to that block and the rest of the set takes the whole release from then on.
+    function it_drops_a_validator_governance_removed_on_the_next_block() public {
+        _selfBond(operatorA, VALIDATOR_A, 3000e18);
+        _selfBond(operatorB, VALIDATOR_B, 1000e18);
+        _activate(VALIDATOR_A);
+        _activate(VALIDATOR_B);               // S = 4000
+        _fundReserve(10000e18);
+        staking.setEmissionSchedule(1000e18, 1000e18, 10000e18, 0);
+
+        // sqrt(4000 / 1000) = 2 at a full reserve: 2000 the first year, A takes three quarters
+        fastForward(YEAR, 1);
+        staking.processBlock();
+        require(staking.totalEmitted() == 2000e18, "year one released");
+
+        // what voteToRemoveValidator does, as staking sees it
+        gov.setStakingContract(address(this));
+        require(gov.removeValidatorFromStaking(VALIDATOR_A), "removed in governance");
+        gov.setStakingContract(address(staking));
+        require(staking.isValidator(VALIDATOR_A), "staking has not heard yet");
+
+        // The next block drops A. Year two was released at the stake the interval started on,
+        // A included: 2000 * 8000 / 10000 = 1600, of which A takes 1200.
+        fastForward(YEAR, 1);
+        staking.processBlock();
+        require(!staking.isValidator(VALIDATOR_A), "seat given up on the next block");
+        require(staking.status(VALIDATOR_A) == 1, "Registered");
+        require(staking.validatorCount() == 1, "count updated");
+        require(staking.activeValidatorCount() == 1, "index updated");
+        require(staking.eligibleStake() == 1000e18, "only B counts from here");
+        require(staking.totalEmitted() == 3600e18, "year two released on both");
+        require(_claimOperator(operatorA, VALIDATOR_A) == 2700e18, "A: paid up to the block that dropped it");
+
+        // Year three on B's 1000 alone: 1000 * sqrt(1000 / 1000) * 6400 / 10000 = 640, all B's.
+        fastForward(YEAR, 1);
+        staking.processBlock();
+        require(staking.totalEmitted() == 4240e18, "year three released");
+        require(_claimOperator(operatorB, VALIDATOR_B) == 1540e18, "B: its quarter of years one and two, all of year three");
+        operatorA.doExpectingFailure(address(staking), "claimOperatorRewards(address)", "SS: no rewards", VALIDATOR_A);
+        require(staking.allocatedRewardLiability() == 0, "all paid out");
+    }
+
     function it_keeps_the_reserve_out_of_recovery_and_claims() public {
         _selfBond(operatorA, VALIDATOR_A, 1000e18);
         _stake(user1, VALIDATOR_A, 1000e18);

@@ -142,10 +142,11 @@ governance `ValidatorAdded` / `ValidatorStakeUpdated` follow.
 3. **Verify** after the start: `EmissionAccrued(amount, stake, reserve, elapsed)` once per block
    with transactions; `rewardReserve` falling and `totalEmitted` / `allocatedRewardLiability`
    rising by the same amounts; `eligibleStake()` equal to the sum of seated, listed validators'
-   `selfBond + delegatedStake`; the staking page's APY and "current rate" reflecting
-   `emissionAnnualRate`. The first year at the proposed calibration with `S = 5,000,000` and a
-   full reserve releases 500,000 STRATO; with `S = 1,250,000` it releases 250,000; the rate
-   falls in proportion to the reserve as it is spent.
+   `selfBond + delegatedStake`; a validator removed by governance vote leaving the staking set
+   and stopping accrual on the next block with transactions (no `syncValidator` needed); the
+   staking page's APY and "current rate" reflecting `emissionAnnualRate`. The first year at the
+   proposed calibration with `S = 5,000,000` and a full reserve releases 500,000 STRATO; with
+   `S = 1,250,000` it releases 250,000; the rate falls in proportion to the reserve as it is spent.
 4. **Pause / change**: `node staking-setup.js emission 0 $S0 $R0 0` pauses (the reserve stays);
    any later `emission …` vote resumes from that block, not from the pause. Re-calibration is
    the same vote with new numbers; it settles the running interval under the old numbers first.
