@@ -125,7 +125,8 @@ export const defaultVaultFactoryFor: Record<string, string> = {
 
 export const defaultPoolV3FactoryFor: Record<string, string> = {
   "114784819836269": "e6b6f05a88e649e4102a801aade9a6bae02f352d", // Helium testnet
-  "33056204878082667": "5d630126d908b46bcf8d00bc15e591a459375809" // Upquark mainnet
+  "33056204878082667": "5d630126d908b46bcf8d00bc15e591a459375809", // Upquark mainnet
+  "7381244120123405172": "ddf7c27f27ac43b25043e100c2076e515526b9ae" // Forktest rehearsal
 };
 
 // PositionManagerV3 (V3 position NFTs). Deployed once per network behind a Proxy; its
@@ -154,6 +155,7 @@ export const defaultStratoNativeCustodyVaultFor: Record<string, string> = {
 export const defaultStratoTokenFor: Record<string, string> = {
   "114784819836269": "8ee9a3391e38176feebf5d43cb2c1d6c4f728b04", // Helium testnet
   "33056204878082667": "2ca3e170e6714282da77815f7864b17f612f5f83", // Upquark mainnet
+  "7381244120123405172": "ac621a150f49198036f84ffe90b4f2286b623583", // Forktest rehearsal
 };
 
 export const defaultStratoStakingFor: Record<string, string> = {

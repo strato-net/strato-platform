@@ -5,11 +5,13 @@ module TransactionReceipt
   ( TransactionReceipt(..)
   , EthHex(..)
   , mkTransactionReceipt
+  , walletGasEstimate
   ) where
 
 import Blockchain.Data.DataDefs (TransactionResult(..))
 import qualified Blockchain.Data.TransactionResultStatus as TRS
 import Blockchain.Data.Transaction (Transaction, whoSignedThisTransaction)
+import Blockchain.Strato.Model.Class (txEnvelopeType)
 import qualified Blockchain.Data.Transaction as TX
 import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.Keccak256 (Keccak256, keccak256ToHex, stringKeccak256)
@@ -57,7 +59,14 @@ data TransactionReceipt = TransactionReceipt
   , logsBloom         :: String
   , status            :: EthHex Integer
   , type_             :: EthHex Integer
+  , effectiveGasPrice :: EthHex Integer
   } deriving (Generic)
+
+-- | The billable gas units of every transaction: eth_estimateGas answers it,
+-- eth_gasPrice spreads the flat fee over it, and receipts bill it, so the
+-- estimate and the receipt agree to within the rounding of one unit.
+walletGasEstimate :: Integer
+walletGasEstimate = 21000
 
 instance ToJSON TransactionReceipt where
   toJSON = genericToJSON defaultOptions { fieldLabelModifier = fixType }
@@ -65,16 +74,19 @@ instance ToJSON TransactionReceipt where
       fixType "type_" = "type"
       fixType name    = name
 
-mkTransactionReceipt :: TransactionResult -> Transaction -> Integer -> [Value] -> String -> TransactionReceipt
-mkTransactionReceipt tr tx blkNum theLogs theLogsBloom = TransactionReceipt
+-- | @feeCharged@ is what the payer was charged in the native currency; the
+-- receipt bills it as the billable gas units at the per-unit price that
+-- covers it, so @gasUsed * effectiveGasPrice@ is the charge up to rounding.
+mkTransactionReceipt :: TransactionResult -> Transaction -> Integer -> Integer -> [Value] -> String -> TransactionReceipt
+mkTransactionReceipt tr tx blkNum feeCharged theLogs theLogsBloom = TransactionReceipt
   { transactionHash   = EthHex (transactionResultTransactionHash tr)
   , blockHash         = EthHex (transactionResultBlockHash tr)
   , blockNumber       = EthHex blkNum
   , transactionIndex  = EthHex 0
   , from              = EthHex <$> whoSignedThisTransaction tx
   , to                = EthHex <$> txTo tx
-  , gasUsed           = EthHex gas
-  , cumulativeGasUsed = EthHex gas
+  , gasUsed           = EthHex walletGasEstimate
+  , cumulativeGasUsed = EthHex walletGasEstimate
   , contractAddress   = if isNativeTransfer
       then Nothing
       else case transactionResultContractsCreated tr of
@@ -83,10 +95,10 @@ mkTransactionReceipt tr tx blkNum theLogs theLogsBloom = TransactionReceipt
   , logs              = theLogs
   , logsBloom         = theLogsBloom
   , status            = EthHex $ if transactionResultStatus tr == Just TRS.Success then 1 else 0
-  , type_             = EthHex 0
+  , type_             = EthHex (toInteger $ txEnvelopeType tx)
+  , effectiveGasPrice = EthHex ((feeCharged + walletGasEstimate - 1) `div` walletGasEstimate)
   }
   where
-    gas = toInteger (transactionResultGasUsed tr)
 
     isNativeTransfer = case tx of
       TX.EthereumTX{TX.ethTo = Just _, TX.value = val, TX.txData = td}
