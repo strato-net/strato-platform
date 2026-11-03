@@ -19,7 +19,7 @@ async function main(): Promise<void> {
 
   const app = express();
   app.get("/health", (_req, res) => {
-    const { proxies, ...cursors } = monitor.store.state;
+    const { proxies, supplies, ...cursors } = monitor.store.state;
     res.status(monitor.healthy ? 200 : 500).json({
       status: monitor.healthy,
       lastCycleAt: monitor.lastCycleAt ? new Date(monitor.lastCycleAt).toISOString() : null,
