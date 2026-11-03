@@ -457,17 +457,24 @@ export function mergeIndexedIssues(indexed: OpenIssue[], cached: OpenIssue[] = [
     (b.createdBlock ?? 0) - (a.createdBlock ?? 0));
 }
 
+/** castVoteOnIssue's (executed, result-or-issueId) from a resolved or a polled receipt. */
+export function voteOutcome(result: any): { executed: unknown; issueId: unknown } {
+  const response = result?.txResult?.response ?? result?.response;
+  const values = response?.t === "tup" ? response.v : [];
+  const contents = result?.data?.tag === "Call" ? result.data.contents : null;
+  return {
+    executed: Array.isArray(contents) ? contents[0] : values[0]?.t === "bool" ? values[0].v : undefined,
+    issueId: Array.isArray(contents) ? contents[1] : values[1]?.v,
+  };
+}
+
 /** Only an actual successful vote receipt can add or remove a cached proposal. */
 export function applyConfirmedVote(cached: OpenIssue[], result: any, proposal: Omit<OpenIssue, "issueId">): OpenIssue[] {
   if (result?.status !== "Success") return cached;
-  const response = result.txResult?.response ?? result.response;
-  const values = response?.t === "tup" ? response.v : [];
-  const contents = result.data?.tag === "Call" ? result.data.contents : null;
-  const executed = Array.isArray(contents) ? contents[0] : values[0]?.t === "bool" ? values[0].v : undefined;
+  const { executed, issueId } = voteOutcome(result);
   if (typeof executed !== "boolean") return cached;
   if (executed) return cached.filter((issue) => !(issue.target === proposal.target && issue.func === proposal.func &&
     JSON.stringify(issue.args) === JSON.stringify(proposal.args)));
-  const issueId = Array.isArray(contents) ? contents[1] : values[1]?.v;
   if (typeof issueId !== "string" || !/^[0-9a-f]{64}$/i.test(issueId)) return cached;
   const existing = cached.find((issue) => issue.issueId === issueId);
   return [{

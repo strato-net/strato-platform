@@ -572,7 +572,7 @@ export const setTokenStatus = async (
   try {
     const tokenAddress = body.address as string;
     const { data: [token] = [] } = await cirrus.get(accessToken, "/" + Token, {
-      params: { address: `eq.${tokenAddress}`, select: "_owner" },
+      params: { address: `eq.${normalizeAddress(tokenAddress)}`, select: "_owner" },
     });
     if (!token) throw new Error(`Token ${tokenAddress} not found`);
     const tx = await buildFunctionTx(await ownerInput(accessToken, {

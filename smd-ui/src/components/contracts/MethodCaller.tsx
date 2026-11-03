@@ -21,7 +21,7 @@ import { SimulateButton } from "@/components/simulation/SimulateButton";
 import { SimulationResultPanel } from "@/components/simulation/SimulationResultPanel";
 import { useUser } from "@/context/UserContext";
 import type { FuncArg } from "@/services/contracts";
-import { useGovernanceOwner } from "@/services/multisig";
+import { useGovernanceOwner, voteOutcome } from "@/services/multisig";
 
 interface MethodCallerProps {
   contractName: string;
@@ -140,7 +140,7 @@ export function MethodCaller({
       );
       setResult(res);
       // castVoteOnIssue returns (executed, result-or-issueId).
-      const voted = governed && res?.data?.contents?.[0] === false;
+      const voted = governed && voteOutcome(res).executed === false;
       toast.success(voted ? `Vote recorded for ${method}` : `Called ${method}`);
     } catch (err: any) {
       const msg = typeof err === "string" ? err : String(err?.message || err);

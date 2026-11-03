@@ -243,7 +243,8 @@ walletWrapCall target method innerArgs =
 -- registry only takes owner-only calls from it, so (unless the sender is that
 -- owner) the call becomes @registry.castVoteOnIssue(wallet, method, ...)@ with
 -- the wallet method's args positional and hinted with their declared types,
--- the variadic tail flattened.
+-- the variadic tail flattened. A wallet that governs itself (Multisig logic)
+-- can't vote on its own callContract, so it votes on the wrapped call directly.
 walletCall ::
   ( MonadIO m,
     (Keccak256 `A.Selectable` CC.CodeCollection) m,
@@ -257,6 +258,16 @@ walletCall ::
   m (Address, Text, Map Text ArgValue)
 walletCall sender wallet method args =
   getGovernanceOwner wallet >>= \case
+    Just registry
+      | registry == wallet,
+        method == "callContract",
+        Just target <- M.lookup "contractToCall" args,
+        Just func <- M.lookup "functionName" args ->
+          pure
+            ( wallet,
+              "castVoteOnIssue",
+              M.fromList [("_target", target), ("_func", func), ("_args", M.findWithDefault (ArgArray mempty) "args" args)]
+            )
     Just registry | registry /= sender -> do
       params <-
         getContractWithCodeCollectionByAddress wallet method >>= \case
