@@ -240,8 +240,8 @@ walletWrapCall target method innerArgs =
     ]
 
 -- | The call a wallet-routed tx is sent as. A wallet owned by a governance
--- registry only takes owner-only calls from it, so (unless the sender is that
--- owner) the call becomes @registry.castVoteOnIssue(wallet, method, ...)@ with
+-- registry only takes onlyOwner calls from it, so (unless the sender is that
+-- owner) such a call becomes @registry.castVoteOnIssue(wallet, method, ...)@ with
 -- the wallet method's args positional and hinted with their declared types,
 -- the variadic tail flattened. A wallet that governs itself (Multisig logic)
 -- can't vote on its own callContract, so it votes on the wrapped call directly.
@@ -268,23 +268,25 @@ walletCall sender wallet method args =
               "castVoteOnIssue",
               M.fromList [("_target", target), ("_func", func), ("_args", M.findWithDefault (ArgArray mempty) "args" args)]
             )
-    Just registry | registry /= sender -> do
-      params <-
-        getContractWithCodeCollectionByAddress wallet method >>= \case
-          Nothing -> throwIO . UserError $ "Could not find contract " <> Text.pack (format wallet)
-          Just (c, _) -> pure . sortOn (Xabi.indexedTypeIndex . snd) . Map.toList $ functionXabiArgs c method
-      voteArgs <- concat <$> traverse positional params
-      pure
-        ( registry,
-          "castVoteOnIssue",
-          M.fromList
-            [ ("_target", ArgString . Text.pack $ show wallet),
-              ("_func", ArgString method),
-              ("_args", ArgArray $ V.fromList voteArgs)
-            ]
-        )
+    Just registry | registry /= sender ->
+      getContractWithCodeCollectionByAddress wallet method >>= \case
+        Nothing -> throwIO . UserError $ "Could not find contract " <> Text.pack (format wallet)
+        -- Methods without onlyOwner (castVoteOnIssue, addAdmin, ...) take any caller
+        Just (c, _) | not (ownerOnly c) -> pure (wallet, method, args)
+        Just (c, _) -> do
+          voteArgs <- concat <$> traverse positional (sortOn (Xabi.indexedTypeIndex . snd) . Map.toList $ functionXabiArgs c method)
+          pure
+            ( registry,
+              "castVoteOnIssue",
+              M.fromList
+                [ ("_target", ArgString . Text.pack $ show wallet),
+                  ("_func", ArgString method),
+                  ("_args", ArgArray $ V.fromList voteArgs)
+                ]
+            )
     _ -> pure (wallet, method, args)
   where
+    ownerOnly c = maybe False (any ((== "onlyOwner") . fst) . _funcModifiers) . Map.lookup method $ c ^. functions
     positional (name, Xabi.IndexedType _ ty) = case (ty, M.lookup name args) of
       (Xabi.Variadic, Nothing) -> pure []
       (Xabi.Variadic, Just (ArgArray v)) -> pure $ V.toList v
