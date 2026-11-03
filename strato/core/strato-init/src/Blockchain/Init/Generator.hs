@@ -129,10 +129,10 @@ createCommandsFile role = do
     -- never votes, proposes or drives round changes, even if its key is in
     -- the validator set.
     let followerFlag = if flags_validatorBehavior then "" else " --validatorBehavior=false"
-        -- A validator's indexer keeps the Redis block index only: no SQL
-        -- side, so no writer lease either.
+        -- Every role that runs the chain keeps the SQL block index, a
+        -- validator included: strato-p2p and vm-runner read blocks from it.
+        -- Only the writer lease is a choice.
         indexerFlags
-          | role == RoleValidator = " --sql=false"
           | flags_writer = ""
           | otherwise = " --writer=false"
     return $
@@ -142,10 +142,14 @@ createCommandsFile role = do
       , "vm-runner " ++ vmRunnerRts
           ++ (if flags_disableSqlIndexing then " --disableSqlIndexing" else "")
           ++ (if flags_disableCirrusIndexing then " --disableCirrusIndexing" else "")
+          -- A validator keeps no account state in SQL: not the state mirror
+          -- (sqlDiff, off through roleRunsCirrus in ethconf) and not the
+          -- balance and nonce updates the VM publishes in its place.
+          ++ (if roleRunsCirrus role then "" else " --publishAddressState=false")
       , restartable ("strato-indexer" ++ indexerFlags)
       ]
       -- Cirrus serves the API; a validator has none to serve.
-      ++ [restartable "slipstream +RTS -T -RTS" | roleIndexesSql role]
+      ++ [restartable "slipstream +RTS -T -RTS" | roleRunsCirrus role]
       ++ [restartable "strato-network-monitor"]
       -- A core cell takes the API tier's transactions through its ingress;
       -- a monolith's strato-api writes its own stream directly.

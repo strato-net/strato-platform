@@ -60,6 +60,8 @@ instance Arbitrary TX.Transaction where
         TX.EthereumTX
           <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
           <*> (B.pack <$> arbitrary) <*> genChainId <*> arbitrary <*> arbitrary <*> genV
+          -- legacy envelope only: a type-2 one needs a chain ID and a 0/1 parity
+          <*> pure 0 <*> pure 0
 
 instance Arbitrary IngestTx where
   arbitrary = IngestTx <$> arbitrary <*> arbitrary

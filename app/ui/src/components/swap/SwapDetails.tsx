@@ -1,7 +1,8 @@
 import { ReactNode } from "react";
 import { HelpCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { SWAP_FEE } from "@/lib/constants";
+import { SWAP_CALLS } from "@/lib/constants";
+import NetworkFee from "@/components/NetworkFee";
 import { LoadingSpinner } from "@/components/swap/TokenInputPanel";
 
 // ============================================================================
@@ -66,7 +67,7 @@ export const SwapDetails = ({
     {/* Transaction Fee */}
     <div className="flex flex-col md:flex-row md:justify-between gap-1 text-sm">
       <span className="text-muted-foreground">Transaction Fee</span>
-      <span className="font-medium text-xs md:text-sm">{SWAP_FEE} USDST ({parseFloat(SWAP_FEE) * 100} voucher)</span>
+      <span className="font-medium text-xs md:text-sm"><NetworkFee calls={SWAP_CALLS} /></span>
     </div>
 
     {/* Price Impact */}
