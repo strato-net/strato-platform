@@ -19,6 +19,9 @@ export const CATCH_UP_MS = 20_000;
 export const CHAIN_NAMES: Record<string, string> = {
   "1": "Ethereum",
   "8453": "Base",
+  "4663": "Robinhood",
+  "59144": "Linea",
+  "999": "HyperEVM",
   "11155111": "Sepolia",
   "84532": "Base Sepolia",
   "46630": "Robinhood Testnet",
@@ -50,10 +53,9 @@ export interface Config {
   bridgeOutAlertUsd: number;
   /** STRATO side of the native bridge; RepresentationMinted is checked against its withdrawals */
   stratoNativeBridge?: string;
-  /** external chains whose bridge contracts are watched */
-  evmChains: { chainId: string; rpcUrl: string; bridges: string[] }[];
+  /** external chains whose bridge contracts are watched; logChunk = blocks per eth_getLogs request */
+  evmChains: { chainId: string; rpcUrl: string; bridges: string[]; logChunk: number }[];
   evmConfirmations: number;
-  evmLogChunk: number;
   slack?: { token: string; channelId: string; infoChannelId?: string };
 }
 
@@ -101,10 +103,12 @@ export function loadConfig(): Config {
     knownExecutors[address("KNOWN_EXECUTORS", executor)] = new Set(funcs);
 
   // EVM_BRIDGES="<chainId>=<bridge>,<bridge>; <chainId2>=<bridge>" + CHAIN_<chainId>_RPC_URL
+  // (+ optional CHAIN_<chainId>_LOG_CHUNK for RPCs with a smaller eth_getLogs range)
   const evmChains = parseList("EVM_BRIDGES").map(([chainId, bridges]) => ({
     chainId,
     rpcUrl: required(`CHAIN_${chainId}_RPC_URL`),
     bridges: bridges.map((b) => address("EVM_BRIDGES", b)),
+    logChunk: num(`CHAIN_${chainId}_LOG_CHUNK`, num("EVM_LOG_CHUNK", 2000)),
   }));
   // FAIL_BURST_IGNORE="<account>,<account>"
   const failBurstIgnore = new Set([
@@ -145,7 +149,6 @@ export function loadConfig(): Config {
     stratoNativeBridge,
     evmChains,
     evmConfirmations: num("EVM_CONFIRMATIONS", 2),
-    evmLogChunk: num("EVM_LOG_CHUNK", 2000),
     slack,
   };
 }

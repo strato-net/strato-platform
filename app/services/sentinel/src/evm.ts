@@ -9,7 +9,8 @@ const log = (msg: string) => console.log(`${new Date().toISOString()} [evm] ${ms
 
 /** StratoNativeRepresentationBridge + its OpenZeppelin AccessControl / UUPS / Pausable bases.
  *  The routed-redemption, redemption-refund and mint-cancel events come from the newer bridge
- *  version (feature/extassetbridge) already deployed on testnet. */
+ *  version (feature/extassetbridge) already deployed on testnet.
+ *  MercataBridge custody: the Safe (1.4.1, incl. SafeL2) and each chain's DepositRouter (Ownable). */
 export const iface = new Interface([
   "event RepresentationMinted(uint256 sourceChainId, address indexed sourceBridge, uint256 indexed sourceWithdrawalId, address indexed stratoToken, address representationToken, address recipient, uint256 amount, bytes32 mintId)",
   "event RedemptionRequested(address indexed representationToken, uint256 amount, address indexed sender, address indexed stratoRecipient, uint96 redemptionId)",
@@ -33,6 +34,29 @@ export const iface = new Interface([
   "event Initialized(uint64 version)",
   "event Paused(address account)",
   "event Unpaused(address account)",
+  "event SafeSetup(address indexed initiator, address[] owners, uint256 threshold, address initializer, address fallbackHandler)",
+  "event AddedOwner(address indexed owner)",
+  "event RemovedOwner(address indexed owner)",
+  "event ChangedThreshold(uint256 threshold)",
+  "event EnabledModule(address indexed module)",
+  "event DisabledModule(address indexed module)",
+  "event ChangedGuard(address indexed guard)",
+  "event ChangedFallbackHandler(address indexed handler)",
+  "event ExecutionFromModuleSuccess(address indexed module)",
+  "event ExecutionFromModuleFailure(address indexed module)",
+  "event SafeModuleTransaction(address module, address to, uint256 value, bytes data, uint8 operation)",
+  "event ExecutionSuccess(bytes32 indexed txHash, uint256 payment)",
+  "event ExecutionFailure(bytes32 indexed txHash, uint256 payment)",
+  "event SafeMultiSigTransaction(address to, uint256 value, bytes data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, bytes signatures, bytes additionalInfo)",
+  "event SafeReceived(address indexed sender, uint256 value)",
+  "event ApproveHash(bytes32 indexed approvedHash, address indexed owner)",
+  "event SignMsg(bytes32 indexed msgHash)",
+  "event DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId)",
+  "event DepositRoutedWithAction(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId, uint8 action, address actionToken, uint256 minFinalOut)",
+  "event TokenConfigUpdated(address indexed token, uint256 minAmount, bool isPermitted)",
+  "event RoutePermittedUpdated(address indexed token, address indexed targetStratoToken, bool isPermitted)",
+  "event GnosisSafeUpdated(address indexed oldSafe, address indexed newSafe)",
+  "event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)",
 ]);
 
 const SEVERITY: Record<string, Severity | null> = {
@@ -49,6 +73,29 @@ const SEVERITY: Record<string, Severity | null> = {
   AttestationSignerUpdated: "critical",
   AttestationThresholdUpdated: "critical",
   MaxAttestationValidityUpdated: "critical",
+  // custody Safe: who can sign, how many must, and any path around the signatures
+  SafeSetup: "critical",
+  AddedOwner: "critical",
+  RemovedOwner: "critical",
+  ChangedThreshold: "critical",
+  EnabledModule: "critical",
+  DisabledModule: "critical",
+  ChangedGuard: "critical",
+  ChangedFallbackHandler: "critical",
+  ExecutionFromModuleSuccess: "critical",
+  ExecutionFromModuleFailure: "critical",
+  SafeModuleTransaction: "critical",
+  ExecutionFailure: "high",
+  ExecutionSuccess: null, // signed withdrawal payouts
+  SafeMultiSigTransaction: null,
+  SafeReceived: null,
+  ApproveHash: null,
+  SignMsg: null,
+  // DepositRouter: where deposits are forwarded, who owns the router, which tokens it accepts
+  GnosisSafeUpdated: "critical",
+  OwnershipTransferred: "critical",
+  DepositRouted: null, // normal user flow
+  DepositRoutedWithAction: null,
 };
 
 const ROLE_NAMES: Record<string, string> = Object.fromEntries([
@@ -126,7 +173,7 @@ export async function scanEvm(cfg: Config, store: StateStore): Promise<void> {
     const deadline = Date.now() + CATCH_UP_MS;
     while (blocks[chain.chainId] < head && Date.now() < deadline) {
       const from = blocks[chain.chainId] + 1;
-      const to = Math.min(head, from + cfg.evmLogChunk - 1);
+      const to = Math.min(head, from + chain.logChunk - 1);
       const logs = await provider.getLogs({ address: chain.bridges.map((b) => `0x${b}`), fromBlock: from, toBlock: to });
 
       const alerts: Alert[] = [];

@@ -32,7 +32,10 @@ Each runs every cycle with its own cursor in `STATE_FILE`; one failing watcher d
 | evm | `eth_getLogs` on `EVM_BRIDGES` | `RepresentationMinted` without an identical, non-aborted STRATO withdrawal | 🔴 |
 | | | `RedemptionRefunded` for a redemption STRATO already credited | 🔴 |
 | | | Role, upgrade, initializer or attestor/threshold/validity change | 🔴 |
-| | | Token mapping, pause, `NativeMintCanceled` or any unrecognized event | 🟠 |
+| | | Custody Safe owner, threshold, module, guard or fallback-handler change, or a module transaction | 🔴 |
+| | | DepositRouter owner or forwarding-Safe change | 🔴 |
+| | | Failed Safe execution | 🟠 |
+| | | Token mapping / config, pause, `NativeMintCanceled` or any unrecognized event | 🟠 |
 
 ## Run
 
