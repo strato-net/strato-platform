@@ -148,11 +148,11 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
     getStakeDeltasFromEvents Nothing evs `shouldBe` M.empty
 
   -- The test config is the default (upquark-shaped, so staking activates at
-  -- defaultStakingActivationBlock "upquark" = 1,000,000), so the block-reward
+  -- defaultStakingActivationBlock "upquark" = 2,000,000), so the block-reward
   -- receipt fork must track the staking activation height rather than
   -- switching on its own. Only helium carries a bespoke height.
   it "ties the block-reward receipt fork to staking activation off helium" $ do
-    let upquarkActivation = 1000000 :: Integer
+    let upquarkActivation = 2000000 :: Integer
     isBlockRewardReceiptForkActive 0 `shouldBe` False
     isBlockRewardReceiptForkActive 320000 `shouldBe` False
     isBlockRewardReceiptForkActive (upquarkActivation - 1) `shouldBe` False
