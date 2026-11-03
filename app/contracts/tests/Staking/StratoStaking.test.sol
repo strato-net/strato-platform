@@ -1075,6 +1075,31 @@ contract Describe_StratoStaking {
         require(staking.rewardReserve() == 9000e18, "claims never touch the reserve");
     }
 
+    // The schedule charges commission when a validator is settled, so a ceiling vote settles
+    // the set first: what was released before it keeps the old split.
+    function it_settles_the_set_before_a_commission_ceiling_change() public {
+        _bondBoth();                          // A: 1000 self-bond at 5% commission; B: 2000
+        _stake(user1, VALIDATOR_A, 1000e18);  // S = 4000
+        _fundReserve(10000e18);
+        staking.setEmissionSchedule(1000e18, 4000e18, 10000e18, 0);
+        fastForward(YEAR, 1);
+        staking.processBlock();
+        require(staking.totalEmitted() == 1000e18, "a year released, settled on nobody yet");
+
+        staking.setParams(100, 0, 16);
+        require(staking.maxCommissionBps() == 0, "ceiling lowered to zero");
+
+        // A's 500 was released under the old ceiling: self-bond 250; delegators 250 gross, 5% -> 12.5 + 237.5
+        require(_claimOperator(operatorA, VALIDATOR_A) == 2625e17, "the operator keeps the commission it earned");
+        uint256 before = strato.balanceOf(address(user1));
+        user1.doSuccessfully(address(staking), "claimRewards", _list(VALIDATOR_A));
+        require(strato.balanceOf(address(user1)) - before == 2375e17, "the delegator's share is unchanged");
+
+        // Income from here on is charged at the new ceiling: self-bond 50, no commission on the rest.
+        _reward(VALIDATOR_A, 100e18);
+        require(_pendingOperatorRewards(VALIDATOR_A) == 50e18, "no commission under a zero ceiling");
+    }
+
     function it_scales_the_release_with_the_root_of_the_stake_and_the_reserve_left() public {
         _selfBond(operatorA, VALIDATOR_A, 1000e18);
         _activate(VALIDATOR_A);               // S = 1000

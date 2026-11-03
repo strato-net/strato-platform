@@ -390,12 +390,19 @@ contract  StratoStaking is Ownable {
         emit JoinsOpenFromBlockSet(_joinsOpenFromBlock);
     }
 
-    // Lowering maxCommissionBps needs no pass over the validators: commission is capped
-    // where it is charged (_commissionBps).
+    // Commission is capped where it is charged (_commissionBps), and the emission schedule
+    // charges it when a validator is settled, so a change of maxCommissionBps settles the
+    // consensus set first: what the schedule released before the vote is split at the old
+    // ceiling. Only seated validators can have unsettled emissions.
     function setParams(uint256 _unbondingSeconds, uint256 _maxCommissionBps, uint256 _maxBatchSize) external onlyOwner onlyInitialized {
         require(_maxCommissionBps <= BPS_DIVISOR, "SS: bad commission");
         require(_maxBatchSize > 0, "SS: bad batch");
 
+        if (_maxCommissionBps != maxCommissionBps) {
+            for (uint256 i = 0; i < activeValidators.length; i++) {
+                _settle(activeValidators[i], operators[activeValidators[i]]);
+            }
+        }
         unbondingSeconds = _unbondingSeconds;
         maxCommissionBps = _maxCommissionBps;
         maxBatchSize = _maxBatchSize;
