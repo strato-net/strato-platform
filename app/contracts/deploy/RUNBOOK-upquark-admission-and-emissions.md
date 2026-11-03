@@ -124,20 +124,23 @@ is consensus-neutral: no set or weight changes.
    it at once. Validators still under the bar leave the set on the next sync, at most
    `maxSetMutationsPerBlock` per block; `syncValidator(v)` is permissionless, so anyone can finish
    it. Governance never drops its last validator.
-4. **Capacity rules**: `node staking-setup.js setparams` votes
+4. **Agreed block**: `node staking-setup.js joinsfrom $JOINS_FROM`. Until that block only the
+   owner (an admin vote) can activate; from it on anyone can call `tryActivate(v)` /
+   `reconcileSet([...])` for an eligible validator. Vote this first and read back
+   `joinsOpenFromBlock == JOINS_FROM` (executed, not merely proposed) before the step 5 vote is
+   even created: a zero opening block means open at once, so unpausing first opens joins
+   immediately, and a seat taken in that gap is not undone by setting the block afterwards.
+5. **Capacity rules**: `node staking-setup.js setparams` votes
    `setSetParams(maxActive, hardCap, evictionMarginBps, mutationsPerBlock, exitNoticeSeconds, unkickCooldown, maxOperatorStakeBps, joinsPaused)`
    — edit the script's `setparams` line to the agreed values with **`joinsPaused = false`**. The
    hard cap only lowers. `maxOperatorStakeBps` now bounds `reconcileSet` as well as
    `tryActivate`.
-5. **Agreed block**: `node staking-setup.js joinsfrom $JOINS_FROM`. Until that block only the
-   owner (an admin vote) can activate; from it on anyone can call `tryActivate(v)` /
-   `reconcileSet([...])` for an eligible validator. Vote 4 and 5 ahead of the block, in either
-   order; both must hold for a permissionless join.
 
 Verify: `joinsPaused false`, `joinsOpenFromBlock == JOINS_FROM`, `/staking/info.joinsOpen`
-flips to `true` once `lastProcessedBlock >= JOINS_FROM`; a registered, self-bonded validator
-outside the set (`isWaiter`) activates itself through the staking page; `ValidatorSynced` and
-governance `ValidatorAdded` / `ValidatorStakeUpdated` follow.
+flips to `true` once `lastProcessedBlock >= JOINS_FROM` (before it `tryActivate` fails with
+`SS: joins not yet open`); a registered, self-bonded validator outside the set (`isWaiter`)
+activates itself through the staking page; `ValidatorSynced` and governance `ValidatorAdded` /
+`ValidatorStakeUpdated` follow.
 
 ## 4. Emissions
 
