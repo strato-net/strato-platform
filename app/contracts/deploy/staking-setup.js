@@ -2,17 +2,25 @@
 //   node staking-setup.js <init|usdst|govstaking|setvreg|params|setparams|validators|mint|fundrouter>
 //   node staking-setup.js grace <unixSeconds>              end of the self-bond grace period
 //   node staking-setup.js setoperator <validator> <operator>
+//   node staking-setup.js joinsfrom <block>                 permissionless joins open at this block
+//   node staking-setup.js emission <e0Wei> <s0Wei> <r0Wei> <startUnix>   emission schedule
+//   node staking-setup.js fundreserve <amountWei>           (direct) fund the emission reserve
 //   node staking-setup.js index                            (direct) index helium's existing set
+//   node staking-setup.js reconcile                        (direct) lower an unbacked reserve after the swap
+//   node staking-setup.js settle                           (direct) settle the set before a downgrade
+// Addresses default to helium; set STAKING_PROXY, VALIDATOR_REGISTRY_PROXY and STRATO_TOKEN
+// for another network.
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
 const { rest, util } = require('blockapps-rest');
 
+const hex40 = (v) => String(v || '').replace(/^0x/, '');
 const REGISTRY = '000000000000000000000000000000000000100c';
 const GOVERNANCE = '0000000000000000000000000000000000000100';
-const STAKING = 'd6726e06c3c71a3bad80b5eb6925707a31729b81';
-const VREG = 'bfbb75bb6bd0bafa2f5c5b735fe518ade76808dd';
-const TOKEN = '8ee9a3391e38176feebf5d43cb2c1d6c4f728b04';
+const STAKING = hex40(process.env.STAKING_PROXY || 'd6726e06c3c71a3bad80b5eb6925707a31729b81');
+const VREG = hex40(process.env.VALIDATOR_REGISTRY_PROXY || 'bfbb75bb6bd0bafa2f5c5b735fe518ade76808dd');
+const TOKEN = hex40(process.env.STRATO_TOKEN || '8ee9a3391e38176feebf5d43cb2c1d6c4f728b04');
 const USDST = '937efa7e3a77e20bbdbd7c0d32b6514f368c1010';
 const FUNDER = '7b1f8cd02cd09ab9510e30fc8e15ff898a639771'; // blockapps_test_1
 // HeliumFeeRouter (payFees + payBlockRewards); set FEE_ROUTER to fund a newer router.
@@ -67,9 +75,41 @@ const STEPS = {
     return { target: VREG, func: 'adminSetOperator',
              args: [{ type: 'address', value: hex(validator) }, { type: 'address', value: hex(operator) }] };
   },
+  // Permissionless activation (with joinsPaused false) opens at this block; 0 = as soon as
+  // joins are unpaused. The owner may always activate.
+  joinsfrom: ([blockNumber]) => {
+    if (!/^[0-9]+$/.test(String(blockNumber || ''))) throw new Error('usage: joinsfrom <block>');
+    return { target: STAKING, func: 'setJoinsOpenFromBlock', args: [blockNumber] };
+  },
+  // Emission schedule: e0 wei a year at s0 wei of eligible stake with r0 wei in reserve, from
+  // start (unix seconds; 0 = now, ignored once the schedule has started). e0 = 0 pauses it.
+  emission:  ([e0, s0, r0, start]) => {
+    if (![e0, s0, r0, start].every((v) => /^[0-9]+$/.test(String(v || '')))) {
+      throw new Error('usage: emission <e0Wei> <s0Wei> <r0Wei> <startUnix>');
+    }
+    return { target: STAKING, func: 'setEmissionSchedule', args: [e0, s0, r0, start] };
+  },
+  // Direct, by the funding account: approve, then move its own STRATO into the reserve.
+  fundreserve: ([amount]) => {
+    if (!/^[0-9]+$/.test(String(amount || ''))) throw new Error('usage: fundreserve <amountWei>');
+    return { direct: true, calls: [
+      { target: TOKEN, name: 'Token', func: 'approve', args: { spender: STAKING, value: amount } },
+      { target: STAKING, name: 'StratoStaking', func: 'fundRewardReserve', args: { amount } },
+    ] };
+  },
   // Permissionless, so a direct call rather than a vote: indexes the consensus set that
   // predates StratoStaking.activeValidators. Idempotent.
   index:     { direct: true, target: STAKING, name: 'StratoStaking', func: 'indexValidatorSet',
+               args: { validators: VALIDATORS } },
+  // Permissionless, so a direct call rather than a vote: lowers a reserve the retired schedule
+  // left under the same name to what the contract holds beyond principal and owed rewards.
+  // Idempotent; moves nothing.
+  reconcile: { direct: true, target: STAKING, name: 'StratoStaking', func: 'reconcileRewardReserve',
+               args: {} },
+  // Permissionless, so a direct call rather than a vote: credits each validator in VALIDATORS
+  // what the schedule owes it, so a downgrade leaves nothing in indexes the previous logic
+  // cannot read. Idempotent; moves nothing.
+  settle:    { direct: true, target: STAKING, name: 'StratoStaking', func: 'settleValidators',
                args: { validators: VALIDATORS } },
   mint:      { target: TOKEN, func: 'mint', args: [FUNDER, FORTY_K] },
   // Fund the fee router so it can pay the flat per-block reward. It pays 0.01
@@ -100,13 +140,15 @@ async function callAsync(tokenObj, callArgs) {
   const username = process.env.GLOBAL_ADMIN_NAME;
   const token = await auth.getUserToken(username, process.env.GLOBAL_ADMIN_PASSWORD);
   if (step.direct) {
-    const final = await callAsync({ token }, {
-      contract: { address: step.target, name: step.name },
-      method: step.func,
-      args: step.args,
-      txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
-    });
-    console.log(`${process.argv[2]} call by ${username}: ${final.status}`);
+    for (const call of step.calls || [step]) {
+      const final = await callAsync({ token }, {
+        contract: { address: call.target, name: call.name },
+        method: call.func,
+        args: call.args,
+        txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
+      });
+      console.log(`${process.argv[2]} ${call.func} call by ${username}: ${final.status}`);
+    }
     return;
   }
   const final = await callAsync({ token }, {

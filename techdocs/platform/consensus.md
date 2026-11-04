@@ -77,8 +77,8 @@ The contract never removes the last validator, and `hardCapValidators` bounds th
 An operator joins in three steps:
 
 1. **Register** in `ValidatorRegistry`, binding the node's validator address. Registration is permissionless.
-2. **Bond** stake: self-bond plus delegated stake must reach `minStake`, a governance parameter.
-3. **Activate** with `StratoStaking.tryActivate`. This needs a free slot, or enough stake to evict the lowest-weighted validator by a margin. While joins are paused, only the owner can activate operators.
+2. **Bond** stake: the operator's own self-bond must reach `minStake`, a governance parameter. Until the admin-set self-bond grace deadline, delegated stake counts toward it too.
+3. **Activate** with `StratoStaking.tryActivate`. This needs a free slot, or enough stake to evict the lowest-weighted validator by a margin, and must keep the validator under the operator stake cap. While joins are paused, or before the block joins open from (`joinsOpenFromBlock`), only the owner can activate operators.
 
 An active operator leaves automatically, in the same transaction, as soon as it stops being eligible. Reasons include:
 
@@ -141,5 +141,7 @@ Every transaction pays a fee through the Decider (`0xDEC1DE`). The Decider runs 
 - **The `BlockRewardsPaid` event** is included in the block's first receipt, from the fork heights listed on [Networks](networks.md#fork-heights).
 
 Whether `FeeRouter` is the active fee implementation depends on each network's `DeciderState` configuration.
+
+**Emission schedule.** The staking contract also releases STRATO from a prefunded reserve to every validator in the set, in proportion to its stake, at `E0 × √(S / S0) × (R / R0)` STRATO a year (`S` the set's stake, `R` the reserve left; `E0`, `S0`, `R0` set by owner vote). The release accrues per block inside `processBlock()` and is claimed like block rewards. An empty reserve, or a rate of zero, releases nothing and never affects the chain.
 
 For how users pay fees, see [Transactions and Fees](transactions-and-fees.md).
