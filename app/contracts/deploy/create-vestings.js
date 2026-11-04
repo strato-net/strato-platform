@@ -4,7 +4,7 @@
 //
 //   node create-vestings.js plan   <schedule.json>   # every addVestings transaction the file implies (no network)
 //   node create-vestings.js create <schedule.json>   # submit them, one AdminRegistry vote per category, skipping done ones
-//   node create-vestings.js status <schedule.json>   # which entries exist on-chain and which do not
+//   node create-vestings.js status <schedule.json>   # which entries exist on-chain, and how many tokens to send the pool
 //   node create-vestings.js verify <schedule.json>   # exit 0 only if every entry is scheduled
 //
 // Env: NODE_URL, OAUTH_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, GLOBAL_ADMIN_NAME,
@@ -163,6 +163,28 @@ async function onChainVestings(tokenObj, s) {
   });
 }
 
+// Pool funding from Cirrus. Values are fetched with ::text: as JSON numbers they would
+// lose precision in JavaScript at these magnitudes (10^23 atoms and up).
+async function poolFunding(tokenObj, s) {
+  const bal = await cirrus(tokenObj, 'BlockApps-Token-_balances', { address: `eq.${s.token}`, key: `eq.${s.pool}`, select: 'value::text', limit: '1' });
+  const pool = await cirrus(tokenObj, 'BlockApps-VestingPool', { address: `eq.${s.pool}`, select: 'totalTokensInVesting::text', limit: '1' });
+  const balance = BigInt(bal.length && /^\d+$/.test(String(bal[0].value)) ? String(bal[0].value) : '0');
+  const committed = BigInt(pool.length && /^\d+$/.test(String(pool[0].totalTokensInVesting)) ? String(pool[0].totalTokensInVesting) : '0');
+  return { balance, committed, available: balance - committed };
+}
+
+function printFunding(s, f, needed) {
+  const shortfall = needed > f.available ? needed - f.available : 0n;
+  console.log(`\npool ${s.pool}: balance ${fmtTokens(f.balance, s.decimals)} tokens, committed ${fmtTokens(f.committed, s.decimals)}, available for new vestings ${fmtTokens(f.available, s.decimals)}`);
+  console.log(`unscheduled entries need ${fmtTokens(needed, s.decimals)} tokens (${needed} atoms)`);
+  if (needed === 0n) console.log('nothing left to schedule.');
+  else if (shortfall === 0n) console.log('the pool already holds enough: run `create`.');
+  else console.log(`SEND ${fmtTokens(shortfall, s.decimals)} tokens (${shortfall} atoms) to the pool ${s.pool} (Token.mint or transfer), then run \`create\`.`);
+  return shortfall;
+}
+
+const neededFor = (report) => report.reduce((n, r) => n + r.c.amounts.reduce((m, a, j) => m + (r.found[j] ? 0n : BigInt(a)), 0n), 0n);
+
 function matchEntry(onchain, c, j) {
   const want = BigInt(c.amounts[j]);
   return onchain.find((v) => v.account === c.accounts[j] && v.managed === c.managed && v.durationWeeks === c.durationWeeks && v.startDate === c.startDate
@@ -206,17 +228,26 @@ async function callAndWait(tokenObj, callArgs) {
 
   const { user, tokenObj } = await login();
 
-  if (cmd === 'status') { await status(tokenObj, s, false); return; }
+  if (cmd === 'status') {
+    const report = await status(tokenObj, s, false);
+    printFunding(s, await poolFunding(tokenObj, s), neededFor(report));
+    return;
+  }
 
   if (cmd === 'verify') {
     const report = await status(tokenObj, s, false);
     const missing = report.reduce((n, r) => n + (r.c.accounts.length - r.done), 0);
+    if (missing > 0) printFunding(s, await poolFunding(tokenObj, s), neededFor(report));
     console.log(missing === 0 ? 'COMPLETE: every entry in the file is scheduled on-chain.' : `INCOMPLETE: ${missing} entries are not scheduled.`);
     process.exit(missing === 0 ? 0 : 1);
   }
 
   if (cmd === 'create') {
     const report = await status(tokenObj, s, true);
+    const needed = neededFor(report);
+    if (needed === 0n) { console.log('every entry is already scheduled; nothing to do.'); return; }
+    const shortfall = printFunding(s, await poolFunding(tokenObj, s), needed);
+    if (shortfall > 0n) { console.error('not submitting: the executing vote would revert with "Not enough tokens available". Fund the pool first.'); process.exit(1); }
     for (const { c, batches } of report) {
       for (const { b, done } of batches) {
         const label = batchLabel(c, b);
