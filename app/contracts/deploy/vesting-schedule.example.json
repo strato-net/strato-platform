@@ -5,10 +5,33 @@
   "decimals": 18,
   "tge": "2026-12-01T00:00:00Z",
   "categories": [
-    { "name": "team", "managed": true, "cliffMonths": 12, "durationWeeks": 104,
-      "entries": [ { "account": "0000000000000000000000000000000000000aa1", "tokens": "1000" },
-                   { "account": "0000000000000000000000000000000000000aa2", "tokens": "2500.5" } ] },
-    { "name": "investors", "managed": false, "cliffMonths": 0, "durationWeeks": 104,
-      "entries": [ { "account": "0000000000000000000000000000000000000bb1", "tokens": "10000" } ] }
+    {
+      "name": "team",
+      "managed": true,
+      "cliffMonths": 12,
+      "durationWeeks": 104,
+      "entries": [
+        {
+          "account": "0000000000000000000000000000000000000aa1",
+          "tokens": "1000"
+        },
+        {
+          "account": "0000000000000000000000000000000000000aa2",
+          "tokens": "2500.5"
+        }
+      ]
+    },
+    {
+      "name": "investors",
+      "managed": false,
+      "cliffMonths": 0,
+      "durationWeeks": 104,
+      "entries": [
+        {
+          "account": "0000000000000000000000000000000000000bb1",
+          "tokens": "10000"
+        }
+      ]
+    }
   ]
 }

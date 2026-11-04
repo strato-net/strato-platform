@@ -1,12 +1,11 @@
-// Create STRATO vestings on a deployed VestingPoolManager from a schedule file, one
-// AdminRegistry vote per run (identical arguments across admins reach quorum), and
-// verify the result from Cirrus.
+// Schedule STRATO vestings on a deployed VestingPoolManager from a schedule file.
+// This script only creates vestings; claiming, pausing, cancelling and funding are
+// done elsewhere (a management app later; funding is a Token.mint vote today).
 //
-//   node create-vestings.js plan   <schedule.json> [category]   # print exact args + hash, no network
-//   node create-vestings.js fund   <schedule.json> <category>   # vote Token.mint(pool, category total)
-//   node create-vestings.js create <schedule.json> <category>   # vote manager.addVestings(...)
-//   node create-vestings.js verify <schedule.json> <category>   # AddedVesting rows per account
-//   node create-vestings.js status <schedule.json>              # pool balance, committed, available
+//   node create-vestings.js plan   <schedule.json>   # every addVestings transaction the file implies (no network)
+//   node create-vestings.js create <schedule.json>   # submit them, one AdminRegistry vote per category, skipping done ones
+//   node create-vestings.js status <schedule.json>   # which entries exist on-chain and which do not
+//   node create-vestings.js verify <schedule.json>   # exit 0 only if every entry is scheduled
 //
 // Env: NODE_URL, OAUTH_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, GLOBAL_ADMIN_NAME,
 // GLOBAL_ADMIN_PASSWORD (+ OAUTH_TOTP). The schedule file carries the addresses.
@@ -14,18 +13,18 @@
 // schedule.json:
 // {
 //   "manager": "<40 hex>", "pool": "<40 hex>", "token": "<40 hex>", "decimals": 18,
-//   "tge": "2026-12-01T00:00:00Z",            // ISO 8601 UTC, or unix seconds
+//   "tge": "2026-12-01T00:00:00Z",      // ISO 8601 with timezone, or unix seconds
+//   "secondsPerMonth": 3600,             // OPTIONAL, testing only: cliff month = this many seconds
 //   "categories": [
 //     { "name": "team", "managed": true, "cliffMonths": 12, "durationWeeks": 104,
-//       "entries": [ { "account": "<40 hex>", "tokens": "1234567.89" }, ... ] }
+//       "entries": [ { "account": "<40 hex>", "tokens": "1234567.89" } ] }
 //   ]
 // }
-// Each category's startDate is derived: TGE plus cliffMonths calendar months (UTC,
-// day-of-month clamped to the shorter month). Nothing vests before that date, which
-// is the sheet's "nothing at the cliff" semantics. Amounts are whole tokens in the
-// file and are converted to atoms here (uint128). Each category is ONE addVestings
-// call: same managed flag, cliff and duration for every entry. An account may appear
-// once per category (ids are parameter hashes).
+// startDate = TGE + cliffMonths calendar months (UTC, day clamped to the shorter
+// month), or TGE + cliffMonths * secondsPerMonth when that override is present.
+// Amounts are whole tokens in the file, converted to atoms (uint128). One category is
+// ONE addVestings call: same managed flag, cliff and duration for every entry; an
+// account may appear once per category because ids are parameter hashes.
 require('dotenv').config();
 const config = require('./config');
 const fs = require('fs');
@@ -36,6 +35,7 @@ const { rest, util } = require('blockapps-rest');
 const ADDRESS_RE = /^[0-9a-fA-F]{40}$/;
 const MAX_UINT128 = (1n << 128n) - 1n;
 const clean = (v) => String(v || '').trim().replace(/^0x/, '').toLowerCase();
+const iso = (s) => new Date(s * 1000).toISOString();
 
 function toAtoms(tokens, decimals) {
   const s = String(tokens).trim();
@@ -63,8 +63,7 @@ function parseTge(v) {
   throw new Error('tge must be an ISO 8601 string or unix seconds');
 }
 
-// TGE + n calendar months, in UTC, keeping the time of day and clamping the day of
-// month to the target month's length (Jan 31 + 1 month = Feb 28/29).
+// TGE + n calendar months in UTC, time of day kept, day clamped (Jan 31 + 1 = Feb 28/29).
 function addMonthsUtc(seconds, months) {
   const d = new Date(seconds * 1000);
   const y = d.getUTCFullYear(), m = d.getUTCMonth(), day = d.getUTCDate();
@@ -76,28 +75,31 @@ function addMonthsUtc(seconds, months) {
 
 function loadSchedule(file) {
   const s = JSON.parse(fs.readFileSync(file, 'utf8'));
-  if (s.tge === undefined) throw new Error('schedule.tge is required (ISO 8601 UTC or unix seconds)');
-  s.tgeSeconds = parseTge(s.tge);
   for (const k of ['manager', 'pool', 'token']) {
     s[k] = clean(s[k]);
     if (!ADDRESS_RE.test(s[k])) throw new Error(`schedule.${k} must be a 20-byte hex address`);
   }
   s.decimals = Number.isInteger(s.decimals) ? s.decimals : 18;
+  if (s.tge === undefined) throw new Error('schedule.tge is required (ISO 8601 with timezone, or unix seconds)');
+  s.tgeSeconds = parseTge(s.tge);
+  if (s.secondsPerMonth !== undefined && (!Number.isInteger(s.secondsPerMonth) || s.secondsPerMonth <= 0)) throw new Error('secondsPerMonth must be a positive integer');
   if (!Array.isArray(s.categories) || !s.categories.length) throw new Error('schedule.categories is empty');
+  const names = new Set();
   for (const c of s.categories) {
-    if (!c.name) throw new Error('category without name');
+    if (!c.name || names.has(c.name)) throw new Error(`category name missing or duplicated: "${c.name}"`);
+    names.add(c.name);
     if (typeof c.managed !== 'boolean') throw new Error(`${c.name}: managed must be true/false`);
     if (!Number.isInteger(c.durationWeeks) || c.durationWeeks < 0 || c.durationWeeks > 65535) throw new Error(`${c.name}: durationWeeks must be 0..65535`);
     if (c.startDate !== undefined) throw new Error(`${c.name}: startDate is derived from tge + cliffMonths; remove it`);
     if (!Number.isInteger(c.cliffMonths) || c.cliffMonths < 0 || c.cliffMonths > 1200) throw new Error(`${c.name}: cliffMonths must be an integer 0..1200`);
-    c.startDate = addMonthsUtc(s.tgeSeconds, c.cliffMonths);
+    c.startDate = s.secondsPerMonth ? s.tgeSeconds + c.cliffMonths * s.secondsPerMonth : addMonthsUtc(s.tgeSeconds, c.cliffMonths);
     if (!Array.isArray(c.entries) || !c.entries.length) throw new Error(`${c.name}: no entries`);
     const seen = new Set();
     c.accounts = []; c.amounts = []; c.total = 0n;
     for (const e of c.entries) {
       const a = clean(e.account);
       if (!ADDRESS_RE.test(a)) throw new Error(`${c.name}: bad account "${e.account}"`);
-      if (seen.has(a)) throw new Error(`${c.name}: ${a} appears twice (same params would collide on the vesting id)`);
+      if (seen.has(a)) throw new Error(`${c.name}: ${a} appears twice (same parameters would collide on the vesting id)`);
       seen.add(a);
       const atoms = toAtoms(e.tokens, s.decimals);
       c.accounts.push(a); c.amounts.push(atoms.toString()); c.total += atoms;
@@ -106,22 +108,22 @@ function loadSchedule(file) {
   return s;
 }
 
-function pick(s, name) {
-  const c = s.categories.find((x) => x.name === name);
-  if (!c) throw new Error(`category "${name}" not in schedule (have: ${s.categories.map((x) => x.name).join(', ')})`);
-  return c;
-}
+const argsFor = (c) => ({ accounts: c.accounts, amounts: c.amounts, managed: c.managed, durationWeeks: c.durationWeeks, startDate: c.startDate });
+const argsHash = (c) => crypto.createHash('sha256').update(JSON.stringify(argsFor(c))).digest('hex');
+const fmtTokens = (atoms, d) => (Number(atoms) / 10 ** d).toLocaleString('en-US');
 
-function argsFor(c) {
-  return { accounts: c.accounts, amounts: c.amounts, managed: c.managed, durationWeeks: c.durationWeeks, startDate: c.startDate };
-}
-
-function describe(s, c) {
-  const args = argsFor(c);
-  const hash = crypto.createHash('sha256').update(JSON.stringify(args)).digest('hex');
-  console.log(`category ${c.name}: ${c.accounts.length} entries, total ${c.total} atoms (${(Number(c.total) / 10 ** s.decimals).toLocaleString('en-US')} tokens), managed=${c.managed}, cliffMonths=${c.cliffMonths} -> startDate=${c.startDate} (${new Date(c.startDate * 1000).toISOString()}), durationWeeks=${c.durationWeeks} (ends ${new Date((c.startDate + c.durationWeeks * 604800) * 1000).toISOString()})`);
-  console.log(`args sha256 ${hash}  <- every admin must see the same hash before voting`);
-  return args;
+function printPlan(s) {
+  console.log(`TGE ${s.tgeSeconds} (${iso(s.tgeSeconds)})${s.secondsPerMonth ? `; TEST SCALE: 1 cliff month = ${s.secondsPerMonth} s` : ''}`);
+  console.log(`manager ${s.manager}  pool ${s.pool}  token ${s.token}  decimals ${s.decimals}`);
+  let grand = 0n;
+  s.categories.forEach((c, i) => {
+    grand += c.total;
+    console.log(`\n[${i + 1}] ${s.manager}.addVestings(accounts[${c.accounts.length}], amounts[${c.accounts.length}], managed=${c.managed}, durationWeeks=${c.durationWeeks}, startDate=${c.startDate})   # ${c.name}`);
+    console.log(`    start ${iso(c.startDate)} (cliff ${c.cliffMonths} months)  end ${iso(c.startDate + c.durationWeeks * 604800)}${c.durationWeeks === 0 ? ' (fully vested at start)' : ''}`);
+    c.accounts.forEach((a, j) => console.log(`    ${a}  ${c.amounts[j]} atoms  (${fmtTokens(c.amounts[j], s.decimals)} tokens)`));
+    console.log(`    total ${c.total} atoms (${fmtTokens(c.total, s.decimals)} tokens)   args sha256 ${argsHash(c)}`);
+  });
+  console.log(`\n${s.categories.length} transactions; ${grand} atoms (${fmtTokens(grand, s.decimals)} tokens) must be available in the pool before they execute.`);
 }
 
 async function login() {
@@ -130,6 +132,42 @@ async function login() {
   if (!user) throw new Error('GLOBAL_ADMIN_NAME is not set');
   const token = await auth.getUserToken(user, process.env.GLOBAL_ADMIN_PASSWORD);
   return { user, tokenObj: { token } };
+}
+
+async function cirrus(tokenObj, table, params) {
+  const { data } = await axios.get(`${config.nodes[0].url}/cirrus/search/${table}`, { headers: { Authorization: `Bearer ${tokenObj.token}` }, params });
+  return Array.isArray(data) ? data : [];
+}
+
+// On-chain vestings of the pool, from the record table of the `vestings` struct mapping:
+// one row per id with the struct as JSON in `value`.
+async function onChainVestings(tokenObj, s) {
+  const rows = await cirrus(tokenObj, 'BlockApps-VestingPool-vestings', { address: `eq.${s.pool}`, select: 'key,value', limit: '5000' });
+  return rows.map((r) => {
+    const v = typeof r.value === 'string' ? JSON.parse(r.value) : (r.value || {});
+    return { id: r.key, account: clean(v.account), managed: v.managed === true || v.managed === 'true', durationWeeks: Number(v.durationWeeks), startDate: Number(v.startDate), amount: String(v.amount), cancelled: v.cancelled === true || v.cancelled === 'true' };
+  });
+}
+
+function matchEntry(onchain, c, j) {
+  const want = BigInt(c.amounts[j]);
+  return onchain.find((v) => v.account === c.accounts[j] && v.managed === c.managed && v.durationWeeks === c.durationWeeks && v.startDate === c.startDate
+    && (/^\d+$/.test(v.amount) ? BigInt(v.amount) === want : Number(v.amount) === Number(want)));
+}
+
+async function status(tokenObj, s, quiet) {
+  const onchain = await onChainVestings(tokenObj, s);
+  const report = [];
+  for (const c of s.categories) {
+    const found = c.accounts.map((_, j) => matchEntry(onchain, c, j));
+    const done = found.filter(Boolean).length;
+    report.push({ c, found, done });
+    if (!quiet) {
+      console.log(`${c.name}: ${done}/${c.accounts.length} scheduled`);
+      c.accounts.forEach((a, j) => console.log(`  ${found[j] ? 'OK      ' : 'MISSING '} ${a}  ${fmtTokens(c.amounts[j], s.decimals)} tokens${found[j] ? `  id ${found[j].id}${found[j].cancelled ? '  (cancelled)' : ''}` : ''}`));
+    }
+  }
+  return report;
 }
 
 async function callAndWait(tokenObj, callArgs) {
@@ -141,79 +179,38 @@ async function callAndWait(tokenObj, callArgs) {
     (opts) => rest.getBlocResults(tokenObj, hashes, opts),
     { config, isAsync: true }, 300000);
   const final = Array.isArray(results) ? results[0] : results;
-  const status = final && final.status;
-  const msg = (final && final.txResult && final.txResult.message) || '';
-  const ret = final && final.txResult && final.txResult.response && final.txResult.response.v;
-  return { status, msg, ret, hash: hashes[0] };
-}
-
-async function cirrus(tokenObj, table, params) {
-  const { data } = await axios.get(`${config.nodes[0].url}/cirrus/search/${table}`, { headers: { Authorization: `Bearer ${tokenObj.token}` }, params });
-  return Array.isArray(data) ? data : [];
-}
-
-async function poolStatus(tokenObj, s) {
-  const bal = await cirrus(tokenObj, 'BlockApps-Token-_balances', { address: `eq.${s.token}`, key: `eq.${s.pool}`, select: 'value', limit: '1' });
-  const pool = await cirrus(tokenObj, 'BlockApps-VestingPool', { address: `eq.${s.pool}`, select: 'totalTokensInVesting', limit: '1' });
-  const balance = BigInt(bal.length ? String(bal[0].value || '0') : '0');
-  const committed = BigInt(pool.length ? String(pool[0].totalTokensInVesting || '0') : '0');
-  return { balance, committed, available: balance - committed };
-}
-
-async function verify(tokenObj, s, c) {
-  const rows = await cirrus(tokenObj, 'BlockApps-VestingPool-AddedVesting', { address: `eq.${s.pool}`, account: `in.(${c.accounts.join(',')})`, select: 'id,account,block_timestamp', order: 'block_timestamp.desc', limit: String(c.accounts.length * 4) });
-  const byAccount = new Map();
-  for (const r of rows) if (!byAccount.has(clean(r.account))) byAccount.set(clean(r.account), r);
-  let missing = 0;
-  for (const a of c.accounts) {
-    const r = byAccount.get(a);
-    if (r) console.log(`  ${a}  id ${r.id}  (${r.block_timestamp})`); else { console.log(`  ${a}  MISSING`); missing++; }
-  }
-  const pool = await cirrus(tokenObj, 'BlockApps-VestingPool', { address: `eq.${s.pool}`, select: 'totalTokensInVesting', limit: '1' });
-  console.log(`pool totalTokensInVesting: ${pool.length ? pool[0].totalTokensInVesting : '?'}; ${c.accounts.length - missing}/${c.accounts.length} entries of ${c.name} have an AddedVesting row`);
-  return missing === 0;
+  return { status: final && final.status, msg: (final && final.txResult && final.txResult.message) || '', hash: hashes[0] };
 }
 
 (async () => {
-  const [cmd, file, name] = process.argv.slice(2);
-  if (!cmd || !file) { console.error('usage: node create-vestings.js plan|fund|create|verify <schedule.json> [category]'); process.exit(2); }
+  const [cmd, file] = process.argv.slice(2);
+  if (!cmd || !file) { console.error('usage: node create-vestings.js plan|create|status|verify <schedule.json>'); process.exit(2); }
   const s = loadSchedule(file);
 
-  if (cmd === 'plan') {
-    const cats = name ? [pick(s, name)] : s.categories;
-    let grand = 0n;
-    for (const c of cats) { describe(s, c); grand += c.total; }
-    console.log(`TGE ${s.tgeSeconds} (${new Date(s.tgeSeconds * 1000).toISOString()}); manager ${s.manager}, pool ${s.pool}, token ${s.token}, decimals ${s.decimals}; grand total ${grand} atoms`);
-    return;
-  }
-  const { user, tokenObj } = await login();
-  if (cmd === 'status') {
-    const st = await poolStatus(tokenObj, s);
-    console.log(`pool ${s.pool}: balance ${st.balance} atoms, committed ${st.committed}, available for new vestings ${st.available} (${(Number(st.available) / 10 ** s.decimals).toLocaleString('en-US')} tokens)`);
-    return;
-  }
-  if (!name) { console.error(`${cmd} needs a category name`); process.exit(2); }
-  const c = pick(s, name);
+  if (cmd === 'plan') { printPlan(s); return; }
 
-  if (cmd === 'fund') {
-    console.log(`${user}: voting Token.mint(${s.pool}, ${c.total}) on token ${s.token} for category ${c.name}`);
-    const r = await callAndWait(tokenObj, { contract: { name: 'Token', address: s.token }, method: 'mint', args: { to: s.pool, amount: c.total.toString() }, txParams: { gasPrice: config.gasPrice, gasLimit: 2000000 } });
-    console.log(`result: ${r.status} ${r.msg ? '| ' + r.msg.slice(0, 160) : ''} ${r.ret ? '| ' + String(r.ret).slice(0, 80) : ''}`);
-    return;
-  }
-  if (cmd === 'create') {
-    const args = describe(s, c);
-    const st = await poolStatus(tokenObj, s);
-    if (st.available < c.total) console.error(`WARNING: pool has ${st.available} atoms available but ${c.name} needs ${c.total}; the executing vote will revert with "Not enough tokens available" unless funded first (run: fund)`);
-    console.log(`${user}: voting ${s.manager}.addVestings for category ${c.name}`);
-    const r = await callAndWait(tokenObj, { contract: { name: 'VestingPoolManager', address: s.manager }, method: 'addVestings', args, txParams: { gasPrice: config.gasPrice, gasLimit: 8000000 } });
-    console.log(`result: ${r.status} ${r.msg ? '| ' + r.msg.slice(0, 160) : ''} ${r.ret ? '| ' + String(r.ret).slice(0, 80) : ''}`);
-    console.log('If this vote reached quorum the vestings exist now; otherwise another admin must run the same command. Then: verify.');
-    return;
-  }
+  const { user, tokenObj } = await login();
+
+  if (cmd === 'status') { await status(tokenObj, s, false); return; }
+
   if (cmd === 'verify') {
-    const ok = await verify(tokenObj, s, c);
-    process.exit(ok ? 0 : 1);
+    const report = await status(tokenObj, s, false);
+    const missing = report.reduce((n, r) => n + (r.c.accounts.length - r.done), 0);
+    console.log(missing === 0 ? 'COMPLETE: every entry in the file is scheduled on-chain.' : `INCOMPLETE: ${missing} entries are not scheduled.`);
+    process.exit(missing === 0 ? 0 : 1);
+  }
+
+  if (cmd === 'create') {
+    const report = await status(tokenObj, s, true);
+    for (const { c, done } of report) {
+      if (done === c.accounts.length) { console.log(`${c.name}: already scheduled (${done}/${done}), skipping`); continue; }
+      if (done > 0) { console.error(`${c.name}: ${done}/${c.accounts.length} entries already exist; a re-run would collide on their ids ("Vesting id already used"). Fix the file first.`); process.exit(1); }
+      console.log(`${c.name}: ${user} voting ${s.manager}.addVestings for ${c.accounts.length} entries, ${fmtTokens(c.total, s.decimals)} tokens, args sha256 ${argsHash(c)}`);
+      const r = await callAndWait(tokenObj, { contract: { name: 'VestingPoolManager', address: s.manager }, method: 'addVestings', args: argsFor(c), txParams: { gasPrice: config.gasPrice, gasLimit: 8000000 } });
+      console.log(`  result: ${r.status}${r.msg ? ' | ' + r.msg.slice(0, 200) : ''} (tx ${r.hash})`);
+    }
+    console.log('Run `status` to see what executed; a vote below quorum needs another admin to run `create` with the same file.');
+    return;
   }
   console.error(`unknown command ${cmd}`); process.exit(2);
 })().catch((e) => { console.error('FAILED:', (e.message || String(e)).slice(0, 300)); process.exit(1); });
