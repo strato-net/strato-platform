@@ -22,7 +22,9 @@ import {
   setGovernanceStakingContract,
   setStratoCommission,
   setStratoEmergencyKicker,
+  setStratoEmissionSchedule,
   setStratoGovernance,
+  setStratoJoinsOpenFromBlock,
   setStratoSelfBondGrace,
   setStratoSetParams,
   setStratoStakingParams,
@@ -644,6 +646,41 @@ class StakingController {
       }
 
       const result = await setStratoSelfBondGrace(req.accessToken, req.address as string, String(selfBondGraceUntil));
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async setJoinsOpenFromBlock(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { blockNumber } = req.body || {};
+      if (!isNonNegativeAmount(blockNumber)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid blockNumber" });
+        return;
+      }
+
+      const result = await setStratoJoinsOpenFromBlock(req.accessToken, req.address as string, String(blockNumber));
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async setEmissionSchedule(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { e0, s0, r0, startTime } = req.body || {};
+      if ([e0, s0, r0, startTime].some((value) => !isNonNegativeAmount(value))) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid emission schedule" });
+        return;
+      }
+
+      const result = await setStratoEmissionSchedule(req.accessToken, req.address as string, {
+        e0: String(e0),
+        s0: String(s0),
+        r0: String(r0),
+        startTime: String(startTime),
+      });
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

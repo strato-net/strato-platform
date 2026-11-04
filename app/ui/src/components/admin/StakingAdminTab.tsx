@@ -51,9 +51,18 @@ type AdminInfo = {
   unkickCooldown: string;
   maxOperatorStakeBps: string;
   joinsPaused: boolean;
+  joinsOpenFromBlock?: string;
   governanceSyncEnabled: boolean;
   validatorCount: string;
   unattributedFees: string;
+  // v2 emission schedule (see StratoStakingInfo).
+  rewardReserve?: string;
+  eligibleStake?: string;
+  emissionRateE0?: string;
+  emissionStakeS0?: string;
+  emissionReserveR0?: string;
+  emissionStart?: string;
+  emissionAnnualRate?: string;
   validators: AdminOperator[];
 };
 
@@ -96,6 +105,8 @@ const StakingAdminTab = () => {
   const [validatorParams, setValidatorParams] = useState<Record<string, string>>({});
   const [setParams, setSetParams] = useState<Record<string, string>>({});
   const [joinsPaused, setJoinsPaused] = useState(true);
+  const [joinsOpenFromBlock, setJoinsOpenFromBlock] = useState("0");
+  const [emission, setEmission] = useState<Record<string, string>>({});
   const [governanceSync, setGovernanceSync] = useState(false);
   const [newOperator, setNewOperator] = useState({ operator: "", validatorAddress: "", commissionPercent: "", name: "" });
   // v1: bind a validator address to an operator. v2: move a validator to a new operator.
@@ -127,6 +138,13 @@ const StakingAdminTab = () => {
         maxOperatorStakeBps: data.maxOperatorStakeBps,
       });
       setJoinsPaused(Boolean(data.joinsPaused));
+      setJoinsOpenFromBlock(data.joinsOpenFromBlock || "0");
+      setEmission({
+        e0: fromWad(data.emissionRateE0 || "0"),
+        s0: fromWad(data.emissionStakeS0 || "0"),
+        r0: fromWad(data.emissionReserveR0 || "0"),
+        start: toDateTimeLocal(data.emissionStart),
+      });
       setGovernanceSync(Boolean(data.governanceSyncEnabled));
       setSelfBondGrace(toDateTimeLocal(data.selfBondGraceUntil));
     } finally {
@@ -284,8 +302,58 @@ const StakingAdminTab = () => {
           <Button size="sm" disabled={blocked} onClick={() => run("set-params", () => api.patch("/staking/admin/set-params", { ...setParams, joinsPaused }), "Validator set vote")}>
             {label("set-params", "Save set parameters")}
           </Button>
+          {isV2 && (
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="space-y-1 text-xs">
+                <span className="text-muted-foreground">Permissionless joins from block (0 = as soon as unpaused)</span>
+                <Input value={joinsOpenFromBlock} onChange={(event) => setJoinsOpenFromBlock(event.target.value)} className="w-48" />
+              </label>
+              <Button size="sm" variant="outline" disabled={blocked || !/^\d+$/.test(joinsOpenFromBlock)} onClick={() => run("joins-from", () => api.patch("/staking/admin/joins-open-from-block", { blockNumber: joinsOpenFromBlock }), "Joins-open block vote")}>
+                {label("joins-from", "Set block")}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {isV2 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Emission schedule</CardTitle>
+            <CardDescription>
+              Releases E0 × √(S / S0) × (R / R0) STRATO a year from the prefunded reserve across the consensus set's stake S, R being the reserve
+              left. E0 = 0 pauses it. The start applies only before the schedule has started; the reserve is funded by a direct
+              fundRewardReserve transaction from the funding account (see the staking runbook).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Reserve {fromWad(info.rewardReserve || "0")} STRATO · eligible stake {fromWad(info.eligibleStake || "0")} STRATO · current rate{" "}
+              {fromWad(info.emissionAnnualRate || "0")} STRATO/year · {Number(info.emissionStart || "0") > 0
+                ? `${Number(info.emissionStart) > Date.now() / 1000 ? "starts" : "accrued to"} ${new Date(Number(info.emissionStart) * 1000).toLocaleString()}`
+                : "not scheduled"}
+            </p>
+            {paramGrid([
+              { key: "e0", label: "E0 (STRATO a year at S0 with R0 in reserve)" },
+              { key: "s0", label: "S0 (STRATO of eligible stake)" },
+              { key: "r0", label: "R0 (STRATO in reserve)" },
+            ], emission, setEmission, (
+              <label className="space-y-1 text-xs">
+                <span className="text-muted-foreground">Start (your local time; blank = now)</span>
+                <Input type="datetime-local" value={emission.start ?? ""} onChange={(event) => setEmission({ ...emission, start: event.target.value })} />
+              </label>
+            ))}
+            <Button size="sm" disabled={blocked} onClick={() => run("emission", () => api.patch("/staking/admin/emission-schedule", {
+              e0: toWad(emission.e0 || "0"),
+              s0: toWad(emission.s0 || "0"),
+              r0: toWad(emission.r0 || "0"),
+              startTime: fromDateTimeLocal(emission.start || "") || "0",
+            }), "Emission schedule vote")}>
+              {label("emission", "Save emission schedule")}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

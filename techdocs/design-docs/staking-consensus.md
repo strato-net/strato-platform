@@ -132,6 +132,20 @@ operator account (`pendingOperatorTokenRewards[operator][token]`, claimed with
 `claimOperatorTokenRewards`), because sharing it with delegators would mean settling every such
 token on every stake change. `recoverStrayToken` never takes a token's unclaimed rewards.
 
+**The emission schedule** is the fourth source, and the automatic one: STRATO prefunded into
+`rewardReserve` (`fundRewardReserve`, anyone may pay in) is released at an annual rate
+`E = E0 · sqrt(S / S0) · (R / R0)`, `S` being the stake behind the consensus set (`eligibleStake`:
+seated and listed validators; waiters and delisted validators count for nothing) and `R` the
+reserve still unreleased. `setEmissionSchedule(e0, s0, r0, startTime)` (owner vote) sets the
+calibration and the start; `e0 = 0` pauses it. Accrual is time-based and lazy: `_accrue` runs
+once per block from `processBlock` and before every change to the set, a record's stake,
+commission or operator, charging the interval at the stake and reserve it started with, into a
+per-stake index; a validator's share is credited on its next touch (`_settleEmissions`) and split
+exactly like block rewards, so it is claimed through `claimRewards` / `claimOperatorRewards`. The
+reserve only ever moves into `allocatedRewardLiability`: claims never dip into it and
+`recoverUntrackedStrato` never sees it. Integer arithmetic throughout (`sqrt(S / S0)` is taken as
+`sqrt(S · S0) / S0`), bounded well inside `uint256` for any stake up to the total supply.
+
 `FeeRouter` runs in the signer's storage context and therefore keeps no storage; its addresses are
 genesis constants behind internal getters. `StratoStaking.processBlock` trusts only `block.*`
 builtins, never `msg.sender`, and must never revert.
@@ -197,12 +211,15 @@ consent, admin `addValidator` still works) → **Active** (in the consensus set)
   Active operator that stops being eligible is removed from governance (counts one set mutation;
   if the per-block budget is exhausted the stake mutation reverts — fail closed). Weight changes
   are pushed the same way.
-* **Joining is explicit**: `tryActivate(op)` (anyone once `joinsPaused=false`; the owner always)
+* **Joining is explicit**: `tryActivate(op)` (anyone once `joinsPaused=false` and
+  `block.number >= joinsOpenFromBlock`, so the policy can be voted ahead of an agreed height; the
+  owner always)
   needs eligibility and either a free slot below `effectiveCap = min(maxActiveValidators,
   hardCapActiveValidators)` or the lowest validator (weight asc, address asc) beaten by
   `evictionMarginBps`; an eviction sends the loser back to Registered (self-bond stays bonded).
   `reconcileSet(candidates)` promotes the named waiters by (weight desc, address asc) within
-  `maxSetMutationsPerBlock`; set-wide passes (eviction, resyncs) walk only the consensus set
+  `maxSetMutationsPerBlock`, skipping any that would breach `maxOperatorStakeBps` (the cap
+  `tryActivate` enforces); set-wide passes (eviction, resyncs) walk only the consensus set
   (`activeValidators`), never every record, so cheap sybil registrations cannot make them
   unaffordable. Kicks bypass the mutation budget. `requestExit(v)` keeps the validator serving for
   `exitNoticeSeconds`, then any sync removes it; `cancelExit(v)` undoes it.
@@ -211,8 +228,9 @@ consent, admin `addValidator` still works) → **Active** (in the consensus set)
 * Params: `setValidatorParams(minStake, proposerFeeBps, maxConsecutiveMisses, jailCooldown)`,
   `setSelfBondGraceUntil(t)`, `setSetParams(maxActiveValidators, hardCapActiveValidators [only lowers],
   evictionMarginBps, maxSetMutationsPerBlock, exitNoticeSeconds, unkickCooldown,
-  maxOperatorStakeBps, joinsPaused)`; `initialize` seeds 50 / 50 / 500 / 2 / unbonding / unbonding /
-  0 / paused.
+  maxOperatorStakeBps, joinsPaused)`, `setJoinsOpenFromBlock(block)`,
+  `setEmissionSchedule(e0, s0, r0, startTime)`; `initialize` seeds 50 / 50 / 500 / 2 / unbonding /
+  unbonding / 0 / paused, and no join height or schedule.
 
 `joinsPaused=false` requires stake-weighted PBFT votes to be live (Key Decision 12 of
 `staking-next-phases.md`), i.e. the activation height has passed on every producer; until then the

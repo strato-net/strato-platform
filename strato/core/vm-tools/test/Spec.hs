@@ -24,7 +24,7 @@
 --import Blockchain.Strato.Model.Secp256k1
 --import Blockchain.VMContext
 
-import Blockchain.Bagger (attachBlockRewards)
+import Blockchain.Bagger (attachBlockRewards, buildNextBlockHeader)
 import Blockchain.Bagger.Transactions (TxRunResult (..), getDeltasFromResults, getStakeDeltasFromResults)
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
@@ -43,6 +43,7 @@ import Blockchain.Strato.Model.Validator
 import Blockchain.VMOptions ()
 import Control.Monad
 import qualified Data.Map.Strict as M
+import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Executable.EVMFlags ()
 import HFlags
 import qualified ActionEncodeSpec
@@ -154,6 +155,23 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
     getStakeDeltasFromEvents (Just govAddr) evs `shouldBe` M.fromList [(v1, 13), (v2, 0)]
     -- and the switch really is exclusive: watching staking ignores governance
     getStakeDeltasFromEvents (Just stakingAddr) evs `shouldBe` M.fromList [(v2, 4)]
+
+  it "carries a full post-fork snapshot from the V2 boundary into the next V3 header" $ do
+    let govAddr = Address 0x100
+        published v st = stakeEvent govAddr "ValidatorStakeUpdated"
+          [("validator", SAddress v False), ("stake", SInteger st)]
+        parent = BlockHeaderV2 zeroHash "" "" "" "" 1999999
+          (posixSecondsToUTCTime 0) "" [v1, v2] [] [] Nothing []
+        snapshot = getStakeDeltasFromEvents (Just govAddr)
+          [published (Address 0x1) (10 :: Integer), published (Address 0x2) (20 :: Integer)]
+        first = buildNextBlockHeader parent zeroHash "" [] [] ""
+          (posixSecondsToUTCTime 1) mempty snapshot
+        next = buildNextBlockHeader first zeroHash "" [] [] ""
+          (posixSecondsToUTCTime 2) mempty M.empty
+    snd (nextValidatorsAndStakes parent) `shouldBe` M.empty
+    getBlockStakes first `shouldBe` []
+    getBlockStakeUpdates first `shouldBe` [(v1, 10), (v2, 20)]
+    getBlockStakes next `shouldBe` [(v1, 10), (v2, 20)]
 
   it "merges stake updates across transactions, later transaction wins" $ do
     let er st = (solidvmErrorResults undefined) { erException = Nothing, erStakeUpdates = st }
