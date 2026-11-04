@@ -130,18 +130,16 @@ Every transaction pays a fee through the Decider (`0xDEC1DE`). The Decider runs 
 **Fees under `FeeRouter`.** When that implementation is `FeeRouter`, each transaction is charged in this order:
 
 1. **Voucher.** It burns one voucher if the sender holds one.
-2. **USDST.** Otherwise it charges $0.01 USDST, split into two parts:
-    - **Proposer's share.** A `proposerFeeBps` share, read from the staking contract, goes to the staking contract. It is credited to the block proposer's operator and delegators, and claimable in USDST.
-    - **Remainder.** The rest goes to `FeeCollector` (`0x100d`).
-3. **Accounting.** It calls the staking contract's `processBlock()`, which updates fee attribution and the liveness counters. A failure there never blocks the transaction.
+2. **USDST.** Otherwise it charges $0.01 USDST to `FeeCollector` (`0x100d`), the fee sink. The router asks the staking contract for a `proposerFeeBps` share; the current staking contract defines none, so the whole fee reaches the sink. Gas pays for the network, not for validators.
+3. **Accounting.** It calls the staking contract's `processBlock()`, which counts the previous block's proposal, pays its producer from the emission schedule and updates the liveness counters. A failure there never blocks the transaction.
 
-**Block rewards.** Once per block, before the block's transactions, the node calls `payBlockRewards()` on the current fee implementation. `FeeRouter` pays the proposer a flat 0.01 STRATO out of its own STRATO balance:
+**Block rewards.** Once per block, before the block's transactions, the node calls `payBlockRewards()` on the current fee implementation. `FeeRouter` offers the proposer a flat 0.01 STRATO out of its own STRATO balance through the staking contract's `creditBlockReward`; the current staking contract defines no such function, the router catches that and pays nothing. There is no flat block reward:
 
-- **An unfunded router pays nothing** and never reverts, so an empty reward pool can't stall the chain.
-- **The `BlockRewardsPaid` event** is included in the block's first receipt, from the fork heights listed on [Networks](networks.md#fork-heights).
+- **The call never reverts**, so neither an unfunded router nor a declining staking contract can stall the chain.
+- **The `BlockRewardsPaid` event** appears in the block's first receipt only when a reward was actually paid, from the fork heights listed on [Networks](networks.md#fork-heights).
 
 Whether `FeeRouter` is the active fee implementation depends on each network's `DeciderState` configuration.
 
-**Emission schedule.** The staking contract also releases STRATO from a prefunded reserve to every validator in the set, in proportion to its stake, at `E0 × √(S / S0) × (R / R0)` STRATO a year (`S` the set's stake, `R` the reserve left; `E0`, `S0`, `R0` set by owner vote). The release accrues per block inside `processBlock()` and is claimed like block rewards. An empty reserve, or a rate of zero, releases nothing and never affects the chain.
+**Emission schedule.** The staking contract pays each finalised block's producer from a prefunded reserve: the release of `E0 × √(S / S0) × (R / R0)` STRATO a year (`S` the earning set's stake, `R` the reserve left; `E0`, `S0`, `R0` committed once by owner vote) for the interval the block closed, at most an hour of it. The amount is credited inside the next block's `processBlock()` and claimed like other staking income. An empty reserve, or no commitment, releases nothing and never affects the chain.
 
 For how users pay fees, see [Transactions and Fees](transactions-and-fees.md).

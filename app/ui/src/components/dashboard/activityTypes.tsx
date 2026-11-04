@@ -1702,6 +1702,100 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData =>
       stratoValidatorCard("Validator Exit Cancelled", event, userAddress),
   },
+  "StratoUnstaked": {
+    contract_name: "StratoStaking",
+    event_name: "Unstaked",
+    displayName: "STRATO Unstaked",
+    iconConfig: { icon: Clock, color: "bg-cyan-400" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+      const user = getEventAttribute(event, "user", "User");
+      const validator = delegatedValidator(event);
+      const amount = getEventAttribute(event, "amount", "Amount") || "0";
+      return {
+        title: "STRATO Unstaked",
+        fields: [
+          stratoAmountField("Amount", amount),
+          addressField("User", user, userAddress),
+          addressField("Validator", validator, userAddress),
+        ],
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: { fieldLabels: ["Amount"], renderer: "amount-with-token" },
+          line2: { fieldLabels: ["User", "Validator"], renderer: "addresses-with-bullet" },
+        },
+      };
+    },
+  },
+  "StratoSelfBondReleased": {
+    contract_name: "StratoStaking",
+    event_name: "SelfBondReleased",
+    displayName: "STRATO Self-Bond Released",
+    iconConfig: { icon: Clock, color: "bg-sky-500" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+      const addressFields = operatorValidatorFields(event, userAddress);
+      const amount = getEventAttribute(event, "amount", "Amount") || "0";
+      return {
+        title: "STRATO Self-Bond Released",
+        fields: [stratoAmountField("Amount", amount), ...addressFields],
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: { fieldLabels: ["Amount"], renderer: "amount-with-token" },
+          line2: { fieldLabels: addressFields.map((field) => field.label), renderer: "addresses-with-bullet" },
+        },
+      };
+    },
+  },
+  "StratoValidatorExited": {
+    contract_name: "StratoStaking",
+    event_name: "ValidatorExited",
+    displayName: "Validator Exited",
+    iconConfig: { icon: Minus, color: "bg-slate-500" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData =>
+      stratoValidatorCard("Validator Exited", event, userAddress, "Left the validator set"),
+  },
+  "StratoValidatorRemovedForLiveness": {
+    contract_name: "StratoStaking",
+    event_name: "ValidatorRemovedForLiveness",
+    displayName: "Validator Removed for Misses",
+    iconConfig: { icon: Clock, color: "bg-rose-600" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+      const missed = getEventAttribute(event, "missedProposals", "MissedProposals");
+      const reentry = formatUnixSeconds(getEventAttribute(event, "reentryTime", "ReentryTime"));
+      return stratoValidatorCard("Validator Removed for Misses", event, userAddress, `${missed || "?"} proposals missed in a row${reentry ? `; may rejoin from ${reentry}` : ""}`);
+    },
+  },
+  "StratoOperatorChangeAnnounced": {
+    contract_name: "StratoStaking",
+    event_name: "OperatorChangeAnnounced",
+    displayName: "Validator Handover Announced",
+    iconConfig: { icon: Clock, color: "bg-sky-600" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
+      const validator = getEventAttribute(event, "validator", "Validator");
+      const oldOperator = getEventAttribute(event, "oldOperator", "OldOperator");
+      const newOperator = getEventAttribute(event, "newOperator", "NewOperator");
+      const ready = formatUnixSeconds(getEventAttribute(event, "readyTime", "ReadyTime"));
+      return {
+        title: "Validator Handover Announced",
+        fields: [
+          addressField("Validator", validator, userAddress),
+          addressField("From", oldOperator, userAddress),
+          addressField("To", newOperator, userAddress),
+          { label: "Note", value: ready ? `Completes from ${ready}` : "Completes after the notice", type: "text" },
+        ],
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: { fieldLabels: ["Note"] },
+          line2: { fieldLabels: ["Validator", "From", "To"], renderer: "addresses-with-bullet" },
+        },
+      };
+    },
+  },
   "StratoOperatorRewardsClaimed": {
     contract_name: "StratoStaking",
     event_name: "OperatorRewardsClaimed",

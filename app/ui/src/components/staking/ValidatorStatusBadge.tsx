@@ -4,17 +4,19 @@ import { Badge } from "@/components/ui/badge";
 export type ValidatorLifecycle = {
   status: 0 | 1 | 2 | 3;
   isWaiter?: boolean;
+  // After a liveness removal: the time the validator may be seated again.
   jailedUntil?: string;
-  exitReadyTime?: string;
+  // An announced handover the incoming operator has yet to complete.
+  pendingOperator?: string;
 };
 
 const describeValidatorStatus = (v: ValidatorLifecycle): { label: string; variant: "default" | "secondary" | "outline" | "destructive" } => {
   const now = Date.now() / 1000;
-  if (v.status === 3) return { label: "Kicked", variant: "destructive" };
-  if (Number(v.jailedUntil || "0") > now) return { label: "Jailed", variant: "destructive" };
-  if (v.status === 2 && Number(v.exitReadyTime || "0") > 0) return { label: "Exiting", variant: "outline" };
+  if (v.status === 3) return { label: "Removed", variant: "destructive" };
+  if (Number(v.jailedUntil || "0") > now) return { label: "Removed for misses", variant: "destructive" };
+  if (v.pendingOperator) return { label: v.status === 2 ? "Active · handover pending" : "Handover pending", variant: "outline" };
   if (v.status === 2) return { label: "Active", variant: "secondary" };
-  if (v.isWaiter) return { label: "Waiting", variant: "outline" };
+  if (v.isWaiter) return { label: "Ready to join", variant: "outline" };
   if (v.status === 1) return { label: "Registered", variant: "outline" };
   return { label: "Unlisted", variant: "outline" };
 };

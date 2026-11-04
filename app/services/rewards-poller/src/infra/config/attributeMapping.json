@@ -316,6 +316,10 @@
     "UnbondingStarted": {
       "amount": "amount",
       "user": "user"
+    },
+    "Unstaked": {
+      "amount": "amount",
+      "user": "user"
     }
   },
 

@@ -18,8 +18,8 @@ const MAX_UINT256 = (1n << 256n) - 1n;
 // Two staking layouts are live at once:
 //   v1 - operator-keyed StratoStaking/ValidatorRegistry paying a funded reward schedule
 //        (mainnet). Scalars from bloc state, per-user and per-operator mappings from Cirrus.
-//   v2 - validator-keyed contracts paid only by block rewards and proposer fees (helium,
-//        upgraded in place). Read from bloc state; see getStakingBlocState.
+//   v2 - validator-keyed contracts paid per finalised block from the committed emission
+//        schedule (helium, upgraded in place). Read from bloc state; see getStakingBlocState.
 export type StakingContractVersion = "v1" | "v2";
 
 // 0 = Missing, 1 = Registered (listed, not in the consensus set), 2 = Active (in the set), 3 = Kicked
@@ -43,8 +43,21 @@ export interface StratoOperatorInfo {
   isValidator: boolean;
   eligible: boolean;
   isWaiter: boolean;
+  // v2: after a liveness removal, the time the validator may be seated again.
   jailedUntil: string;
-  exitReadyTime: string;
+  // v2 readiness evidence (an acknowledgement from the validator key or a finalised
+  // proposal): its time, the start of the unbroken run, and the states the contract derives.
+  readyAt: string;
+  readySince: string;
+  isReady: boolean;
+  readyForAdmission: boolean;
+  // v2: an announced handover and when the incoming operator may complete it ("" / "0" = none).
+  pendingOperator: string;
+  operatorChangeReadyTime: string;
+  // v2: the caller's stake on this validator still waiting its week (votes, earns nothing yet),
+  // and when it may be touched to start earning.
+  userWaitingStake: string;
+  userStakeQualifiesAt: string;
   blocksProposed: string;
   missedProposals: string;
   consecutiveMisses: string;
@@ -105,9 +118,9 @@ export interface StratoStakingInfo {
   rewardPeriodDescription: string;
   baseRewardRate: string;
   stakeRewardRate: string;
-  // v2 emission schedule: emissionAnnualRate = e0 * sqrt(S / s0) * (R / r0) STRATO a year, S the
-  // consensus set's stake (eligibleStake) and R rewardReserve. emissionStart is the scheduled
-  // start while that is ahead, afterwards the time accrued up to; "0" = no schedule.
+  // v2 emission schedule, committed once: emissionAnnualRate = e0 * sqrt(S / s0) * (R / r0)
+  // STRATO a year, S the earning set's stake (eligibleStake) and R rewardReserve, paid per
+  // finalised block to its producer. emissionStart is the committed start; "0" = not committed.
   eligibleStake: string;
   emissionRateE0: string;
   emissionStakeS0: string;
@@ -119,31 +132,26 @@ export interface StratoStakingInfo {
   // validator set / consensus parameters
   minStake: string;
   minSelfBond: string;
-  // v2: until this time minStake is met by self-bond + delegated stake, afterwards by
-  // self-bond alone. "0" = never set (the combined rule applies).
-  selfBondGraceUntil: string;
-  selfBondRuleActive: boolean;
-  proposerFeeBps: string;
-  maxConsecutiveMisses: string;
-  jailCooldown: string;
   maxActiveValidators: string;
   hardCapActiveValidators: string;
-  evictionMarginBps: string;
-  maxSetMutationsPerBlock: string;
-  exitNoticeSeconds: string;
-  unkickCooldown: string;
-  maxOperatorStakeBps: string;
-  joinsPaused: boolean;
-  // v2: permissionless activation also waits for this block (0 = none); joinsOpen is the
-  // effective state now, measured against the last block the contract processed.
+  // v2: the agreed block from which anyone may seat a ready validator (0 = not agreed);
+  // joinsOpen is the effective state now, measured against the last block the contract processed.
   joinsOpenFromBlock: string;
   joinsOpen: boolean;
+  // v2 commitment constants: the week (notices, qualification, trial, reentry), the readiness
+  // window, the ready share a change must leave, the longest interval one block is paid for,
+  // the consecutive misses that let anyone remove a validator.
+  noticeSeconds: string;
+  readinessWindowSeconds: string;
+  readyWeightBps: string;
+  maxCreditedGapSeconds: string;
+  livenessMissLimit: string;
+  // v2: the set's weight and the part of it with fresh readiness evidence.
+  consensusWeight: string;
+  readyWeight: string;
   governanceSyncEnabled: boolean;
   validatorCount: string;
   trackedUsdst: string;
-  unattributedFees: string;
-  totalFeesCredited: string;
-  totalRewardsCredited: string;
   userTotalStake: string;
   userTotalStakeUsd: string;
   claimableRewards: string;
@@ -298,27 +306,20 @@ const emptyInfo = (): StratoStakingInfo => ({
   estimatedApy: "-",
   minStake: "0",
   minSelfBond: "0",
-  selfBondGraceUntil: "0",
-  selfBondRuleActive: false,
-  proposerFeeBps: "0",
-  maxConsecutiveMisses: "0",
-  jailCooldown: "0",
   maxActiveValidators: "0",
   hardCapActiveValidators: "0",
-  evictionMarginBps: "0",
-  maxSetMutationsPerBlock: "0",
-  exitNoticeSeconds: "0",
-  unkickCooldown: "0",
-  maxOperatorStakeBps: "0",
-  joinsPaused: true,
   joinsOpenFromBlock: "0",
   joinsOpen: false,
+  noticeSeconds: "0",
+  readinessWindowSeconds: "0",
+  readyWeightBps: "0",
+  maxCreditedGapSeconds: "0",
+  livenessMissLimit: "0",
+  consensusWeight: "0",
+  readyWeight: "0",
   governanceSyncEnabled: false,
   validatorCount: "0",
   trackedUsdst: "0",
-  unattributedFees: "0",
-  totalFeesCredited: "0",
-  totalRewardsCredited: "0",
   userTotalStake: "0",
   userTotalStakeUsd: "0",
   claimableRewards: "0",
@@ -411,7 +412,7 @@ const invalidateBlocStateCache = (): void => {
 const isFunctionEntry = (value: unknown): boolean =>
   typeof value === "string" && value.startsWith("function");
 
-// v2 is recognised by the creditBlockReward function in bloc state; v1 has no such call.
+// v2 is recognised by the tryActivate function in bloc state; v1 has no such call.
 // Cirrus cannot answer this: the BlockApps-StratoStaking view describes whichever code
 // collection named StratoStaking was uploaded last, not the logic the proxy runs (see
 // getContractState). The verdict is cached briefly so an upgrade is picked up without a
@@ -429,7 +430,7 @@ const detectContractVersion = async (accessToken: string): Promise<StakingContra
 
   try {
     const state = await getStakingBlocState(accessToken);
-    const version: StakingContractVersion = isFunctionEntry(state.creditBlockReward) ? "v2" : "v1";
+    const version: StakingContractVersion = isFunctionEntry(state.tryActivate) ? "v2" : "v1";
     versionVerdict = { address, version, expiresAt: Date.now() + VERSION_TTL_MS };
     return version;
   } catch {
@@ -740,10 +741,14 @@ const recordOperator = (validator: string, record: Record<string, any>): string 
   return isNormalizedAddress(operator) && !/^0+$/.test(operator) ? operator : validator;
 };
 
-const isSelfBondRuleActive = (state: Record<string, any>, now: bigint): boolean => {
-  const graceUntil = parseBigIntLike(state.selfBondGraceUntil);
-  return graceUntil > 0n && now >= graceUntil;
-};
+// StratoStaking's commitment constants. Constants are not part of bloc state, so they are
+// mirrored here; a change of any of them is a logic upgrade, never a vote.
+const V2_MIN_SELF_BOND = 10000n * WAD;
+const V2_NOTICE_SECONDS = 604800n;
+const V2_READINESS_WINDOW_SECONDS = 86400n;
+const V2_READY_WEIGHT_BPS = 7500n;
+const V2_MAX_CREDITED_GAP_SECONDS = 3600n;
+const V2_LIVENESS_MISS_LIMIT = 20n;
 
 type V2ValidatorRecord = {
   validator: string;
@@ -756,20 +761,30 @@ type V2ValidatorRecord = {
   delegatedStake: bigint;
   totalStake: bigint;
   jailedUntil: bigint;
-  exitReadyTime: bigint;
+  readyAt: bigint;
+  readySince: bigint;
+  isReady: boolean;
+  readyForAdmission: boolean;
+  pendingOperator: string;
+  operatorChangeReadyTime: bigint;
   status: StratoOperatorStatus;
   eligible: boolean;
+  // Seated, listed and eligible: what the schedule pays and counts in S.
+  earns: boolean;
 };
 
-// Every listed record with the lifecycle facts StratoStaking derives (status, eligible),
-// ordered by validator address like the v1 Cirrus read.
+// Every listed record with the lifecycle facts StratoStaking derives (status, eligible,
+// readiness), ordered by validator address like the v1 Cirrus read.
 const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => {
   const now = BigInt(Math.floor(Date.now() / 1000));
-  const minStake = parseBigIntLike(state.minStake);
-  const selfBondRuleActive = isSelfBondRuleActive(state, now);
   const isValidatorMap = addressKeyed(state.isValidator);
+  const indexMap = addressKeyed(state.activeValidatorIndex);
+  const underRuleMap = addressKeyed(state.seatedUnderSelfBondRule);
   const jailedUntilMap = addressKeyed(state.jailedUntil);
-  const exitReadyMap = addressKeyed(state.exitReadyTime);
+  const readyAtMap = addressKeyed(state.readyAt);
+  const readySinceMap = addressKeyed(state.readySince);
+  const pendingOperatorMap = addressKeyed(state.pendingOperator);
+  const changeReadyMap = addressKeyed(state.operatorChangeReadyTime);
 
   return [...addressKeyed(state.operators).entries()]
     .filter(([, value]) => value && typeof value === "object" && parseBoolLike(value.exists))
@@ -781,9 +796,15 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
       const delegatedStake = parseBigIntLike(value.delegatedStake);
       const totalStake = selfBond + delegatedStake;
       const jailedUntil = parseBigIntLike(jailedUntilMap.get(validator));
-      const exitReadyTime = parseBigIntLike(exitReadyMap.get(validator));
-      // _meetsMinStake: combined stake until the self-bond grace ends, self-bond after.
-      const meetsMinStake = selfBondRuleActive ? selfBond >= minStake : totalStake >= minStake;
+      const readyAt = parseBigIntLike(readyAtMap.get(validator));
+      const readySince = parseBigIntLike(readySinceMap.get(validator));
+      const isReady = readyAt > 0n && readyAt + V2_READINESS_WINDOW_SECONDS >= now;
+      // _meetsMinStake: a seat held since before the self-bond rule qualifies on self-bond
+      // plus delegations; every other record on self-bond alone.
+      const incumbent = isValidator && !parseBoolLike(underRuleMap.get(validator));
+      const meetsMinStake = incumbent ? totalStake >= V2_MIN_SELF_BOND : selfBond >= V2_MIN_SELF_BOND;
+      const eligible = active && meetsMinStake && now >= jailedUntil;
+      const pendingOperator = normalizeAddress(pendingOperatorMap.get(validator));
 
       return {
         validator,
@@ -796,9 +817,15 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
         delegatedStake,
         totalStake,
         jailedUntil,
-        exitReadyTime,
+        readyAt,
+        readySince,
+        isReady,
+        readyForAdmission: isReady && readyAt - readySince >= V2_NOTICE_SECONDS,
+        pendingOperator: isNormalizedAddress(pendingOperator) && !/^0+$/.test(pendingOperator) ? pendingOperator : "",
+        operatorChangeReadyTime: parseBigIntLike(changeReadyMap.get(validator)),
         status: !active ? 3 : isValidator ? 2 : 1,
-        eligible: active && meetsMinStake && now >= jailedUntil && (exitReadyTime === 0n || now < exitReadyTime),
+        eligible,
+        earns: isValidator && parseBigIntLike(indexMap.get(validator)) > 0n && eligible,
       };
     });
 };
@@ -807,90 +834,27 @@ const v2UnbondingRequests = (state: Record<string, any>, user: string): StratoUn
   const queue = user ? state.unbondingQueue?.[user] : undefined;
   if (!queue || typeof queue !== "object") return [];
 
-  const now = Math.floor(Date.now() / 1000);
+  // Requests the previous logic queued; principal is paid at once now and these are
+  // withdrawable whatever release time they carry.
   return Object.entries(queue as Record<string, any>)
     .map(([id, raw]) => {
       const value = raw || {};
-      const releaseTime = uintString(value.releaseTime);
       const claimed = parseBoolLike(value.claimed);
       return {
         id: String(id),
         amount: uintString(value.amount),
-        releaseTime,
+        releaseTime: uintString(value.releaseTime),
         claimed,
-        ready: !claimed && Number(releaseTime) <= now,
+        ready: !claimed,
       };
     })
     .sort((a, b) => Number(parseBigIntLike(a.id) - parseBigIntLike(b.id)));
-};
-
-// ---- v2 realized block-reward APY ----
-
-const REWARD_WINDOW_DAYS = 7n;
-const REWARD_WINDOW_SECONDS = 7 * 24 * 60 * 60;
-const RECENT_REWARDS_TTL_MS = 60 * 1000;
-let recentRewardsCache: { address: string; expiresAt: number; totals: Promise<Map<string, bigint>> } | null = null;
-
-// Cirrus keeps block_timestamp as text in this form ("2026-09-14 19:47:31 UTC"), so a gte
-// on the same form compares chronologically.
-const cirrusTimestamp = (epochSeconds: number): string =>
-  new Date(epochSeconds * 1000).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
-
-// STRATO block rewards credited per validator over the trailing window. Summed in Postgres
-// (otherwise one row per block), with ::text keeping 18-decimal totals exact through JSON.
-const getRecentBlockRewards = (accessToken: string): Promise<Map<string, bigint>> => {
-  const address = stakingAddress();
-  if (!address) return Promise.resolve(new Map());
-  if (recentRewardsCache?.address === address && Date.now() < recentRewardsCache.expiresAt) {
-    return recentRewardsCache.totals;
-  }
-
-  const since = Math.floor(Date.now() / 1000) - REWARD_WINDOW_SECONDS;
-  const totals = cirrus.get(accessToken, `/${constants.Event}`, {
-    params: {
-      address: `eq.${address}`,
-      event_name: "eq.BlockRewardCredited",
-      block_timestamp: `gte.${cirrusTimestamp(since)}`,
-      select: "validator:attributes->>validator,amount:attributes->>amount::numeric.sum()::text",
-    },
-  })
-    .then(({ data }: { data: any[] }) => {
-      const byValidator = new Map<string, bigint>();
-      for (const row of data || []) {
-        const validator = normalizeAddress(row.validator);
-        if (validator) byValidator.set(validator, (byValidator.get(validator) || 0n) + parseBigIntLike(row.amount));
-      }
-      return byValidator;
-    })
-    .catch(() => {
-      if (recentRewardsCache === entry) recentRewardsCache = null;
-      return new Map<string, bigint>();
-    });
-
-  const entry = { address, expiresAt: Date.now() + RECENT_REWARDS_TTL_MS, totals };
-  recentRewardsCache = entry;
-  return totals;
-};
-
-// What the trailing window's block rewards paid per unit of stake, net of commission,
-// annualised, in bps. Delegators receive amount * delegated/weight * (1 - commission),
-// i.e. amount * (1 - commission) / weight per unit.
-const realizedApyBps = (credited: bigint, stake: bigint, commissionBps: bigint): bigint => {
-  if (credited <= 0n || stake <= 0n) return 0n;
-  const netBps = BPS_DIVISOR - (commissionBps >= BPS_DIVISOR ? BPS_DIVISOR : commissionBps);
-  return (credited * 365n * netBps) / (REWARD_WINDOW_DAYS * stake);
 };
 
 // Commission as StratoStaking charges it: capped at maxCommissionBps.
 const effectiveCommissionBps = (state: Record<string, any>, commissionBps: bigint): bigint => {
   const cap = parseBigIntLike(state.maxCommissionBps);
   return commissionBps < cap ? commissionBps : cap;
-};
-
-const networkApyBps = (state: Record<string, any>, credited: Map<string, bigint>): bigint => {
-  let total = 0n;
-  for (const amount of credited.values()) total += amount;
-  return realizedApyBps(total, parseBigIntLike(state.totalRewardableStake), 0n);
 };
 
 // ---- v2 emission schedule ----
@@ -909,18 +873,20 @@ const sqrtBigInt = (x: bigint): bigint => {
 
 type EmissionSchedule = { eligibleStake: bigint; reserve: bigint; annualRate: bigint };
 
-// StratoStaking.eligibleStake and a year of _emission: what the schedule releases at the
-// current eligible stake (validators in the set and listed) and reserve, once it has started.
+// StratoStaking.eligibleStake and emissionAnnualRate: what the schedule releases a year at
+// the current earning stake and reserve, once committed and started. It is paid per
+// finalised block to the block's producer, so a validator's income follows the blocks it
+// produces; in expectation that is its share of the earning stake.
 const emissionSchedule = (state: Record<string, any>, records: V2ValidatorRecord[]): EmissionSchedule => {
   let eligibleStake = 0n;
   for (const record of records) {
-    if (record.isValidator && record.active) eligibleStake += record.totalStake;
+    if (record.earns) eligibleStake += record.totalStake;
   }
   const reserve = parseBigIntLike(state.rewardReserve);
   const e0 = parseBigIntLike(state.emissionRateE0);
   const s0 = parseBigIntLike(state.emissionStakeS0);
   const r0 = parseBigIntLike(state.emissionReserveR0);
-  const start = parseBigIntLike(state.lastEmissionTime);
+  const start = parseBigIntLike(state.emissionStartTime);
   const started = start > 0n && start <= BigInt(Math.floor(Date.now() / 1000));
   const annualRate = started && e0 > 0n && s0 > 0n && r0 > 0n && eligibleStake > 0n && reserve > 0n
     ? (((e0 * sqrtBigInt(eligibleStake * s0)) / s0) * reserve) / r0
@@ -928,18 +894,10 @@ const emissionSchedule = (state: Record<string, any>, records: V2ValidatorRecord
   return { eligibleStake, reserve, annualRate };
 };
 
-// Gross annual yield of the schedule on eligible stake, in bps; a validator's delegators get
-// it net of that validator's commission.
+// Expected gross annual yield of the schedule per unit of earning stake, in bps; a validator's
+// delegators get it net of that validator's commission, and only on qualified stake.
 const emissionApyBps = (schedule: EmissionSchedule): bigint =>
   schedule.eligibleStake > 0n ? (schedule.annualRate * BPS_DIVISOR) / schedule.eligibleStake : 0n;
-
-// What the schedule has released to a validator since its checkpoint and not yet credited
-// to its record (_settleEmissions does that lazily, on the record's next touch).
-const unsettledEmission = (record: V2ValidatorRecord, index: bigint, paidMap: Map<string, unknown>): bigint => {
-  if (!record.isValidator || !record.active) return 0n;
-  const paid = parseBigIntLike(paidMap.get(record.validator));
-  return index > paid ? (record.totalStake * (index - paid)) / WAD : 0n;
-};
 
 // Total STRATO the user has locked in the staking contract: delegated stake,
 // operator self-bond, and unclaimed unbonding amounts. Consumed by the tokens
@@ -1164,7 +1122,7 @@ const validatorApyBps = (
 };
 
 // Network staking APY for the Earn page. v1: best available net schedule APY across
-// active operators. v2: realized trailing-week block rewards over the rewardable stake.
+// active operators. v2: the committed schedule's expected gross rate on the earning stake.
 // Consumed by the earn service so the portfolio STRATO row can show combined native +
 // rewards APY.
 export const getStratoStakingNetworkApy = async (accessToken: string): Promise<string | null> => {
@@ -1173,8 +1131,7 @@ export const getStratoStakingNetworkApy = async (accessToken: string): Promise<s
 
   const { state, version } = contractState;
   if (version === "v2") {
-    const apyBps = networkApyBps(state, await getRecentBlockRewards(accessToken))
-      + emissionApyBps(emissionSchedule(state, v2ValidatorRecords(state)));
+    const apyBps = emissionApyBps(emissionSchedule(state, v2ValidatorRecords(state)));
     return apyBps > 0n ? formatBpsAsPercent(apyBps) : null;
   }
 
@@ -1312,7 +1269,14 @@ const getV1StakingInfo = async (
       eligible: active,
       isWaiter: false,
       jailedUntil: "0",
-      exitReadyTime: "0",
+      readyAt: "0",
+      readySince: "0",
+      isReady: false,
+      readyForAdmission: false,
+      pendingOperator: "",
+      operatorChangeReadyTime: "0",
+      userWaitingStake: "0",
+      userStakeQualifiesAt: "0",
       blocksProposed: "0",
       missedProposals: "0",
       consecutiveMisses: "0",
@@ -1379,30 +1343,23 @@ const getV1StakingInfo = async (
     estimatedApy,
     minStake: "0",
     minSelfBond: "0",
-    selfBondGraceUntil: "0",
-    selfBondRuleActive: false,
-    proposerFeeBps: "0",
-    maxConsecutiveMisses: "0",
-    jailCooldown: "0",
     maxActiveValidators: "0",
     hardCapActiveValidators: "0",
-    evictionMarginBps: "0",
-    maxSetMutationsPerBlock: "0",
-    exitNoticeSeconds: "0",
-    unkickCooldown: "0",
-    maxOperatorStakeBps: "0",
-    // v1 has no permissionless join at all, so "paused" is the honest reading.
-    joinsPaused: true,
+    // v1 has no permissionless join at all.
     joinsOpenFromBlock: "0",
     joinsOpen: false,
+    noticeSeconds: "0",
+    readinessWindowSeconds: "0",
+    readyWeightBps: "0",
+    maxCreditedGapSeconds: "0",
+    livenessMissLimit: "0",
+    consensusWeight: "0",
+    readyWeight: "0",
     governanceSyncEnabled: false,
     // No separate set counter on v1; every active operator is in the consensus set,
     // which is exactly what activeOperatorCount counts.
     validatorCount: String(state.activeOperatorCount || "0"),
     trackedUsdst: "0",
-    unattributedFees: "0",
-    totalFeesCredited: "0",
-    totalRewardsCredited: "0",
     userTotalStake: userTotalStake.toString(),
     userTotalStakeUsd: stratoPriceWad > 0n ? ((userTotalStake * stratoPriceWad) / WAD).toString() : "0",
     claimableRewards: claimableRewards.toString(),
@@ -1431,10 +1388,10 @@ const getV1StakingInfo = async (
 
 // v2: validator-keyed records from one bloc snapshot. Per-user checkpoints come from the
 // same snapshot as the indexes they are measured against, so a claim can never show as
-// still pending because Cirrus lagged on one side. Income is pushed per block (block
-// rewards, proposer fees), so nothing is projected over time; the frozen schedule indexes
-// are not projected either (records on helium are already level with them, and any
-// remainder is pendingBaseRewards).
+// still pending because Cirrus lagged on one side. Income is credited per finalised block
+// (production income, discretionary rewards), so nothing is projected over time; the
+// frozen schedule indexes are not projected either (records on helium are already level
+// with them, and any remainder is pendingBaseRewards).
 const getV2StakingInfo = async (
   accessToken: string,
   state: Record<string, any>,
@@ -1449,18 +1406,17 @@ const getV2StakingInfo = async (
     validatorProfiles,
     lifetimeClaimedRewards,
     stratoPriceWad,
-    recentRewards,
   ] = await Promise.all([
     getTokenInfo(accessToken, tokenAddress),
     getTokenBalance(accessToken, tokenAddress, user),
     getValidatorProfiles(accessToken, "v2"),
     getLifetimeClaimedRewards(accessToken, user),
     getStratoTokenPriceWad(accessToken),
-    getRecentBlockRewards(accessToken),
   ] as const);
 
-  const now = BigInt(Math.floor(Date.now() / 1000));
   const userStakes = userRow(state.delegatedStake, user);
+  const userWaiting = userRow(state.unqualifiedStake, user);
+  const userSince = userRow(state.stakedSince, user);
   const userPendingRewards = userRow(state.pendingDelegatorRewards, user);
   const userRewardPaid = userRow(state.userRewardPerStakePaid, user);
   const userPendingFees = userRow(state.pendingDelegatorFees, user);
@@ -1474,57 +1430,53 @@ const getV2StakingInfo = async (
   let claimableFees = 0n;
   let userWeightedApyBps = 0n;
   let activeValidatorCount = 0n;
+  let consensusWeight = 0n;
+  let readyWeight = 0n;
   let operatorClaimableTotal = 0n;
   const operated: Array<{ record: V2ValidatorRecord; rewards: bigint; fees: bigint }> = [];
 
   const records = v2ValidatorRecords(state);
   const schedule = emissionSchedule(state, records);
   const scheduleApyBps = emissionApyBps(schedule);
-  const emissionIndex = parseBigIntLike(state.emissionPerStakeStored);
-  const emissionPaidMap = addressKeyed(state.emissionPerStakePaid);
   const validators = records.map((record): StratoOperatorInfo => {
     const { validator, value } = record;
     const profile = validatorProfiles.get(validator) || {};
     const userStake = parseBigIntLike(userStakes.get(validator));
+    const userWaitingStake = parseBigIntLike(userWaiting.get(validator));
+    // Only the qualified part of a position earns against the indexes (_updateUser).
+    const userEarning = userStake - userWaitingStake;
     const commissionBps = effectiveCommissionBps(state, record.commissionBps);
 
-    // What the schedule owes the record since its checkpoint, split as _creditRewards will
-    // on its next touch: the self-bond share and the commission to the operator, the rest
-    // into the delegators' index. With no delegators the whole amount is the operator's.
-    const unsettled = unsettledEmission(record, emissionIndex, emissionPaidMap);
-    const unsettledSelfBond = record.totalStake > 0n ? (unsettled * record.selfBond) / record.totalStake : 0n;
-    const unsettledDelegators = unsettled - unsettledSelfBond;
-    const unsettledCommission = record.delegatedStake > 0n ? (unsettledDelegators * commissionBps) / BPS_DIVISOR : unsettledDelegators;
-
-    const rewardIndex = parseBigIntLike(value.delegatorRewardPerStakeStored)
-      + (record.delegatedStake > 0n ? ((unsettledDelegators - unsettledCommission) * WAD) / record.delegatedStake : 0n);
+    const rewardIndex = parseBigIntLike(value.delegatorRewardPerStakeStored);
     const rewardPaid = parseBigIntLike(userRewardPaid.get(validator));
     const pendingRewards = parseBigIntLike(userPendingRewards.get(validator))
-      + (userStake > 0n && rewardIndex > rewardPaid ? (userStake * (rewardIndex - rewardPaid)) / WAD : 0n);
+      + (userEarning > 0n && rewardIndex > rewardPaid ? (userEarning * (rewardIndex - rewardPaid)) / WAD : 0n);
 
     const feeIndex = parseBigIntLike(value.feePerStakeStored);
     const feePaid = parseBigIntLike(userFeePaid.get(validator));
     const pendingFees = parseBigIntLike(userPendingFees.get(validator))
-      + (userStake > 0n && feeIndex > feePaid ? (userStake * (feeIndex - feePaid)) / WAD : 0n);
+      + (userEarning > 0n && feeIndex > feePaid ? (userEarning * (feeIndex - feePaid)) / WAD : 0n);
 
     // claimOperatorRewards pays self-bond share + commission, after folding any retired
     // schedule remainder (pendingBaseRewards) into the self-bond share.
     const operatorPendingRewards = parseBigIntLike(value.pendingSelfBondRewards)
       + parseBigIntLike(value.pendingCommission)
-      + parseBigIntLike(value.pendingBaseRewards)
-      + unsettledSelfBond
-      + unsettledCommission;
+      + parseBigIntLike(value.pendingBaseRewards);
     const operatorPendingFees = parseBigIntLike(value.pendingSelfBondFees) + parseBigIntLike(value.pendingFeeCommission);
 
-    // Realized block rewards plus the schedule's rate while the validator is in the set.
-    const apyBps = realizedApyBps(recentRewards.get(validator) || 0n, record.totalStake, commissionBps)
-      + (record.isValidator && record.active ? (scheduleApyBps * (BPS_DIVISOR - commissionBps)) / BPS_DIVISOR : 0n);
+    // The schedule's expected rate while the validator earns; what it actually pays follows
+    // the blocks the validator produces and the reserve left.
+    const apyBps = record.earns ? (scheduleApyBps * (BPS_DIVISOR - commissionBps)) / BPS_DIVISOR : 0n;
 
     if (user && record.operator === user) {
       operated.push({ record, rewards: operatorPendingRewards, fees: operatorPendingFees });
       operatorClaimableTotal += operatorPendingRewards;
     }
     if (record.active) activeValidatorCount += 1n;
+    if (record.isValidator) {
+      consensusWeight += record.totalStake;
+      if (record.isReady) readyWeight += record.totalStake;
+    }
 
     userTotalStake += userStake;
     claimableRewards += pendingRewards;
@@ -1544,9 +1496,16 @@ const getV2StakingInfo = async (
       status: record.status,
       isValidator: record.isValidator,
       eligible: record.eligible,
-      isWaiter: record.eligible && !record.isValidator,
+      isWaiter: record.eligible && !record.isValidator && record.readyForAdmission,
       jailedUntil: record.jailedUntil.toString(),
-      exitReadyTime: record.exitReadyTime.toString(),
+      readyAt: record.readyAt.toString(),
+      readySince: record.readySince.toString(),
+      isReady: record.isReady,
+      readyForAdmission: record.readyForAdmission,
+      pendingOperator: record.pendingOperator,
+      operatorChangeReadyTime: record.operatorChangeReadyTime.toString(),
+      userWaitingStake: userWaitingStake.toString(),
+      userStakeQualifiesAt: userWaitingStake > 0n ? (parseBigIntLike(userSince.get(validator)) + V2_NOTICE_SECONDS).toString() : "0",
       blocksProposed: uintString(blocksProposedMap.get(validator)),
       missedProposals: uintString(missedProposalsMap.get(validator)),
       consecutiveMisses: uintString(consecutiveMissesMap.get(validator)),
@@ -1563,13 +1522,12 @@ const getV2StakingInfo = async (
     };
   });
 
-  // Your actual (stake-weighted) APY once you're delegated; the network's realized APY
+  // Your actual (stake-weighted) APY once you're delegated; the schedule's gross rate
   // until then.
-  const networkBps = networkApyBps(state, recentRewards) + scheduleApyBps;
   const estimatedApy = userTotalStake > 0n
     ? formatBpsAsPercent(userWeightedApyBps / userTotalStake)
-    : networkBps > 0n
-      ? formatBpsAsPercent(networkBps)
+    : scheduleApyBps > 0n
+      ? formatBpsAsPercent(scheduleApyBps)
       : "-";
 
   const primary = operated[0];
@@ -1598,7 +1556,8 @@ const getV2StakingInfo = async (
     baseRewardBps: "0",
     maxCommissionBps: uintString(state.maxCommissionBps),
     maxBatchSize: uintString(state.maxBatchSize),
-    unbondingSeconds: uintString(state.unbondingSeconds),
+    // Principal is paid at once; there is no unbonding period.
+    unbondingSeconds: "0",
     periodStart: "0",
     periodFinish: "0",
     rewardPeriodName: "",
@@ -1609,36 +1568,29 @@ const getV2StakingInfo = async (
     emissionRateE0: uintString(state.emissionRateE0),
     emissionStakeS0: uintString(state.emissionStakeS0),
     emissionReserveR0: uintString(state.emissionReserveR0),
-    emissionStart: uintString(state.lastEmissionTime),
+    emissionStart: uintString(state.emissionStartTime),
     emissionAnnualRate: schedule.annualRate.toString(),
     totalEmitted: uintString(state.totalEmitted),
     estimatedApy,
-    minStake: uintString(state.minStake),
+    minStake: V2_MIN_SELF_BOND.toString(),
     minSelfBond: "0",
-    selfBondGraceUntil: uintString(state.selfBondGraceUntil),
-    selfBondRuleActive: isSelfBondRuleActive(state, now),
-    proposerFeeBps: uintString(state.proposerFeeBps),
-    maxConsecutiveMisses: uintString(state.maxConsecutiveMisses),
-    jailCooldown: uintString(state.jailCooldown),
     maxActiveValidators: uintString(state.maxActiveValidators),
     hardCapActiveValidators: uintString(state.hardCapActiveValidators),
-    evictionMarginBps: uintString(state.evictionMarginBps),
-    maxSetMutationsPerBlock: uintString(state.maxSetMutationsPerBlock),
-    exitNoticeSeconds: uintString(state.exitNoticeSeconds),
-    unkickCooldown: uintString(state.unkickCooldown),
-    maxOperatorStakeBps: uintString(state.maxOperatorStakeBps),
-    joinsPaused: parseBoolLike(state.joinsPaused),
     joinsOpenFromBlock: uintString(state.joinsOpenFromBlock),
     // lastProcessedBlock is the last block with a transaction: the height as the contract
-    // last saw it, which is what its own gate compares against.
-    joinsOpen: !parseBoolLike(state.joinsPaused)
+    // last saw it, which is what its own gate compares against. 0 = no block agreed yet.
+    joinsOpen: parseBigIntLike(state.joinsOpenFromBlock) > 0n
       && parseBigIntLike(state.lastProcessedBlock) >= parseBigIntLike(state.joinsOpenFromBlock),
+    noticeSeconds: V2_NOTICE_SECONDS.toString(),
+    readinessWindowSeconds: V2_READINESS_WINDOW_SECONDS.toString(),
+    readyWeightBps: V2_READY_WEIGHT_BPS.toString(),
+    maxCreditedGapSeconds: V2_MAX_CREDITED_GAP_SECONDS.toString(),
+    livenessMissLimit: V2_LIVENESS_MISS_LIMIT.toString(),
+    consensusWeight: consensusWeight.toString(),
+    readyWeight: readyWeight.toString(),
     governanceSyncEnabled: parseBoolLike(state.governanceSyncEnabled),
     validatorCount: uintString(state.validatorCount),
     trackedUsdst: uintString(state.trackedUsdst),
-    unattributedFees: uintString(state.unattributedFees),
-    totalFeesCredited: uintString(state.totalFeesCredited),
-    totalRewardsCredited: uintString(state.totalRewardsCredited),
     userTotalStake: userTotalStake.toString(),
     userTotalStakeUsd: stratoPriceWad > 0n ? ((userTotalStake * stratoPriceWad) / WAD).toString() : "0",
     claimableRewards: claimableRewards.toString(),
@@ -2095,7 +2047,7 @@ export const reconcileStratoValidatorSet = async (
 
   const state = await getStakingBlocState(accessToken, true);
   const candidates = v2ValidatorRecords(state)
-    .filter((record) => record.eligible && !record.isValidator)
+    .filter((record) => record.eligible && !record.isValidator && record.readyForAdmission)
     .sort((a, b) =>
       a.totalStake !== b.totalStake
         ? (b.totalStake > a.totalStake ? 1 : -1)
@@ -2122,28 +2074,71 @@ export const syncStratoValidator = async (
   }));
 };
 
-export const requestStratoExit = async (
+// Leaves the set at once, if the set can spare the validator (otherwise the contract
+// defers it: "SS: unsafe transition"). Self-bond stays bonded until unbonded.
+export const exitStratoValidator = async (
   accessToken: string,
   userAddress: string,
   validator?: string
 ): Promise<{ status: string; hash: string }> => {
   await requireV2(accessToken);
 
-  return await buildAndPost(accessToken, userAddress, stakingCall("requestExit", {
+  return await buildAndPost(accessToken, userAddress, stakingCall("exit", {
     validator: requireValidatorArg(validator),
   }));
 };
 
-export const cancelStratoExit = async (
+// Evidence-based removal, open to anyone: a validator at the liveness miss limit.
+export const removeStratoForMissedProposals = async (
   accessToken: string,
   userAddress: string,
   validator?: string
 ): Promise<{ status: string; hash: string }> => {
   await requireV2(accessToken);
 
-  return await buildAndPost(accessToken, userAddress, stakingCall("cancelExit", {
+  return await buildAndPost(accessToken, userAddress, stakingCall("removeForMissedProposals", {
     validator: requireValidatorArg(validator),
   }));
+};
+
+// Touch a position so a qualification that has come due takes effect (anyone may).
+export const qualifyStratoStake = async (
+  accessToken: string,
+  userAddress: string,
+  validator: string | undefined,
+  user?: string
+): Promise<{ status: string; hash: string }> => {
+  await requireV2(accessToken);
+
+  return await buildAndPost(accessToken, userAddress, stakingCall("qualifyStake", {
+    user: normalizeAddress(user) || normalizeAddress(userAddress),
+    validator: requireValidatorArg(validator),
+  }));
+};
+
+// The incoming operator completes an announced handover a week on, bringing its own bond.
+export const acceptStratoOperator = async (
+  accessToken: string,
+  userAddress: string,
+  validator: string | undefined,
+  bondAmount: string
+): Promise<{ status: string; hash: string }> => {
+  const staking = requireStakingAddress();
+  const token = requireStratoTokenAddress();
+  await requireV2(accessToken);
+
+  return await buildAndPost(accessToken, userAddress, [
+    {
+      contractName: extractContractName(Token),
+      contractAddress: token,
+      method: "approve",
+      args: {
+        spender: staking,
+        value: bondAmount,
+      },
+    },
+    stakingCall("acceptOperator", { validator: requireValidatorArg(validator), bondAmount }),
+  ]);
 };
 
 export const withdrawStratoUnbonded = async (
@@ -2198,21 +2193,19 @@ export const setStratoCommission = async (
     : stakingCall("setCommissionBps", { newCommissionBps: commissionBps }));
 };
 
+// v1 only: v2 commission is the operator's alone (a raise takes a week's notice).
 export const setStratoOperatorCommission = async (
   accessToken: string,
   userAddress: string,
   validator: string,
   commissionBps: string
 ): Promise<{ status: string; hash: string }> => {
-  const version = await requireContractVersion(accessToken);
+  await requireV1(accessToken, "Setting an operator's commission");
 
-  return castVoteOnIssue(
-    accessToken,
-    userAddress,
-    requireStakingAddress(),
-    version === "v2" ? "setValidatorCommissionBps" : "setOperatorCommissionBps",
-    [normalizeAddress(validator), commissionBps]
-  );
+  return castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setOperatorCommissionBps", [
+    normalizeAddress(validator),
+    commissionBps,
+  ]);
 };
 
 export const selfBondStrato = async (
@@ -2352,36 +2345,38 @@ export const addStratoOperator = async (
   ]);
 };
 
+// v2 removals are accountable: announced with published grounds and executed a week later
+// (removeValidator), or one named validator at once on the emergency path. `grounds` is
+// required by the contract on both announce and emergency.
+export type StratoRemovalStep = "announce" | "execute" | "cancel" | "emergency";
+
 export const removeStratoOperator = async (
   accessToken: string,
   userAddress: string,
-  validator: string
+  validator: string,
+  step: StratoRemovalStep = "execute",
+  grounds = ""
 ): Promise<{ status: string; hash: string }> => {
   const version = await requireContractVersion(accessToken);
+  const registry = requireValidatorRegistryAddress();
+  const target = normalizeAddress(validator);
+  if (version !== "v2") {
+    return castVoteOnIssue(accessToken, userAddress, registry, "removeOperator", [target]);
+  }
 
-  return castVoteOnIssue(
-    accessToken,
-    userAddress,
-    requireValidatorRegistryAddress(),
-    version === "v2" ? "removeValidator" : "removeOperator",
-    [normalizeAddress(validator)]
-  );
-};
-
-// Hand a validator to a new operator without the validator key's signature (the admins
-// vouch for it). Staking pays out and unbonds what the outgoing operator owns.
-export const setStratoValidatorOperator = async (
-  accessToken: string,
-  userAddress: string,
-  validator: string,
-  operator: string
-): Promise<{ status: string; hash: string }> => {
-  await requireV2(accessToken);
-
-  return await castVoteOnIssue(accessToken, userAddress, requireValidatorRegistryAddress(), "adminSetOperator", [
-    requireValidatorArg(validator),
-    normalizeAddress(operator),
-  ]);
+  if ((step === "announce" || step === "emergency") && !grounds.trim()) {
+    throw badRequest("grounds are required");
+  }
+  switch (step) {
+    case "announce":
+      return castVoteOnIssue(accessToken, userAddress, registry, "announceRemoval", [target, grounds.trim()]);
+    case "cancel":
+      return castVoteOnIssue(accessToken, userAddress, registry, "cancelRemoval", [target]);
+    case "emergency":
+      return castVoteOnIssue(accessToken, userAddress, registry, "emergencyRemove", [target, grounds.trim()]);
+    default:
+      return castVoteOnIssue(accessToken, userAddress, registry, "removeValidator", [target]);
+  }
 };
 
 // Only the retired operator-keyed V2 registry had setValidatorAddress. The V1 registry never
@@ -2395,22 +2390,10 @@ export const setStratoValidatorAddress = async (
 ): Promise<{ status: string; hash: string }> => {
   if ((await requireContractVersion(accessToken)) === "v2") {
     throw badRequest(
-      "Validator records are keyed by validator address on this network; use PATCH /staking/admin/operators/operator to change a validator's operator."
+      "Validator records are keyed by validator address on this network; a validator moves to another operator only with its key's consent (POST /staking/operator)."
     );
   }
   throw badRequest("This network's validator registry has no validator address binding.");
-};
-
-export const setStratoEmergencyKicker = async (
-  accessToken: string,
-  userAddress: string,
-  kicker: string
-): Promise<{ status: string; hash: string }> => {
-  await requireV2(accessToken);
-
-  return await castVoteOnIssue(accessToken, userAddress, requireValidatorRegistryAddress(), "setEmergencyKicker", [
-    normalizeAddress(kicker),
-  ]);
 };
 
 export const startStratoRewardSchedule = async (
@@ -2444,12 +2427,13 @@ export const stopStratoRewardSchedule = async (
   return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "stopRewardSchedule", []);
 };
 
-// v2 dropped baseRewardBps with the reward schedule.
+// v2 dropped baseRewardBps with the reward schedule and unbondingSeconds with the hold on
+// principal: only the commission ceiling and the batch size remain votable.
 export const setStratoStakingParams = async (
   accessToken: string,
   userAddress: string,
   args: {
-    unbondingSeconds: string;
+    unbondingSeconds?: string;
     baseRewardBps?: string;
     maxCommissionBps: string;
     maxBatchSize: string;
@@ -2458,10 +2442,12 @@ export const setStratoStakingParams = async (
   const version = await requireContractVersion(accessToken);
   if (version === "v2") {
     return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setParams", [
-      args.unbondingSeconds,
       args.maxCommissionBps,
       args.maxBatchSize,
     ]);
+  }
+  if (args.unbondingSeconds === undefined || args.unbondingSeconds === "") {
+    throw badRequest("unbondingSeconds is required");
   }
 
   if (args.baseRewardBps === undefined || args.baseRewardBps === "") {
@@ -2475,53 +2461,13 @@ export const setStratoStakingParams = async (
   ]);
 };
 
-export const setStratoValidatorParams = async (
-  accessToken: string,
-  userAddress: string,
-  args: {
-    minStake: string;
-    proposerFeeBps: string;
-    maxConsecutiveMisses: string;
-    jailCooldown: string;
-  }
-): Promise<{ status: string; hash: string }> => {
-  await requireV2(accessToken);
-
-  return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setValidatorParams", [
-    args.minStake,
-    args.proposerFeeBps,
-    args.maxConsecutiveMisses,
-    args.jailCooldown,
-  ]);
-};
-
-// End of the self-bond grace period (unix seconds). A time in the past applies the
-// self-bond rule immediately and drops under-bonded validators from the set.
-export const setStratoSelfBondGrace = async (
-  accessToken: string,
-  userAddress: string,
-  selfBondGraceUntil: string
-): Promise<{ status: string; hash: string }> => {
-  if (parseBigIntLike(selfBondGraceUntil) <= 0n) throw badRequest("selfBondGraceUntil must be positive");
-  await requireV2(accessToken);
-
-  return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setSelfBondGraceUntil", [
-    selfBondGraceUntil,
-  ]);
-};
-
+// The set's size: everything else about admission is the contract's commitment.
 export const setStratoSetParams = async (
   accessToken: string,
   userAddress: string,
   args: {
     maxActiveValidators: string;
     hardCapActiveValidators: string;
-    evictionMarginBps: string;
-    maxSetMutationsPerBlock: string;
-    exitNoticeSeconds: string;
-    unkickCooldown: string;
-    maxOperatorStakeBps: string;
-    joinsPaused: boolean;
   }
 ): Promise<{ status: string; hash: string }> => {
   await requireV2(accessToken);
@@ -2529,38 +2475,35 @@ export const setStratoSetParams = async (
   return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setSetParams", [
     args.maxActiveValidators,
     args.hardCapActiveValidators,
-    args.evictionMarginBps,
-    args.maxSetMutationsPerBlock,
-    args.exitNoticeSeconds,
-    args.unkickCooldown,
-    args.maxOperatorStakeBps,
-    args.joinsPaused,
   ]);
 };
 
-// Permissionless activation opens at this block (joinsPaused must be false as well); 0 = as
-// soon as joins are unpaused.
+// The agreed block from which anyone may seat a ready validator; movable until it passes,
+// never closed again.
 export const setStratoJoinsOpenFromBlock = async (
   accessToken: string,
   userAddress: string,
   blockNumber: string
 ): Promise<{ status: string; hash: string }> => {
+  if (parseBigIntLike(blockNumber) <= 0n) throw badRequest("blockNumber must be positive");
   await requireV2(accessToken);
 
   return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setJoinsOpenFromBlock", [blockNumber]);
 };
 
-// Emission schedule: e0 STRATO a year at s0 of eligible stake with r0 in reserve (wei), from
-// startTime (unix seconds; 0 = now, ignored once the schedule has started). e0 = 0 pauses it.
-export const setStratoEmissionSchedule = async (
+// Commit the emission schedule, once: e0 STRATO a year at s0 of earning stake with r0 in
+// reserve (wei), from startTime (unix seconds; 0 = now). The reserve must already hold r0.
+export const commitStratoEmissionSchedule = async (
   accessToken: string,
   userAddress: string,
   args: { e0: string; s0: string; r0: string; startTime: string }
 ): Promise<{ status: string; hash: string }> => {
-  if (parseBigIntLike(args.s0) <= 0n || parseBigIntLike(args.r0) <= 0n) throw badRequest("s0 and r0 must be positive");
+  if (parseBigIntLike(args.e0) <= 0n || parseBigIntLike(args.s0) <= 0n || parseBigIntLike(args.r0) <= 0n) {
+    throw badRequest("e0, s0 and r0 must be positive");
+  }
   await requireV2(accessToken);
 
-  return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setEmissionSchedule", [
+  return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "commitEmissionSchedule", [
     args.e0,
     args.s0,
     args.r0,
@@ -2568,31 +2511,16 @@ export const setStratoEmissionSchedule = async (
   ]);
 };
 
+// Wire the governance link, once; it has no off switch.
 export const setStratoGovernance = async (
   accessToken: string,
   userAddress: string,
-  governance: string,
-  syncEnabled: boolean
+  governance: string
 ): Promise<{ status: string; hash: string }> => {
   await requireV2(accessToken);
 
   return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setGovernance", [
     normalizeAddress(governance) || normalizeAddress(constants.mercataGovernance),
-    syncEnabled,
-  ]);
-};
-
-export const recoverStratoUnattributedFees = async (
-  accessToken: string,
-  userAddress: string,
-  to: string,
-  amount: string
-): Promise<{ status: string; hash: string }> => {
-  await requireV2(accessToken);
-
-  return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "recoverUnattributedFees", [
-    normalizeAddress(to),
-    amount,
   ]);
 };
 

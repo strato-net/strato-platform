@@ -171,20 +171,20 @@ router.post("/profile", walletAuth, StakingController.updateProfile);
 router.post("/activate", walletAuth, StakingController.activate);
 router.post("/reconcile", walletAuth, StakingController.reconcile);
 router.post("/sync", walletAuth, StakingController.sync);
-router.post("/exit", walletAuth, StakingController.requestExit);
-router.post("/exit/cancel", walletAuth, StakingController.cancelExit);
+router.post("/exit", walletAuth, StakingController.exit);
+// Permissionless: a validator at the liveness miss limit leaves the set.
+router.post("/remove-for-misses", walletAuth, StakingController.removeForMissedProposals);
+// Permissionless: let a position that has waited its week start earning.
+router.post("/qualify", walletAuth, StakingController.qualifyStake);
+// The announced incoming operator completes a handover with its own bond.
+router.post("/operator/accept", walletAuth, StakingController.acceptOperator);
 
 // admin (owner votes)
 router.patch("/admin/operators/validator-address", walletAuth, StakingController.setValidatorAddress);
-router.patch("/admin/operators/operator", walletAuth, StakingController.setValidatorOperator);
-router.patch("/admin/validator-params", walletAuth, StakingController.setValidatorParams);
-router.patch("/admin/self-bond-grace", walletAuth, StakingController.setSelfBondGrace);
 router.patch("/admin/joins-open-from-block", walletAuth, StakingController.setJoinsOpenFromBlock);
-router.patch("/admin/emission-schedule", walletAuth, StakingController.setEmissionSchedule);
+router.post("/admin/emission-schedule", walletAuth, StakingController.commitEmissionSchedule);
 router.patch("/admin/set-params", walletAuth, StakingController.setSetParams);
 router.patch("/admin/governance", walletAuth, StakingController.setGovernance);
-router.post("/admin/recover-fees", walletAuth, StakingController.recoverUnattributedFees);
-router.patch("/admin/emergency-kicker", walletAuth, StakingController.setEmergencyKicker);
 router.patch("/admin/governance/staking-contract", walletAuth, StakingController.setGovernanceStakingContract);
 router.patch("/admin/governance/hard-cap", walletAuth, StakingController.setGovernanceHardCap);
 router.post("/admin/operators", walletAuth, StakingController.addOperator);

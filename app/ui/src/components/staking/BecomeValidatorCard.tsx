@@ -50,7 +50,7 @@ export type ListedValidatorInfo = ValidatorNextStepInput & {
   name: string;
   operator: string;
   jailedUntil?: string;
-  exitReadyTime?: string;
+  pendingOperator?: string;
 };
 
 const percentToBps = (value: string): string | null => {
@@ -83,7 +83,8 @@ type Props = {
   validators?: ListedValidatorInfo[];
   // Raw minStake (wei) for the next-step check.
   minStakeRaw?: string;
-  joinsPaused?: boolean;
+  // Admission is open from the agreed block.
+  joinsOpen?: boolean;
   // Deep link from strato-authorize-operator: prefilled validator, signature and the nonce it was signed for.
   initialValidator?: string;
   initialSignature?: string;
@@ -112,7 +113,7 @@ const BecomeValidatorCard = ({
   onChangeOperator,
   validators = [],
   minStakeRaw = "0",
-  joinsPaused = false,
+  joinsOpen = false,
   initialValidator,
   initialSignature,
   expectedNonce,
@@ -206,7 +207,7 @@ const BecomeValidatorCard = ({
   const doneRecord = doneValidator
     ? validators.find((candidate) => normalizeAddress(candidate.address) === normalizeAddress(doneValidator))
     : undefined;
-  const nextStep = doneRecord ? describeValidatorNextStep(doneRecord, minStakeRaw, minStake, symbol, joinsPaused) : null;
+  const nextStep = doneRecord ? describeValidatorNextStep(doneRecord, minStakeRaw, minStake, symbol, joinsOpen) : null;
 
   const reset = () => {
     setName("");
@@ -235,7 +236,7 @@ const BecomeValidatorCard = ({
   // ---- already an operator: one validator per operator, so only report where it stands ----
   if (isV2 && operatedValidator) {
     const operatedLabel = operatedValidator.name || truncateAddress(operatedValidator.address, 8, 6);
-    const operatedNext = describeValidatorNextStep(operatedValidator, minStakeRaw, minStake, symbol, joinsPaused);
+    const operatedNext = describeValidatorNextStep(operatedValidator, minStakeRaw, minStake, symbol, joinsOpen);
     const linkedOther = linked && normalizeAddress(initialValidator) !== normalizeAddress(operatedValidator.address);
     const linkedSame = linked && !linkedOther;
     return (
@@ -313,7 +314,8 @@ const BecomeValidatorCard = ({
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold">{title}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Run a STRATO node and this account becomes its operator. You will need {minStake} {symbol} to self-bond.
+              Run a STRATO node and this account becomes its operator. You will need {minStake} {symbol} of your own to
+              self-bond, and the node must acknowledge readiness daily for a week before it can join.
             </p>
           </div>
           <Button size="sm" onClick={() => setPhase("guide")}>
@@ -441,8 +443,9 @@ const BecomeValidatorCard = ({
             {mode === "change" && (
               <>
                 <p>
-                  You will take over as operator. The current operator's self-bond is released for unbonding and the validator
-                  may leave the consensus set until you self-bond at least {minStake} {symbol} and activate.
+                  You will take over as operator a week after the validator key's consent is recorded, by accepting the
+                  handover with at least {minStake} {symbol} of your own self-bond. The current operator keeps operating until
+                  then and is paid out when you accept; delegations stay with the validator.
                 </p>
                 {listed?.status === 3 && (
                   <p>This validator is delisted. Changing its operator does not relist it; relisting needs an admin vote.</p>

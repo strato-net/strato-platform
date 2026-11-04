@@ -29,10 +29,6 @@ contract record MockValidatorSync is IStratoStakingValidatorSync {
         lastOperator = operator;
         validatorOperator[validator] = operator;
     }
-
-    mapping(address => bool) public record overOneThird;
-    function setOverOneThird(address validator, bool over) public { overOneThird[validator] = over; }
-    function exceedsOneThird(address validator) external view override returns (bool) { return overOneThird[validator]; }
 }
 
 // Signing is impossible inside a test, so this registry stands in a key's signature with a
@@ -64,6 +60,7 @@ contract RecoveryHarness is ValidatorRegistry {
 contract Describe_ValidatorRegistry {
     address constant VALIDATOR_A = address(0xaaaa);
     address constant GENESIS_X = address(0xcccc);
+    uint256 constant WEEK = 604800;
 
     ConsentRegistry registry;
     MockValidatorSync staking;
@@ -140,30 +137,40 @@ contract Describe_ValidatorRegistry {
 
         registry.sign(GENESIS_X, address(operatorB));
         operatorB.doSuccessfully(address(registry), "setOperator", GENESIS_X, address(operatorB), uint8(0), uint256(0), uint256(0));
-        require(registry.operatorOf(GENESIS_X) == address(operatorB), "handed over with consent");
-        require(staking.operatorSyncCount() == 1, "staking settles the handover");
+        require(registry.operatorOf(GENESIS_X) == address(operatorB), "bound with consent");
+        require(staking.operatorSyncCount() == 1 && staking.lastOperator() == address(operatorB), "staking told, so it can give notice");
 
-        registry.adminSetOperator(GENESIS_X, address(user));
-        // operatorB's consent was recorded at an earlier nonce; it cannot be replayed.
+        // The key binds back; operatorB's consent was recorded at an earlier nonce and
+        // cannot be replayed.
+        registry.sign(GENESIS_X, address(user));
+        user.doSuccessfully(address(registry), "setOperator", GENESIS_X, address(user), uint8(0), uint256(0), uint256(0));
         operatorB.doExpectingFailure(address(registry), "setOperator", "VR: validator did not authorize operator", GENESIS_X, address(operatorB), uint8(0), uint256(0), uint256(0));
         require(registry.operatorOf(GENESIS_X) == address(user), "unchanged");
     }
 
-    function it_only_lets_the_owner_move_an_operator_without_consent() public {
+    // Nobody moves a validator without its key: not the owner, and not a relisting.
+    function it_never_moves_an_operator_without_consent() public {
         _addValidatorA();
         bool rejected = false;
         try user.do(address(registry), "adminSetOperator(address,address)", VALIDATOR_A, address(user)) {
         } catch {
             rejected = true;
         }
-        require(rejected, "non-owner rejected");
+        require(rejected, "no unsigned path");
         require(registry.operatorOf(VALIDATOR_A) == address(operatorA), "unchanged");
-
         operatorA.doExpectingFailure(address(registry), "setOperator", "VR: validator did not authorize operator", VALIDATOR_A, address(user), uint8(0), uint256(0), uint256(0));
+        operatorA.doExpectingFailure(address(registry), "setOperator", "VR: same operator", VALIDATOR_A, address(operatorA), uint8(0), uint256(0), uint256(0));
 
-        registry.adminSetOperator(VALIDATOR_A, address(operatorB));
-        require(registry.operatorOf(VALIDATOR_A) == address(operatorB), "owner moved it");
-        require(staking.validatorOperator(VALIDATOR_A) == address(operatorB), "synced");
+        registry.emergencyRemove(VALIDATOR_A, "test: delisted");
+        rejected = false;
+        try registry.addValidator(VALIDATOR_A, address(operatorB), 250, "Validator A", "", "", "validator-a") {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "a relisting keeps the operator");
+        registry.addValidator(VALIDATOR_A, address(operatorA), 250, "Validator A", "", "", "validator-a");
+        require(staking.validatorActive(VALIDATOR_A) && registry.operatorOf(VALIDATOR_A) == address(operatorA), "relisted under its operator");
+        require(registry.validatorCount() == 1, "slot reused");
     }
 
     function it_updates_profiles_only_by_the_operator_or_owner() public {
@@ -175,31 +182,86 @@ contract Describe_ValidatorRegistry {
         require(registry.protocolValidatorOperators("validator-a") == address(0), "old protocol id released");
     }
 
-    function it_delists_and_relists_through_the_owner() public {
+    function it_removes_with_published_grounds_after_a_weeks_notice() public {
         _addValidatorA();
+        bool rejected = false;
+        try registry.removeValidator(VALIDATOR_A) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "a removal is announced first");
+        rejected = false;
+        try registry.announceRemoval(VALIDATOR_A, "") {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "grounds are required");
+        rejected = false;
+        try user.do(address(registry), "announceRemoval", VALIDATOR_A, "squat") {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "owner only");
+
+        registry.announceRemoval(VALIDATOR_A, "test: offline for a month, see ticket 42");
+        require(registry.removalAnnouncedAt(VALIDATOR_A) == block.timestamp, "announced");
+        require(registry.removalGrounds(VALIDATOR_A) == "test: offline for a month, see ticket 42", "grounds published");
+        fastForward(WEEK - 1, 1);
+        rejected = false;
+        try registry.removeValidator(VALIDATOR_A) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "the notice runs a week");
+        require(staking.validatorActive(VALIDATOR_A), "still listed");
+
+        fastForward(1, 1);
         registry.removeValidator(VALIDATOR_A);
         (, bool active,,,,,) = registry.operators(VALIDATOR_A);
         require(!active, "delisted");
         require(!staking.validatorActive(VALIDATOR_A), "staking synced as delisted");
         require(staking.lastOperator() == address(operatorA), "delisting names the operator");
-
-        registry.addValidator(VALIDATOR_A, address(operatorB), 250, "Validator A", "", "", "validator-a");
-        require(staking.validatorActive(VALIDATOR_A), "relisted");
-        require(registry.operatorOf(VALIDATOR_A) == address(operatorB), "relisted under a new operator");
-        require(registry.validatorCount() == 1, "slot reused");
+        require(registry.removalAnnouncedAt(VALIDATOR_A) == 0, "notice cleared");
     }
 
-    function it_emergency_kick_only_by_the_kicker_and_only_over_one_third() public {
+    function it_lets_the_owner_withdraw_an_announced_removal() public {
         _addValidatorA();
-        user.doExpectingFailure(address(registry), "emergencyKick(address)", "VR: not the emergency kicker", VALIDATOR_A);
+        registry.announceRemoval(VALIDATOR_A, "test: grounds");
+        registry.cancelRemoval(VALIDATOR_A);
+        require(registry.removalAnnouncedAt(VALIDATOR_A) == 0, "withdrawn");
+        fastForward(WEEK, 1);
+        bool rejected = false;
+        try registry.removeValidator(VALIDATOR_A) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected && staking.validatorActive(VALIDATOR_A), "nothing to execute");
+    }
 
-        registry.setEmergencyKicker(address(user));
-        user.doExpectingFailure(address(registry), "emergencyKick(address)", "VR: validator below one third of stake", VALIDATOR_A);
+    function it_emergency_removes_one_named_validator_with_grounds() public {
+        _addValidatorA();
+        bool rejected = false;
+        try registry.emergencyRemove(VALIDATOR_A, "") {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "grounds are required");
+        rejected = false;
+        try user.do(address(registry), "emergencyRemove", VALIDATOR_A, "squat") {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "owner only");
+        rejected = false;
+        try user.do(address(registry), "emergencyKick(address)", VALIDATOR_A) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "no single-key kick");
 
-        staking.setOverOneThird(VALIDATOR_A, true);
-        user.doSuccessfully(address(registry), "emergencyKick(address)", VALIDATOR_A);
+        registry.emergencyRemove(VALIDATOR_A, "test: double-signing, evidence at ipfs://...");
         (, bool active,,,,,) = registry.operators(VALIDATOR_A);
-        require(!active, "validator delisted");
+        require(!active, "validator delisted at once");
         require(!staking.lastActive(), "staking synced as delisted");
     }
 

@@ -5,6 +5,9 @@ export type ValidatorNextStepInput = {
   isValidator: boolean;
   isWaiter?: boolean;
   selfBond: string;
+  // Readiness evidence from the validator key: fresh within the window, and through the trial.
+  isReady?: boolean;
+  readyForAdmission?: boolean;
 };
 
 export const describeValidatorNextStep = (
@@ -12,13 +15,18 @@ export const describeValidatorNextStep = (
   minStake: string,
   minStakeLabel: string,
   symbol: string,
-  joinsPaused: boolean
+  joinsOpen: boolean
 ): string | null => {
   if (validator.status === 3) return "This validator is delisted. Relisting needs an admin vote.";
   if (validator.isValidator) return "In the validator set.";
   if (BigInt(validator.selfBond || "0") < BigInt(minStake || "0")) {
     return `Self-bond at least ${minStakeLabel} ${symbol} to become eligible.`;
   }
-  if (validator.isWaiter) return joinsPaused ? "Eligible. Joins are paused right now." : "Eligible. Activate to join the validator set.";
+  if (!validator.readyForAdmission) {
+    return validator.isReady
+      ? "Eligible. The node's readiness trial is running: keep it acknowledging daily for a week."
+      : "Eligible. The node must acknowledge readiness from its validator key daily for a week before it can join.";
+  }
+  if (validator.isWaiter) return joinsOpen ? "Ready. Activate to join the validator set." : "Ready. Admission opens at the agreed block.";
   return null;
 };
