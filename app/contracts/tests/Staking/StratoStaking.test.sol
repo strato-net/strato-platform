@@ -730,17 +730,47 @@ contract Describe_StratoStaking {
         staking.forgetSetIndex();
         require(staking.activeValidatorCount() == 0 && staking.validatorCount() == 2, "helium's shape: counted, not indexed");
 
-        address[] memory claimed = new address[](3);
-        claimed[0] = VALIDATOR_A;
-        claimed[1] = VALIDATOR_B;
-        claimed[2] = address(0xdead);
-        user2.doSuccessfully(address(staking), "indexValidatorSet", claimed);
-        require(staking.activeValidatorCount() == 2, "only real members indexed");
-        user2.doSuccessfully(address(staking), "indexValidatorSet", claimed);
+        user2.doSuccessfully(address(staking), "indexValidatorSet");
+        require(staking.activeValidatorCount() == 2, "the set governance lists is indexed");
+        user2.doSuccessfully(address(staking), "indexValidatorSet");
         require(staking.activeValidatorCount() == 2, "idempotent");
 
         staking.forgetOperatorField(VALIDATOR_A);
         require(staking.operatorOf(VALIDATOR_A) == VALIDATOR_A, "a record without an operator field is operated by its key");
+    }
+
+    // Helium's governance held no stakes after the upgrade, so the first weight published
+    // would have been the only weight in the set: one weighted validator among unweighted
+    // peers is the first-round proposer and a one-validator quorum, and anyone can trigger a
+    // validator's publication with a wei of stake. A seat the index does not hold is never
+    // published on its own; indexing reads the set from governance and publishes it whole.
+    function it_publishes_a_set_that_predates_the_index_whole_or_not_at_all() public {
+        _bondBoth();
+        staking.forgetSetIndex();
+
+        MercataGovernance fresh = new MercataGovernance(address(this));
+        fresh.setStakingContract(address(this));
+        fresh.addValidatorFromStaking(VALIDATOR_A, 0);
+        fresh.addValidatorFromStaking(VALIDATOR_B, 0);
+        fresh.setStakingContract(address(staking));
+        staking.setGovernance(address(fresh), true);
+        require(fresh.validatorStake(VALIDATOR_A) == 0 && fresh.validatorStake(VALIDATOR_B) == 0, "nothing published while unindexed");
+
+        _stake(user1, VALIDATOR_A, 1);
+        user2.doSuccessfully(address(staking), "syncValidator", VALIDATOR_B);
+        require(fresh.validatorStake(VALIDATOR_A) == 0 && fresh.validatorStake(VALIDATOR_B) == 0, "a lone seat is not published");
+
+        fresh.setStakingContract(address(this));
+        fresh.addValidatorFromStaking(address(0xdead), 0);
+        fresh.setStakingContract(address(staking));
+        user2.doExpectingFailure(address(staking), "indexValidatorSet", "SS: validator not seated here");
+        fresh.setStakingContract(address(this));
+        require(fresh.removeValidatorFromStaking(address(0xdead)), "test setup: stranger removed");
+        fresh.setStakingContract(address(staking));
+
+        user2.doSuccessfully(address(staking), "indexValidatorSet");
+        require(staking.activeValidatorCount() == 2, "the set governance lists is indexed");
+        require(fresh.validatorStake(VALIDATOR_A) == 1000e18 + 1 && fresh.validatorStake(VALIDATOR_B) == 2000e18, "the whole set is published in one transaction");
     }
 
     // ---- operators ---------------------------------------------------------------------
@@ -1239,39 +1269,30 @@ contract Describe_StratoStaking {
         require(staking.allocatedRewardLiability() == 0, "all paid out");
     }
 
-    // An upgraded proxy's set was backfilled into the index without one of its members. The
-    // schedule follows the index: the member left out neither counts in S nor is credited, so
-    // what is released is exactly what the indexed set can claim; indexing it later pays it
-    // from the next accrual on, not for the time it was missing.
+    // A pre-index set earns no emissions; the backfill indexes and syncs all members in
+    // one transaction, and both begin earning from the next accrual on.
     function it_pays_the_schedule_only_to_the_indexed_set() public {
         _selfBond(operatorA, VALIDATOR_A, 3000e18);
         _selfBond(operatorB, VALIDATOR_B, 1000e18);
         _activate(VALIDATOR_A);
         _activate(VALIDATOR_B);
         staking.forgetSetIndex();
-        user2.doSuccessfully(address(staking), "indexValidatorSet", _list(VALIDATOR_B));
-        require(staking.isValidator(VALIDATOR_A) && staking.activeValidatorIndex(VALIDATOR_A) == 0, "A seated, not indexed");
-        require(staking.eligibleStake() == 1000e18, "only the indexed validator counts");
+        require(staking.activeValidatorCount() == 0 && staking.eligibleStake() == 0, "unindexed set earns nothing");
         _fundReserve(10000e18);
         staking.setEmissionSchedule(1000e18, 1000e18, 10000e18, 0);
 
-        // Year one on B's 1000 alone: 1000 released, all of it B's; nothing for A.
         fastForward(YEAR, 1);
         staking.processBlock();
-        require(staking.totalEmitted() == 1000e18, "year one released on the indexed stake");
-        require(_claimOperator(operatorB, VALIDATOR_B) == 1000e18, "B claims the whole release");
-        operatorA.doExpectingFailure(address(staking), "claimOperatorRewards(address)", "SS: no rewards", VALIDATOR_A);
-        require(staking.allocatedRewardLiability() == 0, "nothing allocated beyond the release");
+        require(staking.totalEmitted() == 0, "no release before indexing");
 
-        // A is indexed: it earns from here on. Year two at S = 4000: 1000 * sqrt(4000 / 1000)
-        // * 9000 / 10000 = 1800, of which A takes three quarters.
-        user2.doSuccessfully(address(staking), "indexValidatorSet", _list(VALIDATOR_A));
-        require(staking.activeValidatorCount() == 2 && staking.eligibleStake() == 4000e18, "A counts from here");
+        user2.doSuccessfully(address(staking), "indexValidatorSet");
+        require(staking.activeValidatorCount() == 2 && staking.eligibleStake() == 4000e18, "both count from here");
+        // Year two at S = 4000: 1000 * sqrt(4000 / 1000) = 2000, split 3:1.
         fastForward(YEAR, 1);
         staking.processBlock();
-        require(staking.totalEmitted() == 2800e18, "year two released on both");
-        require(_claimOperator(operatorA, VALIDATOR_A) == 1350e18, "A: its share of year two, nothing of year one");
-        require(_claimOperator(operatorB, VALIDATOR_B) == 450e18, "B: its quarter of year two");
+        require(staking.totalEmitted() == 2000e18, "year two released on both");
+        require(_claimOperator(operatorA, VALIDATOR_A) == 1500e18, "A's three quarters");
+        require(_claimOperator(operatorB, VALIDATOR_B) == 500e18, "B's quarter");
         require(staking.allocatedRewardLiability() == 0, "all paid out");
     }
 

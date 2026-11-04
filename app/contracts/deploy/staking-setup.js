@@ -98,9 +98,10 @@ const STEPS = {
     ] };
   },
   // Permissionless, so a direct call rather than a vote: indexes the consensus set that
-  // predates StratoStaking.activeValidators. Idempotent.
+  // predates StratoStaking.activeValidators, as governance lists it, and attempts to
+  // sync every member's weight in the same transaction. Idempotent.
   index:     { direct: true, target: STAKING, name: 'StratoStaking', func: 'indexValidatorSet',
-               args: { validators: VALIDATORS } },
+               args: {} },
   // Permissionless, so a direct call rather than a vote: lowers a reserve the retired schedule
   // left under the same name to what the contract holds beyond principal and owed rewards.
   // Idempotent; moves nothing.
