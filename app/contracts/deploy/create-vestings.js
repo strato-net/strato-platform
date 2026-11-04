@@ -3,12 +3,17 @@
 // done elsewhere (a management app later; funding is a Token.mint vote today).
 //
 //   node create-vestings.js plan   <schedule.json>   # every addVestings transaction the file implies (no network)
-//   node create-vestings.js create <schedule.json>   # submit them, one AdminRegistry vote per category, skipping done ones
+//   node create-vestings.js create <schedule.json>   # vote every pending batch, then wait until each executes
 //   node create-vestings.js status <schedule.json>   # which entries exist on-chain, and how many tokens to send the pool
 //   node create-vestings.js verify <schedule.json>   # exit 0 only if every entry is scheduled
 //
 // Env: NODE_URL, OAUTH_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, GLOBAL_ADMIN_NAME,
 // GLOBAL_ADMIN_PASSWORD (+ OAUTH_TOTP). The schedule file carries the addresses.
+// VOTE_WAIT_MINUTES (default 60): how long `create` waits for the other admins.
+//
+// Admin flow: admin 1 runs `create`, which casts one vote per batch (an AdminRegistry
+// issue each) and prints the issue ids; admin 2 confirms them in the admin UI; the
+// script polls the pool's vestings table and reports each batch as it executes.
 //
 // schedule.json:
 // {
@@ -34,6 +39,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const axios = require('axios');
 const { rest, util } = require('blockapps-rest');
+const { getIssueId } = require('./util');
 
 const ADDRESS_RE = /^[0-9a-fA-F]{40}$/;
 const MAX_UINT128 = (1n << 128n) - 1n;
@@ -149,8 +155,17 @@ async function login() {
 }
 
 async function cirrus(tokenObj, table, params) {
-  const { data } = await axios.get(`${config.nodes[0].url}/cirrus/search/${table}`, { headers: { Authorization: `Bearer ${tokenObj.token}` }, params });
-  return Array.isArray(data) ? data : [];
+  try {
+    const { data } = await axios.get(`${config.nodes[0].url}/cirrus/search/${table}`, { headers: { Authorization: `Bearer ${tokenObj.token}` }, params });
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    if (e.response && e.response.status === 401) { // access token expired during a long wait
+      tokenObj.token = (await login()).tokenObj.token;
+      const { data } = await axios.get(`${config.nodes[0].url}/cirrus/search/${table}`, { headers: { Authorization: `Bearer ${tokenObj.token}` }, params });
+      return Array.isArray(data) ? data : [];
+    }
+    throw e;
+  }
 }
 
 // On-chain vestings of the pool, from the record table of the `vestings` struct mapping:
@@ -216,7 +231,33 @@ async function callAndWait(tokenObj, callArgs) {
     (opts) => rest.getBlocResults(tokenObj, hashes, opts),
     { config, isAsync: true }, 300000);
   const final = Array.isArray(results) ? results[0] : results;
-  return { status: final && final.status, msg: (final && final.txResult && final.txResult.message) || '', hash: hashes[0] };
+  return { status: final && final.status, msg: (final && final.txResult && final.txResult.message) || '', hash: hashes[0], issueId: getIssueId(final) };
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Wait until every submitted batch has all its entries on-chain. The vote that reaches
+// quorum executes the batch; until then the issue sits in the AdminRegistry for the
+// other admins. Returns the batches still pending at the deadline.
+async function waitForExecution(tokenObj, s, submitted) {
+  const deadline = Date.now() + Number(process.env.VOTE_WAIT_MINUTES || 60) * 60000;
+  let pending = submitted.slice();
+  let tick = 0;
+  while (pending.length && Date.now() < deadline) {
+    const onchain = await onChainVestings(tokenObj, s);
+    const still = [];
+    for (const x of pending) {
+      const done = x.b.accounts.every((_, j) => matchEntry(onchain, x.c, x.b.from + j));
+      if (done) console.log(`  EXECUTED ${x.label}: ${x.b.accounts.length} entries on-chain`);
+      else still.push(x);
+    }
+    pending = still;
+    if (!pending.length) break;
+    if (tick % 4 === 0) console.log(`  waiting for ${pending.length} issue(s) to be confirmed by another admin: ${pending.map((x) => `${x.label}=${x.issueId || '?'}`).join(', ')}  [${new Date().toISOString()}]`);
+    tick++;
+    await sleep(15000);
+  }
+  return pending;
 }
 
 (async () => {
@@ -248,6 +289,7 @@ async function callAndWait(tokenObj, callArgs) {
     if (needed === 0n) { console.log('every entry is already scheduled; nothing to do.'); return; }
     const shortfall = printFunding(s, await poolFunding(tokenObj, s), needed);
     if (shortfall > 0n) { console.error('not submitting: the executing vote would revert with "Not enough tokens available". Fund the pool first.'); process.exit(1); }
+    const submitted = [];
     for (const { c, batches } of report) {
       for (const { b, done } of batches) {
         const label = batchLabel(c, b);
@@ -255,10 +297,20 @@ async function callAndWait(tokenObj, callArgs) {
         if (done > 0) { console.error(`${label}: ${done}/${b.accounts.length} entries already exist; re-submitting would collide on their ids ("Vesting id already used"). Fix the file (or the batch boundaries) first.`); process.exit(1); }
         console.log(`${label}: ${user} voting ${s.manager}.addVestings for ${b.accounts.length} entries, ${fmtTokens(b.total, s.decimals)} tokens, args sha256 ${argsHash(c, b)}`);
         const r = await callAndWait(tokenObj, { contract: { name: 'VestingPoolManager', address: s.manager }, method: 'addVestings', args: argsFor(c, b), txParams: { gasPrice: config.gasPrice, gasLimit: 8000000 } });
-        console.log(`  result: ${r.status}${r.msg ? ' | ' + r.msg.slice(0, 200) : ''} (tx ${r.hash})`);
+        console.log(`  vote tx ${r.status}${r.msg ? ' | ' + r.msg.slice(0, 120) : ''} (${r.hash})${r.issueId ? `  issue ${r.issueId}` : ''}`);
+        submitted.push({ c, b, label, issueId: r.issueId, hash: r.hash });
       }
     }
-    console.log('Run `status` to see what executed; a vote below quorum needs another admin to run `create` with the same file.');
+    if (!submitted.length) return;
+    console.log(`\n${submitted.length} vote(s) cast. If the registry needs more votes, confirm these issues in the admin UI:`);
+    for (const x of submitted) console.log(`  ${x.label}: issue ${x.issueId || '(id not in receipt; look for addVestings on ' + s.manager + ')'}`);
+    console.log(`Waiting up to ${process.env.VOTE_WAIT_MINUTES || 60} minutes for execution (Ctrl-C is safe: re-running \`create\` skips executed batches and re-casts only pending ones)...`);
+    const pending = await waitForExecution(tokenObj, s, submitted);
+    if (pending.length) {
+      console.error(`\nTIMEOUT: ${pending.length} batch(es) not executed yet: ${pending.map((x) => x.label).join(', ')}. Re-run \`create\` or \`status\` later.`);
+      process.exit(1);
+    }
+    console.log('\nAll submitted batches executed. Run `verify` for the full picture.');
     return;
   }
   console.error(`unknown command ${cmd}`); process.exit(2);
