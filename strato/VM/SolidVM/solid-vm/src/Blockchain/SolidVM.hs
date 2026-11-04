@@ -269,7 +269,7 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
     create' sender' newAddress hsh cc (textToLabel contractName) argVals
 
 create' :: MonadSM m => Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ExecResults
-create' creator newAddress ch cc contractName' valList = do
+create' creator newAddress ch cc contractName' valList = withContractConstruction newAddress $ \deferPublication -> do
 
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
@@ -281,7 +281,9 @@ create' creator newAddress ch cc contractName' valList = do
     pure
       newAddressState
         { addressStateContractRoot = MP.emptyTriePtr,
-          addressStateCodeHash = SolidVMCode (labelToString contractName') ch
+          addressStateCodeHash = if deferPublication
+            then addressStateCodeHash blankAddressState
+            else SolidVMCode (labelToString contractName') ch
         }
 
   -- get the gasLeft from the environment
@@ -304,6 +306,12 @@ create' creator newAddress ch cc contractName' valList = do
 
   -- Run the constructor
   runTheConstructors creator newAddress ch cc contractName' resolvedValList
+
+  when deferPublication $
+    A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \addressState ->
+      pure $ if addressStateCodeHash addressState == addressStateCodeHash blankAddressState
+        then addressState {addressStateCodeHash = SolidVMCode (labelToString contractName') ch}
+        else addressState
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ labelToString contractName'
 
@@ -1589,7 +1597,7 @@ expToVar' (CC.FunctionCall _ e args) = do
           val1 <- getVar var1
           case (val1, name) of
             (SAddress addr _, "derive") -> do
-              (_, hsh, _) <- getCodeAndCollection addr
+              hsh <- getCodeHashForDerivation addr
               let (salt, args'') = case argVals of
                     (SString s:SString n:vs) -> (s,) . (SString n:) $ case reverse vs of
                       SVariadic v : rest -> reverse rest ++ v

@@ -24,6 +24,8 @@ module Blockchain.Forks
     isReplayProtectionForkActive,
     replayProtectionForkBlock,
     isStratoGasForkActive,
+    constructorPublicationForkBlock,
+    isConstructorPublicationForkActive,
     forkNotScheduled
   )
 where
@@ -152,6 +154,18 @@ replayProtectionForkBlock net
 isReplayProtectionForkActive :: Integer -> Bool
 isReplayProtectionForkActive blockNum =
   blockNum >= replayProtectionForkBlock (Conf.networkID $ networkConfig ethConf)
+
+-- | Publish SolidVM runtime code only after construction succeeds.
+constructorPublicationForkBlock :: Integer -> Integer
+constructorPublicationForkBlock net
+  | net == heliumNetworkID = 76752
+  | net == upquarkNetworkID = 65607
+  | net == forktestNetworkID = forktestForkBlock
+  | otherwise = 0
+
+isConstructorPublicationForkActive :: Integer -> Bool
+isConstructorPublicationForkActive blockNum =
+  blockNum >= constructorPublicationForkBlock (Conf.networkID $ networkConfig ethConf)
 
 -- | STRATO is the native currency from this block, and a native-value
 -- transfer must arrive in a type-2 envelope (see envelopeRejection in

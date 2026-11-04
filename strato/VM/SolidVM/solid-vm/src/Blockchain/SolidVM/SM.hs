@@ -35,6 +35,8 @@ module Blockchain.SolidVM.SM
     getCurrentAddress,
     getCurrentCodeAddress,
     withCallInfo,
+    withContractConstruction,
+    getCodeHashForDerivation,
     withStaticCallInfo,
     withUncheckedCallInfo,
     withLocalVars,
@@ -85,7 +87,7 @@ import Blockchain.EthConf (ethConf)
 import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
-import Blockchain.Forks (isOperatorPrecedenceForkActive)
+import Blockchain.Forks (isOperatorPrecedenceForkActive, isConstructorPublicationForkActive)
 import Blockchain.SolidVM.Exception
 import Blockchain.Data.VmTrace
 import Blockchain.SolidVM.GasInfo
@@ -111,7 +113,7 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import qualified Data.ByteString.Char8 as BC
 import Data.Either (isLeft)
-import Data.Foldable (for_)
+import Data.Foldable (for_, find)
 import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
 import qualified Data.Map.Ordered as OMap
@@ -178,6 +180,7 @@ BlockData
 data SState = SState
   { env :: Env.Environment,
     callStack :: [CallInfo],
+    constructingContracts :: !(S.Set Address),
     _action :: !Action,
     _gasInfo :: GasInfo,
     ssDebugSettingsValue :: Maybe DebugSettings,
@@ -462,7 +465,10 @@ variableSet = do
         (ci : _) -> textSet . NE.head $ localVariables ci
       locals = M.singleton "Local Variables" varNames
   acct <- getCurrentAddress
-  ~(contract, _, _) <- getCodeAndCollection acct
+  constructing <- gets constructingContracts
+  contract <- if S.member acct constructing
+    then getCurrentContract
+    else (\(c, _, _) -> c) <$> getCodeAndCollection acct
   let stateVars = S.fromList $ M.keys $ contract ^. CC.storageDefs
       globals = M.singleton "State Variables" stateVars
   pure . VariableSet $ fmap (S.map labelToText) $ locals <> globals
@@ -491,6 +497,7 @@ runSM maybeCode envBefore gi f = do
         SState
           { env = envBefore,
             callStack = [],
+            constructingContracts = S.empty,
             _action = startingAction envBefore,
             _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap}, -- capping the transaction gas limit
             ssDebugSettingsValue = initialDebugSettings,
@@ -889,6 +896,33 @@ popLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   (curFrame : rest) -> case localVariables curFrame of
     _ NE.:| v:vs -> pure $ curFrame{localVariables = v NE.:| vs} : rest
     _ -> internalError "popLocalVars was called with an empty stack" ()
+
+withContractConstruction :: MonadSM m => Address -> (Bool -> m a) -> m a
+withContractConstruction address f = do
+  blockNum <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
+  if not (isConstructorPublicationForkActive blockNum)
+    then f False
+    else do
+      accounts <- SM accessEnv
+      accountsBefore <- snapshotAccountDBEnv accounts
+      bracket get
+        (\previous -> modify $ \ss -> ss {constructingContracts = constructingContracts previous}) $ \previous -> do
+          modify $ \ss -> ss {constructingContracts = S.insert address (constructingContracts ss)}
+          f True `onException` do
+            restoreAccountDBEnv accounts accountsBefore
+            modify (\ss -> ss
+              { env = env previous,
+                callStack = callStack previous,
+                _action = _action previous
+              })
+
+getCodeHashForDerivation :: MonadSM m => Address -> m Keccak256
+getCodeHashForDerivation address = do
+  constructing <- gets constructingContracts
+  frames <- gets callStack
+  case find ((== address) . currentCodeAddress) frames of
+    Just ci | S.member address constructing -> pure $ collectionHash ci
+    _ -> (\(_, hsh, _) -> hsh) <$> getCodeAndCollection address
 
 withStaticCallInfo :: MonadSM m => m a -> m a
 withStaticCallInfo f = do

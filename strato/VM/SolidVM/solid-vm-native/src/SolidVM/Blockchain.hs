@@ -195,7 +195,7 @@ createContractValues contractName' mSalt getArgs = do
   pure $ fromMaybe (internalError "a call to create did not create an address" execResults) $ erNewContractAddress execResults
 
 create' :: Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> SM ExecResults
-create' creator newAddress ch cc contractName' valList = do
+create' creator newAddress ch cc contractName' valList = withContractConstruction newAddress $ \deferPublication -> do
 
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
@@ -207,7 +207,9 @@ create' creator newAddress ch cc contractName' valList = do
     pure
       newAddressState
         { addressStateContractRoot = MP.emptyTriePtr,
-          addressStateCodeHash = SolidVMCode (labelToString contractName') ch
+          addressStateCodeHash = if deferPublication
+            then addressStateCodeHash blankAddressState
+            else SolidVMCode (labelToString contractName') ch
         }
 
   -- get the gasLeft from the environment
@@ -230,6 +232,12 @@ create' creator newAddress ch cc contractName' valList = do
 
   -- Run the constructor
   runTheConstructors creator newAddress ch cc contractName' resolvedValList
+
+  when deferPublication $
+    A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \addressState ->
+      pure $ if addressStateCodeHash addressState == addressStateCodeHash blankAddressState
+        then addressState {addressStateCodeHash = SolidVMCode (labelToString contractName') ch}
+        else addressState
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ labelToString contractName'
 
@@ -730,5 +738,5 @@ selfdestruct target = do
 
 derive :: Address -> T.Text -> T.Text -> ValList -> SM Address
 derive address salt name args = do
-  (_, hsh, _) <- getCodeAndCollection address
+  hsh <- getCodeHashForDerivation address
   pure $ getNewAddressWithSalt_unsafe address (T.unpack salt) (keccak256ToByteString hsh) (SString (T.unpack name) : args)

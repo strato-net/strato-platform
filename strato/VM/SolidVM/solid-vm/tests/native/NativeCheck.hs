@@ -9,6 +9,8 @@ import BlockApps.Logging (runLogging)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.SolidVM.Simple hiding (name)
 import Blockchain.VMContext (runMemContextM, GasCap (..), ContextState)
+import Blockchain.EthConf (ethConf, networkConfig, networkID)
+import Blockchain.Forks (constructorPublicationForkBlock)
 import qualified Control.Monad.Change.Modify as Mod
 import Blockchain.VMOptions ()
 import Blockchain.Strato.Model.Options ()
@@ -188,14 +190,35 @@ source = T.unlines
   , "  event Created(uint value, address creator);"
   , "  constructor(uint number, address account) NativeCreatedBase(number + 1) { value = number; owner = account; emit Created(number, msg.sender); }"
   , "}"
-  , "contract NativeFailingCreated { uint public value; constructor() { value = 99; require(false, \"constructor failed\"); } }"
+  , "contract NativeFailingCreated { uint public value; event FailedConstruction(); constructor() { value = 99; emit FailedConstruction(); require(false, \"constructor failed\"); } }"
+  , "contract NativeGuardedCreated { uint public value; bool public blocked; constructor() { value = 7; try { this.call(\"touch\"); } catch { blocked = true; } } function touch() public { value = 99; } }"
+  , "contract NativeConstructionCalls { function attempt(address target, uint mode) public returns (bool) { try { if (mode == 0) target.call(\"touch\"); if (mode == 1) NativeConstructionRoutes(target).touch(); if (mode == 2) target.delegatecall(\"touch\"); if (mode == 3) NativeConstructionRoutes(target).value(); if (mode == 4) target.call(\"missing\"); } catch { return true; } return false; } }"
+  , "contract NativeConstructionRoutes is NativeConstructionCalls { uint public value = 7; bool public blocked; constructor(address helper, uint mode) { if (helper == address(0)) blocked = attempt(address(this), mode); else blocked = NativeConstructionCalls(helper).attempt(address(this), mode); } function touch() public { value = 99; } fallback() external { value = 99; } }"
+  , "contract NativeConstructionBase is NativeConstructionCalls { bool public blocked; constructor() { blocked = attempt(address(this), 0); } function touch() public {} }"
+  , "contract NativeConstructionDerived is NativeConstructionBase { uint public value; constructor() { value = 11; } }"
+  , "contract NativeConstructionChild { bool public blocked; constructor(address parent) { try { parent.call(\"touch\"); } catch { blocked = true; } } }"
+  , "contract NativeConstructionParent { bool public blocked; constructor() { NativeConstructionChild child = new NativeConstructionChild(address(this)); blocked = child.blocked(); } function touch() public {} }"
+  , "contract NativeConstructionVictim { uint public value = 17; function destroy() public { selfdestruct(payable(address(0xdeadbeef))); } }"
+  , "contract NativeFailingDestroyer { constructor(address victim) { NativeConstructionVictim(victim).destroy(); revert(\"constructor failed\"); } }"
+  , "contract NativeCollisionFactory { bool public entered; function deploy() public returns (NativeCollision) { return new NativeCollision{salt: \"reserved\"}(address(this)); } function duplicate() public { if (!entered) { entered = true; new NativeCollision{salt: \"reserved\"}(address(this)); } } }"
+  , "contract NativeCollision { bool public blocked; constructor(address factory) { try { NativeCollisionFactory(factory).duplicate(); } catch { blocked = true; } } }"
   , "contract NativeCreationProbe {"
+  , "  NativeConstructionVictim public victim; function prepareVictim() public { victim = new NativeConstructionVictim(); }"
   , "  function deploy(uint number) public returns (bool) { NativeCreated child = new NativeCreated(number, msg.sender); return child.value() == number && child.seed() == number + 1 && child.owner() == msg.sender; }"
   , "  function childArg() internal returns (uint) { NativeCreated child = new NativeCreated(23, msg.sender); return child.value() + 1; }"
   , "  function nestedDeployment() public returns (bool) { NativeCreated child = new NativeCreated(childArg(), msg.sender); return child.value() == 24; }"
   , "  function failureThenDeploy() public returns (bool) { try { new NativeFailingCreated(); } catch { NativeCreated child = new NativeCreated(37, msg.sender); return child.value() == 37; } return false; }"
   , "  function saltedDeployment() public returns (bool) { address expected = this.derive(\"native-salt\", \"NativeCreated\", 19, msg.sender); NativeCreated child = new NativeCreated{salt: \"native-salt\"}(19, msg.sender); return address(child) == expected && child.value() == 19; }"
   , "  function nestedSaltedDeployment() public returns (bool) { NativeCreated child = new NativeCreated{salt: string(childArg())}(childArg(), msg.sender); return child.value() == 24; }"
+  , "  function constructorGuard() public returns (bool) { NativeGuardedCreated child = new NativeGuardedCreated(); bool guarded = child.blocked() && child.value() == 7; child.touch(); return guarded && child.value() == 99; }"
+  , "  function saltedConstructorGuard() public returns (bool) { NativeGuardedCreated child = new NativeGuardedCreated{salt: \"guarded\"}(); return child.blocked(); }"
+  , "  function rawConstructorGuard(bool salted) public returns (bool) { string source = \"contract RawGuard { bool public blocked; constructor() { try { address(this).call(\\\"touch\\\"); } catch { blocked = true; } } function touch() public {} }\"; address child; if (salted) child = create2(\"raw-guard\", \"RawGuard\", source); else child = create(\"RawGuard\", source); return child.call(\"blocked\"); }"
+  , "  function constructorRoute(uint mode, bool indirect) public returns (bool) { address helper = address(0); if (indirect) helper = address(new NativeConstructionCalls()); NativeConstructionRoutes child = new NativeConstructionRoutes(helper, mode); bool blocked = child.blocked(); child.touch(); require(child.value() == 99, \"runtime not published\"); return blocked; }"
+  , "  function baseConstructorGuard() public returns (bool) { NativeConstructionDerived child = new NativeConstructionDerived(); require(child.value() == 11, \"derived constructor incomplete\"); child.touch(); return child.blocked(); }"
+  , "  function nestedConstructorGuard() public returns (bool) { NativeConstructionParent child = new NativeConstructionParent(); child.touch(); return child.blocked(); }"
+  , "  function failedConstructorUnpublished() public returns (bool) { address expected = this.derive(\"failed-constructor\", \"NativeFailingCreated\"); try { new NativeFailingCreated{salt: \"failed-constructor\"}(); } catch {} try { expected.call(\"value\"); } catch { return true; } return false; }"
+  , "  function failedDestructionRollback() public returns (bool) { try { new NativeFailingDestroyer(address(victim)); } catch {} return victim.value() == 17; }"
+  , "  function constructorReservation() public returns (bool) { NativeCollisionFactory factory = new NativeCollisionFactory(); NativeCollision child = factory.deploy(); return child.blocked(); }"
   , "}"
   , "contract NativeFeatures {"
   , " decimal public ratio; mapping(uint => Pair) public pairs;"
@@ -332,6 +355,52 @@ main = do
       expect addr "failureThenDeploy" [] (SBool True)
       expect addr "saltedDeployment" [] (SBool True)
       expect addr "nestedSaltedDeployment" [] (SBool True)
+    let publicationFork = constructorPublicationForkBlock (networkID $ networkConfig ethConf)
+    forM_ (filter ((>= 0) . fst) [(publicationFork - 1, False), (publicationFork, True), (publicationFork + 1, True)]) $ \(height, active) -> do
+      let address = 0x2f00 + fromInteger (height - publicationFork + 1)
+          atHeight header = header {BlockHeader.number = height}
+          expectConstruction name args expected = do
+            result <- call $ def & callCodeAddress .~ address & callFuncName .~ name & callArgs . argsArgs .~ args
+              & callArgs . argsBlockData %~ atHeight
+            liftIO $ check result
+            when (name == "failedConstructorUnpublished") $
+              unless (length (erEvents result) == (if active then 0 else 1)) $
+                liftIO $ throwIO $ userError "constructor event rollback does not match fork height"
+            observe name (Just $ SBool expected) result
+      deployment <- create $ def & createNewAddress .~ address & createContractName .~ "NativeCreationProbe" & createCode .~ Code source
+        & createArgs . argsBlockData %~ atHeight
+      liftIO $ check deployment
+      expectConstruction "deploy" ["19"] True
+      expectConstruction "nestedDeployment" [] True
+      expectConstruction "saltedDeployment" [] True
+      expectConstruction "constructorGuard" [] active
+      expectConstruction "saltedConstructorGuard" [] active
+      forM_ ["false", "true"] $ \indirect -> do
+        expectConstruction "rawConstructorGuard" [indirect] active
+        forM_ [0 .. 4 :: Int] $ \mode ->
+          expectConstruction "constructorRoute" [T.pack $ show mode, indirect] active
+      expectConstruction "baseConstructorGuard" [] active
+      expectConstruction "nestedConstructorGuard" [] active
+      expectConstruction "constructorReservation" [] True
+      expectConstruction "failedConstructorUnpublished" [] active
+      prepared <- call $ def & callCodeAddress .~ address & callFuncName .~ "prepareVictim" & callArgs . argsBlockData %~ atHeight
+      liftIO $ check prepared
+      expectConstruction "failedDestructionRollback" [] active
+      let directAddress = address + 0x100
+      direct <- create $ def & createNewAddress .~ directAddress & createContractName .~ "NativeGuardedCreated" & createCode .~ Code source
+        & createArgs . argsBlockData %~ atHeight
+      liftIO $ check direct
+      forM_ [("blocked", Just $ SBool active), ("value", Just $ SInteger $ if active then 7 else 99), ("touch", Nothing), ("value", Just $ SInteger 99)] $ \(name, expected) -> do
+        result <- call $ def & callCodeAddress .~ directAddress & callFuncName .~ name
+          & callArgs . argsBlockData %~ atHeight
+        liftIO $ check result
+        observe ("directConstructor/" <> name) expected result
+    when (publicationFork > 0) $ do
+      forM_ [("constructorGuard", []), ("saltedConstructorGuard", []), ("rawConstructorGuard", ["false"]), ("rawConstructorGuard", ["true"])] $ \(name, args) -> do
+        result <- call $ def & callCodeAddress .~ 0x2600 & callFuncName .~ name & callArgs . argsArgs .~ args
+          & callArgs . argsBlockData %~ (\header -> header {BlockHeader.number = publicationFork})
+        liftIO $ check result
+        observe ("legacyFactory/" <> name) (Just $ SBool True) result
     mutation <- create $ def & createNewAddress .~ 0x2700 & createContractName .~ "NativeConstructorMutation" & createCode .~ Code source & createArgs . argsArgs .~ ["7"]
     liftIO $ check mutation
     expect 0x2700 "seed" [] (SInteger 7)
