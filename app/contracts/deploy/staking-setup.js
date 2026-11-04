@@ -6,6 +6,7 @@
 //   node staking-setup.js emission <e0Wei> <s0Wei> <r0Wei> <startUnix>   emission schedule
 //   node staking-setup.js fundreserve <amountWei>           (direct) fund the emission reserve
 //   node staking-setup.js index                            (direct) index helium's existing set
+//   node staking-setup.js bootstrapstakes                  (direct) publish the full set after the staking fork
 //   node staking-setup.js reconcile                        (direct) lower an unbacked reserve after the swap
 //   node staking-setup.js settle                           (direct) settle the set before a downgrade
 // Addresses default to helium; set STAKING_PROXY, VALIDATOR_REGISTRY_PROXY and STRATO_TOKEN
@@ -101,6 +102,10 @@ const STEPS = {
   // predates StratoStaking.activeValidators. Idempotent.
   index:     { direct: true, target: STAKING, name: 'StratoStaking', func: 'indexValidatorSet',
                args: { validators: VALIDATORS } },
+  // After the staking fork, publish every governance weight in one transaction.
+  // Pre-fork calls cannot populate V2 headers; retry after activation if needed.
+  bootstrapstakes: { direct: true, target: GOVERNANCE, name: 'MercataGovernance',
+                     func: 'publishValidatorStakeSnapshot', args: {} },
   // Permissionless, so a direct call rather than a vote: lowers a reserve the retired schedule
   // left under the same name to what the contract holds beyond principal and owed rewards.
   // Idempotent; moves nothing.
