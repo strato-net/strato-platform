@@ -72,7 +72,6 @@ type StakingValidator = ValidatorLifecycle & {
   // V2 only: readiness evidence from the validator key, an announced handover, and the part of
   // the caller's stake still waiting its week before it earns.
   isReady?: boolean;
-  readyForAdmission?: boolean;
   operatorChangeReadyTime?: string;
   userWaitingStake?: string;
   userStakeQualifiesAt?: string;
@@ -123,7 +122,7 @@ type StakingInfo = {
   // the committed emission schedule. "v1" = operator-keyed contract with a funded reward schedule.
   // Absent on older backends.
   contractVersion?: "v1" | "v2";
-  // V2 commitment: the week every notice, qualification and trial runs for, and the schedule.
+  // V2 commitment: the week every notice and qualification runs for, and the schedule.
   noticeSeconds?: string;
   rewardReserve: string;
   eligibleStake?: string;
@@ -508,10 +507,10 @@ const OperatorPanel = ({
                 ) : <span>not set</span>}
                 <span>· {validator.blocksProposed} blocks proposed · {validator.missedProposals} missed</span>
                 {inSet || !active ? null : <span>· needs {formatToken(minStake, decimals, 0)} {symbol} {activationStake} to activate</span>}
-                {isV2 && active && !inSet && !validator.readyForAdmission && (
-                  <span>· {validator.isReady ? "readiness trial running" : "no fresh readiness evidence"}: the node must acknowledge readiness from its key daily for a week</span>
+                {isV2 && active && !inSet && !validator.isReady && (
+                  <span>· no fresh readiness evidence: the node must send an acknowledgement from its key (good for a day)</span>
                 )}
-                {isV2 && inSet && !validator.isReady && <span>· no readiness evidence in the last day</span>}
+                {isV2 && inSet && !validator.isReady && <span>· no block produced in the last 500 blocks and no acknowledgement in the last day</span>}
                 {isV2 && validator.pendingOperator && !pendingForMe && (
                   <span>· handover to {truncateAddress(validator.pendingOperator, 8, 6)} announced</span>
                 )}

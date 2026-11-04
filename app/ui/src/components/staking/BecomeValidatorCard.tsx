@@ -315,7 +315,7 @@ const BecomeValidatorCard = ({
             <h2 className="text-lg font-semibold">{title}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Run a STRATO node and this account becomes its operator. You will need {minStake} {symbol} of your own to
-              self-bond, and the node must acknowledge readiness daily for a week before it can join.
+              self-bond, and the node must send a readiness acknowledgement from its key before it can join.
             </p>
           </div>
           <Button size="sm" onClick={() => setPhase("guide")}>

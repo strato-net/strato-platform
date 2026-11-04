@@ -4,8 +4,8 @@ Deploys the `StratoStaking` logic from this branch behind the Upquark staking pr
 (`f30a022c…3988`), the `ValidatorRegistry` logic behind its proxy, and configures:
 
 1. **Permissionless admission** — from an agreed block, anyone may seat a validator that holds
-   at least 10,000 STRATO of its operator's own self-bond and has passed the readiness trial
-   (acknowledgements from its validator key every day for a week), into a free seat or by
+   at least 10,000 STRATO of its operator's own self-bond and whose validator key has sent a
+   readiness acknowledgement within the last day, into a free seat or by
    replacing the lowest validator it beats by 5%. Nobody, the owner included, seats anyone
    before that block. Seats held since before this logic keep the rule they were admitted under
    (self-bond plus delegations) until they leave or change operator; nothing expires that.
@@ -40,7 +40,8 @@ export STRATO_TOKEN=2ca3e170e6714282da77815f7864b17f612f5f83
 | Admission opens at block | an agreed height after the consensus fixes (#7649, #7650) are live and the full stake vector is published | `JOINS_FROM = ______` |
 | Incumbent cutoff | every validator seated at the logic swap keeps its exemption; the seated set at that block is the incumbent list | record `activeValidators` at the swap |
 | Self-bond minimum | 10,000 STRATO of the operator's own, constant in the contract | `MIN_SELF_BOND` (no vote) |
-| Notices, qualification, trial, reentry | seven days, constant | `NOTICE_SECONDS` (no vote) |
+| Notices, qualification, reentry | seven days, constant | `NOTICE_SECONDS` (no vote) |
+| Readiness evidence | a key acknowledgement within a day, or a produced block within 500 blocks | `READINESS_WINDOW_SECONDS`, `READINESS_WINDOW_BLOCKS` (no vote) |
 | Formula | `E = E0 × √(S / S0) × (R / R0)` per finalised block, at most an hour per block | as implemented |
 | Calibration | 500,000 STRATO/year at 5,000,000 STRATO of earning stake with the initial reserve | `E0 = 500000000000000000000000`, `S0 = 5000000000000000000000000` |
 | Initial reserve `R0` | 10,000,000 STRATO proposed; confirm the allocation before funding | `R0 = ______` (wei) |
@@ -140,12 +141,12 @@ swaps are consensus-neutral: no set or weight changes.
    delegations for as long as it holds its seat under the same operator. No deadline, no
    mass bonding. A seat that leaves (exit, replacement, removal, liveness removal) or changes
    operator comes back only with 10,000 STRATO of self-bond.
-2. **Readiness**: tell every operator that the validator key must send
-   `acknowledgeReadiness()` from the node at least daily (a finalised proposal counts as one),
-   and that a candidate's first week of acknowledgements is its admission trial. Seated
-   validators without fresh evidence are "unready": the set can still change, but a change
-   that would lower the ready share below 75% of the set's weight is deferred until evidence
-   arrives.
+2. **Readiness**: tell every operator that a candidate's validator key must send
+   `acknowledgeReadiness()` from the node within the day before it activates, and that a
+   seated validator stays "ready" by producing blocks (a finalised proposal is good for 500
+   blocks; an acknowledgement is the fallback for a day). Seated validators without fresh
+   evidence are "unready": the set can still change, but a change that would lower the ready
+   share below 75% of the set's weight is deferred until evidence arrives.
 3. **Agreed block**: `node staking-setup.js joinsfrom $JOINS_FROM`. Until that block only
    governance's own admin vote changes the set; from it on anyone calls `tryActivate(v)` /
    `reconcileSet([...])` for an eligible, ready validator. Movable by another vote until it
@@ -155,7 +156,7 @@ swaps are consensus-neutral: no set or weight changes.
 
 Verify: `joinsOpenFromBlock == JOINS_FROM`, `/staking/info.joinsOpen` flips to `true` once
 `lastProcessedBlock >= JOINS_FROM` (before it `tryActivate` fails with `SS: joins not open`); a
-registered, self-bonded validator whose key has acknowledged daily for a week reads `isWaiter`
+registered, self-bonded validator whose key has acknowledged within the day reads `isWaiter`
 and activates itself through the staking page; `ValidatorSynced` and governance
 `ValidatorAdded` / `ValidatorStakeUpdated` follow; `readyWeight()` rises as validators
 acknowledge or propose.
@@ -207,8 +208,8 @@ transaction as `unstake` / `unbondSelf`.
 - **Emergency**: `node staking-setup.js emergencyremove <validator> <grounds>` (vote) names one
   validator and its grounds and executes at once, under the same per-block and readiness rules.
 - **Liveness**: `node staking-setup.js removeformisses <validator>` (direct, anyone) once
-  `consecutiveMisses[v] >= 20`; the validator may be seated again a week later after a fresh
-  trial. The staking admin tab offers the same button once the limit is reached.
+  `consecutiveMisses[v] >= 20`; the validator may be seated again a week later on fresh
+  evidence. The staking admin tab offers the same button once the limit is reached.
 - **Handover**: the validator key binds the new operator in the registry (`setOperator` with its
   signature, as today); the new operator completes it a week later with
   `acceptOperator(validator, bond >= 10,000 STRATO)` (staking page "Accept"). Until then the old

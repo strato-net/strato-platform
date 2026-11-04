@@ -19,7 +19,6 @@ type AdminOperator = {
   status: 0 | 1 | 2 | 3;
   isWaiter: boolean;
   isReady?: boolean;
-  readyForAdmission?: boolean;
   jailedUntil: string;
   pendingOperator?: string;
   commissionBps: string;
@@ -47,6 +46,7 @@ type AdminInfo = {
   // v2 commitment constants and the set's readiness (see StratoStakingInfo).
   noticeSeconds?: string;
   readinessWindowSeconds?: string;
+  readinessWindowBlocks?: string;
   readyWeightBps?: string;
   maxCreditedGapSeconds?: string;
   livenessMissLimit?: string;
@@ -205,8 +205,8 @@ const StakingAdminTab = () => {
           </CardHeader>
           <CardContent className="grid gap-2 text-sm md:grid-cols-2">
             <p>Self-bond to join or rejoin: <span className="font-medium">{fromWad(info.minStake)} STRATO</span> of the operator's own</p>
-            <p>Notice (commission raise, handover, removal), stake qualification, readiness trial, reentry: <span className="font-medium">{days(info.noticeSeconds)}</span></p>
-            <p>Readiness evidence is good for <span className="font-medium">{days(info.readinessWindowSeconds)}</span>; a change must leave <span className="font-medium">{(Number(info.readyWeightBps || "0") / 100).toFixed(0)}%</span> of the set's weight ready or not lower the share</p>
+            <p>Notice (commission raise, handover, removal), stake qualification, reentry: <span className="font-medium">{days(info.noticeSeconds)}</span></p>
+            <p>Readiness evidence: a produced block within <span className="font-medium">{info.readinessWindowBlocks} blocks</span> or a key acknowledgement within <span className="font-medium">{days(info.readinessWindowSeconds)}</span>; a change must leave <span className="font-medium">{(Number(info.readyWeightBps || "0") / 100).toFixed(0)}%</span> of the set's weight ready or not lower the share</p>
             <p>Set readiness now: <span className="font-medium">{(readyBps / 100).toFixed(0)}%</span> ({fromWad(info.readyWeight || "0")} of {fromWad(info.consensusWeight || "0")} STRATO)</p>
             <p>A finalised block is paid for at most <span className="font-medium">{Math.round(Number(info.maxCreditedGapSeconds || "0") / 60)} minutes</span> of schedule; the rest of a gap stays in the reserve</p>
             <p>Anyone may remove a validator after <span className="font-medium">{info.livenessMissLimit}</span> consecutive missed proposals; two membership changes a block, a replacement counting as two</p>
@@ -311,7 +311,7 @@ const StakingAdminTab = () => {
           <CardTitle>Operators</CardTitle>
           <CardDescription>
             {isV2
-              ? "List a validator under an operator (it still has to self-bond, pass the readiness trial and activate). A change of operator is the validator key's decision. Removal is announced with published grounds and executes a week later; the emergency path removes one validator at once, with grounds."
+              ? "List a validator under an operator (it still has to self-bond, acknowledge readiness from its key and activate). A change of operator is the validator key's decision. Removal is announced with published grounds and executes a week later; the emergency path removes one validator at once, with grounds."
               : "List an operator (it still has to bond and activate), bind validator addresses, kick."}
           </CardDescription>
         </CardHeader>

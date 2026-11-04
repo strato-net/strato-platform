@@ -11,32 +11,36 @@ edits that cannot live anywhere else (listed under "Contract edits outside Strat
 The consensus (node) changes and the gas-fee revision are explicit dependencies, not changes
 made here.
 
-## 1. Readiness evidence before voting power — option B, the trial plus observed operation
+## 1. Readiness evidence before voting power — the minimal check
 
 **Chosen.** A candidate is seated only when all of these hold: its validator key has consented
 to its operator (already required); its operator holds 10,000 STRATO of its own self-bond; and
-the validator key itself has sent `acknowledgeReadiness()` transactions from the node for an
-unbroken week, no two more than a day apart (`readySince` to `readyAt ≥ NOTICE_SECONDS`, every
-gap `≤ READINESS_WINDOW_SECONDS`). A gap longer than a day restarts the run. Evidence older than a
-day is stale. Once seated, a finalised proposal counts as an acknowledgement, so a producing
-validator stays ready without extra transactions.
+the validator key itself has sent an `acknowledgeReadiness()` transaction within the last day
+(`READINESS_WINDOW_SECONDS`). Once seated, producing is the evidence: a finalised proposal within
+the last 500 blocks (`READINESS_WINDOW_BLOCKS`) keeps a validator "ready" for the safe-set rule
+of decision 6, with the acknowledgement as a fallback for a validator that has produced nothing
+lately. Readiness for a seated validator is therefore measured in blocks, not wall-clock time,
+so a quiet chain does not make its validators look absent.
 
-**Why this and not the bare trial.** On-chain, the only objective facts about a node are what
-its key signs. A single signed transaction proves key control and that the node's vault and
-transaction pipeline work at that moment, which is what the commenter said is insufficient.
-A week of daily transactions proves the same thing sustained over the period in which every
-other notice in the system runs, is checkable by anyone from state, and costs the candidate a
-fee a day. It does not prove execution correctness; that is only ever proven by producing
-finalised blocks, which is why the liveness rule (decision 5) removes a seated validator that
-misses twenty proposals in a row. The trial filters nodes that are not reliably up; the
-liveness rule removes nodes that cannot produce.
+**Why this and not a trial.** On-chain, the only objective facts about a node that is not yet a
+validator are what its key signs. A transaction from the key proves key control and a working
+vault and transaction path, and nothing more; repeating it for a week would prove the same
+thing repeatedly, from a script that need not be a node at all, while adding a cron dependency
+and a reset-on-a-missed-day rule that would block honest operators and user withdrawals. Execution
+correctness is only ever proven by producing finalised blocks, and that is policed after
+admission by the liveness removal (decision 5): a seated validator that cannot produce misses
+its first twenty proposals and is removed by anyone. So the check before voting power is kept
+to what it can honestly establish, and the evidence that matters is collected by doing the job.
 
-**Rejected.** A probation seat with reduced voting weight would show execution correctness
-before voting power but needs separate proposer and vote weights in the block header: a
-consensus change outside this branch.
+**Rejected.** A week of daily acknowledgements (option B as first drafted): see above. A
+probation seat with reduced voting weight would show execution correctness before voting power
+but needs separate proposer and vote weights in the block header: a consensus change outside
+this branch.
 
-**Values.** `NOTICE_SECONDS = 604800`, `READINESS_WINDOW_SECONDS = 86400`. Failure: any gap over
-a day restarts the trial. Retry: at once. Evidence too old: after a day.
+**Values.** `READINESS_WINDOW_SECONDS = 86400`, `READINESS_WINDOW_BLOCKS = 500` (at a fiftieth
+of the weight a validator proposes in that span with probability above 0.9999; at one percent,
+above 0.99). Evidence too old: after a day (acknowledgement) or 500 blocks (proposal). Retry:
+at once.
 
 ## 2. Incomplete voting information — option A, continue on the last complete distribution
 
@@ -124,7 +128,7 @@ rule of decision 6:
 
 - *Liveness, permissionless:* `removeForMissedProposals(v)` once `consecutiveMisses[v] ≥ 20`.
   The evidence is on chain and anyone may act on it. The validator keeps its stake, may be
-  seated again a week later, and must pass a fresh readiness trial first.
+  seated again a week later, on fresh readiness evidence.
 - *Ordinary removal, by the quality-control account:* `ValidatorRegistry.announceRemoval(v,
   grounds)` publishes the grounds in an event and starts a week's notice;
   `removeValidator(v)` executes after it; `cancelRemoval(v)` withdraws it. Relisting needs
@@ -151,8 +155,8 @@ through the extraordinary process if the account itself is the problem.
 **Chosen.** After any change to the set or to a seated validator's weight, the resulting set
 must either be *safe*, meaning strictly more than two thirds of its weight is ready and at
 least `READY_WEIGHT_BPS = 7500` (three quarters) of it is, or the change must not have lowered
-the ready share. "Ready" is fresh evidence under decision 1 (an acknowledgement or a finalised
-proposal within a day). Applied uniformly to exits, replacements, removals of every kind,
+the ready share. "Ready" is fresh evidence under decision 1 (a finalised proposal within 500
+blocks, or an acknowledgement within a day). Applied uniformly to exits, replacements, removals of every kind,
 handovers, stakes, moves, unstakes and self-bond changes; a change that fails is deferred (the
 transaction reverts with `SS: unsafe transition`) and can be retried once evidence arrives or
 once an unready member has been removed. Removing an unready member, or adding a ready one,

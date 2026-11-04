@@ -106,7 +106,7 @@ const STEPS = {
   removevalidator: (rest) => removal('removeValidator', rest, false),
   emergencyremove: (rest) => removal('emergencyRemove', rest, true),
   // Permissionless, so a direct call rather than a vote: a validator at the liveness miss
-  // limit leaves the set; it may be seated again a week later after a fresh readiness trial.
+  // limit leaves the set; it may be seated again a week later on fresh readiness evidence.
   removeformisses: ([validator]) => {
     if (!isHex40(validator)) throw new Error('usage: removeformisses <validator>');
     return { direct: true, target: STAKING, name: 'StratoStaking', func: 'removeForMissedProposals',

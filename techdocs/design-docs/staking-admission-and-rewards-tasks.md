@@ -42,9 +42,9 @@ them is the first task below.
   bypass are gone; nobody seats anyone before the block. Verification steps are in the runbook.
 
 - [x] **Require objective, permissionless applicant readiness checks before voting power
-  activates.** Decision 1: `acknowledgeReadiness()` from the validator key, an unbroken week of
-  daily evidence (`readyForAdmission`), checked by `tryActivate` / `reconcileSet`; a finalised
-  proposal is evidence too.
+  activates.** Decision 1: an `acknowledgeReadiness()` transaction from the validator key
+  within the last day (`isReady`), checked by `tryActivate` / `reconcileSet`; once seated, a
+  finalised proposal within 500 blocks is the evidence.
 
 - [x] **Pay for successful finalized production, not merely remaining listed.** `_payProduction`
   pays `block.prevProposer` per finalised block, unweighted by stake, split between qualified
@@ -150,10 +150,10 @@ them is the first task below.
   explicit zeros, on top of #7649 and #7650; add a `StakingConsensusSpec` case for a set with
   one zero-weight member after a complete vector. *Dependency; node change.*
 
-- [ ] **Validator hosts: daily readiness acknowledgement** (decision 1). Add to the node's
-  operator tooling (next to `strato-authorize-operator`) a scheduled `acknowledgeReadiness()`
-  transaction from the validator key, and document it in the validator operations guide; the
-  staking page shows "no fresh evidence" for a seated validator without one.
+- [ ] **Validator hosts: readiness acknowledgement** (decision 1). Add to the node's operator
+  tooling (next to `strato-authorize-operator`) a one-off `acknowledgeReadiness()` transaction
+  from the validator key for a candidate about to activate, and document it in the validator
+  operations guide; a seated validator keeps ready by producing blocks.
 
 - [ ] **Indexer or app job: touch due positions** (decision 3). `qualifyStake(user, validator)`
   is permissionless; a periodic job (or the staking page's "Start earning" button, which this
@@ -178,7 +178,7 @@ them is the first task below.
   anchor their sync; no on-chain change.
 
 - [ ] **Helium rehearsal of the in-place upgrade**: run the runbook on Helium (swap, reconcile,
-  readiness trial for one new validator, agreed block, fund, commit, a handover, an ordinary and
+  readiness acknowledgement and activation of one new validator, agreed block, fund, commit, a handover, an ordinary and
   an emergency removal, a liveness removal), checking every "Verify" line, before Upquark.
 
 - [ ] **Rollout note on `processBlock` logging**: after the swap the node logs "no block

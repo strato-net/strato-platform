@@ -5,9 +5,8 @@ export type ValidatorNextStepInput = {
   isValidator: boolean;
   isWaiter?: boolean;
   selfBond: string;
-  // Readiness evidence from the validator key: fresh within the window, and through the trial.
+  // Fresh readiness evidence: an acknowledgement from the validator key within the day.
   isReady?: boolean;
-  readyForAdmission?: boolean;
 };
 
 export const describeValidatorNextStep = (
@@ -22,10 +21,8 @@ export const describeValidatorNextStep = (
   if (BigInt(validator.selfBond || "0") < BigInt(minStake || "0")) {
     return `Self-bond at least ${minStakeLabel} ${symbol} to become eligible.`;
   }
-  if (!validator.readyForAdmission) {
-    return validator.isReady
-      ? "Eligible. The node's readiness trial is running: keep it acknowledging daily for a week."
-      : "Eligible. The node must acknowledge readiness from its validator key daily for a week before it can join.";
+  if (!validator.isReady) {
+    return "Eligible. The node must send a readiness acknowledgement from its validator key (good for a day) before it can join.";
   }
   if (validator.isWaiter) return joinsOpen ? "Ready. Activate to join the validator set." : "Ready. Admission opens at the agreed block.";
   return null;

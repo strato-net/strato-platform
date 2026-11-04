@@ -173,12 +173,13 @@ consensus-derived but **not cryptographically attributable** — a round change 
 "missed proposal" evidence and the round can change right after the previous commit — so real
 slashing waits for provable round changes (Phase 4). At `LIVENESS_MISS_LIMIT` (twenty) consecutive
 misses anyone may call `removeForMissedProposals(v)`: the validator leaves the set with its stake
-untouched and may be seated again after `NOTICE_SECONDS` and a fresh readiness trial.
+untouched and may be seated again after `NOTICE_SECONDS` on fresh readiness evidence.
 
-**Readiness.** A validator key reports its node up and in sync with `acknowledgeReadiness()`
-(from the key itself); a finalised proposal counts as one. Evidence is fresh for
-`READINESS_WINDOW_SECONDS` (a day); an unbroken run of fresh evidence `NOTICE_SECONDS` long
-(`readySince` to `readyAt`) is the admission trial. Every change to the set or to a seated
+**Readiness.** A validator key reports its vault and transaction path working with
+`acknowledgeReadiness()` (from the key itself), good for `READINESS_WINDOW_SECONDS` (a day): what a
+candidate shows before it is seated. Once seated, producing is the evidence: a finalised proposal
+(`lastProposedBlock`) is good for `READINESS_WINDOW_BLOCKS` (500 blocks), so a quiet chain does
+not make its validators look absent. Every change to the set or to a seated
 validator's weight must leave the resulting set *safe* (strictly more than two thirds, and at least
 `READY_WEIGHT_BPS` = three quarters, of its weight ready) or must not lower the ready share;
 otherwise it reverts with `SS: unsafe transition` and is retried later. Removing an unready member
@@ -191,7 +192,7 @@ logic (`seatedUnderSelfBondRule == false`) keeps the rule it was admitted under,
 expires it. Also: listed, past any liveness reentry wait (`jailedUntil`). Below the threshold ⇒
 `removeValidatorFromStaking` (governance never drops its last validator; a seat that stays only
 because it cannot be removed earns nothing); re-joining is an explicit `tryActivate` under the
-self-bond rule and a fresh trial.
+self-bond rule and fresh evidence.
 
 ## Governance
 
@@ -237,16 +238,16 @@ consent, admin `addValidator` still works) → **Active** (in the consensus set)
 (removed by the quality-control account with published grounds after a week's notice, or at once on
 the emergency path; self-bond paid back to the operator at once; re-listing after `NOTICE_SECONDS`,
 under the same operator). `StratoStaking.status(v)` / `eligible(v)` / `isWaiter(v)` /
-`readyForAdmission(v)`, all by validator address.
+`isReady(v)`, all by validator address.
 
 * `eligible = listed ∧ meets the self-bond minimum (incumbents: self-bond plus delegations) ∧ past any liveness reentry wait`
-* `isWaiter = eligible ∧ not seated ∧ readyForAdmission`
+* `isWaiter = eligible ∧ not seated ∧ isReady`
 * **Leaving is automatic and same-tx** (`_syncValidator` at the end of every stake mutation): an
   Active validator that stops being eligible is removed from governance (counts one set mutation;
   with the per-block budget spent it keeps its seat until a later sync and earns nothing
   meanwhile). Weight changes are pushed the same way. Every mutation then checks the safe-set rule.
 * **Joining is explicit**: `tryActivate(v)` (anyone, from `joinsOpenFromBlock`; nobody before it,
-  the owner included) needs eligibility, the readiness trial and either a free slot below
+  the owner included) needs eligibility, fresh readiness evidence and either a free slot below
   `effectiveCap = min(maxActiveValidators, hardCapActiveValidators)` or the lowest validator
   (weight asc, address asc) beaten by `EVICTION_MARGIN_BPS` (5%); a replacement sends the loser
   back to Registered (self-bond stays bonded) and counts as two of the block's
@@ -261,7 +262,7 @@ under the same operator). `StratoStaking.status(v)` / `eligible(v)` / `isWaiter(
 * Votable: `setSetParams(maxActiveValidators, hardCapActiveValidators [only lowers])`,
   `setJoinsOpenFromBlock(block)` (ahead only; never closed again), `setParams(maxCommissionBps,
   maxBatchSize)`, `commitEmissionSchedule(e0, s0, r0, startTime)` (once), `setGovernance(0x100)`
-  (once). Constants: `MIN_SELF_BOND`, `NOTICE_SECONDS`, `READINESS_WINDOW_SECONDS`,
+  (once). Constants: `MIN_SELF_BOND`, `NOTICE_SECONDS`, `READINESS_WINDOW_SECONDS`, `READINESS_WINDOW_BLOCKS`,
   `READY_WEIGHT_BPS`, `MAX_CREDITED_GAP_SECONDS`, `LIVENESS_MISS_LIMIT`,
   `MAX_SET_MUTATIONS_PER_BLOCK`, `EVICTION_MARGIN_BPS`. `initialize` seeds 50 / 50 and no join
   height or schedule. Commission: the operator cuts at once and raises on a week's notice; there is
@@ -287,7 +288,7 @@ activation height, #7649 and #7650; (2) deploy `StratoStaking` + `ValidatorRegis
 `Proxy` (V1 is not upgradeable), `initialize(...usdst)`, `setValidatorRegistry`; (3) upgrade
 governance logic (`setLogicContract`), vote `setStakingContract`; (4) list the current validators
 as operators with their node vault addresses, stake ≥ 10,000, `setGovernance(0x100)`, then
-`tryActivate` each (or `reconcileSet`) once their keys have acknowledged for a week,
+`tryActivate` each (or `reconcileSet`) once their keys have acknowledged readiness,
 `setSetParams(maxActiveValidators = live n, …)`, `gov.setHardCapValidators(50)` — all before the
 activation height; (5) deploy `FeeRouter` and `DeciderState.updatePayFeeContract` (owner key); (6)
 after activation, `bootstrapstakes` (#7650), then vote `setJoinsOpenFromBlock`; (7) fund the
@@ -304,7 +305,8 @@ at `0xDEC1DE03` from genesis.
 * forcing a round change needs f+1 colluding validators (unchanged IBFT property);
 * `moveStake` is instant and free; weights apply the next block (no epochs), the moved stake
   earns only after a week;
-* readiness evidence proves key control and sustained operation, not execution correctness; that
-  is proven by finalised production and policed by the liveness removal;
+* readiness evidence before admission proves key control and a working transaction path, not
+  execution correctness; that is proven by finalised production and policed by the liveness
+  removal;
 * Blockstanbul message signatures lack domain separation (`getHash`) and round changes carry no
   signed evidence — both are prerequisites for real slashing.

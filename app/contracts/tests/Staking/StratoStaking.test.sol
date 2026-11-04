@@ -205,57 +205,34 @@ contract Describe_StratoStaking {
         key.doSuccessfully(address(staking), "acknowledgeReadiness");
     }
 
-    // The readiness trial for two keys: an acknowledgement a day for a week.
-    function _trial(User a, User b) internal {
-        for (uint256 day = 0; day < 7; day++) {
-            _ack(a);
-            _ack(b);
-            fastForward(DAY, 1);
-        }
+    // A week passes, so positions placed before it qualify, and the keys acknowledge readiness.
+    function _ackAfterWeek(User a, User b) internal {
+        fastForward(WEEK, 1);
         _ack(a);
         _ack(b);
     }
 
-    function _trialOne(User a) internal {
-        _trial(a, a);
+    function _ackOneAfterWeek(User a) internal {
+        fastForward(WEEK, 1);
+        _ack(a);
     }
 
-    // Three keys through the trial together: a run restarts after a day without evidence,
-    // so keys that need admission at the same time acknowledge side by side.
-    function _trialThree(User a, User b, User c) internal {
-        for (uint256 day = 0; day < 7; day++) {
-            _ack(a);
-            _ack(b);
-            _ack(c);
-            fastForward(DAY, 1);
-        }
+    function _ackThreeAfterWeek(User a, User b, User c) internal {
+        fastForward(WEEK, 1);
         _ack(a);
         _ack(b);
         _ack(c);
-    }
-
-    // The calibration committed with the block clock seeded: production is paid for the
-    // interval between the two blocks before the paying one, so the first paid block needs
-    // a block before it on record.
-    function _commit() internal {
-        staking.commitEmissionSchedule(E0, S0, R0, 0);
-        _seedClock();
-    }
-
-    function _seedClock() internal {
-        setBlockContext(address(0), address(0), address(0), 0);
-        staking.processBlock();
     }
 
     function _activate(address validator) internal {
         staking.tryActivate(validator);
     }
 
-    // A at 1000 of self-bond (5% commission), B at 2000, both through the trial and seated.
+    // A at 1000 of self-bond (5% commission), B at 2000, a week on, both acknowledged and seated.
     function _bondBoth() internal {
         _selfBond(operatorA, VALIDATOR_A, 1000e18);
         _selfBond(operatorB, VALIDATOR_B, 2000e18);
-        _trial(validatorA, validatorB);
+        _ackAfterWeek(validatorA, validatorB);
         _activate(VALIDATOR_A);
         _activate(VALIDATOR_B);
     }
@@ -351,11 +328,11 @@ contract Describe_StratoStaking {
 
         _selfBond(operatorA, VALIDATOR_A, 1e18);
         require(staking.eligible(VALIDATOR_A), "meets the minimum");
-        require(!staking.isWaiter(VALIDATOR_A), "not a waiter before the readiness trial");
-        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: readiness trial incomplete", VALIDATOR_A);
+        require(!staking.isWaiter(VALIDATOR_A), "not a waiter without readiness evidence");
+        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: no readiness evidence", VALIDATOR_A);
 
-        _trialOne(validatorA);
-        require(staking.readyForAdmission(VALIDATOR_A) && staking.isWaiter(VALIDATOR_A), "eligible, ready, not yet seated");
+        _ack(validatorA);
+        require(staking.isReady(VALIDATOR_A) && staking.isWaiter(VALIDATOR_A), "eligible, ready, not yet seated");
         require(!gov.isValidator(VALIDATOR_A), "joining is explicit");
         attacker.doSuccessfully(address(staking), "tryActivate(address)", VALIDATOR_A);
         require(staking.status(VALIDATOR_A) == 2, "Active");
@@ -508,7 +485,7 @@ contract Describe_StratoStaking {
     // but its funds are its own and its seat earns nothing once it stops qualifying.
     function it_never_removes_the_last_validator_nor_locks_its_funds() public {
         _selfBond(operatorA, VALIDATOR_A, 1000e18);
-        _trialOne(validatorA);
+        _ackOneAfterWeek(validatorA);
         _activate(VALIDATOR_A);
         operatorA.doExpectingFailure(address(staking), "exit(address)", "SS: last validator", VALIDATOR_A);
 
@@ -550,7 +527,7 @@ contract Describe_StratoStaking {
         // the owner included.
         _registerSelf(validatorC);
         _selfBond(validatorC, address(validatorC), 1000e18);
-        _trialOne(validatorC);
+        _ackOneAfterWeek(validatorC);
         validatorC.doExpectingFailure(address(fresh), "reconcileSet", "SS: joins not open", _list(address(validatorC)));
         rejected = false;
         try fresh.reconcileSet(_list(address(validatorC))) {
@@ -569,7 +546,7 @@ contract Describe_StratoStaking {
 
         _registerSelf(validatorC);
         _selfBond(validatorC, address(validatorC), 1049e18);
-        _trialOne(validatorC);
+        _ackOneAfterWeek(validatorC);
         validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: set full", address(validatorC));
 
         _selfBond(validatorC, address(validatorC), 1e18);
@@ -594,7 +571,7 @@ contract Describe_StratoStaking {
         _selfBond(operatorA, VALIDATOR_A, 1000e18);
         _selfBond(operatorB, VALIDATOR_B, 3000e18);
         _selfBond(validatorC, address(validatorC), 2000e18);
-        _trialThree(validatorA, validatorB, validatorC);
+        _ackThreeAfterWeek(validatorA, validatorB, validatorC);
 
         address[] memory candidates = new address[](3);
         candidates[0] = VALIDATOR_A;
@@ -618,7 +595,7 @@ contract Describe_StratoStaking {
         _bondBoth();
         _registerSelf(validatorC);
         _selfBond(validatorC, address(validatorC), 1000e18);
-        _trialOne(validatorC);
+        _ackOneAfterWeek(validatorC);
         _ack(validatorA);
         _ack(validatorB);
 
@@ -662,7 +639,7 @@ contract Describe_StratoStaking {
         _selfBond(operatorA, VALIDATOR_A, 1000e18);
         _selfBond(operatorB, VALIDATOR_B, 2000e18);
         _selfBond(validatorC, address(validatorC), 1000e18);
-        _trialThree(validatorA, validatorB, validatorC);
+        _ackThreeAfterWeek(validatorA, validatorB, validatorC);
         _activate(VALIDATOR_A);
         _activate(VALIDATOR_B);
         fastForward(1, 1);
@@ -734,7 +711,7 @@ contract Describe_StratoStaking {
 
     // ---- readiness evidence --------------------------------------------------------------
 
-    function it_requires_an_unbroken_week_of_acknowledgements_for_admission() public {
+    function it_admits_on_a_fresh_acknowledgement_from_the_key_and_keeps_ready_by_producing() public {
         _registerSelf(validatorC);
         _selfBond(validatorC, address(validatorC), 1000e18);
         bool rejected = false;
@@ -744,28 +721,25 @@ contract Describe_StratoStaking {
         }
         require(rejected && staking.readyAt(address(operatorA)) == 0, "only a listed validator key acknowledges");
 
-        for (uint256 day = 0; day < 3; day++) {
-            _ack(validatorC);
-            fastForward(DAY, 1);
-        }
-        fastForward(2 * DAY, 1);                       // a gap of three days: the run restarts
-        for (uint256 day = 0; day < 6; day++) {
-            _ack(validatorC);
-            fastForward(DAY, 1);
-        }
         _ack(validatorC);
-        require(staking.isReady(address(validatorC)), "fresh evidence");
-        require(!staking.readyForAdmission(address(validatorC)), "six days since the restart: not yet");
-        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: readiness trial incomplete", address(validatorC));
+        fastForward(DAY + 1, 1);
+        require(!staking.isReady(address(validatorC)), "an acknowledgement is good for a day");
+        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: no readiness evidence", address(validatorC));
 
-        fastForward(DAY, 1);
         _ack(validatorC);
-        require(staking.readyForAdmission(address(validatorC)), "a week unbroken");
+        require(staking.isReady(address(validatorC)) && staking.isWaiter(address(validatorC)), "fresh evidence");
         validatorC.doSuccessfully(address(staking), "tryActivate(address)", address(validatorC));
         require(gov.isValidator(address(validatorC)), "seated");
 
-        fastForward(DAY + 1, 1);
-        require(!staking.isReady(address(validatorC)), "evidence is good for a day");
+        // Seated, producing is the evidence: a finalised proposal is good for 500 blocks, however long they take.
+        setBlockContext(address(validatorC), address(validatorC), address(validatorC), 0);
+        fastForward(1, 1);
+        staking.processBlock();
+        require(staking.lastProposedBlock(address(validatorC)) == block.number - 1, "the parent block it produced");
+        fastForward(3 * DAY, 1);
+        require(staking.isReady(address(validatorC)), "ready on its proposal, days after the acknowledgement lapsed");
+        fastForward(1, 499);
+        require(!staking.isReady(address(validatorC)), "and not once the proposal is 500 blocks old");
     }
 
     function it_counts_proposals_and_misses_once_per_block_and_takes_a_proposal_as_evidence() public {
@@ -817,9 +791,9 @@ contract Describe_StratoStaking {
 
         fastForward(WEEK, 1);
         require(staking.eligible(VALIDATOR_A) && !staking.isWaiter(VALIDATOR_A), "eligible again, but its evidence lapsed with it");
-        _trialOne(validatorA);
+        _ack(validatorA);
         _activate(VALIDATOR_A);
-        require(gov.isValidator(VALIDATOR_A), "back after a fresh trial");
+        require(gov.isValidator(VALIDATOR_A), "back on fresh evidence");
     }
 
     function it_does_not_count_a_miss_without_a_round_change() public {
@@ -949,7 +923,7 @@ contract Describe_StratoStaking {
         // A seat kept only because this block's churn budget is spent earns nothing either:
         // C replaces A (two changes), then B drops below the minimum in the same block.
         staking.setSetParams(2, 50);
-        _trialOne(validatorC);
+        _ackOneAfterWeek(validatorC);
         _ack(validatorA);
         _ack(validatorB);
         validatorC.doSuccessfully(address(staking), "tryActivate(address)", address(validatorC));
@@ -967,7 +941,7 @@ contract Describe_StratoStaking {
 
     function it_scales_the_release_with_the_root_of_the_stake_and_the_reserve_left() public {
         _selfBond(operatorA, VALIDATOR_A, 1000e18);
-        _trialOne(validatorA);
+        _ackOneAfterWeek(validatorA);
         _activate(VALIDATOR_A);                       // S = 1000
         _fundReserve(10000e18);
         _commit();

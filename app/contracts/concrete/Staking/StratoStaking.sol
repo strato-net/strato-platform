@@ -10,7 +10,7 @@ import "./IStakingGovernance.sol";
 // selection and voting) and keeps liveness counters.
 //
 // The rules below are the network's commitment, not configuration: the self-bond minimum,
-// the seven-day notices, the readiness trial, the liveness limit, the per-block churn bound
+// the seven-day notices, the readiness windows, the liveness limit, the per-block churn bound
 // and the emission formula are constants, the emission schedule is committed once, and no
 // owner call can pause, redirect, recover or rewrite what the schedule owes. Changing any of
 // them is a logic upgrade under the network's extraordinary process.
@@ -41,9 +41,9 @@ import "./IStakingGovernance.sol";
 //   Registered = listed, not in the consensus set (may receive stake)
 //   Active     = in the consensus set (explicit tryActivate / reconcileSet; room or eviction)
 //   Kicked     = delisted by the registry (self-bond released to the operator)
-// Joining needs the self-bond minimum, the readiness trial (acknowledgements from the
-// validator key spanning READINESS_TRIAL_SECONDS with no gap over READINESS_WINDOW_SECONDS)
-// and open admission (joinsOpenFromBlock). A seat held since before this logic keeps the
+// Joining needs the self-bond minimum, fresh readiness evidence (an acknowledgement sent by
+// the validator key within READINESS_WINDOW_SECONDS, or, once seated, a finalised proposal
+// within READINESS_WINDOW_BLOCKS) and open admission (joinsOpenFromBlock). A seat held since before this logic keeps the
 // rule it was admitted under (self-bond plus delegations) until the validator leaves the set
 // or changes operator. Every change to the set or to a seated validator's weight must leave
 // the resulting set able to finalise on fresh acknowledgements (READY_WEIGHT_BPS of its
@@ -103,7 +103,7 @@ contract  StratoStaking is Ownable {
     event ValidatorEvicted(address indexed operator, address indexed validator, address indexed by);
     event ValidatorExited(address indexed operator, address indexed validator);
     event ValidatorRemovedForLiveness(address indexed validator, uint256 missedProposals, uint256 reentryTime);
-    event ReadinessAcknowledged(address indexed validator, uint256 readySince, uint256 readyAt);
+    event ReadinessAcknowledged(address indexed validator, uint256 readyAt);
     // Shape and emission pattern are relied on by the node's stake-event parser (Delta.hs).
     event ValidatorSynced(address indexed operator, address indexed validator, bool registered, uint256 weight);
     event DiscretionaryRewardCredited(address indexed operator, address indexed validator, address indexed token, address funder, uint256 amount);
@@ -132,10 +132,14 @@ contract  StratoStaking is Ownable {
     // Self-bond a validator needs to join or rejoin the set, in the operator's own STRATO.
     uint256 public constant MIN_SELF_BOND = 10000e18;
     // Seven days: notice before a commission raise or an operator handover, the time a new
-    // position waits before it earns, the readiness trial, and the wait before a removed
-    // validator may be listed or seated again.
+    // position waits before it earns, and the wait before a removed validator may be listed
+    // or seated again.
     uint256 public constant NOTICE_SECONDS = 604800;
-    // A readiness acknowledgement (or a finalised proposal) is evidence for a day.
+    // Readiness evidence: a finalised proposal within this many blocks (what a seated
+    // validator shows by doing its job; at a fiftieth of the weight it proposes in that span
+    // with near certainty), or an acknowledgement sent by the validator key within a day
+    // (the fallback, and the only evidence a validator that is not yet seated can give).
+    uint256 public constant READINESS_WINDOW_BLOCKS = 500;
     uint256 public constant READINESS_WINDOW_SECONDS = 86400;
     // Share of the resulting set's weight that must be ready before a change goes through.
     uint256 public constant READY_WEIGHT_BPS = 7500;
@@ -180,10 +184,10 @@ contract  StratoStaking is Ownable {
     // qualifying on self-bond plus delegations until it leaves the set or changes operator.
     mapping(address => bool) public  seatedUnderSelfBondRule;
 
-    // Readiness: the last acknowledgement by the validator key (or finalised proposal), and
-    // the start of the unbroken run of them.
+    // Readiness: the last acknowledgement sent by the validator key, and the last block the
+    // validator produced that the network finalised.
     mapping(address => uint256) public  readyAt;
-    mapping(address => uint256) public  readySince;
+    mapping(address => uint256) public  lastProposedBlock;
 
     // Liveness, derived from block.prev*.
     mapping(address => uint256) public  blocksProposed;
@@ -418,19 +422,17 @@ contract  StratoStaking is Ownable {
         return _meetsMinStake(validator, v) && block.timestamp >= jailedUntil[validator];
     }
 
-    // Fresh evidence of operation: an acknowledgement or a finalised proposal within the window.
+    // Fresh evidence of operation: a finalised proposal within the block window, or an
+    // acknowledgement from the key within the day.
     function isReady(address validator) public view returns (bool) {
+        uint256 proposed = lastProposedBlock[validator];
+        if (proposed > 0 && proposed + READINESS_WINDOW_BLOCKS >= block.number) return true;
         return readyAt[validator] > 0 && readyAt[validator] + READINESS_WINDOW_SECONDS >= block.timestamp;
-    }
-
-    // The trial: fresh evidence at the end of an unbroken run of it at least NOTICE_SECONDS long.
-    function readyForAdmission(address validator) public view returns (bool) {
-        return isReady(validator) && readyAt[validator] - readySince[validator] >= NOTICE_SECONDS;
     }
 
     // A waiter is eligible, ready and not in the set; promotion is explicit.
     function isWaiter(address validator) public view returns (bool) {
-        return eligible(validator) && !isValidator[validator] && readyForAdmission(validator);
+        return eligible(validator) && !isValidator[validator] && isReady(validator);
     }
 
     // Voting weight of the consensus set. Stake behind listed validators outside the set
@@ -642,7 +644,7 @@ contract  StratoStaking is Ownable {
         _requireJoinsOpen();
         require(!isValidator[validator], "SS: already active");
         require(eligible(validator), "SS: not eligible");
-        require(readyForAdmission(validator), "SS: readiness trial incomplete");
+        require(isReady(validator), "SS: no readiness evidence");
         (uint256 total, uint256 ready) = readyWeight();
 
         if (validatorCount < effectiveCap()) {
@@ -677,21 +679,14 @@ contract  StratoStaking is Ownable {
         }
     }
 
-    // A validator key reports that its node is up and in sync. Acknowledgements must come
-    // from the key itself; a finalised proposal counts as one too (_processPrevBlock). An
-    // acknowledgement later than the window after the previous one starts a new run.
+    // A validator key reports that its node's vault and transaction path work: the
+    // transaction must come from the key itself. It is what a validator shows before it is
+    // seated; once seated, producing blocks is the evidence.
     function acknowledgeReadiness() external onlyInitialized {
         StakingValidator storage v = operators[msg.sender];
         require(v.exists && v.active, "SS: validator missing");
-        _recordReady(msg.sender, true);
-    }
-
-    function _recordReady(address validator, bool announce) internal {
-        if (readyAt[validator] == 0 || readyAt[validator] + READINESS_WINDOW_SECONDS < block.timestamp) {
-            readySince[validator] = block.timestamp;
-        }
-        readyAt[validator] = block.timestamp;
-        if (announce) emit ReadinessAcknowledged(validator, readySince[validator], block.timestamp);
+        readyAt[msg.sender] = block.timestamp;
+        emit ReadinessAcknowledged(msg.sender, block.timestamp);
     }
 
     // An operator takes its validator out of the set, at once if the set can spare it.
@@ -709,7 +704,7 @@ contract  StratoStaking is Ownable {
 
     // Evidence-based removal, open to anyone: a validator that has missed
     // LIVENESS_MISS_LIMIT proposals in a row leaves the set and may be seated again after
-    // NOTICE_SECONDS, with a fresh readiness trial. Stake is untouched.
+    // NOTICE_SECONDS, on fresh readiness evidence. Stake is untouched.
     function removeForMissedProposals(address validator) external onlyInitialized onlyListed(validator) {
         require(isValidator[validator], "SS: not active");
         require(consecutiveMisses[validator] >= LIVENESS_MISS_LIMIT, "SS: liveness evidence short");
@@ -1347,14 +1342,14 @@ contract  StratoStaking is Ownable {
 
     // Record who proposed the previous block and whether its intended proposer (the one
     // selected for the round the height started at) missed. A finalised proposal is
-    // readiness evidence. A miss is consensus-derived but not cryptographically
+    // readiness evidence (lastProposedBlock). A miss is consensus-derived but not cryptographically
     // attributable (a round change carries no signed "missed" evidence), so it only costs
     // the block's income and counts toward the liveness limit. No tokens move here.
     function _processPrevBlock(address actual, address intended) internal {
         if (actual != address(0)) {
             blocksProposed[actual] += 1;
             consecutiveMisses[actual] = 0;
-            _recordReady(actual, false);
+            lastProposedBlock[actual] = block.number - 1;
         }
         if (intended == address(0) || intended == actual) return;
 

@@ -45,12 +45,11 @@ export interface StratoOperatorInfo {
   isWaiter: boolean;
   // v2: after a liveness removal, the time the validator may be seated again.
   jailedUntil: string;
-  // v2 readiness evidence (an acknowledgement from the validator key or a finalised
-  // proposal): its time, the start of the unbroken run, and the states the contract derives.
+  // v2 readiness evidence: the last acknowledgement from the validator key, the last block
+  // it produced, and whether either is fresh (a day, 500 blocks).
   readyAt: string;
-  readySince: string;
+  lastProposedBlock: string;
   isReady: boolean;
-  readyForAdmission: boolean;
   // v2: an announced handover and when the incoming operator may complete it ("" / "0" = none).
   pendingOperator: string;
   operatorChangeReadyTime: string;
@@ -138,11 +137,12 @@ export interface StratoStakingInfo {
   // joinsOpen is the effective state now, measured against the last block the contract processed.
   joinsOpenFromBlock: string;
   joinsOpen: boolean;
-  // v2 commitment constants: the week (notices, qualification, trial, reentry), the readiness
-  // window, the ready share a change must leave, the longest interval one block is paid for,
+  // v2 commitment constants: the week (notices, qualification, reentry), the readiness
+  // windows, the ready share a change must leave, the longest interval one block is paid for,
   // the consecutive misses that let anyone remove a validator.
   noticeSeconds: string;
   readinessWindowSeconds: string;
+  readinessWindowBlocks: string;
   readyWeightBps: string;
   maxCreditedGapSeconds: string;
   livenessMissLimit: string;
@@ -312,6 +312,7 @@ const emptyInfo = (): StratoStakingInfo => ({
   joinsOpen: false,
   noticeSeconds: "0",
   readinessWindowSeconds: "0",
+  readinessWindowBlocks: "0",
   readyWeightBps: "0",
   maxCreditedGapSeconds: "0",
   livenessMissLimit: "0",
@@ -746,6 +747,7 @@ const recordOperator = (validator: string, record: Record<string, any>): string 
 const V2_MIN_SELF_BOND = 10000n * WAD;
 const V2_NOTICE_SECONDS = 604800n;
 const V2_READINESS_WINDOW_SECONDS = 86400n;
+const V2_READINESS_WINDOW_BLOCKS = 500n;
 const V2_READY_WEIGHT_BPS = 7500n;
 const V2_MAX_CREDITED_GAP_SECONDS = 3600n;
 const V2_LIVENESS_MISS_LIMIT = 20n;
@@ -762,9 +764,8 @@ type V2ValidatorRecord = {
   totalStake: bigint;
   jailedUntil: bigint;
   readyAt: bigint;
-  readySince: bigint;
+  lastProposedBlock: bigint;
   isReady: boolean;
-  readyForAdmission: boolean;
   pendingOperator: string;
   operatorChangeReadyTime: bigint;
   status: StratoOperatorStatus;
@@ -782,7 +783,9 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
   const underRuleMap = addressKeyed(state.seatedUnderSelfBondRule);
   const jailedUntilMap = addressKeyed(state.jailedUntil);
   const readyAtMap = addressKeyed(state.readyAt);
-  const readySinceMap = addressKeyed(state.readySince);
+  const lastProposedMap = addressKeyed(state.lastProposedBlock);
+  // The height as the contract last saw it, which is what its own window compares against.
+  const head = parseBigIntLike(state.lastProcessedBlock);
   const pendingOperatorMap = addressKeyed(state.pendingOperator);
   const changeReadyMap = addressKeyed(state.operatorChangeReadyTime);
 
@@ -797,8 +800,9 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
       const totalStake = selfBond + delegatedStake;
       const jailedUntil = parseBigIntLike(jailedUntilMap.get(validator));
       const readyAt = parseBigIntLike(readyAtMap.get(validator));
-      const readySince = parseBigIntLike(readySinceMap.get(validator));
-      const isReady = readyAt > 0n && readyAt + V2_READINESS_WINDOW_SECONDS >= now;
+      const lastProposedBlock = parseBigIntLike(lastProposedMap.get(validator));
+      const isReady = (lastProposedBlock > 0n && lastProposedBlock + V2_READINESS_WINDOW_BLOCKS >= head)
+        || (readyAt > 0n && readyAt + V2_READINESS_WINDOW_SECONDS >= now);
       // _meetsMinStake: a seat held since before the self-bond rule qualifies on self-bond
       // plus delegations; every other record on self-bond alone.
       const incumbent = isValidator && !parseBoolLike(underRuleMap.get(validator));
@@ -818,9 +822,8 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
         totalStake,
         jailedUntil,
         readyAt,
-        readySince,
+        lastProposedBlock,
         isReady,
-        readyForAdmission: isReady && readyAt - readySince >= V2_NOTICE_SECONDS,
         pendingOperator: isNormalizedAddress(pendingOperator) && !/^0+$/.test(pendingOperator) ? pendingOperator : "",
         operatorChangeReadyTime: parseBigIntLike(changeReadyMap.get(validator)),
         status: !active ? 3 : isValidator ? 2 : 1,
@@ -1270,9 +1273,8 @@ const getV1StakingInfo = async (
       isWaiter: false,
       jailedUntil: "0",
       readyAt: "0",
-      readySince: "0",
+      lastProposedBlock: "0",
       isReady: false,
-      readyForAdmission: false,
       pendingOperator: "",
       operatorChangeReadyTime: "0",
       userWaitingStake: "0",
@@ -1350,6 +1352,7 @@ const getV1StakingInfo = async (
     joinsOpen: false,
     noticeSeconds: "0",
     readinessWindowSeconds: "0",
+    readinessWindowBlocks: "0",
     readyWeightBps: "0",
     maxCreditedGapSeconds: "0",
     livenessMissLimit: "0",
@@ -1496,12 +1499,11 @@ const getV2StakingInfo = async (
       status: record.status,
       isValidator: record.isValidator,
       eligible: record.eligible,
-      isWaiter: record.eligible && !record.isValidator && record.readyForAdmission,
+      isWaiter: record.eligible && !record.isValidator && record.isReady,
       jailedUntil: record.jailedUntil.toString(),
       readyAt: record.readyAt.toString(),
-      readySince: record.readySince.toString(),
+      lastProposedBlock: record.lastProposedBlock.toString(),
       isReady: record.isReady,
-      readyForAdmission: record.readyForAdmission,
       pendingOperator: record.pendingOperator,
       operatorChangeReadyTime: record.operatorChangeReadyTime.toString(),
       userWaitingStake: userWaitingStake.toString(),
@@ -1583,6 +1585,7 @@ const getV2StakingInfo = async (
       && parseBigIntLike(state.lastProcessedBlock) >= parseBigIntLike(state.joinsOpenFromBlock),
     noticeSeconds: V2_NOTICE_SECONDS.toString(),
     readinessWindowSeconds: V2_READINESS_WINDOW_SECONDS.toString(),
+    readinessWindowBlocks: V2_READINESS_WINDOW_BLOCKS.toString(),
     readyWeightBps: V2_READY_WEIGHT_BPS.toString(),
     maxCreditedGapSeconds: V2_MAX_CREDITED_GAP_SECONDS.toString(),
     livenessMissLimit: V2_LIVENESS_MISS_LIMIT.toString(),
@@ -2047,7 +2050,7 @@ export const reconcileStratoValidatorSet = async (
 
   const state = await getStakingBlocState(accessToken, true);
   const candidates = v2ValidatorRecords(state)
-    .filter((record) => record.eligible && !record.isValidator && record.readyForAdmission)
+    .filter((record) => record.eligible && !record.isValidator && record.isReady)
     .sort((a, b) =>
       a.totalStake !== b.totalStake
         ? (b.totalStake > a.totalStake ? 1 : -1)
