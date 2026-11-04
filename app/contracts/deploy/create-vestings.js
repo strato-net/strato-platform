@@ -19,7 +19,9 @@
 // {
 //   "manager": "<40 hex>", "pool": "<40 hex>", "token": "<40 hex>", "decimals": 18,
 //   "tge": "2026-12-01T00:00:00Z",      // ISO 8601 with timezone, or unix seconds
-//   "secondsPerMonth": 3600,             // OPTIONAL, testing only: cliff month = this many seconds
+//   "secondsPerMonth": 3600,             // TESTING ONLY: cliff month = this many seconds. Without it a
+//                                        // cliff month is a real calendar month. `create` refuses a
+//                                        // file that has it unless ALLOW_TEST_SCALE=1 is set.
 //   "batchSize": 25,                     // OPTIONAL, default 25: entries per addVestings transaction
 //   "categories": [
 //     { "name": "team", "managed": true, "cliffMonths": 12, "durationWeeks": 104,
@@ -284,6 +286,10 @@ async function waitForExecution(tokenObj, s, submitted) {
   }
 
   if (cmd === 'create') {
+    if (s.secondsPerMonth && process.env.ALLOW_TEST_SCALE !== '1') {
+      console.error(`refusing to create: the schedule has secondsPerMonth=${s.secondsPerMonth} (test scale: a cliff month is ${s.secondsPerMonth} s, not a calendar month). Remove it for a real deployment, or set ALLOW_TEST_SCALE=1 for a rehearsal.`);
+      process.exit(1);
+    }
     const report = await status(tokenObj, s, true);
     const needed = neededFor(report);
     if (needed === 0n) { console.log('every entry is already scheduled; nothing to do.'); return; }
