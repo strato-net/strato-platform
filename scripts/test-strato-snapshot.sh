@@ -193,8 +193,19 @@ if STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapsho
   exit 1
 fi
 
-STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium --force
+STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium --force \
+  2> "$TMP/restore-all-dbs.err"
 assert_no_appledouble "$NODE"
+if grep -q "Leaving out the dumps" "$TMP/restore-all-dbs.err"; then
+  echo "a restore of every database must extract every dump" >&2
+  exit 1
+fi
+
+# A validator loads only eth; cirrus.dump is not extracted.
+STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium --force \
+  --databases eth 2> "$TMP/restore-eth-only.err"
+assert_contains "$TMP/restore-eth-only.err" "Leaving out the dumps that are not loaded: cirrus.dump$"
+assert_contains "$NODE/.ethereumH/state/value" "state-from-snapshot"
 
 cat > "$TMP/metadata.json" <<'JSON'
 {

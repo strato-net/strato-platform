@@ -143,11 +143,13 @@ warn() {
 # early and names the override instead.
 require_free_space() {
   local dir="$1" needed_kb="$2" what="$3" avail_kb
+  local hint="${4:-}"
+  [[ -n "$hint" ]] || hint="Set STRATO_SNAPSHOT_WORKDIR to a directory on a volume with space (a cell's data drive, not /tmp)."
   avail_kb="$(df -Pk "$dir" 2>/dev/null | awk 'NR==2 {print $4}')"
   [[ -n "$avail_kb" ]] || return 0  # unknown filesystem: do not block the run
   if (( avail_kb < needed_kb )); then
     die "not enough room in $dir for $what: $((needed_kb / 1048576)) GiB needed, $((avail_kb / 1048576)) GiB free.
-Set STRATO_SNAPSHOT_WORKDIR to a directory on a volume with space (a cell's data drive, not /tmp)."
+$hint"
   fi
 }
 
@@ -676,24 +678,26 @@ make_archive() {
   esac
 }
 
+# Optional third argument: a file of tar exclude patterns (tar -X).
 extract_archive() {
   local archive="$1"
   local dest="$2"
+  local exclude_file="${3:-/dev/null}"
   mkdir -p "$dest"
 
   case "$archive" in
     *.tar.zst|*.tzst)
       if command -v zstd >/dev/null 2>&1; then
-        zstd -dc "$archive" | tar -xpf - -C "$dest"
+        zstd -dc "$archive" | tar -X "$exclude_file" -xpf - -C "$dest"
       else
-        tar --zstd -xpf "$archive" -C "$dest"
+        tar -X "$exclude_file" --zstd -xpf "$archive" -C "$dest"
       fi
       ;;
     *.tar.gz|*.tgz)
-      tar -xzpf "$archive" -C "$dest"
+      tar -X "$exclude_file" -xzpf "$archive" -C "$dest"
       ;;
     *.tar)
-      tar -xpf "$archive" -C "$dest"
+      tar -X "$exclude_file" -xpf "$archive" -C "$dest"
       ;;
     *)
       die "unsupported archive extension: $archive"
@@ -2086,6 +2090,17 @@ restore_payload() {
       || die "target node has no secrets/postgres_password; run strato-setup first"
     info "[6/7] Loading the public databases ($(selected_databases | paste -sd, -)) into the node's own postgres cluster"
     info "      The node keeps its own postgres password and its local-only oauth database; only the databases named above are replaced"
+    # The rebuilt databases are far larger than their dumps, mostly indexes
+    # (measured: eth ~5x its dump, cirrus ~15x).
+    local load_kb=0 dump_kb factor db
+    for db in $(selected_databases); do
+      dump_kb="$(du -k "$extracted/payload/postgres-dumps/$db.dump" 2>/dev/null | awk '{print $1}')"
+      factor=6
+      [[ "$db" == "cirrus" ]] && factor=16
+      load_kb=$((load_kb + ${dump_kb:-0} * factor))
+    done
+    require_free_space "$node_dir/postgres" "$load_kb" "the databases rebuilt from the dumps" \
+      "The node's postgres cluster lives in $node_dir/postgres; free space on that volume and run the restore again (a cached archive is reused, not downloaded again)."
     local node_password
     node_password="$(<"$node_dir/secrets/postgres_password")"
     load_databases "$node_dir/postgres" "$extracted/payload/postgres-dumps" "$node_password"
@@ -2321,15 +2336,26 @@ cmd_restore() {
 
   extracted="$(mktemp_dir)"
   manifest="$extracted/SNAPSHOT.json"
-  # The payload expands well past the archive: a 15 GB helium archive carries a
-  # 17 GB .ethereumH alone. Three times the archive is the working rule.
+  # The payload expands to 1.5-1.8 times the archive (zstd -9 --long=27). The
+  # databases rebuilt from the dumps are checked separately before they load.
   local archive_kb
   archive_kb="$(du -k "$archive" 2>/dev/null | awk '{print $1}')"
-  [[ -n "$archive_kb" ]] && require_free_space "$extracted" "$((archive_kb * 3))" "the extracted snapshot"
+  [[ -n "$archive_kb" ]] && require_free_space "$extracted" "$((archive_kb * 2))" "the extracted snapshot"
+  # Only the dumps that will be loaded are extracted: a validator (--databases
+  # eth) never loads cirrus.dump.
+  local exclude_file selected db
+  exclude_file="$(mktemp_dir)/exclude"
+  selected=" $(selected_databases | tr '\n' ' ') "
+  for db in "${SNAPSHOT_PG_DATABASES[@]}"; do
+    if [[ "$SNAPSHOT_SKIP_DATABASES" == "true" || "$selected" != *" $db "* ]]; then
+      printf 'payload/postgres-dumps/%s.dump\n' "$db"
+    fi
+  done > "$exclude_file"
   t_step="$(date +%s)"
   info "[3/7] Extracting the $(human_bytes "$(file_size_bytes "$archive")") archive into $extracted"
   info "      (decompression is fast; this step is bound by writing the uncompressed state to disk, mostly the LevelDB state trie)"
-  extract_archive "$archive" "$extracted"
+  [[ -s "$exclude_file" ]] && info "      Leaving out the dumps that are not loaded: $(sed 's|.*/||' "$exclude_file" | paste -sd, -)"
+  extract_archive "$archive" "$extracted" "$exclude_file"
   [[ -f "$manifest" ]] || die "SNAPSHOT.json missing from archive"
   info "      Extracted $(human_bytes "$(dir_size_bytes "$extracted")") in $(find "$extracted" -type f | wc -l | tr -d ' ') files ($(elapsed_since "$t_step"))"
 
