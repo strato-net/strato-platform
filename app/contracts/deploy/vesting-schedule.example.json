@@ -4,6 +4,7 @@
   "token": "8ee9a3391e38176feebf5d43cb2c1d6c4f728b04",
   "decimals": 18,
   "tge": "2026-12-01T00:00:00Z",
+  "batchSize": 25,
   "categories": [
     {
       "name": "team",

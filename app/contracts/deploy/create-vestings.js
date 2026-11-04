@@ -15,6 +15,7 @@
 //   "manager": "<40 hex>", "pool": "<40 hex>", "token": "<40 hex>", "decimals": 18,
 //   "tge": "2026-12-01T00:00:00Z",      // ISO 8601 with timezone, or unix seconds
 //   "secondsPerMonth": 3600,             // OPTIONAL, testing only: cliff month = this many seconds
+//   "batchSize": 25,                     // OPTIONAL, default 25: entries per addVestings transaction
 //   "categories": [
 //     { "name": "team", "managed": true, "cliffMonths": 12, "durationWeeks": 104,
 //       "entries": [ { "account": "<40 hex>", "tokens": "1234567.89" } ] }
@@ -22,9 +23,11 @@
 // }
 // startDate = TGE + cliffMonths calendar months (UTC, day clamped to the shorter
 // month), or TGE + cliffMonths * secondsPerMonth when that override is present.
-// Amounts are whole tokens in the file, converted to atoms (uint128). One category is
-// ONE addVestings call: same managed flag, cliff and duration for every entry; an
-// account may appear once per category because ids are parameter hashes.
+// Amounts are whole tokens in the file, converted to atoms (uint128). A category is
+// split into batches of batchSize entries, in file order; each batch is ONE
+// addVestings transaction (one vote) with the category's managed flag, cliff and
+// duration, and is atomic: one bad entry reverts that batch only. An account may
+// appear once per category because ids are parameter hashes.
 require('dotenv').config();
 const config = require('./config');
 const fs = require('fs');
@@ -83,6 +86,8 @@ function loadSchedule(file) {
   if (s.tge === undefined) throw new Error('schedule.tge is required (ISO 8601 with timezone, or unix seconds)');
   s.tgeSeconds = parseTge(s.tge);
   if (s.secondsPerMonth !== undefined && (!Number.isInteger(s.secondsPerMonth) || s.secondsPerMonth <= 0)) throw new Error('secondsPerMonth must be a positive integer');
+  if (s.batchSize === undefined) s.batchSize = 25;
+  if (!Number.isInteger(s.batchSize) || s.batchSize <= 0) throw new Error('batchSize must be a positive integer');
   if (!Array.isArray(s.categories) || !s.categories.length) throw new Error('schedule.categories is empty');
   const names = new Set();
   for (const c of s.categories) {
@@ -104,26 +109,35 @@ function loadSchedule(file) {
       const atoms = toAtoms(e.tokens, s.decimals);
       c.accounts.push(a); c.amounts.push(atoms.toString()); c.total += atoms;
     }
+    c.batches = [];
+    for (let i = 0; i < c.accounts.length; i += s.batchSize) {
+      const accounts = c.accounts.slice(i, i + s.batchSize), amounts = c.amounts.slice(i, i + s.batchSize);
+      c.batches.push({ index: c.batches.length, from: i, accounts, amounts, total: amounts.reduce((t, x) => t + BigInt(x), 0n) });
+    }
   }
   return s;
 }
 
-const argsFor = (c) => ({ accounts: c.accounts, amounts: c.amounts, managed: c.managed, durationWeeks: c.durationWeeks, startDate: c.startDate });
-const argsHash = (c) => crypto.createHash('sha256').update(JSON.stringify(argsFor(c))).digest('hex');
+const argsFor = (c, b) => ({ accounts: b.accounts, amounts: b.amounts, managed: c.managed, durationWeeks: c.durationWeeks, startDate: c.startDate });
+const argsHash = (c, b) => crypto.createHash('sha256').update(JSON.stringify(argsFor(c, b))).digest('hex');
+const batchLabel = (c, b) => c.batches.length > 1 ? `${c.name} batch ${b.index + 1}/${c.batches.length}` : c.name;
 const fmtTokens = (atoms, d) => (Number(atoms) / 10 ** d).toLocaleString('en-US');
 
 function printPlan(s) {
   console.log(`TGE ${s.tgeSeconds} (${iso(s.tgeSeconds)})${s.secondsPerMonth ? `; TEST SCALE: 1 cliff month = ${s.secondsPerMonth} s` : ''}`);
   console.log(`manager ${s.manager}  pool ${s.pool}  token ${s.token}  decimals ${s.decimals}`);
-  let grand = 0n;
-  s.categories.forEach((c, i) => {
+  let grand = 0n, txs = 0;
+  for (const c of s.categories) {
     grand += c.total;
-    console.log(`\n[${i + 1}] ${s.manager}.addVestings(accounts[${c.accounts.length}], amounts[${c.accounts.length}], managed=${c.managed}, durationWeeks=${c.durationWeeks}, startDate=${c.startDate})   # ${c.name}`);
-    console.log(`    start ${iso(c.startDate)} (cliff ${c.cliffMonths} months)  end ${iso(c.startDate + c.durationWeeks * 604800)}${c.durationWeeks === 0 ? ' (fully vested at start)' : ''}`);
-    c.accounts.forEach((a, j) => console.log(`    ${a}  ${c.amounts[j]} atoms  (${fmtTokens(c.amounts[j], s.decimals)} tokens)`));
-    console.log(`    total ${c.total} atoms (${fmtTokens(c.total, s.decimals)} tokens)   args sha256 ${argsHash(c)}`);
-  });
-  console.log(`\n${s.categories.length} transactions; ${grand} atoms (${fmtTokens(grand, s.decimals)} tokens) must be available in the pool before they execute.`);
+    console.log(`\n== ${c.name}: ${c.accounts.length} entries in ${c.batches.length} transaction(s) of up to ${s.batchSize}; managed=${c.managed}; start ${iso(c.startDate)} (cliff ${c.cliffMonths} months); end ${iso(c.startDate + c.durationWeeks * 604800)}${c.durationWeeks === 0 ? ' (fully vested at start)' : ''}; total ${fmtTokens(c.total, s.decimals)} tokens`);
+    for (const b of c.batches) {
+      txs++;
+      console.log(`[${txs}] ${s.manager}.addVestings(accounts[${b.accounts.length}], amounts[${b.accounts.length}], managed=${c.managed}, durationWeeks=${c.durationWeeks}, startDate=${c.startDate})   # ${batchLabel(c, b)}`);
+      b.accounts.forEach((a, j) => console.log(`    ${a}  ${b.amounts[j]} atoms  (${fmtTokens(b.amounts[j], s.decimals)} tokens)`));
+      console.log(`    batch total ${b.total} atoms (${fmtTokens(b.total, s.decimals)} tokens)   args sha256 ${argsHash(c, b)}`);
+    }
+  }
+  console.log(`\n${txs} transactions; ${grand} atoms (${fmtTokens(grand, s.decimals)} tokens) must be available in the pool before they execute.`);
 }
 
 async function login() {
@@ -161,9 +175,10 @@ async function status(tokenObj, s, quiet) {
   for (const c of s.categories) {
     const found = c.accounts.map((_, j) => matchEntry(onchain, c, j));
     const done = found.filter(Boolean).length;
-    report.push({ c, found, done });
+    const batches = c.batches.map((b) => ({ b, done: b.accounts.filter((_, j) => found[b.from + j]).length }));
+    report.push({ c, found, done, batches });
     if (!quiet) {
-      console.log(`${c.name}: ${done}/${c.accounts.length} scheduled`);
+      console.log(`${c.name}: ${done}/${c.accounts.length} scheduled` + (c.batches.length > 1 ? ` (${batches.filter((x) => x.done === x.b.accounts.length).length}/${c.batches.length} batches complete)` : ''));
       c.accounts.forEach((a, j) => console.log(`  ${found[j] ? 'OK      ' : 'MISSING '} ${a}  ${fmtTokens(c.amounts[j], s.decimals)} tokens${found[j] ? `  id ${found[j].id}${found[j].cancelled ? '  (cancelled)' : ''}` : ''}`));
     }
   }
@@ -202,12 +217,15 @@ async function callAndWait(tokenObj, callArgs) {
 
   if (cmd === 'create') {
     const report = await status(tokenObj, s, true);
-    for (const { c, done } of report) {
-      if (done === c.accounts.length) { console.log(`${c.name}: already scheduled (${done}/${done}), skipping`); continue; }
-      if (done > 0) { console.error(`${c.name}: ${done}/${c.accounts.length} entries already exist; a re-run would collide on their ids ("Vesting id already used"). Fix the file first.`); process.exit(1); }
-      console.log(`${c.name}: ${user} voting ${s.manager}.addVestings for ${c.accounts.length} entries, ${fmtTokens(c.total, s.decimals)} tokens, args sha256 ${argsHash(c)}`);
-      const r = await callAndWait(tokenObj, { contract: { name: 'VestingPoolManager', address: s.manager }, method: 'addVestings', args: argsFor(c), txParams: { gasPrice: config.gasPrice, gasLimit: 8000000 } });
-      console.log(`  result: ${r.status}${r.msg ? ' | ' + r.msg.slice(0, 200) : ''} (tx ${r.hash})`);
+    for (const { c, batches } of report) {
+      for (const { b, done } of batches) {
+        const label = batchLabel(c, b);
+        if (done === b.accounts.length) { console.log(`${label}: already scheduled (${done}/${done}), skipping`); continue; }
+        if (done > 0) { console.error(`${label}: ${done}/${b.accounts.length} entries already exist; re-submitting would collide on their ids ("Vesting id already used"). Fix the file (or the batch boundaries) first.`); process.exit(1); }
+        console.log(`${label}: ${user} voting ${s.manager}.addVestings for ${b.accounts.length} entries, ${fmtTokens(b.total, s.decimals)} tokens, args sha256 ${argsHash(c, b)}`);
+        const r = await callAndWait(tokenObj, { contract: { name: 'VestingPoolManager', address: s.manager }, method: 'addVestings', args: argsFor(c, b), txParams: { gasPrice: config.gasPrice, gasLimit: 8000000 } });
+        console.log(`  result: ${r.status}${r.msg ? ' | ' + r.msg.slice(0, 200) : ''} (tx ${r.hash})`);
+      }
     }
     console.log('Run `status` to see what executed; a vote below quorum needs another admin to run `create` with the same file.');
     return;
