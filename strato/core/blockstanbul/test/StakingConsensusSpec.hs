@@ -152,18 +152,31 @@ spec = describe "stake-weighted consensus" $ do
       _sequence (_view ctx) `shouldBe` 11
 
     it "selects the leader by stake once active and round-robin before" $ do
-      let weights = M.fromList [(Validator me, 1000), (Validator other, 0)]
-      computeLeader activeCtx {_stakes = weights} `shouldBe` Validator me
-      computeLeader (activeCtx {_stakes = weights} & view . round .~ 1) `shouldBe` Validator other
+      let pair = S.fromList [Validator me, Validator other]
+          weights = M.fromList [(Validator me, 1000), (Validator other, 1)]
+          pick0 = selectProposer 1 11 pair weights 0 0
+          pick1 = if pick0 == Validator me then Validator other else Validator me
+      computeLeader activeCtx {_stakes = weights} `shouldBe` pick0
+      computeLeader (activeCtx {_stakes = weights} & view . round .~ 1) `shouldBe` pick1
       computeLeader legacyCtx `shouldBe` (0 `S.elemAt` _validators legacyCtx)
       computeLeader (legacyCtx & view . round .~ 1) `shouldBe` (1 `S.elemAt` _validators legacyCtx)
 
+    it "selects the leader uniformly while a validator has no stake yet" $ do
+      let partial = M.fromList [(Validator me, 1000)]
+      computeLeader activeCtx {_stakes = partial} `shouldBe` computeLeader activeCtx {_stakes = M.empty}
+      computeLeader (activeCtx {_stakes = partial} & view . round .~ 1) `shouldBe` computeLeader (activeCtx & view . round .~ 1)
+
   describe "stake-weighted quorum" $ do
     let pair = S.fromList [Validator me, Validator other]
-    it "weighs votes by stake once active, one each before, and one each while nobody has stake" $ do
-      voteWeights True pair (M.fromList [(Validator me, 10)]) `shouldBe` M.fromList [(Validator me, 10), (Validator other, 0)]
-      voteWeights False pair (M.fromList [(Validator me, 10)]) `shouldBe` M.fromList [(Validator me, 1), (Validator other, 1)]
-      voteWeights True pair M.empty `shouldBe` M.fromList [(Validator me, 1), (Validator other, 1)]
+        headcount = M.fromList [(Validator me, 1), (Validator other, 1)]
+    it "weighs votes by stake once active and every member has some, one each otherwise" $ do
+      voteWeights True pair (M.fromList [(Validator me, 10), (Validator other, 5)]) `shouldBe` M.fromList [(Validator me, 10), (Validator other, 5)]
+      voteWeights False pair (M.fromList [(Validator me, 10), (Validator other, 5)]) `shouldBe` headcount
+      voteWeights True pair M.empty `shouldBe` headcount
+      -- A member without a published weight is not a member without a vote: until every
+      -- weight is published, nobody's stake can outvote the headcount.
+      voteWeights True pair (M.fromList [(Validator me, 10)]) `shouldBe` headcount
+      hasSupermajority (voteWeights True pair (M.fromList [(Validator me, 10)])) (S.singleton (Validator me)) `shouldBe` False
 
     it "needs more than two thirds of the weight" $ do
       let w = M.fromList [(Validator me, 70), (Validator other, 30)]
@@ -173,11 +186,12 @@ spec = describe "stake-weighted consensus" $ do
       hasMinority (M.fromList [(Validator me, 60), (Validator other, 40)]) (S.singleton (Validator other)) `shouldBe` True
 
     it "commits on stake, not on headcount, once active" $ do
-      let blk = Block (v3 [Validator me, Validator other] [(Validator me, 1000)] 0 [] []) [] []
+      let stakes' = [(Validator me, 1000), (Validator other, 1)]
+          blk = Block (v3 [Validator me, Validator other] stakes' 0 [] []) [] []
           di = blockHash blk
           prepare who = IMsg (MsgAuth who dummySig) (Prepare (View 0 10) di)
           commitsOut out = length [() | OMsg _ Commit {} <- out]
-      out <- runWith activeCtx {_stakes = M.fromList [(Validator me, 1000)]} $ do
+      out <- runWith activeCtx {_stakes = M.fromList stakes'} $ do
         proposal .= Just blk
         o1 <- sendMessages [prepare other]
         o2 <- sendMessages [prepare me]
@@ -211,10 +225,13 @@ spec = describe "stake-weighted consensus" $ do
       checkProposalHeader solo vw (seal $ v3 [] [(Validator me, 7)] 0 [] []) `shouldSatisfy` rejected
 
     it "rejects proposals sealed by someone other than the selected proposer" $ do
-      let hdr = v3 [Validator me, Validator other] [(Validator other, 7)] 0 [] []
-          ctx = activeCtx {_stakes = M.fromList [(Validator other, 7)]}
-      selectProposer 1 11 (_validators ctx) (_stakes ctx) 0 0 `shouldBe` Validator other
-      checkProposalHeader ctx vw (seal hdr) `shouldSatisfy` either (const True) (const False)
+      -- Of the two rounds of a height exactly one selects `other`; seal that one as `me`.
+      let stakes' = [(Validator me, 1), (Validator other, 7)]
+          ctx = activeCtx {_stakes = M.fromList stakes'}
+          rnd = if selectProposer 1 11 (_validators ctx) (_stakes ctx) 0 0 == Validator other then 0 else 1
+          hdr = v3 [Validator me, Validator other] stakes' rnd [] []
+      selectProposer 1 11 (_validators ctx) (_stakes ctx) 0 rnd `shouldBe` Validator other
+      checkProposalHeader ctx (View (fromInteger rnd) 10) (seal hdr) `shouldSatisfy` either (const True) (const False)
 
     it "does not apply the extra checks before activation" $
       checkProposalHeader legacyCtx vw (Block (v3 [] [] 5 [] []) [] []) `shouldBe` Right ()
