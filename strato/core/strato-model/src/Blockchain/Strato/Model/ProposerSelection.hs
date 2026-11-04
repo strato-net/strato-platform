@@ -13,6 +13,7 @@ module Blockchain.Strato.Model.ProposerSelection
   ( StakeMap,
     selectProposer,
     selectionSeed,
+    stakeWeights,
   )
 where
 
@@ -33,17 +34,35 @@ selectionSeed chainId height rnd =
     be256 :: Integer -> B.ByteString
     be256 = word256ToBytes . fromInteger
 
+-- | The stake weights in force for a validator set: the published weights when
+-- every member has one, nothing otherwise.
+--
+-- Weights are published one validator at a time (the staking contract syncs a
+-- validator when its stake moves, and anyone can move it by a wei), so a set in
+-- which some members have weight and others have none is a set whose weights
+-- are not all published yet. Weighing such a set would hand it to whoever was
+-- published first: a lone weighted member is the first-round proposer and,
+-- with everyone else weighing 0, a one-member quorum. So weights are in force only
+-- once every member has some; until then the set is unweighted, as before
+-- activation. Every consumer of stake weights (leader selection, vote tallies)
+-- goes through this, so they switch together.
+stakeWeights :: S.Set Validator -> StakeMap -> Maybe (M.Map Validator Integer)
+stakeWeights validators stakes
+  | not (S.null validators) && all (> 0) (M.elems weights) = Just weights
+  | otherwise = Nothing
+  where
+    weights = M.fromSet (\v -> max 0 (M.findWithDefault 0 v stakes)) validators
+
 -- | @selectProposer chainId height validators stakes startRound round@ selects
 -- the proposer for @height@ at PBFT round @round@, where @startRound@ is the
 -- round the height began at (the round of the parent block; rounds persist
 -- across heights and only advance on timeouts).
 --
--- A round picks a validator with probability proportional to its stake
--- (validators without an entry in the stake map weigh 0); if the total weight
--- of the candidates is 0 the pick is uniform over the sorted candidate list.
--- The proposers chosen for the previous rounds of this height (at most
--- @n - 1@ of them) are excluded, so a round change always moves to a different
--- validator.
+-- A round picks a validator with probability proportional to its stake while
+-- the set's weights are in force ('stakeWeights'); otherwise the pick is
+-- uniform over the sorted candidate list. The proposers chosen for the
+-- previous rounds of this height (at most @n - 1@ of them) are excluded, so a
+-- round change always moves to a different validator.
 --
 -- The validator set must be non-empty.
 selectProposer :: Integer -> Integer -> S.Set Validator -> StakeMap -> Integer -> Integer -> Validator
@@ -54,17 +73,17 @@ selectProposer chainId height validators stakes startRound rnd
     n = toInteger (S.size validators)
     -- only the last n-1 rounds of this height can exclude anybody
     firstRound = max startRound (rnd - (n - 1))
+    inForce = stakeWeights validators stakes
 
     go r cands =
       let pick = pickWeighted (selectionSeed chainId height r) cands
        in if r >= rnd then pick else go (r + 1) (filter (/= pick) cands)
 
-    pickWeighted seed cands =
-      let weights = [(c, max 0 (M.findWithDefault 0 c stakes)) | c <- cands]
-          total = sum (map snd weights)
-       in if total == 0
-            then cands !! fromInteger (seed `mod` toInteger (length cands))
-            else walk (seed `mod` total) weights
+    pickWeighted seed cands = case inForce of
+      Nothing -> cands !! fromInteger (seed `mod` toInteger (length cands))
+      Just ws ->
+        let weights = [(c, ws M.! c) | c <- cands]
+         in walk (seed `mod` sum (map snd weights)) weights
 
     walk _ [] = error "selectProposer: exhausted weights"
     walk x ((c, w) : rest)
