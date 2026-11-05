@@ -29,7 +29,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { psmService, PsmInfo, EligibleToken } from "@/services/psmService";
 import { formatBalance, safeBigInt, safeParseUnits } from "@/utils/numberUtils";
-import { PSM_MINT_FEE, PSM_REDEEM_FEE } from "@/lib/constants";
+import { PSM_MINT_CALLS, PSM_REDEEM_CALLS } from "@/lib/constants";
+import NetworkFee from "@/components/NetworkFee";
 
 const BPS_DENOMINATOR = 10000n;
 const WAD = 10n ** 18n;
@@ -399,7 +400,7 @@ const DirectMintPSMSection = () => {
 
                   {isLoggedIn && (
                     <div className="text-sm text-muted-foreground">
-                      Transaction Fee: {PSM_MINT_FEE} USDST
+                      Transaction Fee: <NetworkFee calls={PSM_MINT_CALLS} />
                     </div>
                   )}
 
@@ -518,7 +519,7 @@ const DirectMintPSMSection = () => {
 
                 {isLoggedIn && (
                   <div className="text-sm text-muted-foreground">
-                    Transaction Fee: {PSM_REDEEM_FEE} USDST
+                    Transaction Fee: <NetworkFee calls={PSM_REDEEM_CALLS} />
                   </div>
                 )}
 
@@ -572,7 +573,7 @@ const DirectMintPSMSection = () => {
                   to you.
                 </p>
                 <p className="text-xs">
-                  Transaction fee: {PSM_REDEEM_FEE} USDST
+                  Transaction fee: <NetworkFee calls={PSM_REDEEM_CALLS} />
                 </p>
               </div>
             </AlertDialogDescription>
