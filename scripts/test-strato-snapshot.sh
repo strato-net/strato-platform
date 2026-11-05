@@ -193,18 +193,38 @@ if STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapsho
   exit 1
 fi
 
-STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium --force \
-  2> "$TMP/restore-all-dbs.err"
+# The extraction dir is gone when restore exits, so a tar wrapper records the
+# files each extraction (tar ... -C <dir>) wrote.
+TAR_FAKEBIN="$TMP/tar-fakebin"
+mkdir -p "$TAR_FAKEBIN"
+cat > "$TAR_FAKEBIN/tar" <<'SH'
+#!/usr/bin/env bash
+"${REAL_TAR:?}" "$@" || exit
+dest=""
+prev=""
+for arg in "$@"; do
+  [[ "$prev" == "-C" ]] && dest="$arg"
+  prev="$arg"
+done
+[[ -z "$dest" ]] || find "$dest" -type f >> "${FAKE_TAR_LOG:?}"
+SH
+chmod +x "$TAR_FAKEBIN/tar"
+TAR_ENV=(STRATO_SNAPSHOT_OFFLINE_TEST=1 REAL_TAR="$(command -v tar)" PATH="$TAR_FAKEBIN:$PATH")
+
+env "${TAR_ENV[@]}" FAKE_TAR_LOG="$TMP/tar-all-dbs.log" "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium --force
 assert_no_appledouble "$NODE"
-if grep -q "Leaving out the dumps" "$TMP/restore-all-dbs.err"; then
-  echo "a restore of every database must extract every dump" >&2
-  exit 1
-fi
+assert_contains "$TMP/tar-all-dbs.log" "/payload/postgres-dumps/eth.dump$"
+assert_contains "$TMP/tar-all-dbs.log" "/payload/postgres-dumps/cirrus.dump$"
 
 # A validator loads only eth; cirrus.dump is not extracted.
-STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium --force \
+env "${TAR_ENV[@]}" FAKE_TAR_LOG="$TMP/tar-eth-only.log" "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium --force \
   --databases eth 2> "$TMP/restore-eth-only.err"
 assert_contains "$TMP/restore-eth-only.err" "Leaving out the dumps that are not loaded: cirrus.dump$"
+assert_contains "$TMP/tar-eth-only.log" "/payload/postgres-dumps/eth.dump$"
+if grep -q "/payload/postgres-dumps/cirrus.dump$" "$TMP/tar-eth-only.log"; then
+  echo "a restore of --databases eth must not extract cirrus.dump" >&2
+  exit 1
+fi
 assert_contains "$NODE/.ethereumH/state/value" "state-from-snapshot"
 
 cat > "$TMP/metadata.json" <<'JSON'
