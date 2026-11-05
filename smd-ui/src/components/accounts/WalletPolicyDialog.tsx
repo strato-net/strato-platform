@@ -38,7 +38,7 @@ import {
 } from "@/services/userWallets";
 
 function isZero(addr?: string): boolean {
-  return !addr || /^0x?0*$/.test(addr.replace(/^0x/, "0x"));
+  return !addr || /^0x?0*$/.test(addr);
 }
 
 export function WalletPolicyDialog({ wallet }: { wallet: UserWallet }) {
