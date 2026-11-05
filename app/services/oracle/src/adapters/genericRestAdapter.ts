@@ -252,14 +252,19 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
 
     // TwelveData /quote?prepost=true: extended_price (pre/post-market) when newer than the regular-session close
     // Single symbol returns the quote directly, multiple returns {"XAU/USD": {...}}
+    // `timestamp` is the OPEN of the daily bar (e.g. 09:30 ET), not the quote time; `last_quote_at` is when
+    // `close` was last updated. Using `timestamp` would make every regular-session quote look hours old
+    // and fail a maxAgeSec gate. Non-equities report extended_price "0" / extended_timestamp 0.
     } else if (parsePattern === 'twelveDataQuote') {
         symbols.forEach(symbol => {
             const mapped = sourceConfig.symbolMapping?.[symbol] || symbol;
             const quote = data[mapped] || (symbols.length === 1 ? data : null);
             if (!quote) return;
-            const useExtended = quote.extended_price && Number(quote.extended_timestamp) >= Number(quote.timestamp || 0);
+            const closeAt = Number(quote.last_quote_at || quote.timestamp || 0);
+            const extendedAt = Number(quote.extended_timestamp || 0);
+            const useExtended = parseFloat(quote.extended_price) > 0 && extendedAt > closeAt;
             const priceUSD = parseFloat(useExtended ? quote.extended_price : quote.close);
-            const tsSec = Number(useExtended ? quote.extended_timestamp : quote.timestamp);
+            const tsSec = useExtended ? extendedAt : closeAt;
             const price = Math.floor(priceUSD * 1e18);
             if (isValidPrice(price) && tsSec > 0) {
                 result[symbol] = { price, feedTimestamp: new Date(tsSec * 1000).toISOString() };
