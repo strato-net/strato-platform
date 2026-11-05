@@ -1872,7 +1872,7 @@ export const getProtocolRevenueByPeriod = async (
       return aggregated.aggregated[period];
     }
   } catch (error: any) {
-    console.error(`Error fetching ${protocol || 'aggregated'} protocol revenue for ${period}:`, {
+    console.error("Error fetching %s protocol revenue for %s:", protocol || 'aggregated', period, {
       error: error.response?.data || error.message
     });
     throw new Error(`Failed to fetch protocol revenue for ${period}`);
