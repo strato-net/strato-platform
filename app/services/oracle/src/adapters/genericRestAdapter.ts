@@ -250,18 +250,19 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
 
-    // TwelveData: {symbol}.price where symbol is mapped (e.g., XAU/USD)
-    // Single symbol returns {"price": "..."}, multiple returns {"XAU/USD": {"price": "..."}}
-    } else if (parsePattern === '{symbol}.price') {
+    // TwelveData /quote?prepost=true: extended_price (pre/post-market) when newer than the regular-session close
+    // Single symbol returns the quote directly, multiple returns {"XAU/USD": {...}}
+    } else if (parsePattern === 'twelveDataQuote') {
         symbols.forEach(symbol => {
             const mapped = sourceConfig.symbolMapping?.[symbol] || symbol;
-            // Handle single symbol response (direct price) vs batch response (keyed by symbol)
-            const symbolData = data[mapped] || (symbols.length === 1 ? data : null);
-            if (symbolData?.price) {
-                const price = Math.floor(parseFloat(symbolData.price) * 1e18);
-                if (isValidPrice(price)) {
-                    result[symbol] = { price, feedTimestamp: new Date().toISOString() };
-                }
+            const quote = data[mapped] || (symbols.length === 1 ? data : null);
+            if (!quote) return;
+            const useExtended = quote.extended_price && Number(quote.extended_timestamp) >= Number(quote.timestamp || 0);
+            const priceUSD = parseFloat(useExtended ? quote.extended_price : quote.close);
+            const tsSec = Number(useExtended ? quote.extended_timestamp : quote.timestamp);
+            const price = Math.floor(priceUSD * 1e18);
+            if (isValidPrice(price) && tsSec > 0) {
+                result[symbol] = { price, feedTimestamp: new Date(tsSec * 1000).toISOString() };
             }
         });
 
