@@ -235,7 +235,7 @@ const stripComments = (str) => {
 /** Combined, comment-stripped source exactly as it would be uploaded. Usable in dry runs (no credentials). */
 async function localSource(contractFile) {
   const config = require('./config');
-  const { importer } = require('blockapps-rest');
+  const { importer } = require('./strato');
   return combineSource(config, importer, contractFile);
 }
 
@@ -534,7 +534,7 @@ async function main() {
   // config.js reads NODE_URL at load time, so require it only after setting it.
   const config = require('./config');
   const auth = require('./auth');
-  const { rest, importer, util } = require('blockapps-rest');
+  const { rest, importer, util } = require('./strato');
   console.log(`\nAuthenticating as ${process.env.GLOBAL_ADMIN_NAME} against ${config.nodes[0].url}...`);
   const chain = {
     rest, importer, util, config, nodeUrl: config.nodes[0].url,

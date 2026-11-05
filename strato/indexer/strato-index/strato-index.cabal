@@ -98,3 +98,25 @@ executable strato-promote
     , text
     , time
   default-language: Haskell2010
+
+test-suite strato-index-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Paths_strato_index
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base
+    , bytestring
+    , common-log
+    , composable-monads-base
+    , directory
+    , filepath
+    , hflags
+    , hspec
+    , strato-index
+    , strato-model
+    , streaming
+  default-language: Haskell2010

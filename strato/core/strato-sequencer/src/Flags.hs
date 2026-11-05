@@ -50,6 +50,7 @@ exportFlagsAsMetrics = do
   set "kafkaclientid" $ show flags_kafkaclientid
   set "blockstanbul_block_period_ms" $ show (Conf.blockPeriodMs (networkConfig ethConf))
   set "blockstanbul_round_period_s" $ show (Conf.roundPeriodS (networkConfig ethConf))
+  set "blockstanbul_max_timestamp_drift_s" $ show (Conf.maxTimestampDriftS (networkConfig ethConf))
   set "validatorBehavior" $ show flags_validatorBehavior
   set "seq_debug_mode" $ show flags_seq_debug_mode
   set "seq_max_events_per_iter" $ show flags_seq_max_events_per_iter

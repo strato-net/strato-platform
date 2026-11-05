@@ -96,12 +96,14 @@ tests:
     dependencies:
       - hspec
       - QuickCheck
+      - aeson
       - blockapps-data
       - blockDB
       - containers
       - ethereum-rlp
       - strato-model
       - vm-tools
+      - strato-conf
       - base16-bytestring
       - blockapps-data
       - blockapps-datadefs
@@ -112,6 +114,7 @@ tests:
       - statedb-monad
       - solid-vm-model
       - strato-model
+      - time
       - vector
       - Decimal
       - binary

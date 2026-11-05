@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { ArrowDown, ArrowUp, Gem, Frown } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
+import { metalPurchasesEnabled } from '@/lib/constants';
 import { useBridgeContext } from '@/context/BridgeContext';
 import { formatBalance } from '@/utils/numberUtils';
 import { mergePendingDeposits } from '@/lib/bridge/utils';
@@ -269,6 +270,13 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
               ? emptyState
               : renderTxRows(activeTxs)
         }
+        {!metalPurchasesEnabled && isBridge && isLoggedIn && (
+          <div className="border-t border-border/70 px-4 py-3">
+            <Link to="/metal-transactions?from=deposits" className={linkClass}>
+              Metal purchase history {"\u2192"}
+            </Link>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

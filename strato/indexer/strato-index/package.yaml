@@ -76,3 +76,19 @@ executables:
       - time
     other-modules: []
 
+
+tests:
+  strato-index-test:
+    main: Main.hs
+    source-dirs: test
+    dependencies:
+    - bytestring
+    - common-log
+    - composable-monads-base
+    - directory
+    - filepath
+    - hflags
+    - hspec
+    - strato-index
+    - strato-model
+    - streaming

@@ -33,6 +33,7 @@ CONTAINER_MODE="false"
 PREBUILT="false"
 PREBUILT_TAG=""
 REPO_URL=""
+SSL_DIR=""
 SETUP_ARGS=()
 for arg in "$@"; do
     case "$arg" in
@@ -59,7 +60,7 @@ for arg in "$@"; do
             ;;
         # --role is passed through to strato-setup; remembered here because a
         # snapshot (chain state) has nothing to restore into an API-only directory
-        # and a validator keeps no SQL databases. strato-setup matches the value
+        # and a validator loads only the eth dump. strato-setup matches the value
         # case-insensitively, so it is lowercased here too.
         --role=*)
             ROLE="$(printf '%s' "${arg#*=}" | tr '[:upper:]' '[:lower:]')"
@@ -92,6 +93,13 @@ for arg in "$@"; do
         --repoUrl=*)
             REPO_URL="${arg#*=}"
             SETUP_ARGS+=("$arg")
+            ;;
+        # Made absolute, so that a strato-setup run in a container (below)
+        # finds the certificate where its files are mounted.
+        --sslDir=*)
+            SSL_DIR="${arg#*=}"
+            [[ -d "$SSL_DIR" ]] && SSL_DIR="$(cd "$SSL_DIR" && pwd)"
+            SETUP_ARGS+=("--sslDir=$SSL_DIR")
             ;;
         *)
             SETUP_ARGS+=("$arg")
@@ -210,7 +218,9 @@ elif [[ "$CONTAINER_MODE" == "true" && "$PREBUILT" == "true" ]]; then
     # No host binaries: strato-setup runs from the strato image, over the node
     # directory's parent mounted at its own path, as the invoking user, with
     # the host's name (the node URL is built from it) and home (the default
-    # node file, and the OAuth credentials strato-login stored).
+    # node file, and the OAuth credentials strato-login stored). The --sslDir
+    # files are mounted one by one at their own paths, so a certificate that
+    # is a symlink (e.g. Let's Encrypt live/) still resolves on the host.
     if ! docker image inspect "$STRATO_IMAGE" >/dev/null 2>&1 && ! docker pull "$STRATO_IMAGE"; then
         echo "Error: could not pull $STRATO_IMAGE." >&2
         exit 1
@@ -219,8 +229,12 @@ elif [[ "$CONTAINER_MODE" == "true" && "$PREBUILT" == "true" ]]; then
     NODE_PARENT="$(cd "$(dirname "$NODE_DIR")" && pwd)"
     SECRETS_MOUNT=()
     [[ -d "$HOME/.secrets" ]] && SECRETS_MOUNT=(-v "$HOME/.secrets:$HOME/.secrets:ro")
+    SSL_MOUNTS=()
+    for f in server.pem server.key; do
+        [[ -n "$SSL_DIR" && -f "$SSL_DIR/$f" ]] && SSL_MOUNTS+=(-v "$SSL_DIR/$f:$SSL_DIR/$f:ro")
+    done
     docker run --rm --entrypoint strato-setup --user "$(id -u):$(id -g)" --hostname "$(hostname)" \
-        -e HOME="$HOME" -v "$HOME/.strato:$HOME/.strato" "${SECRETS_MOUNT[@]}" \
+        -e HOME="$HOME" -v "$HOME/.strato:$HOME/.strato" "${SECRETS_MOUNT[@]}" "${SSL_MOUNTS[@]}" \
         -v "$NODE_PARENT:$NODE_PARENT" -w "$NODE_PARENT" \
         "$STRATO_IMAGE" "$NODE_PARENT/$(basename "$NODE_DIR")" "${SETUP_ARGS[@]:1}"
 elif [[ "$PREBUILT" == "true" ]] && ! command -v strato-setup >/dev/null 2>&1; then
@@ -241,11 +255,12 @@ if [[ "$FROM_SNAPSHOT" == "true" ]]; then
         SNAPSHOT_ARG=(--snapshot)
         echo "Restoring node from latest $NETWORK snapshot..."
     fi
-    # A validator keeps no SQL block index and no Cirrus: restore the chain
-    # state only and leave the eth and cirrus dumps out.
+    # A validator keeps the SQL block index (strato-p2p and vm-runner read
+    # blocks from it) but runs no Cirrus: load the eth dump and leave the
+    # cirrus dump out.
     RESTORE_ARGS=()
     if [[ "$ROLE" == "validator" ]]; then
-        RESTORE_ARGS+=(--skip-databases)
+        RESTORE_ARGS+=(--databases eth)
     fi
     if ! strato_tool strato-snapshot restore "$NODE_DIR" "${SNAPSHOT_ARG[@]}" --network "$NETWORK" --force "${RESTORE_ARGS[@]}"; then
         echo "Error: snapshot restore failed; not starting STRATO." >&2
@@ -312,7 +327,9 @@ export MALLOC_ARENA_MAX=2
 # "-p", drops an output it can no longer write (the gone terminal, a closed
 # pipe) instead of exiting: a dead tee leaves convoke's pipe without a reader.
 : > logs/convoke.log
-nohup strato-fast-cores convoke > >(trap '' HUP; tee -a -p logs/convoke.log >/dev/null) 2> >(trap '' HUP; tee -a -p logs/convoke.log >&2) &
+# BSD tee (macOS) has no "-p"; there a closed output ends that tee as before.
+TEE_P=""; tee -p </dev/null >/dev/null 2>&1 && TEE_P="-p"
+nohup strato-fast-cores convoke > >(trap '' HUP; tee -a $TEE_P logs/convoke.log >/dev/null) 2> >(trap '' HUP; tee -a $TEE_P logs/convoke.log >&2) &
 CONVOKE_PID=$!
 echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
 

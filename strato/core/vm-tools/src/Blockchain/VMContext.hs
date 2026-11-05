@@ -85,6 +85,7 @@ module Blockchain.VMContext
   )
 where
 
+import Control.Exception (throw)
 import BlockApps.Init ()
 import BlockApps.Logging
 import Blockchain.Bagger.BaggerState (BaggerState, defaultBaggerState)
@@ -626,12 +627,12 @@ getNewAddressWithSalt address salt hsh args = do
   when flags_debug $ liftIO $ putStrLn $ "Creating new address: owner=" ++ format address ++ ", nonce=" ++ show nonce'
   let saltAsString = case salt of
         (SString s) -> s
-        _ -> invalidArguments "big major bad" salt
+        _ -> throw (InvalidArguments "big major bad" (T.unpack (renderValueShallow salt)))
   let newAddress = getNewAddressWithSalt_unsafe address saltAsString (keccak256ToByteString hsh) args
   $logDebugS "getNewAddressWithSalt" $ T.pack $ show address ++ " " ++ saltAsString ++ " " ++ (show $ keccak256ToByteString hsh) ++ " " ++ show args
   doesAddressAlreadyExist <- A.lookup (Mod.Proxy @AddressState) newAddress
   case doesAddressAlreadyExist of
-    Just _ -> duplicateContract $ "The address " ++ show newAddress ++ " already exists. Try using a different salt or constructor arguments."
+    Just _ -> throw (DuplicateContract $ "The address " ++ show newAddress ++ " already exists. Try using a different salt or constructor arguments.")
     Nothing -> do
       incrementNonce address
       return newAddress

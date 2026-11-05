@@ -1,6 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const cookieParser = require('cookie-parser');
+const escapeHtml = require('escape-html');
 
 const path = require('path');
 
@@ -16,12 +17,6 @@ const KRATOS_BROWSER_URL = process.env.KRATOS_BROWSER_URL || 'http://localhost:8
 const KRATOS_ADMIN_URL = process.env.KRATOS_ADMIN_URL || 'http://localhost:4434';
 const HYDRA_ADMIN_URL = process.env.HYDRA_ADMIN_URL || 'http://localhost:4445';
 const ADMIN_USERNAME = process.env.LOCAL_AUTH_ADMIN_USERNAME || 'admin';
-
-const escapeHtml = value => String(value)
-  .replace(/&/g, '&amp;')
-  .replace(/"/g, '&quot;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;');
 
 const html = (title, content, pageId = '') => `
 <!DOCTYPE html>
@@ -131,7 +126,7 @@ app.get('/login', async (req, res) => {
         <div id="kc-form">
           <div id="kc-form-wrapper">
             <form id="kc-form-login" method="POST" action="/auth/ui/login/oauth">
-              <input type="hidden" name="login_challenge" value="${login_challenge}">
+              <input type="hidden" name="login_challenge" value="${escapeHtml(login_challenge)}">
               <div class="form-group">
                 <label for="username" class="pf-c-form__label pf-c-form__label-text">Username</label>
                 <input id="username" class="pf-c-form-control" name="identifier" type="text" value="${ADMIN_USERNAME}" autofocus autocomplete="username" />
@@ -149,7 +144,7 @@ app.get('/login', async (req, res) => {
       `, 'login-login'));
     } catch (error) {
       console.error('Hydra login error:', error.response?.data || error.message);
-      return res.status(500).send(html('Error', `<div class="alert alert-error">Login error: ${error.message}</div>`));
+      return res.status(500).send(html('Error', `<div class="alert alert-error">Login error: ${escapeHtml(error.message)}</div>`));
     }
   }
 
@@ -162,7 +157,7 @@ app.get('/login', async (req, res) => {
       );
 
       const csrfToken = flowData.ui.nodes.find(n => n.attributes.name === 'csrf_token')?.attributes.value || '';
-      const messages = flowData.ui.messages?.map(m => m.text).join('<br>') || '';
+      const messages = flowData.ui.messages?.map(m => escapeHtml(m.text)).join('<br>') || '';
 
       return res.send(html('Login to STRATO', `
         ${messages ? `<div class="alert alert-error">${messages}</div>` : ''}
@@ -238,7 +233,7 @@ app.post('/login/oauth', async (req, res) => {
       <div id="kc-form">
         <div id="kc-form-wrapper">
           <form id="kc-form-login" method="POST" action="/auth/ui/login/oauth">
-            <input type="hidden" name="login_challenge" value="${login_challenge}">
+            <input type="hidden" name="login_challenge" value="${escapeHtml(login_challenge)}">
             <div class="form-group">
               <label for="username" class="pf-c-form__label pf-c-form__label-text">Username</label>
               <input id="username" class="pf-c-form-control" name="identifier" type="text" value="${escapeHtml(identifier)}" autofocus autocomplete="username" />
@@ -295,7 +290,7 @@ app.get('/consent', async (req, res) => {
     return res.redirect(completion.redirect_to);
   } catch (error) {
     console.error('Consent error:', error.response?.data || error.message);
-    res.status(500).send(html('Error', `<div class="alert alert-error">Consent error: ${error.message}</div>`));
+    res.status(500).send(html('Error', `<div class="alert alert-error">Consent error: ${escapeHtml(error.message)}</div>`));
   }
 });
 
@@ -346,8 +341,8 @@ app.get('/error', async (req, res) => {
   const { error, error_description } = req.query;
   res.send(html('Error', `
     <div class="alert alert-error">
-      <strong>${error || 'Unknown error'}</strong>
-      ${error_description ? `<p>${error_description}</p>` : ''}
+      <strong>${escapeHtml(error || 'Unknown error')}</strong>
+      ${error_description ? `<p>${escapeHtml(error_description)}</p>` : ''}
     </div>
     <div id="kc-form">
       <div id="kc-form-wrapper">
