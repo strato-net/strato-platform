@@ -301,11 +301,20 @@ feePerGas = do
 
     selector hex = either (const B.empty) id (B16.decode hex)
 
+-- | 0 before the STRATO-gas fork: wallets check the quote against
+-- eth_getBalance, which is USDST until then, while the fee may be paid in
+-- STRATO or a voucher, and nothing enforces the signed price before the fork.
 eth_gasPrice :: Method Server
 eth_gasPrice = toMethod "eth_gasPrice" f ()
   where
     f :: RpcResult Server String
-    f = (\fee -> "0x" ++ showHex fee "") <$> feePerGas
+    f = do
+      tok <- liftIO nativeToken
+      fee <- case tok of
+        Right t | t /= postFork -> return 0
+        _ -> feePerGas
+      return $ "0x" ++ showHex fee ""
+    postFork = EthConf.nativeTokenAt ethConf (stratoGasForkBlock (EthConf.network $ networkConfig ethConf))
 
 -- | The whole per-unit price is the base fee (see 'blockBaseFee'); no tip.
 eth_maxPriorityFeePerGas :: Method Server
