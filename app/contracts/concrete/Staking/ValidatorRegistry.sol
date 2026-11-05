@@ -4,6 +4,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
 interface IStratoStakingValidatorSync {
     function syncValidatorRecord(address validator, bool active, uint256 commissionBps, address operator) external;
     function syncValidatorOperator(address validator, address operator) external;
+    function exceedsOneThird(address validator) external view returns (bool);
 }
 
 // Human-facing validator metadata, keyed by the validator (consensus node) address. The
@@ -24,17 +25,8 @@ struct ValidatorProfile {
 //
 // A validator can only be bound to an operator with the validator key's consent: a
 // transaction sent from the validator address itself, or the key's signature over
-// operatorAuthorizationDigest. First listing by the owner (an admin vote) is the one
-// exception, since the admins vouch for the binding. Nobody can claim a node they do not
-// run, and nobody, the owner included, moves a validator to another operator without the
-// key. A consented handover binds here at once; the staking contract gives it a week's
-// notice and completes it when the incoming operator has bonded.
-//
-// Delisting is the owner's (the admins', collectively) quality-control power, and it is
-// accountable: an ordinary removal is announced with its published grounds and executes
-// NOTICE_SECONDS later; the emergency path removes one named validator at once, with its
-// grounds on record. Both go through the staking contract's per-block churn and readiness
-// rules like any other change to the set.
+// operatorAuthorizationDigest. Listing by the owner (an admin vote) is the one exception,
+// since the admins vouch for the binding. Nobody can claim a node they do not run.
 //
 // Upgraded in place on helium from an operator-keyed layout. SolidVM storage is keyed by
 // name, so the historical names stay (operators, operatorList, protocolValidatorOperators)
@@ -44,17 +36,17 @@ contract ValidatorRegistry is Ownable {
     event Initialized(address indexed staking);
     event ValidatorListed(address indexed validator, address indexed operator, uint256 commissionBps);
     event ValidatorRelisted(address indexed validator, address indexed operator, uint256 commissionBps);
-    event RemovalAnnounced(address indexed validator, string grounds, uint256 readyTime);
-    event RemovalCancelled(address indexed validator);
     event ValidatorDelisted(address indexed validator);
-    event ValidatorRemoved(address indexed validator, string grounds, bool emergency);
     event ValidatorProfileUpdated(address indexed validator);
     event OperatorChanged(address indexed validator, address indexed oldOperator, address indexed newOperator);
-
-    // Seven days: the notice before an announced removal executes.
-    uint256 public constant NOTICE_SECONDS = 604800;
+    event EmergencyKickerSet(address indexed kicker);
+    event EmergencyKick(address indexed validator, address indexed kicker);
 
     IStratoStakingValidatorSync public staking;
+    // Under stake-weighted quorum a validator holding more than a third of the stake can
+    // stall the chain and cannot be jailed (no block commits without its seal). This key
+    // may delist such a validator without waiting for an owner vote.
+    address public emergencyKicker;
 
     // Validators in listing order. Delisted validators stay so their records remain addressable.
     address[] public operatorList;
@@ -63,9 +55,6 @@ contract ValidatorRegistry is Ownable {
     // Operator authorizations each validator key has granted. Part of the signed digest, so
     // every signature is good for exactly one binding.
     mapping(address => uint256) public authorizationNonce;
-    // An announced removal: when it was announced and the published grounds.
-    mapping(address => uint256) public removalAnnouncedAt;
-    mapping(address => string) public removalGrounds;
 
     constructor(address initialOwner) Ownable(initialOwner) { }
 
@@ -172,23 +161,24 @@ contract ValidatorRegistry is Ownable {
             return;
         }
 
-        // Relisting reuses the validator's slot and keeps its operator: moving a validator to
-        // another operator is the key's decision, not the owner's.
+        // Relisting reuses the validator's slot; staking settles a change of operator.
         require(!profile.active, "VR: validator active");
-        require(operator == operatorOf(validator), "VR: handover needs consent");
+        address oldOperator = operatorOf(validator);
         _setProtocolValidatorId(validator, profile.protocolValidatorId, protocolValidatorId);
         profile.active = true;
         profile.name = name;
         profile.description = description;
         profile.metadataURI = metadataURI;
         profile.protocolValidatorId = protocolValidatorId;
+        profile.operator = operator;
 
         staking.syncValidatorRecord(validator, true, commissionBps, operator);
+        if (oldOperator != operator) emit OperatorChanged(validator, oldOperator, operator);
         emit ValidatorRelisted(validator, operator, commissionBps);
     }
 
-    // Admin listing (and relisting of a delisted validator under its operator). The admins
-    // vouch for a first binding, so no validator signature is needed.
+    // Admin listing (and relisting of a delisted validator). The admins vouch for the
+    // validator/operator binding, so no validator signature is needed.
     function addValidator(
         address validator,
         address operator,
@@ -247,68 +237,56 @@ contract ValidatorRegistry is Ownable {
 
     // ---- operator changes -------------------------------------------------------------
 
-    // Hand a validator to a new operator, with the validator key's consent to that operator.
-    // The binding moves here; staking announces the handover and completes it a week later,
-    // once the incoming operator has bonded, paying the outgoing operator out then. Until
-    // then the outgoing operator still operates in staking's eyes; the key may bind back to
-    // it to withdraw the handover.
-    function setOperator(address validator, address newOperator, uint8 v, uint256 r, uint256 s) external {
-        require(operators[validator].exists, "VR: validator missing");
+    function _changeOperator(address validator, address newOperator) internal {
         require(newOperator != address(0), "VR: operator=0");
         address oldOperator = operatorOf(validator);
         require(oldOperator != newOperator, "VR: same operator");
-        _consumeAuthorization(validator, newOperator, v, r, s);
         operators[validator].operator = newOperator;
+        // Staking pays out and unbonds what the outgoing operator owns.
         staking.syncValidatorOperator(validator, newOperator);
         emit OperatorChanged(validator, oldOperator, newOperator);
     }
 
+    // Hand a validator to a new operator, with the validator key's consent to that operator.
+    function setOperator(address validator, address newOperator, uint8 v, uint256 r, uint256 s) external {
+        require(operators[validator].exists, "VR: validator missing");
+        _consumeAuthorization(validator, newOperator, v, r, s);
+        _changeOperator(validator, newOperator);
+    }
+
+    function adminSetOperator(address validator, address newOperator) external onlyOwner {
+        require(operators[validator].exists, "VR: validator missing");
+        _changeOperator(validator, newOperator);
+    }
+
     // ---- delisting and profile ----------------------------------------------------------
 
-    function _delist(address validator, string grounds, bool emergency) internal {
+    function _delist(address validator) internal {
         ValidatorProfile storage profile = operators[validator];
         require(profile.exists, "VR: validator missing");
         require(profile.active, "VR: validator inactive");
 
         profile.active = false;
-        removalAnnouncedAt[validator] = 0;
-        delete removalGrounds[validator];
-        // Delisting stops future income in staking and returns the operator's bond, but does
-        // not erase historical state or claims.
+        // Delisting stops future income in staking but does not erase historical state.
         staking.syncValidatorRecord(validator, false, 0, operatorOf(validator));
 
         emit ValidatorDelisted(validator);
-        emit ValidatorRemoved(validator, grounds, emergency);
     }
 
-    // Ordinary removal, step one: publish the grounds and start the notice.
-    function announceRemoval(address validator, string grounds) external onlyOwner {
-        ValidatorProfile storage profile = operators[validator];
-        require(profile.exists && profile.active, "VR: validator missing");
-        require(bytes(grounds).length > 0, "VR: grounds required");
-        removalAnnouncedAt[validator] = block.timestamp;
-        removalGrounds[validator] = grounds;
-        emit RemovalAnnounced(validator, grounds, block.timestamp + NOTICE_SECONDS);
-    }
-
-    function cancelRemoval(address validator) external onlyOwner {
-        require(removalAnnouncedAt[validator] != 0, "VR: no removal pending");
-        removalAnnouncedAt[validator] = 0;
-        delete removalGrounds[validator];
-        emit RemovalCancelled(validator);
-    }
-
-    // Ordinary removal, step two: execute an announced removal once its notice has run.
     function removeValidator(address validator) external onlyOwner {
-        require(removalAnnouncedAt[validator] != 0, "VR: removal not announced");
-        require(block.timestamp >= removalAnnouncedAt[validator] + NOTICE_SECONDS, "VR: removal notice running");
-        _delist(validator, removalGrounds[validator], false);
+        _delist(validator);
     }
 
-    // The emergency path: one named validator, at once, with its grounds on record.
-    function emergencyRemove(address validator, string grounds) external onlyOwner {
-        require(bytes(grounds).length > 0, "VR: grounds required");
-        _delist(validator, grounds, true);
+    function setEmergencyKicker(address kicker) external onlyOwner {
+        emergencyKicker = kicker;
+        emit EmergencyKickerSet(kicker);
+    }
+
+    function emergencyKick(address validator) external {
+        require(emergencyKicker != address(0) && msg.sender == emergencyKicker, "VR: not the emergency kicker");
+        require(staking.exceedsOneThird(validator), "VR: validator below one third of stake");
+        _delist(validator);
+        emit EmergencyKick(validator, msg.sender);
     }
 
     function updateProfile(

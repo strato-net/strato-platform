@@ -69,26 +69,6 @@ type StakingValidator = ValidatorLifecycle & {
   // V2 only: what this validator's operator can claim for it (STRATO rewards, USDST fees).
   operatorPendingRewards?: string;
   operatorPendingFees?: string;
-  // V2 only: readiness evidence from the validator key, an announced handover, and the part of
-  // the caller's stake still waiting its week before it earns.
-  isReady?: boolean;
-  operatorChangeReadyTime?: string;
-  userWaitingStake?: string;
-  userStakeQualifiesAt?: string;
-};
-
-// A delegation that has waited its week earns from its next touch.
-const waitingStakeNote = (validator: StakingValidator, decimals: number, symbol: string): { text: string; due: boolean } | null => {
-  const waiting = BigInt(validator.userWaitingStake || "0");
-  if (waiting <= 0n) return null;
-  const at = Number(validator.userStakeQualifiesAt || "0");
-  const due = at > 0 && at <= Date.now() / 1000;
-  return {
-    text: due
-      ? `${formatToken(waiting.toString(), decimals)} ${symbol} has waited its week: touch it to start earning`
-      : `${formatToken(waiting.toString(), decimals)} ${symbol} earns from ${formatReleaseTime(String(at))}`,
-    due,
-  };
 };
 
 type UnbondingRequest = {
@@ -109,7 +89,7 @@ const SHOW_MOVE_BUTTON = false;
 const VALIDATOR_DISPLAY_LIMIT = 10;
 type ProcessingAction =
   | "stake" | "claim" | "unstake" | "move" | "withdraw" | "operator-claim" | "commission" | "bond" | "self-unbond"
-  | "claim-fees" | "operator-claim-fees" | "register" | "operator" | "activate" | "exit" | "accept-operator" | "qualify" | "profile";
+  | "claim-fees" | "operator-claim-fees" | "register" | "operator" | "activate" | "exit" | "cancel-exit" | "profile";
 
 type StakingInfo = {
   configured: boolean;
@@ -118,17 +98,14 @@ type StakingInfo = {
   // network: validator addresses, set membership and liveness counters do not exist
   // on chain yet, so the features built on them stay hidden rather than showing zeros.
   validatorSetDeployed: boolean;
-  // "v2" = validator-keyed contract: rows keyed by validator address, paid per finalised block from
-  // the committed emission schedule. "v1" = operator-keyed contract with a funded reward schedule.
-  // Absent on older backends.
+  // "v2" = validator-keyed contract: rows keyed by validator address, block rewards and proposer
+  // fees only. "v1" = operator-keyed contract with a funded reward schedule. Absent on older backends.
   contractVersion?: "v1" | "v2";
-  // V2 commitment: the week every notice and qualification runs for, and the schedule.
-  noticeSeconds?: string;
-  rewardReserve: string;
-  eligibleStake?: string;
-  emissionAnnualRate?: string;
-  emissionStart?: string;
-  totalEmitted?: string;
+  // V2: minStake phases in as a self-bond requirement at this unix time ("0" = not scheduled);
+  // until then delegated stake still counts toward eligibility.
+  selfBondGraceUntil?: string;
+  selfBondRuleActive?: boolean;
+  totalRewardsCredited?: string;
   // V2: validator addresses the connected account operates.
   operatedValidators?: string[];
   stakingAddress: string;
@@ -144,6 +121,7 @@ type StakingInfo = {
   totalRewardableStake: string;
   activeValidatorCount: string;
   // Reward schedule fields below are V1 only ("0"/"" on V2).
+  rewardReserve: string;
   baseRewardBps: string;
   maxCommissionBps: string;
   maxBatchSize: string;
@@ -154,12 +132,14 @@ type StakingInfo = {
   rewardPeriodDescription: string;
   estimatedApy: string;
   minStake: string;
-  // V2: whether a waiter can activate right now (the agreed block has passed).
-  joinsOpen?: boolean;
-  joinsOpenFromBlock?: string;
+  // V2: the operator's own bond a new seat needs (StratoStaking.MIN_SELF_BOND).
+  minSelfBond: string;
+  proposerFeeBps: string;
+  joinsPaused: boolean;
   validatorCount: string;
   maxActiveValidators: string;
   hardCapActiveValidators: string;
+  exitNoticeSeconds: string;
   userTotalStake: string;
   claimableRewards: string;
   claimableFees: string;
@@ -261,6 +241,15 @@ const formatRewardPeriodStatus = (startTime: string | undefined, finishTime: str
   return `Ended ${formatReleaseTime(finishTime || "0")}`;
 };
 
+// "24 hours" / "7 days" from a seconds string, for the exit confirmation.
+const formatNotice = (seconds: string): string => {
+  const n = Number(seconds || "0");
+  if (!Number.isFinite(n) || n <= 0) return "the notice period";
+  if (n >= 86400) { const d = Math.round(n / 86400); return `${d} day${d === 1 ? "" : "s"}`; }
+  if (n >= 3600) { const h = Math.round(n / 3600); return `${h} hour${h === 1 ? "" : "s"}`; }
+  const m = Math.max(1, Math.round(n / 60)); return `${m} minute${m === 1 ? "" : "s"}`;
+};
+
 const DEEP_LINK_STORAGE_KEY = "staking.deepLink";
 
 // strato-authorize-operator links to this page with validator/operator/signature/nonce in the URL
@@ -284,9 +273,8 @@ const formatUptime = (proposed: string, missed: string): string => {
   return `${pct >= 99.995 ? "100" : pct.toFixed(2)}%`;
 };
 
-// V2: minStake is a self-bond requirement in the operator's own STRATO; a seat held since before
-// the rule keeps qualifying on self-bond plus delegations until it leaves or changes operator.
-const selfBondRequirementText = (minStakeLabel: string): string => `Validators need ${minStakeLabel} of their own self-bond to join or rejoin the set.`;
+// V2: minStake is a self-bond requirement.
+const selfBondRequirementText = (minStakeLabel: string): string => `Validators need ${minStakeLabel} of self-bond.`;
 
 const TipLabel = ({ label, tooltip, className }: { label: string; tooltip: string; className?: string }) => (
   <TooltipProvider>
@@ -348,7 +336,7 @@ type OperatorPanelProps = {
   selfBondNote?: string;
   validatorSetDeployed: boolean;
   canManage: boolean;
-  joinsOpen: boolean;
+  joinsPaused: boolean;
   canCoverActionFee: boolean;
   submitting: boolean;
   // The in-flight action, when it belongs to this panel.
@@ -359,10 +347,9 @@ type OperatorPanelProps = {
   onSelfBond: (amount: bigint) => Promise<boolean>;
   onSelfUnbond: (amount: bigint) => Promise<boolean>;
   onActivate: () => Promise<boolean>;
-  onExit: () => Promise<boolean>;
-  // The connected account is this validator's announced incoming operator.
-  pendingForMe: boolean;
-  onAcceptOperator: (bondAmount: bigint) => Promise<boolean>;
+  exitNoticeSeconds: string;
+  onRequestExit: () => Promise<boolean>;
+  onCancelExit: () => Promise<boolean>;
   onUpdateProfile?: (profile: OperatorProfileInput) => Promise<boolean>;
 };
 
@@ -383,7 +370,7 @@ const OperatorPanel = ({
   selfBondNote,
   validatorSetDeployed,
   canManage,
-  joinsOpen,
+  joinsPaused,
   canCoverActionFee,
   submitting,
   processing,
@@ -393,24 +380,21 @@ const OperatorPanel = ({
   onSelfBond,
   onSelfUnbond,
   onActivate,
-  onExit,
-  pendingForMe,
-  onAcceptOperator,
+  exitNoticeSeconds,
+  onRequestExit,
+  onCancelExit,
   onUpdateProfile,
 }: OperatorPanelProps) => {
   const [commissionPercent, setCommissionPercent] = useState("");
   const [selfBondAmount, setSelfBondAmount] = useState("");
   const [selfUnbondAmount, setSelfUnbondAmount] = useState("");
-  const [acceptBondAmount, setAcceptBondAmount] = useState("");
   const [profileDraft, setProfileDraft] = useState<OperatorProfileInput | null>(null);
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
 
   const active = Boolean(validator?.active);
   const inSet = Boolean(validator?.isValidator);
-  const canActivate = Boolean(validator?.isWaiter) && joinsOpen;
-  const handoverReadyAt = Number(validator?.operatorChangeReadyTime || "0");
-  const handoverReady = pendingForMe && handoverReadyAt > 0 && handoverReadyAt <= Date.now() / 1000;
-  const acceptBondParsed = safeParseUnits(acceptBondAmount, decimals);
+  const exiting = Number(validator?.exitReadyTime || "0") > 0;
+  const canActivate = Boolean(validator?.isWaiter) && !joinsPaused;
   const claimable = BigInt(claimableRewards || "0");
   const fees = BigInt(claimableFees || "0");
   const selfBond = BigInt(validator?.selfBond || "0");
@@ -424,8 +408,8 @@ const OperatorPanel = ({
   const selfUnbondReady = canManage && selfUnbondParsed > 0n && selfUnbondParsed <= selfBond;
   const belowSelfBond = isV2 && !!validator && selfBond < BigInt(minStake || "0");
   const validatorLabel = validator ? validator.name || truncateAddress(validator.address, 8, 6) : "";
+  // V2: a seat is only ever taken on self-bond (StratoStaking._meetsMinStake).
   const activationStake = isV2 ? "self-bond" : "total stake";
-  const acceptReady = handoverReady && acceptBondParsed >= BigInt(minStake || "0") && acceptBondParsed <= wallet;
 
   const buttonLabel = (action: ProcessingAction, label: string, pendingLabel: string) => (
     processing === action ? (
@@ -456,11 +440,6 @@ const OperatorPanel = ({
     if (await onSelfUnbond(selfUnbondParsed)) setSelfUnbondAmount("");
   };
 
-  const submitAccept = async () => {
-    if (!acceptReady) return;
-    if (await onAcceptOperator(acceptBondParsed)) setAcceptBondAmount("");
-  };
-
   const openProfile = () => {
     if (!validator) return;
     // A forty-zero value is the indexer's rendering of an unset string, never a real profile field.
@@ -488,13 +467,11 @@ const OperatorPanel = ({
       <CardContent className="p-5">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">{isV2 && validator ? (pendingForMe ? `Handover to you: ${validatorLabel}` : `You operate ${validatorLabel}`) : "Operator"}</h2>
+            <h2 className="text-lg font-semibold">{isV2 && validator ? `You operate ${validatorLabel}` : "Operator"}</h2>
             <p className="text-sm text-muted-foreground">
-              {pendingForMe
-                ? "The validator key has consented to you as operator. Accept the handover with your own self-bond once the week's notice has run."
-                : active
-                  ? "Claim validator rewards, update commission, or manage self-bond."
-                  : "Claim accrued validator rewards or unbond existing self-bond."}
+              {active
+                ? "Claim validator rewards, update commission, or manage self-bond."
+                : "Claim accrued validator rewards or unbond existing self-bond."}
             </p>
             {validator && validatorSetDeployed && (
               <p className="mt-1 flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
@@ -507,13 +484,6 @@ const OperatorPanel = ({
                 ) : <span>not set</span>}
                 <span>· {validator.blocksProposed} blocks proposed · {validator.missedProposals} missed</span>
                 {inSet || !active ? null : <span>· needs {formatToken(minStake, decimals, 0)} {symbol} {activationStake} to activate</span>}
-                {isV2 && active && !inSet && !validator.isReady && (
-                  <span>· no fresh readiness evidence: the node must send an acknowledgement from its key (good for a day)</span>
-                )}
-                {isV2 && inSet && !validator.isReady && <span>· no block produced in the last 500 blocks and no acknowledgement in the last day</span>}
-                {isV2 && validator.pendingOperator && !pendingForMe && (
-                  <span>· handover to {truncateAddress(validator.pendingOperator, 8, 6)} announced</span>
-                )}
               </p>
             )}
             {selfBondNote && (
@@ -530,18 +500,18 @@ const OperatorPanel = ({
                 {buttonLabel("activate", "Activate", "Activating")}
               </Button>
             )}
-            {validatorSetDeployed && inSet && canManage && (
+            {validatorSetDeployed && inSet && !exiting && (
               <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
                 <Button size="sm" variant="destructive" onClick={() => setExitDialogOpen(true)} disabled={submitting || !canCoverActionFee}>
-                  {buttonLabel("exit", "Exit", "Exiting")}
+                  {buttonLabel("exit", "Request exit", "Requesting")}
                 </Button>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Exit the validator set with {validator?.name || "this validator"}?</AlertDialogTitle>
+                    <AlertDialogTitle>Request exit for {validator?.name || "this validator"}?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      The validator leaves the set at once and stops producing blocks and earning. If the remaining set
-                      could not finalise on its ready members the exit is deferred and the transaction fails; try again
-                      later. The self-bond stays bonded until you unbond it, which pays it back immediately.
+                      After {formatNotice(exitNoticeSeconds)} this validator leaves the validator set and stops proposing
+                      blocks and earning rewards. Its self-bond stays bonded until you unbond it. You can cancel the exit
+                      before the notice period ends.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -549,13 +519,18 @@ const OperatorPanel = ({
                     <AlertDialogAction
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       disabled={submitting}
-                      onClick={() => { setExitDialogOpen(false); void onExit(); }}
+                      onClick={() => { setExitDialogOpen(false); void onRequestExit(); }}
                     >
-                      Exit
+                      Request exit
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+            )}
+            {validatorSetDeployed && inSet && exiting && (
+              <Button size="sm" variant="outline" onClick={onCancelExit} disabled={submitting || !canCoverActionFee}>
+                {buttonLabel("cancel-exit", `Cancel exit (${formatReleaseTime(validator?.exitReadyTime || "0")})`, "Cancelling")}
+              </Button>
             )}
             {onUpdateProfile && validator && !profileDraft && (
               <Button size="sm" variant="outline" onClick={openProfile} disabled={submitting}>
@@ -564,26 +539,6 @@ const OperatorPanel = ({
             )}
           </div>
         </div>
-
-        {pendingForMe && (
-          <div className="mt-4 rounded-md bg-muted/30 p-3">
-            <p className="text-xs text-muted-foreground">
-              Accept handover {handoverReady ? "(notice has run)" : `from ${formatReleaseTime(validator?.operatorChangeReadyTime || "0")}`} · at least {formatToken(minStake, decimals, 0)} {symbol} of self-bond · wallet {formatToken(walletBalance, decimals)}
-            </p>
-            <div className="mt-2 flex gap-2 md:max-w-sm">
-              <Input
-                value={acceptBondAmount}
-                onChange={(event) => setAcceptBondAmount(event.target.value)}
-                placeholder={`${formatToken(minStake, decimals, 0)} ${symbol}`}
-                inputMode="decimal"
-                disabled={submitting || !handoverReady}
-              />
-              <Button size="sm" onClick={submitAccept} disabled={!acceptReady || submitting || !canCoverActionFee}>
-                {buttonLabel("accept-operator", "Accept", "Accepting")}
-              </Button>
-            </div>
-          </div>
-        )}
 
         <div className={`mt-4 grid gap-3 ${active || selfBond > 0n ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
           <div className="rounded-md bg-muted/30 p-3">
@@ -709,7 +664,7 @@ const OperatorPanel = ({
                     {buttonLabel("commission", "Update", "Updating")}
                   </Button>
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">A cut applies at once; a raise is announced and applies a week later, on a second update with the same value.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Commission changes are a separate transaction from the profile.</p>
               </div>
             )}
           </div>
@@ -895,7 +850,7 @@ const EarnStaking = () => {
     : {};
   const claimableFees = useMemo(() => BigInt(info?.claimableFees || "0"), [info?.claimableFees]);
   const totalStakeAmount = useMemo(() => safeParseUnits(stakeAmount, decimals), [decimals, stakeAmount]);
-  const apyLabel = isV2 ? "Expected APY" : "Est. APY";
+  const apyLabel = isV2 ? "APY (7d)" : "Est. APY";
 
   const filteredValidators = useMemo(() => {
     const query = validatorSearch.trim().toLowerCase();
@@ -1259,34 +1214,23 @@ const EarnStaking = () => {
       validator
     );
 
-  const handleExit = (validator: string) =>
+  const handleRequestExit = (validator: string) =>
     runAction(
       async () => {
         await api.post("/staking/exit", operatorBody(validator), stakingTxConfig);
       },
-      "Exit submitted",
+      "Exit requested",
       "exit",
       validator
     );
 
-  const handleAcceptOperator = (validator: string, bondAmount: bigint) =>
+  const handleCancelExit = (validator: string) =>
     runAction(
       async () => {
-        await api.post("/staking/operator/accept", { validator, bondAmount: bondAmount.toString() }, stakingTxConfig);
+        await api.post("/staking/exit/cancel", operatorBody(validator), stakingTxConfig);
       },
-      "Handover accepted",
-      "accept-operator",
-      validator
-    );
-
-  // A delegation that has waited its week earns from its next touch; anyone may touch it.
-  const handleQualify = (validator: string) =>
-    runAction(
-      async () => {
-        await api.post("/staking/qualify", { validator }, stakingTxConfig);
-      },
-      "Position qualified",
-      "qualify",
+      "Exit cancelled",
+      "cancel-exit",
       validator
     );
 
@@ -1304,7 +1248,7 @@ const EarnStaking = () => {
   };
 
   const selfBondNote = isV2 && info
-    ? selfBondRequirementText(`${formatToken(info.minStake, decimals, 0)} ${symbol}`)
+    ? selfBondRequirementText(`${formatToken(info.minSelfBond, decimals, 0)} ${symbol}`)
     : undefined;
 
   const renderOperatorPanel = (
@@ -1319,13 +1263,13 @@ const EarnStaking = () => {
       {...earnings}
       maxCommissionBps={info?.maxCommissionBps || "0"}
       walletBalance={info?.walletBalance || "0"}
-      minStake={info?.minStake || "0"}
+      minStake={(isV2 ? info?.minSelfBond : info?.minStake) || "0"}
       decimals={decimals}
       symbol={symbol}
       selfBondNote={selfBondNote}
       validatorSetDeployed={validatorSetDeployed}
-      canManage={isLoggedIn && (isV2 ? sameAddress(validator?.operator, userAddress || undefined) : !!info?.isOperator)}
-      joinsOpen={Boolean(info?.joinsOpen)}
+      canManage={isLoggedIn && (isV2 || !!info?.isOperator)}
+      joinsPaused={Boolean(info?.joinsPaused)}
       canCoverActionFee={canCoverActionFee}
       submitting={submitting}
       processing={processingTarget === key ? processingAction : null}
@@ -1335,9 +1279,9 @@ const EarnStaking = () => {
       onSelfBond={(amount) => handleSelfBond(key, amount)}
       onSelfUnbond={(amount) => handleSelfUnbond(key, amount)}
       onActivate={() => handleActivate(key)}
-      onExit={() => handleExit(key)}
-      pendingForMe={isV2 && !!validator?.pendingOperator && sameAddress(validator.pendingOperator, userAddress || undefined)}
-      onAcceptOperator={(bondAmount) => handleAcceptOperator(key, bondAmount)}
+      exitNoticeSeconds={info?.exitNoticeSeconds || "0"}
+      onRequestExit={() => handleRequestExit(key)}
+      onCancelExit={() => handleCancelExit(key)}
       onUpdateProfile={isV2 ? (profile) => handleUpdateProfile(key, profile) : undefined}
     />
   );
@@ -1377,7 +1321,7 @@ const EarnStaking = () => {
           <StatCard
             label="APY"
             tooltip={isV2
-              ? "Expected annual yield for delegators from the committed emission schedule at the current stake and reserve, net of validator commission. It varies: validators are paid per block they produce, the rate falls as the reserve is released, a new delegation earns only after a week, and quiet periods pay less. Rewards APY comes from platform reward emissions."
+              ? "Annual yield delegators realized over the last 7 days from STRATO block rewards, net of validator commission. Rewards APY comes from platform reward emissions."
               : "Estimated annual yield for delegating STRATO. Native APY comes from the staking reward schedule, net of validator commission. Rewards APY comes from platform reward emissions."}
             value={apyWithBreakdown(info.estimatedApy)}
             icon={TrendingUp}
@@ -1421,11 +1365,10 @@ const EarnStaking = () => {
               {isV2 ? (
                 <>
                   <p className="text-xs text-muted-foreground">Staking Rewards</p>
-                  <p className="mt-1 text-lg font-semibold">STRATO for every block produced</p>
+                  <p className="mt-1 text-lg font-semibold">STRATO block rewards</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    A committed reserve pays each finalised block's producer from the emission schedule; stake decides who
-                    produces. Income is split between the operator's self-bond and delegators after commission, on stake
-                    that has been in place for a week.
+                    Validators earn STRATO for each block they propose plus USDST proposer fees, split between the
+                    operator's self-bond and delegators after commission. APY is what delegators realized over the last 7 days.
                   </p>
                 </>
               ) : (
@@ -1439,7 +1382,7 @@ const EarnStaking = () => {
               )}
               <p className="mt-2 text-sm text-muted-foreground">
                 {isV2
-                  ? `${formatToken(info.totalEmitted, decimals)} ${symbol} released to date · ${formatToken(info.rewardReserve, decimals, 0)} ${symbol} in reserve`
+                  ? `${formatToken(info.totalRewardsCredited, decimals)} ${symbol} credited to date`
                   : formatRewardPeriodStatus(info.periodStart, info.periodFinish)}
                 {" · "}
                 <a
@@ -1496,7 +1439,7 @@ const EarnStaking = () => {
             isV2={isV2}
             connectedAddress={userAddress}
             operatedValidator={operatedValidators[0] ?? null}
-            minStake={formatToken(info.minStake, decimals, 0)}
+            minStake={formatToken(isV2 ? info.minSelfBond : info.minStake, decimals, 0)}
             maxCommissionBps={info.maxCommissionBps}
             symbol={symbol}
             disabled={!canCoverActionFee}
@@ -1504,8 +1447,8 @@ const EarnStaking = () => {
             onRegister={handleRegister}
             onChangeOperator={isV2 ? handleChangeOperator : undefined}
             validators={validators}
-            minStakeRaw={info.minStake}
-            joinsOpen={Boolean(info.joinsOpen)}
+            minStakeRaw={isV2 ? info.minSelfBond : info.minStake}
+            joinsPaused={Boolean(info.joinsPaused)}
             errorMessage={bindingError}
             {...deepLinkProps}
           />
@@ -1521,7 +1464,7 @@ const EarnStaking = () => {
                 <h2 className="text-lg font-semibold">Validators</h2>
                 <p className="text-sm text-muted-foreground">
                   {info.validatorCount} in the validator set{Number(info.maxActiveValidators || "0") > 0 ? ` of ${info.maxActiveValidators}` : ""}
-                  {validatorSetDeployed ? ` · ${info.activeValidatorCount} listed` : ""}{isV2 ? " · principal withdrawable at once" : ` · unbonding ${formatDuration(info.unbondingSeconds)}`}
+                  {validatorSetDeployed ? ` · ${info.activeValidatorCount} listed` : ""} · unbonding {formatDuration(info.unbondingSeconds)}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1623,9 +1566,6 @@ const EarnStaking = () => {
                         <div className="rounded-md bg-muted/30 px-3 py-2">
                           <p className="text-xs text-muted-foreground">Your Stake</p>
                           <p className="font-semibold">{formatToken(validator.userStake, decimals)} {symbol}</p>
-                          {waitingStakeNote(validator, decimals, symbol) && (
-                            <p className="mt-0.5 text-xs text-muted-foreground">{waitingStakeNote(validator, decimals, symbol)?.text}</p>
-                          )}
                         </div>
                         <div className="rounded-md bg-muted/30 px-3 py-2">
                           <p className="text-xs text-muted-foreground">Rewards</p>
@@ -1679,11 +1619,6 @@ const EarnStaking = () => {
                         >
                           Unstake
                         </Button>
-                        {waitingStakeNote(validator, decimals, symbol)?.due && (
-                          <Button className="w-full" variant="outline" size="sm" onClick={() => handleQualify(rowKey)} disabled={!isLoggedIn || !canCoverActionFee || submitting}>
-                            {actionButtonLabel("qualify", "Start earning", "Qualifying")}
-                          </Button>
-                        )}
                       </div>
                     </div>
                   );
@@ -1730,7 +1665,7 @@ const EarnStaking = () => {
                         <TipLabel
                           label={apyLabel}
                           tooltip={isV2
-                            ? "Expected annual yield for this validator's delegators from the emission schedule while it earns, after its commission, plus platform Rewards APY when active. Actual income follows the blocks it produces and the reserve left."
+                            ? "Annual yield this validator's delegators realized from STRATO block rewards over the last 7 days, after its commission, plus platform Rewards APY when active."
                             : "Estimated annual yield from this validator: Native APY after its commission, plus platform Rewards APY when active."}
                         />
                       </th>
@@ -1769,12 +1704,7 @@ const EarnStaking = () => {
                             <td className="px-4 py-3 text-right text-sm tabular-nums">{formatUptime(validator.blocksProposed, validator.missedProposals)}</td>
                           )}
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.totalStake, decimals)}</td>
-                          <td className="px-4 py-3 text-right text-sm">
-                            {formatToken(validator.userStake, decimals)}
-                            {waitingStakeNote(validator, decimals, symbol) && (
-                              <p className="mt-0.5 text-xs text-muted-foreground">{waitingStakeNote(validator, decimals, symbol)?.text}</p>
-                            )}
-                          </td>
+                          <td className="px-4 py-3 text-right text-sm">{formatToken(validator.userStake, decimals)}</td>
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.pendingRewards, decimals)}</td>
                           <td className="px-4 py-3 text-right text-sm">{apyWithBreakdown(validator.estimatedApy)}</td>
                           <td className="px-4 py-3 text-right text-sm">{formatPercentFromBps(validator.commissionBps)}</td>
@@ -1813,11 +1743,6 @@ const EarnStaking = () => {
                               >
                                 Unstake
                               </Button>
-                              {waitingStakeNote(validator, decimals, symbol)?.due && (
-                                <Button variant="outline" size="sm" onClick={() => handleQualify(rowKey)} disabled={!isLoggedIn || !canCoverActionFee || submitting}>
-                                  {actionButtonLabel("qualify", "Start earning", "Qualifying")}
-                                </Button>
-                              )}
                             </div>
                           </td>
                         </tr>
@@ -2000,7 +1925,6 @@ const EarnStaking = () => {
                       />
                       <p className="text-xs text-muted-foreground">
                         Wallet: {formatToken(info?.walletBalance, decimals)} {symbol}
-                        {isV2 ? " · a new delegation votes at once and earns after a week; a top-up moves the clock in proportion" : ""}
                       </p>
                     </div>
                   )}
@@ -2033,7 +1957,7 @@ const EarnStaking = () => {
                         disabled={!isLoggedIn || actionValidatorStake <= 0n}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Your stake: {formatToken(actionValidator.userStake, decimals)} {symbol}{isV2 ? " · paid back at once" : ` · unbonding ${formatDuration(info?.unbondingSeconds)}`}
+                        Your stake: {formatToken(actionValidator.userStake, decimals)} {symbol} · unbonding {formatDuration(info?.unbondingSeconds)}
                       </p>
                     </div>
                   )}

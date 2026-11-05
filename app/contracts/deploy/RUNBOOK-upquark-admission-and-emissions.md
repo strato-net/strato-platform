@@ -1,246 +1,110 @@
-# Upquark: permissionless admission and the committed emission schedule
+# Upquark: permissionless admission and the emission schedule
 
-Deploys the `StratoStaking` logic from this branch behind the Upquark staking proxy
-(`f30a022c…3988`), the `ValidatorRegistry` logic behind its proxy, and configures:
+Swaps the `StratoStaking` logic behind the Upquark staking proxy (`f30a022c…3988`) for this
+branch's and turns on two things. `ValidatorRegistry`, `MercataGovernance`, `FeeRouter` and the
+node are unchanged. Rehearse every step on helium first (same commands without the exports).
 
-1. **Permissionless admission** — from an agreed block, anyone may seat a validator that holds
-   at least 10,000 STRATO of its operator's own self-bond and whose validator key has sent a
-   readiness acknowledgement within the last day, into a free seat or by
-   replacing the lowest validator it beats by 5%. Nobody, the owner included, seats anyone
-   before that block. Seats held since before this logic keep the rule they were admitted under
-   (self-bond plus delegations) until they leave or change operator; nothing expires that.
-2. **The committed emission schedule** — STRATO prefunded into the staking contract's reserve
-   pays each finalised block's producer the formula `E = E0 × √(S / S0) × (R / R0)` a year for
-   the interval the block closed (at most an hour of it), `S` being the stake behind the earning
-   set and `R` the reserve still unreleased. Committed once, after the reserve is funded; no
-   pause, restart, re-calibration or recovery exists afterwards.
+1. **Staking by right from an agreed block.** From `joinsOpenFromBlock` anyone may seat
+   (`tryActivate` / `reconcileSet`) a listed validator whose operator holds
+   `MIN_SELF_BOND` = 10,000 STRATO of its own self-bond; delegations add weight but never
+   qualify a new seat. Before that block nobody can seat anyone, the owner included, and there
+   is no pause after it. Every seat held at the swap keeps the rule it was admitted under
+   (`minStake`, with `selfBondGraceUntil`) until it leaves the set or changes operator.
+2. **The emission schedule.** STRATO prefunded into the staking contract's `emissionReserve`
+   pays each block's producer `E = E0 × √(S / S0) × (R / R0)` STRATO a year for the interval its
+   block closed (at most an hour), split like the block reward. `S` is the consensus set's
+   weight, `R` the reserve left. Committed once: no pause, no re-calibration, and neither
+   `recoverUntrackedStrato` nor reward claims can reach the reserve.
 
-Only the staking and registry logic change. `MercataGovernance`, `FeeRouter` and the node are
-untouched. The schedule rides on the `processBlock()` hook the router already calls every
-transaction; the router's flat block reward and proposer fee share end because the staking
-contract no longer answers `creditBlockReward` / `proposerFeeBps` (the router catches both and,
-by its own design, pays nothing and routes the whole fee to the fee sink).
-
-"Vote" = an AdminRegistry issue (`castVoteOnIssue`); run the command once per admin, two votes
-execute. All commands run from `app/contracts/deploy` with the usual `.env` (`NODE_URL`, OAuth
-client, `GLOBAL_ADMIN_NAME` / `GLOBAL_ADMIN_PASSWORD`) **and** the Upquark addresses:
+"Vote" = an AdminRegistry issue; run the command once per admin, two votes execute. Commands run
+from `app/contracts` with the usual `.env` and:
 
 ```sh
 export STAKING_PROXY=f30a022ce83bed7adeafc286c719388dcc3b3988
-export VALIDATOR_REGISTRY_PROXY=d190674c0923a4646746b298037507bb9fc1057f
 export STRATO_TOKEN=2ca3e170e6714282da77815f7864b17f612f5f83
 ```
 
-(`staking-setup.js` and `deploy-staking.js` default to helium without them.)
+## 0. Launch inputs (decide before step 2)
 
-## 0. Launch inputs (record before step 3; these are values, not policy)
+| Item | Value |
+|---|---|
+| Agreed opening block | `JOINS_FROM = ______` |
+| Rate at the reference point | `E0 = ______` wei a year (proposed: 500,000 STRATO = `500000000000000000000000`) |
+| Reference stake | `S0 = ______` wei (proposed: 5,000,000 STRATO = `5000000000000000000000000`) |
+| Reference reserve, funded before the commitment | `R0 = ______` wei |
+| Reserve funder (holds the STRATO) | `FUNDER = ______` |
+| Start | `START = ______` unix seconds (`0` = when the vote executes) |
+| USDST fee share to proposers | `0` (gas fees are not validator income); voted in step 3 |
+| FeeRouter flat block reward (0.01 STRATO a block, paid while the router holds STRATO) | keep funding it, or let it run dry |
 
-| Item | Resolved policy | Value used |
-|---|---|---|
-| Admission opens at block | an agreed height after the consensus fixes (#7649, #7650) are live and the full stake vector is published | `JOINS_FROM = ______` |
-| Incumbent cutoff | every validator seated at the logic swap keeps its exemption; the seated set at that block is the incumbent list | record `activeValidators` at the swap |
-| Self-bond minimum | 10,000 STRATO of the operator's own, constant in the contract | `MIN_SELF_BOND` (no vote) |
-| Notices, qualification, reentry | seven days, constant | `NOTICE_SECONDS` (no vote) |
-| Readiness evidence | a key acknowledgement within a day, or a produced block within 500 blocks | `READINESS_WINDOW_SECONDS`, `READINESS_WINDOW_BLOCKS` (no vote) |
-| Formula | `E = E0 × √(S / S0) × (R / R0)` per finalised block, at most an hour per block | as implemented |
-| Calibration | 500,000 STRATO/year at 5,000,000 STRATO of earning stake with the initial reserve | `E0 = 500000000000000000000000`, `S0 = 5000000000000000000000000` |
-| Initial reserve `R0` | 10,000,000 STRATO proposed; confirm the allocation before funding | `R0 = ______` (wei) |
-| Funding account | project funds, separate from stakers' deposits and owed rewards | `FUNDER = ______` |
-| Rewards start | at or after funding and the consensus activation; nothing is back-paid | `START = ______` (unix seconds, `0` = at the vote) |
-| Legacy router balance | whatever STRATO the Upquark router holds stays there (it has no withdrawal and the staking contract no longer accepts its reward); its disposition is a separate, public decision | record the balance |
-| Quality-control account | the AdminRegistry admin set (collective, two votes); approvers listed publicly | `______` |
-
-The contract stores calibration, not policy: every rule above is a constant, and a change of
-any of them is a logic upgrade under the network's extraordinary process (see
-`techdocs/design-docs/staking-admission-and-rewards-decisions.md`, decision 8).
-
-## 1. Before: record and verify the state
+## 1. Before the swap: record and check
 
 ```sh
 curl -s "$NODE_URL/bloc/v2.2/contracts/StratoStaking/$STAKING_PROXY/state" > upquark-staking-before.json
-curl -s "$NODE_URL/bloc/v2.2/contracts/MercataGovernance/0000000000000000000000000000000000000100/state" > upquark-governance-before.json
-curl -s "$NODE_URL/strato-api/eth/v1.2/block/last/1" > upquark-head-before.json
 ```
 
-Check, and stop if any of these does not hold — this branch assumes V2 is live and activated:
+Stop unless all of these hold (this branch assumes staking V2 is live on Upquark):
 
-- the staking state has `tryActivate` and `activeValidators` (V2 logic), and
-  `activeValidators` holds exactly governance's `validators` (same members, no duplicates), every
-  one with `isValidator` true (the set is indexed; if not, `node staking-setup.js index` with the
-  full current set in `VALIDATORS` **before the commitment**: a seated validator left out of
-  the index is paid nothing for the blocks it produces);
-- `governanceSyncEnabled` is `true`, governance `stakingContract` is the staking proxy, and
-  `validatorStake` matches `lastSyncedWeight` for every validator;
-- `maxActiveValidators`, `hardCapActiveValidators`: write them down. Every other admission
-  parameter the previous logic had (`minStake`, `selfBondGraceUntil`, `evictionMarginBps`,
-  `maxSetMutationsPerBlock`, `exitNoticeSeconds`, `unkickCooldown`, `maxOperatorStakeBps`,
-  `joinsPaused`, `unbondingSeconds`, `proposerFeeBps`) is dead storage under the new logic;
-- `stakingActivationBlock` on the validators' `ethconf.yaml` vs. `upquarkStakingForkBlock` in
-  `Forks.hs` (2,000,000): every validator must run with both at the same height before the
-  lower of the two, and the headcount-until-complete rule (#7649) and the full-vector
-  bootstrap (#7650) must be merged and live first;
-- pending `unbondingQueue` requests: they stay withdrawable (at once) under the new logic.
+- `governanceSyncEnabled` is `true` and `activeValidators` holds exactly governance's validators,
+  each with `isValidator` true. If the index is short, `node deploy/staking-setup.js index` with
+  the set in `VALIDATORS` first: an unindexed seat is left out of `S`.
+- Record `activeValidators`: these are the incumbents. Record `minStake` and `selfBondGraceUntil`
+  as well, and do not change them for this rollout: they are now the incumbents' rule only.
+- Record `proposerFeeBps`, `maxConsecutiveMisses`, `jailCooldown` (step 3 re-submits them).
 
-The staking page's `/staking/info` shows the same numbers (`contractVersion`, `joinsOpen`,
-`minStake`, `consensusWeight`, `readyWeight`).
-
-## 2. Deploy the new logic (votes)
+## 2. Swap the logic (votes)
 
 ```sh
-node deploy-staking.js gen staking
-node deploy-staking.js gen registry
-# Admin A: first create vote
-node deploy-staking.js deploy staking
-# Admin B: executes the create, prints the logic address, casts the first setLogicContract vote
-node deploy-staking.js deploy staking
-# Admin A: second vote executes the swap
-node vote-setlogic.js $STAKING_PROXY <logic address>
-# the same three steps for the registry
-node vote-setlogic.js $VALIDATOR_REGISTRY_PROXY <logic address>
+node deploy/upgrade.js --proxy-address $STAKING_PROXY --contract-name StratoStaking --contract-file BaseCodeCollection.sol +OVERRIDE-CHECKS
 ```
 
-Record the **previous** logic addresses from both proxies before the swaps (`logicContract` in
-each proxy's state).
+Verify against `upquark-staking-before.json`:
 
-Verify:
-
-- `commitEmissionSchedule`, `fundRewardReserve`, `acknowledgeReadiness`, `exit`,
-  `removeForMissedProposals`, `qualifyStake`, `acceptOperator`, `readyWeight`, `eligibleStake`
-  appear in the staking contract's bloc function list; `tryActivate` still does (the app detects
-  V2 by it); `creditBlockReward`, `proposerFeeBps`, `recoverUntrackedStrato`,
-  `recoverStrayToken`, `recoverUnattributedFees`, `setEmissionSchedule`, `setValidatorParams`,
-  `setSelfBondGraceUntil`, `settleValidators`, `requestExit`, `cancelExit` do not;
-- `announceRemoval`, `cancelRemoval`, `emergencyRemove` appear in the registry's list;
-  `adminSetOperator`, `emergencyKick`, `setEmergencyKicker` do not;
 - `validatorCount`, `isValidator`, `lastSyncedWeight`, `delegatedStake`, `totalUserStake`,
-  `totalSelfBond`, `totalRewardableStake`, `allocatedRewardLiability` identical to step 1;
-- governance state identical to step 1 (no `ValidatorAdded` / `ValidatorRemoved` /
-  `ValidatorStakeUpdated` events);
-- `seatedUnderSelfBondRule` reads false for every seated validator (they are the incumbents);
-  `joinsOpenFromBlock` reads `0` (closed) unless it was voted earlier, `emissionStartTime` `0`;
-- `rewardReserve` is not new: the retired schedule kept its own under that name, and the logic
-  in between dropped the field and let the owner of the day take the STRATO behind it, so the
-  proxy may read a reserve nothing backs, against which every claim fails with
-  `SS: rewards unavailable`. Right after the swap run `node staking-setup.js reconcile`
-  (direct, permissionless: `reconcileRewardReserve()` only ever lowers the reserve to what the
-  contract holds beyond principal and `allocatedRewardLiability`, and moves nothing), then
-  verify `rewardReserve` reads as exactly that amount and that a test `claimOperatorRewards` /
-  `claimRewards` of some pending amount succeeds before anything is funded;
-- `untrackedStrato()` is what the old `recoverableUntrackedStrato()` read: nobody can take it;
-- the chain keeps committing; `lastProcessedBlock` keeps advancing, `lastBlockTime` /
-  `previousBlockTime` start filling (production income needs two processed blocks on record
-  before the first paid one); the node logs "no block rewards paid by …" once per block, which
-  is the router's `creditBlockReward` call finding no such function — expected.
+  `totalSelfBond`, `totalRewardableStake`, `allocatedRewardLiability` unchanged; governance shows
+  no `ValidatorAdded` / `ValidatorRemoved` / `ValidatorStakeUpdated` from the swap.
+- `seatedUnderSelfBondRule` reads false for every incumbent; `joinsOpenFromBlock`,
+  `emissionReserve` and `emissionStartTime` read 0.
+- The chain keeps committing and `lastProcessedBlock` keeps advancing.
 
-Storage is keyed by name and the contracts keep their names and every historical field, so the
-swaps are consensus-neutral: no set or weight changes.
+## 3. Fee share (vote)
 
-## 3. Admission (one vote)
+In the admin tab's "Validator parameters", keep the pre-filled incumbent min stake and liveness
+values, set the proposer fee share to 0 and save. That votes `setValidatorParams(minStake, 0,
+maxConsecutiveMisses, jailCooldown)`. Verify `proposerFeeBps == 0`; from then on the whole USDST
+fee goes to the fee collector.
 
-1. **Incumbents**: nothing to do. Each seated validator keeps qualifying on self-bond plus
-   delegations for as long as it holds its seat under the same operator. No deadline, no
-   mass bonding. A seat that leaves (exit, replacement, removal, liveness removal) or changes
-   operator comes back only with 10,000 STRATO of self-bond.
-2. **Readiness**: tell every operator that a candidate's validator key must send
-   `acknowledgeReadiness()` from the node within the day before it activates, and that a
-   seated validator stays "ready" by producing blocks (a finalised proposal is good for 500
-   blocks; an acknowledgement is the fallback for a day). Seated validators without fresh
-   evidence are "unready": the set can still change, but a change that would lower the ready
-   share below 75% of the set's weight is deferred until evidence arrives.
-3. **Agreed block**: `node staking-setup.js joinsfrom $JOINS_FROM`. Until that block only
-   governance's own admin vote changes the set; from it on anyone calls `tryActivate(v)` /
-   `reconcileSet([...])` for an eligible, ready validator. Movable by another vote until it
-   passes; never closed again (no pause exists).
-4. **Set size**: `node staking-setup.js setparams` votes `setSetParams(50, 50)` if the current
-   values differ. The hard cap only lowers.
+## 4. Fund and commit the emission schedule
 
-Verify: `joinsOpenFromBlock == JOINS_FROM`, `/staking/info.joinsOpen` flips to `true` once
-`lastProcessedBlock >= JOINS_FROM` (before it `tryActivate` fails with `SS: joins not open`); a
-registered, self-bonded validator whose key has acknowledged within the day reads `isWaiter`
-and activates itself through the staking page; `ValidatorSynced` and governance
-`ValidatorAdded` / `ValidatorStakeUpdated` follow; `readyWeight()` rises as validators
-acknowledge or propose.
+1. **Fund** (direct transactions by the funder; set `GLOBAL_ADMIN_NAME` /
+   `GLOBAL_ADMIN_PASSWORD` to that account): `node deploy/staking-setup.js fundreserve $R0`
+   approves the proxy, then calls `fundEmissionReserve`. Verify `emissionReserve == R0` and
+   `recoverableUntrackedStrato()` unchanged from before the funding.
+2. **Commit** (vote): `node deploy/staking-setup.js emission $E0 $S0 $R0 $START`. It fails with
+   `SS: reserve unfunded` unless the reserve holds `R0`, and with `SS: schedule committed` if a
+   schedule exists. Verify `emissionStartTime`, `emissionRateE0`, `emissionStakeS0`,
+   `emissionReserveR0`.
+3. **Verify payouts** after the start: a `ProductionRewarded(operator, validator, amount, elapsed,
+   stake, reserve)` per processed block whose producer is seated and eligible, with
+   `amount == emissionAnnualRate() × elapsed / 31536000` at that block's `stake` and `reserve`;
+   `emissionReserve` falling and `totalEmitted` and `allocatedRewardLiability` rising by the same
+   amounts; `elapsed` never above 3600. The staking page's APY now includes these payouts.
+   Validators and delegators claim with the existing claim calls.
+4. **Top-ups**: `fundreserve` again at any time, by anyone. `R` rises; `R0` does not change.
 
-## 4. Emissions
+## 5. Open admission (vote)
 
-1. **Fund the reserve** (direct transactions by `FUNDER`, which must hold the STRATO; set
-   `GLOBAL_ADMIN_NAME` / `GLOBAL_ADMIN_PASSWORD` to that account for this step):
-   `node staking-setup.js fundreserve $R0` — approves the staking proxy, then
-   `fundRewardReserve(R0)`. Anyone may fund the reserve; nothing can take it back out, under
-   this logic or any exceptional change (see §6). It reconciles first (step 2), so the deposit
-   lands on the backed reserve. Verify `rewardReserve == previous backed value + R0`,
-   `untrackedStrato() == 0`, a `RewardReserveFunded` event.
-2. **Commit the schedule** (vote): `node staking-setup.js commit $E0 $S0 $R0 $START`
-   → `commitEmissionSchedule(e0, s0, r0, startTime)`. It requires `rewardReserve >= r0`: what is
-   advertised is funded. With `START = 0` the schedule starts at the block the second vote
-   executes in; a future `START` schedules it. Nothing is paid for blocks before the start. The
-   vote fails with `SS: schedule committed` if one exists: there is no second commitment.
-3. **Verify** after the start: `ProductionRewarded(validator, amount, elapsed, stake, reserve)`
-   once per finalised block whose producer is seated, listed and eligible; `rewardReserve`
-   falling and `totalEmitted` / `allocatedRewardLiability` rising by the same amounts;
-   `eligibleStake()` equal to the sum of seated, listed, eligible validators' `selfBond +
-   delegatedStake`; `elapsed` never above 3600; a validator removed by governance vote leaving
-   the staking set and unpaid from the next block (no `syncValidator` needed); the staking
-   page's "Expected APY" and "current rate" reflecting `emissionAnnualRate()`. At the proposed
-   calibration with `S = 5,000,000` and a full reserve the rate is 500,000 STRATO a year, and
-   250,000 at `S = 1,250,000`; what a year actually releases is that rate times the share of
-   the year covered by block intervals of an hour or less, less the reserve's decay as it is
-   released (with a block every six minutes around the clock, about 487,700 STRATO the first
-   year; a quiet chain releases less). This variable, production-based yield is the accepted
-   shape of the schedule.
-4. **Top-ups**: `fundreserve` again, any time. `R` rises, `R0` and past earnings do not change.
-   There is no pause and no re-calibration.
+`node deploy/staking-setup.js joinsfrom $JOINS_FROM` votes `setJoinsOpenFromBlock`. It can be
+moved, by another vote, only to a later block and only until the block is reached.
 
-Validators and delegators claim through the existing `claimRewards` / `claimOperatorRewards`
-calls and the staking page. A delegation or self-bond placed after the swap earns from the week
-after it was placed and from its next touch (`qualifyStake`, the page's "Start earning", or any
-stake action); positions that predate the swap earn at once. Principal comes back in the same
-transaction as `unstake` / `unbondSelf`.
-
-## 5. Quality control: removals and handovers
-
-- **Ordinary removal**: `node staking-setup.js announceremoval <validator> <grounds>` (vote;
-  grounds are published in `RemovalAnnounced`), then after seven days
-  `node staking-setup.js removevalidator <validator>` (vote). `cancelRemoval` withdraws an
-  announcement. The removal is a membership change like any other: two per block, and never
-  one that leaves the set unable to finalise on its ready members (it then fails with
-  `SS: unsafe transition`; retry when evidence arrives or after removing an unready member).
-- **Emergency**: `node staking-setup.js emergencyremove <validator> <grounds>` (vote) names one
-  validator and its grounds and executes at once, under the same per-block and readiness rules.
-- **Liveness**: `node staking-setup.js removeformisses <validator>` (direct, anyone) once
-  `consecutiveMisses[v] >= 20`; the validator may be seated again a week later on fresh
-  evidence. The staking admin tab offers the same button once the limit is reached.
-- **Handover**: the validator key binds the new operator in the registry (`setOperator` with its
-  signature, as today); the new operator completes it a week later with
-  `acceptOperator(validator, bond >= 10,000 STRATO)` (staking page "Accept"). Until then the old
-  operator operates and is paid out at completion; delegations stay. The key binds back to
-  withdraw. There is no admin path that moves a validator.
-- Holding more than a third of the stake is not grounds for anything on its own.
+Verify: `joinsOpenFromBlock == JOINS_FROM`; before it `tryActivate` fails with
+`SS: joins not open` for everyone; from it a validator whose operator self-bonded 10,000 STRATO
+shows as eligible on the staking page and seats itself (`ValidatorSynced`, then governance
+`ValidatorAdded`); one with less self-bond, however much is delegated, stays ineligible.
 
 ## 6. Rollback
 
-- Admission: there is none. `joinsOpenFromBlock` cannot be moved once passed. Reverting the
-  logic is the only way to close admission and is an extraordinary change.
-- Emissions: there is no pause. The reserve is dedicated, under this logic and any other: a
-  downgrade to a logic that could read it as untracked and recover it is excluded by policy
-  (task 14 of the change list) and must not be voted. If the logic ever has to be reverted for
-  a defect, the reverting logic must carry the reserve, the qualification state and the
-  pending handovers forward; it cannot be the previous logic on this branch's base. Record
-  `allocatedRewardLiability`, `rewardReserve` and `principalBalance()` before any such step.
-  Nothing is lazily settled under this logic (production income is credited per block), so a
-  reverting logic reads every claim from the same fields this one writes
-  (`pendingSelfBondRewards`, `pendingCommission`, `delegatorRewardPerStakeStored`,
-  `pendingDelegatorRewards`).
-
-## 7. Open items for the business owner
-
-The decisions the code cannot make, all values rather than policy:
-
-- the values in the table in §0 (reserve size and funder, start, agreed block, the
-  quality-control approvers);
-- the disposition of the STRATO the legacy router still holds (it keeps paying nobody);
-- the gas-fee revision (STRATO gas to the fee sink, STRATO bought with USDST) and the router
-  cleanup that goes with it are a separate change this branch depends on but does not make;
-  under this logic gas already goes wholly to the fee sink;
-- the node-side rule for incomplete voting information after the bootstrap (decision 2): a
-  separate node change on top of #7649 / #7650, specified in the decisions document.
+Swap back to the previous logic with the same `upgrade.js` vote only before step 4: from the
+first funding on, the previous logic would count the reserve as untracked STRATO that
+`recoverUntrackedStrato` can take. After step 4, any replacement logic must keep
+`emissionReserve` out of recovery and payouts.
