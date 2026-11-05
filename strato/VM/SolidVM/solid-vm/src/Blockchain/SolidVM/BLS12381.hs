@@ -67,9 +67,10 @@ module Blockchain.SolidVM.BLS12381
   )
 where
 
+import Control.Exception (throw)
 import Data.Bits (shiftL)
 import qualified Data.ByteString as B
-import Blockchain.VM.SolidException (invalidArguments)
+import Blockchain.VM.SolidException (SolidException (InvalidArguments))
 import Data.Curve (Coordinates (Affine), Form (Weierstrass), mul')
 import qualified Data.Curve.Weierstrass.BLS12381 as G1Curve
 import qualified Data.Curve.Weierstrass.BLS12381T as G2Curve
@@ -472,11 +473,11 @@ g1FromInts :: G1Coords -> G1
 g1FromInts (0, 0) = O
 g1FromInts (x, y)
   | outOfRange x || outOfRange y =
-      invalidArguments "bls12381" $ "G1 coordinate out of range [0, p): " ++ show (x, y)
+      throw (InvalidArguments "bls12381" $ "G1 coordinate out of range [0, p): " ++ show (x, y))
   | not (onCurveG1 p) =
-      invalidArguments "bls12381" $ "G1 point is not on the curve: " ++ show (x, y)
+      throw (InvalidArguments "bls12381" $ "G1 point is not on the curve: " ++ show (x, y))
   | not (inSubgroupG1 p) =
-      invalidArguments "bls12381" $ "G1 point is not in the r-order subgroup: " ++ show (x, y)
+      throw (InvalidArguments "bls12381" $ "G1 point is not in the r-order subgroup: " ++ show (x, y))
   | otherwise = p
   where
     p = A (fromInteger x :: G1Curve.Fq) (fromInteger y :: G1Curve.Fq)
@@ -489,11 +490,11 @@ g2FromInts :: G2Coords -> G2
 g2FromInts ((0, 0), (0, 0)) = O
 g2FromInts coords@((xc0, xc1), (yc0, yc1))
   | any outOfRange [xc0, xc1, yc0, yc1] =
-      invalidArguments "bls12381" $ "G2 coordinate out of range [0, p): " ++ show coords
+      throw (InvalidArguments "bls12381" $ "G2 coordinate out of range [0, p): " ++ show coords)
   | not (onCurveG2 p) =
-      invalidArguments "bls12381" $ "G2 point is not on the twist curve: " ++ show coords
+      throw (InvalidArguments "bls12381" $ "G2 point is not on the twist curve: " ++ show coords)
   | not (inSubgroupG2 p) =
-      invalidArguments "bls12381" $ "G2 point is not in the r-order subgroup: " ++ show coords
+      throw (InvalidArguments "bls12381" $ "G2 point is not in the r-order subgroup: " ++ show coords)
   | otherwise = p
   where
     p = A (mkFp2 xc0 xc1) (mkFp2 yc0 yc1)

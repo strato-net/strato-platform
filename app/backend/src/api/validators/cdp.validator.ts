@@ -1,4 +1,4 @@
-import Joi from "@hapi/joi";
+import Joi from "joi";
 import { validateAddressField, numericStringField } from "./common.validators";
 
 // CDP Vault Operation Validators

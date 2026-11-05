@@ -18,6 +18,7 @@ module Blockchain.JsonRpcCommand
   )
 where
 
+import Control.Exception (displayException)
 import BlockApps.Logging
 import BlockApps.Solidity.ABI
 import Blockchain.Data.BlockHeader (BlockHeader)
@@ -313,7 +314,7 @@ ethCallEx blockHeader gas fromAddr toAddr callData = do
       case erException result of
         Just ex -> do
           $logInfoS "ethCall" . T.pack $ prettyCall ++ " => EXCEPTION: " ++ show ex
-          return (Left (show ex), Just result)
+          return (Left (either displayException displayException ex), Just result)
         Nothing -> case erReturnVal result of
           Nothing -> do
             $logInfoS "ethCall" . T.pack $ prettyCall ++ " => (no return value)"
@@ -350,7 +351,7 @@ ethCreateEx blockHeader TxCreateObject {..} = do
   case erException result of
     Just ex -> do
       $logInfoS "ethCreate" . T.pack $ "creation => EXCEPTION: " ++ show ex
-      return (Left (show ex), Just result)
+      return (Left (either displayException displayException ex), Just result)
     Nothing -> do
       $logInfoS "ethCreate" . T.pack $ "created at " ++ show newAddr
       -- SolidVM has no runtime bytecode to return, so the useful result of a
@@ -377,7 +378,7 @@ ethFuncCallEx blockHeader TxFuncCallObject {..} = do
   case erException result of
     Just ex -> do
       $logInfoS "ethFuncCall" . T.pack $ prettyCall ++ " => EXCEPTION: " ++ show ex
-      return (Left (show ex), Just result)
+      return (Left (either displayException displayException ex), Just result)
     Nothing -> do
       $logInfoS "ethFuncCall" . T.pack $ prettyCall ++ " => ok"
       -- No ABI return types are available on this path; the return value

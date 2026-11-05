@@ -89,9 +89,9 @@ import Text.RawString.QQ
 -- those that are returned in ExecResults
 newtype HandledException = HE SolidException deriving (Show, Exception)
 
-anyTODO :: Selector HandledException
-anyTODO (HE TODO {}) = True
-anyTODO _ = False
+anyUnsupportedFeature :: Selector HandledException
+anyUnsupportedFeature (HE UnsupportedFeature {}) = True
+anyUnsupportedFeature _ = False
 
 anyParseError :: Selector HandledException
 anyParseError (HE ParseError {}) = True
@@ -8357,7 +8357,7 @@ contract qq {
     delete b;
     delete yy;
   }
-}|]) `shouldThrow` anyTODO
+}|]) `shouldThrow` anyUnsupportedFeature
 
   it "can successfully use the 'blockhash' built-in" $ runTest ( do
     runBS [r|

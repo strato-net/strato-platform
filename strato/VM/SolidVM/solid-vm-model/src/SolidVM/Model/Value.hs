@@ -24,9 +24,11 @@ module SolidVM.Model.Value
     weakGetVar,
     forceLoadVar,
     renderValue,
+    renderValueShallow,
   )
 where
 
+import Control.Exception (throw)
 import Blockchain.Data.RLP
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Address
@@ -186,7 +188,7 @@ instance Eq Value where
     (SBytes b1, SString b2) -> b1 == encodeUtf8 (T.pack b2)
     (SNULL, _) -> False
     (_, SNULL) -> False
-    _ -> todo "Value/Eq" (x, y)
+    _ -> throw (TypeError "unsupported value types for equality" (format (renderValueShallow x, renderValueShallow y)))
 
 instance Ord Value where
   compare x y = case (toNull x, toNull y) of
@@ -201,11 +203,11 @@ instance Ord Value where
     (SBytes b1, SString b2) -> compare b1 (encodeUtf8 (T.pack b2))
     (SNULL, _) -> LT
     (_, SNULL) -> GT
-    _ -> todo "Value/Ord" (x, y)
+    _ -> throw (TypeError "unsupported value types for ordering" (format (renderValueShallow x, renderValueShallow y)))
 
 instance RLPSerializable Value where
   rlpEncode = rlpEncodeValue
-  rlpDecode x = todo "Value/rlpDecode" x
+  rlpDecode x = throw (InternalError ("RLP decoding of Value is not supported: " ++ show x))
 
 rlpEncodeVariable :: Variable -> RLPObject
 rlpEncodeVariable (Variable _) = rlpEncodeValue SNULL
@@ -243,7 +245,7 @@ coerceFromInt _ _ SString {} n = SString $ showHex n ""
 coerceFromInt _ _ SDecimal {} n = SDecimal $ Decimal 0 n
 coerceFromInt _ _ (SContract c _) n = SContract c $ fromIntegral n
 coerceFromInt ct cc (SEnumVal tipe _ _) n' =
-  fromMaybe (typeError "missing enum val" $ show (tipe, n')) $ do
+  fromMaybe (throw (TypeError "missing enum val" $ format (tipe, n'))) $ do
     let n = fromIntegral n'
     -- Look up enum in contract first, then fall back to file-level enums
     enumDef <- fmap fst $ M.lookup tipe (CC._enums ct) <|> M.lookup tipe (cc ^. CC.flEnums)
@@ -251,7 +253,7 @@ coerceFromInt ct cc (SEnumVal tipe _ _) n' =
     return $ SEnumVal tipe (enumDef !! n) $ fromIntegral n'
 coerceFromInt _ _ SNULL n = SInteger n
 coerceFromInt _ _ SReference{} n = SInteger n
-coerceFromInt _ _ t x = typeError "coerceFromInt: invalid literal for type" $ show (t, x)
+coerceFromInt _ _ t x = throw (TypeError "coerceFromInt: invalid literal for type" $ format (renderValueShallow t, x))
 
 -- coerceType allows integer literals to initialize integers, addresses, and
 -- strings (in the special case of 0) and bytes32, determined by type instead of value
@@ -262,7 +264,7 @@ coerceType ct cc xt = \case
     SVMType.String {} -> SString s
     SVMType.Bytes {} -> SString s
     SVMType.Decimal {} -> SDecimal (read s :: Decimal)
-    _ -> typeError "string literal must be string or bytes" $ show (xt, s)
+    _ -> throw (TypeError "string literal must be string or bytes" $ show xt ++ ": " ++ s)
   v -> v
 
 valEquals :: CC.Contract -> CodeCollection -> Value -> Value -> Bool
@@ -314,7 +316,7 @@ defaultValue ctract (SVMType.UnknownLabel name) =
           return . SStruct name . M.map initializeField . M.fromList $ sdef
       ]
 defaultValue _ SVMType.Variadic = STuple V.empty
-defaultValue _ x = todo "defaultValue" x
+defaultValue _ x = throw (UnsupportedFeature "default value for type" (show x))
 
 createDefaultValue ::
   MonadIO m =>
@@ -417,6 +419,10 @@ instance Format Value where
   format (SAddress a _) = "Address(" ++ take 10 (show a) ++ "...)"
   format v = valueTypeName v
 
+instance Format Variable where
+  format (Constant value) = T.unpack (renderValueShallow value)
+  format (Variable _) = "variable"
+
 getConst :: Variable -> Value
 getConst (Constant v) = v
 getConst (Variable _) = SNULL
@@ -434,6 +440,22 @@ forceLoadVar = forceLoadVal <=< weakGetVar
           SArray vs -> SArray . fmap Constant <$> traverse forceLoadVar vs
           SMap m -> SMap . fmap Constant <$> traverse forceLoadVar m
           _ -> pure v
+
+-- | Shallow, pure rendering of a value: scalars verbatim, compounds
+-- summarized without dereferencing nested variables or storage.
+renderValueShallow :: Value -> T.Text
+renderValueShallow = \case
+  SInteger i -> T.pack (show i)
+  SDecimal d -> T.pack (show d)
+  SString str -> T.pack (show str)
+  SBool b -> if b then "true" else "false"
+  SAddress addr _ -> T.pack (show addr)
+  SEnumVal enumName valName _ -> labelToText enumName <> "." <> labelToText valName
+  SStruct sname _ -> "<struct " <> labelToText sname <> ">"
+  STuple _ -> "<tuple>"
+  SArray _ -> "<array>"
+  SMap _ -> "<mapping>"
+  v -> T.take 100 . T.pack $ show v
 
 -- | JSON-ish text form of a fully evaluated value (only 'Constant' cells;
 -- see 'forceLoadVar'). Used for event args wherever they are shown as text.
