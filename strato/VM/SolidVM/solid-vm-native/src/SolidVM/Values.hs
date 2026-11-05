@@ -223,7 +223,7 @@ valueAsAt addr ctx t v = case (t, v) of
     block <- BlockHeader.number . Env.blockHeader <$> getEnv
     case toBasic block v >>= either (const Nothing) Just . N.fromBasic t of
       Just result -> pure result
-      Nothing -> throwIO $ TypeError "external value does not match the declared type" (show v <> " -> " <> T.unpack (N.showTy t))
+      Nothing -> throwIO $ TypeError "external value does not match the declared type" (T.unpack (renderValueShallow v) <> " -> " <> T.unpack (N.showTy t))
 
 isVariadic :: N.Ty t -> Bool
 isVariadic N.TVariadic = True
@@ -259,7 +259,7 @@ valueDynAt addr ctx = \case
     Right (N.SomeTy t) -> N.Dyn t <$> valueAsAt addr ctx t v
     Left message -> throwIO $ N.Divergence message
   SNULL -> pure $ N.Dyn N.TUnit ()
-  v -> throwIO $ N.Divergence $ "unsupported native boundary value: " <> T.pack (show v)
+  v -> throwIO $ N.Divergence $ "unsupported native boundary value: " <> renderValueShallow v
 
 structDyn :: T.Text -> [(T.Text, N.Dyn)] -> N.Dyn
 structDyn structName = go (\fields values -> N.Dyn (N.TStruct structName fields) values)

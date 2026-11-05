@@ -97,7 +97,7 @@ Preconditions, in order. "Vote" = one AdminRegistry issue, run once per admin.
    the old build forks off. The router's activation block (step 4) is `fork` in
    `networks.js`, which must be the same number.
 2. **Token.** Upgrade the STRATO proxy to the burnable logic (`upgrade.js`, vote). Transfers
-   stay paused until TGE: the router moves each fee to the burn address with `transferFrom`,
+   stay paused until TGE: the router moves each fee to its fee address (`0xdead5712a7…dead5712a70`) with `transferFrom`,
    so whitelist it for `transferFrom` (`whitelist-feerouter.js upquark <router>`, vote) before
    installing it, or every STRATO-paid transaction is rejected. Whitelisting the pool for `transfer` (`whitelist-feerouter.js upquark transfer <pool>`, vote)
    lets USDST buy STRATO, including the router's shortfall buy, while `transferFrom` stays

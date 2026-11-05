@@ -45,7 +45,7 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
-const { rest, util } = require('blockapps-rest');
+const { rest, util } = require('./strato');
 const { getIssueId, saveCallListTXDataAsFile } = require('./util');
 
 const DEFAULT_NODE_URL = 'https://app.strato.nexus';

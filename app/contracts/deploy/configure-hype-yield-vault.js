@@ -132,7 +132,7 @@ async function main() {
   require('dotenv').config();
   const config = require('./config');
   const auth = require('./auth');
-  const { rest } = require('blockapps-rest');
+  const { rest } = require('./strato');
   const username = process.env.GLOBAL_ADMIN_NAME;
   const password = process.env.GLOBAL_ADMIN_PASSWORD;
   if (!username || !password) {

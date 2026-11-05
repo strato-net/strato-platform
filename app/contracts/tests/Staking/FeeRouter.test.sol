@@ -39,6 +39,7 @@ contract record LegacyGovernance {
 
 contract record MockVoucher {
     mapping(address => uint) public balances;
+    function balanceOf(address account) external view returns (uint) { return balances[account]; }
     function mint(address to, uint amount) public { balances[to] += amount; }
     function burn(address from, uint amount) public {
         require(balances[msg.sender] >= amount, "no voucher");
@@ -70,6 +71,7 @@ contract record FeeRouterHarness is FeeRouter {
     uint public swapPremiumBps = 10000;
     uint public activation;
     address public feeCollectorAddr;
+    address public burnAddressOverride;
 
     function configure(address v, address u, address g, address d) public {
         voucherAddr = v;
@@ -88,6 +90,7 @@ contract record FeeRouterHarness is FeeRouter {
     function setBlockReward(uint r) public { blockReward_ = r; }
     function setSwapPremium(uint bps) public { swapPremiumBps = bps; }
     function setActivation(uint b, address collector) public { activation = b; feeCollectorAddr = collector; }
+    function setBurnAddress(address sink) public { burnAddressOverride = sink; }
 
     function _voucher() internal view override returns (address) { return voucherAddr; }
     function _usdst() internal view override returns (address) { return usdstAddr; }
@@ -99,23 +102,36 @@ contract record FeeRouterHarness is FeeRouter {
     function _minPoolLiquidity() internal view override returns (uint) { return minLiquidity; }
     function _blockReward() internal view override returns (uint) { return blockReward_; }
     function _maxSwapPremiumBps() internal view override returns (uint) { return swapPremiumBps; }
+    function _burnAddress() internal view override returns (address) { return burnAddressOverride == address(0) ? FEE_ADDRESS : burnAddressOverride; }
     function _activationBlock() internal view override returns (uint) { return activation; }
     function _feeCollector() internal view override returns (address) { return feeCollectorAddr; }
 }
 
 contract record Signer is FeeRouterHarness {
+    function runCanary(address router) public { FeeRouter(router).gasCanary(); }
     function pay(address router) public {
+        // Raw self-call reproduces the native root sender/storage identity;
+        // delegatecall then preserves it. The production guard is not overridden.
+        address(this).call("nativePay", router);
+    }
+    function nativePay(address router) public {
+        require(msg.sender == address(this), "test native self-call only");
         address(router).delegatecall("payFees");
     }
+    function untrustedDelegatePay(address router) public { address(router).delegatecall("payFees"); }
 
     function approve(address token, address spender, uint amount) public {
         Token(token).approve(spender, amount);
+    }
+
+    function delegateBuyGas(address router, uint amount) public {
+        address(router).delegatecall("buyAndSinkFee", amount);
     }
 }
 
 contract Describe_FeeRouter {
     address constant PROPOSER = address(0xaaaa);
-    address constant BURN_ADDRESS = address(0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddead);
+    address constant FEE_ADDRESS = address(0xdead5712a70000000000000000000dead5712a70);
     uint constant Q192 = 6277101735386680763835789423207666416102355444464034512896;
     uint constant WINDOW = 1800; // FeeRouter._twapWindow
     int constant FULL_RANGE = 887220; // widest tick multiple of the 0.30% tier's spacing
@@ -372,7 +388,7 @@ contract Describe_FeeRouter {
         signer.pay(address(router));
     }
 
-    // ---- payment: one whole voucher, else STRATO to the burn address ----
+    // ---- payment: one whole voucher, else STRATO to the fee address ----
 
     function it_sends_the_strato_fee_to_the_burn_address() public {
         _pricedPool(0, true);
@@ -380,7 +396,7 @@ contract Describe_FeeRouter {
 
         signer.pay(address(router));
         require(strato.balanceOf(address(signer)) == 1e18 - 1e16, "signer paid 0.01 STRATO");
-        require(strato.balanceOf(BURN_ADDRESS) == 1e16, "the fee sits at the burn address");
+        require(strato.balanceOf(FEE_ADDRESS) == 1e16, "the fee sits at the fee address");
         require(strato.totalSupply() == supply, "moved, not burned");
         require(strato.balanceOf(address(feeCollector)) == 0, "nothing to the collector");
         require(strato.balanceOf(address(router)) == 0, "nothing to the router");
@@ -438,7 +454,7 @@ contract Describe_FeeRouter {
         admin.castVoteOnIssue(address(admin), "addWhitelist", address(strato), "transferFrom", address(router));
         signer.pay(address(router));
         require(strato.balanceOf(address(signer)) == 1e18 - 1e16, "paid while paused");
-        require(strato.balanceOf(BURN_ADDRESS) == 1e16, "to the burn address");
+        require(strato.balanceOf(FEE_ADDRESS) == 1e16, "to the fee address");
     }
 
     function it_reverts_when_strato_is_short_and_there_is_no_voucher() public {
@@ -557,10 +573,142 @@ contract Describe_FeeRouter {
 
         s.pay(address(router));
         require(strato.balanceOf(address(s)) == 0, "exactly the shortfall bought, then the fee burned");
-        require(strato.balanceOf(BURN_ADDRESS) == 1e16, "the whole fee goes to the burn address");
+        require(strato.balanceOf(FEE_ADDRESS) == 1e16, "the whole fee goes to the fee address");
         require(strato.totalSupply() == supply, "nothing burned");
         uint spent = 1e18 - usdst.balanceOf(address(s));
         require(spent >= 5e15 && spent <= 5e15 * 101 / 100, "shortfall bought at the pool price plus its fee");
+    }
+
+    function _dustPaymentsAt(int tick, bool stratoFirst) internal {
+        _pricedPool(tick, stratoFirst);
+        pool.setGasSwapRouter(address(router));
+        admin.castVoteOnIssue(address(admin), "addWhitelist", address(strato), "transfer", address(pool));
+        admin.castVoteOnIssue(address(admin), "addWhitelist", address(strato), "transferFrom", address(router));
+        strato.pause();
+        uint fee = _quotedFee();
+        uint[] memory dust = new uint[](3);
+        dust[0] = 1; dust[1] = 2; dust[2] = 7;
+        uint sunk = 0;
+        for (uint i = 0; i < dust.length; i++) {
+            Signer s = _shortSigner(0, 1e18);
+            strato.mint(address(s), fee - dust[i]);
+            s.approve(address(usdst), address(router), 123);
+            uint price = pool.sqrtPriceX96();
+            bool usdFirst = address(pool.token0()) == address(usdst);
+            (uint cost, uint rounding, bool complete) = pool.quoteGasExactOutput(usdFirst, dust[i]);
+            require(complete && cost > 0 && pool.sqrtPriceX96() == price, "quote changed state");
+            uint proportional = (dust[i] * 2e16 + fee - 1) / fee;
+            require(cost <= proportional + rounding, "quote includes more than rounding");
+            s.pay(address(router));
+            sunk += fee;
+            require(strato.balanceOf(address(s)) == 0 && strato.balanceOf(FEE_ADDRESS) == sunk, "dust did not pay exact fee");
+            require(1e18 - usdst.balanceOf(address(s)) == cost, "quote differs from actual input");
+            require(usdst.allowance(address(s), address(router)) == 123, "dust changed prior allowance");
+            require(usdst.allowance(address(router), address(pool)) == 0 && usdst.balanceOf(address(router)) == 0, "dust left pool approval or funds");
+        }
+    }
+    function it_pays_dust_shortfalls_at_parity_strato_first() public { _dustPaymentsAt(0, true); }
+    function it_pays_dust_shortfalls_at_parity_usdst_first() public { _dustPaymentsAt(0, false); }
+    function it_pays_dust_shortfalls_at_low_tick_strato_first() public { _dustPaymentsAt(-60000, true); }
+    function it_pays_dust_shortfalls_at_low_tick_usdst_first() public { _dustPaymentsAt(-60000, false); }
+    function it_pays_dust_shortfalls_at_high_tick_strato_first() public { _dustPaymentsAt(60000, true); }
+    function it_pays_dust_shortfalls_at_high_tick_usdst_first() public { _dustPaymentsAt(60000, false); }
+
+    function it_pays_one_unit_shortfall_at_mainnet_fee_and_depth() public {
+        _newBlock();
+        poolFactory = new PoolV3Factory(address(this));
+        poolFactory.initialize(address(factory), address(feeCollector));
+        pool = PoolV3(poolFactory.createPoolV3(address(strato), address(usdst), 500, TickMath.getSqrtRatioAtTick(0)));
+        pool.increaseObservationCardinalityNext(16);
+        strato.mint(address(this), BIG); usdst.mint(address(this), BIG);
+        strato.approve(address(pool), BIG); usdst.approve(address(pool), BIG);
+        pool.mint(address(this), -887270, 887270, 1e20, BIG, BIG, block.timestamp);
+        router.configureStrato(address(strato), address(pool));
+        fastForward(WINDOW, 1); router.payBlockRewards();
+        pool.setGasSwapRouter(address(router));
+        admin.castVoteOnIssue(address(admin), "addWhitelist", address(strato), "transfer", address(pool));
+        admin.castVoteOnIssue(address(admin), "addWhitelist", address(strato), "transferFrom", address(router));
+        strato.pause();
+        Signer s = _shortSigner(1e16 - 1, 1e18);
+        s.approve(address(usdst), address(router), 123);
+        (uint cost, uint rounding, bool complete) = pool.quoteGasExactOutput(false, 1);
+        require(complete && cost == 3 && rounding == 1, "wrong mainnet dust rounding");
+        s.pay(address(router));
+        require(strato.balanceOf(FEE_ADDRESS) == 1e16 && strato.balanceOf(address(s)) == 0, "dust fee not paid");
+        require(usdst.balanceOf(address(s)) == 1e18 - 3 && usdst.allowance(address(s), address(router)) == 123, "wrong dust debit or allowance");
+    }
+
+    function it_emits_a_canary_witness_without_changing_funds_after_the_fee() public {
+        _pricedPool(0, true);
+        Signer s = _shortSigner(0, 1e18);
+        s.pay(address(router));
+        uint usd = usdst.balanceOf(address(s));
+        uint sunk = strato.balanceOf(FEE_ADDRESS);
+        s.runCanary(address(router));
+        require(usdst.balanceOf(address(s)) == usd && strato.balanceOf(FEE_ADDRESS) == sunk && strato.balanceOf(address(s)) == 0, "canary body moved funds");
+    }
+    function it_records_the_successful_quote_block_separately_from_timestamp() public {
+        _pricedPool(0, true);
+        require(block.timestamp != block.number, "fixture must separate time and height");
+        require(router.quotedBlock() == block.number && router.quotedAt() == block.timestamp, "quote block/time confused");
+        uint successfulBlock = router.quotedBlock();
+        router.setMinLiquidity(1e40);
+        fastForward(60, 1); router.payBlockRewards();
+        require(router.lastRewardedBlock() == block.number && router.quotedBlock() == successfulBlock, "failed pricing falsely marked current");
+    }
+
+    function _rejectDirectFee(User attacker, address target) internal {
+        bool failed = false;
+        try attacker.do(target, "payFees") {
+        } catch Error(string e) {
+            require(e == "FeeRouter: signer context only", "wrong direct-hook rejection");
+            failed = true;
+        }
+        require(failed, "direct public fee hook succeeded");
+    }
+    function it_rejects_direct_fee_calls_without_spending_router_strato() public {
+        _gasOnlyPool(true);
+        strato.mint(address(router), 1e18);
+        User attacker = new User();
+        for (uint i = 0; i < 10; i++) { _rejectDirectFee(attacker, address(router)); }
+        require(strato.balanceOf(address(router)) == 1e18 && strato.balanceOf(FEE_ADDRESS) == 0, "router STRATO depleted");
+        require(strato.balanceOf(address(attacker)) == 0 && usdst.balanceOf(address(attacker)) == 0, "attacker funded the test");
+    }
+    function it_rejects_direct_fee_calls_without_spending_router_usdst() public {
+        _gasOnlyPool(true);
+        usdst.mint(address(router), 1e18);
+        uint price = pool.sqrtPriceX96();
+        User attacker = new User();
+        for (uint i = 0; i < 10; i++) { _rejectDirectFee(attacker, address(router)); }
+        require(usdst.balanceOf(address(router)) == 1e18 && strato.balanceOf(FEE_ADDRESS) == 0 && pool.sqrtPriceX96() == price, "router USDST depleted or pool changed");
+    }
+    function it_rejects_direct_fee_calls_without_burning_router_vouchers() public {
+        voucher.mint(address(router), 2e18);
+        strato.mint(address(router), 1e18);
+        usdst.mint(address(router), 1e18);
+        User attacker = new User();
+        _rejectDirectFee(attacker, address(router));
+        require(voucher.balanceOf(address(router)) == 2e18 && strato.balanceOf(address(router)) == 1e18 && usdst.balanceOf(address(router)) == 1e18, "router reserves changed");
+    }
+    function it_preserves_the_default_fee_sink_from_develop() public {
+        FeeRouter defaultRouter = new FeeRouter();
+        require(defaultRouter.burnAddress() == FEE_ADDRESS, "default fee sink changed");
+    }
+
+    function it_rejects_direct_fee_calls_before_any_configuration_lookup() public {
+        FeeRouter unconfigured = new FeeRouter();
+        User attacker = new User();
+        _rejectDirectFee(attacker, address(unconfigured));
+    }
+    function it_rejects_nonself_delegation_without_spending_the_signer() public {
+        Signer s = _shortSigner(1e16, 1e18);
+        bool failed = false;
+        try s.untrustedDelegatePay(address(router)) {
+        } catch Error(string e) {
+            require(e == "FeeRouter: signer context only", "wrong nonself-context rejection");
+            failed = true;
+        }
+        require(failed && strato.balanceOf(address(s)) == 1e16 && usdst.balanceOf(address(s)) == 1e18, "nonself caller charged signer");
     }
 
     function it_buys_the_whole_fee_when_the_signer_holds_no_strato() public {
@@ -594,9 +742,329 @@ contract Describe_FeeRouter {
         _pricedPool(0, true);
         Signer s = _shortSigner(0, 1e18);
         s.setSwapPremium(0); // the pool's own 0.30% already exceeds a zero premium
+        router.setSwapPremium(0);
 
         require(_paymentReverts(s), "pool price above the cap: unpaid");
         require(strato.balanceOf(address(s)) == 0 && usdst.balanceOf(address(s)) == 1e18, "nothing bought or burned");
+    }
+
+    // ---- gas-only pool: real pool math, proxy, paused token and exact whitelist ----
+
+    function _gasOnlyPool(bool stratoFirst) internal {
+        _pricedPool(0, stratoFirst);
+        pool.setGasSwapRouter(address(router));
+        admin.castVoteOnIssue(address(admin), "addWhitelist", address(strato), "transfer", address(pool));
+        admin.castVoteOnIssue(address(admin), "addWhitelist", address(strato), "transferFrom", address(router));
+        strato.pause();
+        require(!admin.whitelist(address(strato), "transferFrom", address(pool)), "pool does not need STRATO transferFrom");
+    }
+
+    function _buyer() internal returns (User) {
+        User u = new User();
+        usdst.mint(address(u), 1e18);
+        u.do(address(usdst), "approve", address(router), 1e18);
+        return u;
+    }
+
+    function it_blocks_ordinary_buys_on_the_gas_only_pool() public {
+        _gasOnlyPool(true);
+        User u = _buyer();
+        u.do(address(usdst), "approve", address(pool), 1e18);
+        bool failed = false;
+        try u.do(address(pool), "swap", address(u), false, int(1e16), 0, 1, block.timestamp) {
+        } catch Error(string e) {
+            require(e == "Gas swaps only", "must reject at the pool gate");
+            failed = true;
+        }
+        require(failed, "ordinary buy succeeded");
+        require(usdst.balanceOf(address(u)) == 1e18 && strato.balanceOf(address(u)) == 0, "trade moved funds");
+    }
+
+    function it_blocks_ordinary_sells_even_with_the_old_pool_whitelist() public {
+        _gasOnlyPool(true);
+        admin.castVoteOnIssue(address(admin), "addWhitelist", address(strato), "transferFrom", address(pool));
+        User u = _buyer();
+        strato.mint(address(u), 2e18);
+        u.do(address(strato), "approve", address(pool), 2e18);
+        bool failed = false;
+        try u.do(address(pool), "swap", address(u), true, int(2e18), 0, 1, block.timestamp) {
+        } catch Error(string e) {
+            require(e == "Gas swaps only", "must reject despite the token whitelist");
+            failed = true;
+        }
+        require(failed && strato.balanceOf(address(u)) == 2e18, "ordinary sell succeeded");
+    }
+
+    function it_blocks_direct_swaps_to_the_burn_sink_too() public {
+        _gasOnlyPool(true);
+        bool failed = false;
+        try pool.swap(FEE_ADDRESS, false, -int(1e16), 0, 2e16, block.timestamp) {
+        } catch Error(string e) {
+            require(e == "Gas swaps only", "recipient must not replace caller authorization");
+            failed = true;
+        }
+        require(failed, "owner bypassed the router gate");
+    }
+
+    function it_pays_usdst_only_gas_with_strato_paused_and_the_pool_restricted() public {
+        _gasOnlyPool(true);
+        Signer s = _shortSigner(0, 1e18);
+        uint supply = strato.totalSupply();
+        s.pay(address(router));
+        require(strato.balanceOf(FEE_ADDRESS) == 1e16, "gas was not sunk");
+        require(strato.balanceOf(address(s)) == 0 && strato.balanceOf(address(router)) == 0, "gas became spendable");
+        require(strato.totalSupply() == supply, "fixed supply changed");
+        require(usdst.allowance(address(router), address(pool)) == 0, "router left a pool approval");
+    }
+
+    function it_pays_mixed_strato_and_usdst_gas_with_the_pool_restricted() public {
+        _gasOnlyPool(true);
+        Signer s = _shortSigner(5e15, 1e18);
+        s.pay(address(router));
+        require(strato.balanceOf(address(s)) == 0, "held fee not sunk");
+        require(strato.balanceOf(FEE_ADDRESS) == 1e16, "mixed payment did not sink the full fee");
+        uint spent = 1e18 - usdst.balanceOf(address(s));
+        require(spent > 5e15 && spent < 51e14, "wrong shortfall input");
+    }
+
+    function it_pays_gas_with_strato_as_token1() public {
+        _gasOnlyPool(false);
+        Signer s = _shortSigner(0, 1e18);
+        s.pay(address(router));
+        require(strato.balanceOf(FEE_ADDRESS) == 1e16, "wrong swap direction");
+        require(strato.balanceOf(address(s)) == 0, "STRATO delivered to payer");
+    }
+
+    function it_keeps_direct_strato_and_voucher_payments_working() public {
+        _gasOnlyPool(true);
+        uint price = pool.sqrtPriceX96();
+        signer.pay(address(router));
+        Signer v = _signerWithVoucher();
+        v.pay(address(router));
+        require(strato.balanceOf(FEE_ADDRESS) == 1e16, "direct STRATO fee missing");
+        require(voucher.balances(address(v)) == 0 && strato.balanceOf(address(v)) == 1e18, "voucher path changed");
+        require(pool.sqrtPriceX96() == price, "non-swap gas moved the pool");
+    }
+
+    function it_does_not_require_the_full_usdst_cap_in_the_payers_balance() public {
+        _gasOnlyPool(true);
+        Signer s = _shortSigner(0, 11e15);
+        s.pay(address(router));
+        require(strato.balanceOf(FEE_ADDRESS) == 1e16, "affordable gas rejected");
+        require(usdst.balanceOf(address(s)) > 0, "unused USDST not refunded");
+        require(usdst.balanceOf(address(router)) == 0, "router retained payer input");
+    }
+
+    function it_preserves_existing_payer_approvals_including_unlimited() public {
+        _gasOnlyPool(true);
+        Signer s = _shortSigner(0, 1e18);
+        uint unlimited = 2 ** 256 - 1;
+        s.approve(address(usdst), address(router), unlimited);
+        s.approve(address(usdst), address(pool), 777);
+        s.pay(address(router));
+        require(usdst.allowance(address(s), address(router)) == unlimited, "router approval changed");
+        require(usdst.allowance(address(s), address(pool)) == 777, "pool approval changed");
+    }
+
+    function it_direct_gas_purchases_only_burn_the_callers_payment() public {
+        _gasOnlyPool(true);
+        User u = _buyer();
+        usdst.mint(address(router), 7e18);
+        strato.mint(address(router), 3e18);
+        uint payerBefore = usdst.balanceOf(address(u));
+        u.do(address(router), "buyAndSinkFee", 1e16);
+        require(strato.balanceOf(FEE_ADDRESS) == 1e16 && strato.balanceOf(address(u)) == 0, "buyer received STRATO");
+        require(usdst.balanceOf(address(router)) == 7e18 && strato.balanceOf(address(router)) == 3e18, "router pot was spent or refunded");
+        require(payerBefore - usdst.balanceOf(address(u)) > 1e16, "caller did not pay");
+    }
+
+    function it_cannot_spend_a_victims_allowance_for_a_direct_gas_purchase() public {
+        _gasOnlyPool(true);
+        User victim = _buyer();
+        User attacker = new User();
+        bool failed = false;
+        try attacker.do(address(router), "buyAndSinkFee", 1e16) {
+        } catch {
+            failed = true;
+        }
+        require(failed, "unfunded attacker bought gas");
+        require(usdst.balanceOf(address(victim)) == 1e18, "victim paid");
+        require(usdst.allowance(address(victim), address(router)) == 1e18, "victim allowance consumed");
+        require(strato.balanceOf(FEE_ADDRESS) == 0, "unexpected burn");
+    }
+
+    function it_rejects_zero_and_oversized_gas_purchases() public {
+        _gasOnlyPool(true);
+        User u = _buyer();
+        bool zeroFailed = false;
+        bool largeFailed = false;
+        try u.do(address(router), "buyAndSinkFee", 0) {
+        } catch { zeroFailed = true; }
+        try u.do(address(router), "buyAndSinkFee", 1e16 + 1) {
+        } catch { largeFailed = true; }
+        require(zeroFailed && largeFailed, "invalid shortfall accepted");
+        require(usdst.balanceOf(address(u)) == 1e18, "invalid purchase took funds");
+    }
+
+    function it_rejects_delegatecalled_gas_purchases() public {
+        _gasOnlyPool(true);
+        Signer s = _shortSigner(0, 1e18);
+        bool failed = false;
+        try s.delegateBuyGas(address(router), 1e16) {
+        } catch Error(string e) {
+            require(e == "FeeRouter: installed router only", "wrong identity guard");
+            failed = true;
+        }
+        require(failed, "gas purchase ran in payer storage");
+    }
+
+    function it_rejects_an_uninstalled_router() public {
+        _gasOnlyPool(true);
+        User u = _buyer();
+        decider.setImpl(address(0x1234));
+        bool failed = false;
+        try u.do(address(router), "buyAndSinkFee", 1e16) {
+        } catch { failed = true; }
+        require(failed && usdst.balanceOf(address(u)) == 1e18, "old router still accepted purchases");
+    }
+
+    function it_disables_flash_even_if_the_flash_pause_flag_is_cleared() public {
+        _gasOnlyPool(true);
+        pool.setFlashPaused(false);
+        bool failed = false;
+        try pool.flash(address(this), 0, 0, []) {
+        } catch Error(string e) {
+            require(e == "Gas-only pool", "flash must fail at the gas-only guard");
+            failed = true;
+        }
+        require(failed, "flash bypassed gas-only mode");
+    }
+
+    function it_only_allows_the_owner_to_change_the_gas_router() public {
+        _gasOnlyPool(true);
+        User u = new User();
+        bool failed = false;
+        try u.do(address(pool), "setGasSwapRouter", address(u)) {
+        } catch { failed = true; }
+        require(failed && pool.gasSwapRouter() == address(router), "router restriction replaced");
+    }
+
+    function it_rolls_back_failed_gas_swaps_and_refunds_nothing_from_the_router_pot() public {
+        _gasOnlyPool(true);
+        Signer s = _shortSigner(5e15, 1);
+        usdst.mint(address(router), 7e18);
+        uint price = pool.sqrtPriceX96();
+        uint poolStrato = strato.balanceOf(address(pool));
+        uint poolUsdst = usdst.balanceOf(address(pool));
+        require(_paymentReverts(s), "unaffordable gas accepted");
+        require(usdst.balanceOf(address(s)) == 1 && strato.balanceOf(address(s)) == 5e15, "payer state persisted");
+        require(usdst.balanceOf(address(router)) == 7e18, "router subsidized gas");
+        require(pool.sqrtPriceX96() == price && strato.balanceOf(address(pool)) == poolStrato && usdst.balanceOf(address(pool)) == poolUsdst, "pool state persisted");
+        require(strato.balanceOf(FEE_ADDRESS) == 0, "failed gas burned tokens");
+    }
+
+    function it_respects_a_configured_sink_override() public {
+        _gasOnlyPool(true);
+        address sink = address(0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddead);
+        require(sink != FEE_ADDRESS, "override must differ from default sink");
+        router.setBurnAddress(sink);
+        Signer s = _shortSigner(5e15, 1e18);
+        s.pay(address(router));
+        require(strato.balanceOf(sink) == 1e16, "fee sent to wrong sink");
+        require(strato.balanceOf(FEE_ADDRESS) == 0, "default sink used");
+    }
+
+    function it_rolls_back_a_purchase_when_sinking_the_held_portion_fails() public {
+        _gasOnlyPool(true);
+        admin.castVoteOnIssue(address(admin), "removeWhitelist", address(strato), "transferFrom", address(router));
+        Signer s = _shortSigner(5e15, 1e18);
+        uint price = pool.sqrtPriceX96();
+        uint poolStrato = strato.balanceOf(address(pool));
+        uint poolUsdst = usdst.balanceOf(address(pool));
+        require(_paymentReverts(s), "unwhitelisted router sank held STRATO");
+        require(strato.balanceOf(FEE_ADDRESS) == 0, "shortfall burn persisted");
+        require(strato.balanceOf(address(s)) == 5e15 && usdst.balanceOf(address(s)) == 1e18, "payer debit persisted");
+        require(pool.sqrtPriceX96() == price && strato.balanceOf(address(pool)) == poolStrato && usdst.balanceOf(address(pool)) == poolUsdst, "purchase persisted");
+    }
+
+    function it_rejects_an_incomplete_exact_output_quote_atomically() public {
+        _gasOnlyPool(true);
+        strato.unpause();
+        pool.burn(-FULL_RANGE, FULL_RANGE, 1e24, block.timestamp);
+        strato.approve(address(pool), BIG);
+        usdst.approve(address(pool), BIG);
+        pool.mint(address(this), -60, 60, 1e10, BIG, BIG, block.timestamp);
+        strato.pause();
+        Signer s = _shortSigner(0, 1e18);
+        uint price = pool.sqrtPriceX96();
+        bool failed = false;
+        try s.pay(address(router)) {
+        } catch Error(string e) {
+            require(e == "FeeRouter: incomplete gas quote", "must reject the partial fill");
+            failed = true;
+        }
+        require(failed, "partial gas fee accepted");
+        require(strato.balanceOf(FEE_ADDRESS) == 0 && usdst.balanceOf(address(s)) == 1e18, "partial purchase persisted");
+        require(pool.sqrtPriceX96() == price, "partial swap changed the price");
+    }
+
+    function it_keeps_one_quote_for_multiple_gas_swaps_in_the_same_block() public {
+        _gasOnlyPool(true);
+        Signer a = _shortSigner(0, 1e18);
+        Signer b = _shortSigner(0, 1e18);
+        a.pay(address(router));
+        b.pay(address(router));
+        require(router.priceVersion() == 1 && _quotedFee() == 1e16, "gas swap repriced the fee");
+        require(strato.balanceOf(FEE_ADDRESS) == 2e16, "payers paid different STRATO fees");
+    }
+
+    function it_rejects_direct_gas_purchases_before_the_first_quote() public {
+        _pool(0, true);
+        pool.setGasSwapRouter(address(router));
+        User u = _buyer();
+        bool failed = false;
+        try u.do(address(router), "buyAndSinkFee", 1) {
+        } catch { failed = true; }
+        require(failed && usdst.balanceOf(address(u)) == 1e18, "unpriced purchase accepted");
+    }
+
+    function it_reproduces_and_closes_the_live_pool_whitelist_gap_at_mainnet_depth() public {
+        _newBlock();
+        poolFactory = new PoolV3Factory(address(this));
+        poolFactory.initialize(address(factory), address(feeCollector));
+        pool = PoolV3(poolFactory.createPoolV3(address(strato), address(usdst), 500, 79228162514264337593543950336));
+        pool.increaseObservationCardinalityNext(16);
+        strato.mint(address(this), BIG);
+        usdst.mint(address(this), BIG);
+        strato.approve(address(pool), BIG);
+        usdst.approve(address(pool), BIG);
+        pool.mint(address(this), -887270, 887270, 1e20, BIG, BIG, block.timestamp);
+        router.configureStrato(address(strato), address(pool));
+        fastForward(WINDOW, 1);
+        router.payBlockRewards();
+        admin.castVoteOnIssue(address(admin), "addWhitelist", address(strato), "transfer", address(pool));
+        admin.castVoteOnIssue(address(admin), "addWhitelist", address(strato), "transferFrom", address(pool));
+        admin.castVoteOnIssue(address(admin), "addWhitelist", address(strato), "transferFrom", address(router));
+        strato.pause();
+
+        User trader = _buyer();
+        strato.mint(address(trader), 4e18);
+        trader.do(address(strato), "approve", address(pool), 4e18);
+        trader.do(address(pool), "swap", address(trader), true, int(2e18), 0, 1, block.timestamp);
+        require(strato.balanceOf(address(trader)) == 2e18, "baseline gap was not reproduced");
+
+        pool.setGasSwapRouter(address(router));
+        admin.castVoteOnIssue(address(admin), "removeWhitelist", address(strato), "transferFrom", address(pool));
+        bool failed = false;
+        try trader.do(address(pool), "swap", address(trader), true, int(2e18), 0, 1, block.timestamp) {
+        } catch Error(string e) {
+            require(e == "Gas swaps only", "gate must close the reproduced route");
+            failed = true;
+        }
+        require(failed && strato.balanceOf(address(trader)) == 2e18, "ordinary trading remains open");
+        Signer s = _shortSigner(0, 1e18);
+        s.pay(address(router));
+        require(strato.balanceOf(FEE_ADDRESS) == 1e16 && strato.balanceOf(address(s)) == 0, "gas failed at mainnet depth");
     }
 
     // ---- staking notification ----
