@@ -121,6 +121,15 @@ paid and the reward stays in the router. The Phase 1 funded reward schedule was 
 (an upgraded proxy settles what the schedule had already allocated to each record once, on its
 next touch).
 
+**The emission schedule** pays from a prefunded reserve inside the staking contract
+(`fundEmissionReserve`, anyone). Once per block `processBlock` pays the previous block's producer
+`E0 × √(S / S0) × (R / R0)` STRATO a year for the interval its block closed, at most
+`MAX_CREDITED_GAP_SECONDS` (an hour), where `S` is `consensusWeight()` and `R` the reserve left;
+the amount is split like the block reward. Only a seated, listed, eligible producer is paid;
+anything unpaid stays in the reserve. `commitEmissionSchedule(e0, s0, r0, start)` runs once and
+needs the reserve to hold `r0`; there is no pause or re-calibration, and the reserve is kept out
+of `recoverUntrackedStrato` and of reward payouts.
+
 **Discretionary rewards** are the third source of income, open to anyone with tokens to give.
 `distributeRewards(tokens, amounts, validators)` splits each amount across the listed validators by
 stake weight (an empty list means the consensus set; division dust goes to the last recipient with
@@ -147,10 +156,13 @@ slashing waits for provable round changes (Phase 4). Optional knob: after
 removed from the set, stake untouched; `syncValidator` re-adds it after the cooldown). Notable
 downtime is an admin kick (`removeOperator` / governance vote).
 
-Eligibility: `selfBond >= minStake` (10k) — a validator must have its own stake at risk; delegated
-stake adds weight but cannot qualify it. `selfBondGraceUntil` phases this in for validators admitted
-on delegated stake: while it is unset (0, as on an upgraded proxy) or in the future,
-`selfBond + delegatedStake >= minStake` still qualifies. Also: listed, not jailed, no exit due.
+Eligibility: `selfBond >= MIN_SELF_BOND` (10,000 STRATO, a constant) for a candidate and for any
+seat taken under this rule — a validator must have its own stake at risk; delegated stake adds
+weight but cannot qualify it. A seat held since before the rule (`seatedUnderSelfBondRule` false)
+keeps the rule it was admitted under until it leaves the set or changes operator: `selfBond >=
+minStake`, which `selfBondGraceUntil` phases in for validators admitted on delegated stake (while
+it is unset, 0 as on an upgraded proxy, or in the future, `selfBond + delegatedStake >= minStake`
+still qualifies). Also: listed, not jailed, no exit due.
 Below the threshold ⇒ `removeValidatorFromStaking` (governance never drops its last validator);
 re-joining is an explicit `tryActivate`.
 
@@ -192,12 +204,12 @@ consent, admin `addValidator` still works) → **Active** (in the consensus set)
 `removeValidator`; self-bond force-unbonded to the operator; re-listing after `unkickCooldown`).
 `StratoStaking.status(v)` / `eligible(v)` / `isWaiter(v)`, all by validator address.
 
-* `eligible = listed ∧ meets minStake (self-bond; see selfBondGraceUntil) ∧ not jailed ∧ no exit due`
+* `eligible = listed ∧ meets the self-bond minimum (MIN_SELF_BOND; an incumbent seat: minStake, see selfBondGraceUntil) ∧ not jailed ∧ no exit due`
 * **Leaving is automatic and same-tx** (`_syncValidator` at the end of every stake mutation): an
   Active operator that stops being eligible is removed from governance (counts one set mutation;
   if the per-block budget is exhausted the stake mutation reverts — fail closed). Weight changes
   are pushed the same way.
-* **Joining is explicit**: `tryActivate(op)` (anyone once `joinsPaused=false`; the owner always)
+* **Joining is explicit**: `tryActivate(op)` (anyone from `joinsOpenFromBlock`; nobody before it, the owner included)
   needs eligibility and either a free slot below `effectiveCap = min(maxActiveValidators,
   hardCapActiveValidators)` or the lowest validator (weight asc, address asc) beaten by
   `evictionMarginBps`; an eviction sends the loser back to Registered (self-bond stays bonded).
@@ -211,12 +223,13 @@ consent, admin `addValidator` still works) → **Active** (in the consensus set)
 * Params: `setValidatorParams(minStake, proposerFeeBps, maxConsecutiveMisses, jailCooldown)`,
   `setSelfBondGraceUntil(t)`, `setSetParams(maxActiveValidators, hardCapActiveValidators [only lowers],
   evictionMarginBps, maxSetMutationsPerBlock, exitNoticeSeconds, unkickCooldown,
-  maxOperatorStakeBps, joinsPaused)`; `initialize` seeds 50 / 50 / 500 / 2 / unbonding / unbonding /
-  0 / paused.
+  maxOperatorStakeBps)`, `setJoinsOpenFromBlock(b)` (a future block only, fixed once reached),
+  `commitEmissionSchedule(e0, s0, r0, start)` (once); `initialize` seeds 50 / 50 / 500 / 2 /
+  unbonding / unbonding / 0, with joins closed until an opening block is agreed.
 
-`joinsPaused=false` requires stake-weighted PBFT votes to be live (Key Decision 12 of
-`staking-next-phases.md`), i.e. the activation height has passed on every producer; until then the
-owner activates operators (today's admin-gated set).
+`joinsOpenFromBlock` must not come before stake-weighted PBFT votes are live (Key Decision 12 of
+`staking-next-phases.md`), i.e. before the activation height has passed on every producer; until
+it is reached nobody seats a validator through staking.
 
 ## Activation and rollout
 

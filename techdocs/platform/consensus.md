@@ -85,12 +85,12 @@ The contract never removes the last validator, and `hardCapValidators` bounds th
 An operator joins in three steps:
 
 1. **Register** in `ValidatorRegistry`, binding the node's validator address. Registration is permissionless.
-2. **Bond** stake: self-bond plus delegated stake must reach `minStake`, a governance parameter.
-3. **Activate** with `StratoStaking.tryActivate`. This needs a free slot, or enough stake to evict the lowest-weighted validator by a margin. While joins are paused, only the owner can activate operators.
+2. **Bond** stake: the operator's own self-bond must reach 10,000 STRATO (`MIN_SELF_BOND`). Delegated stake adds weight but does not count toward it. A validator seated before this rule keeps the rule it was admitted under (`minStake`, a governance parameter) until it leaves the set or changes operator.
+3. **Activate** with `StratoStaking.tryActivate`. This needs a free slot, or enough stake to evict the lowest-weighted validator by a margin. Anyone can activate an eligible operator from the agreed opening block (`joinsOpenFromBlock`); before it nobody can, the owner included.
 
 An active operator leaves automatically, in the same transaction, as soon as it stops being eligible. Reasons include:
 
-- falling below `minStake`
+- falling below its minimum stake
 - being jailed
 - reaching the end of an exit notice
 - being removed by the owner
@@ -147,6 +147,8 @@ Every transaction pays a fee through the Decider (`0xDEC1DE`). The Decider runs 
 
 - **An unfunded router pays nothing** and never reverts, so an empty reward pool can't stall the chain.
 - **The `BlockRewardsPaid` event** is included in the block's first receipt, from the fork heights listed on [Networks](networks.md#fork-heights).
+
+**Emission schedule.** Once per block, `processBlock()` also pays the previous block's producer from a reserve prefunded in the staking contract: `E0 × √(S / S0) × (R / R0)` STRATO a year for the interval its block closed (at most an hour), where `S` is the consensus set's stake and `R` the reserve still unreleased. The schedule is committed once, by an admin vote, after the reserve holds `R0`. It can't be paused, and admins can't recover the reserve.
 
 Whether `FeeRouter` is the active fee implementation depends on each network's `DeciderState` configuration.
 

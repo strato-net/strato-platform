@@ -12,6 +12,8 @@ import { getOraclePrices } from "./oracle.service";
 const { Token, StratoStaking, ValidatorRegistry } = constants;
 const WAD = 10n ** 18n;
 const BPS_DIVISOR = 10000n;
+// StratoStaking.MIN_SELF_BOND: the operator's own bond a new seat needs.
+const MIN_SELF_BOND = 10000n * WAD;
 const YEAR_SECONDS = 365n * 24n * 60n * 60n;
 const MAX_UINT256 = (1n << 256n) - 1n;
 
@@ -122,7 +124,10 @@ export interface StratoStakingInfo {
   exitNoticeSeconds: string;
   unkickCooldown: string;
   maxOperatorStakeBps: string;
+  // v2: true until a processed block reaches joinsOpenFromBlock ("0" = not agreed); there is
+  // no admin pause, admission opens for everyone at that block.
   joinsPaused: boolean;
+  joinsOpenFromBlock: string;
   governanceSyncEnabled: boolean;
   validatorCount: string;
   trackedUsdst: string;
@@ -289,6 +294,7 @@ const emptyInfo = (): StratoStakingInfo => ({
   unkickCooldown: "0",
   maxOperatorStakeBps: "0",
   joinsPaused: true,
+  joinsOpenFromBlock: "0",
   governanceSyncEnabled: false,
   validatorCount: "0",
   trackedUsdst: "0",
@@ -721,6 +727,13 @@ const isSelfBondRuleActive = (state: Record<string, any>, now: bigint): boolean 
   return graceUntil > 0n && now >= graceUntil;
 };
 
+// _requireJoinsOpen, with the last processed block (the last block with a transaction)
+// standing in for the head.
+const isJoinsOpen = (state: Record<string, any>): boolean => {
+  const from = parseBigIntLike(state.joinsOpenFromBlock);
+  return from > 0n && parseBigIntLike(state.lastProcessedBlock) >= from;
+};
+
 type V2ValidatorRecord = {
   validator: string;
   operator: string;
@@ -744,6 +757,7 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
   const minStake = parseBigIntLike(state.minStake);
   const selfBondRuleActive = isSelfBondRuleActive(state, now);
   const isValidatorMap = addressKeyed(state.isValidator);
+  const selfBondRuleSeatMap = addressKeyed(state.seatedUnderSelfBondRule);
   const jailedUntilMap = addressKeyed(state.jailedUntil);
   const exitReadyMap = addressKeyed(state.exitReadyTime);
 
@@ -758,8 +772,12 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
       const totalStake = selfBond + delegatedStake;
       const jailedUntil = parseBigIntLike(jailedUntilMap.get(validator));
       const exitReadyTime = parseBigIntLike(exitReadyMap.get(validator));
-      // _meetsMinStake: combined stake until the self-bond grace ends, self-bond after.
-      const meetsMinStake = selfBondRuleActive ? selfBond >= minStake : totalStake >= minStake;
+      // _meetsMinStake: a candidate, or a seat taken under the self-bond rule, needs
+      // MIN_SELF_BOND of self-bond; a seat from before the rule keeps minStake, on combined
+      // stake until the self-bond grace ends and on self-bond after.
+      const meetsMinStake = !isValidator || parseBoolLike(selfBondRuleSeatMap.get(validator))
+        ? selfBond >= MIN_SELF_BOND
+        : selfBondRuleActive ? selfBond >= minStake : totalStake >= minStake;
 
       return {
         validator,
@@ -812,8 +830,9 @@ let recentRewardsCache: { address: string; expiresAt: number; totals: Promise<Ma
 const cirrusTimestamp = (epochSeconds: number): string =>
   new Date(epochSeconds * 1000).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
 
-// STRATO block rewards credited per validator over the trailing window. Summed in Postgres
-// (otherwise one row per block), with ::text keeping 18-decimal totals exact through JSON.
+// STRATO block rewards and emission-schedule payouts credited per validator over the trailing
+// window. Summed in Postgres (otherwise one row per block), with ::text keeping 18-decimal
+// totals exact through JSON.
 const getRecentBlockRewards = (accessToken: string): Promise<Map<string, bigint>> => {
   const address = stakingAddress();
   if (!address) return Promise.resolve(new Map());
@@ -825,7 +844,7 @@ const getRecentBlockRewards = (accessToken: string): Promise<Map<string, bigint>
   const totals = cirrus.get(accessToken, `/${constants.Event}`, {
     params: {
       address: `eq.${address}`,
-      event_name: "eq.BlockRewardCredited",
+      event_name: "in.(BlockRewardCredited,ProductionRewarded)",
       block_timestamp: `gte.${cirrusTimestamp(since)}`,
       select: "validator:attributes->>validator,amount:attributes->>amount::numeric.sum()::text",
     },
@@ -1313,6 +1332,7 @@ const getV1StakingInfo = async (
     maxOperatorStakeBps: "0",
     // v1 has no permissionless join at all, so "paused" is the honest reading.
     joinsPaused: true,
+    joinsOpenFromBlock: "0",
     governanceSyncEnabled: false,
     // No separate set counter on v1; every active operator is in the consensus set,
     // which is exactly what activeOperatorCount counts.
@@ -1511,7 +1531,7 @@ const getV2StakingInfo = async (
     stakeRewardRate: "0",
     estimatedApy,
     minStake: uintString(state.minStake),
-    minSelfBond: "0",
+    minSelfBond: MIN_SELF_BOND.toString(),
     selfBondGraceUntil: uintString(state.selfBondGraceUntil),
     selfBondRuleActive: isSelfBondRuleActive(state, now),
     proposerFeeBps: uintString(state.proposerFeeBps),
@@ -1524,7 +1544,8 @@ const getV2StakingInfo = async (
     exitNoticeSeconds: uintString(state.exitNoticeSeconds),
     unkickCooldown: uintString(state.unkickCooldown),
     maxOperatorStakeBps: uintString(state.maxOperatorStakeBps),
-    joinsPaused: parseBoolLike(state.joinsPaused),
+    joinsPaused: !isJoinsOpen(state),
+    joinsOpenFromBlock: uintString(state.joinsOpenFromBlock),
     governanceSyncEnabled: parseBoolLike(state.governanceSyncEnabled),
     validatorCount: uintString(state.validatorCount),
     trackedUsdst: uintString(state.trackedUsdst),
@@ -2413,7 +2434,6 @@ export const setStratoSetParams = async (
     exitNoticeSeconds: string;
     unkickCooldown: string;
     maxOperatorStakeBps: string;
-    joinsPaused: boolean;
   }
 ): Promise<{ status: string; hash: string }> => {
   await requireV2(accessToken);
@@ -2426,7 +2446,6 @@ export const setStratoSetParams = async (
     args.exitNoticeSeconds,
     args.unkickCooldown,
     args.maxOperatorStakeBps,
-    args.joinsPaused,
   ]);
 };
 
