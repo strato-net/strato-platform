@@ -227,33 +227,41 @@ if grep -q "/payload/postgres-dumps/cirrus.dump$" "$TMP/tar-eth-only.log"; then
 fi
 assert_contains "$NODE/.ethereumH/state/value" "state-from-snapshot"
 
-# A database load that cannot fit is refused before the chain state is
-# replaced: the node keeps its old state rather than mixing the snapshot's
-# chain with its old databases. df reports a full disk everywhere except the
-# extraction work area.
+# A restore that cannot fit is refused before the chain state is replaced: the
+# node keeps its old state rather than mixing the snapshot's chain with its old
+# databases. df reports a full node volume and a roomy work area, either on the
+# same volume or on another one (FAKE_DF_WORK_MOUNT), where moving the state
+# into the node is a copy that needs room of its own.
 DF_FAKEBIN="$TMP/df-fakebin"
 mkdir -p "$DF_FAKEBIN"
 cat > "$DF_FAKEBIN/df" <<'SH'
 #!/usr/bin/env bash
-if [[ "$*" == *.snapshot-work* ]]; then
-  exec "${REAL_DF:?}" "$@"
-fi
 echo "Filesystem 1024-blocks Used Available Capacity Mounted"
-echo "fake 100 100 0 100% /"
+if [[ "$*" == *.snapshot-work* ]]; then
+  echo "fake 1000000000 0 1000000000 0% ${FAKE_DF_WORK_MOUNT:?}"
+else
+  echo "fake 100 100 0 100% /node"
+fi
 SH
 chmod +x "$DF_FAKEBIN/df"
-echo "state-before-refused-restore" > "$NODE/.ethereumH/state/value"
-if STRATO_SNAPSHOT_OFFLINE_TEST=1 REAL_DF="$(command -v df)" PATH="$DF_FAKEBIN:$PATH" \
-    "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium --force > "$TMP/restore-full-disk.out" 2>&1; then
-  echo "a restore whose databases cannot fit should fail" >&2
-  exit 1
-fi
-assert_contains "$TMP/restore-full-disk.out" "not enough room in .* for the databases rebuilt from the dumps"
-assert_contains "$NODE/.ethereumH/state/value" "state-before-refused-restore"
-if grep -q "\[5/7\]" "$TMP/restore-full-disk.out"; then
-  echo "a refused database load must stop before the chain state is replaced" >&2
-  exit 1
-fi
+for work_mount in /node /work; do
+  echo "state-before-refused-restore" > "$NODE/.ethereumH/state/value"
+  if STRATO_SNAPSHOT_OFFLINE_TEST=1 FAKE_DF_WORK_MOUNT="$work_mount" PATH="$DF_FAKEBIN:$PATH" \
+      "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium --force > "$TMP/restore-full-disk.out" 2>&1; then
+    echo "a restore that cannot fit should fail (work area on $work_mount)" >&2
+    exit 1
+  fi
+  if [[ "$work_mount" == /node ]]; then
+    assert_contains "$TMP/restore-full-disk.out" "not enough room in .* for the databases rebuilt from the dumps:"
+  else
+    assert_contains "$TMP/restore-full-disk.out" "not enough room in .* for the chain state copied from the work area and the databases rebuilt from the dumps:"
+  fi
+  assert_contains "$NODE/.ethereumH/state/value" "state-before-refused-restore"
+  if grep -q "\[5/7\]" "$TMP/restore-full-disk.out"; then
+    echo "a refused restore must stop before the chain state is replaced (work area on $work_mount)" >&2
+    exit 1
+  fi
+done
 
 cat > "$TMP/metadata.json" <<'JSON'
 {

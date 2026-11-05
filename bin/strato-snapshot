@@ -153,6 +153,11 @@ $hint"
   fi
 }
 
+# The mount point holding a path, to tell whether two paths share a volume.
+mount_point() {
+  df -P "$1" 2>/dev/null | awk 'NR==2 {print $NF}'
+}
+
 # After die() and warn(), both of which it uses: the work directory may be
 # unwritable (fatal) or merely not where we expected (a warning).
 init_workdir
@@ -2048,8 +2053,9 @@ restore_payload() {
   [[ -d "$extracted/payload/jlog" ]] \
     || die "payload has no jlog/ streaming state; this looks like a pre-$SNAPSHOT_VERSION (kafka) snapshot, which this build cannot restore"
 
-  # Everything that can refuse the database load is checked before step 5
-  # replaces the chain state, so a refusal leaves the node as it was.
+  # Everything that can refuse the restore is checked before step 5 replaces
+  # the chain state, so a refusal leaves the node as it was.
+  local load_kb=0 state_kb=0 dump_kb factor db pg_dir="$node_dir/postgres"
   if [[ -d "$extracted/payload/postgres-dumps" && "$SNAPSHOT_SKIP_DATABASES" != "true" ]]; then
     if [[ -n "$SNAPSHOT_PG_HOST" ]]; then
       [[ "$SNAPSHOT_REPLACE_DATABASES" == "true" ]] \
@@ -2059,18 +2065,32 @@ restore_payload() {
         || die "target node has no secrets/postgres_password; run strato-setup first"
       # The rebuilt databases are far larger than their dumps, mostly indexes
       # (measured: eth ~5x its dump, cirrus ~15x).
-      local load_kb=0 dump_kb factor db pg_dir="$node_dir/postgres"
       for db in $(selected_databases); do
         dump_kb="$(du -k "$extracted/payload/postgres-dumps/$db.dump" 2>/dev/null | awk '{print $1}')"
         factor=6
         [[ "$db" == "cirrus" ]] && factor=16
         load_kb=$((load_kb + ${dump_kb:-0} * factor))
       done
-      [[ -d "$pg_dir" ]] || pg_dir="$node_dir"
-      require_free_space "$pg_dir" "$load_kb" "the databases rebuilt from the dumps" \
-        "The node's postgres cluster lives in $node_dir/postgres; free space on that volume and run the restore again (a cached archive is reused, not downloaded again)."
     fi
   fi
+  # Step 5 moves the extracted state into the node: a rename on one
+  # filesystem, but a full copy when the work area is on another volume.
+  if [[ "$(mount_point "$extracted")" != "$(mount_point "$node_dir")" ]]; then
+    state_kb="$(du -sk "$extracted/payload/ethereumH" "$extracted/payload/redis" "$extracted/payload/jlog" 2>/dev/null | awk '{s += $1} END {print s + 0}')"
+  fi
+  [[ -d "$pg_dir" ]] || pg_dir="$node_dir"
+  local hint="Free space on that volume and run the restore again (a cached archive is reused, not downloaded again)."
+  local node_kb="$state_kb" node_what=""
+  (( state_kb > 0 )) && node_what="the chain state copied from the work area"
+  if [[ "$(mount_point "$pg_dir")" == "$(mount_point "$node_dir")" ]]; then
+    node_kb=$((node_kb + load_kb))
+    if (( load_kb > 0 )); then
+      node_what="${node_what:+$node_what and }the databases rebuilt from the dumps"
+    fi
+  else
+    require_free_space "$pg_dir" "$load_kb" "the databases rebuilt from the dumps" "$hint"
+  fi
+  require_free_space "$node_dir" "$node_kb" "$node_what" "$hint"
 
   info "[5/7] Replacing the node's chain state with the snapshot's"
   info "      Removing the old .ethereumH state (ethconf.yaml is kept), redis/, jlog/ and any pre-jlog kafka/"
