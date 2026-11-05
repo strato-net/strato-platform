@@ -18,12 +18,12 @@ export const VAULT_ICON_BASE_URL = "https://fileserver.mercata.blockapps.net/hig
  * given artwork one at a time.
  */
 const VAULT_ICON_FILES: Record<string, string> = {
-  [SAVE_USDST_VAULT_KEY]: "179b57839a7885c9347ad826981d745dd039274674206cf4c9ba499eadefb8b5.png",
-  "eth-carry": "b31ebf44566cd8e5f21238c72b78cc14effa1ee828786e3ab546c901b7d2b860.png",
-//   "wbtc-carry": "wbtc-carry.png",
-//   "usdc-yield": "usdc-yield.png",
-  "goldst-yield": "24043fcf78a7586414e2740b1debdd1d68a4e53477dcc0b7eaf06566fb324eb2.png",
-//   "silvst-yield": "silvst-yield.png",
+  [SAVE_USDST_VAULT_KEY]: "323f649574f7559907e383ccfd46838762be8f0213d7dc144f14e84ee48b8451.png",
+  "eth-carry": "f0ce4f3a905444fc58fa28a558dada3ac300b9f79dd13bd309b0d2e553d77fa5.png",
+  "wbtc-carry": "4b048b6b08515fe2f40184944673248fb5c387dfa7b04980b0e1a5792fecb4e0.png",
+  "usdc-yield": "cd7402081e448dcbb10ced74cb53ea0259b2205870136a3bd9c8cd05ce9fbcdd.png",
+  "goldst-yield": "f67de103ada9df64a9c112e2e88c417c6242a9d46b22e882d1786630714948ec.png",
+  "silvst-yield": "3c6fb897f54bafc662df6de95c760a4a36b1de1ae906285e9b6f3746852f2235.png",
 };
 
 /**
