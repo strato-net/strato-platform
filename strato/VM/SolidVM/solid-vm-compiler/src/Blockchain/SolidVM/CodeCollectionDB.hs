@@ -40,7 +40,7 @@ import Blockchain.SolidVM.Metrics
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq (force)
-import Control.Exception
+import Control.Exception hiding (TypeError)
 import Control.Lens hiding (Context, assign, bimap, from, to)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.IO.Class
@@ -321,10 +321,10 @@ codeCollectionFromSourceWith opts isRunningTests typeCheck initCode = do
       ecc <- compileSourceWith opts isRunningTests typeCheck initMap
       let cc = case ecc of
             Right a -> a
-            Left (PEx p) -> parseError "codeCollectionFromSource" p
-            Left (IEx p) -> typeError "codeCollectionFromSource" $ show p
+            Left (PEx p) -> throw (ParseError "codeCollectionFromSource" (show p))
+            Left (IEx p) -> throw (TypeError "codeCollectionFromSource" $ show p)
             Left (SVMEx (s, _)) -> throw s
-            Left (TCEx xs) -> typeError "Typechecker" $ T.unpack (typeErrorToAnnotation xs)
+            Left (TCEx xs) -> throw (TypeError "Typechecker" $ T.unpack (typeErrorToAnnotation xs))
       codeCacheInsert cacheKey cc
       return $ assert (hsh == hsh') (hsh, cc)
 
@@ -376,7 +376,7 @@ codeCollectionFromHashNoCacheWith ::
   m CodeCollection
 codeCollectionFromHashNoCacheWith opts isRunningTests mergeFuncs typeCheck hsh =
   getCode hsh >>= \case
-    Nothing -> internalError "unknown code hash" hsh
+    Nothing -> throw (InternalError ("unknown code hash: " ++ show hsh))
     Just initCode -> do
       let initMap = case Aeson.decode $ BL.fromStrict initCode of
             Just l -> M.fromList l
@@ -384,7 +384,7 @@ codeCollectionFromHashNoCacheWith opts isRunningTests mergeFuncs typeCheck hsh =
       ecc <- (if mergeFuncs then compileSourceWith else compileSource'With) opts isRunningTests typeCheck initMap
       case ecc of
         Right a -> pure a
-        Left (PEx p) -> parseError "codeCollectionFromHash" p
-        Left (IEx p) -> typeError "codeCollectionFromHash" $ show p
+        Left (PEx p) -> throw (ParseError "codeCollectionFromHash" (show p))
+        Left (IEx p) -> throw (TypeError "codeCollectionFromHash" $ show p)
         Left (SVMEx (s, _)) -> throw s
-        Left (TCEx xs) -> typeError "codeCollectionFromHash" (show xs)
+        Left (TCEx xs) -> throw (TypeError "codeCollectionFromHash" $ T.unpack (typeErrorToAnnotation xs))

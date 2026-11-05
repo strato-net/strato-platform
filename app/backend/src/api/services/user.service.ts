@@ -8,6 +8,7 @@ import { StratoError } from "../../errors";
 import JSONBig from "json-bigint";
 import { normalizeLegacyEscapes, repairStructuredJson } from "../helpers/jsonStringParsing.helper";
 import { FunctionInput } from "../../types/types";
+import { validateAddressField } from "../validators/common.validators";
 const { AdminRegistry, adminRegistry, DAY_MS } = constants;
 const JSONBigString = JSONBig({ storeAsString: true });
 const JSONBigNumber = JSONBig({ useNativeBigInt: true });
@@ -824,6 +825,7 @@ export const getContractDetails = async (
   accessToken: string,
   address: string,
 ): Promise<object> => {
+  address = await validateAddressField("Contract address").validateAsync(address);
   try {
     const response = await bloc.get(accessToken, `/contracts/contract/${address}/details`);
 

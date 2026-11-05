@@ -3,7 +3,7 @@ import RestStatus from "http-status-codes";
 import { getAdmin, isUserAdmin, addAdmin, removeAdmin, createIssue, castVoteOnIssueById, simulateCastVoteOnIssue, dismissIssue, getOpenIssues,
          getExecutedIssues, contractSearch, getContractDetails,
  } from "../services/user.service";
-import { validateUserAddress, validateAddressField } from "../validators/common.validators";
+import { validateUserAddress } from "../validators/common.validators";
 import { validateIssuesQuery } from "../validators/user.validator";
 
 class UserController {
@@ -94,7 +94,6 @@ class UserController {
     try {
       const { accessToken, address: actorAddress } = req;
       const { target, func, args } = req.body;
-      validateAddressField(target);
 
       const result = await createIssue(accessToken, actorAddress as string, target, func, args);
       res.status(RestStatus.OK).json({
@@ -123,7 +122,6 @@ class UserController {
     try {
       const { accessToken, address: actorAddress } = req;
       const { target, func, args } = req.body;
-      validateAddressField(target);
 
       const result = await simulateCastVoteOnIssue(accessToken, actorAddress as string, target, func, args);
       res.status(RestStatus.OK).json(result);

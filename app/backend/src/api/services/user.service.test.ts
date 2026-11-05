@@ -3,9 +3,59 @@ import test from "node:test";
 import JSONBig from "json-bigint";
 import { bloc, cirrus, eth, strato } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
-import { castVoteOnIssueById, createIssue, governedInput, ownerInput } from "./user.service";
+import {
+  castVoteOnIssueById,
+  createIssue,
+  getContractDetails,
+  governedInput,
+  ownerInput,
+  simulateCastVoteOnIssue,
+} from "./user.service";
 
 const JSONBigString = JSONBig({ storeAsString: true });
+
+test("contract details accepts valid addresses and uses the validated value", async (t) => {
+  const paths: string[] = [];
+  const details = { _contractName: "Example" };
+  t.mock.method(bloc, "get", (async (_token: string, path: string) => {
+    paths.push(path);
+    return { status: 200, data: details };
+  }) as typeof bloc.get);
+
+  for (const address of ["aB".repeat(20), "0x" + "12".repeat(20)]) {
+    assert.deepEqual(await getContractDetails("access-token", address), details);
+    assert.deepEqual(await getContractDetails("access-token", ` ${address} `), details);
+    assert.equal(paths[paths.length - 1], `/contracts/contract/${address}/details`);
+  }
+});
+
+test("contract lookups reject invalid addresses before making any node request", async (t) => {
+  const get = t.mock.method(bloc, "get", async () => { throw new Error("Unexpected node request"); });
+  const post = t.mock.method(bloc, "post", async () => { throw new Error("Unexpected simulation"); });
+  const tx = t.mock.method(strato, "post", async () => { throw new Error("Unexpected transaction"); });
+  const invalidAddresses = [
+    "../../../../strato-api/eth/v1.2/metadata?ignored=",
+    "%2e%2e/%2e%2e/%2e%2e/%2e%2e/internal-status#",
+    "..\\..\\..\\..\\internal-status#",
+    "http://attacker.invalid/",
+    "//attacker.invalid/",
+    "a".repeat(40) + "?query=value",
+    "a".repeat(40) + "#fragment",
+    "a".repeat(39),
+    "a".repeat(41),
+    "g".repeat(40),
+    "",
+  ];
+
+  for (const address of invalidAddresses) {
+    await assert.rejects(getContractDetails("access-token", address), { name: "ValidationError" });
+    await assert.rejects(createIssue("access-token", "a".repeat(40), address, "example", []), { name: "ValidationError" });
+    await assert.rejects(simulateCastVoteOnIssue("access-token", "a".repeat(40), address, "example", []), { name: "ValidationError" });
+  }
+  assert.equal(get.mock.callCount(), 0);
+  assert.equal(post.mock.callCount(), 0);
+  assert.equal(tx.mock.callCount(), 0);
+});
 
 test("traces create-issue argument transformations through the STRATO request", async (t) => {
   const target = "0x1111111111111111111111111111111111111111";

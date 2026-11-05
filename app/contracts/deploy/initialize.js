@@ -9,7 +9,7 @@
 require("dotenv").config();
 const config = require("./config");
 const auth = require("./auth");
-const { rest } = require("blockapps-rest");
+const { rest } = require("./strato");
 const { ADMIN_REGISTRY, governedCallArgs } = require("./util");
 
 // Targets to initialize.
