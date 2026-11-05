@@ -526,6 +526,16 @@ test("replays a registry-created issue's variadic tail as the values it rendered
   assert.deepEqual(posted[0].args._args, [false, true]);
 });
 
+test("replays a bytes value rendered as hex\"…\" as bytes, not as text", async (t) => {
+  // Re-sent verbatim, hex"…" arrives as a string and the vote opens a different issue
+  const value = "50056542149a3c5dd91db8d25b5f9e9d147e2d0fc5b59d1e2b46cf4ebf589177";
+  const posted = mockRegistryReplay(t, [`"${TOKEN}"`, "\"cancelVesting\"", `hex"${value}"`]);
+
+  await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(posted[0].args._args)), [{ type: "bytes", value }]);
+});
+
 test("keeps quoted variadic renderings verbatim so the node strips exactly one quote level", async (t) => {
   // Unquoted, the node re-types them by shape: "0000…1008" becomes the integer 1008
   // (integer is tried before address) and "\"mint\"" loses a quote level

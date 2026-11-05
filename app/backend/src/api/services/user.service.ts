@@ -247,8 +247,13 @@ const parseTxArg = (text: string): any => {
   }
 };
 
-const parseVariadicArg = (text: string): any =>
-  text.startsWith('"') ? text : parseTxArg(text);
+// A bytes value is recorded as hex"…", which is not JSON: re-sent as that text it would
+// be a string. Hinted as bytes it hashes like the original, whatever its declared width
+const parseVariadicArg = (text: string): any => {
+  const bytes = /^hex"((?:[0-9a-fA-F]{2})*)"$/.exec(text);
+  if (bytes) return { type: "bytes", value: bytes[1] };
+  return text.startsWith('"') ? text : parseTxArg(text);
+};
 
 const formatArg = (type: AbiType, value: any): any => {
   const typeName = solidityTypeName(type);
