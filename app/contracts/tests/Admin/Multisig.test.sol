@@ -58,6 +58,16 @@ contract ReentrantSigner is Signer {
             reentryBlocked = true;
         }
     }
+
+    // Run another queued issue from inside this one
+    function runAndExecute(address _token, address _to) public {
+        runs++;
+        try {
+            wallet.executeIssue(_token, "transfer", _to, 1000);
+        } catch {
+            reentryBlocked = true;
+        }
+    }
 }
 
 // A signer that swallows the failure of its own vote
@@ -125,6 +135,26 @@ contract Describe_Multisig {
         first.invoke(address(wallet), "swapAdmin", oldSigner, newSigner);
         second.invoke(address(wallet), "swapAdmin", oldSigner, newSigner);
         require(ms.isAdminAddress(newSigner), "signer swap did not execute");
+    }
+
+    function enableTimelock() internal {
+        vote(a, address(wallet), "setTimelockDelay", 86400);
+        vote(b, address(wallet), "setTimelockDelay", 86400);
+        require(ms.timelockDelay() == 86400, "timelock delay not set");
+    }
+
+    // Two of three signers pass an issue, which then waits out the delay
+    function voteToQueue(address target, string func, variadic args) internal returns (string) {
+        string issueId = ms.getIssueId(target, func, args);
+        vote(a, target, func, args);
+        require(!vote(b, target, func, args), "passed issue ran before its delay");
+        require(issueExecutableAt(issueId) != 0, "passed issue was not queued");
+        return issueId;
+    }
+
+    function issueExecutableAt(string issueId) internal returns (uint) {
+        (, uint executableAt,) = ms.timelocks(issueId);
+        return executableAt;
     }
 
     function it_rejects_outsiders() {
@@ -329,5 +359,127 @@ contract Describe_Multisig {
         require(wallet.owner() == address(wallet), "two of three transferred ownership");
         vote(c, address(wallet), "transferOwnership", address(outsider));
         require(wallet.owner() == address(outsider), "unanimous vote did not transfer ownership");
+    }
+
+    function it_runs_a_passed_issue_at_once_without_a_timelock_delay() {
+        require(ms.timelockDelay() == 0, "timelock delay should start at 0");
+        string issueId = ms.getIssueId(address(token), "transfer", address(outsider), 1000);
+        vote(a, address(token), "transfer", address(outsider), 1000);
+        require(vote(b, address(token), "transfer", address(outsider), 1000), "passed issue did not run");
+        require(issueExecutableAt(issueId) == 0, "issue was queued");
+    }
+
+    function it_rejects_a_timelock_delay_above_the_maximum() {
+        vote(a, address(wallet), "setTimelockDelay", 2592001);
+        require(rejects(b, address(wallet), "castVoteOnIssue", address(wallet), "setTimelockDelay", 2592001), "delay above the maximum accepted");
+        require(ms.timelockDelay() == 0, "timelock delay changed");
+    }
+
+    function it_queues_a_passed_issue_until_its_delay_is_up() {
+        enableTimelock();
+        string issueId = voteToQueue(address(token), "transfer", address(outsider), 1000);
+        (uint queuedAt, uint executableAt, uint expiresAt) = ms.timelocks(issueId);
+        require(queuedAt == block.timestamp && executableAt == queuedAt + 86400 && expiresAt == executableAt + 604800, "unexpected timelock");
+        require(rejects(outsider, address(wallet), "executeIssue", address(token), "transfer", address(outsider), 1000), "ran before its delay");
+        require(token.balanceOf(address(wallet)) == 1000, "funds moved before the delay");
+
+        fastForward(86400);
+        outsider.invoke(address(wallet), "executeIssue", address(token), "transfer", address(outsider), 1000);
+        require(token.balanceOf(address(outsider)) == 1000, "queued transfer did not run");
+        require(!ms.currentIssues(issueId) && issueExecutableAt(issueId) == 0, "executed issue was not cleared");
+        require(rejects(outsider, address(wallet), "executeIssue", address(token), "transfer", address(outsider), 1000), "queued issue ran twice");
+    }
+
+    function it_does_not_run_a_queued_issue_after_its_grace_period() {
+        enableTimelock();
+        voteToQueue(address(token), "transfer", address(outsider), 1000);
+        fastForward(86400 + 604800 + 1);
+        require(rejects(outsider, address(wallet), "executeIssue", address(token), "transfer", address(outsider), 1000), "expired issue ran");
+        require(token.balanceOf(address(wallet)) == 1000, "funds moved after expiry");
+    }
+
+    function it_takes_no_votes_or_dismissal_on_a_queued_issue() {
+        // At one of three, the proposer's vote alone passes an issue
+        vote(a, address(wallet), "setDefaultVotingThresholdBps", 3333);
+        vote(b, address(wallet), "setDefaultVotingThresholdBps", 3333);
+        vote(a, address(wallet), "setTimelockDelay", 86400);
+        require(ms.timelockDelay() == 86400, "timelock delay not set");
+
+        string issueId = ms.getIssueId(address(token), "transfer", address(outsider), 1000);
+        vote(a, address(token), "transfer", address(outsider), 1000);
+        require(issueExecutableAt(issueId) != 0, "issue not queued");
+        require(rejects(b, address(wallet), "castVoteOnIssue", address(token), "transfer", address(outsider), 1000), "voted on a queued issue");
+        require(rejects(a, address(wallet), "dismissIssue", issueId), "dismissed a queued issue");
+        require(ms.currentIssues(issueId), "queued issue was dropped");
+    }
+
+    function it_runs_a_queued_issue_after_a_signer_change() {
+        enableTimelock();
+        Signer d = new Signer();
+        voteToQueue(address(token), "transfer", address(outsider), 1000);
+        voteToQueue(address(wallet), "_swapAdmin", address(c), address(d));
+        fastForward(86400);
+        ms.executeIssue(address(wallet), "_swapAdmin", address(c), address(d));
+        require(ms.isAdminAddress(address(d)) && !ms.isAdminAddress(address(c)), "signer swap did not run");
+
+        require(rejects(d, address(wallet), "castVoteOnIssue", address(token), "transfer", address(outsider), 1000), "new signer voted on a queued issue");
+        ms.executeIssue(address(token), "transfer", address(outsider), 1000);
+        require(token.balanceOf(address(outsider)) == 1000, "queued issue did not survive the signer change");
+    }
+
+    function it_lets_the_signers_cancel_a_queued_issue_before_its_delay_is_up() {
+        enableTimelock();
+        string issueId = voteToQueue(address(token), "transfer", address(outsider), 1000);
+        require(!vote(c, address(wallet), "cancelIssue", issueId), "one vote cancelled the issue");
+        require(vote(a, address(wallet), "cancelIssue", issueId), "cancel waited for the timelock");
+        require(!ms.currentIssues(issueId) && issueExecutableAt(issueId) == 0, "cancelled issue was not cleared");
+
+        fastForward(86400);
+        require(rejects(outsider, address(wallet), "executeIssue", address(token), "transfer", address(outsider), 1000), "cancelled issue ran");
+        require(token.balanceOf(address(wallet)) == 1000, "funds moved");
+    }
+
+    function it_cannot_cancel_an_issue_that_is_not_queued() {
+        string issueId = ms.getIssueId(address(token), "transfer", address(outsider), 1000);
+        vote(a, address(token), "transfer", address(outsider), 1000);
+        vote(a, address(wallet), "cancelIssue", issueId);
+        require(rejects(b, address(wallet), "castVoteOnIssue", address(wallet), "cancelIssue", issueId), "cancelled an issue that was not queued");
+        require(ms.currentIssues(issueId), "pending issue was dropped");
+    }
+
+    function it_waits_out_the_delay_to_hand_the_wallet_over() {
+        enableTimelock();
+        vote(a, address(wallet), "transferOwnership", address(outsider));
+        vote(b, address(wallet), "transferOwnership", address(outsider));
+        require(!vote(c, address(wallet), "transferOwnership", address(outsider)), "ownership moved before the delay");
+        require(wallet.owner() == address(wallet), "ownership moved before the delay");
+
+        fastForward(86400);
+        ms.executeIssue(address(wallet), "transferOwnership", address(outsider));
+        require(wallet.owner() == address(outsider), "queued ownership transfer did not run");
+    }
+
+    function it_blocks_running_a_queued_issue_from_a_running_one() {
+        ReentrantSigner r = new ReentrantSigner();
+        r.setWallet(address(wallet));
+        enableTimelock();
+        voteToQueue(address(token), "transfer", address(outsider), 1000);
+        voteToQueue(address(r), "runAndExecute", address(token), address(outsider));
+        fastForward(86400);
+
+        ms.executeIssue(address(r), "runAndExecute", address(token), address(outsider));
+        require(r.runs() == 1 && r.reentryBlocked(), "nested execution was not blocked");
+        require(token.balanceOf(address(wallet)) == 1000, "nested issue ran");
+        ms.executeIssue(address(token), "transfer", address(outsider), 1000);
+        require(token.balanceOf(address(outsider)) == 1000, "queued issue was lost");
+    }
+
+    function it_rejects_timelock_controls_outside_a_vote() {
+        enableTimelock();
+        string issueId = voteToQueue(address(token), "transfer", address(outsider), 1000);
+        require(rejects(outsider, address(wallet), "setTimelockDelay", 0), "outsider set the delay");
+        require(rejects(a, address(wallet), "setTimelockDelay", 0), "signer set the delay without a vote");
+        require(rejects(a, address(wallet), "cancelIssue", issueId), "signer cancelled without a vote");
+        require(ms.timelockDelay() == 86400 && issueExecutableAt(issueId) != 0, "timelock changed");
     }
 }

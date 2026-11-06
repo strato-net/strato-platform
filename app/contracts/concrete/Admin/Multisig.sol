@@ -9,6 +9,15 @@
  * its code hash.
  */
 contract record Multisig {
+    uint public constant MAXIMUM_DELAY = 2592000; // 30 days
+    uint public constant GRACE_PERIOD = 604800; // 7 days
+
+    struct Timelock {
+        uint queuedAt;
+        uint executableAt;
+        uint expiresAt;
+    }
+
     // The wallet's Ownable owner; the logic contract itself owns itself
     address _owner;
 
@@ -19,8 +28,10 @@ contract record Multisig {
     mapping (string => mapping (address => uint)) public record votesMap;
     mapping (string => bool) public record currentIssues;
     mapping (string => uint) public record issueConfigVersions;
+    mapping (string => Timelock) public record timelocks;
 
     uint public defaultVotingThresholdBps = 6000; // 3/5
+    uint public timelockDelay; // 0 executes an issue as soon as it passes
 
     // Bumped by every signer or threshold change; votes cast under an older version never count
     uint public configVersion;
@@ -29,14 +40,17 @@ contract record Multisig {
 
     event IssueCreated(address creator, string issueId, address target, string func, variadic args);
     event IssueVoted(address voter, string issueId, address target, string func, variadic args);
+    event IssueQueued(address queuer, string issueId, address target, string func, uint executableAt, uint expiresAt, variadic args);
     event IssueExecuted(address executor, string issueId, address target, string func, variadic args);
     event IssueDismissed(address sender, string issueId);
+    event IssueCancelled(string issueId);
 
     event AdminAdded(address indexed admin);
     event AdminRemoved(address indexed admin);
     event AdminSwapped(address indexed replacedAdmin, address indexed newAdmin);
 
     event DefaultVotingThresholdSet(uint votingThresholdBps);
+    event TimelockDelaySet(uint delay);
 
     bool public initialized = false;
 
@@ -87,9 +101,10 @@ contract record Multisig {
 
     function dismissIssue(string _issueId) external {
         require(currentIssues[_issueId], "Issue does not exist or is not active");
+        require(timelocks[_issueId].executableAt == 0, "Cannot dismiss queued issue");
         require(votes[_issueId].length == 1, "Only issues with a single vote can be dismissed");
         require(votes[_issueId][0] == msg.sender, "Only the proposer can dismiss their issue");
-        _clearVotes(_issueId);
+        _clearIssue(_issueId);
         emit IssueDismissed(msg.sender, _issueId);
     }
 
@@ -104,7 +119,9 @@ contract record Multisig {
                 _func == "_addAdmin" ||
                 _func == "_removeAdmin" ||
                 _func == "_swapAdmin" ||
+                _func == "cancelIssue" ||
                 _func == "setDefaultVotingThresholdBps" ||
+                _func == "setTimelockDelay" ||
                 _func == "setLogicContract" ||
                 _func == "transferOwnership",
                 "Multisig cannot vote to call " + _func + " on itself"
@@ -116,8 +133,10 @@ contract record Multisig {
         if (configVersion == 0) configVersion = 1;
 
         string issueId = _getIssueId(_target, _func, _args);
+        // A queued issue already passed, so a later config change doesn't reset it
+        require(timelocks[issueId].executableAt == 0, "Cannot vote on queued issue");
         if (issueConfigVersions[issueId] != configVersion) {
-            _clearVotes(issueId);
+            _clearIssue(issueId);
             issueConfigVersions[issueId] = configVersion;
         }
 
@@ -132,11 +151,14 @@ contract record Multisig {
         }
 
         if (_shouldExecute(issueId, _target, _func)) {
-            variadic ret = _executeIssue(issueId, _target, _func, _args);
-            return (true, ret);
-        } else {
-            return (false, issueId);
+            // Cancelling a queued issue has to beat its timelock
+            if (timelockDelay == 0 || (_target == address(this) && _func == "cancelIssue")) {
+                variadic ret = _executeIssue(issueId, _target, _func, _args);
+                return (true, ret);
+            }
+            _queueIssue(issueId, _target, _func, _args);
         }
+        return (false, issueId);
     }
 
     function _shouldExecute(string _issueId, address _target, string _func) internal returns (bool) {
@@ -148,6 +170,23 @@ contract record Multisig {
         return 10000 * issueVotes >= defaultVotingThresholdBps * admins.length;
     }
 
+    // Anyone can run a queued issue once its delay is up: the signers already decided it
+    function executeIssue(address _target, string _func, variadic _args) external returns (variadic) {
+        require(!executing, "Cannot execute while an issue is executing");
+        string issueId = _getIssueId(_target, _func, _args);
+        Timelock storage timelock = timelocks[issueId];
+        require(timelock.executableAt != 0, "Issue is not queued");
+        require(block.timestamp >= timelock.executableAt, "Timelock delay has not elapsed");
+        require(block.timestamp <= timelock.expiresAt, "Queued issue has expired");
+        return _executeIssue(issueId, _target, _func, _args);
+    }
+
+    function cancelIssue(string _issueId) external onlyOwner {
+        require(timelocks[_issueId].executableAt != 0, "Issue is not queued");
+        _clearIssue(_issueId);
+        emit IssueCancelled(_issueId);
+    }
+
     function getIssueId(address _target, string _func, variadic _args) external returns (string) {
         return _getIssueId(_target, _func, _args);
     }
@@ -156,8 +195,15 @@ contract record Multisig {
         return keccak256(_target, _func, _args);
     }
 
+    function _queueIssue(string _issueId, address _target, string _func, variadic _args) internal {
+        uint executableAt = block.timestamp + timelockDelay;
+        uint expiresAt = executableAt + GRACE_PERIOD;
+        timelocks[_issueId] = Timelock(block.timestamp, executableAt, expiresAt);
+        emit IssueQueued(msg.sender, _issueId, _target, _func, executableAt, expiresAt, _args);
+    }
+
     function _executeIssue(string _issueId, address _target, string _func, variadic _args) internal returns (variadic) {
-        _clearVotes(_issueId);
+        _clearIssue(_issueId);
         executing = true;
         variadic ret = _target.call(_func, _args);
         executing = false;
@@ -165,13 +211,20 @@ contract record Multisig {
         return ret;
     }
 
-    function _clearVotes(string _issueId) internal {
+    function _clearIssue(string _issueId) internal {
         for (uint i = 0; i < votes[_issueId].length; i++) {
             votesMap[_issueId][votes[_issueId][i]] = 0;
             votes[_issueId][i] = address(0);
         }
         votes[_issueId].length = 0;
         delete currentIssues[_issueId];
+        _clearTimelock(_issueId);
+    }
+
+    function _clearTimelock(string _issueId) internal {
+        timelocks[_issueId].queuedAt = 0;
+        timelocks[_issueId].executableAt = 0;
+        timelocks[_issueId].expiresAt = 0;
     }
 
     function _addAdmin(address _admin) external onlyOwner {
@@ -218,5 +271,11 @@ contract record Multisig {
         defaultVotingThresholdBps = _defaultVotingThresholdBps;
         configVersion++;
         emit DefaultVotingThresholdSet(_defaultVotingThresholdBps);
+    }
+
+    function setTimelockDelay(uint _delay) external onlyOwner {
+        require(_delay <= MAXIMUM_DELAY, "Timelock delay exceeds the maximum");
+        timelockDelay = _delay;
+        emit TimelockDelaySet(_delay);
     }
 }

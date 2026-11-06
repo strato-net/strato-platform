@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   Check,
+  Clock,
   Vote,
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -61,6 +62,7 @@ import {
   multisigDisplayName,
   votesNeeded,
   strip0x,
+  MAX_TIMELOCK_DELAY,
   type OpenIssue,
 } from "@/services/multisig";
 
@@ -82,6 +84,17 @@ function humanBalance(t: TokenBalance): string {
   return safeFormatUnits(t.balance, t.decimals);
 }
 
+/** A duration in seconds as "2d 4h", "3h 20m", "45m" or "30s". */
+function formatDuration(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d) return h ? `${d}d ${h}h` : `${d}d`;
+  if (h) return m ? `${h}h ${m}m` : `${h}h`;
+  return m ? `${m}m` : `${s}s`;
+}
+
 /** Human-readable label + canonical args for a governance issue's function. */
 function describeIssue(func: string, args: string[]): { label: string; canonical: string[] } {
   const a0 = args[0] ?? "";
@@ -98,6 +111,15 @@ function describeIssue(func: string, args: string[]): { label: string; canonical
     case "setDefaultVotingThresholdBps":
       // Label is rendered as "M of N" by labelForIssue (needs the signer count).
       return { label: "Set approval threshold", canonical: [String(Number(a0) || 0)] };
+    case "setTimelockDelay": {
+      const seconds = Number(a0) || 0;
+      return {
+        label: seconds ? `Set timelock delay to ${formatDuration(seconds)}` : "Turn off the timelock",
+        canonical: [String(seconds)],
+      };
+    }
+    case "cancelIssue":
+      return { label: `Cancel queued issue ${shortenHex(a0, 8, 6)}`, canonical: [a0] };
     case "transferOwnership":
       return { label: `Transfer ownership → ${shortenHex(a0, 6, 4)}`, canonical: [strip0x(a0)] };
     case "setLogicContract":
@@ -572,7 +594,7 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
   const { config } = useIsMultisig(wallet.address);
   const { data: signers = [] } = useSigners(wallet.address);
   const nested = fullRoute.length > 1;
-  const { addSigner, removeSigner, setDefaultThreshold } = useMultisigActions({
+  const { addSigner, removeSigner, setDefaultThreshold, setTimelockDelay } = useMultisigActions({
     walletAddress: wallet.address,
     route: fullRoute.map((w) => w.address),
   });
@@ -587,9 +609,11 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
   const [newSigner, setNewSigner] = useState("");
   const [newSignerAddr, setNewSignerAddr] = useState("");
   const [targetM, setTargetM] = useState<number | null>(null);
+  const [delayHours, setDelayHours] = useState("");
   const [busy, setBusy] = useState<string>("");
 
   const selectedM = Math.min(Math.max(targetM ?? needed, 1), Math.max(1, signerCount));
+  const delaySeconds = delayHours.trim() === "" ? null : Math.round(Number(delayHours) * 3600);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["multisig-signers", wallet.address] });
@@ -668,6 +692,27 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
     }
   };
 
+  const doDelay = async () => {
+    if (!guard() || delaySeconds === null) return;
+    if (!Number.isFinite(delaySeconds) || delaySeconds < 0 || delaySeconds > MAX_TIMELOCK_DELAY) {
+      toast.error(`The delay must be between 0 and ${MAX_TIMELOCK_DELAY / 3600} hours`);
+      return;
+    }
+    setBusy("delay");
+    try {
+      await setTimelockDelay(delaySeconds);
+      toast.success("Vote cast to change the timelock", {
+        description: `Proposing ${delaySeconds ? formatDuration(delaySeconds) : "no delay"}. Takes effect once the threshold is met${config.timelockDelay ? " and the current delay is up" : ""}.`,
+      });
+      setDelayHours("");
+      invalidate();
+    } catch (err: any) {
+      toast.error("Failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy("");
+    }
+  };
+
   return (
     <div className="space-y-5">
       {!iAmSigner && nested ? (
@@ -719,6 +764,41 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
           </Button>
         </div>
       </div>
+
+      {/* Timelock delay: only the Multisig logic has one */}
+      {config.runsMultisigLogic ? (
+        <div className="rounded-lg border border-border p-3">
+          <div className="text-sm font-medium">Timelock</div>
+          <div className="text-xs text-muted-foreground">
+            {config.timelockDelay
+              ? `Passed issues wait ${formatDuration(config.timelockDelay)} before anyone can execute them; signers can vote to cancel them meanwhile`
+              : "Off: passed issues execute at once"}
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <Input
+              type="number"
+              min={0}
+              max={MAX_TIMELOCK_DELAY / 3600}
+              step="any"
+              value={delayHours}
+              onChange={(e) => setDelayHours(e.target.value)}
+              placeholder={String(config.timelockDelay / 3600)}
+              aria-label="Timelock delay in hours"
+              className="w-28"
+            />
+            <span className="text-sm text-muted-foreground">hours</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={doDelay}
+              disabled={busy !== "" || !canSubmit || !canVote || delaySeconds === null || delaySeconds === config.timelockDelay}
+              className="ml-auto"
+            >
+              {busy === "delay" ? "Voting…" : "Propose change"}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Signer list */}
       <div className="space-y-2">
@@ -793,7 +873,9 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
   const queryClient = useQueryClient();
   const { config } = useIsMultisig(wallet.address);
   const { data: signers = [] } = useSigners(wallet.address);
-  const { data: issues = [], isLoading, error: issuesError, refetch, isFetching } = useOpenIssues(wallet.address);
+  const { data: issues = [], isLoading, error: issuesError, refetch, isFetching, dataUpdatedAt } = useOpenIssues(wallet.address);
+  // Queue countdowns advance with the 3-second issue refresh
+  const now = Math.floor(dataUpdatedAt / 1000);
   const { data: thresholds = {} } = useVotingThresholds(wallet.address);
   const tokenMeta = useTokenMeta(wallet.address);
   const nested = fullRoute.length > 1;
@@ -805,6 +887,8 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
     swapSigner,
     setDefaultThreshold,
     dismissIssue,
+    executeIssue,
+    cancelIssue,
     proposeTransfer,
   } = useMultisigActions({ walletAddress: wallet.address, route: routeAddrs });
   const issueSim = useSimulation();
@@ -900,6 +984,34 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
     }
   };
 
+  const execute = async (issue: OpenIssue) => {
+    setBusy(`${issue.issueId}:execute`);
+    try {
+      await executeIssue({ ...issue, args: describeIssue(issue.func, issue.args).canonical });
+      toast.success("Issue executed");
+      invalidate();
+    } catch (err: any) {
+      toast.error("Execute failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const cancel = async (issue: OpenIssue) => {
+    setBusy(`${issue.issueId}:cancel`);
+    try {
+      await cancelIssue(issue.issueId);
+      toast.success(nested ? `Cancel proposed in ${viaName}` : "Vote cast to cancel", {
+        description: "The cancel runs as soon as enough signers vote for it, without waiting out the timelock.",
+      });
+      invalidate();
+    } catch (err: any) {
+      toast.error("Cancel failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy("");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -968,6 +1080,8 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
         const remaining = Math.max(0, needed - count);
         const iVoted = !issue.invalidated && issue.voters.some((v) => eq(v, voterAddr));
         const pct = needed > 0 ? Math.min(100, (count / needed) * 100) : 0;
+        const queued = issue.queued;
+        const ready = !!queued && now >= queued.executableAt && now <= queued.expiresAt;
         // Mirrors the contract's dismissIssue gate: a single vote, cast by the caller.
         const canDismiss = issue.voters.length === 1 && eq(issue.voters[0], me);
         const dismissHint =
@@ -989,7 +1103,31 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {issueSim.canSimulate && canVote ? (
+                {queued ? (
+                  <>
+                    {canVote ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => cancel(issue)}
+                        disabled={busy !== "" || !canSubmit}
+                        title="Proposes cancelling this issue; the cancel runs as soon as it passes"
+                        className="text-destructive hover:text-destructive"
+                      >
+                        {busy === `${issue.issueId}:cancel` ? "Voting…" : nested ? `Cancel via ${viaName}` : "Cancel"}
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      onClick={() => execute(issue)}
+                      disabled={busy !== "" || !canSubmit || !ready}
+                      title={ready ? "Anyone can execute a queued issue once its delay is up" : "Not executable now"}
+                    >
+                      {busy === `${issue.issueId}:execute` ? "Executing…" : "Execute"}
+                    </Button>
+                  </>
+                ) : null}
+                {!queued && issueSim.canSimulate && canVote ? (
                   <SimulateButton
                     onClick={() => simulateVote(issue)}
                     pending={issueSim.pending && simFor === issue.issueId}
@@ -997,7 +1135,7 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
                     label="Simulate"
                   />
                 ) : null}
-                {iAmSigner ? (
+                {!queued && iAmSigner ? (
                   <Button
                     size="sm"
                     variant="outline"
@@ -1009,37 +1147,49 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
                     {busy === `${issue.issueId}:dismiss` ? "Dismissing…" : "Dismiss"}
                   </Button>
                 ) : null}
-                <Button
-                  size="sm"
-                  onClick={() => vote(issue)}
-                  disabled={busy !== "" || !canSubmit || !canVote || iVoted}
-                  title={
-                    nested
-                      ? `Casts your vote in ${viaName}; it arrives here through the membership chain.`
-                      : undefined
-                  }
-                >
-                  {iVoted ? (
-                    <span className="inline-flex items-center gap-1">
-                      <Check className="h-3.5 w-3.5" /> {nested ? "Chain voted" : "Voted"}
-                    </span>
-                  ) : busy === issue.issueId ? (
-                    "Voting…"
-                  ) : nested ? (
-                    `Vote via ${viaName}`
-                  ) : (
-                    "Vote"
-                  )}
-                </Button>
+                {!queued ? (
+                  <Button
+                    size="sm"
+                    onClick={() => vote(issue)}
+                    disabled={busy !== "" || !canSubmit || !canVote || iVoted}
+                    title={
+                      nested
+                        ? `Casts your vote in ${viaName}; it arrives here through the membership chain.`
+                        : undefined
+                    }
+                  >
+                    {iVoted ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Check className="h-3.5 w-3.5" /> {nested ? "Chain voted" : "Voted"}
+                      </span>
+                    ) : busy === issue.issueId ? (
+                      "Voting…"
+                    ) : nested ? (
+                      `Vote via ${viaName}`
+                    ) : (
+                      "Vote"
+                    )}
+                  </Button>
+                ) : null}
               </div>
             </div>
             <div className="mt-3">
               <Progress value={pct} className="h-1.5" />
               <div className="mt-1 text-xs text-muted-foreground">
                 {count} of {needed} approvals · {needed} of {signers.length} signers required
-                {remaining > 0 ? ` · ${remaining} more approval${remaining === 1 ? "" : "s"} needed` : ""}
+                {!queued && remaining > 0 ? ` · ${remaining} more approval${remaining === 1 ? "" : "s"} needed` : ""}
                 {nested && iVoted ? ` — includes ${hopName(fullRoute[fullRoute.length - 2])}` : ""}
               </div>
+              {queued ? (
+                <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3 shrink-0" />
+                  {now < queued.executableAt
+                    ? `Passed and queued: anyone can execute it in ${formatDuration(queued.executableAt - now)}.`
+                    : ready
+                      ? `Ready: anyone can execute it for another ${formatDuration(queued.expiresAt - now)}.`
+                      : "Expired without being executed: it can only be cancelled now."}
+                </p>
+              ) : null}
               {issue.indexing ? (
                 <p className="mt-1 text-xs text-muted-foreground">Proposal confirmed; syncing the issue list.</p>
               ) : null}

@@ -29,6 +29,9 @@ export const ADMIN_REGISTRY_IMPL_FALLBACK = "00000000000000000000000000000000000
 export const MULTISIG_SOURCE = multisigSource;
 export const MULTISIG_CODE_HASH = strip0x(keccak256(stringToBytes(multisigSource)));
 
+/** The contract's MAXIMUM_DELAY: a timelock delay can be at most 30 days (in seconds). */
+export const MAX_TIMELOCK_DELAY = 2592000;
+
 /** thresholds are stored in basis points: 6000 = 60%. */
 export const bpsToPct = (bps: number) => Math.round((bps / 100) * 10) / 10;
 export const pctToBps = (pct: number) => Math.round(pct * 100);
@@ -111,6 +114,8 @@ export interface MultisigConfig {
   runsMultisigLogic: boolean;
   /** Bumped by every signer or threshold change; 0 on logic that doesn't track it. */
   configVersion: number;
+  /** Seconds a passed issue waits before anyone can execute it; 0 executes it at once. */
+  timelockDelay: number;
 }
 
 /** A User wallet's multisig-relevant state, read from its cirrus storage blob. */
@@ -129,6 +134,7 @@ export function useMultisigConfig(walletAddress?: string | null) {
         defaultThresholdBps: Number(data["defaultVotingThresholdBps"] ?? 0) || 0,
         runsMultisigLogic: !isZeroAddr(logicContract) && !!(await findMultisigLogic(logicContract)),
         configVersion: Number(data["configVersion"] ?? 0) || 0,
+        timelockDelay: Number(data["timelockDelay"] ?? 0) || 0,
       };
     },
   });
@@ -139,6 +145,7 @@ export function useMultisigConfig(walletAddress?: string | null) {
     defaultThresholdBps: 0,
     runsMultisigLogic: false,
     configVersion: 0,
+    timelockDelay: 0,
   };
   return { config, ...q };
 }
@@ -351,10 +358,20 @@ export interface OpenIssue {
   voters: string[];
   /** Its votes predate a signer or threshold change, so they no longer count. */
   invalidated?: boolean;
+  /** It passed and waits out the timelock: executable from executableAt to expiresAt (unix seconds). */
+  queued?: QueuedWindow;
   createdBlock?: number;
   indexing?: boolean;
   transactionHash?: string;
 }
+
+export interface QueuedWindow {
+  executableAt: number;
+  expiresAt: number;
+}
+
+/** Events after an issue's creation that close it. */
+const CLOSING_EVENTS = ["IssueExecuted", "IssueDismissed", "IssueCancelled"];
 
 export function normalizeArgs(raw: unknown): string[] {
   if (Array.isArray(raw)) return raw.map(formatVariadicArg);
@@ -380,7 +397,8 @@ export function normalizeArgs(raw: unknown): string[] {
 export function buildOpenIssues(
   voteRows: any[],
   created: any[],
-  versions?: { current: number; byIssue: Map<string, number> }
+  versions?: { current: number; byIssue: Map<string, number> },
+  timelocks?: Map<string, QueuedWindow>
 ): OpenIssue[] {
   // Group live votes by issueId (drop zeroed-out / cleared entries).
   const votersByIssue = new Map<string, string[]>();
@@ -412,10 +430,12 @@ export function buildOpenIssues(
   for (const [issueId, voters] of votersByIssue) {
     const d = detailsByIssue.get(issueId);
     if (created.some((ev) =>
-      (ev.event_name === "IssueExecuted" || ev.event_name === "IssueDismissed") &&
+      CLOSING_EVENTS.includes(ev.event_name) &&
       ev.attributes?.issueId === issueId && Number(ev.block_number) >= (d?.block ?? 0)
     )) continue;
-    const invalidated =
+    // A queued issue already passed, so a later signer or threshold change doesn't reset it
+    const queued = timelocks?.get(issueId);
+    const invalidated = !queued &&
       !!versions && versions.current > 0 && versions.byIssue.get(issueId) !== versions.current;
     issues.push({
       issueId,
@@ -425,6 +445,7 @@ export function buildOpenIssues(
       voters,
       createdBlock: d?.block,
       ...(invalidated ? { invalidated } : {}),
+      ...(queued ? { queued } : {}),
     });
   }
   issues.sort((a, b) => (b.createdBlock ?? 0) - (a.createdBlock ?? 0));
@@ -438,7 +459,7 @@ export function mergeIndexedIssues(indexed: OpenIssue[], cached: OpenIssue[] = [
     const creation = events.find((event) => event.event_name === "IssueCreated" &&
       event.attributes?.issueId === pending.issueId && event.transaction_hash === pending.transactionHash);
     if (creation && events.some((event) =>
-      (event.event_name === "IssueExecuted" || event.event_name === "IssueDismissed") &&
+      CLOSING_EVENTS.includes(event.event_name) &&
       event.attributes?.issueId === pending.issueId && Number(event.block_number) >= Number(creation.block_number)
     )) continue;
     const current = issues.get(pending.issueId);
@@ -506,11 +527,11 @@ export function useOpenIssues(walletAddress?: string | null) {
       const [mappingRows, created, data] = await Promise.all([
         cirrusGet(
           "mapping",
-          `collection_name=in.(votes,issueConfigVersions)&address=eq.${addr}&select=collection_name,key,value`
+          `collection_name=in.(votes,issueConfigVersions,timelocks)&address=eq.${addr}&select=collection_name,key,value`
         ),
         cirrusGet(
           "event",
-          `address=eq.${addr}&event_name=in.(IssueCreated,IssueExecuted,IssueDismissed)&order=block_number.desc` +
+          `address=eq.${addr}&event_name=in.(IssueCreated,${CLOSING_EVENTS.join(",")})&order=block_number.desc` +
             `&select=event_name,attributes,block_number,transaction_hash`
         ),
         fetchStorageData(addr),
@@ -522,8 +543,17 @@ export function useOpenIssues(walletAddress?: string | null) {
           .map((r): [string, number] => [String(r?.key?.key ?? ""), Number(r?.value ?? 0)])
       );
       const versions = { current: Number(data["configVersion"] ?? 0) || 0, byIssue };
+      // Cleared timelocks stay in the collection as zeros
+      const timelocks = new Map(
+        mappingRows
+          .filter((r) => r?.collection_name === "timelocks" && Number(r?.value?.executableAt) > 0)
+          .map((r): [string, QueuedWindow] => [
+            String(r?.key?.key ?? ""),
+            { executableAt: Number(r.value.executableAt), expiresAt: Number(r.value.expiresAt) },
+          ])
+      );
 
-      return mergeIndexedIssues(buildOpenIssues(voteRows, created, versions), queryClient.getQueryData(queryKey), created);
+      return mergeIndexedIssues(buildOpenIssues(voteRows, created, versions, timelocks), queryClient.getQueryData(queryKey), created);
     },
   });
 }
@@ -831,6 +861,32 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
   );
 
   /**
+   * Run a queued issue once its timelock is up. Anyone may, so it goes straight to the
+   * wallet even on a nested route, with the args its votes carried (same issueId).
+   */
+  const executeIssue = useCallback(
+    (issue: { target: string; func: string; args: string[] }) =>
+      callWallet("executeIssue", {
+        _target: strip0x(issue.target || walletAddress),
+        _func: issue.func,
+        _args: issue.args,
+      }),
+    [callWallet, walletAddress]
+  );
+
+  /** Propose/vote to cancel a queued issue; the cancel runs as soon as it passes. */
+  const cancelIssue = useCallback(
+    (issueId: string) => castVote("cancelIssue", [issueId]),
+    [castVote]
+  );
+
+  /** Propose/vote to change the timelock delay, in seconds (0 turns it off). */
+  const setTimelockDelay = useCallback(
+    (seconds: number) => castVote("setTimelockDelay", [String(seconds)]),
+    [castVote]
+  );
+
+  /**
    * Propose/vote to transfer `amountRaw` (smallest units) of the token at
    * `tokenAddress` out of the treasury to `to`. Executes as `token.transfer(to,
    * amount)` from the wallet once the vote threshold is met. Args are normalized so
@@ -854,6 +910,9 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
     setDefaultThreshold,
     castVote,
     dismissIssue,
+    executeIssue,
+    cancelIssue,
+    setTimelockDelay,
     proposeTransfer,
   };
 }

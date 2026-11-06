@@ -144,3 +144,22 @@ test("an issue voted under an earlier signer set or threshold is marked invalida
   assert.deepEqual(stale[0].voters, [signer]);
   assert.equal(legacy[0].invalidated, undefined);
 });
+
+test("a queued issue keeps its window and is not invalidated by a later signer or threshold change", () => {
+  const votes = [{ key: { key: issueId, key2: "0" }, value: signer }];
+  const window = { executableAt: 1792964287, expiresAt: 1793569087 };
+  const issues = buildOpenIssues(votes, created, { current: 2, byIssue: new Map([[issueId, 1]]) }, new Map([[issueId, window]]));
+  assert.deepEqual(issues[0].queued, window);
+  assert.equal(issues[0].invalidated, undefined);
+});
+
+test("a cancelled issue is no longer open", () => {
+  const votes = [{ key: { key: issueId, key2: "0" }, value: signer }];
+  const cancelled = [...created, { event_name: "IssueCancelled", attributes: { issueId }, block_number: "867200" }];
+  assert.deepEqual(buildOpenIssues(votes, cancelled), []);
+  const cached = applyConfirmedVote([], receipt, proposal);
+  assert.deepEqual(mergeIndexedIssues([], cached, [
+    { event_name: "IssueCreated", attributes: { issueId }, block_number: "867162", transaction_hash: "receipt" },
+    { event_name: "IssueCancelled", attributes: { issueId }, block_number: "867200" },
+  ]), []);
+});
