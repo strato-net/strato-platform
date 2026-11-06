@@ -7,6 +7,9 @@ module Blockchain.Strato.Discovery.UDP
   ( dataToPacket,
     sendPacket,
     ndPacketToRLP,
+    maxPacketBytes,
+    packetWireLength,
+    neighborsPackets,
     NodeDiscoveryPacket (..),
     Endpoint (..),
     Neighbor (..),
@@ -196,6 +199,28 @@ ndPacketToRLP (Pong (Endpoint ipFrom (UDPPort udpPortFrom) (TCPPort tcpPortFrom)
   )
 ndPacketToRLP (FindNeighbors target expiration) = (3, RLPArray [rlpEncode target, rlpEncode expiration])
 ndPacketToRLP (Neighbors neighbors expiration) = (4, RLPArray [RLPArray $ map rlpEncode neighbors, rlpEncode expiration])
+
+-- | The largest packet a discovery node may send (devp2p discovery v4), small
+-- enough that no path has to fragment it: a receiver that never gets the second
+-- fragment of a bigger datagram never sees the packet at all.
+maxPacketBytes :: Int
+maxPacketBytes = 1280
+
+-- | The size of a packet as 'sendPacket' puts it on the wire: hash, signature,
+-- type byte and the RLP payload.
+packetWireLength :: NodeDiscoveryPacket -> Int
+packetWireLength = (32 + 65 + 1 +) . B.length . rlpSerialize . snd . ndPacketToRLP
+
+-- | Spread the neighbors over as many 'Neighbors' packets as it takes for each
+-- one to fit in 'maxPacketBytes'; no neighbors still answers with one packet.
+neighborsPackets :: Integer -> [Neighbor] -> [NodeDiscoveryPacket]
+neighborsPackets expiration = map (`Neighbors` expiration) . fill []
+  where
+    fill acc [] = [reverse acc]
+    fill acc (n : ns)
+      | null acc || fits (n : acc) = fill (n : acc) ns
+      | otherwise = reverse acc : fill [n] ns
+    fits ns' = packetWireLength (Neighbors ns' expiration) <= maxPacketBytes
 
 dataToPacket :: B.ByteString -> Either DiscoverException (NodeDiscoveryPacket, PublicKey)
 dataToPacket msg = do
