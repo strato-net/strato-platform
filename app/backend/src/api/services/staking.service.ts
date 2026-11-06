@@ -1,7 +1,8 @@
 import { bloc, cirrus, strato } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { keccak256 } from "../../utils/keccak256";
+import { authorizationDigest, findOperatedValidator, mapRegistryRevert, profileText, splitSignature } from "./stakingAuthorization";
+import { StratoError } from "../../errors/StratoError";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
@@ -377,6 +378,12 @@ const getBlocState = (
 const getStakingBlocState = (accessToken: string, fresh = false): Promise<Record<string, any>> =>
   getBlocState(accessToken, extractContractName(StratoStaking), requireStakingAddress(), fresh);
 
+// A committed write makes every cached snapshot stale; drop them so the next /info read
+// (from this user or anyone else) sees the new state instead of waiting out the TTL.
+const invalidateBlocStateCache = (): void => {
+  blocStateCache.clear();
+};
+
 const isFunctionEntry = (value: unknown): boolean =>
   typeof value === "string" && value.startsWith("function");
 
@@ -448,12 +455,12 @@ type StakingContractState = {
 // views keep serving v1 reads because both layouts still declare those collections.
 // The version falls back to v1 when none was ever detected, which is what every
 // network showed before v2 existed; a null here means bloc is unreachable.
-const getContractState = async (accessToken: string): Promise<StakingContractState | null> => {
+const getContractState = async (accessToken: string, fresh = false): Promise<StakingContractState | null> => {
   if (!stakingAddress()) return null;
 
   const version = (await detectContractVersion(accessToken)) ?? "v1";
   try {
-    return { version, state: await getStakingBlocState(accessToken) };
+    return { version, state: await getStakingBlocState(accessToken, fresh) };
   } catch {
     return null;
   }
@@ -573,12 +580,27 @@ const getOperatorRows = async (accessToken: string): Promise<Array<{ key: string
   }
 };
 
-// Registry profiles, keyed by operator on v1 and by validator on v2. Only display fields
-// are read here (their meaning did not change), so Cirrus serves both layouts.
-const getValidatorProfiles = async (accessToken: string): Promise<Map<string, Record<string, any>>> => {
+// Registry profiles, keyed by operator on v1 and by validator on v2. On v2 they come from the
+// registry proxy's bloc state: it is the storage the running logic wrote, it omits never-written
+// fields (Cirrus renders those as forty zeros, see profileText) and it is not reshaped by code
+// uploads. v1 keeps the Cirrus read.
+const getValidatorProfiles = async (
+  accessToken: string,
+  version: StakingContractVersion = "v1"
+): Promise<Map<string, Record<string, any>>> => {
   const address = validatorRegistryAddress();
   const profiles = new Map<string, Record<string, any>>();
   if (!address) return profiles;
+
+  if (version === "v2") {
+    try {
+      const state = await getBlocState(accessToken, extractContractName(ValidatorRegistry), address);
+      for (const [key, value] of addressKeyed(state.operators)) profiles.set(key, value || {});
+    } catch {
+      // empty map: the page degrades to addresses without names
+    }
+    return profiles;
+  }
 
   try {
     const { data } = await cirrus.get(accessToken, `/${ValidatorRegistry}-operators`, {
@@ -1099,9 +1121,10 @@ export const getStratoStakingNetworkApy = async (accessToken: string): Promise<s
 
 export const getStratoStakingInfo = async (
   accessToken: string,
-  userAddress?: string
+  userAddress?: string,
+  fresh = false
 ): Promise<StratoStakingInfo> => {
-  const contractState = await getContractState(accessToken);
+  const contractState = await getContractState(accessToken, fresh);
   if (!contractState) return emptyInfo();
 
   return contractState.version === "v2"
@@ -1138,7 +1161,7 @@ const getV1StakingInfo = async (
     getUserMap(accessToken, "pendingDelegatorRewards", userAddress),
     getUserMap(accessToken, "userRewardPerStakePaid", userAddress),
     getUnbondingRequests(accessToken, userAddress),
-    getValidatorProfiles(accessToken),
+    getValidatorProfiles(accessToken, "v1"),
     getLifetimeClaimedRewards(accessToken, userAddress),
     getStratoTokenPriceWad(accessToken),
   ] as const);
@@ -1206,10 +1229,10 @@ const getV1StakingInfo = async (
       active,
       registryActive: parseBoolLike(profile.active),
       operator: operatorAddress,
-      name: String(profile.name || ""),
-      description: String(profile.description || ""),
-      metadataURI: String(profile.metadataURI || ""),
-      protocolValidatorId: String(profile.protocolValidatorId || ""),
+      name: profileText(profile.name),
+      description: profileText(profile.description),
+      metadataURI: profileText(profile.metadataURI),
+      protocolValidatorId: profileText(profile.protocolValidatorId),
       validatorAddress: normalizeAddress(profile.validatorAddress),
       status,
       isValidator: active,
@@ -1348,7 +1371,7 @@ const getV2StakingInfo = async (
   ] = await Promise.all([
     getTokenInfo(accessToken, tokenAddress),
     getTokenBalance(accessToken, tokenAddress, user),
-    getValidatorProfiles(accessToken),
+    getValidatorProfiles(accessToken, "v2"),
     getLifetimeClaimedRewards(accessToken, user),
     getStratoTokenPriceWad(accessToken),
     getRecentBlockRewards(accessToken),
@@ -1417,10 +1440,10 @@ const getV2StakingInfo = async (
       active: record.active,
       registryActive: parseBoolLike(profile.active),
       operator: record.operator,
-      name: String(profile.name || ""),
-      description: String(profile.description || ""),
-      metadataURI: String(profile.metadataURI || ""),
-      protocolValidatorId: String(profile.protocolValidatorId || ""),
+      name: profileText(profile.name),
+      description: profileText(profile.description),
+      metadataURI: profileText(profile.metadataURI),
+      protocolValidatorId: profileText(profile.protocolValidatorId),
       validatorAddress: validator,
       status: record.status,
       isValidator: record.isValidator,
@@ -1540,9 +1563,11 @@ const buildAndPost = async (
   txs: FunctionInput | FunctionInput[]
 ): Promise<{ status: string; hash: string }> => {
   const builtTx = await buildFunctionTx(txs, userAddress, accessToken);
-  return await postAndWaitForTx(accessToken, () =>
+  const result = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
+  if (result.status !== "unsigned") invalidateBlocStateCache();
+  return result;
 };
 
 const stakingCall = (method: string, args: Record<string, unknown> = {}): FunctionInput => ({
@@ -1769,19 +1794,7 @@ export const claimStratoOperatorFeeRewards = async (
 
 // The registry's operator-authorization message: keccak256 over the packed encoding of the
 // prefix, registry, validator, operator and uint256 nonce, with no signed-message prefix
-// (ValidatorRegistry.authorizationDigest).
-const AUTHORIZATION_PREFIX = "STRATO validator operator authorization";
-
-const authorizationDigest = (registry: string, validator: string, operator: string, nonce: bigint): string => {
-  const packed = Buffer.concat([
-    Buffer.from(AUTHORIZATION_PREFIX, "utf8"),
-    Buffer.from(registry, "hex"),
-    Buffer.from(validator, "hex"),
-    Buffer.from(operator, "hex"),
-    Buffer.from(nonce.toString(16).padStart(64, "0"), "hex"),
-  ]);
-  return `0x${keccak256(packed).toString("hex")}`;
-};
+// (ValidatorRegistry.authorizationDigest); see stakingAuthorization.ts.
 
 export const getStratoAuthorizationDigest = async (
   accessToken: string,
@@ -1808,25 +1821,25 @@ export const getStratoAuthorizationDigest = async (
   };
 };
 
-// r || s || v as 130 hex characters. r and s travel as decimal strings (uint256
-// parameters); v may be a recovery id (0/1) or 27/28, as the registry accepts both.
-const splitSignature = (signature: unknown): { v: string; r: string; s: string } | null => {
-  if (signature === undefined || signature === null || signature === "") return null;
+// One operator runs one validator (validator -> operator is 1:1). The registry does not
+// enforce it, so refuse here, reading state fresh, before anything is posted. The validator
+// the caller already operates is named by its registry profile when that read succeeds.
+const assertOperatesNoOtherValidator = async (accessToken: string, userAddress: string, exceptValidator?: string): Promise<void> => {
+  const operated = findOperatedValidator(v2ValidatorRecords(await getStakingBlocState(accessToken, true)), userAddress);
+  if (!operated || (exceptValidator && operated.validator === exceptValidator)) return;
 
-  const hex = String(signature).trim().replace(/^0x/i, "");
-  if (!/^[0-9a-fA-F]{130}$/.test(hex)) {
-    throw badRequest("signature must be 0x followed by 130 hex characters (r, s, v)");
+  let label = `0x${operated.validator}`;
+  try {
+    const registryState = await getBlocState(accessToken, extractContractName(ValidatorRegistry), requireValidatorRegistryAddress(), false);
+    const name = String(addressKeyed(registryState.operators).get(operated.validator)?.name || "").trim();
+    if (name) label = `${name} (0x${operated.validator})`;
+  } catch {
+    // The address alone is a fine label.
   }
-  const v = parseInt(hex.slice(128), 16);
-  if (![0, 1, 27, 28].includes(v)) {
-    throw badRequest("signature v must be 0, 1, 27 or 28");
-  }
-
-  return {
-    r: BigInt(`0x${hex.slice(0, 64)}`).toString(),
-    s: BigInt(`0x${hex.slice(64, 128)}`).toString(),
-    v: String(v),
-  };
+  throw new StratoError(
+    `This account already operates validator ${label}. An operator can run one validator; use a different account.`,
+    409
+  );
 };
 
 // List a validator with msg.sender as its operator; joining the consensus set is a
@@ -1839,6 +1852,7 @@ export const registerStratoOperator = async (
   const validator = requireValidatorArg(input.validator);
   if (input.commissionBps === undefined || input.commissionBps === "") throw badRequest("commissionBps is required");
   await requireV2(accessToken);
+  await assertOperatesNoOtherValidator(accessToken, userAddress);
 
   const signature = splitSignature(input.signature);
   if (!signature && validator !== normalizeAddress(userAddress)) {
@@ -1847,17 +1861,89 @@ export const registerStratoOperator = async (
     );
   }
 
-  return await buildAndPost(accessToken, userAddress, registryCall("register", {
-    validator,
-    commissionBps: String(input.commissionBps),
-    name: String(input.name || ""),
-    description: String(input.description || ""),
-    metadataURI: String(input.metadataURI || ""),
-    // Ignored by the registry when the validator key is the sender.
-    v: signature?.v ?? "0",
-    r: signature?.r ?? "0",
-    s: signature?.s ?? "0",
-  }));
+  try {
+    return await buildAndPost(accessToken, userAddress, registryCall("register", {
+      validator,
+      commissionBps: String(input.commissionBps),
+      name: String(input.name || ""),
+      description: String(input.description || ""),
+      metadataURI: String(input.metadataURI || ""),
+      // Ignored by the registry when the validator key is the sender.
+      v: signature?.v ?? "0",
+      r: signature?.r ?? "0",
+      s: signature?.s ?? "0",
+    }));
+  } catch (error) {
+    throw mapRegistryRevert(error);
+  }
+};
+
+export type SetOperatorInput = {
+  validator: string;
+  // r || s || v from the validator key over the authorization digest naming the caller.
+  signature?: string;
+};
+
+export type StratoOperatorChangeResult = {
+  status: string;
+  hash: string;
+  // The record after the change, read fresh from staking; absent for an unsigned
+  // (external-wallet) result or when the read-back fails.
+  validator?: { address: string; status: StratoOperatorStatus; isValidator: boolean; operator: string };
+};
+
+// Hand a listed validator to the caller as its new operator (ValidatorRegistry.setOperator).
+// Needs the validator key's consent to the caller unless the key itself sends it. Anyone
+// holding a valid signature may submit; the outcome is fixed by the digest, only the timing
+// is the submitter's. Staking pays out and unbonds what the outgoing operator owns.
+export const setStratoOperator = async (
+  accessToken: string,
+  userAddress: string,
+  input: SetOperatorInput
+): Promise<StratoOperatorChangeResult> => {
+  const validator = requireValidatorArg(input.validator);
+  const newOperator = normalizeAddress(userAddress);
+  await requireV2(accessToken);
+  // Taking over the validator you already operate is the registry's "same operator" case.
+  await assertOperatesNoOtherValidator(accessToken, userAddress, validator);
+
+  const signature = splitSignature(input.signature);
+  if (!signature && validator !== newOperator) {
+    throw badRequest(
+      "signature is required: the validator key must sign the operator authorization digest (GET /staking/authorization-digest)"
+    );
+  }
+
+  let result: { status: string; hash: string };
+  try {
+    result = await buildAndPost(accessToken, userAddress, registryCall("setOperator", {
+      validator,
+      newOperator,
+      // Ignored by the registry when the validator key is the sender.
+      v: signature?.v ?? "0",
+      r: signature?.r ?? "0",
+      s: signature?.s ?? "0",
+    }));
+  } catch (error) {
+    throw mapRegistryRevert(error);
+  }
+  if (result.status === "unsigned") return result;
+
+  // Best effort: tell the caller what the record looks like now. A failed read must not
+  // turn a committed transaction into an error.
+  try {
+    const state = await getStakingBlocState(accessToken, true);
+    const record = v2ValidatorRecords(state).find((entry) => entry.validator === validator);
+    if (record) {
+      return {
+        ...result,
+        validator: { address: validator, status: record.status, isValidator: record.isValidator, operator: record.operator },
+      };
+    }
+  } catch (error) {
+    console.warn(`setOperator read-back failed for ${validator}: ${(error as Error)?.message ?? error}`);
+  }
+  return result;
 };
 
 export const updateStratoOperatorProfile = async (

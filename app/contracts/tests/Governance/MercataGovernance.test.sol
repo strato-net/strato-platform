@@ -102,6 +102,65 @@ contract Describe_MercataGovernance {
         require(!removed, "unknown validators are ignored");
     }
 
+    // Consensus applies a block's additions before its removals, so "removed, then
+    // added again" within one block would drop the validator from the consensus set
+    // while it stays listed here.
+    function it_refuses_to_readd_a_validator_in_the_block_that_removed_it() public {
+        _add(staking, v1, 1);
+        _add(staking, v2, 2);
+        staking.doSuccessfully(address(gov), "removeValidatorFromStaking(address)", v1);
+        staking.doExpectingFailure(address(gov), "addValidatorFromStaking(address,uint256)", "Validator was removed in this block", v1, uint256(1));
+        require(!gov.isValidator(v1), "still removed");
+
+        fastForward(1, 1);
+        _add(staking, v1, 1);
+        require(gov.isValidator(v1), "added again a block later");
+        require(gov.validatorStake(v1) == 1, "stake published again");
+    }
+
+    // With a quantum, a weight moves only when the stake has moved a whole quantum away
+    // from it, so parking a stake on a boundary and nudging it does not flip the weight.
+    function it_publishes_stake_weights_a_quantum_at_a_time() public {
+        gov.setStakeQuantum(10);
+        _add(staking, v1, 105);
+        require(gov.validatorStake(v1) == 100, "rounded down to the quantum");
+        _add(staking, v1, 109);
+        _add(staking, v1, 100);
+        _add(staking, v1, 99);
+        _add(staking, v1, 91);
+        require(gov.validatorStake(v1) == 100, "held while the stake stays within a quantum");
+        _add(staking, v1, 90);
+        require(gov.validatorStake(v1) == 90, "a whole quantum down");
+        _add(staking, v1, 99);
+        require(gov.validatorStake(v1) == 90, "held again");
+        _add(staking, v1, 127);
+        require(gov.validatorStake(v1) == 120, "several quanta up");
+        _add(staking, v1, 0);
+        require(gov.validatorStake(v1) == 0, "down to nothing");
+
+        gov.setStakeQuantum(0);
+        _add(staking, v1, 7);
+        require(gov.validatorStake(v1) == 7, "no quantum: every change is published");
+    }
+
+    // A vote to add must not count toward a removal once the validator has joined
+    // through staking.
+    function it_drops_pending_votes_when_membership_changes() public {
+        User a1 = new User();
+        User a2 = new User();
+        gov.seedAdmin(address(a1));
+        gov.seedAdmin(address(a2));
+        _add(staking, v2, 5);
+
+        a1.doSuccessfully(address(gov), "voteToAddValidator(address)", v1);
+        require(!gov.isValidator(v1), "one of two votes");
+        _add(staking, v1, 5);
+        a2.doSuccessfully(address(gov), "voteToRemoveValidator(address)", v1);
+        require(gov.isValidator(v1), "the add vote is gone: one removal vote is not a quorum");
+        a1.doSuccessfully(address(gov), "voteToRemoveValidator(address)", v1);
+        require(!gov.isValidator(v1), "removed by two removal votes");
+    }
+
     function it_keeps_state_across_a_logic_upgrade_behind_a_proxy() public {
         MercataGovernance proxied = MercataGovernance(address(new Proxy(address(gov), address(this))));
         proxied.setStakingContract(address(staking));
@@ -171,6 +230,29 @@ contract Describe_MercataGovernance {
     // At genesis the admin list holds exactly one entry (the AdminRegistry), so
     // a single executed vote could empty it and strand the contract: every
     // voteTo* entry point then fails its admin check and nothing can re-seed one.
+    function it_does_not_count_the_votes_of_removed_admins() public {
+        User a1 = new User();
+        User a2 = new User();
+        User a3 = new User();
+        User a4 = new User();
+        gov.seedAdmin(address(a1));
+        gov.seedAdmin(address(a2));
+        gov.seedAdmin(address(a3));
+        gov.seedAdmin(address(a4)); // quorum is 3 of 4
+
+        a1.doSuccessfully(address(gov), "voteToAddValidator(address)", v1);
+        a2.doSuccessfully(address(gov), "voteToAddValidator(address)", v1);
+        a2.doSuccessfully(address(gov), "voteToRemoveAdmin(address)", address(a1));
+        a3.doSuccessfully(address(gov), "voteToRemoveAdmin(address)", address(a1));
+        a4.doSuccessfully(address(gov), "voteToRemoveAdmin(address)", address(a1));
+        require(gov.adminMap(address(a1)) == 0, "a1 voted out"); // quorum is now 3 of 3
+
+        a3.doSuccessfully(address(gov), "voteToAddValidator(address)", v1);
+        require(!gov.isValidator(v1), "a1's vote no longer counts: two of three");
+        a4.doSuccessfully(address(gov), "voteToAddValidator(address)", v1);
+        require(gov.isValidator(v1), "added by three current admins");
+    }
+
     function it_removes_admins_by_vote_but_never_the_last_one() public {
         User a1 = new User();
         User a2 = new User();

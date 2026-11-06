@@ -1,0 +1,466 @@
+#!/usr/bin/env python3
+"""strato-authorize-operator: let this node's validator key authorise an operator.
+
+Runs on the validator host. Reads the node's own credentials, asks the vault (which
+holds the node key) to sign a consent digest for the operator address you name, and
+prints the signature plus a link into the staking page where the operator submits it.
+The private key never leaves the vault; the node key never needs USDST.
+
+Design: design-documents/validator-operator-binding.md (Component A).
+
+Exit codes: 0 ok / nothing to do, 2 usage, 3 node files, 4 token, 5 vault,
+6 public API, 7 registry not ready (not validator-keyed or logic predates the nonce fix),
+8 unknown network, 9 self-test failed, 10 declined or no terminal.
+"""
+import argparse
+import base64
+import json
+import os
+import re
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+# The app host sits behind Cloudflare, which 403s Python's default user agent, and its nginx
+# CSRF layer only lets unauthenticated POSTs through for known API-client agents (matched on
+# substrings such as "curl/"). This string satisfies both while staying identifiable.
+USER_AGENT = "strato-authorize-operator/1.0 curl/8.7.1"
+PREFIX = b"STRATO validator operator authorization"
+STAKING_PAGE = "/dashboard/earn-staking"
+VAULT_API_PATH = "/strato/v2.3"
+NETWORKS = {
+    "helium": {"api": "https://app.testnet.strato.nexus"},
+    "upquark": {"api": "https://app.strato.nexus"},
+}
+# Pinned by tests/Staking/ValidatorRegistry.test.sol: digest for registry 0x11..11,
+# validator 0xf39F..2266, operator 0x22..22, nonce 7.
+SELF_TEST = (
+    "1111111111111111111111111111111111111111",
+    "f39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+    "2222222222222222222222222222222222222222",
+    7,
+    "b40f7746740b70994c96fae88ae656ddfaf42a06872675fdde41dbee73e79bd3",
+)
+TIMEOUT = 30
+
+
+# ---------------------------------------------------------------- keccak-256
+# Ethereum's Keccak-256 (pad10*1 with domain byte 0x01). hashlib.sha3_256 is
+# NIST SHA-3 with a different padding byte and gives different hashes.
+_RC = [0x0000000000000001, 0x0000000000008082, 0x800000000000808A, 0x8000000080008000,
+       0x000000000000808B, 0x0000000080000001, 0x8000000080008081, 0x8000000000008009,
+       0x000000000000008A, 0x0000000000000088, 0x0000000080008009, 0x000000008000000A,
+       0x000000008000808B, 0x800000000000008B, 0x8000000000008089, 0x8000000000008003,
+       0x8000000000008002, 0x8000000000000080, 0x000000000000800A, 0x800000008000000A,
+       0x8000000080008081, 0x8000000000008080, 0x0000000080000001, 0x8000000080008008]
+_ROT = [[0, 36, 3, 41, 18], [1, 44, 10, 45, 2], [62, 6, 43, 15, 61],
+        [28, 55, 25, 21, 56], [27, 20, 39, 8, 14]]
+_M = (1 << 64) - 1
+
+
+def _rol(x, n):
+    n %= 64
+    return ((x << n) | (x >> (64 - n))) & _M if n else x
+
+
+def _keccak_f(a):
+    for rc in _RC:
+        c = [a[x][0] ^ a[x][1] ^ a[x][2] ^ a[x][3] ^ a[x][4] for x in range(5)]
+        d = [c[(x - 1) % 5] ^ _rol(c[(x + 1) % 5], 1) for x in range(5)]
+        a = [[a[x][y] ^ d[x] for y in range(5)] for x in range(5)]
+        b = [[0] * 5 for _ in range(5)]
+        for x in range(5):
+            for y in range(5):
+                b[y][(2 * x + 3 * y) % 5] = _rol(a[x][y], _ROT[x][y])
+        a = [[b[x][y] ^ ((~b[(x + 1) % 5][y]) & b[(x + 2) % 5][y]) for y in range(5)] for x in range(5)]
+        a[0][0] ^= rc
+    return a
+
+
+def keccak256(data: bytes) -> bytes:
+    rate = 136
+    state = [[0] * 5 for _ in range(5)]
+    msg = bytearray(data) + b"\x01"
+    msg += b"\x00" * ((-len(msg)) % rate)
+    msg[-1] |= 0x80
+    for off in range(0, len(msg), rate):
+        block = msg[off:off + rate]
+        for i in range(rate // 8):
+            state[i % 5][i // 5] ^= int.from_bytes(block[8 * i:8 * i + 8], "little")
+        state = _keccak_f(state)
+    return b"".join(state[i % 5][i // 5].to_bytes(8, "little") for i in range(4))
+
+
+def authorization_digest(registry: str, validator: str, operator: str, nonce: int) -> bytes:
+    """keccak256(abi.encodePacked(PREFIX, registry, validator, operator, uint256 nonce))."""
+    preimage = PREFIX + bytes.fromhex(registry) + bytes.fromhex(validator) + bytes.fromhex(operator) \
+        + nonce.to_bytes(32, "big")
+    assert len(preimage) == 131
+    return keccak256(preimage)
+
+
+# ---------------------------------------------------------------- helpers
+def say(msg=""):
+    print(msg, file=sys.stderr)
+
+
+def die(code, msg):
+    say(f"error: {msg}")
+    sys.exit(code)
+
+
+def address(label, value):
+    hex_ = str(value or "").strip().lower()
+    hex_ = hex_[2:] if hex_.startswith("0x") else hex_
+    if not re.fullmatch(r"[0-9a-f]{40}", hex_):
+        die(2, f"{label} is not an address: {value!r}")
+    return hex_
+
+
+class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(req.full_url, code, "redirect refused", headers, fp)
+
+
+_OPENER = urllib.request.build_opener(_RefuseRedirects)
+
+
+def http(method, url, headers=None, body=None, timeout=TIMEOUT):
+    """Returns (status, parsed JSON or raw text). Never raises for HTTP errors."""
+    scheme, host = urllib.parse.urlsplit(url)[:2]
+    if scheme != "https" and host.split(":")[0] not in ("localhost", "127.0.0.1"):
+        die(2, f"refusing non-HTTPS URL {url}")
+    hdrs = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+    hdrs.update(headers or {})
+    data = None
+    if body is not None:
+        data = body if isinstance(body, bytes) else json.dumps(body).encode()
+        hdrs.setdefault("Content-Type", "application/json")
+    req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
+    try:
+        with _OPENER.open(req, timeout=timeout) as resp:
+            raw = resp.read()
+            status = resp.status
+    except urllib.error.HTTPError as e:
+        raw = e.read() if e.fp else b""
+        status = e.code
+    except (urllib.error.URLError, OSError) as e:
+        return None, str(e.reason if hasattr(e, "reason") else e)
+    text = raw.decode("utf-8", "replace")
+    try:
+        return status, json.loads(text)
+    except ValueError:
+        return status, text
+
+
+def read_yaml_sections(path):
+    """Tiny reader for the generated YAML: {section: {key: value}} plus top-level keys under ''."""
+    out = {"": {}}
+    section = ""
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            m_top = re.match(r"^([A-Za-z_][\w-]*):\s*(.*?)\s*$", line)
+            m_sub = re.match(r"^\s+([A-Za-z_][\w-]*):\s*(.*?)\s*$", line)
+            if m_top:
+                key, value = m_top.groups()
+                if value == "":
+                    section = key
+                    out.setdefault(section, {})
+                else:
+                    out[""][key] = _unquote(value)
+            elif m_sub and section:
+                out[section][m_sub.group(1)] = _unquote(m_sub.group(2))
+    return out
+
+
+def _unquote(v):
+    v = v.strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+        return v[1:-1]
+    return v
+
+
+# ---------------------------------------------------------------- steps
+def step1_read_node_files(args):
+    home = os.path.expanduser("~")
+    node_dir = args.node_dir
+    if not node_dir:
+        default_file = os.path.join(home, ".strato", "default-node")
+        try:
+            with open(default_file, encoding="utf-8") as fh:
+                node_dir = fh.read().strip()
+        except OSError:
+            die(3, f"no --node-dir given and {default_file} is missing; pass --node-dir <node directory>")
+    if not os.path.isdir(node_dir):
+        die(3, f"node directory does not exist: {node_dir}")
+
+    creds_path = os.path.join(node_dir, "secrets", "oauth_credentials.yaml")
+    if not os.path.isfile(creds_path):
+        creds_path = os.path.join(home, ".secrets", "strato_credentials.yaml")
+    if not os.path.isfile(creds_path):
+        die(3, f"no credentials: neither {node_dir}/secrets/oauth_credentials.yaml nor "
+               f"~/.secrets/strato_credentials.yaml exists (run strato-login / strato-setup)")
+    creds = read_yaml_sections(creds_path)[""]
+    for key in ("discoveryUrl", "clientId", "clientSecret"):
+        if not creds.get(key):
+            die(3, f"{creds_path} has no {key}")
+
+    ethconf_path = os.path.join(node_dir, ".ethereumH", "ethconf.yaml")
+    if not os.path.isfile(ethconf_path):
+        die(3, f"missing {ethconf_path}")
+    ethconf = read_yaml_sections(ethconf_path)
+    vault_url = ethconf.get("urlConfig", {}).get("vaultUrl", "").rstrip("/")
+    network = ethconf.get("networkConfig", {}).get("network", "")
+    if not vault_url:
+        die(3, f"{ethconf_path} has no urlConfig.vaultUrl")
+    if not vault_url.endswith(VAULT_API_PATH):
+        vault_url += VAULT_API_PATH
+    if not network and not (args.api_url and args.registry):
+        die(3, f"{ethconf_path} has no networkConfig.network; pass --api-url and --registry")
+
+    api = args.api_url.rstrip("/") if args.api_url else NETWORKS.get(network, {}).get("api")
+    if not api:
+        die(8, f"unknown network {network!r}; pass --api-url <app host> and --registry <address>")
+    return {
+        "node_dir": node_dir, "creds_path": creds_path, "discovery_url": creds["discoveryUrl"],
+        "client_id": creds["clientId"], "client_secret": creds["clientSecret"],
+        "vault_url": vault_url, "network": network or "(custom)", "api": api,
+    }
+
+
+def step1d_registry_address(ctx, args):
+    if args.registry:
+        ctx["registry"] = address("--registry", args.registry)
+        ctx["registry_source"] = "--registry"
+        return
+    url = f"{ctx['api']}/api/staking/info/public"
+    status, body = http("GET", url)
+    if status != 200 or not isinstance(body, dict) or not body.get("validatorRegistryAddress"):
+        die(6, f"could not read validatorRegistryAddress from {url} (status {status}); pass --registry")
+    ctx["registry"] = address("validatorRegistryAddress", body["validatorRegistryAddress"])
+    ctx["registry_source"] = "app host"
+
+
+def step2_token(ctx):
+    status, disc = http("GET", ctx["discovery_url"], timeout=10)
+    if status != 200 or not isinstance(disc, dict) or not disc.get("token_endpoint"):
+        die(4, f"OpenID discovery failed at {ctx['discovery_url']} (status {status})")
+    basic = base64.b64encode(f"{ctx['client_id']}:{ctx['client_secret']}".encode()).decode()
+    status, tok = http("POST", disc["token_endpoint"],
+                       headers={"Authorization": f"Basic {basic}",
+                                "Content-Type": "application/x-www-form-urlencoded"},
+                       body=b"grant_type=client_credentials", timeout=10)
+    if status != 200 or not isinstance(tok, dict) or not tok.get("access_token"):
+        detail = tok.get("error") if isinstance(tok, dict) else tok
+        hint = ""
+        if detail == "invalid_client":
+            hint = f"; the client id or secret in {ctx['creds_path']} was rejected"
+        elif detail == "unauthorized_client":
+            hint = "; this Keycloak client is not allowed the client-credentials grant (service accounts off)"
+        die(4, f"token request failed (status {status}, {detail}){hint}")
+    ctx["token"] = tok["access_token"]
+
+
+def step3_validator(ctx):
+    status, body = http("GET", f"{ctx['vault_url']}/key",
+                        headers={"Authorization": f"Bearer {ctx['token']}"})
+    if status == 200 and isinstance(body, dict) and body.get("address"):
+        ctx["validator"] = address("vault key address", body["address"])
+        return
+    if status == 400:
+        die(5, "the vault has no key for this client: the node has not completed setup, or these "
+               "credentials are not the ones the node runs with")
+    if status == 401:
+        die(5, f"the vault rejected the token; it trusts a different realm than {ctx['discovery_url']}")
+    if status == 503:
+        die(5, "the vault is sealed (password not set); the node cannot sign blocks right now either")
+    die(5, f"vault key request failed at {ctx['vault_url']}/key (status {status}: {str(body)[:200]})")
+
+
+def step4_registry_state(ctx):
+    url = f"{ctx['api']}/bloc/v2.2/contracts/ValidatorRegistry/{ctx['registry']}/state"
+    status, state = http("GET", url)
+    if status != 200 or not isinstance(state, dict):
+        die(6, f"could not read registry state from {url} (status {status}); check --api-url / --registry")
+    fn = state.get("operatorAuthorizationDigest")
+    if not (isinstance(fn, str) and fn.startswith("function")):
+        die(7, f"the registry {ctx['registry']} on {ctx['network']} is not the validator-keyed contract yet")
+    nonces = state.get("authorizationNonce") or {}
+    ctx["nonce"] = int(str(nonces.get(ctx["validator"], "0")))
+    record = (state.get("operators") or {}).get(ctx["validator"])
+    ctx["record"] = record
+    ctx["name"] = (record or {}).get("name", "")
+    if record is None:
+        ctx["action"] = "register"
+        ctx["current_operator"] = None
+    else:
+        ctx["current_operator"] = address("record operator", record.get("operator") or ctx["validator"])
+        ctx["listed_active"] = record.get("active") is True
+        ctx["action"] = "same" if ctx["current_operator"] == ctx["operator"] else "change"
+
+
+def step5_digest(ctx):
+    ctx["digest"] = authorization_digest(ctx["registry"], ctx["validator"], ctx["operator"], ctx["nonce"]).hex()
+
+
+def step6a_chain_check(ctx):
+    """Ask the deployed registry for its digest; refuse to sign if the logic disagrees."""
+    body = {
+        "address": ctx["operator"],
+        "txs": [{"type": "FUNCTION", "payload": {
+            "contractName": "ValidatorRegistry", "contractAddress": ctx["registry"],
+            "method": "operatorAuthorizationDigest",
+            "args": {"validator": ctx["validator"], "operator": ctx["operator"]}}}],
+        "txParams": {"gasLimit": 1000000, "gasPrice": 0},
+    }
+    status, res = http("POST", f"{ctx['api']}/bloc/v2.2/transaction/simulate", body=body, timeout=60)
+    try:
+        chain = str(res[0]["data"]["contents"][0]).lower()
+        chain = chain[2:] if chain.startswith("0x") else chain  # no str.removeprefix: python 3.6 hosts
+        ok = status == 200 and res[0].get("status") == "Success"
+    except (KeyError, IndexError, TypeError):
+        chain, ok = "", False
+    if not ok:
+        die(6, f"could not evaluate operatorAuthorizationDigest on {ctx['api']} (status {status}: {str(res)[:200]})")
+    if chain != ctx["digest"]:
+        die(7, "the deployed registry computes a different digest than this script "
+               f"(chain {chain[:16]}…, local {ctx['digest'][:16]}…). Most likely its logic predates the "
+               "nonce fix (design-documents/handoff-registry-digest-drops-unwritten-nonce.md); ask the admins "
+               "to swap the registry logic before using signed authorizations.")
+
+
+def step6_summary_and_confirm(ctx, args):
+    o, v = ctx["operator"], ctx["validator"]
+    say(f"Network:    {ctx['network']}")
+    say(f"Validator:  0x{v}" + (f'   "{ctx["name"]}"' if ctx["name"] else "") + "   (this node's key)")
+    say(f"Operator:   0x{o}")
+    say(f"Registry:   0x{ctx['registry']}   (from {ctx['registry_source']})")
+    say(f"Nonce:      {ctx['nonce']}")
+    say(f"Digest:     0x{ctx['digest']}")
+    if ctx["action"] == "same":
+        say(f"Action:     0x{o} already operates this validator. Nothing to do.")
+        sys.exit(0)
+    if ctx["action"] == "register":
+        say("Action:     first registration")
+        say(f"            Only 0x{o} can submit this signature, from the staking page. It stays valid")
+        say("            until it is used or until this validator's nonce moves.")
+    else:
+        say(f"Action:     operator change from 0x{ctx['current_operator']} to 0x{o}")
+        say(f"            When submitted, 0x{ctx['current_operator']}'s self-bond is released for unbonding, its pending")
+        say("            rewards are paid out, and this validator may leave the consensus set until")
+        say(f"            0x{o} self-bonds at least the minimum stake and activates.")
+        say(f"            Sign when 0x{o} is ready to take over.")
+        if not ctx.get("listed_active"):
+            say("            This validator is not listed as active. Changing its operator does not relist it;")
+            say("            relisting needs an admin vote.")
+    say()
+    if args.digest_only:
+        print(f"0x{ctx['digest']}")
+        sys.exit(0)
+    if args.yes:
+        return
+    answer = _ask("Sign? [y/N] ")
+    if answer not in ("y", "yes"):
+        die(10, "nothing signed")
+
+
+def _ask(prompt):
+    # Prefer the controlling terminal so the prompt works even when stdout is piped. Open it
+    # twice (read, write): a single "r+" handle needs a seekable file and a Linux tty is not
+    # (io.UnsupportedOperation: File or stream is not seekable). Fall back to stdin when there
+    # is no /dev/tty but stdin is a terminal.
+    try:
+        tty_in = open("/dev/tty", "r", encoding="utf-8")
+        tty_out = open("/dev/tty", "w", encoding="utf-8")
+    except (OSError, ValueError) as e:
+        if sys.stdin.isatty():
+            sys.stderr.write(prompt)
+            sys.stderr.flush()
+            return sys.stdin.readline().strip().lower()
+        die(10, f"no terminal to confirm on ({e}); pass --yes to sign without a prompt")
+    with tty_in, tty_out:
+        tty_out.write(prompt)
+        tty_out.flush()
+        return tty_in.readline().strip().lower()
+
+
+def step7_sign(ctx):
+    def attempt():
+        return http("POST", f"{ctx['vault_url']}/signature",
+                    headers={"Authorization": f"Bearer {ctx['token']}"},
+                    body={"msgHash": ctx["digest"]})
+    status, sig = attempt()
+    if status is None:
+        status, sig = attempt()  # one retry on connection errors
+    if status == 503:
+        die(5, "the vault is sealed (password not set)")
+    if status != 200 or not isinstance(sig, dict):
+        die(5, f"vault signature request failed (status {status}: {str(sig)[:200]})")
+    try:
+        r = int(str(sig["r"]), 16).to_bytes(32, "big").hex()
+        s = int(str(sig["s"]), 16).to_bytes(32, "big").hex()
+        v = int(str(sig["v"]))
+    except (KeyError, ValueError, OverflowError):
+        die(5, f"unexpected vault response: {json.dumps(sig)[:200]}")
+    if v not in (0, 1, 27, 28):
+        die(5, f"unexpected recovery id from vault: {v}")
+    ctx["signature"] = f"0x{r}{s}{v:02x}"
+
+
+def step8_print(ctx):
+    sig, v, o = ctx["signature"], ctx["validator"], ctx["operator"]
+    # Fragment, not query string: fragments never leave the browser, so the signature stays out of
+    # nginx/Cloudflare access logs and the login round trip.
+    link = f"{ctx['api']}{STAKING_PAGE}#validator=0x{v}&operator=0x{o}&signature={sig}&nonce={ctx['nonce']}"
+    print(sig)
+    say(f"Signature: {sig}")
+    say()
+    if ctx["action"] == "register":
+        say(f"Next: log in to the staking page as 0x{o} and register this validator:")
+        say(f"  {link}")
+        say("The page takes the validator address and the signature; you choose the name and commission.")
+        say(f"Only 0x{o} can submit this signature. It stays valid until used or until the nonce moves.")
+    else:
+        say(f"Next: log in to the staking page as 0x{o} and use Change operator:")
+        say(f"  {link}")
+        say(f"After the change, 0x{o} must self-bond at least the minimum stake and activate.")
+
+
+def self_test():
+    reg, val, op, nonce, expect = SELF_TEST
+    if authorization_digest(reg, val, op, nonce).hex() != expect:
+        die(9, "Keccak self-test failed; refusing to sign anything")
+
+
+def main():
+    p = argparse.ArgumentParser(prog="strato-authorize-operator",
+                                description="Authorise an operator for this node's validator key.")
+    p.add_argument("operator", help="operator account address (0x…)")
+    p.add_argument("--node-dir", help="node directory (default: the path in ~/.strato/default-node)")
+    p.add_argument("--registry", help="ValidatorRegistry proxy address (default: from the app host)")
+    p.add_argument("--api-url", help="app host for chain reads and the link (default: per network)")
+    p.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
+    p.add_argument("--digest-only", action="store_true", help="print the digest and exit without signing")
+    args = p.parse_args()
+
+    self_test()
+    operator = address("operator", args.operator)  # cheapest check first
+    ctx = step1_read_node_files(args)
+    ctx["operator"] = operator
+    step1d_registry_address(ctx, args)
+    step2_token(ctx)
+    step3_validator(ctx)
+    step4_registry_state(ctx)
+    step5_digest(ctx)
+    if ctx["action"] != "same":
+        step6a_chain_check(ctx)
+    step6_summary_and_confirm(ctx, args)
+    step7_sign(ctx)
+    step8_print(ctx)
+
+
+if __name__ == "__main__":
+    main()
