@@ -464,9 +464,22 @@ call' from to' fnCalltype functionName valList = do
       _ -> case M.lookup functionName $ contract ^. CC.storageDefs of
         Just CC.VariableDecl {..} | not (isExternal && _varVisibility /= Just CC.Public) -> do
           _ <- Runtime.compiledContract hsh cc contract
+          let checkIndices typ (v : vs) = case typ of
+                SVMType.Mapping _ keyType valueType _ _ -> do
+                  void $ coerceUnsignedValue contract cc keyType v
+                  checkIndices valueType vs
+                SVMType.Array valueType _ -> do
+                  void $ coerceUnsignedValue contract cc (SVMType.Int (Just False) Nothing) v
+                  checkIndices valueType vs
+                _ -> pure ()
+              checkIndices _ [] = pure ()
+              checkedValue typ v
+                | SReference _ <- v, SVMType.Int (Just False) _ <- typ = pure (SUnsigned 0)
+                | otherwise = coerceUnsignedValue contract cc typ v
+          checkIndices _varType valList
           let args' = fromMaybe [] $ case (_varType, valList) of
                 ((SVMType.Array _ _), oa) -> for oa $ \case
-                  SInteger n -> Just . MS.Index . BC.pack $ show n
+                  SIntegral n -> Just . MS.Index . BC.pack $ show n
                   _ -> Nothing
                 ((SVMType.Mapping _ _ _ _ _), oa) ->
                   traverse convertValueToStoragePathPiece oa
@@ -486,15 +499,15 @@ call' from to' fnCalltype functionName valList = do
                           SVMType.Error{} -> Nothing
                           SVMType.Array{} -> Nothing
                           SVMType.Mapping{} -> Nothing
-                          _ -> Just n
+                          _ -> Just (n, t)
                         ) <$> fields
-                  fieldVals <- for fieldsToLoad $ \fieldName ->
-                    getVar $ Constant $ SReference $ path `MS.snoc` MS.Field (BC.pack $ labelToString fieldName)
+                  fieldVals <- for fieldsToLoad $ \(fieldName, typ) ->
+                    getVar (Constant $ SReference $ path `MS.snoc` MS.Field (BC.pack $ labelToString fieldName)) >>= checkedValue typ
                   fieldVars <- traverse createVar fieldVals
                   pure . STuple $ V.fromList fieldVars
               handleSimple path = do
                 v <- getVar $ Constant $ SReference path
-                pure $ Just v
+                Just <$> checkedValue (returnType _varType) v
               typeTuple = [(Nothing, CC.IndexedType 0 (returnType _varType) Nothing)]
           case args' of
             [] -> do
@@ -523,7 +536,7 @@ call' from to' fnCalltype functionName valList = do
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
     convertValueToStoragePathPiece v =
       case v of
-        SInteger i -> Just $ MS.Index $ BC.pack $ show i
+        SIntegral i -> Just $ MS.Index $ BC.pack $ show i
         SString s -> Just $ MS.Index $ DT.encodeUtf8 $ T.pack s
         SAddress a _ -> Just $ MS.Index $ BC.pack $ show a
         SBool b -> Just $ MS.Index $ bool "false" "true" b

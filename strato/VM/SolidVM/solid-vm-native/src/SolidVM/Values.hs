@@ -57,7 +57,7 @@ resolveArgRef src contract cc argType arg = case arg of
         SVMType.Array t' _ -> do
           lenVal <- resolveArgRef src contract cc (SVMType.Int Nothing Nothing) (SReference $ r `MS.snoc` MS.Field "length")
           case lenVal of
-            SInteger l' -> do
+            SIntegral l' -> do
               elems <- for [0 .. l' - 1] $ \i ->
                 resolveArgRef src contract cc t' (SReference $ r `MS.snoc` MS.Index (BC.pack $ show i))
               vars <- traverse createVar elems
@@ -134,11 +134,11 @@ validateFunctionArguments cc contract' func argVals = checkFunc $ func : CC._fun
     marshalValue (t, v) =
       -- These cases might not be all inclusive of all valid combinations.
       case (v, t) of
-        (SInteger i, SVMType.Int _ _) -> pure . Just $ SInteger i
+        (SIntegral i, SVMType.Int _ _) -> pure . Just $ SInteger i
         -- (SInteger i, SVMType.String _) -> pure . Just . SString $ show i
-        (SInteger i, SVMType.Address b) -> pure . Just $ SAddress (fromInteger i) b
-        (SInteger i, SVMType.UnknownLabel _) -> pure . Just $ SAddress (fromInteger i) False
-        (SInteger i, SVMType.Decimal) -> pure . Just . SDecimal $ fromInteger i
+        (SIntegral i, SVMType.Address b) -> pure . Just $ SAddress (fromInteger i) b
+        (SIntegral i, SVMType.UnknownLabel _) -> pure . Just $ SAddress (fromInteger i) False
+        (SIntegral i, SVMType.Decimal) -> pure . Just . SDecimal $ fromInteger i
         (SDecimal d, SVMType.Decimal) -> pure . Just $ SDecimal d
         (SString s, SVMType.String _) -> pure . Just $ SString s
         (SString s, SVMType.Bytes _ _) -> pure . Just $ SBytes $ DT.encodeUtf8 $ T.pack s
@@ -243,8 +243,9 @@ structAs addr ctx (N.FCons name t rest) vs = case M.lookup name vs of
 
 valueDynAt :: Address -> M.Map T.Text N.SType -> Value -> SM N.Dyn
 valueDynAt addr ctx = \case
+  SUnsigned n -> pure $ N.Dyn N.TUInt n
   SDecimal v -> pure $ N.Dyn N.TDecimal v
-  SInteger v -> pure $ N.Dyn N.TInt v
+  SIntegral v -> pure $ N.Dyn N.TInt v
   SBool v -> pure $ N.Dyn N.TBool v
   SAddress v _ -> pure $ N.Dyn N.TAddr v
   SContract name v -> pure $ N.Dyn (N.TContract name) v
@@ -286,6 +287,7 @@ referenceType _ _ = Left "native storage reference has no declaration"
 
 toValue :: N.Dyn -> SM Value
 toValue (N.Dyn t v) = case t of
+  N.TUInt -> pure $ SUnsigned v
   N.TDecimal -> pure $ SDecimal v
   N.TInt -> pure $ SInteger v
   N.TBool -> pure $ SBool v

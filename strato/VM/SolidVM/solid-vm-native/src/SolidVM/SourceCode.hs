@@ -2,6 +2,7 @@
 -- Inspection representations are never used by the executable compiler.
 module SolidVM.SourceCode where
 
+import Numeric.Natural (Natural)
 import SolidVM.Core hiding (Fun(..))
 import qualified SolidVM.Core as Core
 import qualified SolidVM.BuiltinSource as BuiltinSource
@@ -221,6 +222,7 @@ class ToSource a where
 instance ToSource (Code a) where
   toSource code = maybe (sourceExpression code) (SigE (sourceExpression code)) (codeType code)
 instance ToSource Integer where toSource = LitE . IntegerL
+instance ToSource Natural where toSource = LitE . IntegerL . toInteger
 instance ToSource Int where toSource = LitE . IntegerL . fromIntegral
 instance ToSource Bool where toSource True = ConE 'True; toSource False = ConE 'False
 instance ToSource T.Text where toSource = LitE . StringL . T.unpack
@@ -239,7 +241,7 @@ instance ToSource SType where
     SArray e -> app 'SArray [toSource e]
 instance ToSource (Ty a) where
   toSource = \case
-    TInt -> ConE 'TInt; TDecimal -> ConE 'TDecimal; TBool -> ConE 'TBool
+    TUInt -> ConE 'TUInt; TInt -> ConE 'TInt; TDecimal -> ConE 'TDecimal; TBool -> ConE 'TBool
     TAddr -> ConE 'TAddr; TStr -> ConE 'TStr; TBytes -> ConE 'TBytes; TUnit -> ConE 'TUnit
     TEnum n ns -> app 'TEnum [toSource n,toSource ns]
     TContract n -> app 'TContract [toSource n]
@@ -352,6 +354,7 @@ replaceFree = walk
       _ -> concat (gmapQ bound x)
 
 literal :: Ty a -> a -> Exp
+literal TUInt = toSource
 literal TInt = toSource
 literal TDecimal = toSource
 literal TBool = toSource
@@ -418,6 +421,7 @@ builtinCode n f = Code f expression Nothing Nothing Ordinary
 
 haskellType :: Ty a -> Type
 haskellType = \case
+  TUInt -> ConT ''Natural
   TInt -> ConT ''Integer
   TDecimal -> ConT ''Decimal
   TBool -> ConT ''Bool

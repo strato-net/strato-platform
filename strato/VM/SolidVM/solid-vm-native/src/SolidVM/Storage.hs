@@ -54,6 +54,7 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8', encodeUtf8)
 import qualified Data.Vector as V
+import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
 import SolidVM.Model.Value
@@ -76,7 +77,7 @@ fromBasic = \case
 
 toBasic :: Integer -> Value -> Maybe MS.BasicValue
 toBasic currentBlockNum = \case
-  SInteger i -> Just $ MS.BInteger i
+  SIntegral i -> Just $ MS.BInteger i
   SString s -> Just . MS.BString . encodeUtf8 $ T.pack s
   SDecimal v -> Just $ MS.BDecimal $ BC.pack $ show v
   SBool b -> Just $ MS.BBool b
@@ -94,6 +95,13 @@ toBasic currentBlockNum = \case
 setVar :: MonadSM m => Variable -> Value -> m ()
 setVar (Constant dst) src = setVal dst src
 setVar (Variable var) val = liftIO $ writeIORef var val
+setVar (TypedVariable t var) val = checkTypedValue t val >>= setVar var
+
+checkTypedValue :: MonadSM m => SVMType.Type -> Value -> m Value
+checkTypedValue t value = do
+  contract <- getCurrentContract
+  (_, cc) <- getCurrentCodeCollection
+  coerceUnsignedValue contract cc t value
 
 setVal :: MonadSM m => Value -> Value -> m ()
 -- If val is a simple value, assign it. If it
@@ -144,7 +152,7 @@ setVal dst@(SReference path) src = do
     Just b -> do
       markDiffForAction addr path b
       putSolidStorageKeyVal' addr path b
-setVal (SInteger dst) (SInteger _) = immutableError "Cannot assign immutable or constants after assigned ->" dst -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
+setVal (SIntegral dst) (SIntegral _) = immutableError "Cannot assign immutable or constants after assigned ->" dst -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
 setVal (SNULL) _ = return ()
 setVal dst src = typeError "unknown case called in setVal (Probably tried to change the value of a constant):" ("src = " ++ show src ++ ", dst = " ++ show dst)
 
@@ -201,6 +209,7 @@ getVar (Constant (SPush v (Just var))) = do
   return $ SPush v (Just $ Constant resolved)
 getVar (Constant v) = return v
 getVar (Variable v) = liftIO $ readIORef v
+getVar (TypedVariable t v) = getVar v >>= checkTypedValue t
 
 -- | Fully evaluate a value: every nested cell and storage reference is
 -- resolved, so the result holds only 'Constant's and can leave the VM.
@@ -224,7 +233,7 @@ getIntEither p = getIntValEither <$> getVar p
 
 getIntValEither :: Value -> Either Value Integer
 getIntValEither v' = case toNull v' of
-  SInteger s -> Right s
+  SIntegral s -> Right s
   SNULL -> Right 0
   v -> Left v
 
@@ -241,7 +250,7 @@ getRealNum :: MonadSM m => Variable -> m (Either Integer Decimal)
 getRealNum p = do
   v <- getVar p
   case toNull v of
-    SInteger s -> return $ Left s
+    SIntegral s -> return $ Left s
     SDecimal s -> return $ Right s
     SNULL -> return $ Left 0
     _ -> typeError "getRealNum" $ show (p, v)
@@ -252,7 +261,7 @@ getBool = getBoolVal <=< getVar
 getBoolVal :: MonadSM m => Value -> m Bool
 getBoolVal v' = case toNull v' of
   SBool b -> return b
-  SInteger _ -> return True -- integer is guaranteed to not be 0
+  SIntegral _ -> return True -- integer is guaranteed to not be 0
   SNULL -> return False
   v -> typeError "getBool" $ show v
 
@@ -261,7 +270,7 @@ getAddress = getAddressVal <=< getVar
 
 getAddressVal :: MonadSM m => Value -> m Address
 getAddressVal v' = case toNull v' of
-  SInteger i -> pure $ fromIntegral i
+  SIntegral i -> pure $ fromIntegral i
   SAddress a _ -> pure a
   SContract _ a -> pure a
   SString s -> case readMaybe s of
@@ -288,7 +297,7 @@ getBytes = getBytesVal <=< getVar
 
 getBytesVal :: MonadSM m => Value -> m BC.ByteString
 getBytesVal v' = case toNull v' of
-  SInteger i -> pure $ integer2Bytes i
+  SIntegral i -> pure $ integer2Bytes i
   SAddress a _ -> pure $ addressToByteString a
   SContract _ a -> pure $ addressToByteString a
   SString s -> case B16.decode $ BC.pack s of

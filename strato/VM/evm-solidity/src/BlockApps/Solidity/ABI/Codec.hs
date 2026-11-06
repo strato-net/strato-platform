@@ -84,7 +84,7 @@ isDynamicValue (SArray _) = True
 isDynamicValue _ = False
 
 encodeStaticValue :: Value -> B.ByteString
-encodeStaticValue (SInteger n) = encodeInt256 n
+encodeStaticValue (SIntegral n) = encodeInt256 n
 encodeStaticValue (SBool True) = encodeUint256 1
 encodeStaticValue (SBool False) = encodeUint256 0
 encodeStaticValue (SAddress addr _) = padLeft32 $ addressToByteString addr

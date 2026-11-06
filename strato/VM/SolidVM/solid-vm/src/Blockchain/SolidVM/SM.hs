@@ -808,16 +808,14 @@ withCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff f = do
 -- read (readIORef); storage is never touched, which would mutate the MP trie.
 renderArgShallow :: MonadIO m => (SolidString, Variable) -> m Text
 renderArgShallow (name, var) = do
-  val <- case var of
-    Constant v -> pure v
-    Variable ref -> readIORef ref
+  val <- weakGetVar var
   pure $ labelToText name <> "=" <> renderValueShallow val
 
 -- | Shallow, pure rendering of a value: scalars verbatim, compounds
 -- summarized without dereferencing nested variables or storage.
 renderValueShallow :: Value -> Text
 renderValueShallow = \case
-  SInteger i -> T.pack (show i)
+  SIntegral i -> T.pack (show i)
   SDecimal d -> T.pack (show d)
   SString str -> T.pack (show str)
   SBool b -> if b then "true" else "false"

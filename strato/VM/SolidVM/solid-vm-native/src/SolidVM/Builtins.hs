@@ -26,9 +26,12 @@ import Text.Printf (printf)
 import Text.Read (readEither, readMaybe)
 
 flatten :: [Dyn] -> [Dyn]
-flatten ds = case reverse ds of
+flatten ds = map signedInteger $ case reverse ds of
   Dyn TVariadic rest : xs -> reverse xs ++ rest
   _ -> ds
+  where
+    signedInteger (Dyn TUInt n) = Dyn TInt (toInteger n)
+    signedInteger d = d
 
 bad :: T.Text -> [Dyn] -> M a
 bad name ds = liftIO $ throwIO $ E.InvalidArguments (T.unpack name) (show (map showDyn ds))
@@ -168,6 +171,7 @@ encodeValues ds = RLPArray (map encodeValue ds)
 
 encodeValue :: Dyn -> RLPObject
 encodeValue (Dyn ty v) = case ty of
+  TUInt -> rlpEncode (toInteger v)
   TInt -> rlpEncode v
   TDecimal -> rlpEncode (show v)
   TBool -> rlpEncode v

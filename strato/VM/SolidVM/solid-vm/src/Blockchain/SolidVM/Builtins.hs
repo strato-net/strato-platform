@@ -110,14 +110,18 @@ push (SReference apt) _ vals = do
   setVar (Constant (SReference lenPath)) newLen
   setVar (Constant (SReference idxPath)) av
   return $ Constant newLen
-push (SArray vec) (Just (Variable ref)) vals = do
+push (SArray vec) (Just variable) vals | mutable variable = do
   let av = case vals of
              [] -> SNULL
              (a:_) -> a
   newVar <- createVar av
   let newArr = V.snoc vec newVar
-  setVar (Variable ref) (SArray newArr)
+  setVar variable (SArray newArr)
   return $ Constant (SInteger $ fromIntegral $ V.length newArr)
+  where
+    mutable (Variable _) = True
+    mutable (TypedVariable _ inner) = mutable inner
+    mutable _ = False
 push v mv argVals = do
   invalidArguments "push" (v, mv, argVals)
 
@@ -443,7 +447,7 @@ abiEncodePacked = fmap fold . traverse encodeValuePacked
     encodeValuePacked (SBool True)       = pure $ B.singleton 1
     encodeValuePacked (SBool False)      = pure $ B.singleton 0
     encodeValuePacked (SAddress addr _)  = pure $ addressToByteString addr
-    encodeValuePacked (SInteger n)       = pure $ encodeInt256 n
+    encodeValuePacked (SIntegral n)       = pure $ encodeInt256 n
     encodeValuePacked (SString s)        = pure $ BC.pack s
     encodeValuePacked (SBytes bs)        = pure bs
     encodeValuePacked (SEnumVal _ _ w)   = pure $ encodeUint256 (fromIntegral w)

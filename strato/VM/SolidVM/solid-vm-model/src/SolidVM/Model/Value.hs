@@ -4,11 +4,15 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- Generic/Store (DecimalRaw i)
 
 module SolidVM.Model.Value
   ( Variable (..),
-    Value (..),
+    Value (.., SIntegral),
+    unsignedInteger,
+    coerceUnsignedValue,
     ValList,
     toNull,
     rlpEncodeVariable,
@@ -61,6 +65,7 @@ import qualified Data.Vector as V
 import Data.Word
 import GHC.Generics (Generic)
 import Numeric
+import Numeric.Natural (Natural)
 import SolidVM.Model.CodeCollection (CodeCollection)
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
@@ -71,11 +76,13 @@ import qualified SolidVM.Model.Type as SVMType
 data Variable
   = Variable (IORef Value)
   | Constant Value
+  | TypedVariable SVMType.Type Variable
   deriving (Eq)
 
 instance Show Variable where
   show (Variable _) = "<variable>"
   show (Constant v) = "Constant: " ++ show v
+  show (TypedVariable _ v) = show v
 
 instance NFData Variable where rnf = (`seq` ())
 instance NFData Value where rnf = (`seq` ())
@@ -125,7 +132,25 @@ data Value
   | SContinue
   | SBytes ByteString
   | SVariadic [Value]
+  | SUnsigned Natural
   deriving (Show, Generic)
+
+-- Numeric consumers accept either representation; legacy constructors remain signed.
+pattern SIntegral :: Integer -> Value
+pattern SIntegral n <- (integerValue -> Just n) where
+  SIntegral n = SInteger n
+
+{-# COMPLETE SIntegral, SDecimal, SString, SBool, SAddress, SUserDefined, SEnum, SEnumVal, SStructDef, SStruct, STuple, SArray, SMap, SFunction, SBuiltinVariable, SSetterGetter, SContractDef, SContractItem, SContract, SContractFunction, SPush, SNULL, SReference, SHexDecodeAndTrim, SStringConcat, SDeferredConstant, SAddressToAscii, SBreak, SContinue, SBytes, SVariadic #-}
+
+integerValue :: Value -> Maybe Integer
+integerValue (SInteger n) = Just n
+integerValue (SUnsigned n) = Just (toInteger n)
+integerValue _ = Nothing
+
+unsignedInteger :: Integer -> Value
+unsignedInteger n
+  | n < 0 = arithmeticException "unsigned integer underflow" n
+  | otherwise = SUnsigned (fromInteger n)
 
 -- See the note on the Store instances in SolidVM.Model.Storable.
 instance Store Value
@@ -148,6 +173,7 @@ instance Store Variable where
 snapshotVariable :: Variable -> Value
 snapshotVariable (Constant c) = c
 snapshotVariable (Variable _) = SNULL
+snapshotVariable (TypedVariable _ v) = snapshotVariable v
 
 deriving instance Generic (DecimalRaw i)
 
@@ -161,7 +187,7 @@ toNull :: Value -> Value
 toNull SNULL = SNULL
 toNull SReference{} = SNULL
 toNull (SBool False) = SNULL
-toNull (SInteger 0) = SNULL
+toNull (SIntegral 0) = SNULL
 toNull (SDecimal 0.0) = SNULL
 toNull (SString "") = SNULL
 toNull (SAddress 0 _) = SNULL
@@ -174,7 +200,7 @@ toNull v = v
 instance Eq Value where
   x == y = case (toNull x, toNull y) of
     (SNULL, SNULL) -> True
-    (SInteger i1, SInteger i2) -> i1 == i2
+    (SIntegral i1, SIntegral i2) -> i1 == i2
     (SString s1, SString s2) -> s1 == s2
     (SDecimal v1, SDecimal v2) -> v1 == v2
     (SBool b1, SBool b2) -> b1 == b2
@@ -191,7 +217,7 @@ instance Eq Value where
 instance Ord Value where
   compare x y = case (toNull x, toNull y) of
     (SNULL, SNULL) -> EQ
-    (SInteger i1, SInteger i2) -> compare i1 i2
+    (SIntegral i1, SIntegral i2) -> compare i1 i2
     (SString s1, SString s2) -> compare s1 s2
     (SDecimal v1, SDecimal v2) -> compare v1 v2
     (SBool b1, SBool b2) -> compare b1 b2
@@ -210,11 +236,12 @@ instance RLPSerializable Value where
 rlpEncodeVariable :: Variable -> RLPObject
 rlpEncodeVariable (Variable _) = rlpEncodeValue SNULL
 rlpEncodeVariable (Constant v) = rlpEncodeValue v
+rlpEncodeVariable (TypedVariable _ v) = rlpEncodeVariable v
 
 rlpEncodeValue :: Value -> RLPObject
 rlpEncodeValue SNULL = rlpEncodeValue $ SInteger 0
 rlpEncodeValue SReference{} = rlpEncodeValue $ SInteger 0
-rlpEncodeValue (SInteger i) = rlpEncode i
+rlpEncodeValue (SIntegral i) = rlpEncode i
 rlpEncodeValue (SString s) = rlpEncode s
 rlpEncodeValue (SBytes bs) = rlpEncode bs
 rlpEncodeValue (SDecimal decimal) = rlpEncode $ show decimal
@@ -235,7 +262,7 @@ rlpEncodeValues xs = rlpEncodeValue $ STuple $ V.fromList $ Constant <$> xs
 -- to assume the type that was intended for them, once
 -- it is determined that their expected type is
 coerceFromInt :: CC.Contract -> CodeCollection -> Value -> Integer -> Value
-coerceFromInt _ _ SInteger {} n = SInteger n
+coerceFromInt _ _ SIntegral {} n = SInteger n
 coerceFromInt _ _ (SAddress _ b) n = SAddress (fromIntegral n) b
 coerceFromInt _ _ SBool {} n = SBool $ n /= 0
 coerceFromInt _ _ SString {} 0 = SString ""
@@ -257,7 +284,7 @@ coerceFromInt _ _ t x = typeError "coerceFromInt: invalid literal for type" $ sh
 -- strings (in the special case of 0) and bytes32, determined by type instead of value
 coerceType :: CC.Contract -> CodeCollection -> SVMType.Type -> Value -> Value
 coerceType ct cc xt = \case
-  SInteger i -> coerceFromInt ct cc (defaultValue ct xt) i
+  SIntegral i -> coerceFromInt ct cc (defaultValue ct xt) i
   SString s -> case xt of
     SVMType.String {} -> SString s
     SVMType.Bytes {} -> SString s
@@ -265,11 +292,38 @@ coerceType ct cc xt = \case
     _ -> typeError "string literal must be string or bytes" $ show (xt, s)
   v -> v
 
+coerceUnsignedValue :: MonadIO m => CC.Contract -> CodeCollection -> SVMType.Type -> Value -> m Value
+coerceUnsignedValue ct cc t value = case (t, value) of
+  (SVMType.Int (Just False) _, SIntegral n) -> pure $! unsignedInteger n
+  (SVMType.Int (Just False) _, SNULL) -> pure SNULL
+  (SVMType.Int (Just False) _, SVariadic [v]) -> coerceUnsignedValue ct cc t v
+  (SVMType.Int (Just False) _, SReference _) -> pure value
+  (SVMType.Int (Just False) _, _) -> typeError "expected unsigned integer" (show value)
+  (SVMType.Int _ _, SUnsigned n) -> pure (SInteger $ toInteger n)
+  (SVMType.Array element _, SArray items) -> SArray <$> traverse (typed element) items
+  (SVMType.Mapping _ _ element _ _, SMap items) -> SMap <$> traverse (typed element) items
+  (SVMType.UserDefined _ actual, _) -> coerceUnsignedValue ct cc actual value
+  (SVMType.Struct _ name, _) -> coerceUnsignedValue ct cc (SVMType.UnknownLabel name) value
+  (SVMType.UnknownLabel name, _) | prefix : rest <- T.splitOn "." name, not (null rest), Just owner <- M.lookup prefix (cc ^. CC.contracts) ->
+    coerceUnsignedValue owner cc (SVMType.UnknownLabel $ T.intercalate "." rest) value
+  (_, SStruct name fields) -> case M.lookup name (CC._structs ct) <|> M.lookup name (cc ^. CC.flStructs) of
+    Nothing -> pure value
+    Just defs -> do
+      let types = M.fromList [(n, CC.fieldTypeType f) | (n, f, _) <- defs]
+      SStruct name <$> M.traverseWithKey (\n v -> maybe (pure v) (`typed` v) (M.lookup n types)) fields
+  _ -> pure value
+  where
+    typed typ var@(TypedVariable existing _) | typ == existing = pure var
+    typed typ var = do
+      v <- weakGetVar var
+      checked <- coerceUnsignedValue ct cc typ v
+      checked `seq` pure (TypedVariable typ var)
+
 valEquals :: CC.Contract -> CodeCollection -> Value -> Value -> Bool
 valEquals ct cc lhs rhs = case (lhs, rhs) of
-  (SInteger _, SInteger _) -> lhs == rhs
-  (SInteger i, _) -> coerceFromInt ct cc rhs i == rhs
-  (_, SInteger i) -> lhs == coerceFromInt ct cc lhs i
+  (SIntegral _, SIntegral _) -> lhs == rhs
+  (SIntegral i, _) -> coerceFromInt ct cc rhs i == rhs
+  (_, SIntegral i) -> lhs == coerceFromInt ct cc lhs i
   _ -> lhs == rhs
 
 createVar' :: MonadIO m => Value -> m Variable
@@ -277,6 +331,7 @@ createVar' val = liftIO $ Variable <$> newIORef val
 
 toVar :: MonadIO m => Variable -> m Variable
 toVar (Constant val) = createVar val
+toVar (TypedVariable t var) = TypedVariable t <$> toVar var
 toVar var            = pure var
 
 createVar :: MonadIO m => Value -> m Variable
@@ -375,7 +430,7 @@ type ValList = [Value]
 
 -- | Human-readable type name for Value constructors (used in error messages)
 valueTypeName :: Value -> String
-valueTypeName (SInteger _) = "Integer"
+valueTypeName (SIntegral _) = "Integer"
 valueTypeName (SDecimal _) = "Decimal"
 valueTypeName (SString _) = "String"
 valueTypeName (SBool _) = "Bool"
@@ -411,7 +466,7 @@ valueTypeName (SVariadic _) = "Variadic"
 instance Format Value where
   format (SReference path) =
     "Reference(" ++ BC.unpack (MS.unparsePath path) ++ ")"
-  format (SInteger n) = "Integer(" ++ show n ++ ")"
+  format (SIntegral n) = "Integer(" ++ show n ++ ")"
   format (SBool b) = "Bool(" ++ show b ++ ")"
   format (SString s) = "String(" ++ show (take 20 s) ++ if length s > 20 then "...)" else ")"
   format (SAddress a _) = "Address(" ++ take 10 (show a) ++ "...)"
@@ -420,10 +475,12 @@ instance Format Value where
 getConst :: Variable -> Value
 getConst (Constant v) = v
 getConst (Variable _) = SNULL
+getConst (TypedVariable _ v) = getConst v
 
 weakGetVar :: MonadIO m => Variable -> m Value
 weakGetVar (Constant c) = return c
 weakGetVar (Variable v) = liftIO $ readIORef v
+weakGetVar (TypedVariable _ v) = weakGetVar v
 
 forceLoadVar :: MonadIO m => Variable -> m Value
 forceLoadVar = forceLoadVal <=< weakGetVar
@@ -441,7 +498,7 @@ renderValue :: Value -> T.Text
 renderValue = go False
   where
     go _ SNULL = "null"
-    go _ (SInteger v) = T.pack $ show v
+    go _ (SIntegral v) = T.pack $ show v
     go b (SString v) = T.pack $ bool id show b v
     go b (SBytes v) = T.pack . bool id show b . BC.unpack $ B16.encode v
     go _ (SBool v) = bool "false" "true" v
@@ -465,12 +522,13 @@ renderValue = go False
 instance ToJSON Variable where
   toJSON (Constant v) = toJSON v
   toJSON (Variable _) = toJSON SNULL
+  toJSON (TypedVariable _ v) = toJSON v
 
 instance FromJSON Variable where
   parseJSON v = Constant <$> parseJSON v
 
 instance ToJSON Value where
-  toJSON (SInteger n) = object ["t" .= ("int" :: String), "v" .= show n]
+  toJSON (SIntegral n) = object ["t" .= ("int" :: String), "v" .= show n]
   toJSON (SDecimal d) = object ["t" .= ("dec" :: String), "v" .= show d]
   toJSON (SString s) = object ["t" .= ("str" :: String), "v" .= s]
   toJSON (SBool b) = object ["t" .= ("bool" :: String), "v" .= b]
@@ -512,7 +570,8 @@ instance FromJSON Value where
 -- instance maps to () are SNULL. Everything else is a tag and the fields.
 instance Binary.Binary Value where
   put v = case v of
-    SInteger n -> tag 0 >> Binary.put n
+    SUnsigned n -> tag 12 >> Binary.put (toInteger n)
+    SIntegral n -> tag 0 >> Binary.put n
     SDecimal d -> tag 1 >> Binary.put (decimalPlaces d) >> Binary.put (decimalMantissa d)
     SString s -> tag 2 >> putUtf8String s
     SBool b -> tag 3 >> Binary.put b
@@ -529,6 +588,7 @@ instance Binary.Binary Value where
       tag = Binary.put
       snapshot (Constant c) = c
       snapshot (Variable _) = SNULL
+      snapshot (TypedVariable _ v') = snapshot v'
   get = do
     t <- Binary.get :: Binary.Get Word8
     case t of
@@ -544,4 +604,7 @@ instance Binary.Binary Value where
       9 -> SContract <$> Binary.get <*> Binary.get
       10 -> SBytes <$> Binary.get
       11 -> pure SNULL
+      12 -> do
+        n <- Binary.get
+        if n < 0 then fail "negative unsigned integer" else pure (unsignedInteger n)
       _ -> fail $ "Unknown Value tag: " ++ show t

@@ -95,7 +95,7 @@ instance RLPSerializable TypedArg where
 -- semantic rather than incidental restriction.
 valueToTypedArg :: MonadIO m => Value -> m (Maybe TypedArg)
 valueToTypedArg v = case v of
-  SInteger i -> pure $ Just (TAInt i)
+  SIntegral i -> pure $ Just (TAInt i)
   SBool b -> pure $ Just (TABool b)
   SAddress a _ -> pure $ Just (TAAddress a)
   SString s -> pure $ Just (TAString s)
@@ -117,4 +117,5 @@ valueToTypedArg v = case v of
 -- the IORef when present.
 variableToTypedArg :: MonadIO m => Variable -> m (Maybe TypedArg)
 variableToTypedArg (Variable ref) = liftIO (readIORef ref) >>= valueToTypedArg
+variableToTypedArg (TypedVariable _ var) = variableToTypedArg var
 variableToTypedArg (Constant val) = valueToTypedArg val
