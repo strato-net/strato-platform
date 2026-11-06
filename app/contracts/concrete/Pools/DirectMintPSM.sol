@@ -1,4 +1,5 @@
 import "../../abstract/ERC20/access/Ownable.sol";
+import "../Admin/AdminRegistry.sol";
 import "../Admin/FeeCollector.sol";
 import "../Savings/SaveUSDSTVault.sol";
 import "../Tokens/Token.sol";
@@ -259,7 +260,7 @@ contract DirectMintPSM is Ownable {
         address vaultAddress = savingsVault;
         require(savingsDepositAvailable(mintAmount), "Savings deposit unavailable");
 
-        Token(mintableToken).mint(address(this), mintAmount);
+        AdminRegistry(Ownable(mintableToken).owner()).castVoteOnIssue(mintableToken, "mint", address(this), mintAmount);
         IERC20(mintableToken).approve(vaultAddress, mintAmount);
         return SaveUSDSTVault(vaultAddress).deposit(mintAmount, recipient);
     }
@@ -297,7 +298,7 @@ contract DirectMintPSM is Ownable {
             shares = _mintIntoSavings(msg.sender, mintAmount);
             emit DirectPSMMintedToSavings(msg.sender, amount, mintAmount, shares, againstToken);
         } else {
-            Token(mintableToken).mint(msg.sender, mintAmount);
+            AdminRegistry(Ownable(mintableToken).owner()).castVoteOnIssue(mintableToken, "mint", msg.sender, mintAmount);
         }
 
         emit DirectPSMMinted(msg.sender, amount, mintAmount, againstToken);
@@ -323,7 +324,7 @@ contract DirectMintPSM is Ownable {
         require(availableRedemptionLiquidity(redeemToken) >= amount, "Insufficient liquidity");
 
         _transferFrom(mintableToken, msg.sender, address(this), amount);
-        Token(mintableToken).burn(address(this), amount);
+        AdminRegistry(Ownable(mintableToken).owner()).castVoteOnIssue(mintableToken, "burn", address(this), amount);
 
         // Settle the redeemToken side: fee to the collector, remainder to the redeemer.
         uint feeAmount = amount - payoutAmount;

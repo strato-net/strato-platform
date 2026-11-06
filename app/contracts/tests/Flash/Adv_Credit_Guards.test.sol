@@ -4,13 +4,12 @@ pragma solidity ^0.8.0;
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADVERSARIAL: FlashMint's own guards.
 //   6a  can maxLoan be exceeded / stacked (nesting, intermediary, per-tx)
-//   6b  can Ownable.onlyOwner's try/catch swallow a failed Token.mint / Token.burn
+//   6b  can FlashMint's castVoteOnIssue swallow a failed Token.mint / Token.burn
 //   6c  can `locked` be left stuck true (bricking) via a caught revert
 //   6d  pausing the USDST Token itself must stop the facility
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Tokens/Token.sol";
 
@@ -123,7 +122,7 @@ contract Swallower {
     }
 }
 
-contract Describe_Adv_Credit_Guards is Authorizable {
+contract Describe_Adv_Credit_Guards {
 
     Mercata m;
     FlashMint fm;
@@ -136,13 +135,11 @@ contract Describe_Adv_Credit_Guards is Authorizable {
     address USDST;
     address COLL;
     Token usdstT;
-    Token collT;
 
     uint CAP;
     uint WAD;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         WAD = 1e18;
         CAP = 2000000e18;   // vendor's own cap = 40% of live USDST float
 
@@ -154,26 +151,27 @@ contract Describe_Adv_Credit_Guards is Authorizable {
         admin    = m.adminRegistry();
         fm       = new FlashMint(address(admin));
 
-        USDST  = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",[],[],[],"USDST",0,18);
+        USDST  = address(ret);
         usdstT = Token(USDST);
-        usdstT.setStatus(2);
-        reg.setUSDST(USDST);
-        oracle.setAssetPrice(USDST, 1e18);
+        admin.castVoteOnIssue(USDST, "setStatus", 2);
+        admin.castVoteOnIssue(address(reg), "setUSDST", USDST);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", USDST, 1e18);
 
-        COLL  = m.tokenFactory().createToken("GOLDST","Gold",[],[],[],"GOLDST",0,18);
-        collT = Token(COLL);
-        collT.setStatus(2);
-        oracle.setAssetPrice(COLL, 100e18);
+        (executed, ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "GOLDST","Gold",[],[],[],"GOLDST",0,18);
+        COLL  = address(ret);
+        admin.castVoteOnIssue(COLL, "setStatus", 2);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", COLL, 100e18);
         // mainnet-shaped: LR 1.50, minCR 1.55, penalty 10%, close factor 50%, no accrual
-        cdp.setCollateralAssetParams(COLL, 150e16, 155e16, 1000, 5000, 1e27, 1e18, 1e30, false);
+        admin.castVoteOnIssue(address(cdp), "setCollateralAssetParams", COLL, 150e16, 155e16, 1000, 5000, 1e27, 1e18, 1e30, false);
 
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(cdp));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(cdp));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(fm));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(fm));
 
-        fm.initialize(USDST, address(m.feeCollector()), CAP);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), CAP);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
     }
 
     function beforeEach() public { }
@@ -188,7 +186,7 @@ contract Describe_Adv_Credit_Guards is Authorizable {
 
         require(!usdstT.paused(), "precondition: USDST unpaused");
 
-        usdstT.pause();
+        admin.castVoteOnIssue(USDST, "pause");
         require(usdstT.paused(), "USDST must be paused");
         require(!fm.paused(), "FlashMint.paused is independent");
 
@@ -205,7 +203,7 @@ contract Describe_Adv_Credit_Guards is Authorizable {
         require(fm.loansServed() == servedBefore, "no loan while USDST paused");
         require(usdstT.totalSupply() == supplyBefore, "supply unchanged");
 
-        usdstT.unpause();
+        admin.castVoteOnIssue(USDST, "unpause");
         require(!usdstT.paused(), "cleanup: unpaused");
         b.go(1e18);
         require(fm.loansServed() == servedBefore + 1, "unpause restores flashLoan");
@@ -215,11 +213,11 @@ contract Describe_Adv_Credit_Guards is Authorizable {
     function it_db_token_pause_blocks_flash_driven_cdp_repay() public {
         SelfUnwinder su = new SelfUnwinder();
         su.init(address(fm), address(cdp), USDST);
-        collT.mint(address(su), 4000e18);           // 4,000 COLL @ $100 = $400,000
+        admin.castVoteOnIssue(COLL, "mint", address(su), 4000e18);           // 4,000 COLL @ $100 = $400,000
         su.open(COLL, 4000e18, 150000e18);          // borrow $150,000
-        usdstT.mint(address(su), 200000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(su), 200000e18);
 
-        usdstT.pause();
+        admin.castVoteOnIssue(USDST, "pause");
         require(usdstT.paused(), "USDST paused");
 
         (uint colBefore, uint debtBefore) = cdp.vaults(address(su), COLL);
@@ -232,7 +230,7 @@ contract Describe_Adv_Credit_Guards is Authorizable {
         require(debtAfter == debtBefore, "debt untouched");
         require(colAfter == colBefore, "collateral untouched");
 
-        usdstT.unpause();
+        admin.castVoteOnIssue(USDST, "unpause");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -312,8 +310,8 @@ contract Describe_Adv_Credit_Guards is Authorizable {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 6b — Ownable.onlyOwner runs the BODY inside try{}; can a failed
-    //      Token.mint / Token.burn be swallowed into castVoteOnIssue?
+    // 6b — FlashMint mints/burns through castVoteOnIssue; can a failed
+    //      Token.mint / Token.burn be swallowed there?
     // ─────────────────────────────────────────────────────────────────────────
 
     /// @notice Revoke the "burn" grant but keep "mint". If the failed burn is swallowed,
@@ -376,14 +374,14 @@ contract Describe_Adv_Credit_Guards is Authorizable {
     ///         facility's token at any time. Record the fact.
     function it_ha_initialize_has_no_once_guard() public {
         address before = fm.token();
-        fm.initialize(USDST, address(m.feeCollector()), 0);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), 0);
         log("6b initialize() re-called successfully. token before/after: "
             + string(before) + " / " + string(fm.token()));
         log("6b re-initialize RESET maxLoan to " + string(fm.maxLoan())
             + " and whitelistEnabled to " + string(fm.whitelistEnabled()));
         require(fm.maxLoan() == 0, "re-initialize resets maxLoan (fails closed)");
-        fm.setMaxLoan(CAP);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "setMaxLoan", CAP);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
     }
 }
 

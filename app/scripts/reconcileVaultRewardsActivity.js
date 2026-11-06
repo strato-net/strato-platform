@@ -299,9 +299,10 @@ const EXPECTED_EVENTS = [
   { eventName: TRANSFER_EVENT, actionType: 3 },
 ];
 const EXPECTED_POSITION_EVENTS = EXPECTED_EVENTS.map((e) => `${e.eventName}:${e.actionType}`).join(",");
-// setPositionActivityEvents argument: the VM wants enum members by name.
+// setPositionActivityEvents argument: enum fields inside struct args go
+// through castVoteOnIssue as ordinals (type hints don't reach struct fields).
 const expectedEventsArgs = () =>
-  EXPECTED_EVENTS.map((e) => ({ eventName: e.eventName, actionType: ACTION_TYPE_NAMES[e.actionType] }));
+  EXPECTED_EVENTS.map((e) => ({ eventName: e.eventName, actionType: e.actionType }));
 const actionableEventsSignature = (config) =>
   config.actionableEvents
     .map((event) => `${event.eventName}:${event.actionType}`)
@@ -597,6 +598,33 @@ const functionTx = (contractName, contractAddress, method, callArgs) => ({
   payload: { contractName, contractAddress, method, args: callArgs },
 });
 
+// Declared parameters of the onlyOwner targets called here, in order.
+const GOVERNED_PARAMS = {
+  setEmissionRate: [["activityId", "uint256"], ["newEmissionRate", "uint256"]],
+  setPositionActivityEvents: [["activityId", "uint256"], ["newActionableEvents", "ActionableEvent[]"]],
+  pause: [],
+  unpause: [],
+  batchHandleAction: [
+    ["sourceContracts", "address[]"], ["eventNames", "string[]"], ["users", "address[]"],
+    ["amounts", "uint256[]"], ["blockNumbers", "uint256[]"], ["eventIndexes", "uint256[]"],
+  ],
+  batchHandleTransfer: [
+    ["sourceContracts", "address[]"], ["eventNames", "string[]"], ["senders", "address[]"],
+    ["recipients", "address[]"], ["amounts", "uint256[]"], ["blockNumbers", "uint256[]"],
+    ["eventIndexes", "uint256[]"],
+  ],
+};
+
+// An onlyOwner call on an AdminRegistry-owned target, routed through
+// AdminRegistry.castVoteOnIssue with positional, type-hinted args: executed
+// at once for a whitelisted caller, recorded as an admin's vote otherwise.
+const governedTx = (contractAddress, method, callArgs) =>
+  functionTx("AdminRegistry", ADMIN_REGISTRY, "castVoteOnIssue", {
+    _target: contractAddress,
+    _func: method,
+    _args: GOVERNED_PARAMS[method].map(([name, type]) => ({ type, value: callArgs[name] })),
+  });
+
 async function sendAndWait(txs, label, identity = "poller") {
   if (!IDENTITIES[identity].token) die(`${label}: authentication as ${identity} is required to send transactions`);
   console.log(`  -> posting ${txs.length} tx(s) as ${identity}: ${label}`);
@@ -664,8 +692,8 @@ async function waitForGovernanceOutcome(transactionHash) {
 }
 
 // A governed call on an onlyOwner target. With admin credentials the call is
-// submitted as the admin, which casts the first vote (the Ownable fallback
-// routes it into AdminRegistry.castVoteOnIssue); then the on-chain effect is
+// submitted as the admin through AdminRegistry.castVoteOnIssue, which casts
+// the first vote; then the on-chain effect is
 // polled until the second admin's vote executes it, the way deploy/upgrade.js
 // waits for IssueExecuted. Without admin credentials the call is announced
 // for the admins to cast in SMD and the effect is polled the same way.
@@ -677,7 +705,7 @@ async function governedCall({ label, contractName, address, method, args, done }
   const call = `${contractName}(${address}).${method}(${JSON.stringify(args)})`;
   if (IDENTITIES.admin.username) {
     await login("admin");
-    const { hashes } = await sendAndWait([functionTx(contractName, address, method, args)], label, "admin");
+    const { hashes } = await sendAndWait([governedTx(address, method, args)], label, "admin");
     // A repeated vote by the same admin emits no governance event, so this
     // wait is bounded instead of fatal.
     let outcome = null;
@@ -706,7 +734,7 @@ async function governedCall({ label, contractName, address, method, args, done }
 
 async function submitPollerBatch(method, callArgs, label) {
   const { hashes } = await sendAndWait(
-    [functionTx("Rewards", REWARDS, method, callArgs)],
+    [governedTx(REWARDS, method, callArgs)],
     label
   );
   const transactionHash = hashes[0];

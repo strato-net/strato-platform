@@ -4,7 +4,7 @@ import {
   getNativeRepresentationBridgeAddress,
 } from "../config";
 import { JsonRpcProvider } from "ethers";
-import { execute } from "../utils/stratoHelper";
+import { execute, executeGoverned } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
 import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
 import {
@@ -244,7 +244,7 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDeposit
   const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
 
   try {
-    await execute({
+    await executeGoverned({
       contractName: "MercataBridge",
       contractAddress: config.bridge.address!,
       method: "confirmDepositBatch",
@@ -327,7 +327,7 @@ export const reviewDepositBatch = async (deposits: NonEmptyArray<ConfirmDepositA
   const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
 
   try {
-    await execute({
+    await executeGoverned({
       contractName: "MercataBridge",
       contractAddress: config.bridge.address!,
       method: "reviewDepositBatch",
@@ -469,7 +469,7 @@ const adoptExistingPayouts = async (existing: Map<string, WithdrawalPayout[]>) =
       `Withdrawal ${withdrawalId} already has Safe payout ${hashes[0]}; recording it instead of proposing another`,
     );
     try {
-      await execute({
+      await executeGoverned({
         contractName: "MercataBridge",
         contractAddress: config.bridge.address!,
         method: "confirmWithdrawalBatch",
@@ -519,7 +519,7 @@ const confirmEligibleWithdrawalBatch = async (
       custodyTxHashes,
     });
     // Resolves only on success; a pending or failed confirmation throws before any payout is proposed
-    await execute({
+    await executeGoverned({
       contractName: "MercataBridge",
       contractAddress: config.bridge.address!,
       method: "confirmWithdrawalBatch",
@@ -639,7 +639,7 @@ export const finaliseWithdrawalBatch = async (
   ids: NonEmptyArray<Number>,
 ) => {
   try {
-    await execute({
+    await executeGoverned({
       contractName: "MercataBridge",
       contractAddress: config.bridge.address!,
       method: "finaliseWithdrawalBatch",

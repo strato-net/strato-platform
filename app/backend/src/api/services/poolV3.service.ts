@@ -6,6 +6,7 @@
 import { cirrus } from "../../utils/appApiHelper";
 import { isMissingTableError } from "../../utils/cirrusErrors";
 import { buildFunctionTx } from "../../utils/txBuilder";
+import { governedInput } from "./user.service";
 import { executeTransaction } from "../../utils/txHelper";
 import * as config from "../../config/config";
 import {
@@ -1644,7 +1645,7 @@ export const createPool = async (
 
   const tx = await buildFunctionTx(
     [
-      {
+      await governedInput(accessToken, {
         contractName: "PoolV3Factory",
         contractAddress: config.poolV3Factory,
         method: "createPoolV3",
@@ -1654,7 +1655,7 @@ export const createPool = async (
           fee: params.fee,
           initialSqrtPriceX96,
         },
-      },
+      }),
     ],
     userAddress,
     accessToken

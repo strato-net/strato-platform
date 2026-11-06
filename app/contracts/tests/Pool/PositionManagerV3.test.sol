@@ -1,7 +1,6 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../concrete/Pools/PoolV3Factory.sol";
 import "../../concrete/Pools/PositionManagerV3.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 
 /*
  * PositionManagerV3 test suite.
@@ -20,7 +19,7 @@ contract User {
     }
 }
 
-contract Describe_PositionManagerV3 is Authorizable {
+contract Describe_PositionManagerV3 {
 
     Mercata m;
     string[] emptyArray;
@@ -38,23 +37,25 @@ contract Describe_PositionManagerV3 is Authorizable {
     uint constant MAX_COLLECT = 340282366920938463463374607431768211456; // 2^128
 
     function beforeAll() {
-        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
         emptyArray = new string[](0);
     }
 
     function beforeEach() {
-        token0Address = m.tokenFactory().createToken(
+        AdminRegistry reg = m.adminRegistry();
+        (bool executed, variadic ret) = reg.castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Token 0", "Test Token 0", emptyArray, emptyArray, emptyArray, "TK0", 10000000e18, 18
         );
-        token1Address = m.tokenFactory().createToken(
+        token0Address = address(ret);
+        (executed, ret) = reg.castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Token 1", "Test Token 1", emptyArray, emptyArray, emptyArray, "TK1", 10000000e18, 18
         );
-        Token(token0Address).setStatus(2); // ACTIVE
-        Token(token1Address).setStatus(2); // ACTIVE
-        Token(token0Address).mint(address(this), BIG);
-        Token(token1Address).mint(address(this), BIG);
+        token1Address = address(ret);
+        reg.castVoteOnIssue(token0Address, "setStatus", 2); // ACTIVE
+        reg.castVoteOnIssue(token1Address, "setStatus", 2); // ACTIVE
+        reg.castVoteOnIssue(token0Address, "mint", address(this), BIG);
+        reg.castVoteOnIssue(token1Address, "mint", address(this), BIG);
 
         factory = new PoolV3Factory(address(this));
         factory.initialize(address(m.tokenFactory()), address(m.feeCollector()));
@@ -96,8 +97,8 @@ contract Describe_PositionManagerV3 is Authorizable {
     /// @dev A user with balances and manager approvals (for managed mints)
     function _newManagedUser() internal returns (User) {
         User u = new User();
-        Token(token0Address).mint(address(u), BIG);
-        Token(token1Address).mint(address(u), BIG);
+        m.adminRegistry().castVoteOnIssue(token0Address, "mint", address(u), BIG);
+        m.adminRegistry().castVoteOnIssue(token1Address, "mint", address(u), BIG);
         u.do(token0Address, "approve", address(manager), BIG);
         u.do(token1Address, "approve", address(manager), BIG);
         return u;
@@ -106,8 +107,8 @@ contract Describe_PositionManagerV3 is Authorizable {
     /// @dev A user with balances and direct-pool approvals on a given pool
     function _newDirectUser(PoolV3 p) internal returns (User) {
         User u = new User();
-        Token(address(p.token0())).mint(address(u), BIG);
-        Token(address(p.token1())).mint(address(u), BIG);
+        m.adminRegistry().castVoteOnIssue(address(p.token0()), "mint", address(u), BIG);
+        m.adminRegistry().castVoteOnIssue(address(p.token1()), "mint", address(u), BIG);
         u.do(address(p.token0()), "approve", address(p), BIG);
         u.do(address(p.token1()), "approve", address(p), BIG);
         return u;
@@ -116,16 +117,19 @@ contract Describe_PositionManagerV3 is Authorizable {
     /// @dev Fresh pair + pool with the same tier/price as the primary pool, for differential
     ///      (manager vs direct) comparisons
     function _createMirrorPool() internal returns (PoolV3) {
-        address t0 = m.tokenFactory().createToken(
+        AdminRegistry reg = m.adminRegistry();
+        (bool executed, variadic ret) = reg.castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Mirror 0", "Mirror Token 0", emptyArray, emptyArray, emptyArray, "MR0", 10000000e18, 18
         );
-        address t1 = m.tokenFactory().createToken(
+        address t0 = address(ret);
+        (executed, ret) = reg.castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Mirror 1", "Mirror Token 1", emptyArray, emptyArray, emptyArray, "MR1", 10000000e18, 18
         );
-        Token(t0).setStatus(2);
-        Token(t1).setStatus(2);
-        Token(t0).mint(address(this), BIG);
-        Token(t1).mint(address(this), BIG);
+        address t1 = address(ret);
+        reg.castVoteOnIssue(t0, "setStatus", 2);
+        reg.castVoteOnIssue(t1, "setStatus", 2);
+        reg.castVoteOnIssue(t0, "mint", address(this), BIG);
+        reg.castVoteOnIssue(t1, "mint", address(this), BIG);
         return PoolV3(factory.createPoolV3(t0, t1, 3000, Q96));
     }
 

@@ -1,7 +1,6 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/ERC20.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC4626/ERC4626.sol";
 import "../../concrete/Tokens/Token.sol";
 
@@ -26,7 +25,7 @@ contract record TestVault is ERC4626 {
     }
 }
 
-contract Describe_ERC4626 is Authorizable {
+contract Describe_ERC4626 {
     uint public INFINITY = 2 ** 256 - 1;
 
     Mercata m;
@@ -34,15 +33,15 @@ contract Describe_ERC4626 is Authorizable {
     address assetToken;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
     }
 
     function beforeEach() public {
         vault = new TestVault();
-        assetToken = m.tokenFactory().createToken("Asset", "Test Asset Token", [], [], [], "ASSET", 0, 18);
-        Token(assetToken).setStatus(2);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "Asset", "Test Asset Token", [], [], [], "ASSET", 0, 18);
+        assetToken = address(ret);
+        m.adminRegistry().castVoteOnIssue(assetToken, "setStatus", 2);
         vault.initialize(assetToken, "Test Vault Shares", "tvSHARE");
     }
 
@@ -61,7 +60,7 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_2_totalAssets_increases_after_deposit() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
@@ -70,7 +69,7 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_2_totalAssets_decreases_after_withdraw() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
@@ -81,11 +80,11 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_2_totalAssets_includes_donated_assets() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
-        Token(assetToken).mint(address(vault), 50e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(vault), 50e18);
 
         require(vault.totalAssets() == 150e18, "totalAssets should include direct donations");
     }
@@ -94,7 +93,7 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_3_initial_deposit_mints_one_to_one() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
@@ -111,12 +110,12 @@ contract Describe_ERC4626 is Authorizable {
         User alice = new User();
         User bob = new User();
 
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
         // Donate to make rate non-trivial: 100 shares, 150 assets -> 1 share ≈ 1.5 assets
-        Token(assetToken).mint(address(vault), 50e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(vault), 50e18);
 
         uint sharesFromAlice = vault.convertToShares(100e18);
         uint sharesFromBob = vault.convertToShares(100e18);
@@ -136,12 +135,12 @@ contract Describe_ERC4626 is Authorizable {
         User alice = new User();
         User bob = new User();
 
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
         // Donate to make 1 share > 1 asset
-        Token(assetToken).mint(address(vault), 50e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(vault), 50e18);
 
         uint assetsFromAlice = vault.convertToAssets(100e18);
         uint assetsFromBob = vault.convertToAssets(100e18);
@@ -159,14 +158,14 @@ contract Describe_ERC4626 is Authorizable {
     function it_6_previewDeposit_matches_deposit() public {
         // Seed vault with non-trivial rate
         User seed = new User();
-        Token(assetToken).mint(address(seed), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(seed), 100e18);
         seed.do(assetToken, "approve", address(vault), INFINITY);
         seed.do(address(vault), "deposit(uint256,address)", 100e18, address(seed));
-        Token(assetToken).mint(address(vault), 50e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(vault), 50e18);
 
         // Preview then execute
         User alice = new User();
-        Token(assetToken).mint(address(alice), 80e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 80e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
 
         uint previewShares = vault.previewDeposit(80e18);
@@ -181,13 +180,13 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_7_previewMint_matches_mint() public {
         User seed = new User();
-        Token(assetToken).mint(address(seed), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(seed), 100e18);
         seed.do(assetToken, "approve", address(vault), INFINITY);
         seed.do(address(vault), "deposit(uint256,address)", 100e18, address(seed));
-        Token(assetToken).mint(address(vault), 50e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(vault), 50e18);
 
         User alice = new User();
-        Token(assetToken).mint(address(alice), 200e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 200e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
 
         uint previewAssets = vault.previewMint(50e18);
@@ -205,10 +204,10 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_8_previewWithdraw_matches_withdraw() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
-        Token(assetToken).mint(address(vault), 50e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(vault), 50e18);
 
         uint previewShares = vault.previewWithdraw(30e18);
         uint sharesBefore = IERC20(address(vault)).balanceOf(address(alice));
@@ -224,10 +223,10 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_9_previewRedeem_matches_redeem() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
-        Token(assetToken).mint(address(vault), 50e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(vault), 50e18);
 
         uint previewAssets = vault.previewRedeem(40e18);
         uint assetsBefore = IERC20(assetToken).balanceOf(address(alice));
@@ -243,7 +242,7 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_10_deposit_transfers_assets_mints_shares() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 200e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 200e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
 
         uint aliceAssetsBefore = IERC20(assetToken).balanceOf(address(alice));
@@ -268,14 +267,14 @@ contract Describe_ERC4626 is Authorizable {
     function it_11_mint_transfers_quoted_assets_mints_exact_shares() public {
         // Seed vault
         User seed = new User();
-        Token(assetToken).mint(address(seed), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(seed), 100e18);
         seed.do(assetToken, "approve", address(vault), INFINITY);
         seed.do(address(vault), "deposit(uint256,address)", 100e18, address(seed));
-        Token(assetToken).mint(address(vault), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(vault), 100e18);
 
         // Alice mints exact shares
         User alice = new User();
-        Token(assetToken).mint(address(alice), 500e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 500e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
 
         uint aliceAssetsBefore = IERC20(assetToken).balanceOf(address(alice));
@@ -294,7 +293,7 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_12_withdraw_burns_shares_sends_exact_assets() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
@@ -318,7 +317,7 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_13_redeem_burns_exact_shares_sends_assets() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
@@ -341,7 +340,7 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_14_owner_can_withdraw_without_allowance() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
@@ -354,7 +353,7 @@ contract Describe_ERC4626 is Authorizable {
         User owner = new User();
         User spender = new User();
 
-        Token(assetToken).mint(address(owner), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(owner), 100e18);
         owner.do(assetToken, "approve", address(vault), INFINITY);
         owner.do(address(vault), "deposit(uint256,address)", 100e18, address(owner));
 
@@ -374,7 +373,7 @@ contract Describe_ERC4626 is Authorizable {
         User owner = new User();
         User spender = new User();
 
-        Token(assetToken).mint(address(owner), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(owner), 100e18);
         owner.do(assetToken, "approve", address(vault), INFINITY);
         owner.do(address(vault), "deposit(uint256,address)", 100e18, address(owner));
 
@@ -393,7 +392,7 @@ contract Describe_ERC4626 is Authorizable {
         User owner = new User();
         User spender = new User();
 
-        Token(assetToken).mint(address(owner), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(owner), 100e18);
         owner.do(assetToken, "approve", address(vault), INFINITY);
         owner.do(address(vault), "deposit(uint256,address)", 100e18, address(owner));
 
@@ -418,7 +417,7 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_15_max_withdraw_and_max_redeem_track_owner() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
@@ -435,7 +434,7 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_15_cannot_withdraw_more_than_max() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
@@ -451,7 +450,7 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_15_cannot_redeem_more_than_max() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
@@ -467,7 +466,7 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_16_previews_are_independent_of_caller_balance_and_allowance() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
@@ -487,7 +486,7 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_17_exchange_rate_rises_after_yield() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
@@ -495,7 +494,7 @@ contract Describe_ERC4626 is Authorizable {
         require(vault.convertToAssets(1e18) >= 999999999999999999, "pre-yield: 1 share ≈ 1 asset");
 
         // Simulate yield: donate 100 assets
-        Token(assetToken).mint(address(vault), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(vault), 100e18);
 
         // Post-yield: 100 shares, 200 assets -> 1 share ≈ 2 assets
         require(vault.totalAssets() == 200e18, "totalAssets should include yield");
@@ -506,7 +505,7 @@ contract Describe_ERC4626 is Authorizable {
 
         // New depositor gets fewer shares per asset
         User bob = new User();
-        Token(assetToken).mint(address(bob), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(bob), 100e18);
         bob.do(assetToken, "approve", address(vault), INFINITY);
         bob.do(address(vault), "deposit(uint256,address)", 100e18, address(bob));
 
@@ -519,12 +518,12 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_18_tiny_deposit_on_shifted_rate() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
         // Double the rate
-        Token(assetToken).mint(address(vault), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(vault), 100e18);
 
         // 1 wei deposit at 2:1 rate => shares = floor(1 * (100e18+1) / (200e18+1)) = 0
         // Deposit of 0 shares still executes (no revert in base ERC4626) but mints nothing.
@@ -534,7 +533,7 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_18_tiny_redeem_returns_proportional_assets() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
@@ -550,12 +549,12 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_18_mint_does_not_undercharge_assets() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
         // Donate to shift rate
-        Token(assetToken).mint(address(vault), 50e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(vault), 50e18);
 
         // previewMint rounds UP (Ceil), so minting 1 share should cost at least 1.5 assets
         uint costFor1Share = vault.previewMint(1);
@@ -568,12 +567,12 @@ contract Describe_ERC4626 is Authorizable {
 
     function it_18_withdraw_does_not_under_burn_shares() public {
         User alice = new User();
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
         // Donate to shift rate
-        Token(assetToken).mint(address(vault), 50e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(vault), 50e18);
 
         // previewWithdraw rounds UP (Ceil), so withdrawing 1 asset burns at least ceil(1 share at 1.5x rate)
         uint sharesBurned = vault.previewWithdraw(1e18);
@@ -588,15 +587,15 @@ contract Describe_ERC4626 is Authorizable {
         User bob = new User();
 
         // Alice deposits 100 at 1:1
-        Token(assetToken).mint(address(alice), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 100e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
         // Yield accrues: +100 donated
-        Token(assetToken).mint(address(vault), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(vault), 100e18);
 
         // Bob deposits 100 at 2:1 rate -> gets ~50 shares
-        Token(assetToken).mint(address(bob), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(bob), 100e18);
         bob.do(assetToken, "approve", address(vault), INFINITY);
         bob.do(address(vault), "deposit(uint256,address)", 100e18, address(bob));
 
@@ -632,9 +631,9 @@ contract Describe_ERC4626 is Authorizable {
         User bob = new User();
         User charlie = new User();
 
-        Token(assetToken).mint(address(alice), 500e18);
-        Token(assetToken).mint(address(bob), 500e18);
-        Token(assetToken).mint(address(charlie), 500e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(alice), 500e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(bob), 500e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(charlie), 500e18);
         alice.do(assetToken, "approve", address(vault), INFINITY);
         bob.do(assetToken, "approve", address(vault), INFINITY);
         charlie.do(assetToken, "approve", address(vault), INFINITY);
@@ -666,7 +665,7 @@ contract Describe_ERC4626 is Authorizable {
         require(vault.totalSupply() == 160e18, "S2: supply is 160");
 
         // --- Step 3: Yield arrives (+40), rate shifts to 200/160 = 1.25 ---
-        Token(assetToken).mint(address(vault), 40e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(vault), 40e18);
         require(vault.totalAssets() == 200e18, "S3: vault holds 200 after yield");
         require(vault.totalSupply() == 160e18, "S3: supply unchanged at 160");
 
@@ -709,7 +708,7 @@ contract Describe_ERC4626 is Authorizable {
         require(bobAssetsGot6 > 20e18, "S6: rate > 1:1 so bob gets more than 20 assets per 20 shares");
 
         // --- Step 7: More yield (+50) ---
-        Token(assetToken).mint(address(vault), 50e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(vault), 50e18);
         uint totalAssetsS7 = vault.totalAssets();
         require(totalAssetsS7 == 250e18 - bobAssetsGot6 + 50e18, "S7: vault assets reflect withdrawal + new yield");
 
@@ -762,7 +761,7 @@ contract Describe_ERC4626 is Authorizable {
         User victim = new User();
 
         // Attacker front-runs: deposit 1 wei, then donate a large amount
-        Token(assetToken).mint(address(attacker), 10001e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(attacker), 10001e18);
         attacker.do(assetToken, "approve", address(vault), INFINITY);
         attacker.do(address(vault), "deposit(uint256,address)", 1, address(attacker));
 
@@ -774,7 +773,7 @@ contract Describe_ERC4626 is Authorizable {
         require(vault.totalAssets() == 10000e18 + 1, "donation should inflate totalAssets");
 
         // Victim deposits
-        Token(assetToken).mint(address(victim), 10000e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(victim), 10000e18);
         victim.do(assetToken, "approve", address(vault), INFINITY);
         victim.do(address(vault), "deposit(uint256,address)", 10000e18, address(victim));
 
@@ -794,13 +793,13 @@ contract Describe_ERC4626 is Authorizable {
         User victim = new User();
 
         // Attacker: deposit tiny, donate big
-        Token(assetToken).mint(address(attacker), 101e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(attacker), 101e18);
         attacker.do(assetToken, "approve", address(vault), INFINITY);
         attacker.do(address(vault), "deposit(uint256,address)", 1e18, address(attacker));
         attacker.do(assetToken, "transfer", address(vault), 100e18);
 
         // Victim deposits same amount as donation
-        Token(assetToken).mint(address(victim), 100e18);
+        m.adminRegistry().castVoteOnIssue(assetToken, "mint", address(victim), 100e18);
         victim.do(assetToken, "approve", address(vault), INFINITY);
         victim.do(address(vault), "deposit(uint256,address)", 100e18, address(victim));
 
@@ -827,12 +826,13 @@ contract Describe_ERC4626 is Authorizable {
         uint amount = (seed % 1000000 + 1) * 1e12;
 
         TestVault v = new TestVault();
-        address tkn = m.tokenFactory().createToken("PR", "PropRT", [], [], [], "PR", 0, 18);
-        Token(tkn).setStatus(2);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "PR", "PropRT", [], [], [], "PR", 0, 18);
+        address tkn = address(ret);
+        m.adminRegistry().castVoteOnIssue(tkn, "setStatus", 2);
         v.initialize(tkn, "PV", "PV");
 
         User u = new User();
-        Token(tkn).mint(address(u), amount);
+        m.adminRegistry().castVoteOnIssue(tkn, "mint", address(u), amount);
         u.do(tkn, "approve", address(v), INFINITY);
         u.do(address(v), "deposit(uint256,address)", amount, address(u));
 
@@ -853,22 +853,23 @@ contract Describe_ERC4626 is Authorizable {
         uint yieldAmt = ((seedYield % 100000) + 1) * 1e12;
 
         TestVault v = new TestVault();
-        address tkn = m.tokenFactory().createToken("PY", "PropYield", [], [], [], "PY", 0, 18);
-        Token(tkn).setStatus(2);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "PY", "PropYield", [], [], [], "PY", 0, 18);
+        address tkn = address(ret);
+        m.adminRegistry().castVoteOnIssue(tkn, "setStatus", 2);
         v.initialize(tkn, "PV", "PV");
 
         User alice = new User();
         User bob = new User();
 
-        Token(tkn).mint(address(alice), amountA);
+        m.adminRegistry().castVoteOnIssue(tkn, "mint", address(alice), amountA);
         alice.do(tkn, "approve", address(v), INFINITY);
         alice.do(address(v), "deposit(uint256,address)", amountA, address(alice));
 
-        Token(tkn).mint(address(bob), amountB);
+        m.adminRegistry().castVoteOnIssue(tkn, "mint", address(bob), amountB);
         bob.do(tkn, "approve", address(v), INFINITY);
         bob.do(address(v), "deposit(uint256,address)", amountB, address(bob));
 
-        Token(tkn).mint(address(v), yieldAmt);
+        m.adminRegistry().castVoteOnIssue(tkn, "mint", address(v), yieldAmt);
 
         uint aliceShares = IERC20(address(v)).balanceOf(address(alice));
         alice.do(address(v), "redeem(uint256,address,address)", aliceShares, address(alice), address(alice));
@@ -892,18 +893,19 @@ contract Describe_ERC4626 is Authorizable {
         uint initialDeposit = ((seed % 500000) + 1) * 1e12;
 
         TestVault v = new TestVault();
-        address tkn = m.tokenFactory().createToken("PC", "PropConv", [], [], [], "PC", 0, 18);
-        Token(tkn).setStatus(2);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "PC", "PropConv", [], [], [], "PC", 0, 18);
+        address tkn = address(ret);
+        m.adminRegistry().castVoteOnIssue(tkn, "setStatus", 2);
         v.initialize(tkn, "PV", "PV");
 
         User u = new User();
-        Token(tkn).mint(address(u), initialDeposit);
+        m.adminRegistry().castVoteOnIssue(tkn, "mint", address(u), initialDeposit);
         u.do(tkn, "approve", address(v), INFINITY);
         u.do(address(v), "deposit(uint256,address)", initialDeposit, address(u));
 
         uint yieldAmt = ((seed % 100000)) * 1e12;
         if (yieldAmt > 0) {
-            Token(tkn).mint(address(v), yieldAmt);
+            m.adminRegistry().castVoteOnIssue(tkn, "mint", address(v), yieldAmt);
         }
 
         uint testShares = 1e18;

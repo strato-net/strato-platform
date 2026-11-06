@@ -1,5 +1,6 @@
 import "./LendingRegistry.sol";
 import "../Tokens/Token.sol";
+import "../Admin/AdminRegistry.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 
@@ -63,7 +64,7 @@ contract record LiquidityPool is Ownable  {
         require(IERC20(asset).transferFrom(user, address(this), amount), "Transfer failed");
 
         // Mint calculated amount of mTokens to the user
-        mToken.mint(user, mintAmount);
+        AdminRegistry(mToken.owner()).castVoteOnIssue(address(mToken), "mint", user, mintAmount);
 
         emit Deposited(user, amount, mintAmount);
     }
@@ -78,7 +79,7 @@ contract record LiquidityPool is Ownable  {
         require(IERC20(asset).transferFrom(depositor, address(this), amount), "Transfer failed");
 
         // Mint calculated amount of mTokens to the recipient
-        mToken.mint(recipient, mintAmount);
+        AdminRegistry(mToken.owner()).castVoteOnIssue(address(mToken), "mint", recipient, mintAmount);
 
         emit DepositedOnBehalfOf(depositor, recipient, amount, mintAmount);
         emit Deposited(recipient, amount, mintAmount); // Recipient gets credit for the deposit
@@ -103,7 +104,7 @@ contract record LiquidityPool is Ownable  {
         require(underlyingAmount <= cashForLPs, "Insufficient liquidity (excl reserves)");
 
         // Burn mTokens from user first
-        mToken.burn(user, mTokenAmount);
+        AdminRegistry(mToken.owner()).castVoteOnIssue(address(mToken), "burn", user, mTokenAmount);
 
         // Transfer exact underlying amount to user
         require(IERC20(asset).transfer(user, underlyingAmount), "Withdraw failed");

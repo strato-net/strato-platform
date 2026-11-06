@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   Check,
+  Clock,
   Vote,
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -50,7 +51,6 @@ import { SimulateButton } from "@/components/simulation/SimulateButton";
 import { SimulationResultPanel } from "@/components/simulation/SimulationResultPanel";
 import type { UserWallet } from "@/services/userWallets";
 import {
-  useAdminRegistryLogic,
   useIsMultisig,
   useSigners,
   useVotingThresholds,
@@ -62,7 +62,7 @@ import {
   multisigDisplayName,
   votesNeeded,
   strip0x,
-  isZeroAddr,
+  MAX_TIMELOCK_DELAY,
   type OpenIssue,
 } from "@/services/multisig";
 
@@ -84,6 +84,17 @@ function humanBalance(t: TokenBalance): string {
   return safeFormatUnits(t.balance, t.decimals);
 }
 
+/** A duration in seconds as "2d 4h", "3h 20m", "45m" or "30s". */
+function formatDuration(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d) return h ? `${d}d ${h}h` : `${d}d`;
+  if (h) return m ? `${h}h ${m}m` : `${h}h`;
+  return m ? `${m}m` : `${s}s`;
+}
+
 /** Human-readable label + canonical args for a governance issue's function. */
 function describeIssue(func: string, args: string[]): { label: string; canonical: string[] } {
   const a0 = args[0] ?? "";
@@ -100,6 +111,15 @@ function describeIssue(func: string, args: string[]): { label: string; canonical
     case "setDefaultVotingThresholdBps":
       // Label is rendered as "M of N" by labelForIssue (needs the signer count).
       return { label: "Set approval threshold", canonical: [String(Number(a0) || 0)] };
+    case "setTimelockDelay": {
+      const seconds = Number(a0) || 0;
+      return {
+        label: seconds ? `Set timelock delay to ${formatDuration(seconds)}` : "Turn off the timelock",
+        canonical: [String(seconds)],
+      };
+    }
+    case "cancelIssue":
+      return { label: `Cancel queued issue ${shortenHex(a0, 8, 6)}`, canonical: [a0] };
     case "transferOwnership":
       return { label: `Transfer ownership → ${shortenHex(a0, 6, 4)}`, canonical: [strip0x(a0)] };
     case "setLogicContract":
@@ -286,18 +306,17 @@ function EnablePanel({
   partiallyEnabled: boolean;
 }) {
   const { userAddress } = useUser();
-  const { canSubmit } = useSubmitTransaction();
+  const { canSubmit, isAppAuthenticated } = useSubmitTransaction();
   const queryClient = useQueryClient();
-  const { logic: adminLogic, isLoading: logicLoading } = useAdminRegistryLogic();
   const { config, selfOwned, initialized } = useIsMultisig(wallet.address);
-  const { enableMultisig } = useMultisigActions({ walletAddress: wallet.address });
+  const { ensureMultisigLogic, enableMultisig } = useMultisigActions({ walletAddress: wallet.address });
 
   const me = strip0x(userAddress ?? "");
   const [extra, setExtra] = useState<{ text: string; addr: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState("");
 
-  const logicSet = !isZeroAddr(config.logicContract) && eq(config.logicContract, adminLogic);
+  const logicSet = config.runsMultisigLogic;
 
   const run = async () => {
     if (!me) {
@@ -314,7 +333,10 @@ function EnablePanel({
     const signers = [me, ...extra.map((e) => e.addr).filter(Boolean)];
     setBusy(true);
     try {
-      await enableMultisig(adminLogic, signers, { logicSet, initialized, selfOwned });
+      const logic = logicSet
+        ? config.logicContract
+        : await ensureMultisigLogic(isAppAuthenticated ? undefined : wallet.username);
+      await enableMultisig(logic, signers, { logicSet, initialized, selfOwned });
       queryClient.invalidateQueries({ queryKey: ["multisig-config", wallet.address] });
       queryClient.invalidateQueries({ queryKey: ["multisig-signers", wallet.address] });
       toast.success("Multisig enabled", {
@@ -335,8 +357,8 @@ function EnablePanel({
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Finish enabling</AlertTitle>
           <AlertDescription>
-            This wallet already delegates to the AdminRegistry logic but isn't fully locked
-            yet. Running the remaining steps below will complete setup.
+            This wallet already delegates to multisig logic but isn't fully locked yet.
+            Running the remaining steps below will complete setup.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -345,7 +367,8 @@ function EnablePanel({
         <p>Enabling multisig runs up to three transactions on this wallet:</p>
         <ol className="ml-4 list-decimal space-y-1">
           <li className={logicSet ? "line-through" : ""}>
-            Point the wallet's logic contract at the AdminRegistry governance logic.
+            Point the wallet's logic contract at the Multisig logic (deployed first if this
+            network doesn't have it yet).
           </li>
           <li className={initialized ? "line-through" : ""}>Set the initial signer(s).</li>
           <li className={selfOwned ? "line-through" : ""}>
@@ -413,7 +436,7 @@ function EnablePanel({
 
       <Button
         onClick={run}
-        disabled={busy || logicLoading || !canSubmit || !me}
+        disabled={busy || !canSubmit || !me}
         className="w-full"
       >
         {busy ? step || "Working…" : partiallyEnabled ? "Finish enabling" : "Enable multisig"}
@@ -438,6 +461,7 @@ function EnabledView({ wallet, route }: { wallet: UserWallet; route?: UserWallet
   );
   return (
     <>
+      <UpgradeLogicPanel wallet={wallet} fullRoute={fullRoute} />
       <MemberOfPanel fullRoute={fullRoute} />
       <Tabs defaultValue={fullRoute.length > 1 ? "issues" : "treasury"} className="mt-1">
       <TabsList className="grid w-full grid-cols-4">
@@ -460,6 +484,59 @@ function EnabledView({ wallet, route }: { wallet: UserWallet; route?: UserWallet
       </TabsContent>
       </Tabs>
     </>
+  );
+}
+
+/**
+ * User wallets enabled before the Multisig logic existed run the AdminRegistry logic,
+ * which keeps counting votes from replaced signers and lets whitelisted accounts act
+ * without a vote. Offer their signers a vote to switch; signers, threshold and funds
+ * stay. Registries without a username (the global 0x100c) keep their logic.
+ */
+function UpgradeLogicPanel({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserWallet[] }) {
+  const { userAddress } = useUser();
+  const { canSubmit } = useSubmitTransaction();
+  const queryClient = useQueryClient();
+  const { config, isLoading } = useIsMultisig(wallet.address);
+  const { data: signers = [] } = useSigners(wallet.address);
+  const { ensureMultisigLogic, castVote } = useMultisigActions({
+    walletAddress: wallet.address,
+    route: fullRoute.map((w) => w.address),
+  });
+  const [busy, setBusy] = useState(false);
+  const canVote = fullRoute.length > 1 || signers.some((s) => eq(s, userAddress ?? ""));
+  if (!wallet.username || isLoading || config.runsMultisigLogic || !canVote) return null;
+
+  const propose = async () => {
+    setBusy(true);
+    try {
+      await castVote("setLogicContract", [await ensureMultisigLogic()]);
+      queryClient.invalidateQueries({ queryKey: ["multisig-open-issues", wallet.address] });
+      toast.success("Upgrade proposed", {
+        description: "It runs once enough signers vote for it under Issues.",
+      });
+    } catch (err: any) {
+      toast.error("Upgrade proposal failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Alert className="mb-3">
+      <AlertTriangle className="h-4 w-4" />
+      <AlertTitle>Older multisig logic</AlertTitle>
+      <AlertDescription className="space-y-2">
+        <p>
+          This wallet runs the AdminRegistry logic, which keeps counting votes from signers who
+          have since been replaced and lets whitelisted accounts act without a vote. Switching
+          to the Multisig logic keeps its signers, threshold and funds.
+        </p>
+        <Button size="sm" onClick={propose} disabled={busy || !canSubmit}>
+          {busy ? "Proposing…" : "Propose upgrade"}
+        </Button>
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -517,7 +594,7 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
   const { config } = useIsMultisig(wallet.address);
   const { data: signers = [] } = useSigners(wallet.address);
   const nested = fullRoute.length > 1;
-  const { addSigner, removeSigner, setDefaultThreshold } = useMultisigActions({
+  const { addSigner, removeSigner, setDefaultThreshold, setTimelockDelay } = useMultisigActions({
     walletAddress: wallet.address,
     route: fullRoute.map((w) => w.address),
   });
@@ -532,9 +609,11 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
   const [newSigner, setNewSigner] = useState("");
   const [newSignerAddr, setNewSignerAddr] = useState("");
   const [targetM, setTargetM] = useState<number | null>(null);
+  const [delayHours, setDelayHours] = useState("");
   const [busy, setBusy] = useState<string>("");
 
   const selectedM = Math.min(Math.max(targetM ?? needed, 1), Math.max(1, signerCount));
+  const delaySeconds = delayHours.trim() === "" ? null : Math.round(Number(delayHours) * 3600);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["multisig-signers", wallet.address] });
@@ -613,6 +692,27 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
     }
   };
 
+  const doDelay = async () => {
+    if (!guard() || delaySeconds === null) return;
+    if (!Number.isFinite(delaySeconds) || delaySeconds < 0 || delaySeconds > MAX_TIMELOCK_DELAY) {
+      toast.error(`The delay must be between 0 and ${MAX_TIMELOCK_DELAY / 3600} hours`);
+      return;
+    }
+    setBusy("delay");
+    try {
+      await setTimelockDelay(delaySeconds);
+      toast.success("Vote cast to change the timelock", {
+        description: `Proposing ${delaySeconds ? formatDuration(delaySeconds) : "no delay"}. Takes effect once the threshold is met${config.timelockDelay ? " and the current delay is up" : ""}.`,
+      });
+      setDelayHours("");
+      invalidate();
+    } catch (err: any) {
+      toast.error("Failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy("");
+    }
+  };
+
   return (
     <div className="space-y-5">
       {!iAmSigner && nested ? (
@@ -664,6 +764,41 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
           </Button>
         </div>
       </div>
+
+      {/* Timelock delay: only the Multisig logic has one */}
+      {config.runsMultisigLogic ? (
+        <div className="rounded-lg border border-border p-3">
+          <div className="text-sm font-medium">Timelock</div>
+          <div className="text-xs text-muted-foreground">
+            {config.timelockDelay
+              ? `Passed issues wait ${formatDuration(config.timelockDelay)} before anyone can execute them; signers can vote to cancel them meanwhile`
+              : "Off: passed issues execute at once"}
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <Input
+              type="number"
+              min={0}
+              max={MAX_TIMELOCK_DELAY / 3600}
+              step="any"
+              value={delayHours}
+              onChange={(e) => setDelayHours(e.target.value)}
+              placeholder={String(config.timelockDelay / 3600)}
+              aria-label="Timelock delay in hours"
+              className="w-28"
+            />
+            <span className="text-sm text-muted-foreground">hours</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={doDelay}
+              disabled={busy !== "" || !canSubmit || !canVote || delaySeconds === null || delaySeconds === config.timelockDelay}
+              className="ml-auto"
+            >
+              {busy === "delay" ? "Voting…" : "Propose change"}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Signer list */}
       <div className="space-y-2">
@@ -738,7 +873,9 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
   const queryClient = useQueryClient();
   const { config } = useIsMultisig(wallet.address);
   const { data: signers = [] } = useSigners(wallet.address);
-  const { data: issues = [], isLoading, error: issuesError, refetch, isFetching } = useOpenIssues(wallet.address);
+  const { data: issues = [], isLoading, error: issuesError, refetch, isFetching, dataUpdatedAt } = useOpenIssues(wallet.address);
+  // Queue countdowns advance with the 3-second issue refresh
+  const now = Math.floor(dataUpdatedAt / 1000);
   const { data: thresholds = {} } = useVotingThresholds(wallet.address);
   const tokenMeta = useTokenMeta(wallet.address);
   const nested = fullRoute.length > 1;
@@ -750,6 +887,8 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
     swapSigner,
     setDefaultThreshold,
     dismissIssue,
+    executeIssue,
+    cancelIssue,
     proposeTransfer,
   } = useMultisigActions({ walletAddress: wallet.address, route: routeAddrs });
   const issueSim = useSimulation();
@@ -845,6 +984,34 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
     }
   };
 
+  const execute = async (issue: OpenIssue) => {
+    setBusy(`${issue.issueId}:execute`);
+    try {
+      await executeIssue({ ...issue, args: describeIssue(issue.func, issue.args).canonical });
+      toast.success("Issue executed");
+      invalidate();
+    } catch (err: any) {
+      toast.error("Execute failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const cancel = async (issue: OpenIssue) => {
+    setBusy(`${issue.issueId}:cancel`);
+    try {
+      await cancelIssue(issue.issueId);
+      toast.success(nested ? `Cancel proposed in ${viaName}` : "Vote cast to cancel", {
+        description: "The cancel runs as soon as enough signers vote for it, without waiting out the timelock.",
+      });
+      invalidate();
+    } catch (err: any) {
+      toast.error("Cancel failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy("");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -902,16 +1069,23 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
         <div className="space-y-3">
           {issues.map((issue) => {
         const label = labelForIssue(issue, tokenMeta, signers.length);
-        const count = issue.voters.length;
-        const needed = votesNeeded(signers.length,
-          thresholds[`${issue.target}|${issue.func}`] || config.defaultThresholdBps || 6000);
+        const count = issue.invalidated ? 0 : issue.voters.length;
+        // The Multisig logic has one threshold, except that handing the wallet to a new
+        // owner takes every signer
+        const bps = (!config.runsMultisigLogic && thresholds[`${issue.target}|${issue.func}`]) ||
+          config.defaultThresholdBps || 6000;
+        const unanimous = config.runsMultisigLogic && issue.func === "transferOwnership" &&
+          eq(issue.target, wallet.address);
+        const needed = unanimous ? signers.length : votesNeeded(signers.length, bps);
         const remaining = Math.max(0, needed - count);
-        const iVoted = issue.voters.some((v) => eq(v, voterAddr));
+        const iVoted = !issue.invalidated && issue.voters.some((v) => eq(v, voterAddr));
         const pct = needed > 0 ? Math.min(100, (count / needed) * 100) : 0;
+        const queued = issue.queued;
+        const ready = !!queued && now >= queued.executableAt && now <= queued.expiresAt;
         // Mirrors the contract's dismissIssue gate: a single vote, cast by the caller.
-        const canDismiss = count === 1 && eq(issue.voters[0], me);
+        const canDismiss = issue.voters.length === 1 && eq(issue.voters[0], me);
         const dismissHint =
-          count !== 1
+          issue.voters.length !== 1
             ? "Only issues with a single vote can be dismissed"
             : !canDismiss
               ? "Only the proposer can dismiss this issue"
@@ -929,7 +1103,31 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {issueSim.canSimulate && canVote ? (
+                {queued ? (
+                  <>
+                    {canVote ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => cancel(issue)}
+                        disabled={busy !== "" || !canSubmit}
+                        title="Proposes cancelling this issue; the cancel runs as soon as it passes"
+                        className="text-destructive hover:text-destructive"
+                      >
+                        {busy === `${issue.issueId}:cancel` ? "Voting…" : nested ? `Cancel via ${viaName}` : "Cancel"}
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      onClick={() => execute(issue)}
+                      disabled={busy !== "" || !canSubmit || !ready}
+                      title={ready ? "Anyone can execute a queued issue once its delay is up" : "Not executable now"}
+                    >
+                      {busy === `${issue.issueId}:execute` ? "Executing…" : "Execute"}
+                    </Button>
+                  </>
+                ) : null}
+                {!queued && issueSim.canSimulate && canVote ? (
                   <SimulateButton
                     onClick={() => simulateVote(issue)}
                     pending={issueSim.pending && simFor === issue.issueId}
@@ -937,7 +1135,7 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
                     label="Simulate"
                   />
                 ) : null}
-                {iAmSigner ? (
+                {!queued && iAmSigner ? (
                   <Button
                     size="sm"
                     variant="outline"
@@ -949,39 +1147,57 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
                     {busy === `${issue.issueId}:dismiss` ? "Dismissing…" : "Dismiss"}
                   </Button>
                 ) : null}
-                <Button
-                  size="sm"
-                  onClick={() => vote(issue)}
-                  disabled={busy !== "" || !canSubmit || !canVote || iVoted}
-                  title={
-                    nested
-                      ? `Casts your vote in ${viaName}; it arrives here through the membership chain.`
-                      : undefined
-                  }
-                >
-                  {iVoted ? (
-                    <span className="inline-flex items-center gap-1">
-                      <Check className="h-3.5 w-3.5" /> {nested ? "Chain voted" : "Voted"}
-                    </span>
-                  ) : busy === issue.issueId ? (
-                    "Voting…"
-                  ) : nested ? (
-                    `Vote via ${viaName}`
-                  ) : (
-                    "Vote"
-                  )}
-                </Button>
+                {!queued ? (
+                  <Button
+                    size="sm"
+                    onClick={() => vote(issue)}
+                    disabled={busy !== "" || !canSubmit || !canVote || iVoted}
+                    title={
+                      nested
+                        ? `Casts your vote in ${viaName}; it arrives here through the membership chain.`
+                        : undefined
+                    }
+                  >
+                    {iVoted ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Check className="h-3.5 w-3.5" /> {nested ? "Chain voted" : "Voted"}
+                      </span>
+                    ) : busy === issue.issueId ? (
+                      "Voting…"
+                    ) : nested ? (
+                      `Vote via ${viaName}`
+                    ) : (
+                      "Vote"
+                    )}
+                  </Button>
+                ) : null}
               </div>
             </div>
             <div className="mt-3">
               <Progress value={pct} className="h-1.5" />
               <div className="mt-1 text-xs text-muted-foreground">
                 {count} of {needed} approvals · {needed} of {signers.length} signers required
-                {remaining > 0 ? ` · ${remaining} more approval${remaining === 1 ? "" : "s"} needed` : ""}
+                {!queued && remaining > 0 ? ` · ${remaining} more approval${remaining === 1 ? "" : "s"} needed` : ""}
                 {nested && iVoted ? ` — includes ${hopName(fullRoute[fullRoute.length - 2])}` : ""}
               </div>
+              {queued ? (
+                <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3 shrink-0" />
+                  {now < queued.executableAt
+                    ? `Passed and queued: anyone can execute it in ${formatDuration(queued.executableAt - now)}.`
+                    : ready
+                      ? `Ready: anyone can execute it for another ${formatDuration(queued.expiresAt - now)}.`
+                      : "Expired without being executed: it can only be cancelled now."}
+                </p>
+              ) : null}
               {issue.indexing ? (
                 <p className="mt-1 text-xs text-muted-foreground">Proposal confirmed; syncing the issue list.</p>
+              ) : null}
+              {issue.invalidated ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Invalidated by a signer or threshold change: earlier votes no longer count.
+                  Voting starts it again.
+                </p>
               ) : null}
             </div>
             {simFor === issue.issueId ? (

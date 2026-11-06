@@ -185,7 +185,23 @@ function getEnvVar(name) {
 const firstValue = (value) => Array.isArray(value) ? value[0] : value;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// A castVoteOnIssue receipt returns (executed, ret): the target call's return value once the issue
+// executed, otherwise the issueId the vote was recorded on
+function getVoteResult(receipt) {
+  const response = receipt?.txResult?.response;
+  if (response?.t === 'tup' && response.v?.[0]?.t === 'bool') {
+    return { executed: response.v[0].v === true, value: response.v[1]?.v ?? null };
+  }
+  const contents = receipt?.data?.contents;
+  if (Array.isArray(contents) && typeof contents[0] === 'boolean') {
+    return { executed: contents[0], value: contents[1] ?? null };
+  }
+  return null;
+}
+
 function getReceiptValue(receipt) {
+  const vote = getVoteResult(receipt);
+  if (vote) return vote.value;
   return receipt?.txResult?.response?.v || firstValue(receipt?.data?.contents) || null;
 }
 
@@ -198,8 +214,83 @@ function getCreatedAddress(receipt) {
 }
 
 function getIssueId(receipt) {
+  const vote = getVoteResult(receipt);
+  if (vote?.executed) return null;
   const value = getReceiptValue(receipt);
   return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+const normalizeAddr = (value) => String(value || '').toLowerCase().replace(/^0x/, '');
+
+const ADMIN_REGISTRY = normalizeAddr(process.env.ADMIN_REGISTRY_ADDRESS || '000000000000000000000000000000000000100c');
+
+// Solidity name of a bloc ABI type, as a {type, value} argument hint spells it
+function solidityTypeName(type = {}) {
+  switch (type.tag) {
+    case 'Int':
+      return `${type.signed ? '' : 'u'}int${type.bytes ? type.bytes * 8 : ''}`;
+    case 'String':
+    case 'Bool':
+    case 'Address':
+    case 'Account':
+    case 'Decimal':
+      return type.tag.toLowerCase();
+    case 'Bytes':
+      return `bytes${type.bytes ?? ''}`;
+    case 'Array':
+      return `${solidityTypeName(type.entry)}[${type.length ?? ''}]`;
+    case 'UnknownLabel':
+      return type.contents || '';
+    case 'UserDefined':
+      return solidityTypeName(type.actual);
+    default:
+      return type.typedef || '';
+  }
+}
+
+/**
+ * Call args that run an onlyOwner function of an AdminRegistry-owned contract through
+ * AdminRegistry.castVoteOnIssue: executed at once for a whitelisted caller, recorded as an admin's
+ * vote otherwise. Takes rest.call's args with named function args; the registry's variadic _args
+ * are positional and carry no ABI, so each is hinted with the target's declared type (unhinted, a
+ * digit-only address becomes an int). Enum fields inside struct args must be ordinals.
+ */
+async function governedCallArgs(tokenObj, { contract, method, args = {}, registry = ADMIN_REGISTRY, ...rest }, nodeUrl = config.nodes[0].url) {
+  const { data } = await axios.get(`${nodeUrl}/bloc/v2.2/contracts/contract/${contract.address}/details`, {
+    headers: { Authorization: `Bearer ${tokenObj.token}` },
+  });
+  const params = data?._functions?.[method]?._funcArgs;
+  if (!Array.isArray(params)) throw new Error(`Function ${method} not found on contract ${contract.address}`);
+  const hintedArgs = params
+    .slice()
+    .sort((a, b) => (a?.[1]?.index ?? 0) - (b?.[1]?.index ?? 0))
+    .flatMap(([name, { type = {} } = {}]) => {
+      if (args[name] === undefined) throw new Error(`Missing ${method} argument ${name}`);
+      return type.tag === 'Variadic' ? args[name] : [{ type: solidityTypeName(type), value: args[name] }];
+    });
+  return {
+    ...rest,
+    contract: { address: registry, name: 'AdminRegistry' },
+    method: 'castVoteOnIssue',
+    args: { _target: contract.address, _func: method, _args: hintedArgs },
+  };
+}
+
+// Call args for an owner-only method on a proxy: sent as-is when an account owns the proxy,
+// voted through its owner when that owner is a registry (its ABI has castVoteOnIssue)
+async function proxyOwnerCallArgs(tokenObj, callArgs, nodeUrl = config.nodes[0].url) {
+  const proxy = normalizeAddr(callArgs.contract.address);
+  const [row] = await searchCirrusWithToken(tokenObj, 'BlockApps-Proxy', { address: `eq.${proxy}`, select: '_owner' });
+  if (!row) throw new Error(`Proxy ${proxy} not found in Cirrus`);
+  const owner = normalizeAddr(row._owner);
+  // bloc answers 400 for an address with no contract, i.e. an account
+  const { status, data } = await axios.get(`${nodeUrl}/bloc/v2.2/contracts/contract/${owner}/details`, {
+    headers: { Authorization: `Bearer ${tokenObj.token}` },
+    validateStatus: (code) => code === 200 || code === 400,
+  });
+  return status === 200 && data?._functions?.castVoteOnIssue
+    ? governedCallArgs(tokenObj, { ...callArgs, registry: owner }, nodeUrl)
+    : callArgs;
 }
 
 async function searchCirrusWithToken(tokenObj, tableName, params) {
@@ -318,6 +409,7 @@ const cirrusSearch = async (tableName, params = {}) => {
 };
 
 module.exports = {
+  ADMIN_REGISTRY,
   callListAndWait,
   createContractArgs,
   getEnvVar,
@@ -326,5 +418,8 @@ module.exports = {
   cirrusSearch,
   getCreatedAddress,
   getIssueId,
+  getVoteResult,
+  governedCallArgs,
   pollForCreateIssueExecution,
+  proxyOwnerCallArgs,
 };

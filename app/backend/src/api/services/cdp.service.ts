@@ -4,6 +4,7 @@
 
 import { strato, cirrus } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
+import { governedInput } from "./user.service";
 import { FunctionInput } from "../../types/types";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
@@ -1494,7 +1495,7 @@ export const setCollateralConfig = async (
     },
   };
 
-  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, tx), userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
@@ -1521,7 +1522,7 @@ export const setAssetPaused = async (
     },
   };
 
-  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, tx), userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
@@ -1547,7 +1548,7 @@ export const setGlobalPaused = async (
     },
   };
 
-  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, tx), userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
@@ -1574,7 +1575,7 @@ export const setAssetSupported = async (
     },
   };
 
-  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, tx), userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
