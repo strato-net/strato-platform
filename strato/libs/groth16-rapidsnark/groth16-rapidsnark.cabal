@@ -1,6 +1,6 @@
 cabal-version: 2.2
 
--- This file has been generated from package.yaml by hpack version 0.38.1.
+-- This file has been generated from package.yaml by hpack version 0.39.6.
 --
 -- see: https://github.com/sol/hpack
 
@@ -93,6 +93,7 @@ extra-source-files:
     vendor/wasm3/m3_function.h
     vendor/wasm3/m3_info.h
     vendor/wasm3/m3_math_utils.h
+    vendor/wasm3/m3_validate.h
     vendor/wasm3/wasm3.h
     vendor/wasm3/wasm3_defs.h
     vendor/circom_witness.c
@@ -106,6 +107,7 @@ extra-source-files:
     vendor/wasm3/m3_info.c
     vendor/wasm3/m3_module.c
     vendor/wasm3/m3_parse.c
+    vendor/wasm3/m3_validate.c
     vendor/wasm3/LICENSE
 
 library
@@ -141,6 +143,7 @@ library
       vendor/wasm3/m3_info.c
       vendor/wasm3/m3_module.c
       vendor/wasm3/m3_parse.c
+      vendor/wasm3/m3_validate.c
       vendor/circom_witness.c
   cxx-sources:
       vendor/rapidsnark/src/prover.cpp

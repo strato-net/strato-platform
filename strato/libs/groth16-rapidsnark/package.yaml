@@ -53,6 +53,7 @@ library:
     - vendor/wasm3/m3_info.c
     - vendor/wasm3/m3_module.c
     - vendor/wasm3/m3_parse.c
+    - vendor/wasm3/m3_validate.c
     # Circom witness calculator
     - vendor/circom_witness.c
   
