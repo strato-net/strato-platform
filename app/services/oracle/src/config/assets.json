@@ -89,10 +89,12 @@
         },
         "SPY": {
           "targetAssetAddress": "19a7ebee83ed53cb5917aad3f2b1c2cd37da771d",
+          "maxAgeSec": 120,
           "comment": "Robinhood SPY bridge token"
         },
         "NVDA": {
           "targetAssetAddress": "b8fa2db41236b1421eb8aea8a52826ba32096fbf",
+          "maxAgeSec": 120,
           "comment": "Robinhood NVDA bridge token"
         },
         "WHYPE": {
@@ -454,7 +456,6 @@
             "USDC",
             "USDT",
             "TSLAX",
-            "SPY",
             "SPYX",
             "WEETH",
             "WHYPE",
@@ -481,9 +482,7 @@
             "USDC",
             "USDT",
             "TSLAX",
-            "SPY",
             "SPYX",
-            "NVDA",
             "WEETH",
             "WHYPE",
             "KHYPE",
@@ -504,9 +503,7 @@
             "USDC": "coingecko:usd-coin",
             "USDT": "coingecko:tether",
             "TSLAX": "coingecko:tesla-xstock",
-            "SPY": "coingecko:spdr-s-p-500-etf-trust-robinhood-tokenized-stock",
             "SPYX": "coingecko:sp500-xstock",
-            "NVDA": "coingecko:nvidia-robinhood-tokenized-stock",
             "WEETH": "coingecko:wrapped-eeth",
             "WHYPE": "hyperliquid:0x5555555555555555555555555555555555555555",
             "KHYPE": "hyperliquid:0xfd739d4e423301ce9385c1fb8850539d657c296d",
@@ -557,9 +554,9 @@
           }
         },
         "TwelveData": {
-          "url": "https://api.twelvedata.com/price",
-          "params": "apikey,symbol",
-          "parse": "{symbol}.price",
+          "url": "https://api.twelvedata.com/quote",
+          "params": "apikey,symbol,prepost=true",
+          "parse": "twelveDataQuote",
           "apiKeyEnvVar": "TWELVEDATA_API_KEY",
           "comment": "Uses stock price feeds as a proxy for xStock / Robinhood stock assets (SPY, SPYX, NVDA, TSLAX).",
           "assets": [
@@ -581,6 +578,30 @@
             "TSLAX": "TSLA",
             "DOGE": "DOGE/USD",
             "BRENT": "XBR/USD"
+          }
+        },
+        "RobinhoodPools": {
+          "url": "https://rpc.mainnet.chain.robinhood.com",
+          "parse": "uniswapV3Twap",
+          "twapSeconds": 60,
+          "comment": "On-chain TWAP via pool observe(); quote token USDG treated as $1. No API key.",
+          "assets": [
+            "NVDA",
+            "SPY"
+          ],
+          "pools": {
+            "NVDA": {
+              "address": "0xd4eb21209c4d6093f80b5b84f5c45cc093ea14a3",
+              "baseIsToken0": false,
+              "decimals0": 6,
+              "decimals1": 18
+            },
+            "SPY": {
+              "address": "0x38453c115607463Ac284820Ce959831042f3Df4E",
+              "baseIsToken0": true,
+              "decimals0": 18,
+              "decimals1": 6
+            }
           }
         },
         "OANDA": {
@@ -697,10 +718,12 @@
         },
         "SPY": {
           "targetAssetAddress": "3132c60e0fc30e58c03181a3d9c56904a37099f1",
+          "maxAgeSec": 120,
           "comment": "Robinhood SPY bridge token on Helium"
         },
         "NVDA": {
           "targetAssetAddress": "d7fe8f62a5efbd8dd0f59ac94b13e022818178fc",
+          "maxAgeSec": 120,
           "comment": "Robinhood NVDA bridge token on Helium"
         },
         "WHYPE": {
@@ -1062,7 +1085,6 @@
             "USDC",
             "USDT",
             "TSLAX",
-            "SPY",
             "SPYX",
             "WEETH",
             "WHYPE",
@@ -1089,9 +1111,7 @@
             "USDC",
             "USDT",
             "TSLAX",
-            "SPY",
             "SPYX",
-            "NVDA",
             "WEETH",
             "WHYPE",
             "KHYPE",
@@ -1112,9 +1132,7 @@
             "USDC": "coingecko:usd-coin",
             "USDT": "coingecko:tether",
             "TSLAX": "coingecko:tesla-xstock",
-            "SPY": "coingecko:spdr-s-p-500-etf-trust-robinhood-tokenized-stock",
             "SPYX": "coingecko:sp500-xstock",
-            "NVDA": "coingecko:nvidia-robinhood-tokenized-stock",
             "WEETH": "coingecko:wrapped-eeth",
             "WHYPE": "hyperliquid:0x5555555555555555555555555555555555555555",
             "KHYPE": "hyperliquid:0xfd739d4e423301ce9385c1fb8850539d657c296d",
@@ -1165,9 +1183,9 @@
           }
         },
         "TwelveData": {
-          "url": "https://api.twelvedata.com/price",
-          "params": "apikey,symbol",
-          "parse": "{symbol}.price",
+          "url": "https://api.twelvedata.com/quote",
+          "params": "apikey,symbol,prepost=true",
+          "parse": "twelveDataQuote",
           "apiKeyEnvVar": "TWELVEDATA_API_KEY",
           "comment": "Uses stock price feeds as a proxy for xStock / Robinhood stock assets (SPY, SPYX, NVDA, TSLAX).",
           "assets": [
@@ -1189,6 +1207,30 @@
             "TSLAX": "TSLA",
             "DOGE": "DOGE/USD",
             "BRENT": "XBR/USD"
+          }
+        },
+        "RobinhoodPools": {
+          "url": "https://rpc.mainnet.chain.robinhood.com",
+          "parse": "uniswapV3Twap",
+          "twapSeconds": 60,
+          "comment": "On-chain TWAP via pool observe(); quote token USDG treated as $1. No API key.",
+          "assets": [
+            "NVDA",
+            "SPY"
+          ],
+          "pools": {
+            "NVDA": {
+              "address": "0xd4eb21209c4d6093f80b5b84f5c45cc093ea14a3",
+              "baseIsToken0": false,
+              "decimals0": 6,
+              "decimals1": 18
+            },
+            "SPY": {
+              "address": "0x38453c115607463Ac284820Ce959831042f3Df4E",
+              "baseIsToken0": true,
+              "decimals0": 18,
+              "decimals1": 6
+            }
           }
         },
         "OANDA": {
