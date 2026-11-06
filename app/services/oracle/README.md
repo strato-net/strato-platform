@@ -65,13 +65,14 @@ COINMARKETCAP_API_KEY=your-coinmarketcap-key
 COINGECKO_API_KEY=your-coingecko-api-key
 METALS_DEV_API_KEY=your-metals-dev-key
 METALS_API_API_KEY=your-metals-api-key
+PURE_API_KEY=your-pure-api-key  # collectpure.com API Keys dashboard
 COMMODITIES_API_KEY=your-commodities-api-key
 COMMODITY_PRICE_API_KEY=your-commodity-price-api-key
 COINAPI_API_KEY=your-coinapi-api-key
 DEFILLAMA_API_KEY=your-defillama-api-key  # Pro/API plan: https://defillama.com/subscription
 TWELVEDATA_API_KEY=your-twelvedata-key
 OANDA_API_KEY=your-oanda-api-key
-OANDA_ACCOUNT_ID=your-oanda-account-id  # Fetch via: curl -H "Authorization: Bearer API_KEY" https://api-fxpractice.oanda.com/v3/accounts
+OANDA_ACCOUNT_ID=your-oanda-account-id  # Fetch via: curl -H "Authorization: Bearer API_KEY" https://api-fxtrade.oanda.com/v3/accounts
 
 # Oracle Configuration
 CRON_SCHEDULE="0 */15 * * * *"
