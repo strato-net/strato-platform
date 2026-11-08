@@ -145,16 +145,23 @@ def checkNodeIsGettingBlocks() {
 }
 
 def spinUpVault() {
-  writeFile file: "run-vault.sh", text: """#!/bin/bash
-  sudo \\
-    ssl=true \\
-    HTTPS_PORT=8093 \\
-    INITIAL_OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration' \\
-    INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/mercata' \\
-    INITIAL_OAUTH_JWT_USERNAME_CLAIM='sub' \\
-    PASSWORD=123 \\
-    ./vault
-  """
+  // Prepare removes the test Vault volume, so each deployment gets fresh DB credentials.
+  writeFile file: "run-vault.sh", text: '''#!/bin/bash
+  set -e
+  sudo bash -c '
+    set -e
+    postgres_password="$(openssl rand -hex 32)"
+    postgres_vault_password="$(openssl rand -hex 32)"
+    export postgres_password postgres_vault_password
+    export ssl=true
+    export HTTPS_PORT=8093
+    export INITIAL_OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration
+    export INITIAL_OAUTH_ISSUER=https://keycloak.blockapps.net/auth/realms/mercata
+    export INITIAL_OAUTH_JWT_USERNAME_CLAIM=sub
+    export PASSWORD=123
+    exec ./vault
+  '
+  '''
   sh 'chmod +x run-vault.sh'
 
   sh './run-vault.sh'
