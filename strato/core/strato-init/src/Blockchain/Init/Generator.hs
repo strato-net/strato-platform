@@ -17,7 +17,7 @@ import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
 import Blockchain.Init.Options (flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer, flags_disableSqlIndexing, flags_disableCirrusIndexing, flags_syncFromFile)
-import Blockchain.Init.PgRoles (writeRolePasswords)
+import Blockchain.Init.PgRoles (writeRolePasswords, writeSecretFile)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -33,13 +33,14 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Maybe
 import qualified Data.Yaml as YAML
 import System.Environment (lookupEnv)
-import System.FilePath ((</>))
+import System.FilePath ((</>), takeDirectory)
 import System.Entropy (getEntropy)
 import qualified Data.ByteString as BS
 import Data.Char (toLower)
-import Turtle (chmod, roo)
 import UnliftIO.Directory
-import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes, ownerReadMode, ownerWriteMode, groupReadMode, otherReadMode)
+import System.IO (openBinaryTempFile, hClose)
+import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes, ownerReadMode, groupReadMode, otherReadMode)
+import System.Posix.Types (FileMode)
 import Data.Bits ((.|.))
 
 -- | Create a GenesisInfo from network name. Does NOT write to file.
@@ -283,7 +284,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     when (not $ null flags_sslDir) $ liftIO $ do
       createDirectoryIfMissing True ("secrets" </> "ssl")
       copyFile (flags_sslDir </> "server.pem") ("secrets" </> "ssl" </> "server.pem")
-      copyFile (flags_sslDir </> "server.key") ("secrets" </> "ssl" </> "server.key")
+      BS.readFile (flags_sslDir </> "server.key") >>= writeConfigFile ("secrets" </> "ssl" </> "server.key") ownerReadMode
       putStrLn "  ✓ SSL certificate and key installed"
 
     -- Set postgres password: --password, else the env var, else a random one.
@@ -295,8 +296,6 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     -- (the point of re-pointing a node at another Postgres).
     let pgPasswordExists = pgPasswordExists' && not (regenerate && not (null flags_password))
     unless pgPasswordExists $ liftIO $ do
-      -- The stored file is read-only; make it writable before replacing it.
-      when pgPasswordExists' $ setFileMode pgPasswordFile ownerModes
       envPassword <- lookupEnv "postgres_password"
       password <- case (flags_password, envPassword) of
         (pw, _) | not (null pw) -> return pw
@@ -304,8 +303,8 @@ mkFilesAndGenesis nodeDir hasFlags network = do
         _ | role == RoleApi -> error "--role=api needs the core's Postgres password: pass --password or set postgres_password"
           | otherwise -> generatePassword 32
       putStrLn $ "  Creating postgres password file: " ++ pgPasswordFile
-      writeFile pgPasswordFile password
-      void $ chmod roo pgPasswordFile
+      writeSecretFile pgPasswordFile password
+    when pgPasswordExists $ liftIO $ setFileMode pgPasswordFile ownerReadMode
 
     liftIO $ writeRolePasswords (regenerate && not (null flags_password))
 
@@ -320,8 +319,8 @@ mkFilesAndGenesis nodeDir hasFlags network = do
         Just sec | not (null sec) -> return sec
         _ -> generatePassword 64
       putStrLn $ "  Creating session secret file: " ++ sessionSecretFile
-      writeFile sessionSecretFile secret
-      void $ chmod roo sessionSecretFile
+      writeSecretFile sessionSecretFile secret
+    when sessionSecretExists $ liftIO $ setFileMode sessionSecretFile ownerReadMode
 
     when flags_localAuth $ liftIO setupLocalAuthSecrets
 
@@ -350,8 +349,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
                 , "clientId: \"" ++ clientId ++ "\""
                 , "clientSecret: \"" ++ clientSecret ++ "\""
                 ]
-          writeFile destOauth localOauthConfig
-          void $ chmod roo destOauth
+          writeSecretFile destOauth localOauthConfig
           putStrLn $ "  ✓ Generated secure local OAuth credentials: " ++ destOauth
         else do
           home <- getHomeDirectory
@@ -359,8 +357,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
           sourceExists <- doesFileExist sourceOauth
           if sourceExists
             then do
-              copyFile sourceOauth destOauth
-              void $ chmod roo destOauth
+              readFile sourceOauth >>= writeSecretFile destOauth
             else
               error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first."
     -- Setup OAuth credentials
@@ -375,20 +372,24 @@ mkFilesAndGenesis nodeDir hasFlags network = do
           sourceExists <- doesFileExist sourceOauth
           if sourceExists
             then do
-              copyFile sourceOauth destOauth'
-              void $ chmod roo destOauth'
+              readFile sourceOauth >>= writeSecretFile destOauth'
             else
               error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first."
+    liftIO $ setFileMode destOauth ownerReadMode
 
     ethconf <- liftIO $ genEthConf role
 
     let dir = ".ethereumH"
-    -- Writable for the rewrite, then back to the world-readable, read-only
-    -- mode the containers mounting it expect.
-    when regenerate $ liftIO $ setFileMode (dir </> "ethconf.yaml") (ownerReadMode .|. ownerWriteMode .|. groupReadMode .|. otherReadMode)
-    liftIO $ YAML.encodeFile (dir </> "ethconf.yaml") ethconf
-    liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
-    liftIO $ putStrLn "  ✓ Generated ethconf.yaml"
+        noPassword sql = sql { EC.password = "" }
+        publicEthconf = ethconf
+          { EC.sqlConfig = noPassword (EC.sqlConfig ethconf)
+          , EC.sqlReaderConfig = noPassword <$> EC.sqlReaderConfig ethconf
+          , EC.cirrusConfig = noPassword (EC.cirrusConfig ethconf)
+          , EC.peerDbConfig = noPassword <$> EC.peerDbConfig ethconf
+          }
+    liftIO $ writeConfigFile (dir </> "ethconf.yaml") ownerReadMode (YAML.encode ethconf)
+    liftIO $ writeConfigFile (dir </> "ethconf-public.yaml") (ownerReadMode .|. groupReadMode .|. otherReadMode) (YAML.encode publicEthconf)
+    liftIO $ putStrLn "  ✓ Generated ethconf.yaml and ethconf-public.yaml"
 
     liftIO $ do
       cwd <- getCurrentDirectory
@@ -443,8 +444,15 @@ mkFilesAndGenesis nodeDir hasFlags network = do
 normalizeGenesisInfo :: GenesisInfo -> GenesisInfo
 normalizeGenesisInfo = fromMaybe (error "Internal Error in normalizeGenesisInfo: this shouldn't happen") . JSON.decode . JSON.encode
 
-makeReadOnly :: FilePath -> IO ()
-makeReadOnly = void . chmod roo
+-- Write through a private temporary file so passwords are never briefly
+-- world-readable while setup creates or regenerates the full config.
+writeConfigFile :: FilePath -> FileMode -> BS.ByteString -> IO ()
+writeConfigFile path mode content = do
+  (tmp, handle) <- openBinaryTempFile (takeDirectory path) "ethconf.tmp"
+  BS.hPut handle content
+  hClose handle
+  setFileMode tmp mode
+  renameFile tmp path
 
 generatePassword :: Int -> IO String
 generatePassword len = do

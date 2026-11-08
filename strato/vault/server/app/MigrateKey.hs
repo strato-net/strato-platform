@@ -105,12 +105,13 @@ main = do
 
 -- | Resolve Postgres connection settings using the following precedence:
 --
---   1. CLI flag, if the operator passed a value different from the built-in
+--   1. --pgPasswordFile, when provided.
+--   2. CLI flag, if the operator passed a value different from the built-in
 --      HFlags default (i.e. explicitly overrode it).
---   2. Environment variable (same names the vault-wrapper daemon reads from
+--   3. Environment variable (same names the vault-wrapper daemon reads from
 --      docker-compose: @postgres_host@, @postgres_port@, @postgres_user@,
 --      @postgres_password@, @postgres_vault_wrapper_db@), if set and non-empty.
---   3. The built-in HFlags default from 'Options'.
+--   4. The built-in HFlags default from 'Options'.
 --
 -- This matches the standard Unix CLI > env > default convention while still
 -- letting operators run the tool inside an existing vault-wrapper container
@@ -119,8 +120,10 @@ connectInfo :: IO ConnectInfo
 connectInfo = do
   host <- resolve "postgres_host" Options.flags_pghost "postgres"
   portStr <- resolve "postgres_port" Options.flags_pgport "5432"
-  user <- resolve "postgres_user" Options.flags_pguser "postgres"
-  pw <- resolve "postgres_password" Options.flags_password "api"
+  user <- resolve "postgres_user" Options.flags_pguser "strato_vault"
+  pw <- if null Options.flags_pgPasswordFile
+    then resolve "postgres_password" Options.flags_password ""
+    else Options.readPgPassword
   db <- resolve "postgres_vault_wrapper_db" Options.flags_database "oauth"
   pure
     ConnectInfo

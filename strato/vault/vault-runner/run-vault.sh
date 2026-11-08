@@ -2,6 +2,13 @@
 set -e
 
 cd "$(dirname "$0")"
+compose_quote() {
+  local value=${1//\\/\\\\}
+  value=${value//\"/\\\"}
+  value=${value//\$/\$\$}
+  printf '"%s"' "$value"
+}
+
 if [ ! -f .env ]; then
   umask 077
   if sudo docker volume inspect vault_vaultpgdata >/dev/null 2>&1; then
@@ -12,8 +19,13 @@ if [ ! -f .env ]; then
     postgres_password=$(openssl rand -hex 32)
   fi
   postgres_vault_password=$(openssl rand -hex 32)
-  printf 'postgres_password=%s\npostgres_vault_password=%s\n' \
-    "$postgres_password" "$postgres_vault_password" > .env
+  {
+    printf 'postgres_password='
+    compose_quote "$postgres_password"
+    printf '\npostgres_vault_password='
+    compose_quote "$postgres_vault_password"
+    printf '\n'
+  } > .env
 fi
 
 sudo \

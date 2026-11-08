@@ -3,6 +3,17 @@ set -eu
 
 export PGHOST="${PG_ADMIN_HOST:?}" PGPORT="${PG_ADMIN_PORT:-5432}" PGUSER="${PG_ADMIN_USER:-postgres}"
 export PGPASSWORD="$(cat /run/secrets/postgres_password)"
+export PGCONNECT_TIMEOUT=3
+
+attempt=0
+until psql -X -Atqc 'SELECT 1' -d postgres >/dev/null 2>&1; do
+  attempt=$((attempt + 1))
+  if [ "$attempt" -ge 60 ]; then
+    echo "PostgreSQL administrator connection is not ready at $PGHOST:$PGPORT" >&2
+    exit 1
+  fi
+  sleep 2
+done
 
 psql -X -v ON_ERROR_STOP=1 -d postgres -f /strato/pg-roles.sql
 
@@ -67,6 +78,19 @@ SELECT format('GRANT EXECUTE ON FUNCTION %I.%I(%s) TO strato_cirrus_anon',
    AND l.lanname = 'sql' AND p.provolatile = 's' AND p.proretset
    AND p.pronargs = 1 AND NOT p.prosecdef
    AND btrim(p.prosrc) LIKE 'SELECT v.*%'
+\gexec
+-- Array-field views call this helper as the reader; it is separate from the
+-- computed-relationship functions selected above.
+SELECT format('GRANT EXECUTE ON FUNCTION %I.%I(%s) TO strato_app, strato_cirrus_anon',
+              n.nspname, p.proname, pg_get_function_identity_arguments(p.oid))
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  JOIN pg_language l ON l.oid = p.prolang
+ WHERE n.nspname = 'public' AND p.proname = 'jsonb_obj_to_array'
+   AND p.pronargs = 1 AND p.proargtypes[0] = 'jsonb'::regtype
+   AND p.prorettype = 'jsonb'::regtype
+   AND pg_get_userbyid(p.proowner) = 'strato_cirrus'
+   AND l.lanname = 'sql' AND p.provolatile = 'i' AND NOT p.prosecdef
 \gexec
 SQL
 fi

@@ -8,9 +8,9 @@
 # Reads are served from the SQL mirror by vm-query: this copy's own
 # (VM_QUERY=true) and, when that is unreachable, the other copies' at
 # VM_QUERY_URLS. Nothing here ever reaches a core's consensus VM.
-# Mount a node's ethconf.yaml at ./config/ethconf.yaml for the network
-# parameters, and the node's secrets/ (pg_*_password, session_secret,
-# oauth_credentials.yaml) at ./secrets/.
+# Mount a node's ethconf.yaml and ethconf-public.yaml under ./config/ for
+# the network parameters, and the node's secrets/ (pg_*_password,
+# session_secret, oauth_credentials.yaml) at ./secrets/.
 services:
   strato-api:
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>-<HASH_STRATO>}
@@ -117,8 +117,9 @@ services:
       - ${HTTP_PORT:-8081}:${HTTP_PORT:-8081}
       - ${HTTPS_PORT:-443}:443
     volumes:
-      - ./config/ethconf.yaml:/config/ethconf.yaml:ro
-      - ./secrets:/run/secrets:ro
+      - ./config/ethconf-public.yaml:/config/ethconf.yaml:ro
+      - ./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro
+      - ./secrets/session_secret:/run/secrets/session_secret:ro
       - ./secrets/ssl:/etc/ssl/strato:ro
       - ./logs:/logs
     healthcheck:

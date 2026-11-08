@@ -70,13 +70,14 @@ requireEnv name =
     Just "" -> die_ $ "environment variable is empty: " <> name
     Just s -> pure (C8.pack s)
 
-connectInfo :: ConnectInfo
-connectInfo =
-  ConnectInfo
+connectInfo :: IO ConnectInfo
+connectInfo = do
+  pgPassword <- Options.readPgPassword
+  pure ConnectInfo
     { connectHost = Options.flags_pghost,
       connectPort = read Options.flags_pgport,
       connectUser = Options.flags_pguser,
-      connectPassword = Options.flags_password,
+      connectPassword = pgPassword,
       connectDatabase = Options.flags_database
     }
 
@@ -85,7 +86,8 @@ runRotate oldPwBs newPwBs skipConfirm = do
   let oldPw = Password oldPwBs
       newPw = Password newPwBs
 
-  bracket (connect connectInfo) close $ \conn -> do
+  ci <- connectInfo
+  bracket (connect ci) close $ \conn -> do
     _ <- (query_ conn [sql| SELECT 1 |] :: IO [Only Int])
     putStrLn "DB connection OK."
 

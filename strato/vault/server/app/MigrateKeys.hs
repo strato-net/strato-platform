@@ -49,12 +49,13 @@ q1 mv = do
 main :: IO ()
 main = do
   _ <- $initHFlags "migrate-keys"
+  pgPassword <- readPgPassword
   let dbConnectInfo =
         ConnectInfo
           { connectHost = flags_pghost,
             connectPort = read flags_pgport,
             connectUser = flags_pguser,
-            connectPassword = flags_password,
+            connectPassword = pgPassword,
             connectDatabase = flags_database
           }
   conn <- connect dbConnectInfo

@@ -110,7 +110,7 @@ generateDockerCompose role = do
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
-            , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
+            , "./.ethereumH/ethconf-public.yaml:/config/ethconf.yaml:ro"
             , "./secrets/pg_app_password:/run/secrets/pg_app_password:ro"
             ]
         , environment = Just $ Map.fromList $
@@ -153,7 +153,7 @@ generateDockerCompose role = do
         { image = imageRef "app-ui" hashAppUi
         , user = Just userGid
         , depends_on = Just $ DependsOnList ["app-backend"]
-        , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
+        , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf-public.yaml:/config/ethconf.yaml:ro"]
         , environment = Just $ Map.fromList
             [ ("POSTHOG_KEY", "${POSTHOG_KEY:-}")
             , ("POSTHOG_HOST", "${POSTHOG_HOST:-}")
@@ -170,7 +170,7 @@ generateDockerCompose role = do
         , user = Just userGid
         , depends_on = Just $ DependsOnList (["apex"] ++ [ "postgrest" | bundledPostgrest ] ++ ["prometheus"])
         , extra_hosts = hostGateway
-        , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
+        , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf-public.yaml:/config/ethconf.yaml:ro"]
         , environment = Just $ Map.fromList [("WAGMI_PROJECT_ID", "${WAGMI_PROJECT_ID:-}")]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh /usr/src/app/docker-run.sh >> /logs/smd.log 2>&1"]
@@ -200,7 +200,7 @@ generateDockerCompose role = do
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/pg_apex_password:/run/secrets/pg_apex_password:ro"
-            , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
+            , "./.ethereumH/ethconf-public.yaml:/config/ethconf.yaml:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh /usr/src/app/docker-run.sh >> /logs/apex.log 2>&1"]
@@ -211,6 +211,7 @@ generateDockerCompose role = do
   let redis = def
         { image = "redis:3.2"
         , user = Just userGid
+        , depends_on = Just $ withPgInit []
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh redis-server --appendonly yes >> /logs/redis.log 2>&1"]
         , restart = Just "unless-stopped"
@@ -239,6 +240,7 @@ generateDockerCompose role = do
         { image = imageRef "postgrest" hashPostgrest
         , user = Just userGid
         , depends_on = Just $ withPgInit ["postgres"]
+        , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
             [ ("PG_ENV_POSTGRES_DB", "cirrus")
             , ("PG_ENV_POSTGRES_HOST", pgReaderHost)
@@ -275,7 +277,7 @@ generateDockerCompose role = do
         , command = Just ["exec docker-entrypoint.sh postgres -c max_connections=800 -c shared_buffers=512MB >> /logs/postgres.log 2>&1"]
         , restart = Just "unless-stopped"
         , healthcheck = Just Healthcheck
-            { test = ["CMD-SHELL", "pg_isready -U postgres"]
+            { test = ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres"]
             , interval = Just "2s"
             , timeout = Just "2s"
             , retries = Just 10
@@ -293,6 +295,7 @@ generateDockerCompose role = do
         { image = imageRef "strato" hashStrato
         , user = Just userGid
         , depends_on = if externalPostgres then Nothing else Just $ DependsOnMap $ Map.singleton "postgres" (DependsOnCondition "service_healthy")
+        , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
             [ ("PG_ADMIN_HOST", pgWriterHost)
             , ("PG_ADMIN_PORT", "5432")
@@ -367,7 +370,7 @@ generateDockerCompose role = do
             , "./secrets/ssl:/etc/ssl/strato:ro"
             , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
             , "./secrets/session_secret:/run/secrets/session_secret:ro"
-            , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
+            , "./.ethereumH/ethconf-public.yaml:/config/ethconf.yaml:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         -- chmod so the host user's strato-logrotate can rotate (truncate) the
@@ -448,7 +451,7 @@ generateDockerCompose role = do
         , volumes = Just
             [ "./logs:/logs"
             , "./prometheus:/prometheus"
-            , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
+            , "./.ethereumH/ethconf-public.yaml:/config/ethconf.yaml:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec /entrypoint.sh >> /logs/prometheus.log 2>&1"]
@@ -478,7 +481,7 @@ generateDockerCompose role = do
             , "./secrets/local_auth_hydra_pairwise_salt:/run/secrets/local_auth_hydra_pairwise_salt:ro"
             , "./secrets/local_auth_kratos_cookie_secret:/run/secrets/local_auth_kratos_cookie_secret:ro"
             , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
-            , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
+            , "./.ethereumH/ethconf-public.yaml:/config/ethconf.yaml:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         -- chmod so the host user's strato-logrotate can rotate (truncate) the

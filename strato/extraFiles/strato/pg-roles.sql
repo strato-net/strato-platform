@@ -7,10 +7,14 @@ BEGIN
     'strato_postgrest', 'strato_auth', 'strato_vault', 'strato_history'
   ] LOOP
     BEGIN
-      EXECUTE format('CREATE ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS', name);
+      EXECUTE format('CREATE ROLE %I LOGIN', name);
     EXCEPTION WHEN duplicate_object THEN NULL;
     END;
-    EXECUTE format('ALTER ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS', name);
+    IF EXISTS (SELECT 1 FROM pg_roles
+                WHERE rolname = name AND (rolsuper OR rolreplication OR rolbypassrls)) THEN
+      RAISE EXCEPTION 'runtime role % has privileged attributes; remove them before startup', name;
+    END IF;
+    EXECUTE format('ALTER ROLE %I LOGIN NOCREATEDB NOCREATEROLE', name);
     IF name <> 'strato_postgrest' AND EXISTS (SELECT 1 FROM pg_auth_members WHERE member = (SELECT oid FROM pg_roles WHERE rolname = name)) THEN
       RAISE EXCEPTION 'runtime role % has memberships; remove them before startup', name;
     END IF;
@@ -20,10 +24,14 @@ END $roles$;
 DO $anon$
 BEGIN
   BEGIN
-    CREATE ROLE strato_cirrus_anon NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+    CREATE ROLE strato_cirrus_anon NOLOGIN;
   EXCEPTION WHEN duplicate_object THEN NULL;
   END;
-  ALTER ROLE strato_cirrus_anon NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+  IF EXISTS (SELECT 1 FROM pg_roles
+              WHERE rolname = 'strato_cirrus_anon' AND (rolsuper OR rolreplication OR rolbypassrls)) THEN
+    RAISE EXCEPTION 'strato_cirrus_anon has privileged attributes';
+  END IF;
+  ALTER ROLE strato_cirrus_anon NOLOGIN NOCREATEDB NOCREATEROLE;
   IF EXISTS (SELECT 1 FROM pg_auth_members WHERE member = (SELECT oid FROM pg_roles WHERE rolname = 'strato_cirrus_anon')) THEN
     RAISE EXCEPTION 'strato_cirrus_anon has role memberships';
   END IF;
@@ -36,6 +44,21 @@ BEGIN
 END $anon$;
 ALTER ROLE strato_postgrest NOINHERIT;
 GRANT strato_cirrus_anon TO strato_postgrest;
+
+-- A managed-database administrator is not a superuser. Membership lets it
+-- create databases and transfer existing objects to the runtime owners.
+DO $owner_membership$
+DECLARE name text;
+BEGIN
+  IF NOT (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) THEN
+    FOREACH name IN ARRAY ARRAY[
+      'strato_eth', 'strato_cirrus', 'strato_apex',
+      'strato_auth', 'strato_vault', 'strato_history'
+    ] LOOP
+      EXECUTE format('GRANT %I TO %I', name, current_user);
+    END LOOP;
+  END IF;
+END $owner_membership$;
 
 \set eth_password `cat /run/secrets/pg_eth_password`
 \set cirrus_password `cat /run/secrets/pg_cirrus_password`

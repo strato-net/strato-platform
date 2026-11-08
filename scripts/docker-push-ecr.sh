@@ -71,7 +71,9 @@ fi
 for f in "${COMPOSE_FILES[@]}"; do
   [[ -f "$f" ]] || { echo "error: compose file not found: $f" >&2; exit 1; }
   log "collecting images from $f"
-  if ! compose_images="$(docker compose -f "$f" config --images)"; then
+  # Image discovery needs no database credentials; satisfy Compose's required
+  # runtime variables without passing real secrets to this read-only command.
+  if ! compose_images="$(postgres_password=unused postgres_vault_password=unused docker compose -f "$f" config --images)"; then
     echo "error: failed to read images from $f" >&2
     exit 1
   fi
