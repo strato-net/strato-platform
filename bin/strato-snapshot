@@ -1619,7 +1619,7 @@ SNAPSHOT_PG_HOST=""
 SNAPSHOT_PG_PORT="5432"
 SNAPSHOT_PG_USER="postgres"
 SNAPSHOT_PG_PASSWORD_FILE=""
-# Node dir whose ethconf.yaml carries the cluster credentials (set by create/restore).
+# Node dir whose secrets/postgres_password holds the cluster administrator credential.
 SNAPSHOT_PG_NODE_DIR=""
 # Which of the captured databases a run touches (--databases): all of them by default.
 SNAPSHOT_DATABASES=""
@@ -1864,21 +1864,17 @@ load_databases() {
 # Run a postgres client tool against an external cluster, with the dumps
 # directory mounted at /dumps. The password is read from its file inside the
 # container's environment only; it is never echoed or written to the payload.
-# The cluster password, without anyone copying it around: the node's own
-# ethconf.yaml already carries the credentials it connects with, so a node dir
-# is enough. --postgres-password-file overrides it for a node dir that has none.
+# The cluster administrator password is kept out of runtime ethconf.yaml.
+# --postgres-password-file overrides the node's admin secret.
 external_pg_password() {
   if [[ -n "$SNAPSHOT_PG_PASSWORD_FILE" ]]; then
     [[ -r "$SNAPSHOT_PG_PASSWORD_FILE" ]] || die "cannot read $SNAPSHOT_PG_PASSWORD_FILE"
     cat "$SNAPSHOT_PG_PASSWORD_FILE"
     return 0
   fi
-  local conf="$SNAPSHOT_PG_NODE_DIR/.ethereumH/ethconf.yaml"
-  [[ -f "$conf" ]] || die "no --postgres-password-file and no $conf to read the cluster password from"
-  local pw
-  pw="$(read_ethconf_value "$conf" sqlConfig password 2>/dev/null || true)"
-  [[ -n "$pw" ]] || die "could not read sqlConfig.password from $conf; pass --postgres-password-file"
-  printf '%s' "$pw"
+  local secret="$SNAPSHOT_PG_NODE_DIR/secrets/postgres_password"
+  [[ -r "$secret" ]] || die "no --postgres-password-file and no readable $secret"
+  cat "$secret"
 }
 
 external_pg() {

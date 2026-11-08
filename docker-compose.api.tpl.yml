@@ -2,14 +2,14 @@
 # STRATO API tier: strato-api + ethereum-jsonrpc (+ vm-query) behind an nginx
 # sidecar, with PostgREST for Cirrus. Stateless; run as many copies as needed
 # behind a load balancer. Everything it needs is reached over the network:
-#   Postgres (eth + cirrus)   postgres_host / postgres_password
+#   Postgres (eth + cirrus)   postgres_host / role passwords
 #   core cells (tx submission) INGRESS_URLS: every cell's strato-ingest
 #   vault                     VAULT_URL
 # Reads are served from the SQL mirror by vm-query: this copy's own
 # (VM_QUERY=true) and, when that is unreachable, the other copies' at
 # VM_QUERY_URLS. Nothing here ever reaches a core's consensus VM.
 # Mount a node's ethconf.yaml at ./config/ethconf.yaml for the network
-# parameters, and the node's secrets/ (postgres_password, session_secret,
+# parameters, and the node's secrets/ (pg_*_password, session_secret,
 # oauth_credentials.yaml) at ./secrets/.
 services:
   strato-api:
@@ -18,8 +18,6 @@ services:
     environment:
       - postgres_host=${postgres_host:?postgres_host is required}
       - postgres_port=${postgres_port:-5432}
-      - postgres_user=${postgres_user:-postgres}
-      - postgres_password=${postgres_password:-}
       # Comma-separated; a submitted batch is posted to every cell.
       - INGRESS_URLS=${INGRESS_URLS:?INGRESS_URLS is required (http://<cell>:8600, comma-separated)}
       - VM_QUERY=${VM_QUERY:-true}
@@ -30,7 +28,9 @@ services:
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-}
     volumes:
       - ./config/ethconf.yaml:/config/ethconf.yaml:ro
-      - ./secrets:/run/secrets:ro
+      - ./secrets/pg_eth_password:/run/secrets/pg_eth_password:ro
+      - ./secrets/pg_cirrus_password:/run/secrets/pg_cirrus_password:ro
+      - ./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro
       - ./logs/strato-api:/var/lib/strato-api/logs
     healthcheck:
       test: ["CMD-SHELL", "pgrep strato-api && pgrep ethereum-jsonrpc || exit 1"]
@@ -49,14 +49,16 @@ services:
       - PG_ENV_POSTGRES_DB=cirrus
       # A read replica endpoint serves PostgREST fine; defaults to the writer.
       - PG_ENV_POSTGRES_HOST=${postgres_reader_host:-${postgres_host}}
-      - PG_ENV_POSTGRES_USER=${postgres_user:-postgres}
+      - PG_ENV_POSTGRES_USER=strato_postgrest
       - PG_PORT_5432_TCP_PORT=${postgres_port:-5432}
+      - POSTGREST_ANONYMOUS=strato_cirrus_anon
+      - POSTGREST_SCHEMA=public
       - POSTGREST_LOG_LEVEL=error
       # On a replica the writer's schema-reload NOTIFY never arrives; the
       # entrypoint polls the schema and reloads on change (0 disables).
       - POSTGREST_SCHEMA_RELOAD_SECONDS=${POSTGREST_SCHEMA_RELOAD_SECONDS:-30}
     volumes:
-      - ./secrets/postgres_password:/run/secrets/postgres_password:ro
+      - ./secrets/pg_postgrest_password:/run/secrets/pg_postgrest_password:ro
     restart: unless-stopped
     logging:
       driver: "json-file"

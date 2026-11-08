@@ -41,8 +41,8 @@ services:
       - NODE_URL=${NODE_URL}
       - postgres_host=${postgres_host:-postgres}
       - postgres_port=${postgres_port:-5432}
-      - postgres_user=${postgres_user:-postgres}
-      - postgres_password=${postgres_password}
+      - postgres_user=strato_history
+      - postgres_password=${postgres_history_password:-}
       - HISTORY_DB_NAME=${HISTORY_DB_NAME:-history}
     restart: unless-stopped
     logging:

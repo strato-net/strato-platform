@@ -6,14 +6,14 @@ set -e
 # put the Postgres password into the container log.
 
 # Read postgres password from mounted secrets file
-if [ -f /run/secrets/postgres_password ]; then
-  PG_ENV_POSTGRES_PASSWORD=$(cat /run/secrets/postgres_password)
+if [ -f /run/secrets/pg_postgrest_password ]; then
+  PG_ENV_POSTGRES_PASSWORD=$(cat /run/secrets/pg_postgrest_password)
 fi
-export PGPASSWORD="${PG_ENV_POSTGRES_PASSWORD:-}"
+export PGPASSWORD="${PG_ENV_POSTGRES_PASSWORD:?PostgREST role password is required}"
 
 echo "the pg host and port are: ${PG_ENV_POSTGRES_HOST} ${PG_PORT_5432_TCP_PORT}"
 
-until psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER:-postgres}" -c '\q'; do
+until psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER:-strato_postgrest}" -d "${PG_ENV_POSTGRES_DB}" -c '\q'; do
   >&2 echo "Postgres is unavailable - sleeping"
   sleep 1
 done
@@ -48,7 +48,7 @@ FINGERPRINT_SQL="select md5(coalesce(string_agg(x, ',' order by x), '')) from (
 ) s"
 
 schema_fingerprint() {
-  psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER:-postgres}" \
+  psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER:-strato_postgrest}" \
        -d "${PG_ENV_POSTGRES_DB}" -Atq -c "$FINGERPRINT_SQL" 2>/dev/null || true
 }
 

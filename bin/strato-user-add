@@ -124,6 +124,10 @@ fi
 # cluster named in ethconf's sqlConfig (--pghost at setup); psql goes through
 # the container in the first case and runs on the host in the second.
 pg_password="$(tr -d '\n' < secrets/postgres_password)"
+if [[ ! -r secrets/pg_vault_password ]]; then
+  echo "Error: missing secrets/pg_vault_password" >&2
+  exit 1
+fi
 read -r PG_HOST PG_PORT < <(python3 - <<'PY'
 import re
 text = open(".ethereumH/ethconf.yaml").read()
@@ -472,7 +476,7 @@ import_key() {
   fi
   printf "%s" "$private_key" | "${import_cmd[@]}" \
     --pghost "$PG_HOST" --pgport "$PG_PORT" \
-    --password "$pg_password" \
+    --pguser strato_vault --pgPasswordFile secrets/pg_vault_password \
     --database oauth \
     --vaultPasswordFile secrets/vault_password \
     --username "$username" \

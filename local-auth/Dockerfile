@@ -3,8 +3,8 @@ FROM oryd/hydra:v2.2.0 AS hydra
 
 FROM alpine:3.20
 
-ENV DSN=postgres://postgres@postgres:5432/kratos?sslmode=disable
-ENV HYDRA_DSN=postgres://postgres@postgres:5432/hydra?sslmode=disable
+ENV DSN=postgres://strato_auth@postgres:5432/kratos?sslmode=disable
+ENV HYDRA_DSN=postgres://strato_auth@postgres:5432/hydra?sslmode=disable
 
 # Install supervisor, utilities, and Node.js
 RUN apk add --no-cache \

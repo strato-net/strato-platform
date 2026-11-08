@@ -271,6 +271,12 @@ fi
 cd "$NODE_DIR"
 NODE_DIR_ABS="$(pwd)"
 
+if grep -Eq '^[[:space:]]+user:[[:space:]]*"?postgres"?([[:space:]]|$)' .ethereumH/ethconf.yaml; then
+    echo "Error: this node still has PostgreSQL superuser connections in ethconf.yaml." >&2
+    echo "Run strato-down, then strato-setup $NODE_DIR_ABS --regenerate with the node's original flags, then strato-up." >&2
+    exit 1
+fi
+
 # A --dockerMode=all directory is recognised by its compose file, so a restart
 # needs no flags: compose runs the whole node, and there is no host convoke to
 # start, check or stop.

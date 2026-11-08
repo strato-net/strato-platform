@@ -22,7 +22,6 @@ where
 import Blockchain.EthConf.Model
 import Control.Concurrent.MVar
 import Control.Exception (catch, IOException)
-import Control.Monad (void, when)
 import qualified Database.PostgreSQL.Simple as PG
 import System.Process (readProcess)
 import Control.Monad.Composable.Base (Eff)
@@ -82,15 +81,11 @@ currentCellId = case cellId ethConf of
   Just c | not (null c) -> return c
   _ -> filter (`notElem` ("\n\r" :: String)) <$> readProcess "hostname" [] ""
 
--- | Create the configured database if it does not exist yet, through the
--- maintenance database. Idempotent, and a concurrent creator's win is fine.
+-- | Database creation and ownership belong to the one-shot pg-init service.
+-- Fail here if a runtime process starts before provisioning has completed.
 ensureDatabaseExists :: SqlConf -> IO ()
 ensureDatabaseExists conf = do
-  conn <- PG.connectPostgreSQL (postgreSQLConnectionString conf {database = "postgres"})
-  found <- PG.query conn "SELECT 1 FROM pg_database WHERE datname = ?" (PG.Only (database conf)) :: IO [PG.Only Int]
-  when (null found) $
-    void (PG.execute_ conn (fromString ("CREATE DATABASE \"" ++ database conf ++ "\"")))
-      `catch` (\(_ :: PG.SqlError) -> return ())
+  conn <- PG.connectPostgreSQL (postgreSQLConnectionString conf)
   PG.close conn
 
 -- | Run against a fresh stream environment (and so a fresh broker

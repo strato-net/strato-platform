@@ -1,7 +1,7 @@
 
 sqlConfig:
-  user: "postgres"
-  password: "api"
+  user: "strato_eth"
+  password: ""
   host: "localhost"
   port: 5432
   database: "eth2"

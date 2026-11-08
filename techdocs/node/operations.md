@@ -47,7 +47,7 @@ All logs are plain files in `mynode/logs/`. The containers use Docker's `none` l
 |---|---|
 | `convoke.log` | The supervisor. Records start-up, process launches with their full command lines, and shutdowns. |
 | `strato-sequencer`, `vm-runner`, `strato-p2p`, `ethereum-discover`, `strato-indexer`, `slipstream`, `strato-api`, `ethereum-jsonrpc`, `strato-network-monitor`, `strato-logrotate` | One file per node process, named after the executable, with no extension |
-| `nginx.log`, `app-backend.log`, `app-ui.log`, `smd.log`, `apex.log`, `postgres.log`, `postgrest.log`, `redis.log`, `prometheus.log`, `docs.log` | One file per container; with `--localAuth`, also `local-auth.log` |
+| `nginx.log`, `app-backend.log`, `app-ui.log`, `smd.log`, `apex.log`, `postgres.log`, `pg-init.log`, `postgrest.log`, `redis.log`, `prometheus.log`, `docs.log` | One file per container; with `--localAuth`, also `local-auth.log` |
 | `rts-sizing.log` | Runtime flag sizing chosen at setup |
 
 ### Rotation
@@ -130,6 +130,55 @@ strato-up mynode --network=<network> --sslDir=/path/to/ssl --snapshot
 On a node run from [prebuilt images](prebuilt.md), skip `make`: check out the new tag or commit, then restart the same way with `--dockerMode=all --prebuilt` among the flags.
 
 Pass the same flags you used before. Validators should coordinate upgrades with the other network operators. Releases that change consensus rules activate them at agreed block heights (see [Networks](../platform/networks.md#fork-heights)).
+
+## PostgreSQL runtime roles
+
+The generated node configuration uses separate non-superuser logins for `eth`,
+Cirrus, Apex, the app, PostgREST, local auth, Vault, and history. A one-shot
+`pg-init` container creates the roles and databases before the node services
+start. It transfers existing `postgres`-owned objects in each database's
+`public` schema to that database's writer role. The cluster administrator
+password remains in `secrets/postgres_password` for provisioning and operator
+tools; ordinary services connect with role-specific passwords.
+PostgREST exposes Cirrus-owned tables and views in the database's `public`
+schema read-only, including relations created later by Slipstream. Independently
+owned objects in `public` receive no anonymous grant. Existing objects owned by
+the cluster administrator are transferred to the Cirrus role, so review any
+custom tables or views in Cirrus's `public` schema before migration: they will
+become publicly readable too. Its anonymous role can execute
+Slipstream's read-only computed relationship functions, but receives no general
+function execution grant. PostgreSQL system catalogs live in `pg_catalog`,
+outside the exposed schema.
+
+Before upgrading an existing Cirrus database, inventory the relations that
+will be public. Review unfamiliar names and the definitions of any views that
+read outside Cirrus data:
+
+```sql
+SELECT c.relname, c.relkind, pg_get_userbyid(c.relowner) AS owner,
+       CASE WHEN c.relkind IN ('v', 'm') THEN pg_get_viewdef(c.oid) END AS view_definition
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+ ORDER BY c.relname;
+```
+
+For a new node, use the clean restart procedure above. To keep an existing
+node's databases, back them up, stop the node, and regenerate its configuration
+with its original setup flags before starting it:
+
+```bash
+strato-down mynode
+strato-setup mynode --regenerate <original setup flags>
+strato-up mynode
+```
+
+Check `logs/pg-init.log` if startup stops at provisioning. Its administrator
+credential must be allowed to create roles and databases and change ownership
+of existing objects. On a split deployment, provision the shared database
+cluster from its core node before starting API-only nodes. All tiers pointing
+at that cluster must use the same administrator password so `strato-setup`
+derives matching runtime credentials.
 
 ## Snapshots
 

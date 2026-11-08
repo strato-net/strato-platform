@@ -8,13 +8,14 @@ volumes:
 services:
   vault-wrapper:
     depends_on:
-    - postgres
+      pg-init:
+        condition: service_completed_successfully
     environment:
     - keyStoreCacheTimeout=${keyStoreCacheTimeout:-60}
     - postgres_host=postgres
-    - postgres_password=${postgres_password:-api}
+    - postgres_password=${postgres_vault_password:?postgres_vault_password is required}
     - postgres_port=5432
-    - postgres_user=postgres
+    - postgres_user=strato_vault
     - postgres_vault_wrapper_db=oauth
     - VAULTWRAPPER_DEBUG=${VAULTWRAPPER_DEBUG}
     image: ${VAULTWRAPPER_IMAGE:-registry-aws.blockapps.net:5000/blockapps/vault-wrapper:14.5.2-e324a42}
@@ -24,9 +25,23 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
+  pg-init:
+    image: postgres:9.6
+    entrypoint: ["/pg-init.sh"]
+    environment:
+      - postgres_host=postgres
+      - postgres_port=5432
+      - postgres_admin_password=${postgres_password:?postgres_password is required}
+      - postgres_vault_password=${postgres_vault_password:?postgres_vault_password is required}
+      - postgres_vault_wrapper_db=oauth
+    volumes:
+      - ../pg-init.sh:/pg-init.sh:ro
+    depends_on:
+      - postgres
+    restart: "no"
   postgres:
     environment:
-      - POSTGRES_PASSWORD=${postgres_password:-api}
+      - POSTGRES_PASSWORD=${postgres_password:?postgres_password is required}
     image: postgres:9.6
     volumes:
       - vaultpgdata:/var/lib/postgresql/data

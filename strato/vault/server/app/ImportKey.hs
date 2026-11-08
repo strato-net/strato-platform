@@ -24,8 +24,9 @@ main = do
   privateKeyHex <- filter (not . isSpace) <$> getContents
   privateKey <- decodePrivateKey privateKeyHex
   vaultPassword <- readVaultPassword
+  pgPassword <- readPgPassword
 
-  conn <- connect dbConnectInfo
+  conn <- connect (dbConnectInfo pgPassword)
   (mMsgLst :: [(B.ByteString, SB.Nonce, B.ByteString)]) <- runSelect conn VQ.getMessageQuery
   case mMsgLst of
     [] -> die "message table is empty, so the vault password must not be set. Aborting..."
@@ -41,13 +42,13 @@ main = do
         _ -> die "couldn't decrypt the secret message, probably you entered the wrong vault password"
     _ -> die "multiple rows in message table, something is not right"
 
-dbConnectInfo :: ConnectInfo
-dbConnectInfo =
+dbConnectInfo :: String -> ConnectInfo
+dbConnectInfo pgPassword =
   ConnectInfo
     { connectHost = flags_pghost,
       connectPort = read flags_pgport,
       connectUser = flags_pguser,
-      connectPassword = flags_password,
+      connectPassword = pgPassword,
       connectDatabase = flags_database
     }
 

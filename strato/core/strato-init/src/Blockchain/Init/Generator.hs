@@ -17,6 +17,7 @@ import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
 import Blockchain.Init.Options (flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer, flags_disableSqlIndexing, flags_disableCirrusIndexing, flags_syncFromFile)
+import Blockchain.Init.PgRoles (writeRolePasswords)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -92,13 +93,12 @@ createCommandsFile :: Role -> IO ()
 createCommandsFile role = do
   localAuthCommands <- if flags_localAuth
     then do
-      pgPassword <- filter (/= '\n') <$> readFile "secrets/postgres_password"
       -- The vault wrapper runs next to the other node processes, so it reaches
       -- Postgres the way genEthConf's sqlConfig does: on a host the IPv4
       -- loopback (postgres publishes on 127.0.0.1 only, but "localhost"
       -- resolves to ::1 first on macOS), in a container the service name. See
       -- storeHost.
-      return [restartable $ "blockapps-vault-wrapper-server --pghost " ++ storeHost "postgres" flags_pghost ++ " --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
+      return [restartable $ "blockapps-vault-wrapper-server --pghost " ++ storeHost "postgres" flags_pghost ++ " --pguser strato_vault --pgPasswordFile secrets/pg_vault_password --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
     else return []
 
   coreCommands <- if not (roleRunsCore role) then return [] else do
@@ -306,6 +306,8 @@ mkFilesAndGenesis nodeDir hasFlags network = do
       putStrLn $ "  Creating postgres password file: " ++ pgPasswordFile
       writeFile pgPasswordFile password
       void $ chmod roo pgPasswordFile
+
+    liftIO $ writeRolePasswords (regenerate && not (null flags_password))
 
     -- Session secret for nginx's encrypted session cookies. Every API-tier
     -- nginx must share it, or a cookie minted by one instance fails to

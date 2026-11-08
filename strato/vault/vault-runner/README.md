@@ -14,7 +14,7 @@ cp docker-compose.vault.yml strato/vault/vault-runner/
 
 ### Prerequisites
 
-- Docker with Compose v2
+- Docker with Compose v2 and OpenSSL
 
 ### Run
 
@@ -23,6 +23,13 @@ cd strato-platform/strato/vault/vault-runner
 ./run-vault.sh
 # > Enter vault password when prompted
 ```
+
+The first run creates `.env` with separate random PostgreSQL administrator and
+Vault login passwords. Keep this file with the `vaultpgdata` volume across
+restarts. When upgrading an existing volume, the script asks for its current
+PostgreSQL administrator password (the old Compose default was `api`) and
+creates a new Vault login password. The Vault encryption password prompted by
+`enter-password.sh` is separate from both database passwords.
 
 ### Configure your local STRATO with the local vault
 

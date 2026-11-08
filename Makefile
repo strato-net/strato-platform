@@ -54,21 +54,47 @@ $(info )
 dir_hash = $(shell git ls-files $(1) 2>/dev/null | LC_ALL=C sort | xargs sha256sum 2>/dev/null | sha256sum | cut -c1-12)
 
 # Image content hashes - used for docker tags
+ifndef HASH_STRATO
 HASH_STRATO := $(call dir_hash,strato)
+endif
+ifndef HASH_POSTGREST
 HASH_POSTGREST := $(call dir_hash,postgrest-packager)
+endif
+ifndef HASH_NGINX
 HASH_NGINX := $(call dir_hash,nginx-packager)
+endif
+ifndef HASH_APEX
 HASH_APEX := $(call dir_hash,apex)
+endif
+ifndef HASH_APP_BACKEND
 HASH_APP_BACKEND := $(call dir_hash,app/backend)
+endif
+ifndef HASH_APP_UI
 HASH_APP_UI := $(call dir_hash,app/ui)
+endif
 # app/nginx is built from the Lua files copied in from nginx-packager (see
 # the app-nginx target), so its tag covers both or it would describe stale Lua.
+ifndef HASH_APP_NGINX
 HASH_APP_NGINX := $(call dir_hash,app/nginx nginx-packager/openid.tpl.lua nginx-packager/csrf.lua nginx-packager/tracing.lua)
+endif
+ifndef HASH_PROMETHEUS
 HASH_PROMETHEUS := $(call dir_hash,prometheus-packager)
+endif
+ifndef HASH_SMD
 HASH_SMD := $(call dir_hash,smd-ui)
+endif
+ifndef HASH_BRIDGE
 HASH_BRIDGE := $(call dir_hash,app/services/bridge)
+endif
+ifndef HASH_BRIDGE_NGINX
 HASH_BRIDGE_NGINX := $(call dir_hash,app/services/bridge/nginx)
+endif
+ifndef HASH_HISTORY
 HASH_HISTORY := $(call dir_hash,app/services/history)
+endif
+ifndef HASH_LOCAL_AUTH
 HASH_LOCAL_AUTH := $(call dir_hash,local-auth)
+endif
 
 # Check if image exists in Docker — rebuild if missing (hash in tag handles source changes)
 # Usage: $(call image_missing,image_name_with_tag)
@@ -215,19 +241,21 @@ history:
 
 all: local
 
-local: build_common apex nginx postgrest prometheus smd app-backend app-ui bridge bridge-nginx oracle local-auth
+local: build_common strato_docker apex nginx postgrest prometheus smd app-backend app-ui bridge bridge-nginx oracle local-auth
 
-# What a --role=validator directory runs: the binaries plus the two images it
-# starts (postgres and redis are stock images, pulled by compose). No app, SMD,
+# What a --role=validator directory runs: the binaries plus pg-init's strato
+# image and the two service images it starts (postgres and redis are stock
+# images, pulled by compose). No app, SMD,
 # nginx, PostgREST, bridge, oracle or local-auth builds.
-validator: build_common apex prometheus
+validator: build_common strato_docker apex prometheus
 
-# What a --role=api-node directory runs: the binaries plus the four images it
-# starts (postgres and redis are stock images, pulled by compose). With
+# What a --role=api-node directory runs: the binaries plus pg-init's strato
+# image and the four service images it starts (postgres and redis are stock
+# images, pulled by compose). With
 # --monitoring=false the apex and prometheus images go unused; with
 # --localAuth add the local-auth image (make api-node local-auth). No app,
 # SMD, bridge or oracle builds.
-api-node: build_common nginx apex prometheus postgrest
+api-node: build_common strato_docker nginx apex prometheus postgrest
 
 docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle local-auth docker-compose
 
@@ -433,6 +461,7 @@ profile: build_common_profiled
 vault-wrapper: build_common_docker
 	@echo Now building vault-wrapper...
 	cp strato/vault/doit.sh ${VAULTDIR}
+	cp strato/vault/pg-init.sh ${VAULTDIR}
 	docker build --target vault-wrapper --tag ${REPO_AWS_ECR_URL}vault-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 
 # Builds the migrate-key admin tool on the host and installs it to ~/.local/bin.

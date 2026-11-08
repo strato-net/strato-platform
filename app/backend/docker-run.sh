@@ -39,8 +39,8 @@ else
 fi
 
 # Read Postgres password for direct DB queries
-if [ -f /run/secrets/postgres_password ]; then
-  export postgres_password=$(cat /run/secrets/postgres_password)
+if [ -f /run/secrets/pg_app_password ]; then
+  export postgres_password=$(cat /run/secrets/pg_app_password)
 fi
 
 echo "Waiting for STRATO node to finish syncing (checking ${STRATO_API_URL}/metadata for isSynced=true)..."

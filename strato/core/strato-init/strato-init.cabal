@@ -25,6 +25,7 @@ library
       Blockchain.Init.BuildMetadata.TH
       Blockchain.Init.Monad
       Blockchain.Init.Options
+      Blockchain.Init.PgRoles
       Blockchain.Init.Role
       Blockchain.Init.RtsFlags
   other-modules:
@@ -45,6 +46,7 @@ library
     , composable-monads-base
     , conduit
     , containers
+    , cryptonite
     , data-default
     , directory
     , entropy
@@ -53,6 +55,7 @@ library
     , hflags
     , http-types
     , leveldb-haskell
+    , memory
     , monad-alter
     , nibblestring
     , process

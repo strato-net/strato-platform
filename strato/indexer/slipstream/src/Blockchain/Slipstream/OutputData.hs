@@ -548,10 +548,10 @@ slipstreamQueryText _ (CreateFkeyFunction ForeignKeyInfo{..}) = T.concat
   , fkiFunctionName
   , "\"(\n  "
   , tableNameToDoubleQuoteText fkiSourceTableName
-  , "\n) TO postgres;\n\n"
+  , "\n) TO strato_cirrus_anon;\n\n"
   , "GRANT SELECT ON "
   , tableNameToDoubleQuoteText fkiDestTableName
-  , " TO postgres;"
+  , " TO strato_cirrus_anon;"
   ]
 slipstreamQueryText _ (RefreshMaterializedView _tableName) = T.concat []
   -- [ "REFRESH MATERIALIZED VIEW CONCURRENTLY "

@@ -1,6 +1,21 @@
 #!/bin/bash
 set -e
 
+cd "$(dirname "$0")"
+if [ ! -f .env ]; then
+  umask 077
+  if sudo docker volume inspect vault_vaultpgdata >/dev/null 2>&1; then
+    read -r -s -p "Existing PostgreSQL administrator password: " postgres_password
+    echo
+    [ -n "$postgres_password" ] || { echo "PostgreSQL password is required" >&2; exit 1; }
+  else
+    postgres_password=$(openssl rand -hex 32)
+  fi
+  postgres_vault_password=$(openssl rand -hex 32)
+  printf 'postgres_password=%s\npostgres_vault_password=%s\n' \
+    "$postgres_password" "$postgres_vault_password" > .env
+fi
+
 sudo \
   ssl=false \
   HTTP_PORT=8080 \

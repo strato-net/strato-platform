@@ -26,19 +26,8 @@ do
 done
 echo 'postgres is available'
 
-PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
-# Check if this container was initialized before
-if [ ! -f _container_initialized ]; then
-    # Create the database for vault-wrapper if does not exist from previous STRATO deployments (e.g. STRATO upgrade flow)
-    if ! PGPASSWORD=${postgres_password} psql ${PSQL_CONNECTION_PARAMS} -lqt | cut -d \| -f 1 | grep -qw ${postgres_vault_wrapper_db}; then
-      echo "Creating the '${postgres_vault_wrapper_db}' database"
-      PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_vault_wrapper_db}
-    else
-      echo "Using the existing '${postgres_vault_wrapper_db}' database from previous STRATO deployment"
-    fi
-    # Create the '_container_initialized' sentinel file
-    date '+%Y-%m-%d %H:%M:%S' > _container_initialized
-fi
+PGPASSWORD=${postgres_password} psql -h "$postgres_host" -p "$postgres_port" -U "$postgres_user" \
+  -d "$postgres_vault_wrapper_db" -v ON_ERROR_STOP=1 -Atqc 'SELECT 1' > /dev/null
 
 RED='\033[0;31m'
 NC='\033[0m' # No Color

@@ -10,7 +10,7 @@ import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.EthConf (containerMode, nodeHostname)
 import Blockchain.Init.Role
-import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_discoveryPort, flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_p2pPort, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_monitoring, flags_publicStratoRpc, flags_repoUrl, flags_sslDir)
+import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_discoveryPort, flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_p2pPort, flags_pghost, flags_pguser, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_monitoring, flags_publicStratoRpc, flags_repoUrl, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -31,16 +31,16 @@ apexPort = 80
 -- strato-api.
 roleHasService :: Bool -> Role -> String -> Bool
 roleHasService _ RoleNode _ = True
-roleHasService _ RoleCore name = name `elem` ["postgres", "redis", "streaming", "prometheus"]
+roleHasService _ RoleCore name = name `elem` ["postgres", "pg-init", "redis", "streaming", "prometheus"]
 roleHasService _ RoleApi name = name `elem` ["nginx", "postgrest", "docs"]
 -- A validator keeps its stores and Prometheus, plus apex: the network monitor
 -- polls its /health, published directly since there is no nginx.
-roleHasService _ RoleValidator name = name `elem` ["postgres", "redis", "streaming", "prometheus", "apex"]
+roleHasService _ RoleValidator name = name `elem` ["postgres", "pg-init", "redis", "streaming", "prometheus", "apex"]
 -- An api-node keeps everything the APIs need and drops what only serves
 -- people: no docs, smd or app-*. Prometheus and apex produce /health for the
 -- network monitor and stay unless --monitoring=false; local-auth is in the
 -- service list only with --localAuth, as on a node.
-roleHasService monitoring RoleApiNode name = name `elem` (["postgres", "redis", "streaming", "nginx", "postgrest", "local-auth"] ++ [ svc | monitoring, svc <- ["prometheus", "apex"] ])
+roleHasService monitoring RoleApiNode name = name `elem` (["postgres", "pg-init", "redis", "streaming", "nginx", "postgrest", "local-auth"] ++ [ svc | monitoring, svc <- ["prometheus", "apex"] ])
 
 generateDockerCompose :: Role -> IO ()
 generateDockerCompose role = do
@@ -67,6 +67,9 @@ generateDockerCompose role = do
       withPostgres :: [String] -> [String]
       withPostgres svcs = [svc | svc <- svcs, externalPostgres `implies` (svc /= "postgres")]
       implies a b = not a || b
+      withPgInit svcs = DependsOnMap $ Map.fromList
+        ([ (svc, DependsOnCondition "service_started") | svc <- withPostgres svcs ]
+        ++ [ ("pg-init", DependsOnCondition "service_completed_successfully") | roleRunsCore role ])
   uid <- show <$> getEffectiveUserID
   gid <- show <$> getEffectiveGroupID
   
@@ -101,14 +104,14 @@ generateDockerCompose role = do
   let appBackend = def
         { image = imageRef "app-backend" hashAppBackend
         , user = Just userGid
-        , depends_on = Just $ DependsOnList (withPostgres (["postgres"] ++ [ "postgrest" | bundledPostgrest ]))
+        , depends_on = Just $ withPgInit (["postgres"] ++ [ "postgrest" | bundledPostgrest ])
         , init = Just True
         , extra_hosts = hostGateway
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
             , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
-            , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
+            , "./secrets/pg_app_password:/run/secrets/pg_app_password:ro"
             ]
         , environment = Just $ Map.fromList $
             [ ("RPC_URL_MAINNET", "${RPC_URL_MAINNET:-}")
@@ -137,7 +140,7 @@ generateDockerCompose role = do
             , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY:-}")
             , ("postgres_host", pgReaderHost)
             , ("postgres_port", "5432")
-            , ("postgres_user", "postgres")
+            , ("postgres_user", "strato_app")
             ]
             ++ containerOnly [("STRATO_HOSTNAME", "strato")]
         , entrypoint = Just ["/bin/sh", "-c"]
@@ -178,12 +181,12 @@ generateDockerCompose role = do
   let apex = def
         { image = imageRef "apex" hashApex
         , user = Just userGid
-        , depends_on = Just $ DependsOnList (withPostgres ["postgres", "prometheus"] ++ [ "redis" | hasService "redis" ])
+        , depends_on = Just $ withPgInit (["postgres", "prometheus"] ++ [ "redis" | hasService "redis" ])
         , extra_hosts = hostGateway
         , environment = Just $ Map.fromList $
             [ ("postgres_host", pgWriterHost)
             , ("postgres_port", "5432")
-            , ("postgres_user", "postgres")
+            , ("postgres_user", "strato_apex")
             ]
             -- apex reads the last block and validators from Redis wherever the
             -- node has one, so it starts after Redis. On a validator it requires
@@ -196,7 +199,7 @@ generateDockerCompose role = do
         , ports = if role == RoleValidator then Just [show apexPort ++ ":3009"] else Nothing
         , volumes = Just
             [ "./logs:/logs"
-            , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
+            , "./secrets/pg_apex_password:/run/secrets/pg_apex_password:ro"
             , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
@@ -235,17 +238,19 @@ generateDockerCompose role = do
   let postgrest = def
         { image = imageRef "postgrest" hashPostgrest
         , user = Just userGid
-        , depends_on = Just $ DependsOnList (withPostgres ["postgres"])
+        , depends_on = Just $ withPgInit ["postgres"]
         , environment = Just $ Map.fromList
             [ ("PG_ENV_POSTGRES_DB", "cirrus")
             , ("PG_ENV_POSTGRES_HOST", pgReaderHost)
-            , ("PG_ENV_POSTGRES_USER", "postgres")
+            , ("PG_ENV_POSTGRES_USER", "strato_postgrest")
             , ("PG_PORT_5432_TCP_PORT", "5432")
+            , ("POSTGREST_ANONYMOUS", "strato_cirrus_anon")
+            , ("POSTGREST_SCHEMA", "public")
             , ("POSTGREST_LOG_LEVEL", "error")
             ]
         , volumes = Just
             [ "./logs:/logs"
-            , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
+            , "./secrets/pg_postgrest_password:/run/secrets/pg_postgrest_password:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec sh /doit.sh >> /logs/postgrest.log 2>&1"]
@@ -282,6 +287,32 @@ generateDockerCompose role = do
             }
         , logging = noLogging
         , ports = publish ["127.0.0.1:5432:5432"]
+        }
+
+  let pgInit = def
+        { image = imageRef "strato" hashStrato
+        , user = Just userGid
+        , depends_on = if externalPostgres then Nothing else Just $ DependsOnMap $ Map.singleton "postgres" (DependsOnCondition "service_healthy")
+        , environment = Just $ Map.fromList
+            [ ("PG_ADMIN_HOST", pgWriterHost)
+            , ("PG_ADMIN_PORT", "5432")
+            , ("PG_ADMIN_USER", flags_pguser)
+            , ("PG_HAS_CIRRUS", if roleRunsCirrus role then "true" else "false")
+            , ("PG_HAS_APEX", if hasService "apex" then "true" else "false")
+            , ("PG_HAS_LOCAL_AUTH", if flags_localAuth then "true" else "false")
+            , ("PG_HAS_HISTORY", if roleRunsCirrus role then "true" else "false")
+            , ("LOCAL_AUTH_RESET", "${LOCAL_AUTH_RESET:-false}")
+            ]
+        , volumes = Just
+            [ "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
+            , "./secrets:/run/secrets:ro"
+            , "./logs:/logs"
+            ]
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["/strato/pg-init.sh >> /logs/pg-init.log 2>&1"]
+        , healthcheck = Just $ def { test = ["NONE"] }
+        , restart = Just "no"
+        , logging = noLogging
         }
 
 
@@ -427,11 +458,11 @@ generateDockerCompose role = do
 
   let localAuth = def
         { image = imageRef "local-auth" hashLocalAuth
-        , depends_on = Just $ DependsOnList (withPostgres ["postgres"])
+        , depends_on = Just $ withPgInit ["postgres"]
         , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
-            [ ("DSN", "postgres://postgres@" ++ pgWriterHost ++ ":5432/kratos?sslmode=disable")
-            , ("HYDRA_DSN", "postgres://postgres@" ++ pgWriterHost ++ ":5432/hydra?sslmode=disable")
+            [ ("DSN", "postgres://strato_auth@" ++ pgWriterHost ++ ":5432/kratos?sslmode=disable")
+            , ("HYDRA_DSN", "postgres://strato_auth@" ++ pgWriterHost ++ ":5432/hydra?sslmode=disable")
             ]
         , healthcheck = Just Healthcheck
             { test = ["CMD", "curl", "-f", "http://localhost:4444/.well-known/openid-configuration"]
@@ -442,7 +473,11 @@ generateDockerCompose role = do
             }
         , volumes = Just
             [ "./logs:/logs"
-            , "./secrets:/run/secrets:ro"
+            , "./secrets/pg_auth_password:/run/secrets/pg_auth_password:ro"
+            , "./secrets/local_auth_hydra_system_secret:/run/secrets/local_auth_hydra_system_secret:ro"
+            , "./secrets/local_auth_hydra_pairwise_salt:/run/secrets/local_auth_hydra_pairwise_salt:ro"
+            , "./secrets/local_auth_kratos_cookie_secret:/run/secrets/local_auth_kratos_cookie_secret:ro"
+            , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
             , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
@@ -465,6 +500,7 @@ generateDockerCompose role = do
             , ("redis", redis)
             , ("postgrest", postgrest)
             , ("postgres", postgres)
+            , ("pg-init", pgInit)
             , ("nginx", nginx)
             , ("docs", docs)
             , ("prometheus", prometheus)
@@ -531,8 +567,9 @@ generateDockerCompose role = do
         , user = Just userGid
         , init = Just True
         , depends_on = Just $ DependsOnMap $ Map.fromList
-            [ (svc, DependsOnCondition "service_healthy")
-            | svc <- withPostgres ["postgres"] ++ [ "redis" | hasService "redis" ] ++ [ "local-auth" | flags_localAuth ] ]
+            ([ (svc, DependsOnCondition "service_healthy")
+             | svc <- withPostgres ["postgres"] ++ [ "redis" | hasService "redis" ] ++ [ "local-auth" | flags_localAuth ] ]
+             ++ [ ("pg-init", DependsOnCondition "service_completed_successfully") | roleRunsCore role ])
         , extra_hosts = hostGateway
         -- strato-logrotate reads its thresholds from the environment: on a host
         -- it inherits strato-up's, here compose passes them through from the

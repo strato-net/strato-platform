@@ -55,16 +55,21 @@ Numerics are strings (uint256 does not fit a JSON number). Times are ISO
 
 ## Storage
 
-Postgres, its own database (`HISTORY_DB_NAME`, created on first start).
+Postgres, its own database (`HISTORY_DB_NAME`, provisioned before the service
+starts on a node). Set `HISTORY_DB_CREATE=true` only when running the service
+standalone with a login allowed to create databases.
 `price_observations`, `swaps` and `balance_changes` are partitioned by month
 on block time; the indexer creates partitions as it goes.
 
 ## Running
 
 ```
-postgres_host=... postgres_password=... NODE_URL=https://app.example \
+postgres_host=... postgres_user=strato_history postgres_password=... NODE_URL=https://app.example \
 npm start
 ```
+
+The standalone app Compose file reads `postgres_history_password` from its
+environment. Node services read `secrets/pg_history_password`.
 
 `npm test` runs the feed-independent checks, then the Postgres suite
 (`test/db.test.ts`: partitions, idempotent replay, feed ordering) when

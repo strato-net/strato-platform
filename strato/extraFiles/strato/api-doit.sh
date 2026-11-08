@@ -9,7 +9,7 @@
 # STRATO_CONF, so nothing here depends on the working-directory convention.
 #
 # Environment (all optional unless noted):
-#   postgres_host, postgres_port, postgres_user   writer endpoint (host required)
+#   postgres_host, postgres_port                  writer endpoint (host required)
 #   postgres_reader_host                          replica endpoint for reads
 #   ETHCONF_BASE64                                the node config, when not mounted
 #   INGRESS_URLS (required)                       the core cells' transaction ingress
@@ -17,7 +17,7 @@
 #                                                 a batch is posted to every one
 #   VM_QUERY (default true), VM_QUERY_URLS        this copy's vm-query, and other
 #                                                 copies' to try when it is down
-#   postgres_password | /run/secrets/postgres_password
+#   /run/secrets/pg_eth_password and pg_cirrus_password
 #   VAULT_URL                                     vault-wrapper base URL
 #   OAUTH_CREDENTIALS_YAML | /run/secrets/oauth_credentials.yaml
 #     | OAUTH_DISCOVERY_URL + OAUTH_CLIENT_ID + OAUTH_CLIENT_SECRET
@@ -51,8 +51,15 @@ cd "$STRATO_API_DIR"
 CONF="$STRATO_API_DIR/ethconf.yaml"
 cp "$ETHCONF_FILE" "$CONF"
 
-if [[ -z "${postgres_password:-}" && -f /run/secrets/postgres_password ]]; then
-  postgres_password=$(tr -d '[:space:]' < /run/secrets/postgres_password)
+if [[ -f /run/secrets/pg_eth_password ]]; then
+  postgres_eth_password=$(tr -d '[:space:]' < /run/secrets/pg_eth_password)
+fi
+if [[ -f /run/secrets/pg_cirrus_password ]]; then
+  postgres_cirrus_password=$(tr -d '[:space:]' < /run/secrets/pg_cirrus_password)
+fi
+if [[ -z "${postgres_eth_password:-}" || -z "${postgres_cirrus_password:-}" ]]; then
+  echo 'api-doit.sh: both PostgreSQL role passwords are required' >&2
+  exit 7
 fi
 
 # Endpoint overrides. Anything unset keeps the mounted config's value.
@@ -72,10 +79,10 @@ override     '.sqlConfig.host'                 "${postgres_host:-}"
 override     '.cirrusConfig.host'              "${postgres_reader_host:-${postgres_host:-}}"
 override_num '.sqlConfig.port'                 "${postgres_port:-}"
 override_num '.cirrusConfig.port'              "${postgres_port:-}"
-override     '.sqlConfig.user'                 "${postgres_user:-}"
-override     '.cirrusConfig.user'              "${postgres_user:-}"
-override     '.sqlConfig.password'             "${postgres_password:-}"
-override     '.cirrusConfig.password'          "${postgres_password:-}"
+override     '.sqlConfig.user'                 'strato_eth'
+override     '.cirrusConfig.user'              'strato_cirrus'
+override     '.sqlConfig.password'             "$postgres_eth_password"
+override     '.cirrusConfig.password'          "$postgres_cirrus_password"
 override     '.urlConfig.vaultUrl'             "${VAULT_URL:-}"
 # Submitted transactions go to every core cell's ingress (strato-ingest);
 # this tier runs no sequencer and never writes a stream of its own.

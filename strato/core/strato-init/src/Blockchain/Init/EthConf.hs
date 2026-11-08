@@ -5,6 +5,7 @@ module Blockchain.Init.EthConf (genEthConf, containerMode, nodeHostname, preferI
 
 import Blockchain.EthConf
 import Blockchain.Init.Options hiding (flags_localAuth)
+import Blockchain.Init.PgRoles (rolePassword)
 import Blockchain.Init.Role
 import Control.Monad.Composable.Streaming.DockerConfig (brokerConfig, bcHost, bcPort)
 import qualified Blockchain.Init.Options as Opts
@@ -160,7 +161,8 @@ flagsNetworkIdentity = (flags_network, computeNetworkID, computeChainId flags_ne
 
 genEthConf :: Role -> IO EthConf
 genEthConf nodeRole = do
-  pgPass <- filter (/= '\n') <$> readFile "secrets/postgres_password"
+  ethPass <- rolePassword "eth"
+  cirrusPass <- rolePassword "cirrus"
 
   localHostname <- nodeHostname
 
@@ -183,9 +185,9 @@ genEthConf nodeRole = do
   -- given; its writes (and consistency-sensitive reads) stay on --pghost.
   let readerHost = if null flags_pgReaderHost || nodeRole /= RoleApi then Nothing else Just flags_pgReaderHost
       writerSql = (sqlConfig runtimeConfig)
-        { user = flags_pguser
+        { user = "strato_eth"
         , host = storeHost "postgres" flags_pghost
-        , password = pgPass
+        , password = ethPass
         }
 
   let commaList = words . map (\c -> if c == ',' then ' ' else c)
@@ -213,9 +215,9 @@ genEthConf nodeRole = do
     , sqlConfig = writerSql
     , sqlReaderConfig = (\h -> writerSql { host = h }) <$> readerHost
     , cirrusConfig = (cirrusConfig runtimeConfig)
-        { user = flags_pguser
+        { user = "strato_cirrus"
         , host = maybe (storeHost "postgres" flags_pghost) id readerHost
-        , password = pgPass
+        , password = cirrusPass
         }
     , streamingConfig = (streamingConfig runtimeConfig)
         { streamingHost = if flags_kafkahost == "localhost"

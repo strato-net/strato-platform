@@ -24,11 +24,18 @@ if [[ -f .strato.pid ]]; then
     source .strato.pid
     if [[ -n "$CONVOKE_PID" ]] && kill -0 "$CONVOKE_PID" 2>/dev/null; then
         kill "$CONVOKE_PID" 2>/dev/null || true
-        tail --pid="$CONVOKE_PID" -f logs/convoke.log 2>/dev/null || true
+        for _ in $(seq 1 30); do
+            kill -0 "$CONVOKE_PID" 2>/dev/null || break
+            sleep 1
+        done
     fi
     rm -f .strato.pid
 else
     echo "No pidfile found"
 fi
+
+# Convoke normally stops the containers itself. Also do it here so a failed
+# startup or a platform without GNU tail cannot leave the project running.
+docker compose -p strato down
 
 echo "STRATO stopped"

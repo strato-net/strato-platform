@@ -23,7 +23,6 @@ import Control.Monad.Composable.Streaming (createTopicAndWait)
 import Control.Monad.Composable.Base (runEff, withResources)
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader (runReaderT)
 import Data.String (fromString)
 import Data.Text.Encoding (encodeUtf8)
 import qualified Data.Text as T
@@ -32,7 +31,6 @@ import HFlags
 import Instrumentation
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
-import UnliftIO.Exception (catch, SomeException)
 
 main :: IO ()
 main = do
@@ -53,15 +51,9 @@ main = do
 
       createTopicAndWait "vmevents"
 
-      -- Create cirrus database if it doesn't exist
       let cirrusConf = EC.cirrusConfig ethConf
-          rawConn = EC.postgreSQLConnectionString cirrusConf {EC.database = ""}
           cirrusDb = EC.database cirrusConf
-          query = T.pack $ "CREATE DATABASE " ++ show cirrusDb ++ ";"
-      $logInfoS "main" $ T.pack $ "Ensuring cirrus database exists: " ++ cirrusDb
-      catch
-        (withPostgresqlConn rawConn (runReaderT (rawExecute query [])))
-        (\(_ :: SomeException) -> $logInfoS "main" "Database already exists, continuing")
+      $logInfoS "main" $ T.pack $ "Using cirrus database: " ++ cirrusDb
 
       conn <- createPostgresqlPool cirrusConnStr 10
       liftIO $ runSqlPersistMPool (runMigration migrateAll) conn

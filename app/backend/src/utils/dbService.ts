@@ -13,18 +13,18 @@ let pool: Pool | null = null;
 /**
  * Initialize the Postgres connection pool for direct cirrus DB queries.
  * Reads connection config from postgres_* environment variables (same naming as other services)
- * and /run/secrets/postgres_password (exported as postgres_password in docker-run.sh).
+ * and /run/secrets/pg_app_password (exported as postgres_password in docker-run.sh).
  */
 export function initDbPool(): void {
   const password = process.env.postgres_password;
   if (!password) {
-    throw new Error("postgres_password is not set. Ensure postgres_password secret is mounted.");
+    throw new Error("postgres_password is not set. Ensure pg_app_password secret is mounted.");
   }
 
   const config: PoolConfig = {
     host: process.env.postgres_host || "postgres",
     port: parseInt(process.env.postgres_port || "5432", 10),
-    user: process.env.postgres_user || "postgres",
+    user: process.env.postgres_user || "strato_app",
     password,
     database: cirrusDbName,
     max: 10,

@@ -44,14 +44,13 @@ export const config = {
   db: {
     host: process.env.postgres_host || "postgres",
     port: Number(process.env.postgres_port || 5432),
-    user: process.env.postgres_user || "postgres",
+    user: process.env.postgres_user || "strato_history",
     password: process.env.postgres_password || "",
     database: dbName,
     ssl: parseDbSsl(),
-    // Existing DB used only for CREATE DATABASE (skipped when createDatabase
-    // is off, e.g. an RDS user without CREATEDB and a pre-created database)
+    // Database creation is performed by the one-shot node provisioner.
     maintenanceDb: process.env.POSTGRES_MAINTENANCE_DB || "postgres",
-    createDatabase: process.env.HISTORY_DB_CREATE !== "false",
+    createDatabase: process.env.HISTORY_DB_CREATE === "true",
   },
   // The feed: Cirrus's global event table, paged by id (block_number sorts
   // as text there, so never page by it).

@@ -18,11 +18,10 @@ import Control.Monad.Composable.Base (Eff, Logger, (:>))
 import Control.Monad.Composable.Streaming (createTopicAndWait)
 import Control.Monad.Trans.Reader (runReaderT)
 import qualified Data.Text as T
-import Database.Persist.Postgresql (withPostgresqlConn, rawExecute, runMigration)
+import Database.Persist.Postgresql (withPostgresqlConn, runMigration)
 import qualified Blockchain.EthConf as UEC
 import qualified Blockchain.EthConf.Model as EC
 import qualified Text.Colors as CL
-import UnliftIO.Exception (catch, SomeException)
 
 -- | The index events topic, which vm-runner writes and this process reads.
 bootstrapIndexerTopic :: Eff es ()
@@ -35,16 +34,10 @@ bootstrapIndexer = do
   bootstrapIndexerTopic
   let ethconf = UEC.ethConf
       pgconf = EC.sqlConfig ethconf
-      rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}
       localConn = EC.postgreSQLConnectionString pgconf
       db = EC.database pgconf
 
-  $logInfoS "strato-index" . T.pack $ CL.yellow $ "Creating database: " ++ db
-  let query = T.pack $ "CREATE DATABASE " ++ show db ++ ";"
-
-  catch
-    (withPostgresqlConn rawConn (runReaderT (rawExecute query [])))
-    (\(_ :: SomeException) -> $logInfoS "strato-index" "Database already exists, skipping")
+  $logInfoS "strato-index" . T.pack $ CL.yellow $ "Using database: " ++ db
 
   withPostgresqlConn localConn $
     runReaderT $ do

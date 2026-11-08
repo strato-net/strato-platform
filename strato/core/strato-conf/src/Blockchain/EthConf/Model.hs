@@ -459,8 +459,8 @@ instance FromJSON VmConf where
 
 instance Default SqlConf where
   def = SqlConf
-    { user = "postgres"
-    , password = "api"
+    { user = "strato_eth"
+    , password = ""
     , host = "localhost"
     , port = 5432
     , database = "eth"
@@ -574,7 +574,7 @@ instance Default EthConf where
   def = EthConf
     { sqlConfig = def
     , sqlReaderConfig = Nothing
-    , cirrusConfig = def { database = "cirrus" }
+    , cirrusConfig = def { user = "strato_cirrus", database = "cirrus" }
     , ingressUrls = []
     , cellId = Nothing
     , peerDbConfig = Nothing

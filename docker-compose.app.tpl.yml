@@ -7,7 +7,7 @@
 #   postgres_*          the node's cirrus database (read-only pool), until the
 #                       managed cluster exists
 #   OAUTH_*             the app's own OIDC client
-# Put secrets/session_secret and secrets/postgres_password next to this file.
+# Put secrets/session_secret and secrets/pg_app_password next to this file.
 services:
   backend:
     image: ${APP_BACKEND_IMAGE:-<REPO_URL>app-backend:<VERSION>-<HASH_APP_BACKEND>}
@@ -19,8 +19,8 @@ services:
       - BASE_URL=${BASE_URL:-}
       - postgres_host=${postgres_host:?postgres_host is required}
       - postgres_port=${postgres_port:-5432}
-      - postgres_user=${postgres_user:-postgres}
-      - postgres_password=${postgres_password:-}
+      - postgres_user=strato_app
+      - postgres_password=${postgres_app_password:-}
       - RPC_URL_MAINNET=${RPC_URL_MAINNET:-}
       - RPC_URL_MAINNET_FALLBACK=${RPC_URL_MAINNET_FALLBACK:-}
       - RPC_URL_SEPOLIA=${RPC_URL_SEPOLIA:-}
@@ -44,7 +44,7 @@ services:
       - SAVE_USDST_VAULT=${SAVE_USDST_VAULT:-}
       - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
     volumes:
-      - ./secrets/postgres_password:/run/secrets/postgres_password:ro
+      - ./secrets/pg_app_password:/run/secrets/pg_app_password:ro
     restart: unless-stopped
     logging:
       driver: "json-file"

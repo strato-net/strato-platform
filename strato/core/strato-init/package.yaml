@@ -26,6 +26,7 @@ library:
     - Blockchain.Init.BuildMetadata.TH
     - Blockchain.Init.Monad
     - Blockchain.Init.Options
+    - Blockchain.Init.PgRoles
     - Blockchain.Init.Role
     - Blockchain.Init.RtsFlags
   dependencies:
@@ -40,12 +41,14 @@ library:
   - common-log
   - conduit
   - containers
+  - cryptonite
   - directory
   - filepath
   - format
   - hflags
   - http-types
   - leveldb-haskell
+  - memory
   - monad-alter
   - nibblestring
   - entropy

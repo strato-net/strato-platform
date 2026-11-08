@@ -8,8 +8,8 @@ export PROMETHEUS_HOST=${PROMETHEUS_HOST:-'prometheus:9090'}
 source set-aux-env-vars.sh
 
 # Read postgres password from mounted secrets file
-if [ -f /run/secrets/postgres_password ]; then
-  postgres_password=$(cat /run/secrets/postgres_password)
+if [ -f /run/secrets/pg_apex_password ]; then
+  postgres_password=$(cat /run/secrets/pg_apex_password)
 fi
 
 # Set postgres configurations. Write via temp files and overwrite (rather than
