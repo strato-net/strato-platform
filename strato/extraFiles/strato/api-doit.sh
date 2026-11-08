@@ -1,5 +1,5 @@
 #!/bin/bash
-# Entrypoint for the API tier (docker-compose.api.yml): strato-api and
+# Entrypoint for the API tier (the ha-infra api-tier task): strato-api and
 # ethereum-jsonrpc from the strato image, with nginx as a sidecar container.
 #
 # Config: a node's ethconf.yaml mounted at /config/ethconf.yaml supplies the
