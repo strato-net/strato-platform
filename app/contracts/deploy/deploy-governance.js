@@ -9,7 +9,7 @@ require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
 const fs = require('fs');
-const { rest, util } = require('blockapps-rest');
+const { rest, util } = require('./strato');
 const { getCreatedAddress, getIssueId, pollForCreateIssueExecution } = require('./util');
 
 const GOVERNANCE_PROXY = '0000000000000000000000000000000000000100';

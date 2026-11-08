@@ -12,6 +12,7 @@ module OptimizerSpec where
 
 --pick, pre,
 
+import Control.Exception (throw)
 import BlockApps.Logging
 import Control.Monad.Composable.Base (runEff)
 import Blockchain.DB.CodeDB
@@ -56,7 +57,7 @@ runOptimizer :: String -> IO CodeCollection
 runOptimizer c = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT $ do
   eCC <- compileSourceWithAnnotations True True (M.fromList [("", T.pack c)])
   case eCC of
-    Left _ -> internalError "Compilation Error" ()
+    Left _ -> throw (InternalError "Compilation Error")
     Right cc -> pure cc
 
 runTestOptimizer :: CodeCollection -> IO ()

@@ -3,6 +3,7 @@
 
 module Blockchain.Slipstream.QueryFormatHelper where
 
+import Data.Char (isAlphaNum, isAscii)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Map as Map
@@ -108,6 +109,12 @@ escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
 
 escapeQuestionMarks :: T.Text -> T.Text
 escapeQuestionMarks = T.replace "?" "??"
+
+-- | A code collection's creator is chosen by whoever deploys it and ends up in
+-- table names, view definitions and SQL literals. Keep it to the characters
+-- legitimate creators use, so it can never break out of the quoting around it.
+sanitizeCreator :: T.Text -> T.Text
+sanitizeCreator = T.map (\c -> if isAscii c && (isAlphaNum c || c `elem` ("._@-" :: String)) then c else '_')
 
 escapeUnderscores :: T.Text -> T.Text
 escapeUnderscores = T.replace "_" "\\_"

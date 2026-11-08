@@ -4,6 +4,7 @@
 -- No `Value` sum type at runtime: every compiled closure has an exact Haskell type.
 module SolidVM.Core where
 
+import Text.Format (format)
 import Control.Exception
 import Control.Monad.Reader
 import qualified Data.ByteString as B
@@ -17,7 +18,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Type.Equality
-import Blockchain.SolidVM.Exception (SolidException (TooMuchGas))
+import Blockchain.SolidVM.Exception (SolidException (InternalError, TooMuchGas))
 import Data.Bits ((.|.), (.&.), xor, shiftL, shiftR)
 import Blockchain.Strato.Model.Address (Address (..))
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
@@ -122,13 +123,13 @@ data Dyn = forall t. Dyn (Ty t) t
 showDyn :: Dyn -> T.Text
 showDyn (Dyn t v) = case t of
   TDecimal -> T.pack (show v)
-  TInt -> T.pack (show v); TBool -> T.pack (show v); TAddr -> T.pack (show v); TStr -> T.pack (show v)
-  TBytes -> T.pack (show v); TEnum n ns -> let i = enumNumber v in n <> "." <> (if i >= 0 && fromIntegral i < length ns then ns !! fromIntegral i else T.pack (show i))
+  TInt -> T.pack (show v); TBool -> T.pack (show v); TAddr -> T.pack (show v); TStr -> v
+  TBytes -> T.pack (format v); TEnum n ns -> let i = enumNumber v in n <> "." <> (if i >= 0 && fromIntegral i < length ns then ns !! fromIntegral i else T.pack (show i))
   TContract n -> n <> "(" <> T.pack (show v) <> ")"; TUnit -> "()"
   TArr et -> "[" <> T.intercalate "," (map (showDyn . Dyn et) (F.toList v)) <> "]"
   TStruct n fs -> n <> "{" <> T.intercalate "," (showFields fs v) <> "}"
   TTuple fs -> "(" <> T.intercalate "," (showFields fs v) <> ")"
-  TVariadic -> "[" <> T.intercalate "," (map showDyn v) <> "]"; TMaybe _ -> "<maybe>"; TRef _ -> T.pack (show v)
+  TVariadic -> "[" <> T.intercalate "," (map showDyn v) <> "]"; TMaybe _ -> "<maybe>"; TRef _ -> T.pack (format v)
   TAlias _ _ -> "<alias>"
   TRaw -> "[" <> T.intercalate "," (map showDyn v) <> "]"
   TWireArray -> "[" <> T.intercalate "," (map showDyn v) <> "]"
@@ -180,7 +181,7 @@ fromBasic t v = case (t, v) of
   (TStr, BString s) -> Right (TE.decodeUtf8 s)
   (TBytes, BBytes s) -> Right s
   (TBytes, BString s) -> Right s
-  _ -> Left ("storage value " <> T.pack (show v) <> " does not fit declared type " <> showTy t)
+  _ -> Left ("storage value " <> T.pack (format v) <> " does not fit declared type " <> showTy t)
 
 -- Keep the existing storage format (tags, BDefault for zero values).
 -- Preserve scalar tags for action diffs; the storage backend normalizes defaults.
@@ -254,16 +255,19 @@ data Frame = Frame
 
 -- A revert carries a message; it unwinds to the nearest try/catch or external call boundary.
 newtype Revert = Revert T.Text deriving Show
-instance Exception Revert
+instance Exception Revert where
+  displayException (Revert message) = T.unpack message
 
 -- Semantic divergence from the typed model (e.g. storage tag mismatch, dynamic arg of wrong type).
 -- Reported, never papered over (criterion 12).
 newtype Divergence = Divergence T.Text deriving Show
-instance Exception Divergence
+instance Exception Divergence where
+  displayException (Divergence message) = "native execution mismatch: " ++ T.unpack message
 
 -- A required native entry is unavailable; this is an engine failure, not a revert.
 newtype NativeUnavailable = NativeUnavailable T.Text deriving Show
-instance Exception NativeUnavailable
+instance Exception NativeUnavailable where
+  displayException (NativeUnavailable message) = "native execution unavailable: " ++ T.unpack message
 
 data RT = RT
   { rtChargeGas :: Integer -> IO ()
@@ -373,6 +377,7 @@ catchContractFailure action handler = do
   liftIO $ runReaderT action state `catches`
     [ Handler (\(_ :: Revert) -> runReaderT handler state)
     , Handler (\(e :: SolidException) -> case e of
+        InternalError{} -> throwIO e
         TooMuchGas{} -> throwIO e
         _ -> runReaderT handler state)
     ]

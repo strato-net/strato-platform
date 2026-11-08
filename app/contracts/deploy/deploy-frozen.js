@@ -3,7 +3,7 @@ require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
 const fs = require('fs');
-const { rest, util } = require('blockapps-rest');
+const { rest, util } = require('./strato');
 const { getCreatedAddress, getIssueId, pollForCreateIssueExecution } = require('./util');
 const PROXY = 'd6726e06c3c71a3bad80b5eb6925707a31729b81';
 async function poll(tokenObj, hashes) {
