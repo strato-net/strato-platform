@@ -437,7 +437,7 @@ slipstreamQueryText _ CreateView{..} =
         , " c ON s.address = c.address INNER JOIN "
         , tableNameToText codeTableName
         , " x ON c.code_hash = x.code_hash WHERE x.creator = '"
-        , tableNameCreator viewName
+        , escapeSingleQuotes $ tableNameCreator viewName
         -- Derived contracts are looked up in the inheritance table rather than
         -- listed here, so that registering a code collection holding only some of
         -- a contract's children cannot shrink the view (#5665). The ARRAY subquery
