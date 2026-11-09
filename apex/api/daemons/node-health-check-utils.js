@@ -39,8 +39,6 @@ const neededJobs = process.env.HEALTH_CHECK_JOBS
 
 const maxStalledIntervals = config.healthCheck.maxStalledIntervals;
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
 async function singleCheck() {
   try {
     await queryHealthStatus();
