@@ -78,7 +78,7 @@ An operator joins in three steps:
 
 1. **Register** in `ValidatorRegistry`, binding the node's validator address. Registration is permissionless.
 2. **Bond** stake: the operator's own self-bond must reach the self-bond minimum (`selfBondMinimum`, 10,000 STRATO until governance sets it). Delegated stake adds weight but does not count toward it. A validator seated before this rule keeps the rule it was admitted under (`minStake`, a governance parameter) until it leaves the set or changes operator.
-3. **Activate** with `StratoStaking.tryActivate`. This needs a free slot, or enough stake to evict the lowest-weighted validator by a margin. Anyone can activate an eligible operator from block 2,000,000 (`JOINS_OPEN_FROM_BLOCK`, fixed in the contract); before it nobody can, the owner included.
+3. **Activate** with `StratoStaking.tryActivate`. This needs a free slot, or enough stake to evict the lowest-weighted validator by a margin. Anyone can activate an eligible operator from the agreed opening block (`joinsOpenFromBlock`); before it nobody can, the owner included.
 
 An active operator leaves automatically, in the same transaction, as soon as it stops being eligible. Reasons include:
 

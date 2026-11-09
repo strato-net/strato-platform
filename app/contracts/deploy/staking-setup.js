@@ -3,6 +3,7 @@
 //   node staking-setup.js grace <unixSeconds>              end of the self-bond grace period
 //   node staking-setup.js setoperator <validator> <operator>
 //   node staking-setup.js index                            (direct) index helium's existing set
+//   node staking-setup.js joinsfrom <block>                permissionless admission opens at this block
 //   node staking-setup.js selfbondmin <amountWei>          own bond a new seat needs (10,000 until set)
 //   node staking-setup.js fundreserve <amountWei>          (direct) fund the emission reserve
 //   node staking-setup.js emission <e0Wei> <s0Wei> <r0Wei> <startUnix>   commit the emission schedule, once
@@ -77,8 +78,13 @@ const STEPS = {
   // predates StratoStaking.activeValidators. Idempotent.
   index:     { direct: true, target: STAKING, name: 'StratoStaking', func: 'indexValidatorSet',
                args: { validators: VALIDATORS } },
+  // From this block anyone may seat an eligible validator, and nobody before it. Can be set
+  // or moved only to a future block, and only until it is reached.
+  joinsfrom: ([blockNumber]) => {
+    if (!/^[1-9][0-9]*$/.test(String(blockNumber || ''))) throw new Error('usage: joinsfrom <block>');
+    return { target: STAKING, func: 'setJoinsOpenFromBlock', args: [blockNumber] };
+  },
   // The operator's own bond a candidate, or a seat taken under the self-bond rule, needs.
-  // Permissionless admission opens at block 2,000,000, fixed in the contract.
   selfbondmin: ([amount]) => {
     if (!/^[1-9][0-9]*$/.test(String(amount || ''))) throw new Error('usage: selfbondmin <amountWei>');
     return { target: STAKING, func: 'setSelfBondMinimum', args: [amount] };

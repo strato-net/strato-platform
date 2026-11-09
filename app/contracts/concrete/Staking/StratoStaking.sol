@@ -29,7 +29,7 @@ import "./IStakingGovernance.sol";
 //   Kicked     = delisted by the registry owner (self-bond force-unbonded)
 // Leaving the set (under minStake, exit notice, kick) is automatic and same-tx;
 // joining is explicit and bounded by maxActiveValidators / hardCapActiveValidators.
-// Joining is open to anyone from JOINS_OPEN_FROM_BLOCK and needs selfBondMinimum of the operator's
+// Joining is open to anyone from joinsOpenFromBlock and needs selfBondMinimum of the operator's
 // own bond; a seat held from before that rule keeps the rule it was admitted under.
 //
 // Upgraded in place on helium from an operator-keyed layout that also paid a funded reward
@@ -74,6 +74,7 @@ contract  StratoStaking is Ownable {
     event SelfBondGraceSet(uint256 selfBondGraceUntil);
     event SelfBondMinimumSet(uint256 selfBondMinimum);
     event SetParamsUpdated(uint256 maxActiveValidators, uint256 hardCapActiveValidators, uint256 evictionMarginBps, uint256 maxSetMutationsPerBlock, uint256 exitNoticeSeconds, uint256 unkickCooldown, uint256 maxOperatorStakeBps);
+    event JoinsOpenFromBlockSet(uint256 blockNumber);
     event ParamsUpdated(uint256 unbondingSeconds, uint256 maxCommissionBps, uint256 maxBatchSize);
     event EmissionScheduleCommitted(uint256 e0, uint256 s0, uint256 r0, uint256 startTime);
     event EmissionReserveFunded(address indexed funder, uint256 amount, uint256 reserve);
@@ -114,10 +115,6 @@ contract  StratoStaking is Ownable {
     // Self-bond a seat taken under the admission rule needs until the admins set
     // selfBondMinimum (see _minSelfBond).
     uint256 public constant DEFAULT_SELF_BOND_MINIMUM = 10000e18;
-    // The block from which anyone may seat an eligible validator; before it nobody can, the
-    // owner included. upquark's staking fork height. The code is shared by every network, so
-    // on helium too admission opens only at this height.
-    uint256 public constant JOINS_OPEN_FROM_BLOCK = 2000000;
     // The longest interval one block is paid for by the emission schedule, and the year its
     // rate is quoted over.
     uint256 public constant MAX_CREDITED_GAP_SECONDS = 3600;
@@ -159,6 +156,7 @@ contract  StratoStaking is Ownable {
     uint256 public exitNoticeSeconds;
     uint256 public unkickCooldown;
     uint256 public maxOperatorStakeBps;     // inbound stake cap per validator (0 = off)
+    uint256 public joinsOpenFromBlock;      // first block of permissionless activation (0 = not yet agreed)
     uint256 public validatorCount;
     uint256 public mutationBlock;
     uint256 public setMutationsThisBlock;
@@ -404,6 +402,15 @@ contract  StratoStaking is Ownable {
         emit SetParamsUpdated(_maxActiveValidators, _hardCapActiveValidators, _evictionMarginBps, _maxSetMutationsPerBlock, _exitNoticeSeconds, _unkickCooldown, _maxOperatorStakeBps);
     }
 
+    // Agree the block from which anyone may seat an eligible validator. It can be set, or
+    // moved, only to a future block and only until it is reached; admission then stays open.
+    function setJoinsOpenFromBlock(uint256 _joinsOpenFromBlock) external onlyOwner onlyInitialized {
+        require(joinsOpenFromBlock == 0 || block.number < joinsOpenFromBlock, "SS: joins already open");
+        require(_joinsOpenFromBlock > block.number, "SS: block passed");
+        joinsOpenFromBlock = _joinsOpenFromBlock;
+        emit JoinsOpenFromBlockSet(_joinsOpenFromBlock);
+    }
+
     // Lowering maxCommissionBps needs no pass over the validators: commission is capped
     // where it is charged (_commissionBps).
     function setParams(uint256 _unbondingSeconds, uint256 _maxCommissionBps, uint256 _maxBatchSize) external onlyOwner onlyInitialized {
@@ -647,15 +654,10 @@ contract  StratoStaking is Ownable {
         }
     }
 
-    // Admission is open to everyone from the opening block, and to nobody before it.
+    // Admission is open to everyone from the agreed block, and to nobody before it.
     function _requireJoinsOpen() internal view {
-        require(block.number >= _joinsOpenFromBlock(), "SS: joins not open");
+        require(joinsOpenFromBlock != 0 && block.number >= joinsOpenFromBlock, "SS: joins not open");
         require(governanceSyncEnabled, "SS: governance sync off");
-    }
-
-    // Virtual so a test harness can open joins at a block it chooses.
-    function _joinsOpenFromBlock() internal view virtual returns (uint256) {
-        return JOINS_OPEN_FROM_BLOCK;
     }
 
     // Put an eligible validator into the consensus set: into a free slot, or by evicting

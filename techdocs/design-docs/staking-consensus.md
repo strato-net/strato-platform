@@ -211,7 +211,7 @@ consent, admin `addValidator` still works) → **Active** (in the consensus set)
   Active operator that stops being eligible is removed from governance (counts one set mutation;
   if the per-block budget is exhausted the stake mutation reverts — fail closed). Weight changes
   are pushed the same way.
-* **Joining is explicit**: `tryActivate(op)` (anyone from block 2,000,000, `JOINS_OPEN_FROM_BLOCK`; nobody before it, the owner included)
+* **Joining is explicit**: `tryActivate(op)` (anyone from `joinsOpenFromBlock`; nobody before it, the owner included)
   needs eligibility and either a free slot below `effectiveCap = min(maxActiveValidators,
   hardCapActiveValidators)` or the lowest validator (weight asc, address asc) beaten by
   `evictionMarginBps`; an eviction sends the loser back to Registered (self-bond stays bonded).
@@ -225,11 +225,11 @@ consent, admin `addValidator` still works) → **Active** (in the consensus set)
 * Params: `setValidatorParams(minStake, proposerFeeBps, maxConsecutiveMisses, jailCooldown)`,
   `setSelfBondGraceUntil(t)`, `setSelfBondMinimum(m)` (re-checks the set), `setSetParams(maxActiveValidators, hardCapActiveValidators [only lowers],
   evictionMarginBps, maxSetMutationsPerBlock, exitNoticeSeconds, unkickCooldown,
-  maxOperatorStakeBps)`, `commitEmissionSchedule(e0, s0, r0, start)` (once); `initialize` seeds
-  50 / 50 / 500 / 2 / unbonding / unbonding / 0. The opening block is a constant, so no call
-  opens or closes admission.
+  maxOperatorStakeBps)`, `setJoinsOpenFromBlock(b)` (a future block only, fixed once reached),
+  `commitEmissionSchedule(e0, s0, r0, start)` (once); `initialize` seeds 50 / 50 / 500 / 2 /
+  unbonding / unbonding / 0, with joins closed until an opening block is agreed.
 
-`JOINS_OPEN_FROM_BLOCK` (2,000,000, Upquark's staking fork) must not come before stake-weighted PBFT votes are live (Key Decision 12 of
+`joinsOpenFromBlock` must not come before stake-weighted PBFT votes are live (Key Decision 12 of
 `staking-next-phases.md`), i.e. before the activation height has passed on every producer; until
 it is reached nobody seats a validator through staking.
 

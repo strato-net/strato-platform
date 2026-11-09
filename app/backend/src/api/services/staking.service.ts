@@ -15,8 +15,6 @@ const BPS_DIVISOR = 10000n;
 // StratoStaking.DEFAULT_SELF_BOND_MINIMUM: the operator's own bond a new seat needs until
 // the admins set selfBondMinimum.
 const DEFAULT_SELF_BOND_MINIMUM = 10000n * WAD;
-// StratoStaking.JOINS_OPEN_FROM_BLOCK: anyone may seat an eligible validator from this block.
-const JOINS_OPEN_FROM_BLOCK = 2000000n;
 const YEAR_SECONDS = 365n * 24n * 60n * 60n;
 const MAX_UINT256 = (1n << 256n) - 1n;
 
@@ -127,8 +125,8 @@ export interface StratoStakingInfo {
   exitNoticeSeconds: string;
   unkickCooldown: string;
   maxOperatorStakeBps: string;
-  // v2: true until a processed block reaches the contract's constant JOINS_OPEN_FROM_BLOCK;
-  // there is no admin pause, admission opens for everyone at that block.
+  // v2: true until a processed block reaches joinsOpenFromBlock ("0" = not agreed); there is
+  // no admin pause, admission opens for everyone at that block.
   joinsPaused: boolean;
   joinsOpenFromBlock: string;
   governanceSyncEnabled: boolean;
@@ -738,8 +736,10 @@ const isSelfBondRuleActive = (state: Record<string, any>, now: bigint): boolean 
 
 // _requireJoinsOpen, with the last processed block (the last block with a transaction)
 // standing in for the head.
-const isJoinsOpen = (state: Record<string, any>): boolean =>
-  parseBigIntLike(state.lastProcessedBlock) >= JOINS_OPEN_FROM_BLOCK;
+const isJoinsOpen = (state: Record<string, any>): boolean => {
+  const from = parseBigIntLike(state.joinsOpenFromBlock);
+  return from > 0n && parseBigIntLike(state.lastProcessedBlock) >= from;
+};
 
 type V2ValidatorRecord = {
   validator: string;
@@ -1553,7 +1553,7 @@ const getV2StakingInfo = async (
     unkickCooldown: uintString(state.unkickCooldown),
     maxOperatorStakeBps: uintString(state.maxOperatorStakeBps),
     joinsPaused: !isJoinsOpen(state),
-    joinsOpenFromBlock: JOINS_OPEN_FROM_BLOCK.toString(),
+    joinsOpenFromBlock: uintString(state.joinsOpenFromBlock),
     governanceSyncEnabled: parseBoolLike(state.governanceSyncEnabled),
     validatorCount: uintString(state.validatorCount),
     trackedUsdst: uintString(state.trackedUsdst),

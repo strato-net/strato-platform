@@ -290,7 +290,7 @@ const StakingAdminTab = () => {
       <Card>
         <CardHeader>
           <CardTitle>Validator set</CardTitle>
-          <CardDescription>Set size and admission rules. Permissionless joins open for everyone at block 2,000,000, fixed in the contract.</CardDescription>
+          <CardDescription>Set size and admission rules. Permissionless joins open for everyone at the agreed block (setJoinsOpenFromBlock).</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {paramGrid([

@@ -4,11 +4,11 @@ Swaps the `StratoStaking` logic behind the Upquark staking proxy (`f30a022c…39
 branch's and turns on two things. `ValidatorRegistry`, `MercataGovernance`, `FeeRouter` and the
 node are unchanged. Rehearse every step on helium first (same commands without the exports).
 
-1. **Staking by right from block 2,000,000.** From `JOINS_OPEN_FROM_BLOCK` (2,000,000, a
-   constant: Upquark's staking fork) anyone may seat (`tryActivate` / `reconcileSet`) a listed
-   validator whose operator holds `selfBondMinimum` of its own self-bond (10,000 STRATO until
-   the admins vote another value); delegations add weight but never qualify a new seat. Before
-   that block nobody can seat anyone, the owner included, and there is no pause after it. Every seat held at the swap keeps the rule it was admitted under
+1. **Staking by right from an agreed block.** From `joinsOpenFromBlock` anyone may seat
+   (`tryActivate` / `reconcileSet`) a listed validator whose operator holds
+   `selfBondMinimum` of its own self-bond (10,000 STRATO until the admins vote another value);
+   delegations add weight but never qualify a new seat. Before that block nobody can seat
+   anyone, the owner included, and there is no pause after it. Every seat held at the swap keeps the rule it was admitted under
    (`minStake`, with `selfBondGraceUntil`) until it leaves the set or changes operator.
 2. **The emission schedule.** STRATO prefunded into the staking contract's `emissionReserve`
    pays each block's producer `E = E0 × √(S / S0) × (R / R0)` STRATO a year for the interval its
@@ -28,7 +28,7 @@ export STRATO_TOKEN=2ca3e170e6714282da77815f7864b17f612f5f83
 
 | Item | Value |
 |---|---|
-| Opening block | 2,000,000 (`JOINS_OPEN_FROM_BLOCK`, fixed in the contract; nothing to vote) |
+| Agreed opening block | `JOINS_FROM = ______` (after block 2,000,000 and after every validator has a published stake weight) |
 | Self-bond minimum for new seats | 10,000 STRATO by default; to change it, `node deploy/staking-setup.js selfbondmin <amountWei>` (vote) |
 | Rate at the reference point | `E0 = ______` wei a year (proposed: 500,000 STRATO = `500000000000000000000000`) |
 | Reference stake | `S0 = ______` wei (proposed: 5,000,000 STRATO = `5000000000000000000000000`) |
@@ -64,8 +64,9 @@ Verify against `upquark-staking-before.json`:
 - `validatorCount`, `isValidator`, `lastSyncedWeight`, `delegatedStake`, `totalUserStake`,
   `totalSelfBond`, `totalRewardableStake`, `allocatedRewardLiability` unchanged; governance shows
   no `ValidatorAdded` / `ValidatorRemoved` / `ValidatorStakeUpdated` from the swap.
-- `seatedUnderSelfBondRule` reads false for every incumbent; `selfBondMinimum`,
-  `emissionReserve` and `emissionStartTime` read 0 (a `selfBondMinimum` of 0 means 10,000).
+- `seatedUnderSelfBondRule` reads false for every incumbent; `joinsOpenFromBlock`,
+  `selfBondMinimum`, `emissionReserve` and `emissionStartTime` read 0 (a `selfBondMinimum` of 0
+  means 10,000).
 - The chain keeps committing and `lastProcessedBlock` keeps advancing.
 
 ## 3. Fee share (vote)
@@ -93,15 +94,19 @@ fee goes to the fee collector.
    Validators and delegators claim with the existing claim calls.
 4. **Top-ups**: `fundreserve` again at any time, by anyone. `R` rises; `R0` does not change.
 
-## 5. Open admission (no vote)
+## 5. Open admission (vote)
 
-Admission opens by itself at block 2,000,000; no call sets or moves it. If the admins want a
-self-bond minimum other than 10,000 STRATO, they vote `node deploy/staking-setup.js selfbondmin
-<amountWei>` (`setSelfBondMinimum`) before then; a higher value later also drops seats taken
-under the rule whose operator holds less.
+`node deploy/staking-setup.js joinsfrom $JOINS_FROM` votes `setJoinsOpenFromBlock`. It can be
+moved, by another vote, only to a later block and only until the block is reached. Pick a block
+after block 2,000,000 and after every validator has a published stake weight: until then the
+nodes vote by headcount, and a seat bought at the minimum would count as much as any other.
 
-Verify: before block 2,000,000 `tryActivate` fails with `SS: joins not open` for everyone;
-from it a validator whose operator self-bonded the minimum
+If the admins want a self-bond minimum other than 10,000 STRATO, they vote
+`node deploy/staking-setup.js selfbondmin <amountWei>` (`setSelfBondMinimum`) before the opening
+block; a higher value later also drops seats taken under the rule whose operator holds less.
+
+Verify: `joinsOpenFromBlock == JOINS_FROM`; before it `tryActivate` fails with
+`SS: joins not open` for everyone; from it a validator whose operator self-bonded the minimum
 shows as eligible on the staking page and seats itself (`ValidatorSynced`, then governance
 `ValidatorAdded`); one with less self-bond, however much is delegated, stays ineligible.
 

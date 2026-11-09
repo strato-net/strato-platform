@@ -30,20 +30,8 @@ contract UpgradedInPlaceStaking is StratoStaking {
         seatedUnderSelfBondRule[validator] = false;
     }
 
-    // Joins open at a block the test picks, unless it switches the real one on.
-    bool public realOpeningBlock;
-    uint256 public openingBlock;
-
-    function openJoinsFrom(uint256 blockNumber) public {
-        openingBlock = blockNumber;
-    }
-
-    function useRealOpeningBlock() public {
-        realOpeningBlock = true;
-    }
-
-    function _joinsOpenFromBlock() internal view override returns (uint256) {
-        return realOpeningBlock ? super._joinsOpenFromBlock() : openingBlock;
+    function forgetJoinsOpenFromBlock() public {
+        joinsOpenFromBlock = 0;
     }
 
     // The last processed block carried this timestamp; the test clock only moves forward.
@@ -138,7 +126,7 @@ contract Describe_StratoStaking {
         // set of 50, generous mutation budget, 100s exit notice / unkick cooldown, no stake cap
         staking.setSetParams(50, 50, 500, 10, 100, 100, 0);
         // joins open from the next block, which the fastForward below reaches
-        staking.openJoinsFrom(block.number + 1);
+        staking.setJoinsOpenFromBlock(block.number + 1);
 
         address[] memory validators = new address[](2);
         validators[0] = VALIDATOR_A;
@@ -1078,10 +1066,10 @@ contract Describe_StratoStaking {
         attacker.doExpectingFailure(address(registry), "register", "VR: already registered", VALIDATOR_A, uint256(0), "x", "", "", uint8(27), uint256(1), uint256(1));
     }
 
-    // Admission opens at block 2,000,000 for everyone at once: nobody seats anyone before it,
-    // the owner included, and no call moves it.
-    function it_register_needs_the_key_and_activation_waits_for_the_opening_block() public {
-        staking.useRealOpeningBlock();
+    // Admission opens at the agreed block for everyone at once: nobody seats anyone before it,
+    // the owner included, and the block is fixed once reached.
+    function it_register_needs_the_key_and_activation_waits_for_the_agreed_block() public {
+        staking.forgetJoinsOpenFromBlock();
         _registerSelf(validatorC);
         require(staking.status(address(validatorC)) == 1, "Registered");
         require(staking.operatorOf(address(validatorC)) == address(validatorC), "self-operated");
@@ -1096,14 +1084,27 @@ contract Describe_StratoStaking {
         } catch {
             rejected = true;
         }
-        require(rejected, "before the opening block the owner cannot seat anyone either");
+        require(rejected, "no agreed block: the owner cannot seat anyone either");
 
-        fastForward(1, 2000000 - block.number - 1);
-        require(block.number == 1999999, "one block short");
+        rejected = false;
+        try staking.setJoinsOpenFromBlock(block.number) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "only a future block can be agreed");
+        staking.setJoinsOpenFromBlock(block.number + 2);
+        fastForward(1, 1);
         user2.doExpectingFailure(address(staking), "reconcileSet", "SS: joins not open", _list(address(validatorC)));
         fastForward(1, 1);
         user2.doSuccessfully(address(staking), "reconcileSet", _list(address(validatorC)));
-        require(staking.status(address(validatorC)) == 2, "anyone seats it from the opening block");
+        require(staking.status(address(validatorC)) == 2, "anyone seats it from the agreed block");
+
+        rejected = false;
+        try staking.setJoinsOpenFromBlock(block.number + 10) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "once reached, the block cannot be moved");
     }
 
     function it_fills_the_set_then_evicts_the_lowest_with_margin() public {
