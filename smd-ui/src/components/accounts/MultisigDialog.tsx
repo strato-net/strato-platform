@@ -44,8 +44,8 @@ import { shortenHex } from "@/lib/utils";
 import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { formatVariadicArg, parseArgText, typedVariadicArg, variadicArgValue } from "@/lib/args";
-import { useMyTokens, type TokenBalance } from "@/services/tokens";
-import { useContractGroups, useContractInfo, functionArgs } from "@/services/contracts";
+import { useMyTokens, useTokenAllowance, type TokenBalance } from "@/services/tokens";
+import { useContractGroups, useContractInfo, functionArgs, fetchFunctionArgs } from "@/services/contracts";
 import { useSimulation } from "@/components/simulation/useSimulation";
 import { SimulateButton } from "@/components/simulation/SimulateButton";
 import { SimulationResultPanel } from "@/components/simulation/SimulationResultPanel";
@@ -64,6 +64,8 @@ import {
   votesNeeded,
   strip0x,
   MAX_TIMELOCK_DELAY,
+  buildProtocolActionCall,
+  type ProtocolActionKind,
   type OpenIssue,
 } from "@/services/multisig";
 
@@ -154,6 +156,44 @@ function describeIssue(func: string, args: string[]): { label: string; canonical
     default:
       return { label: func || "(unknown)", canonical: args };
   }
+}
+
+const KNOWN_ISSUE_ARG_TYPES: Record<string, string[]> = {
+  _proposeAdmin: ["address", "address"],
+  _removeAdmin: ["address"],
+  approve: ["address", "uint256"],
+  transfer: ["address", "uint256"],
+  setDefaultVotingThresholdBps: ["uint256"],
+  setTimelockDelay: ["uint256"],
+  setLogicContract: ["address"],
+  transferOwnership: ["address"],
+  cancelIssue: ["string"],
+};
+
+/** Rebuild the typed variadic values needed to reproduce an issue's exact hash. */
+async function typedIssueArgs(target: string, func: string, args: string[]): Promise<unknown[]> {
+  if (func === "castVoteOnIssue" && args.length >= 2) {
+    const innerTarget = strip0x(args[0] ?? "");
+    const innerFunc = args[1] ?? "";
+    return [
+      typedVariadicArg("address", innerTarget),
+      typedVariadicArg("string", innerFunc),
+      ...await typedIssueArgs(innerTarget, innerFunc, args.slice(2)),
+    ];
+  }
+
+  const { canonical } = describeIssue(func, args);
+  let types = KNOWN_ISSUE_ARG_TYPES[func] ?? [];
+  try {
+    const declared = await fetchFunctionArgs(target, func);
+    if (declared.length === canonical.length && declared.every((arg) => arg.type)) {
+      types = declared.map((arg) => arg.type);
+    }
+  } catch {
+    // Known functions retain their fixed types; unknown calls use their event values.
+  }
+  if (types.length !== canonical.length) return canonical;
+  return canonical.map((value, index) => typedVariadicArg(types[index], value));
 }
 
 /** Short display name for a hop in a nested-vote route. */
@@ -481,14 +521,18 @@ function EnabledView({ wallet, route }: { wallet: UserWallet; route?: UserWallet
       <UpgradeLogicPanel wallet={wallet} fullRoute={fullRoute} />
       <MemberOfPanel fullRoute={fullRoute} />
       <Tabs defaultValue={fullRoute.length > 1 ? "issues" : "treasury"} className="mt-1">
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className="grid w-full grid-cols-5">
         <TabsTrigger value="treasury">Treasury</TabsTrigger>
+        <TabsTrigger value="actions">Actions</TabsTrigger>
         <TabsTrigger value="signers">Signers</TabsTrigger>
         <TabsTrigger value="issues">Issues</TabsTrigger>
         <TabsTrigger value="history">History</TabsTrigger>
       </TabsList>
       <TabsContent value="treasury" className="mt-4">
         <TreasuryTab wallet={wallet} fullRoute={fullRoute} />
+      </TabsContent>
+      <TabsContent value="actions" className="mt-4">
+        <ProtocolActionsTab wallet={wallet} fullRoute={fullRoute} />
       </TabsContent>
       <TabsContent value="signers" className="mt-4">
         <SignersTab wallet={wallet} fullRoute={fullRoute} />
@@ -1089,9 +1133,9 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
       toast.error("Only a signer (or nested member) can vote");
       return;
     }
-    const { canonical } = describeIssue(issue.func, issue.args);
     setBusy(issue.issueId);
     try {
+      const canonical = await typedIssueArgs(issue.target, issue.func, issue.args);
       if (nested) {
         // A nested vote always goes through castVoteOnIssue with the issue's raw
         // target/func/args, wrapped once per hop; the issueId here still matches
@@ -1134,8 +1178,8 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
     }
   };
 
-  const simulateVote = (issue: OpenIssue) => {
-    const { canonical } = describeIssue(issue.func, issue.args);
+  const simulateVote = async (issue: OpenIssue) => {
+    const canonical = await typedIssueArgs(issue.target, issue.func, issue.args);
     setSimFor(issue.issueId);
     issueSim.run(
       "FUNCTION",
@@ -1159,7 +1203,7 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
   const execute = async (issue: OpenIssue) => {
     setBusy(`${issue.issueId}:execute`);
     try {
-      await executeIssue({ ...issue, args: describeIssue(issue.func, issue.args).canonical });
+      await executeIssue({ ...issue, args: await typedIssueArgs(issue.target, issue.func, issue.args) });
       toast.success("Issue executed");
       invalidate();
     } catch (err: any) {
@@ -1860,6 +1904,276 @@ function TreasuryTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: Use
         onPropose={proposeTransfer}
         onDone={refresh}
       />
+    </div>
+  );
+}
+
+const ACTION_LABELS: Record<ProtocolActionKind, string> = {
+  stake: "Stake",
+  unstake: "Unstake",
+  cdpDeposit: "CDP deposit",
+  cdpBorrow: "CDP borrow",
+  addLiquidity: "Add pool liquidity",
+  removeLiquidity: "Remove pool liquidity",
+};
+
+const validContractAddress = (value: string) => strip0x(value.trim()).length === 40 && isAddressLike(value.trim());
+const positiveInteger = (value: string) => /^\d+$/.test(value.trim()) && BigInt(value.trim()) > 0n;
+
+/**
+ * Protocol calls made from a self-owned wallet must originate in the wallet, so SMD
+ * creates typed multisig issues instead of sending the protocol transaction directly.
+ * Approval-dependent actions stay disabled until Cirrus shows that the approval issue
+ * executed; this prevents the dependent issue from racing its prerequisite.
+ */
+function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserWallet[] }) {
+  const { userAddress } = useUser();
+  const { canSubmit } = useSubmitTransaction();
+  const queryClient = useQueryClient();
+  const { data: signers = [] } = useSigners(wallet.address);
+  const { castVote } = useMultisigActions({
+    walletAddress: wallet.address,
+    route: fullRoute.map((w) => w.address),
+  });
+  const nested = fullRoute.length > 1;
+  const canVote = nested || signers.some((s) => eq(s, userAddress ?? ""));
+
+  const [action, setAction] = useState<ProtocolActionKind>("stake");
+  const [target, setTarget] = useState("");
+  const [validator, setValidator] = useState("");
+  const [asset, setAsset] = useState("");
+  const [spender, setSpender] = useState("");
+  const [tokenA, setTokenA] = useState("");
+  const [tokenB, setTokenB] = useState("");
+  const [amount, setAmount] = useState("");
+  const [amount2, setAmount2] = useState("");
+  const [amount3, setAmount3] = useState("");
+  const [busy, setBusy] = useState<"approve" | "action" | "">("");
+
+  const changeAction = (value: ProtocolActionKind) => {
+    setAction(value);
+    // Contract addresses and amounts are operation-specific. Clearing them avoids
+    // accidentally proposing a new operation against the previous operation's target.
+    setTarget("");
+    setValidator("");
+    setAsset("");
+    setSpender("");
+    setTokenA("");
+    setTokenB("");
+    setAmount("");
+    setAmount2("");
+    setAmount3("");
+  };
+
+  const approvalSpender = action === "stake" || action === "addLiquidity"
+    ? target
+    : action === "cdpDeposit"
+      ? spender
+      : "";
+  const approvalTokenA = action === "addLiquidity" ? tokenA : action === "stake" || action === "cdpDeposit" ? asset : "";
+  const approvalAmountA = action === "addLiquidity" ? amount2 : amount;
+  const approvalTokenB = action === "addLiquidity" ? tokenB : "";
+  const approvalAmountB = action === "addLiquidity" ? amount : "";
+  const approvalRequired = action === "stake" || action === "cdpDeposit" || action === "addLiquidity";
+
+  const allowanceA = useTokenAllowance(
+    validContractAddress(approvalTokenA) ? approvalTokenA : null,
+    wallet.address,
+    validContractAddress(approvalSpender) ? approvalSpender : null
+  );
+  const allowanceB = useTokenAllowance(
+    validContractAddress(approvalTokenB) ? approvalTokenB : null,
+    wallet.address,
+    validContractAddress(approvalSpender) ? approvalSpender : null
+  );
+
+  const allowanceEnough = (allowance: string | undefined, required: string) => {
+    try {
+      return positiveInteger(required) && BigInt(allowance || "0") >= BigInt(required);
+    } catch {
+      return false;
+    }
+  };
+  const approvalInputsComplete = validContractAddress(approvalSpender) &&
+    validContractAddress(approvalTokenA) && positiveInteger(approvalAmountA) &&
+    (action !== "addLiquidity" || (validContractAddress(approvalTokenB) && positiveInteger(approvalAmountB)));
+  const needsApprovalA = approvalRequired && validContractAddress(approvalTokenA) && positiveInteger(approvalAmountA) &&
+    !allowanceEnough(allowanceA.data, approvalAmountA);
+  const needsApprovalB = action === "addLiquidity" && validContractAddress(approvalTokenB) && positiveInteger(approvalAmountB) &&
+    !allowanceEnough(allowanceB.data, approvalAmountB);
+  const approvalReady = !approvalRequired || (approvalInputsComplete &&
+    allowanceEnough(allowanceA.data, approvalAmountA) &&
+    (action !== "addLiquidity" || allowanceEnough(allowanceB.data, approvalAmountB)));
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["multisig-open-issues", wallet.address] });
+    allowanceA.refetch();
+    allowanceB.refetch();
+  };
+
+  const proposeApprovals = async () => {
+    if (!canVote) return toast.error("Only a signer can propose approvals");
+    if (!validContractAddress(approvalSpender)) return toast.error("Enter a valid spender address");
+    if (!validContractAddress(approvalTokenA) || !positiveInteger(approvalAmountA)) {
+      return toast.error("Enter a valid token and positive approval amount");
+    }
+    if (action === "addLiquidity" && (!validContractAddress(approvalTokenB) || !positiveInteger(approvalAmountB))) {
+      return toast.error("Enter both pool tokens and positive amounts");
+    }
+    const approvals = [
+      ...(needsApprovalA ? [{ token: approvalTokenA, value: approvalAmountA }] : []),
+      ...(needsApprovalB ? [{ token: approvalTokenB, value: approvalAmountB }] : []),
+    ];
+    if (!approvals.length) return toast.info("Required allowances are already available");
+    setBusy("approve");
+    try {
+      for (const approval of approvals) {
+        await castVote("approve", [
+          typedVariadicArg("address", approvalSpender),
+          typedVariadicArg("uint256", approval.value),
+        ], approval.token);
+      }
+      toast.success(`${approvals.length === 1 ? "Approval" : "Approvals"} proposed`, {
+        description: "The action unlocks after the approval proposal executes.",
+      });
+      refresh();
+    } catch (err: any) {
+      toast.error("Approval proposal failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const proposeAction = async () => {
+    if (!canVote) return toast.error("Only a signer can propose this action");
+    if (!validContractAddress(target)) return toast.error("Enter a valid protocol contract address");
+    if (!approvalReady) return toast.error("Execute the required approval proposal first");
+
+    try {
+      switch (action) {
+        case "stake":
+        case "unstake":
+          if (!validContractAddress(validator)) throw new Error("Enter a valid validator address");
+          if (action === "stake" && !validContractAddress(asset)) throw new Error("Enter a valid STRATO token address");
+          if (!positiveInteger(amount)) throw new Error("Enter a positive amount in raw units");
+          break;
+        case "cdpDeposit":
+          if (!validContractAddress(asset)) throw new Error("Enter a valid collateral token address");
+          if (!validContractAddress(spender)) throw new Error("Enter a valid CDP vault address");
+          if (!positiveInteger(amount)) throw new Error("Enter a positive amount in raw units");
+          break;
+        case "cdpBorrow":
+          if (!validContractAddress(asset)) throw new Error("Enter a valid collateral token address");
+          if (!positiveInteger(amount)) throw new Error("Enter a positive USDST amount in raw units");
+          break;
+        case "addLiquidity":
+          if (!validContractAddress(tokenA) || !validContractAddress(tokenB)) throw new Error("Enter both pool token addresses");
+          if (!positiveInteger(amount) || !positiveInteger(amount2)) throw new Error("Enter positive token amounts in raw units");
+          break;
+        case "removeLiquidity":
+          if (![amount, amount2, amount3].every(positiveInteger)) throw new Error("Enter positive LP and minimum token amounts");
+          break;
+      }
+      const call = buildProtocolActionCall(action, { target, validator, asset, amount, amount2, amount3 });
+      setBusy("action");
+      await castVote(call.func, call.args, call.target);
+      toast.success(`${ACTION_LABELS[action]} proposed`, {
+        description: "Signers can review and vote on it in the Issues tab.",
+      });
+      refresh();
+    } catch (err: any) {
+      toast.error("Action proposal failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const addressInput = (label: string, value: string, setValue: (value: string) => void, placeholder: string) => (
+    <div className="space-y-1">
+      <Label>{label}</Label>
+      <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} className="font-mono text-xs" />
+    </div>
+  );
+  const amountInput = (label: string, value: string, setValue: (value: string) => void) => (
+    <div className="space-y-1">
+      <Label>{label}</Label>
+      <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder="Raw integer amount" inputMode="numeric" />
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <Label>Protocol operation</Label>
+        <Select value={action} onValueChange={(value) => changeAction(value as ProtocolActionKind)}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {(Object.keys(ACTION_LABELS) as ProtocolActionKind[]).map((value) => (
+              <SelectItem key={value} value={value}>{ACTION_LABELS[value]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {!canVote ? (
+        <Alert><AlertTriangle className="h-4 w-4" /><AlertDescription>Only a signer can propose protocol actions.</AlertDescription></Alert>
+      ) : null}
+
+      {addressInput(
+        action === "stake" || action === "unstake" ? "Staking contract" :
+          action === "cdpDeposit" || action === "cdpBorrow" ? "CDP engine" : "Pool contract",
+        target, setTarget, "40-character contract address"
+      )}
+
+      {(action === "stake" || action === "unstake") && <>
+        {action === "stake" ? addressInput("STRATO token", asset, setAsset, "Token contract used for approval") : null}
+        {addressInput("Validator", validator, setValidator, "Validator address")}
+        {amountInput("Amount (raw units)", amount, setAmount)}
+      </>}
+
+      {(action === "cdpDeposit" || action === "cdpBorrow") && <>
+        {addressInput("Collateral token", asset, setAsset, "Collateral asset address")}
+        {action === "cdpDeposit" ? addressInput("CDP vault / approval spender", spender, setSpender, "Vault contract address") : null}
+        {amountInput(action === "cdpBorrow" ? "USDST to borrow (raw units)" : "Collateral amount (raw units)", amount, setAmount)}
+      </>}
+
+      {action === "addLiquidity" && <>
+        {addressInput("Token A", tokenA, setTokenA, "Token A contract address")}
+        {amountInput("Maximum token A amount (raw units)", amount2, setAmount2)}
+        {addressInput("Token B", tokenB, setTokenB, "Token B contract address")}
+        {amountInput("Token B amount (raw units)", amount, setAmount)}
+      </>}
+
+      {action === "removeLiquidity" && <>
+        {amountInput("LP token amount (raw units)", amount, setAmount)}
+        {amountInput("Minimum token B amount (raw units)", amount2, setAmount2)}
+        {amountInput("Minimum token A amount (raw units)", amount3, setAmount3)}
+      </>}
+
+      {approvalRequired ? (
+        <div className="space-y-2 rounded-md border border-border p-3">
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <span>Prerequisite allowance{approvalTokenB ? "s" : ""}</span>
+            <Badge variant={approvalReady ? "secondary" : "outline"}>{approvalReady ? "Ready" : "Required"}</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            The protocol action remains locked until every approval proposal executes on-chain.
+          </p>
+          {!approvalReady ? (
+            <Button onClick={proposeApprovals} disabled={busy !== "" || !canSubmit || !canVote || !approvalInputsComplete} variant="outline" className="w-full">
+              {busy === "approve" ? "Proposing approval…" : `Propose approval${needsApprovalA && needsApprovalB ? "s" : ""}`}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {(action === "addLiquidity" || action === "removeLiquidity") ? (
+        <p className="text-xs text-muted-foreground">The proposal uses a deadline 60 days from submission; minimum amounts still enforce slippage protection.</p>
+      ) : null}
+
+      <Button onClick={proposeAction} disabled={busy !== "" || !canSubmit || !canVote || !approvalReady} className="w-full">
+        {busy === "action" ? "Proposing…" : `Propose ${ACTION_LABELS[action].toLowerCase()}`}
+      </Button>
     </div>
   );
 }

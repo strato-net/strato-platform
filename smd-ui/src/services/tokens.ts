@@ -56,3 +56,27 @@ export function useMyTokens(ownerAddress?: string | null) {
     refetchInterval: 15000,
   });
 }
+
+/** Current ERC-20 allowance granted by `ownerAddress` to `spenderAddress`. */
+export function useTokenAllowance(
+  tokenAddress?: string | null,
+  ownerAddress?: string | null,
+  spenderAddress?: string | null
+) {
+  return useQuery({
+    queryKey: ["token-allowance", tokenAddress, ownerAddress, spenderAddress],
+    enabled: !!tokenAddress && !!ownerAddress && !!spenderAddress,
+    refetchInterval: 12_000,
+    queryFn: async (): Promise<string> => {
+      const token = strip0x(tokenAddress!);
+      const owner = strip0x(ownerAddress!);
+      const spender = strip0x(spenderAddress!);
+      const { data } = await api.get(
+        `${env.CIRRUS_URL}/mapping?collection_name=eq._allowances` +
+          `&address=eq.${token}&key-%3E%3Ekey=eq.${owner}` +
+          `&key-%3E%3Ekey2=eq.${spender}&select=value&limit=1`
+      );
+      return String(Array.isArray(data) ? data[0]?.value ?? "0" : "0");
+    },
+  });
+}

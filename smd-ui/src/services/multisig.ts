@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { keccak256, stringToBytes } from "viem";
 import { api } from "@/lib/api";
-import { formatVariadicArg, parseJsonExact, variadicArgValue } from "@/lib/args";
+import { formatVariadicArg, parseJsonExact, typedVariadicArg, variadicArgValue } from "@/lib/args";
 import { env } from "@/lib/env";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { useUser } from "@/context/UserContext";
@@ -31,6 +31,71 @@ export const MULTISIG_CODE_HASH = strip0x(keccak256(stringToBytes(multisigSource
 
 /** The contract's MAXIMUM_DELAY: a timelock delay can be at most 30 days (in seconds). */
 export const MAX_TIMELOCK_DELAY = 2592000;
+
+export type ProtocolActionKind = "stake" | "unstake" | "cdpDeposit" | "cdpBorrow" | "addLiquidity" | "removeLiquidity";
+
+export interface ProtocolActionInput {
+  target: string;
+  validator?: string;
+  asset?: string;
+  amount: string;
+  amount2?: string;
+  amount3?: string;
+}
+
+/** Exact target call carried by each SMD protocol-action issue. */
+export function buildProtocolActionCall(
+  action: ProtocolActionKind,
+  input: ProtocolActionInput,
+  nowSeconds = Math.floor(Date.now() / 1000)
+): { target: string; func: string; args: unknown[] } {
+  const target = strip0x(input.target);
+  switch (action) {
+    case "stake":
+    case "unstake":
+      return {
+        target,
+        func: action,
+        args: [
+          typedVariadicArg("address", input.validator || ""),
+          typedVariadicArg("uint256", input.amount),
+        ],
+      };
+    case "cdpDeposit":
+      return {
+        target,
+        func: "deposit",
+        args: [typedVariadicArg("address", input.asset || ""), typedVariadicArg("uint256", input.amount)],
+      };
+    case "cdpBorrow":
+      return {
+        target,
+        func: "mint",
+        args: [typedVariadicArg("address", input.asset || ""), typedVariadicArg("uint256", input.amount)],
+      };
+    case "addLiquidity":
+      return {
+        target,
+        func: "addLiquidity",
+        args: [
+          typedVariadicArg("uint256", input.amount),
+          typedVariadicArg("uint256", input.amount2 || ""),
+          typedVariadicArg("uint256", String(nowSeconds + 60 * 24 * 60 * 60)),
+        ],
+      };
+    case "removeLiquidity":
+      return {
+        target,
+        func: "removeLiquidity",
+        args: [
+          typedVariadicArg("uint256", input.amount),
+          typedVariadicArg("uint256", input.amount2 || ""),
+          typedVariadicArg("uint256", input.amount3 || ""),
+          typedVariadicArg("uint256", String(nowSeconds + 60 * 24 * 60 * 60)),
+        ],
+      };
+  }
+}
 
 /** thresholds are stored in basis points: 6000 = 60%. */
 export const bpsToPct = (bps: number) => Math.round((bps / 100) * 10) / 10;
@@ -911,7 +976,7 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
    * wallet even on a nested route, with the args its votes carried (same issueId).
    */
   const executeIssue = useCallback(
-    (issue: { target: string; func: string; args: string[] }) =>
+    (issue: { target: string; func: string; args: unknown[] }) =>
       callWallet("executeIssue", {
         _target: strip0x(issue.target || walletAddress),
         _func: issue.func,

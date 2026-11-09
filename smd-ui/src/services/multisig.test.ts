@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { applyConfirmedVote, buildNestedCastVotePayload, buildOpenIssues, mergeIndexedIssues, MULTISIG_SOURCE, normalizeArgs, votesNeeded } from "./multisig";
+import { applyConfirmedVote, buildNestedCastVotePayload, buildOpenIssues, buildProtocolActionCall, mergeIndexedIssues, MULTISIG_SOURCE, normalizeArgs, votesNeeded } from "./multisig";
 import { formatVariadicArg, parseArgText, typedVariadicArg } from "../lib/args";
 import { pollResults } from "../lib/walletTx";
 import { api } from "../lib/api";
@@ -62,6 +62,33 @@ test("ABI type hints survive direct and nested proposal payloads", () => {
     { type: "string", value: "configure" },
   ]);
   assert.deepEqual(nested.args._args.slice(2), direct.args._args);
+});
+
+test("protocol workflows build the exact typed target calls", () => {
+  const staking = buildProtocolActionCall("stake", {
+    target: wallet, validator: signer, amount: "1000000000000000000",
+  }, 1000);
+  assert.deepEqual(staking, {
+    target: wallet,
+    func: "stake",
+    args: [
+      { type: "address", value: signer },
+      { type: "uint256", value: 1000000000000000000 },
+    ],
+  });
+
+  const add = buildProtocolActionCall("addLiquidity", {
+    target: pool, amount: "20", amount2: "30",
+  }, 1000);
+  assert.deepEqual(add, {
+    target: pool,
+    func: "addLiquidity",
+    args: [
+      { type: "uint256", value: 20 },
+      { type: "uint256", value: 30 },
+      { type: "uint256", value: 5185000 },
+    ],
+  });
 });
 
 test("cleared vote rows and array metadata do not resurrect an executed issue", () => {
