@@ -41,6 +41,7 @@ module Blockchain.SolidVM.SM
     withUncheckedCallInfo,
     withLocalVars,
     getCurrentCallInfo,
+    setCallArguments,
     getCallStackDepth,
     trimCallStackToDepth,
     getCurrentCallInfoIfExists,
@@ -148,6 +149,7 @@ data CallInfo = CallInfo
     codeCollection :: CC.CodeCollection,
     collectionHash :: Keccak256,
     localVariables :: NE.NonEmpty (Map SolidString Variable),
+    callArguments :: [Variable],
     stateMap :: !(M.Map Address AddressStateModification),
     storageMap :: !(M.Map (Address, MS.StoragePath) MS.BasicValue),
     readOnly :: Bool,
@@ -849,6 +851,7 @@ addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
             codeCollection = cc,
             collectionHash = hsh,
             localVariables = NE.singleton initialLocalVariables,
+            callArguments = [],
             stateMap = M.empty,
             storageMap = M.empty,
             readOnly = ro,
@@ -950,6 +953,11 @@ getCurrentCallInfo = do
   case cs of
     [] -> internalError "getCurrentCallInfo called with an empty stack" ()
     (currentCallInfo : _) -> return currentCallInfo
+
+setCallArguments :: MonadSM m => [Variable] -> m ()
+setCallArguments args = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  [] -> internalError "setCallArguments called with an empty stack" ()
+  info : rest -> pure $ info {callArguments = args} : rest
 
 getCallStackDepth :: MonadSM m => m Int
 getCallStackDepth = length <$> Mod.get (Mod.Proxy @[CallInfo])

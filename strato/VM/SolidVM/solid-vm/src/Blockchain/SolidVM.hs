@@ -1284,12 +1284,8 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           return $ Constant $ SEnumVal enumName name num
     (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAddress) False) . Env.sender) <$> getEnv
     (SBuiltinVariable "msg", "data") -> do
-      contract' <- getCurrentContract
-      functionName <- getCurrentFunctionName
       callInfo <- getCurrentCallInfo
-      let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
-          localVars = NE.head $ localVariables callInfo
-      argVals <- forM argList (\(n, _) -> getVar $ localVars M.! (fromMaybe "" n))
+      argVals <- traverse getVar (callArguments callInfo)
       return . Constant $ SVariadic argVals
     (SBuiltinVariable "msg", "sig") -> do
       functionName <- getCurrentFunctionName
@@ -1395,6 +1391,11 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
           Nothing -> indexOutOfBounds ("index out of range: " ++ (show i)) $ unparseExpression x
         (SMap theMap, _) -> case theMap M.!? theIndex of
           Just v -> typedElement var v
+          Nothing | TypedVariable (SVMType.Mapping _ _ valueType _ _) _ <- var -> do
+            contract <- getCurrentContract
+            (_, cc) <- getCurrentCodeCollection
+            defVal <- createDefaultValue cc contract valueType >>= enforceUnsignedType valueType
+            typedVariable valueType (Constant defVal)
           Nothing -> traverse getVar (fmap fst . uncons $ M.elems theMap) >>= \case
             Nothing -> pure $ Constant SNULL
             Just SIntegral{} -> pure $ Constant $ SInteger 0
@@ -2981,7 +2982,8 @@ runTheConstructors from to hsh cc contractName' argVals' = do
               ((n,(t,var)):) <$> go tns vs'
         map (fmap snd) <$> go argTypeNames argVals
 
-  void . withCallInfo to to contract' "constructor" hsh cc (M.fromList [(fromMaybe "" n, v) | (n, v) <- zipped]) False False . pushSender from $ do
+  void . withCallInfo to to contract' "constructor" hsh cc (M.fromList [(n, v) | (Just n, v) <- zipped, n /= ""]) False False . pushSender from $ do
+    setCallArguments (map snd zipped)
 
     forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
       v <- expToVar e
@@ -3116,7 +3118,7 @@ addLocalVariable name value = do
   addLocalBinding name newVariable
 
 addLocalBinding :: MonadSM m => SolidString -> Variable -> m ()
-addLocalBinding name newVariable = do
+addLocalBinding name newVariable = unless (name == "") $ do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     [] -> internalError "addLocalVariable called with an empty stack" (name, newVariable)
@@ -3334,7 +3336,8 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
       return (n, typed)
   let args = [(fromMaybe "" n, v) | (n, _, v) <- argsWithLoc]
 
-  val' <- withCallInfo address' codeAddr contract' funcName hsh cc (M.fromList [(fromMaybe "" n, v) | (n, v) <- localVars1]) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+  val' <- withCallInfo address' codeAddr contract' funcName hsh cc (M.fromList [(n, v) | (Just n, v) <- localVars1, n /= ""]) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+    setCallArguments (map snd $ take (length argsWithLoc) localVars1)
     matchedArgvals <- forM theModifiers $ \modi -> do
       let !margList =
               fromMaybe []
