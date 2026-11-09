@@ -548,18 +548,23 @@ contract  StratoStaking is Ownable {
     }
 
     // One-time backfill for a proxy upgraded in place, whose consensus set predates
-    // activeValidators. Permissionless and idempotent: it only indexes validators that
-    // isValidator already records. Until it runs, set-wide passes see no members, which
-    // fails safe (no resync, no eviction).
-    function indexValidatorSet(address[] calldata validators) external onlyInitialized {
-        for (uint256 i = 0; i < validators.length; i++) {
-            address validator = validators[i];
-            if (isValidator[validator] && activeValidatorIndex[validator] == 0) {
+    // activeValidators. Permissionless and idempotent. Read the full set from governance
+    // so a caller cannot index just one member and publish a partial weight vector; all
+    // weights are then synced together. Until it runs, set-wide passes see no members,
+    // which fails safe (no resync, no eviction).
+    function indexValidatorSet() external onlyInitialized {
+        require(governanceSyncEnabled, "SS: governance sync off");
+        uint256 count = IStakingGovernance(governance).validatorCount();
+        for (uint256 i = 0; i < count; i++) {
+            address validator = IStakingGovernance(governance).validators(i);
+            require(isValidator[validator], "SS: validator not seated here");
+            if (activeValidatorIndex[validator] == 0) {
                 activeValidators.push(validator);
                 activeValidatorIndex[validator] = activeValidators.length;
             }
         }
         emit ValidatorSetIndexed(activeValidators.length);
+        _syncAllValidators();
     }
 
     function _activate(address validator) internal {
@@ -605,6 +610,9 @@ contract  StratoStaking is Ownable {
             _deactivate(validator);
             return;
         }
+        // A seated member absent from the index predates the backfill. Do not publish
+        // its weight alone; indexValidatorSet syncs the whole governance set at once.
+        if (activeValidatorIndex[validator] == 0) return;
         uint256 weight = _validatorWeight(operators[validator]);
 
         // Publish unconditionally. lastSyncedWeight is only this contract's guess

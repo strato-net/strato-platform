@@ -75,9 +75,10 @@ const STEPS = {
              args: [{ type: 'address', value: hex(validator) }, { type: 'address', value: hex(operator) }] };
   },
   // Permissionless, so a direct call rather than a vote: indexes the consensus set that
-  // predates StratoStaking.activeValidators. Idempotent.
+  // predates StratoStaking.activeValidators, as governance lists it, and attempts to
+  // sync every member's weight in the same transaction. Idempotent.
   index:     { direct: true, target: STAKING, name: 'StratoStaking', func: 'indexValidatorSet',
-               args: { validators: VALIDATORS } },
+               args: {} },
   // From this block anyone may seat an eligible validator, and nobody before it. Can be set
   // or moved only to a future block, and only until it is reached.
   joinsfrom: ([blockNumber]) => {

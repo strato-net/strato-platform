@@ -63,9 +63,17 @@ spec = do
         picked `shouldBe` run chainId (abs height) vs' [] (getNonNegative start) rnd
         picked `shouldSatisfy` (`S.member` vals vs')
 
-    it "never picks a validator with zero stake while others have stake" $
+    it "never picks a validator with less stake than the others' when every validator has some" $
       property $ \(chainId :: Integer) (height :: Integer) (start :: NonNegative Integer) ->
-        run chainId (abs height) [1, 2, 3] [(2, 10), (3, 5)] (getNonNegative start) (getNonNegative start) `shouldSatisfy` (/= Validator 1)
+        run chainId (abs height) [1, 2, 3] [(1, 1), (2, 10 ^ (30 :: Int)), (3, 10 ^ (30 :: Int))] (getNonNegative start) (getNonNegative start) `shouldSatisfy` (/= Validator 1)
+
+    it "treats a set in which a validator has no stake yet as unweighted" $ do
+      let partial = [(2, 10 ^ (30 :: Int)), (3, 5)]
+          picks = [run 1 i [1, 2, 3] partial 0 0 | i <- [1 .. 3000 :: Integer]]
+          share = fromIntegral (length $ filter (== Validator 1) picks) / (3000 :: Double)
+      share `shouldSatisfy` (\x -> x > 0.28 && x < 0.39)
+      stakeWeights (vals [1, 2, 3]) (M.fromList [(Validator a, w) | (a, w) <- partial]) `shouldBe` Nothing
+      stakeWeights (vals [1, 2]) (M.fromList [(Validator 1, 3), (Validator 2, 1)]) `shouldBe` Just (M.fromList [(Validator 1, 3), (Validator 2, 1)])
 
     it "picks in proportion to stake" $ do
       let picks = [run 1 i [1, 2] [(1, 3), (2, 1)] 0 0 | i <- [1 .. 4000 :: Integer]]

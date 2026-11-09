@@ -184,13 +184,14 @@ generateNonceMap :: [Validator] -> M.Map Validator Int
 generateNonceMap = M.fromList . flip zip (repeat 0)
 
 -- | Voting weights of a validator set for quorum purposes: the published stake
--- weights once staking is active (members without stake weigh 0, so they count on
--- neither side; if nobody has stake yet every member weighs 1), one each before.
+-- weights once staking is active and every member has one ('stakeWeights'; a
+-- set with unweighted members is tallied by headcount, so no member can be the
+-- quorum on its own while the others' weights are still unpublished), one each
+-- before activation.
 voteWeights :: Bool -> S.Set Validator -> M.Map Validator Integer -> M.Map Validator Integer
 voteWeights weighted vals stakeMap
-  | weighted && any (> 0) (M.elems staked) = staked
+  | weighted, Just staked <- stakeWeights vals stakeMap = staked
   | otherwise = M.fromSet (const 1) vals
-  where staked = M.fromSet (\v -> max 0 (M.findWithDefault 0 v stakeMap)) vals
 
 -- | @3 * voteWeight voters > 2 * totalWeight@: the PBFT supermajority.
 hasSupermajority :: M.Map Validator Integer -> S.Set Validator -> Bool

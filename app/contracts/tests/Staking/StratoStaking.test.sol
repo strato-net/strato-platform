@@ -1026,17 +1026,47 @@ contract Describe_StratoStaking {
         staking.forgetSetIndex();
         require(staking.activeValidatorCount() == 0 && staking.validatorCount() == 2, "helium's shape: counted, not indexed");
 
-        address[] memory claimed = new address[](3);
-        claimed[0] = VALIDATOR_A;
-        claimed[1] = VALIDATOR_B;
-        claimed[2] = address(0xdead);
-        user2.doSuccessfully(address(staking), "indexValidatorSet", claimed);
-        require(staking.activeValidatorCount() == 2, "only real members indexed");
-        user2.doSuccessfully(address(staking), "indexValidatorSet", claimed);
+        user2.doSuccessfully(address(staking), "indexValidatorSet");
+        require(staking.activeValidatorCount() == 2, "the set governance lists is indexed");
+        user2.doSuccessfully(address(staking), "indexValidatorSet");
         require(staking.activeValidatorCount() == 2, "idempotent");
 
         staking.forgetOperatorField(VALIDATOR_A);
         require(staking.operatorOf(VALIDATOR_A) == VALIDATOR_A, "a record without an operator field is operated by its key");
+    }
+
+    // Helium's governance held no stakes after the upgrade, so the first weight published
+    // would have been the only weight in the set: one weighted validator among unweighted
+    // peers is the first-round proposer and a one-validator quorum, and anyone can trigger a
+    // validator's publication with a wei of stake. A seat the index does not hold is never
+    // published on its own; indexing reads the set from governance and publishes it whole.
+    function it_publishes_a_set_that_predates_the_index_whole_or_not_at_all() public {
+        _bondBoth();
+        staking.forgetSetIndex();
+
+        MercataGovernance fresh = new MercataGovernance(address(this));
+        fresh.setStakingContract(address(this));
+        fresh.addValidatorFromStaking(VALIDATOR_A, 0);
+        fresh.addValidatorFromStaking(VALIDATOR_B, 0);
+        fresh.setStakingContract(address(staking));
+        staking.setGovernance(address(fresh), true);
+        require(fresh.validatorStake(VALIDATOR_A) == 0 && fresh.validatorStake(VALIDATOR_B) == 0, "nothing published while unindexed");
+
+        _stake(user1, VALIDATOR_A, 1);
+        user2.doSuccessfully(address(staking), "syncValidator", VALIDATOR_B);
+        require(fresh.validatorStake(VALIDATOR_A) == 0 && fresh.validatorStake(VALIDATOR_B) == 0, "a lone seat is not published");
+
+        fresh.setStakingContract(address(this));
+        fresh.addValidatorFromStaking(address(0xdead), 0);
+        fresh.setStakingContract(address(staking));
+        user2.doExpectingFailure(address(staking), "indexValidatorSet", "SS: validator not seated here");
+        fresh.setStakingContract(address(this));
+        require(fresh.removeValidatorFromStaking(address(0xdead)), "test setup: stranger removed");
+        fresh.setStakingContract(address(staking));
+
+        user2.doSuccessfully(address(staking), "indexValidatorSet");
+        require(staking.activeValidatorCount() == 2, "the set governance lists is indexed");
+        require(fresh.validatorStake(VALIDATOR_A) == 1000e18 + 1 && fresh.validatorStake(VALIDATOR_B) == 2000e18, "the whole set is published in one transaction");
     }
 
     // ---- operators ---------------------------------------------------------------------
