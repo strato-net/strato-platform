@@ -230,7 +230,7 @@ checkProposalHeader ctx v' pp
     hdr = blockBlockData pp
     hr = getBlockRound hdr
     mSigner = Validator <$> (verifyProposerSeal pp =<< getProposerSeal pp)
-    expected = selectProposer (_chainId ctx) (nextHeight ctx) (_validators ctx) (_stakes ctx) (_lastRound ctx) hr
+    expected = selectProposer (completeStakesFor (nextHeight ctx) ctx) (_chainId ctx) (nextHeight ctx) (_validators ctx) (_stakes ctx) (_lastRound ctx) hr
 
 nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent EOutEvent m ()
 nextRound nt = do
@@ -398,6 +398,7 @@ eventLoop ctx = execStateC ctx $
           realValidators <- use validators
           realStakes <- use stakes
           activation <- use stakingActivation
+          completeFrom <- use completeStakesFrom
           chainId' <- use chainId
           lastRound' <- use lastRound
           seqNo <- use $ view . sequence
@@ -408,7 +409,7 @@ eventLoop ctx = execStateC ctx $
             -- height has been committed with the wrong transactions.
             when (doAuthn && not (bodyMatchesHeader blk)) $
               throwE "transactions or uncles do not match the block header"
-            replayHistoricBlock realValidators realStakes activation chainId' lastRound' seqNo blk
+            replayHistoricBlock realValidators realStakes activation completeFrom chainId' lastRound' seqNo blk
           let blockNo = number . blockBlockData $ blk
           recordMaxBlockNumber "pbft_previousblock" blockNo
           case eNextSeqNo of

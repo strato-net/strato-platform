@@ -155,7 +155,7 @@ spec = describe "stake-weighted consensus" $ do
     it "selects the leader by stake once active and round-robin before" $ do
       let pair = S.fromList [Validator me, Validator other]
           weights = M.fromList [(Validator me, 1000), (Validator other, 1)]
-          pick0 = selectProposer 1 11 pair weights 0 0
+          pick0 = selectProposer True 1 11 pair weights 0 0
           pick1 = if pick0 == Validator me then Validator other else Validator me
       computeLeader activeCtx {_stakes = weights} `shouldBe` pick0
       computeLeader (activeCtx {_stakes = weights} & view . round .~ 1) `shouldBe` pick1
@@ -167,17 +167,29 @@ spec = describe "stake-weighted consensus" $ do
       computeLeader activeCtx {_stakes = partial} `shouldBe` computeLeader activeCtx {_stakes = M.empty}
       computeLeader (activeCtx {_stakes = partial} & view . round .~ 1) `shouldBe` computeLeader (activeCtx & view . round .~ 1)
 
+    it "weighs a partly published set by the earlier rule until the network's complete-vector block" $ do
+      let partial = M.fromList [(Validator me, 1000)]
+          preSwitch = activeCtx {_stakes = partial, _completeStakesFrom = Just 12} -- the next height is 11
+          atSwitch = activeCtx {_stakes = partial, _completeStakesFrom = Just 11}
+      computeLeader preSwitch `shouldBe` Validator me
+      computeLeader (preSwitch & view . round .~ 1) `shouldBe` Validator other
+      computeLeader atSwitch `shouldBe` computeLeader activeCtx {_stakes = M.empty}
+      currentVoteWeights preSwitch `shouldBe` M.fromList [(Validator me, 1000), (Validator other, 0)]
+      currentVoteWeights atSwitch `shouldBe` M.fromList [(Validator me, 1), (Validator other, 1)]
+
   describe "stake-weighted quorum" $ do
     let pair = S.fromList [Validator me, Validator other]
         headcount = M.fromList [(Validator me, 1), (Validator other, 1)]
     it "weighs votes by stake once active and every member has some, one each otherwise" $ do
-      voteWeights True pair (M.fromList [(Validator me, 10), (Validator other, 5)]) `shouldBe` M.fromList [(Validator me, 10), (Validator other, 5)]
-      voteWeights False pair (M.fromList [(Validator me, 10), (Validator other, 5)]) `shouldBe` headcount
-      voteWeights True pair M.empty `shouldBe` headcount
+      voteWeights True True pair (M.fromList [(Validator me, 10), (Validator other, 5)]) `shouldBe` M.fromList [(Validator me, 10), (Validator other, 5)]
+      voteWeights False True pair (M.fromList [(Validator me, 10), (Validator other, 5)]) `shouldBe` headcount
+      voteWeights True True pair M.empty `shouldBe` headcount
       -- A member without a published weight is not a member without a vote: until every
       -- weight is published, nobody's stake can outvote the headcount.
-      voteWeights True pair (M.fromList [(Validator me, 10)]) `shouldBe` headcount
-      hasSupermajority (voteWeights True pair (M.fromList [(Validator me, 10)])) (S.singleton (Validator me)) `shouldBe` False
+      voteWeights True True pair (M.fromList [(Validator me, 10)]) `shouldBe` headcount
+      hasSupermajority (voteWeights True True pair (M.fromList [(Validator me, 10)])) (S.singleton (Validator me)) `shouldBe` False
+      -- Before a network's complete-vector block, the earlier rule: absent members weigh 0.
+      voteWeights True False pair (M.fromList [(Validator me, 10)]) `shouldBe` M.fromList [(Validator me, 10), (Validator other, 0)]
 
     it "needs more than two thirds of the weight" $ do
       let w = M.fromList [(Validator me, 70), (Validator other, 30)]
@@ -229,9 +241,9 @@ spec = describe "stake-weighted consensus" $ do
       -- Of the two rounds of a height exactly one selects `other`; seal that one as `me`.
       let stakes' = [(Validator me, 1), (Validator other, 7)]
           ctx = activeCtx {_stakes = M.fromList stakes'}
-          rnd = if selectProposer 1 11 (_validators ctx) (_stakes ctx) 0 0 == Validator other then 0 else 1
+          rnd = if selectProposer True 1 11 (_validators ctx) (_stakes ctx) 0 0 == Validator other then 0 else 1
           hdr = v3 [Validator me, Validator other] stakes' rnd [] []
-      selectProposer 1 11 (_validators ctx) (_stakes ctx) 0 rnd `shouldBe` Validator other
+      selectProposer True 1 11 (_validators ctx) (_stakes ctx) 0 rnd `shouldBe` Validator other
       checkProposalHeader ctx (View (fromInteger rnd) 10) (seal hdr) `shouldSatisfy` either (const True) (const False)
 
     it "does not apply the extra checks before activation" $

@@ -33,10 +33,11 @@ data BlockSummary = BlockSummary
     bSumProposalFacts :: ProposalFacts
   }
 
--- | @blockHeaderToBSum chainId parentFacts header txCount@; the parent's facts
--- supply the round the height started at.
-blockHeaderToBSum :: Integer -> ProposalFacts -> BlockHeader -> Integer -> BlockSummary
-blockHeaderToBSum chainId parentFacts b txCount =
+-- | @blockHeaderToBSum chainId completeFrom parentFacts header txCount@; the
+-- parent's facts supply the round the height started at, and @completeFrom@ is
+-- the network's @completeStakeVectorBlock@ setting.
+blockHeaderToBSum :: Integer -> Maybe Integer -> ProposalFacts -> BlockHeader -> Integer -> BlockSummary
+blockHeaderToBSum chainId completeFrom parentFacts b txCount =
   BlockSummary
     { bSumParentHash = parentHash b,
       bSumStateRoot = stateRoot b,
@@ -44,7 +45,7 @@ blockHeaderToBSum chainId parentFacts b txCount =
       bSumTimestamp = timestamp b,
       bSumNumber = number b,
       bSumTxCount = txCount,
-      bSumProposalFacts = proposalFactsFromHeader chainId (pfRound parentFacts) b
+      bSumProposalFacts = proposalFactsFromHeader chainId completeFrom (pfRound parentFacts) b
     }
 
 instance RLPSerializable BlockSummary where

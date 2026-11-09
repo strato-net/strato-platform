@@ -20,8 +20,9 @@ Every block height goes through a *view*, which is the pair (sequence number, ro
 
 A **quorum** means that the voters' weight satisfies `3 × voters > 2 × total`.
 
-- **Before staking is active,** or while no validator has stake, each validator weighs 1, so the quorum is a headcount.
-- **Once staking is active,** each validator weighs its stake. Validators with zero stake count on neither side.
+- **Before staking is active,** or while any validator has no published stake weight, each validator weighs 1, so the quorum is a headcount.
+- **Once staking is active and every validator has a weight,** each validator weighs its stake.
+- **Blocks before a network's `completeStakeVectorBlock`** were committed under the earlier rule, and nodes replay them under it: as soon as any validator had a weight, the others weighed 0 and counted on neither side. Helium switches at block 1,500,000; every other network uses the current rule from staking activation.
 
 ### Round changes
 

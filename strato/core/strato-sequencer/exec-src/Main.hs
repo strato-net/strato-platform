@@ -93,10 +93,13 @@ main = do
           , checkpointLastRound = lastRound
           }
         activation = Conf.stakingActivationBlock (networkConfig ethConf)
+        completeFrom = Conf.completeStakeVectorBlock (networkConfig ethConf)
     putStrLn $ "strato-sequencer stakingActivationBlock: " ++ show activation
+    putStrLn $ "strato-sequencer completeStakeVectorBlock: " ++ show completeFrom
     putStrLn $ "strato-sequencer maxTimestampDriftS: " ++ show maxTimestampDriftS'
 
-    return $ newContext (Conf.network (networkConfig ethConf)) (Conf.networkID (networkConfig ethConf)) ckpt Nothing flags_validatorBehavior activation (fromIntegral maxTimestampDriftS')
+    return $ (newContext (Conf.network (networkConfig ethConf)) (Conf.networkID (networkConfig ethConf)) ckpt Nothing flags_validatorBehavior activation (fromIntegral maxTimestampDriftS'))
+      { _completeStakesFrom = completeFrom }
 
   cht <- atomically newTMChan
 

@@ -300,6 +300,13 @@ data NetworkConf = NetworkConf
   -- needs a height because helium already ran with the staking contract as the
   -- source. 'Nothing' means "never switch". Every node of a network must agree.
   , stakingEventsFromGovernanceBlock :: Maybe Integer
+  -- | Block number from which stake weights count only once every validator in
+  -- the set has one; before it, a set with unweighted members is weighed with
+  -- those members at 0. Syncing nodes replay blocks under the rule they were
+  -- committed with, so a network whose history has blocks committed under the
+  -- earlier rule (helium) switches at a height of its own. 'Nothing' means
+  -- "every block". Every node of a network must agree.
+  , completeStakeVectorBlock :: Maybe Integer
   }
   deriving (Show, Eq, Generic, ToJSON)
 
@@ -319,6 +326,7 @@ instance FromJSON NetworkConf where
       <*> v .:? "stakingActivationBlock" .!= defaultStakingActivationBlock net
       <*> v .:? "stakingContractAddress" .!= defaultStakingContractAddress net
       <*> v .:? "stakingEventsFromGovernanceBlock" .!= defaultStakingEventsFromGovernanceBlock net
+      <*> v .:? "completeStakeVectorBlock" .!= defaultCompleteStakeVectorBlock net
 
 -- | Sentinel meaning "staking activation has not been scheduled yet" — used as
 -- the default for networks that already exist so that a node upgrade never
@@ -362,6 +370,16 @@ defaultStakingEventsFromGovernanceBlock :: String -> Maybe Integer
 defaultStakingEventsFromGovernanceBlock net
   | take 6 net == "helium" = Just 300000
   | otherwise = defaultStakingActivationBlock net
+
+-- | Helium's first weights were published one validator per block, so its
+-- headers 253538-253540 carry weights for only some of its validators and
+-- were committed under the earlier rule. Helium keeps that rule until a flag
+-- day past the release that carries this one (tip 1,084,174 on 2026-11-09);
+-- every other network uses the complete-vector rule from staking activation.
+defaultCompleteStakeVectorBlock :: String -> Maybe Integer
+defaultCompleteStakeVectorBlock net
+  | take 6 net == "helium" = Just 1500000
+  | otherwise = Nothing
 
 -- | Is stake-weighted proposer selection in force at the given block number?
 stakingActiveAt :: NetworkConf -> Integer -> Bool
@@ -568,6 +586,7 @@ instance Default NetworkConf where
     , stakingActivationBlock = defaultStakingActivationBlock "upquark"
     , stakingContractAddress = defaultStakingContractAddress "upquark"
     , stakingEventsFromGovernanceBlock = defaultStakingEventsFromGovernanceBlock "upquark"
+    , completeStakeVectorBlock = defaultCompleteStakeVectorBlock "upquark"
     }
 
 instance Default EthConf where

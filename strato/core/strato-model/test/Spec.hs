@@ -53,7 +53,9 @@ spec = do
 
   describe "selectProposer" $ do
     let vals = S.fromList . map Validator
-        run chainId height vs stakes start rnd = selectProposer chainId height (vals vs) (M.fromList $ map (\(a, w) -> (Validator a, w)) stakes) start rnd
+        run chainId height vs stakes start rnd = selectProposer True chainId height (vals vs) (M.fromList $ map (\(a, w) -> (Validator a, w)) stakes) start rnd
+        -- the rule before a network's completeStakeVectorBlock
+        runEarlier chainId height vs stakes start rnd = selectProposer False chainId height (vals vs) (M.fromList $ map (\(a, w) -> (Validator a, w)) stakes) start rnd
 
     it "is deterministic and picks a member of the validator set" $
       property $ \(chainId :: Integer) (height :: Integer) (NonEmpty vs) (start :: NonNegative Integer) (skip :: NonNegative Integer) -> do
@@ -72,8 +74,42 @@ spec = do
           picks = [run 1 i [1, 2, 3] partial 0 0 | i <- [1 .. 3000 :: Integer]]
           share = fromIntegral (length $ filter (== Validator 1) picks) / (3000 :: Double)
       share `shouldSatisfy` (\x -> x > 0.28 && x < 0.39)
-      stakeWeights (vals [1, 2, 3]) (M.fromList [(Validator a, w) | (a, w) <- partial]) `shouldBe` Nothing
-      stakeWeights (vals [1, 2]) (M.fromList [(Validator 1, 3), (Validator 2, 1)]) `shouldBe` Just (M.fromList [(Validator 1, 3), (Validator 2, 1)])
+      stakeWeights True (vals [1, 2, 3]) (M.fromList [(Validator a, w) | (a, w) <- partial]) `shouldBe` Nothing
+      stakeWeights True (vals [1, 2]) (M.fromList [(Validator 1, 3), (Validator 2, 1)]) `shouldBe` Just (M.fromList [(Validator 1, 3), (Validator 2, 1)])
+
+    it "weighs a set with an unweighted validator under the earlier rule, its absent members at 0" $ do
+      let partial = [(2, 10 ^ (30 :: Int)), (3, 5)]
+      forM_ [1 .. 200 :: Integer] $ \i -> runEarlier 1 i [1, 2, 3] partial 0 0 `shouldNotBe` Validator 1
+      stakeWeights False (vals [1, 2, 3]) (M.fromList [(Validator a, w) | (a, w) <- partial])
+        `shouldBe` Just (M.fromList [(Validator 1, 0), (Validator 2, 10 ^ (30 :: Int)), (Validator 3, 5)])
+      stakeWeights False (vals [1, 2]) M.empty `shouldBe` Nothing
+      completeStakesAt (Just 10) 9 `shouldBe` False
+      completeStakesAt (Just 10) 10 `shouldBe` True
+      completeStakesAt Nothing 0 `shouldBe` True
+
+    it "keeps the earlier rule's uniform pick when the remaining candidates weigh nothing" $
+      property $ \(height :: Integer) -> do
+        runEarlier 1 (abs height) [1, 2, 3] [(1, 100)] 0 0 `shouldBe` Validator 1
+        runEarlier 1 (abs height) [1, 2, 3] [(1, 100)] 0 1 `shouldSatisfy` (`elem` [Validator 2, Validator 3])
+
+    -- Helium's first weights were published one validator per block, so its headers
+    -- 253539 and 253540 carry weights for two and three of its four validators. Both
+    -- were committed under the earlier rule, which picked 0c4c; replaying them under
+    -- the complete-vector rule would expect f1e4 and bdd3 and reject the blocks.
+    it "re-derives the proposers helium committed at blocks 253539 and 253540 only under the earlier rule" $ do
+      let heliumNetworkId = 114784819836269
+          v0c4c = Validator 0x0c4cecae296c33f71f9a6e6fb57f418f9d5f7e82
+          vbdd3 = Validator 0xbdd3fe1b9a87a88cff8259528c0a4d6464625713
+          vebcd = Validator 0xebcd85c4212e53a2546cbcea765c1de531b14fb1
+          vf1e4 = Validator 0xf1e4082464ff5c399e43f2c9177904db9547d6a2
+          heliumSet = S.fromList [v0c4c, vbdd3, vebcd, vf1e4]
+          w = 10 ^ (22 :: Int)
+          at253539 = M.fromList [(v0c4c, w), (vbdd3, w)]
+          at253540 = M.fromList [(v0c4c, w), (vbdd3, w), (vebcd, w)]
+      selectProposer False heliumNetworkId 253539 heliumSet at253539 1011 1011 `shouldBe` v0c4c
+      selectProposer False heliumNetworkId 253540 heliumSet at253540 1011 1011 `shouldBe` v0c4c
+      selectProposer True heliumNetworkId 253539 heliumSet at253539 1011 1011 `shouldBe` vf1e4
+      selectProposer True heliumNetworkId 253540 heliumSet at253540 1011 1011 `shouldBe` vbdd3
 
     it "picks in proportion to stake" $ do
       let picks = [run 1 i [1, 2] [(1, 3), (2, 1)] 0 0 | i <- [1 .. 4000 :: Integer]]

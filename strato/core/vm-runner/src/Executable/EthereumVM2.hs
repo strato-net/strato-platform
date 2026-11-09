@@ -254,5 +254,6 @@ writeBlockSummary block = do
       txCnt = fromIntegral $ length (obReceiptTransactions block)
   -- the parent's facts carry the round this height started at (none for genesis / legacy parents)
   parentFacts <- maybe noProposalFacts bSumProposalFacts <$> A.lookup (A.Proxy @BlockSummary) (parentHash header)
-  putBSum sha (blockHeaderToBSum (Conf.networkID (networkConfig ethConf)) parentFacts header txCnt)
+  let netConf = networkConfig ethConf
+  putBSum sha (blockHeaderToBSum (Conf.networkID netConf) (Conf.completeStakeVectorBlock netConf) parentFacts header txCnt)
 

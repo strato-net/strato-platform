@@ -129,7 +129,7 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
 
   it "reads legacy block summaries with no proposal facts" $
     forAll genBlockHeaderV3 $ \h -> do
-      let bsum = blockHeaderToBSum 1 noProposalFacts h 3
+      let bsum = blockHeaderToBSum 1 Nothing noProposalFacts h 3
           legacy = case rlpEncode bsum of
             RLPArray fields -> RLPArray (take 6 fields)
             x -> x
@@ -220,11 +220,11 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
       getStakeDeltasFromResults before `shouldBe` M.fromList [(v2, 0)]
 
   it "derives no proposal facts from pre-v3 headers" $
-    forAll arbitrary $ \h -> proposalFactsFromHeader 1 0 (h :: BlockHeader) `shouldBe` noProposalFacts
+    forAll arbitrary $ \h -> proposalFactsFromHeader 1 Nothing 0 (h :: BlockHeader) `shouldBe` noProposalFacts
 
   it "derives proposal facts from v3 headers" $
     forAll genBlockHeaderV3 $ \h -> do
-      let facts = proposalFactsFromHeader 1 (getBlockRound h) h
+      let facts = proposalFactsFromHeader 1 Nothing (getBlockRound h) h
       pfProposer facts `shouldBe` Address 0 -- unsealed
       pfRound facts `shouldBe` getBlockRound h
       Validator (pfIntendedProposer facts) `shouldSatisfy` (`elem` getBlockValidators h)

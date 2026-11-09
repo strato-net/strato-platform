@@ -487,7 +487,9 @@ loadCode env h = do
   pure $ encodeUtf8 . codeRefCode . P.entityVal <$> mRow
 
 headerSummary :: BlockHeader -> BlockSummary
-headerSummary header = blockHeaderToBSum (fromIntegral (Conf.chainId (Conf.networkConfig ethConf))) noProposalFacts header 0
+headerSummary header =
+  blockHeaderToBSum (fromIntegral (Conf.chainId netConf)) (Conf.completeStakeVectorBlock netConf) noProposalFacts header 0
+  where netConf = Conf.networkConfig ethConf
 
 -- | A block's summary: the best block's from the header already in hand (the
 -- main chain's state root is asked for on every call), any other from the

@@ -90,13 +90,15 @@ bodyMatchesHeader (Block hdr txs uncles) =
     && getBlockOmmersHash hdr == ommersVerificationValue uncles
 
 replayHistoricBlock :: (MonadLogger m, MonadError String m) =>
-                       Set Validator -> M.Map Validator Integer -> Maybe Integer -> Integer -> Integer -> Word256 -> Block -> m (Word256, Validator)
-replayHistoricBlock realValidators realStakes activation chainId' lastRound' seqNo blk = do
+                       Set Validator -> M.Map Validator Integer -> Maybe Integer -> Maybe Integer -> Integer -> Integer -> Word256 -> Block -> m (Word256, Validator)
+replayHistoricBlock realValidators realStakes activation completeFrom chainId' lastRound' seqNo blk = do
   IstanbulExtra {..} <- liftEither $ maybeToEither "no istanbul metadata" $ evalIstanbulExtra id blk
   let hdr = blockBlockData blk
       mProp = verifyProposerSeal blk =<< _proposedSig
       blockNo = fromIntegral . number $ hdr
       stakingActive = maybe True (number hdr >=) activation
+      -- the weight rule the block was committed under
+      completeOnly = completeStakesAt completeFrom (number hdr)
 
   signers <- sequence $ map (verifyCommitmentSeal (blockHash blk)) _commitment
 
@@ -132,7 +134,7 @@ replayHistoricBlock realValidators realStakes activation chainId' lastRound' seq
 
   -- Stake-weighted once staking is active (the stakes in force for this block are
   -- the ones we hold and the header must carry, checked below), headcount before.
-  let weights = voteWeights stakingActive realValidators realStakes
+  let weights = voteWeights stakingActive completeOnly realValidators realStakes
   unless (hasSupermajority weights signerRes) $
     blockstanbulError $
       printf "not enough commit seals (have %d out of %d, weight %d out of %d)"
@@ -157,7 +159,7 @@ replayHistoricBlock realValidators realStakes activation chainId' lastRound' seq
         printf "block #%d has round %d, behind its parent's round %d" blockNo (getBlockRound hdr) lastRound'
 
     let expectedProposer =
-          selectProposer chainId' (number hdr) realValidators realStakes lastRound' (getBlockRound hdr)
+          selectProposer completeOnly chainId' (number hdr) realValidators realStakes lastRound' (getBlockRound hdr)
     unless (propValidator == expectedProposer) $
       blockstanbulError $
         "proposer " ++ format propValidator ++ " of block #" ++ show blockNo
