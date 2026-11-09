@@ -50,8 +50,9 @@ Stop unless all of these hold (this branch assumes staking V2 is live on Upquark
 - `governanceSyncEnabled` is `true` (or already off for step 5) and `activeValidators` holds
   exactly governance's validators, each with `isValidator` true. If the index is short, run
   `node deploy/staking-setup.js index` first, with the link on: it indexes governance's whole set
-  and reverts if governance lists a validator staking has not seated. An unindexed seat is left
-  out of `S`.
+  and reverts if governance lists a validator staking has not seated, or if any validator would
+  end up without a stake weight (`SS: validator without weight`: one that no longer qualifies
+  and that governance will not drop). An unindexed seat is left out of `S`.
 - Record `activeValidators`: these are the incumbents. Record `minStake` and `selfBondGraceUntil`
   as well, and do not change them for this rollout: they are now the incumbents' rule only.
 - Record `proposerFeeBps`, `maxConsecutiveMisses`, `jailCooldown` (step 3 re-submits them).

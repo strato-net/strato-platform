@@ -73,6 +73,15 @@ contract UpgradedInPlaceStaking is StratoStaking {
     }
 }
 
+// Lists validators the way genesis and admin votes do: in the set, not staking-managed.
+contract GenesisGovernance is MercataGovernance {
+    constructor(address initialOwner) MercataGovernance(initialOwner) { }
+
+    function seedValidator(address validator) public {
+        addValidator(validator);
+    }
+}
+
 contract Describe_StratoStaking {
     uint256 public INFINITY = 2 ** 256 - 1;
     address constant VALIDATOR_A = address(0xaaaa);
@@ -1060,6 +1069,9 @@ contract Describe_StratoStaking {
         fresh.addValidatorFromStaking(address(0xdead), 0);
         fresh.setStakingContract(address(staking));
         user2.doExpectingFailure(address(staking), "indexValidatorSet", "SS: validator not seated here");
+        require(staking.activeValidatorCount() == 0, "a refused backfill indexes nobody");
+        user2.doSuccessfully(address(staking), "syncValidator", VALIDATOR_A);
+        require(fresh.validatorStake(VALIDATOR_A) == 0, "so no seat can be published alone after it");
         fresh.setStakingContract(address(this));
         require(fresh.removeValidatorFromStaking(address(0xdead)), "test setup: stranger removed");
         fresh.setStakingContract(address(staking));
@@ -1067,6 +1079,31 @@ contract Describe_StratoStaking {
         user2.doSuccessfully(address(staking), "indexValidatorSet");
         require(staking.activeValidatorCount() == 2, "the set governance lists is indexed");
         require(fresh.validatorStake(VALIDATOR_A) == 1000e18 + 1 && fresh.validatorStake(VALIDATOR_B) == 2000e18, "the whole set is published in one transaction");
+    }
+
+    // Governance refuses to drop a validator staking never managed, which is every seat a
+    // proxy upgraded in place inherited. One that no longer qualifies would stay in the set
+    // without a weight while its peers were published, so the backfill reverts instead.
+    function it_does_not_publish_around_a_seat_governance_refuses_to_drop() public {
+        _bondBoth();
+        staking.forgetSetIndex();
+
+        GenesisGovernance genesis = new GenesisGovernance(address(this));
+        genesis.seedValidator(VALIDATOR_A);
+        genesis.seedValidator(VALIDATOR_B);
+        genesis.setStakingContract(address(staking));
+        staking.setGovernance(address(genesis), true);
+
+        operatorA.do(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 1e18);
+        require(genesis.isValidator(VALIDATOR_A) && !staking.eligible(VALIDATOR_A), "below minStake, kept by governance");
+
+        user2.doExpectingFailure(address(staking), "indexValidatorSet", "SS: validator without weight");
+        require(staking.activeValidatorCount() == 0, "nobody indexed");
+        require(genesis.validatorStake(VALIDATOR_B) == 0, "the eligible peer is not published alone");
+
+        _selfBond(operatorA, VALIDATOR_A, 1e18);
+        user2.doSuccessfully(address(staking), "indexValidatorSet");
+        require(genesis.validatorStake(VALIDATOR_A) == 1000e18 && genesis.validatorStake(VALIDATOR_B) == 2000e18, "published whole once every seat qualifies");
     }
 
     // ---- operators ---------------------------------------------------------------------

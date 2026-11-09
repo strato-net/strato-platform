@@ -565,6 +565,13 @@ contract  StratoStaking is Ownable {
         }
         emit ValidatorSetIndexed(activeValidators.length);
         _syncAllValidators();
+        // The sync leaves a member without a weight when it no longer qualifies and
+        // governance refuses to drop it (a seat staking never managed, or the last one).
+        // Its peers' weights alone would be a partial vector, so nothing is published.
+        count = IStakingGovernance(governance).validatorCount();
+        for (uint256 i = 0; i < count; i++) {
+            require(IStakingGovernance(governance).validatorStake(IStakingGovernance(governance).validators(i)) > 0, "SS: validator without weight");
+        }
     }
 
     function _activate(address validator) internal {
