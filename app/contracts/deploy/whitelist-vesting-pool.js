@@ -13,7 +13,7 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
-const { rest, util } = require('blockapps-rest');
+const { rest, util } = require('./strato'); // the repo's adapter (blockapps-rest is not a declared dependency)
 
 const ADDRESS_RE = /^[0-9a-fA-F]{40}$/;
 const clean = (v) => String(v || '').trim().replace(/^0x/, '');

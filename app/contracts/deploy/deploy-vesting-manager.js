@@ -19,7 +19,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const axios = require('axios');
-const { rest, util, importer } = require('blockapps-rest');
+const { rest, util, importer } = require('./strato'); // the repo's adapter (blockapps-rest is not a declared dependency)
 
 const NAME = process.env.VESTING_MANAGER_NAME || 'VestingPoolManager';
 const ARTIFACT = process.env.VESTING_SOURCE_OUT || 'vesting-source.txt';
@@ -118,6 +118,11 @@ async function resolveManagerAndPool(tokenObj, address) {
     opts => rest.getBlocResults(tokenObj, hashes, opts),
     { config, isAsync: true }, 300000);
   const final = Array.isArray(results) ? results[0] : results;
+  if (!final || final.status !== 'Success') {
+    const reason = (final && final.txResult && final.txResult.message) || JSON.stringify(final).slice(0, 300);
+    console.error(`${user} create FAILED: ${final && final.status} | ${reason} (tx ${hashes[0]})`);
+    process.exit(1);
+  }
 
   let addr = getCreatedAddress(final);
   if (!addr) {

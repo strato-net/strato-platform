@@ -37,6 +37,12 @@
 // }
 // startDate = TGE + cliffMonths calendar months (UTC, day clamped to the shorter
 // month), or TGE + cliffMonths * secondsPerMonth when that override is present.
+// Every entry's on-chain id is obtained from the pool itself (eth_call to
+// vestingHash with the entry's original parameters), never computed off-chain: an
+// off-chain EIP-712 reconstruction did NOT reproduce SolidVM's ids. status/verify and
+// the execution poll match that id against the `key` of BlockApps-VestingPool-vestings,
+// so a pause/unpause (which shifts startDate on-chain) cannot make an existing grant
+// look missing, and amounts never pass through lossy JSON numbers.
 // Amounts are whole tokens in the file, converted to atoms (uint128). A category is
 // split into batches of batchSize entries, in file order; each batch is ONE
 // addVestings transaction (one vote) with the category's managed flag, cliff and
@@ -109,6 +115,7 @@ function loadSchedule(file) {
   if (!Number.isInteger(s.batchSize) || s.batchSize <= 0) throw new Error('batchSize must be a positive integer');
   if (!Array.isArray(s.categories) || !s.categories.length) throw new Error('schedule.categories is empty');
   const names = new Set();
+  const tuples = new Map(); // full parameter tuple -> category; ids are hashes of these, so a duplicate anywhere collides
   for (const c of s.categories) {
     if (!c.name || names.has(c.name)) throw new Error(`category name missing or duplicated: "${c.name}"`);
     names.add(c.name);
@@ -127,6 +134,9 @@ function loadSchedule(file) {
       if (seen.has(a)) throw new Error(`${c.name}: ${a} appears twice (same parameters would collide on the vesting id)`);
       seen.add(a);
       const atoms = toAtoms(e.tokens, s.decimals);
+      const tuple = `${a}|${c.managed}|${c.durationWeeks}|${c.startDate}|${atoms}`;
+      if (tuples.has(tuple)) throw new Error(`${c.name}: ${a} with the same managed flag, duration, start and amount already appears in category "${tuples.get(tuple)}"; identical parameters hash to the same vesting id, so the second one can never be created`);
+      tuples.set(tuple, c.name);
       c.accounts.push(a); c.amounts.push(atoms.toString()); c.total += atoms;
     }
     c.batches = [];
@@ -194,13 +204,36 @@ async function cirrus(tokenObj, table, params) {
 }
 
 // On-chain vestings of the pool, from the record table of the `vestings` struct mapping:
-// one row per id with the struct as JSON in `value`.
+// one row per id (`key`) with the struct as JSON in `value`. The value is fetched as text
+// and long digit runs are quoted before parsing so uint128 amounts stay exact.
+const parseBigJson = (text) => JSON.parse(String(text).replace(/:(\s*)(-?\d{16,})(\s*[,}\]])/g, ':$1"$2"$3'));
 async function onChainVestings(tokenObj, s) {
-  const rows = await cirrus(tokenObj, 'BlockApps-VestingPool-vestings', { address: `eq.${s.pool}`, select: 'key,value', limit: '5000' });
+  const rows = await cirrus(tokenObj, 'BlockApps-VestingPool-vestings', { address: `eq.${s.pool}`, select: 'key,value::text', limit: '5000' });
   return rows.map((r) => {
-    const v = typeof r.value === 'string' ? JSON.parse(r.value) : (r.value || {});
-    return { id: r.key, account: clean(v.account), managed: v.managed === true || v.managed === 'true', durationWeeks: Number(v.durationWeeks), startDate: Number(v.startDate), amount: String(v.amount), cancelled: v.cancelled === true || v.cancelled === 'true' };
+    const v = typeof r.value === 'string' ? parseBigJson(r.value) : (r.value || {});
+    return { id: clean(r.key), account: clean(v.account), managed: v.managed === true || v.managed === 'true', durationWeeks: Number(v.durationWeeks), startDate: Number(v.startDate), amount: String(v.amount), amountClaimed: String(v.amountClaimed || '0'), pausingDate: Number(v.pausingDate || 0), cancelled: v.cancelled === true || v.cancelled === 'true' };
   });
+}
+
+// The vesting id for an entry, from the pool's own vestingHash(address,uint8,bool,uint16,uint64,uint128)
+// via eth_call with the entry's ORIGINAL parameters (curve 0). Selector 0x5d76df6b is
+// keccak256 of that signature; verified against live ids on helium on 2026-11-09.
+const word = (v) => BigInt(v).toString(16).padStart(64, '0');
+async function expectedVestingId(s, c, j) {
+  const data = '0x5d76df6b' + word('0x' + c.accounts[j]) + word(0) + word(c.managed ? 1 : 0) + word(c.durationWeeks) + word(c.startDate) + word(c.amounts[j]);
+  const { data: res } = await axios.post(`${config.nodes[0].url.replace(/\/$/, '')}/rpc`,
+    { jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: '0x' + s.pool, data }, 'latest'] },
+    { headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (create-vestings)' }, timeout: 30000 });
+  if (!res || typeof res.result !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(res.result)) throw new Error(`vestingHash eth_call failed for ${c.accounts[j]}: ${JSON.stringify(res).slice(0, 200)}`);
+  return clean(res.result);
+}
+
+async function resolveIds(s) {
+  for (const c of s.categories) {
+    if (c.ids) continue;
+    c.ids = [];
+    for (let j = 0; j < c.accounts.length; j++) c.ids.push(await expectedVestingId(s, c, j));
+  }
 }
 
 // Pool funding from Cirrus. Values are fetched with ::text: as JSON numbers they would
@@ -226,12 +259,11 @@ function printFunding(s, f, needed) {
 const neededFor = (report) => report.reduce((n, r) => n + r.c.amounts.reduce((m, a, j) => m + (r.found[j] ? 0n : BigInt(a)), 0n), 0n);
 
 function matchEntry(onchain, c, j) {
-  const want = BigInt(c.amounts[j]);
-  return onchain.find((v) => v.account === c.accounts[j] && v.managed === c.managed && v.durationWeeks === c.durationWeeks && v.startDate === c.startDate
-    && (/^\d+$/.test(v.amount) ? BigInt(v.amount) === want : Number(v.amount) === Number(want)));
+  return onchain.find((v) => v.id === c.ids[j]);
 }
 
 async function status(tokenObj, s, quiet) {
+  await resolveIds(s);
   const onchain = await onChainVestings(tokenObj, s);
   const report = [];
   for (const c of s.categories) {
@@ -241,7 +273,7 @@ async function status(tokenObj, s, quiet) {
     report.push({ c, found, done, batches });
     if (!quiet) {
       console.log(`${c.name}: ${done}/${c.accounts.length} scheduled` + (c.batches.length > 1 ? ` (${batches.filter((x) => x.done === x.b.accounts.length).length}/${c.batches.length} batches complete)` : ''));
-      c.accounts.forEach((a, j) => console.log(`  ${found[j] ? 'OK      ' : 'MISSING '} ${a}  ${fmtTokens(c.amounts[j], s.decimals)} tokens${found[j] ? `  id ${found[j].id}${found[j].cancelled ? '  (cancelled)' : ''}` : ''}`));
+      c.accounts.forEach((a, j) => console.log(`  ${found[j] ? 'OK      ' : 'MISSING '} ${a}  ${fmtTokens(c.amounts[j], s.decimals)} tokens  id ${c.ids[j]}${found[j] ? (found[j].cancelled ? '  (cancelled)' : found[j].pausingDate ? '  (paused)' : '') + (found[j].startDate !== c.startDate ? `  (start shifted to ${found[j].startDate} by a pause)` : '') : ''}`));
     }
   }
   return report;
@@ -299,6 +331,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // quorum executes the batch; until then the issue sits in the AdminRegistry for the
 // other admins. Returns the batches still pending at the deadline.
 async function waitForExecution(tokenObj, s, submitted) {
+  await resolveIds(s);
   const deadline = Date.now() + Number(process.env.VOTE_WAIT_MINUTES || 60) * 60000;
   let pending = submitted.slice();
   let tick = 0;
