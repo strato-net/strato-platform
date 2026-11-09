@@ -32,7 +32,7 @@
 //   "batchSize": 25,                     // OPTIONAL, default 25: entries per addVestings transaction
 //   "categories": [
 //     { "name": "team", "managed": true, "cliffMonths": 12, "durationWeeks": 104,
-//       "entries": [ { "account": "<40 hex>", "tokens": "1234567.89" } ] }
+//       "entries": [ { "account": "<40 hex>", "tokens": "1234567.89" } ] }   // tokens: decimal STRING, never a number
 //   ]
 // }
 // startDate = TGE + cliffMonths calendar months (UTC, day clamped to the shorter
@@ -64,7 +64,10 @@ const clean = (v) => String(v || '').trim().replace(/^0x/, '').toLowerCase();
 const iso = (s) => new Date(s * 1000).toISOString();
 
 function toAtoms(tokens, decimals) {
-  const s = String(tokens).trim();
+  // A JSON number has already been rounded to a double by JSON.parse (2500.500000000000000001
+  // arrives as 2500.5), so only strings can carry 18 decimals exactly.
+  if (typeof tokens !== 'string') throw new Error(`token amount must be a decimal STRING, got ${typeof tokens} ${JSON.stringify(tokens)} (write "tokens": "${tokens}")`);
+  const s = tokens.trim();
   if (!/^\d+(\.\d+)?$/.test(s)) throw new Error(`bad token amount "${tokens}"`);
   const [whole, frac = ''] = s.split('.');
   if (frac.length > decimals) throw new Error(`"${tokens}" has more than ${decimals} decimals`);
