@@ -102,6 +102,7 @@ const StakingAdminTab = () => {
   // v1: bind a validator address to an operator. v2: move a validator to a new operator.
   const [validatorAddressEdit, setValidatorAddressEdit] = useState({ operator: "", validatorAddress: "" });
   const [selfBondGrace, setSelfBondGrace] = useState("");
+  const [selfBondMinimum, setSelfBondMinimum] = useState("");
   const [hardCap, setHardCap] = useState("");
   const [emergencyKicker, setEmergencyKicker] = useState("");
   const [recovery, setRecovery] = useState({ to: "", amount: "" });
@@ -212,8 +213,8 @@ const StakingAdminTab = () => {
             isV2
               ? { key: "minStake", label: "Incumbent min stake (STRATO)", wad: true }
               : { key: "minStake", label: "Min stake (STRATO, self-bond + delegated)", wad: true },
-            // The validator-keyed contract's new-seat minimum is the constant MIN_SELF_BOND;
-            // minStake is the bar for seats held from before it.
+            // The validator-keyed contract's new-seat minimum is voted on its own
+            // (setSelfBondMinimum); minStake is the bar for seats held from before it.
             ...(isV2 ? [] : [{ key: "minSelfBond", label: "Min self-bond (STRATO)", wad: true }]),
             { key: "proposerFeeBps", label: "Proposer fee share (bps)" },
             { key: "maxConsecutiveMisses", label: "Jail after consecutive misses" },
@@ -234,8 +235,32 @@ const StakingAdminTab = () => {
       {isV2 && (
         <Card>
           <CardHeader>
+            <CardTitle>Self-bond minimum</CardTitle>
+            <CardDescription>The operator's own bond a candidate, or a seat taken under the self-bond rule, needs. Delegations never count toward it. 10,000 STRATO until set.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">Current minimum: {fromWad(info.minSelfBond)} STRATO</p>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="space-y-1 text-xs">
+                <span className="text-muted-foreground">New minimum (STRATO)</span>
+                <Input value={selfBondMinimum} onChange={(event) => setSelfBondMinimum(event.target.value)} className="w-48" />
+              </label>
+              <Button size="sm" disabled={blocked || !/^[0-9]+(\.[0-9]+)?$/.test(selfBondMinimum.trim()) || toWad(selfBondMinimum) === "0"} onClick={() => run("self-bond-minimum", () => api.patch("/staking/admin/self-bond-minimum", {
+                selfBondMinimum: toWad(selfBondMinimum),
+              }), "Self-bond minimum vote")}>
+                {label("self-bond-minimum", "Set minimum")}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">A higher minimum applies at once: seats taken under the rule whose operator holds less leave the set. Seats held from before the rule stay on min stake.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {isV2 && (
+        <Card>
+          <CardHeader>
             <CardTitle>Self-bond grace deadline</CardTitle>
-            <CardDescription>For seats held from before the 10,000 STRATO self-bond rule: until this deadline their delegated stake still counts toward min stake; after it only self-bond does. New seats always need their operator's own 10,000.</CardDescription>
+            <CardDescription>For seats held from before the self-bond rule: until this deadline their delegated stake still counts toward min stake; after it only self-bond does. New seats always need their operator's own bond at the self-bond minimum.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
@@ -265,7 +290,7 @@ const StakingAdminTab = () => {
       <Card>
         <CardHeader>
           <CardTitle>Validator set</CardTitle>
-          <CardDescription>Set size and admission rules. Permissionless joins open for everyone at the agreed block (setJoinsOpenFromBlock).</CardDescription>
+          <CardDescription>Set size and admission rules. Permissionless joins open for everyone at block 2,000,000, fixed in the contract.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {paramGrid([

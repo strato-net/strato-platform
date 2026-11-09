@@ -158,7 +158,7 @@ slashing waits for provable round changes (Phase 4). Optional knob: after
 removed from the set, stake untouched; `syncValidator` re-adds it after the cooldown). Notable
 downtime is an admin kick (`removeOperator` / governance vote).
 
-Eligibility: `selfBond >= MIN_SELF_BOND` (10,000 STRATO, a constant) for a candidate and for any
+Eligibility: `selfBond >= selfBondMinimum` (10,000 STRATO until governance sets it) for a candidate and for any
 seat taken under this rule — a validator must have its own stake at risk; delegated stake adds
 weight but cannot qualify it. A seat held since before the rule (`seatedUnderSelfBondRule` false)
 keeps the rule it was admitted under until it leaves the set or changes operator: `selfBond >=
@@ -206,12 +206,12 @@ consent, admin `addValidator` still works) → **Active** (in the consensus set)
 `removeValidator`; self-bond force-unbonded to the operator; re-listing after `unkickCooldown`).
 `StratoStaking.status(v)` / `eligible(v)` / `isWaiter(v)`, all by validator address.
 
-* `eligible = listed ∧ meets the self-bond minimum (MIN_SELF_BOND; an incumbent seat: minStake, see selfBondGraceUntil) ∧ not jailed ∧ no exit due`
+* `eligible = listed ∧ meets the self-bond minimum (selfBondMinimum; an incumbent seat: minStake, see selfBondGraceUntil) ∧ not jailed ∧ no exit due`
 * **Leaving is automatic and same-tx** (`_syncValidator` at the end of every stake mutation): an
   Active operator that stops being eligible is removed from governance (counts one set mutation;
   if the per-block budget is exhausted the stake mutation reverts — fail closed). Weight changes
   are pushed the same way.
-* **Joining is explicit**: `tryActivate(op)` (anyone from `joinsOpenFromBlock`; nobody before it, the owner included)
+* **Joining is explicit**: `tryActivate(op)` (anyone from block 2,000,000, `JOINS_OPEN_FROM_BLOCK`; nobody before it, the owner included)
   needs eligibility and either a free slot below `effectiveCap = min(maxActiveValidators,
   hardCapActiveValidators)` or the lowest validator (weight asc, address asc) beaten by
   `evictionMarginBps`; an eviction sends the loser back to Registered (self-bond stays bonded).
@@ -223,13 +223,13 @@ consent, admin `addValidator` still works) → **Active** (in the consensus set)
 * `maxOperatorStakeBps` caps **inbound** stake (stake / selfBond / moveStake target) at that share
   of `totalRewardableStake`; unstaking is never capped; 0 = off (switch it on after bootstrap).
 * Params: `setValidatorParams(minStake, proposerFeeBps, maxConsecutiveMisses, jailCooldown)`,
-  `setSelfBondGraceUntil(t)`, `setSetParams(maxActiveValidators, hardCapActiveValidators [only lowers],
+  `setSelfBondGraceUntil(t)`, `setSelfBondMinimum(m)` (re-checks the set), `setSetParams(maxActiveValidators, hardCapActiveValidators [only lowers],
   evictionMarginBps, maxSetMutationsPerBlock, exitNoticeSeconds, unkickCooldown,
-  maxOperatorStakeBps)`, `setJoinsOpenFromBlock(b)` (a future block only, fixed once reached),
-  `commitEmissionSchedule(e0, s0, r0, start)` (once); `initialize` seeds 50 / 50 / 500 / 2 /
-  unbonding / unbonding / 0, with joins closed until an opening block is agreed.
+  maxOperatorStakeBps)`, `commitEmissionSchedule(e0, s0, r0, start)` (once); `initialize` seeds
+  50 / 50 / 500 / 2 / unbonding / unbonding / 0. The opening block is a constant, so no call
+  opens or closes admission.
 
-`joinsOpenFromBlock` must not come before stake-weighted PBFT votes are live (Key Decision 12 of
+`JOINS_OPEN_FROM_BLOCK` (2,000,000, Upquark's staking fork) must not come before stake-weighted PBFT votes are live (Key Decision 12 of
 `staking-next-phases.md`), i.e. before the activation height has passed on every producer; until
 it is reached nobody seats a validator through staking.
 

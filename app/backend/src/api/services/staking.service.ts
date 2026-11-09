@@ -12,8 +12,11 @@ import { getOraclePrices } from "./oracle.service";
 const { Token, StratoStaking, ValidatorRegistry } = constants;
 const WAD = 10n ** 18n;
 const BPS_DIVISOR = 10000n;
-// StratoStaking.MIN_SELF_BOND: the operator's own bond a new seat needs.
-const MIN_SELF_BOND = 10000n * WAD;
+// StratoStaking.DEFAULT_SELF_BOND_MINIMUM: the operator's own bond a new seat needs until
+// the admins set selfBondMinimum.
+const DEFAULT_SELF_BOND_MINIMUM = 10000n * WAD;
+// StratoStaking.JOINS_OPEN_FROM_BLOCK: anyone may seat an eligible validator from this block.
+const JOINS_OPEN_FROM_BLOCK = 2000000n;
 const YEAR_SECONDS = 365n * 24n * 60n * 60n;
 const MAX_UINT256 = (1n << 256n) - 1n;
 
@@ -124,8 +127,8 @@ export interface StratoStakingInfo {
   exitNoticeSeconds: string;
   unkickCooldown: string;
   maxOperatorStakeBps: string;
-  // v2: true until a processed block reaches joinsOpenFromBlock ("0" = not agreed); there is
-  // no admin pause, admission opens for everyone at that block.
+  // v2: true until a processed block reaches the contract's constant JOINS_OPEN_FROM_BLOCK;
+  // there is no admin pause, admission opens for everyone at that block.
   joinsPaused: boolean;
   joinsOpenFromBlock: string;
   governanceSyncEnabled: boolean;
@@ -722,6 +725,12 @@ const recordOperator = (validator: string, record: Record<string, any>): string 
   return isNormalizedAddress(operator) && !/^0+$/.test(operator) ? operator : validator;
 };
 
+// _minSelfBond: selfBondMinimum, or the default while it was never set.
+const selfBondMinimumOf = (state: Record<string, any>): bigint => {
+  const set = parseBigIntLike(state.selfBondMinimum);
+  return set > 0n ? set : DEFAULT_SELF_BOND_MINIMUM;
+};
+
 const isSelfBondRuleActive = (state: Record<string, any>, now: bigint): boolean => {
   const graceUntil = parseBigIntLike(state.selfBondGraceUntil);
   return graceUntil > 0n && now >= graceUntil;
@@ -729,10 +738,8 @@ const isSelfBondRuleActive = (state: Record<string, any>, now: bigint): boolean 
 
 // _requireJoinsOpen, with the last processed block (the last block with a transaction)
 // standing in for the head.
-const isJoinsOpen = (state: Record<string, any>): boolean => {
-  const from = parseBigIntLike(state.joinsOpenFromBlock);
-  return from > 0n && parseBigIntLike(state.lastProcessedBlock) >= from;
-};
+const isJoinsOpen = (state: Record<string, any>): boolean =>
+  parseBigIntLike(state.lastProcessedBlock) >= JOINS_OPEN_FROM_BLOCK;
 
 type V2ValidatorRecord = {
   validator: string;
@@ -755,6 +762,7 @@ type V2ValidatorRecord = {
 const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => {
   const now = BigInt(Math.floor(Date.now() / 1000));
   const minStake = parseBigIntLike(state.minStake);
+  const selfBondMinimum = selfBondMinimumOf(state);
   const selfBondRuleActive = isSelfBondRuleActive(state, now);
   const isValidatorMap = addressKeyed(state.isValidator);
   const selfBondRuleSeatMap = addressKeyed(state.seatedUnderSelfBondRule);
@@ -773,10 +781,10 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
       const jailedUntil = parseBigIntLike(jailedUntilMap.get(validator));
       const exitReadyTime = parseBigIntLike(exitReadyMap.get(validator));
       // _meetsMinStake: a candidate, or a seat taken under the self-bond rule, needs
-      // MIN_SELF_BOND of self-bond; a seat from before the rule keeps minStake, on combined
+      // selfBondMinimum of self-bond; a seat from before the rule keeps minStake, on combined
       // stake until the self-bond grace ends and on self-bond after.
       const meetsMinStake = !isValidator || parseBoolLike(selfBondRuleSeatMap.get(validator))
-        ? selfBond >= MIN_SELF_BOND
+        ? selfBond >= selfBondMinimum
         : selfBondRuleActive ? selfBond >= minStake : totalStake >= minStake;
 
       return {
@@ -1531,7 +1539,7 @@ const getV2StakingInfo = async (
     stakeRewardRate: "0",
     estimatedApy,
     minStake: uintString(state.minStake),
-    minSelfBond: MIN_SELF_BOND.toString(),
+    minSelfBond: selfBondMinimumOf(state).toString(),
     selfBondGraceUntil: uintString(state.selfBondGraceUntil),
     selfBondRuleActive: isSelfBondRuleActive(state, now),
     proposerFeeBps: uintString(state.proposerFeeBps),
@@ -1545,7 +1553,7 @@ const getV2StakingInfo = async (
     unkickCooldown: uintString(state.unkickCooldown),
     maxOperatorStakeBps: uintString(state.maxOperatorStakeBps),
     joinsPaused: !isJoinsOpen(state),
-    joinsOpenFromBlock: uintString(state.joinsOpenFromBlock),
+    joinsOpenFromBlock: JOINS_OPEN_FROM_BLOCK.toString(),
     governanceSyncEnabled: parseBoolLike(state.governanceSyncEnabled),
     validatorCount: uintString(state.validatorCount),
     trackedUsdst: uintString(state.trackedUsdst),
@@ -2420,6 +2428,21 @@ export const setStratoSelfBondGrace = async (
 
   return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setSelfBondGraceUntil", [
     selfBondGraceUntil,
+  ]);
+};
+
+// The operator's own bond a candidate, or a seat taken under the self-bond rule, needs. A
+// higher bar drops such seats that fall short from the set.
+export const setStratoSelfBondMinimum = async (
+  accessToken: string,
+  userAddress: string,
+  selfBondMinimum: string
+): Promise<{ status: string; hash: string }> => {
+  if (parseBigIntLike(selfBondMinimum) <= 0n) throw badRequest("selfBondMinimum must be positive");
+  await requireV2(accessToken);
+
+  return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setSelfBondMinimum", [
+    selfBondMinimum,
   ]);
 };
 

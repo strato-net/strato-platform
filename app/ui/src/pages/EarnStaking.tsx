@@ -132,7 +132,7 @@ type StakingInfo = {
   rewardPeriodDescription: string;
   estimatedApy: string;
   minStake: string;
-  // V2: the operator's own bond a new seat needs (StratoStaking.MIN_SELF_BOND).
+  // V2: the operator's own bond a new seat needs (StratoStaking selfBondMinimum, 10,000 until set).
   minSelfBond: string;
   proposerFeeBps: string;
   joinsPaused: boolean;

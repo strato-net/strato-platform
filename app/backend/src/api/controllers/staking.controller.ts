@@ -24,6 +24,7 @@ import {
   setStratoEmergencyKicker,
   setStratoGovernance,
   setStratoSelfBondGrace,
+  setStratoSelfBondMinimum,
   setStratoSetParams,
   setStratoStakingParams,
   setStratoOperator,
@@ -644,6 +645,21 @@ class StakingController {
       }
 
       const result = await setStratoSelfBondGrace(req.accessToken, req.address as string, String(selfBondGraceUntil));
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async setSelfBondMinimum(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { selfBondMinimum } = req.body || {};
+      if (!isPositiveAmount(selfBondMinimum)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid selfBondMinimum" });
+        return;
+      }
+
+      const result = await setStratoSelfBondMinimum(req.accessToken, req.address as string, String(selfBondMinimum));
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
