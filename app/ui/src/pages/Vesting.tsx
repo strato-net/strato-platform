@@ -348,6 +348,10 @@ const ProgramHero = ({ summary, vestings }: ProgramHeroProps) => {
   const outstanding = vestings.filter((vesting) => !vesting.cancelled && toBigInt(vesting.locked) > 0n);
   const lastEnd = outstanding.reduce((latest, vesting) => Math.max(latest, vesting.endDate), 0);
   const lastEndIsFloor = outstanding.some((vesting) => vesting.pausingDate > 0);
+  // Before a cliff the start date is what matters, not the far-off end date.
+  const nextStart = vestings
+    .filter((vesting) => vesting.status === "not_started")
+    .reduce((earliest, vesting) => (earliest === 0 ? vesting.startDate : Math.min(earliest, vesting.startDate)), 0);
 
   return (
     <div className="rounded-2xl overflow-hidden text-white" style={{ background: HERO_GRADIENT }}>
@@ -362,12 +366,15 @@ const ProgramHero = ({ summary, vestings }: ProgramHeroProps) => {
             <span className="ml-2 text-lg font-semibold text-white/60 md:text-xl">{TOKEN_SYMBOL}</span>
           </p>
           <p className="mt-3 text-sm text-white/60 md:text-base">
-            {perDay > 0n
-              ? `Vesting ${formatStrato(perDay)} a day. `
-              : vestedPct >= 100
-                ? "Everything has vested."
-                : "Nothing is vesting right now. "}
-            {lastEnd > 0 && `Fully vested ${lastEndIsFloor ? "no earlier than" : "by"} ${formatDay(lastEnd)}.`}
+            {perDay > 0n ? (
+              <>Vesting {formatStrato(perDay)} a day.{lastEnd > 0 && ` Fully vested ${lastEndIsFloor ? "no earlier than" : "by"} ${formatDay(lastEnd)}.`}</>
+            ) : nextStart > 0 ? (
+              <>Vesting starts on {formatDay(nextStart)}.</>
+            ) : vestedPct >= 100 ? (
+              <>Everything has vested.</>
+            ) : (
+              <>Nothing is vesting right now.{lastEnd > 0 && ` Fully vested ${lastEndIsFloor ? "no earlier than" : "by"} ${formatDay(lastEnd)}.`}</>
+            )}
           </p>
 
           <div className="mt-7 flex flex-wrap gap-x-10 gap-y-5">
