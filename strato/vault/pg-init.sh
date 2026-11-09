@@ -3,8 +3,20 @@ set -eu
 
 export PGHOST="${postgres_host:-postgres}" PGPORT="${postgres_port:-5432}" PGUSER=postgres
 export PGPASSWORD="${postgres_admin_password:?}"
+export PGCONNECT_TIMEOUT=3
 
-until psql -X -d postgres -Atqc 'SELECT 1' >/dev/null 2>&1; do sleep 1; done
+# Bounded like the node's pg-init.sh: a wrong administrator password entered
+# for an existing volume fails the deployment with the reason instead of
+# holding every dependent service forever.
+attempt=0
+until error=$(psql -X -d postgres -Atqc 'SELECT 1' 2>&1 >/dev/null); do
+  attempt=$((attempt + 1))
+  if [ "$attempt" -ge 60 ]; then
+    echo "PostgreSQL administrator connection failed at $PGHOST:$PGPORT: $error" >&2
+    exit 1
+  fi
+  sleep 2
+done
 
 psql -X -v ON_ERROR_STOP=1 -d postgres -v db="${postgres_vault_wrapper_db:-oauth}" <<'SQL'
 DO $role$

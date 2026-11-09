@@ -1,4 +1,10 @@
 -- Run only by the one-shot pg-init service with the cluster administrator.
+-- Every core sharing the cluster runs it, so the whole script is one
+-- transaction under an advisory lock (taken in the maintenance database all
+-- provisioners connect to): a CREATE ROLE racing another provisioner fails on
+-- pg_authid's unique index, which the duplicate_object handlers do not catch.
+BEGIN;
+SELECT pg_advisory_xact_lock(617074, hashtext('roles'));
 DO $roles$
 DECLARE name text;
 BEGIN
@@ -77,3 +83,4 @@ ALTER ROLE strato_postgrest PASSWORD :'postgrest_password';
 ALTER ROLE strato_auth PASSWORD :'auth_password';
 ALTER ROLE strato_vault PASSWORD :'vault_password';
 ALTER ROLE strato_history PASSWORD :'history_password';
+COMMIT;

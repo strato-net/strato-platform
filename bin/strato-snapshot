@@ -743,16 +743,17 @@ copy_dir_contents_without_appledouble() {
   (cd "$src" && tar_without_appledouble -cf - .) | (cd "$dest" && tar -xpf -)
 }
 
-# Stage .ethereumH without the host-specific ethconf.yaml and without LevelDB's
-# LOG / LOG.old: every LevelDB directory under .ethereumH (state, hash, code,
-# ...) keeps a plain-text activity log there that LevelDB recreates on open. It
-# carries no state and grows to tens of MB on a long-running node.
+# Stage .ethereumH without the host-specific ethconf.yaml and ethconf-public.yaml
+# and without LevelDB's LOG / LOG.old: every LevelDB directory under .ethereumH
+# (state, hash, code, ...) keeps a plain-text activity log there that LevelDB
+# recreates on open. It carries no state and grows to tens of MB on a
+# long-running node.
 copy_ethereum_payload() {
   local src="$1"
   local dest="$2"
   [[ -d "$src" ]] || die "missing .ethereumH state directory"
   mkdir -p "$dest"
-  (cd "$src" && tar_without_appledouble --exclude='./ethconf.yaml' --exclude='./*/LOG' --exclude='./*/LOG.old' -cf - .) \
+  (cd "$src" && tar_without_appledouble --exclude='./ethconf.yaml' --exclude='./ethconf-public.yaml' --exclude='./*/LOG' --exclude='./*/LOG.old' -cf - .) \
     | (cd "$dest" && tar_without_appledouble -xpf -)
 }
 
@@ -812,6 +813,67 @@ for line in path.read_text(encoding="utf-8").splitlines(keepends=True):
 
 path.write_text("".join(out), encoding="utf-8")
 PY
+}
+
+# The credential-free copy of ethconf.yaml that strato-setup writes for the
+# containers which only need settings (Generator.hs blanks the same four
+# sections). A node configured before that file existed gets it here; a
+# hand-edited layout this line-based rewrite cannot blank safely fails the
+# restore rather than publishing a password.
+write_public_ethconf() {
+  local file="$1"
+  local public="$2"
+  [[ -f "$file" ]] || die "ethconf.yaml not found: $file"
+  python3 - "$file" "$public" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+src, dest = Path(sys.argv[1]), Path(sys.argv[2])
+sections = {"sqlConfig", "sqlReaderConfig", "cirrusConfig", "peerDbConfig"}
+section_key = re.compile(r"""^\s*["']?(sqlConfig|sqlReaderConfig|cirrusConfig|peerDbConfig)["']?\s*:""")
+password_key = re.compile(r"""^\s*["']?password["']?\s*:""")
+current = None
+blanked_indent = None
+out = []
+
+
+def fail(what):
+    sys.exit(f"{src}: {what}; cannot derive ethconf-public.yaml from this layout")
+
+
+for line in src.read_text(encoding="utf-8").splitlines(keepends=True):
+    stripped = line.strip()
+    content = bool(stripped) and not stripped.startswith("#")
+    indent = len(line) - len(line.lstrip(" "))
+    if content:
+        if blanked_indent is not None and indent > blanked_indent:
+            fail(f"{current}.password continues on the next line")
+        blanked_indent = None
+    top = re.match(r"^([A-Za-z0-9_.-]+):(.*)$", line)
+    if top:
+        current = top.group(1)
+        rest = re.sub(r"(^|\s)#.*$", "", top.group(2)).strip()
+        if current in sections and rest:
+            fail(f"{current} is not a block mapping")
+    elif section_key.match(line):
+        fail(f"{section_key.match(line).group(1)} is not a top-level block mapping")
+    elif current in sections and content:
+        value = re.match(r"^(\s+)password:\s*(.*)$", line)
+        if value:
+            if value.group(2).startswith(("|", ">")):
+                fail(f"{current}.password is a block scalar")
+            line = value.group(1) + "password: ''\n"
+            blanked_indent = len(value.group(1))
+        elif password_key.match(line):
+            fail(f"{current}.password is not written as password: value")
+        elif not re.match(r"^\s+[A-Za-z0-9_.-]+:(\s|$)", line):
+            fail(f"{current} has a line that is not a key: value pair")
+    out.append(line)
+
+dest.write_text("".join(out), encoding="utf-8")
+PY
+  chmod 444 "$public"
 }
 
 node_network() {
@@ -1430,7 +1492,7 @@ state_exists() {
   # required to replace it.
   [[ -d "$node_dir/kafka" && -n "$(find "$node_dir/kafka" -mindepth 1 -maxdepth 1 2>/dev/null | head -1)" ]] && return 0
   if [[ -d "$node_dir/.ethereumH" ]]; then
-    find "$node_dir/.ethereumH" -mindepth 1 ! -name ethconf.yaml 2>/dev/null | grep -q . && return 0
+    find "$node_dir/.ethereumH" -mindepth 1 ! -name ethconf.yaml ! -name ethconf-public.yaml 2>/dev/null | grep -q . && return 0
   fi
   return 1
 }
@@ -2031,7 +2093,7 @@ remove_restored_state() {
   # does not keep a stale broker dir around forever.
   rm -rf "$node_dir/redis" "$node_dir/jlog" "$node_dir/kafka"
   if [[ -d "$node_dir/.ethereumH" ]]; then
-    find "$node_dir/.ethereumH" -mindepth 1 ! -name ethconf.yaml -exec rm -rf {} +
+    find "$node_dir/.ethereumH" -mindepth 1 ! -name ethconf.yaml ! -name ethconf-public.yaml -exec rm -rf {} +
   fi
 }
 
@@ -2087,11 +2149,20 @@ restore_payload() {
     require_free_space "$pg_dir" "$load_kb" "the databases rebuilt from the dumps" "$hint"
   fi
   require_free_space "$node_dir" "$node_kb" "$node_what" "$hint"
+  # Derived before anything is replaced: a layout the rewrite cannot blank
+  # refuses the restore while the node is still as it was.
+  if [[ ! -f "$node_dir/.ethereumH/ethconf-public.yaml" ]]; then
+    info "      Writing ethconf-public.yaml, the node's settings without database passwords, for the containers that mount it"
+    write_public_ethconf "$node_dir/.ethereumH/ethconf.yaml" "$node_dir/.ethereumH/ethconf-public.yaml"
+  fi
 
   info "[5/7] Replacing the node's chain state with the snapshot's"
-  info "      Removing the old .ethereumH state (ethconf.yaml is kept), redis/, jlog/ and any pre-jlog kafka/"
+  info "      Removing the old .ethereumH state (ethconf.yaml and ethconf-public.yaml are kept), redis/, jlog/ and any pre-jlog kafka/"
   remove_restored_state "$node_dir"
   mkdir -p "$node_dir/.ethereumH" "$node_dir/postgres"
+  # The node keeps its own configuration: an archive staged before
+  # ethconf-public.yaml was excluded carries the source node's copy.
+  rm -f "$extracted/payload/ethereumH/ethconf.yaml" "$extracted/payload/ethereumH/ethconf-public.yaml"
   info "      Moving the extracted state into place: .ethereumH $(human_bytes "$(dir_size_bytes "$extracted/payload/ethereumH")"), redis $(human_bytes "$(dir_size_bytes "$extracted/payload/redis")"), jlog $(human_bytes "$(dir_size_bytes "$extracted/payload/jlog")")"
   info "      (a rename within one filesystem: instant, no bytes are copied)"
   # Move (not copy) from the throwaway extraction dir: an instant rename on the

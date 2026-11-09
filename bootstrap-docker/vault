@@ -39,6 +39,8 @@ HTTP_PORT          - (default: 8090) Port for HTTP traffic listener.
 HTTPS_PORT         - (default: 8093) Port for HTTPS traffic listener; only used with ssl=true.
 ssl                - (default: false) [true|false] to run the node with SSL/TLS.
 sslCertFileType    - (default: pem) [pem|crt] the SSL certificate type and file extension (should be accessible at ./ssl/certs/server.<sslCertFileType> at deploy time.)
+postgres_password                 - (required) PostgreSQL administrator password; a volume created by an earlier release used the password 'api' unless it was set.
+postgres_vault_password           - (required) Password pg-init sets for the strato_vault login the Vault connects with.
 INITIAL_OAUTH_DISCOVERY_URL       - (required) OpenID Connect discovery URL for initial OAuth2 provider. Additional ones can be added at run time.
 INITIAL_OAUTH_ISSUER              - (required) Issuer value for initial OAuth2 provider.
 INITIAL_OAUTH_JWT_USERNAME_CLAIM  - (default: sub) The claim (payload property) of JWT token to use as unique user id within STRATO Vault."
@@ -176,6 +178,11 @@ export sslCertFileType=${sslCertFileType:-pem}
 if [[ -z ${INITIAL_OAUTH_DISCOVERY_URL} || -z ${INITIAL_OAUTH_ISSUER} ]] ; then
   echo -e "${Red}INITIAL_OAUTH_DISCOVERY_URL, INITIAL_OAUTH_ISSUER are required to start STRATO Vault.\nFor additional help see './strato --help'${NC}"
   exit 13
+fi
+
+if [[ -z ${postgres_password} || -z ${postgres_vault_password} ]] ; then
+  echo -e "${Red}postgres_password and postgres_vault_password are required to start STRATO Vault.\nFor additional help see './vault --help'${NC}"
+  exit 14
 fi
 
 echo "" && echo "*** Common Config ***"

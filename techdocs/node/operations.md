@@ -186,12 +186,14 @@ A snapshot is a cold copy of a synced node's public chain data.
 
 | Included | Excluded |
 |---|---|
-| `.ethereumH/` state, except `ethconf.yaml` | `ethconf.yaml` |
+| `.ethereumH/` state, except `ethconf.yaml` and `ethconf-public.yaml` | `ethconf.yaml`, `ethconf-public.yaml` |
 | Postgres `eth` and `cirrus` databases, as dumps | Postgres `oauth` database (node and user keys) |
 | `redis/` | `secrets/` |
 | `jlog/` | `logs/` |
 
-Restoring keeps the target node's own configuration, credentials and keys.
+Restoring keeps the target node's own configuration, credentials and keys. A
+node set up before `ethconf-public.yaml` existed gets it written from its own
+`ethconf.yaml` during the restore.
 
 Published snapshots live at `s3://strato-snapshots/<network>/v2/`:
 

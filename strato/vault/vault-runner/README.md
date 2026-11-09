@@ -27,9 +27,12 @@ cd strato-platform/strato/vault/vault-runner
 The first run creates `.env` with separate random PostgreSQL administrator and
 Vault login passwords. Keep this file with the `vaultpgdata` volume across
 restarts. When upgrading an existing volume, the script asks for its current
-PostgreSQL administrator password (the old Compose default was `api`) and
-creates a new Vault login password. The Vault encryption password prompted by
-`enter-password.sh` is separate from both database passwords.
+PostgreSQL administrator password (the old Compose default was `api`) unless an
+existing `.env` already holds it, and adds the new Vault login password to that
+file, keeping its other settings. If the stack does not start, the script prints
+`pg-init`'s log; a rejected administrator password is fixed by correcting
+`postgres_password` in `.env` and running the script again. The Vault encryption
+password prompted by `enter-password.sh` is separate from both database passwords.
 
 ### Configure your local STRATO with the local vault
 
@@ -108,8 +111,9 @@ sudo docker exec -i \
   -e NEW_VAULT_PASSWORD="${NEW_PASSWORD}" \
   vault-vault-wrapper-1 \
   /usr/local/bin/change-vault-password \
-    --pghost=postgres --pgport=5432 \
-    --pguser=postgres --password=api --database=oauth
+    --pghost=postgres --pgport=5432 --database=oauth \
+    --pguser=strato_vault \
+    --password="$(sudo docker exec vault-vault-wrapper-1 printenv postgres_password)"
 #
 sudo docker restart -t 0 vault-vault-wrapper-1
 for i in {1..200}; do
@@ -153,7 +157,7 @@ rm -rf update-password.sh
 4. Recreate it.
     ```
     sudo docker exec vault-postgres-1 psql -U postgres -d postgres -c \
-    "CREATE DATABASE oauth OWNER postgres;"
+    "CREATE DATABASE oauth OWNER strato_vault;"
     ```
 5. Restore the dump. Execute from the directory with `vault-dump-file.sql` file:
     ```
@@ -166,16 +170,14 @@ rm -rf update-password.sh
     sudo docker exec vault-postgres-1 psql -U postgres -d oauth -c \
     "SELECT (SELECT count(*) FROM users) AS users, (SELECT count(*) FROM message) AS message;"
     ```
-7. Start the vault.
+7. Start the vault from the `vault-runner` directory. The script brings the
+   stack up with the same settings as the first start; `pg-init` runs again,
+   hands the restored tables to `strato_vault` and removes PUBLIC's privileges.
     ```
-    sudo docker start vault-vault-wrapper-1
+    ./run-vault.sh
+    # > enter the old password when prompted
     ```
-8. POST the old password.
-    ```
-    sudo ./enter-password.sh
-    # > enter the old password
-    ```
-9. Verify.
+8. Verify.
     ```
     sudo docker exec vault-vault-wrapper-1 \
     curl -sf http://localhost:8000/strato/v2.3/verify-password`
@@ -211,7 +213,8 @@ Postgres connection settings are resolved with the standard CLI > env > default
 precedence:
 
 1. **CLI flag** if explicitly passed: `--pghost`, `--pgport`, `--pguser`,
-   `--password`, `--database`.
+   `--password` (or `--pgPasswordFile`, which wins over everything else),
+   `--database`.
 2. **Environment variable** (the same names the vault-wrapper daemon already
    reads from `docker-compose.vault.yml`):
    - `postgres_host`
@@ -219,7 +222,7 @@ precedence:
    - `postgres_user`
    - `postgres_password`
    - `postgres_vault_wrapper_db`
-3. **Default** if neither is set: `postgres` / `5432` / `postgres` / `api` /
+3. **Default** if neither is set: `postgres` / `5432` / `strato_vault` / empty /
    `oauth`.
 
 When running `migrate-key` via `docker exec` inside a `vault-wrapper-*`

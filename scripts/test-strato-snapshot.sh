@@ -55,6 +55,9 @@ make_fixture_snapshot() {
   mkdir -p "$staging/payload/jlog/vmevents"
 
   echo "state-from-snapshot" > "$staging/payload/ethereumH/state/value"
+  # Archives staged before create excluded them carry the source node's copies.
+  printf 'sqlConfig:\n  password: snapshotpass\n' > "$staging/payload/ethereumH/ethconf.yaml"
+  printf 'urlConfig:\n  nodeUrl: http://snapshot-source:8081\n' > "$staging/payload/ethereumH/ethconf-public.yaml"
   echo "eth dump fixture" > "$staging/payload/postgres-dumps/eth.dump"
   echo "cirrus dump fixture" > "$staging/payload/postgres-dumps/cirrus.dump"
   echo "redis-from-snapshot" > "$staging/payload/redis/appendonly.aof"
@@ -186,6 +189,19 @@ if grep -q "password: snapshotpass" "$NODE/.ethereumH/ethconf.yaml"; then
   echo "restore must not import the snapshot postgres password (A2)" >&2
   exit 1
 fi
+# A target configured before ethconf-public.yaml existed gets one derived from
+# its own ethconf.yaml, never the archive's copy.
+assert_file "$NODE/.ethereumH/ethconf-public.yaml"
+assert_contains "$NODE/.ethereumH/ethconf-public.yaml" "nodeUrl: http://local-dev-node:8081"
+assert_contains "$NODE/.ethereumH/ethconf-public.yaml" "password: ''"
+if grep -Eq "snapshot-source|oldpass" "$NODE/.ethereumH/ethconf-public.yaml"; then
+  echo "ethconf-public.yaml must hold the node's own settings without database passwords" >&2
+  exit 1
+fi
+if ! find "$NODE/.ethereumH/ethconf-public.yaml" -perm -0444 | grep -q .; then
+  echo "ethconf-public.yaml must be world-readable for the containers that mount it" >&2
+  exit 1
+fi
 assert_no_appledouble "$NODE"
 
 if STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium >/tmp/strato-snapshot-restore.out 2>&1; then
@@ -213,6 +229,9 @@ TAR_ENV=(STRATO_SNAPSHOT_OFFLINE_TEST=1 REAL_TAR="$(command -v tar)" PATH="$TAR_
 
 env "${TAR_ENV[@]}" FAKE_TAR_LOG="$TMP/tar-all-dbs.log" "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium --force
 assert_no_appledouble "$NODE"
+# The archive's own configs never replace the target's, with or without --force.
+assert_contains "$NODE/.ethereumH/ethconf.yaml" "password: oldpass"
+assert_contains "$NODE/.ethereumH/ethconf-public.yaml" "nodeUrl: http://local-dev-node:8081"
 assert_contains "$TMP/tar-all-dbs.log" "/payload/postgres-dumps/eth.dump$"
 assert_contains "$TMP/tar-all-dbs.log" "/payload/postgres-dumps/cirrus.dump$"
 
@@ -315,6 +334,10 @@ if tar -tzf "$CREATED" | grep -E 'ethereumH/state/LOG(\.old)?$' > "$TMP/created-
   exit 1
 fi
 tar -tzf "$CREATED" | grep -q 'ethereumH/state/value$' || { echo "created archive is missing the state payload" >&2; exit 1; }
+if tar -tzf "$CREATED" | grep -q 'ethconf'; then
+  echo "created archive must not carry ethconf.yaml or ethconf-public.yaml" >&2
+  exit 1
+fi
 if tar -tzf "$CREATED" | grep -E '(^|/)\._' > "$TMP/created-appledouble.out"; then
   echo "created archive should not contain AppleDouble metadata" >&2
   cat "$TMP/created-appledouble.out" >&2
@@ -551,6 +574,10 @@ if tar -tzf "$STATE_ONLY" | grep -q 'postgres-dumps'; then
   echo "a state-only archive must carry no database dumps" >&2
   exit 1
 fi
+if tar -tzf "$STATE_ONLY" | grep -q 'ethconf'; then
+  echo "an archive must not carry the node's ethconf.yaml or ethconf-public.yaml" >&2
+  exit 1
+fi
 STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" inspect "$STATE_ONLY" > "$TMP/state-only-inspect.out"
 if grep -q 'postgres-dumps' "$TMP/state-only-inspect.out"; then
   echo "a state-only manifest must not list database dumps" >&2
@@ -559,13 +586,31 @@ fi
 
 REPLICA="$TMP/replica"
 make_target_node "$REPLICA"
+printf 'urlConfig:\n  nodeUrl: http://replica:8081\n' > "$REPLICA/.ethereumH/ethconf-public.yaml"
 STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$REPLICA" \
   --source "$STATE_ONLY" \
   --network helium \
   --force
 assert_file "$REPLICA/.ethereumH/state/value"
+# The target's own public config survives the restore like its ethconf.yaml.
+assert_contains "$REPLICA/.ethereumH/ethconf-public.yaml" "nodeUrl: http://replica:8081"
 assert_file "$REPLICA/redis/appendonly.aof"
 assert_file "$REPLICA/jlog/vmevents/00000000"
+
+# A hand-edited ethconf.yaml whose section the line-based derivation cannot
+# blank safely fails the restore instead of publishing the password.
+FLOW="$TMP/flow"
+make_target_node "$FLOW"
+printf 'networkConfig:\n  network: helium\nsqlConfig: {database: eth, host: localhost, password: oldpass, user: postgres}\nurlConfig:\n  nodeUrl: http://flow:8081\n' > "$FLOW/.ethereumH/ethconf.yaml"
+if STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$FLOW" --source "$STATE_ONLY" --network helium > "$TMP/flow.out" 2>&1; then
+  echo "restore must refuse to derive ethconf-public.yaml from a flow-style section" >&2
+  exit 1
+fi
+assert_contains "$TMP/flow.out" "sqlConfig is not a block mapping"
+if [[ -e "$FLOW/.ethereumH/ethconf-public.yaml" ]]; then
+  echo "no ethconf-public.yaml may be written when the derivation fails" >&2
+  exit 1
+fi
 
 # pull: pre-download a published snapshot into the persistent download cache.
 # A fake curl serves https://<bucket>.s3.<region>.amazonaws.com/<key> from a

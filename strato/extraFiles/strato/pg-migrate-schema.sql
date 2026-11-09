@@ -3,10 +3,29 @@
 -- transfer the maintenance database and other shared objects.
 BEGIN;
 SELECT pg_advisory_xact_lock(617074, hashtext(current_database()));
-REVOKE CREATE ON SCHEMA public FROM PUBLIC;
-REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
-REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
-REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
+-- Only objects whose ACL still grants PUBLIC are touched: GRANT and REVOKE
+-- rewrite the catalog row even when nothing changes, and such a rewrite
+-- meeting Slipstream's DDL on the primary fails one of the two.
+SELECT 'REVOKE CREATE ON SCHEMA public FROM PUBLIC'
+  FROM pg_namespace n, aclexplode(coalesce(n.nspacl, acldefault('n', n.nspowner))) a
+ WHERE n.nspname = 'public' AND a.grantee = 0 AND a.privilege_type = 'CREATE'
+\gexec
+SELECT format('REVOKE ALL ON %s %s FROM PUBLIC', kind, string_agg(name, ', '))
+  FROM (SELECT CASE WHEN c.relkind = 'S' THEN 'SEQUENCE' ELSE 'TABLE' END AS kind,
+               format('%I.%I', n.nspname, c.relname) AS name
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'f', 'S')
+           AND EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee = 0)) rels
+ GROUP BY kind
+\gexec
+SELECT 'REVOKE ALL ON ROUTINE ' || string_agg(format('%I.%I(%s)', n.nspname, p.proname, pg_get_function_identity_arguments(p.oid)), ', ') || ' FROM PUBLIC'
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE n.nspname = 'public'
+   AND EXISTS (SELECT 1 FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a WHERE a.grantee = 0)
+HAVING count(*) > 0
+\gexec
 
 SELECT format('ALTER SCHEMA public OWNER TO %I', :'owner')
 \gexec
