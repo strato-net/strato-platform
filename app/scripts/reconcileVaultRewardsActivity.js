@@ -48,7 +48,6 @@
     EVENT_INDEX_BASE  First synthetic eventIndex (default 1000000)
     BATCH_SIZE        Actions per batch tx (default 50, capped by the contract's
                       maxBatchSize)
-    INSECURE_TLS=1    Disable TLS verification (equivalent of curl -k)
 
   Usage:
     node reconcileVaultRewardsActivity.js <phase> --network <testnet|prod>
@@ -120,10 +119,6 @@ loadEnvFile(process.env.ENV_FILE || path.join(__dirname, ".env"));
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
-
-if (process.env.INSECURE_TLS === "1") {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-}
 
 const args = process.argv.slice(2);
 const phase = args[0];
