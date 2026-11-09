@@ -215,17 +215,44 @@ async function onChainVestings(tokenObj, s) {
   });
 }
 
-// The vesting id for an entry, from the pool's own vestingHash(address,uint8,bool,uint16,uint64,uint128)
-// via eth_call with the entry's ORIGINAL parameters (curve 0). Selector 0x5d76df6b is
-// keccak256 of that signature; verified against live ids on helium on 2026-11-09.
+// Read-only calls through the node's JSON-RPC (no token needed). Selectors are the first
+// four bytes of keccak256 of the signature; all verified against the live helium contracts
+// on 2026-11-09.
+const SEL = { vestingHash: '5d76df6b', pool: '16f0115b', poolManager: 'dc4c90d3', token: 'fc0c546a', owner: '8da5cb5b' };
 const word = (v) => BigInt(v).toString(16).padStart(64, '0');
-async function expectedVestingId(s, c, j) {
-  const data = '0x5d76df6b' + word('0x' + c.accounts[j]) + word(0) + word(c.managed ? 1 : 0) + word(c.durationWeeks) + word(c.startDate) + word(c.amounts[j]);
+async function ethCall(to, data, what) {
   const { data: res } = await axios.post(`${config.nodes[0].url.replace(/\/$/, '')}/rpc`,
-    { jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: '0x' + s.pool, data }, 'latest'] },
+    { jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: '0x' + to, data: '0x' + data }, 'latest'] },
     { headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (create-vestings)' }, timeout: 30000 });
-  if (!res || typeof res.result !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(res.result)) throw new Error(`vestingHash eth_call failed for ${c.accounts[j]}: ${JSON.stringify(res).slice(0, 200)}`);
+  if (!res || typeof res.result !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(res.result)) throw new Error(`${what}: eth_call to ${to} failed: ${JSON.stringify(res).slice(0, 200)}`);
   return clean(res.result);
+}
+const addressFromWord = (w) => w.slice(24);
+
+// The schedule names three addresses that must belong together: votes go to the manager,
+// grants and funding land on the pool, and the pool pays in the token. Verify the chain
+// agrees before any vote, so a stale or mistyped address cannot create irrevocable grants
+// on a different pool than the one being checked and funded. The manager's owner must be
+// the AdminRegistry the votes are cast through, or the executing vote reverts.
+async function verifyWiring(s) {
+  const pool = addressFromWord(await ethCall(s.manager, SEL.pool, 'manager.pool()'));
+  const poolManager = addressFromWord(await ethCall(s.pool, SEL.poolManager, 'pool.poolManager()'));
+  const token = addressFromWord(await ethCall(s.pool, SEL.token, 'pool.token()'));
+  const owner = addressFromWord(await ethCall(s.manager, SEL.owner, 'manager.owner()'));
+  const problems = [];
+  if (pool !== s.pool) problems.push(`manager ${s.manager} manages pool ${pool}, schedule says ${s.pool}`);
+  if (poolManager !== s.manager) problems.push(`pool ${s.pool} is managed by ${poolManager}, schedule says ${s.manager}`);
+  if (token !== s.token) problems.push(`pool ${s.pool} pays token ${token}, schedule says ${s.token}`);
+  if (owner !== s.adminRegistry) problems.push(`manager ${s.manager} is owned by ${owner}, votes are cast through registry ${s.adminRegistry}`);
+  if (problems.length) throw new Error('schedule does not match the chain:\n  - ' + problems.join('\n  - '));
+  console.log(`wiring OK: manager ${s.manager} -> pool ${s.pool} -> token ${s.token}; manager owner = registry ${s.adminRegistry}`);
+}
+
+// The vesting id for an entry, from the pool's own vestingHash(address,uint8,bool,uint16,uint64,uint128)
+// via eth_call with the entry's ORIGINAL parameters (curve 0).
+async function expectedVestingId(s, c, j) {
+  const data = SEL.vestingHash + word('0x' + c.accounts[j]) + word(0) + word(c.managed ? 1 : 0) + word(c.durationWeeks) + word(c.startDate) + word(c.amounts[j]);
+  return ethCall(s.pool, data, `vestingHash for ${c.accounts[j]}`);
 }
 
 async function resolveIds(s) {
@@ -359,6 +386,7 @@ async function waitForExecution(tokenObj, s, submitted) {
 
   if (cmd === 'plan') { printPlan(s); return; }
 
+  await verifyWiring(s);
   const { user, tokenObj } = await login();
 
   if (cmd === 'status') {
