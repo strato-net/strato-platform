@@ -9,6 +9,14 @@ import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CopyButton from "@/components/ui/copy";
@@ -98,12 +106,7 @@ const formatCountdown = (seconds: number): string => {
   return `${minutes}m`;
 };
 
-const formatDurationWeeks = (weeks: number): string => {
-  if (weeks <= 0) return "Unlocks in full at start";
-  return weeks === 1 ? "1 week, linear" : `${weeks} weeks, linear`;
-};
-
-const truncateId = (id: string): string => (id.length > 16 ? `${id.slice(0, 10)}…${id.slice(-6)}` : id);
+const truncateHex = (value: string): string => (value.length > 16 ? `${value.slice(0, 10)}…${value.slice(-6)}` : value);
 
 const canClaim = (vesting: VestingView): boolean =>
   vesting.status !== "not_started" && toBigInt(vesting.claimable) > 0n;
@@ -113,11 +116,11 @@ const canClaim = (vesting: VestingView): boolean =>
 // This branch's tailwind config has no success/warning tokens and Badge has only four variants,
 // so paused reuses the text-yellow-600 class EarnStaking already uses for warnings.
 const STATUS_BADGE: Record<VestingStatus, { label: string; variant: BadgeProps["variant"]; className?: string }> = {
-  not_started: { label: "Starts soon", variant: "outline" },
-  vesting: { label: "Unlocking", variant: "default" },
+  not_started: { label: "Not started", variant: "outline" },
+  vesting: { label: "Vesting", variant: "default" },
   paused: { label: "Paused", variant: "outline", className: "text-yellow-600 border-yellow-600/40" },
   cancelled: { label: "Cancelled", variant: "destructive" },
-  fully_vested: { label: "Fully unlocked", variant: "secondary" },
+  fully_vested: { label: "Fully vested", variant: "secondary" },
   complete: { label: "Complete", variant: "secondary" },
 };
 
@@ -126,13 +129,13 @@ const STATUS_BADGE: Record<VestingStatus, { label: string; variant: BadgeProps["
 const progressLabel = (event: WalletTxProgressEvent): string => {
   switch (event.status) {
     case "signing":
-      return "Waiting for wallet signature…";
+      return "Waiting for your wallet signature…";
     case "submitting":
-      return "Submitting…";
+      return "Submitting the transaction…";
     case "failed":
       return event.error || "Transaction failed";
     default:
-      return "Submitted";
+      return "Submitted, waiting for the block…";
   }
 };
 
@@ -163,7 +166,7 @@ const apiErrorMessage = (error: unknown): string => {
 // VestingPool revert reasons (and the paused-token transfer guard) mapped to user-facing text.
 const CONTRACT_ERROR_TEXT: Array<[needle: string, text: string]> = [
   ["Can only be claimed by vesting owner", "Only the vesting's account can claim. Sign in with the account that owns this vesting."],
-  ["Trying to claim too many tokens", "The claim exceeds what is unlocked right now. Refresh and try again."],
+  ["Trying to claim too many tokens", "The claim exceeds what has vested right now. Refresh and try again."],
   ["Cannot claim to 0-address", "No beneficiary address was resolved."],
   ["Vesting not active yet", "This vesting has not started yet."],
   ["not whitelisted", "Claims are not enabled yet: the STRATO token is paused and the vesting pool is not yet allowed to transfer it."],
@@ -194,8 +197,8 @@ const LocalDate = ({ seconds, prefix, short }: { seconds: number; prefix?: strin
   );
 };
 
-interface UnlockRingProps {
-  /** Share already claimed, 0..100. Drawn first, in the darkest step of the ramp. */
+interface VestingRingProps {
+  /** Share already claimed, 0..100. Drawn on top in the deepest step of the ramp. */
   claimedPercent: number;
   /** Share vested (claimed + claimable), 0..100. Drawn beneath in the mid step. */
   vestedPercent: number;
@@ -209,7 +212,7 @@ interface UnlockRingProps {
 
 // A circular meter: one hue ramp, fill over a lighter track, so the state reads at a glance.
 // The arcs animate from zero on mount; reduced-motion users get the final state immediately.
-const UnlockRing = ({ claimedPercent, vestedPercent, size, stroke, tone, label, children }: UnlockRingProps) => {
+const VestingRing = ({ claimedPercent, vestedPercent, size, stroke, tone, label, children }: VestingRingProps) => {
   const [drawn, setDrawn] = useState(false);
   useEffect(() => {
     const frame = requestAnimationFrame(() => setDrawn(true));
@@ -254,7 +257,7 @@ interface ScheduleProps {
   now: number;
 }
 
-// The grant's own calendar: cliff on the left, full unlock on the right, the fill is time served.
+// The grant's own calendar: start on the left, fully vested on the right, the fill is time served.
 // A paused or cancelled grant stops at its freeze date and says so with a marker.
 const Schedule = ({ vesting, now }: ScheduleProps) => {
   const started = vesting.status !== "not_started";
@@ -309,7 +312,7 @@ const Schedule = ({ vesting, now }: ScheduleProps) => {
           <p className="font-medium text-foreground">
             <LocalDate seconds={vesting.endDate} prefix={frozen && !vesting.cancelled ? "≥ " : undefined} short />
           </p>
-          <p>{vesting.durationWeeks === 0 ? "Full unlock" : "Fully unlocked"}</p>
+          <p>{vesting.durationWeeks === 0 ? "Vests in full" : "Fully vested"}</p>
         </div>
       </div>
     </div>
@@ -330,19 +333,18 @@ interface ProgramHeroProps {
   vestings: VestingView[];
 }
 
-// The thesis of the page: how much of the allocation has unlocked, as one ring and one figure.
+// The thesis of the page: how much of the allocation has vested, as one ring and one figure.
 const ProgramHero = ({ summary, vestings }: ProgramHeroProps) => {
   const amount = toBigInt(summary.amount);
   const vested = toBigInt(summary.vested);
   const claimed = toBigInt(summary.claimed);
-  const unlockedPercent = percentOf(vested, amount);
+  const vestedPct = percentOf(vested, amount);
   const accruing = vestings.filter((vesting) => vesting.status === "vesting");
   const perDay = accruing.reduce((total, vesting) => total + dailyAccrual(vesting), 0n);
-  // Grants with anything left to unlock, including ones that have not started or are paused.
+  // Grants with anything left to vest, including ones that have not started or are paused.
   const outstanding = vestings.filter((vesting) => !vesting.cancelled && toBigInt(vesting.locked) > 0n);
   const lastEnd = outstanding.reduce((latest, vesting) => Math.max(latest, vesting.endDate), 0);
   const lastEndIsFloor = outstanding.some((vesting) => vesting.pausingDate > 0);
-  const grantWord = vestings.length === 1 ? "grant" : "grants";
 
   return (
     <div className="rounded-2xl overflow-hidden text-white" style={{ background: HERO_GRADIENT }}>
@@ -357,13 +359,12 @@ const ProgramHero = ({ summary, vestings }: ProgramHeroProps) => {
             <span className="ml-2 text-lg font-semibold text-white/60 md:text-xl">{TOKEN_SYMBOL}</span>
           </p>
           <p className="mt-3 text-sm text-white/60 md:text-base">
-            {`Your allocation across ${vestings.length} ${grantWord}. `}
             {perDay > 0n
-              ? `Unlocking ${formatStrato(perDay)} a day. `
-              : unlockedPercent >= 100
-                ? "Everything has unlocked."
-                : "Nothing is accruing right now. "}
-            {lastEnd > 0 && `Last unlock ${lastEndIsFloor ? "no earlier than" : "on"} ${formatDay(lastEnd)}.`}
+              ? `Vesting ${formatStrato(perDay)} a day. `
+              : vestedPct >= 100
+                ? "Everything has vested."
+                : "Nothing is vesting right now. "}
+            {lastEnd > 0 && `Fully vested ${lastEndIsFloor ? "no earlier than" : "by"} ${formatDay(lastEnd)}.`}
           </p>
 
           <div className="mt-7 flex flex-wrap gap-x-10 gap-y-5">
@@ -372,7 +373,7 @@ const ProgramHero = ({ summary, vestings }: ProgramHeroProps) => {
               <p className="mt-1 text-xl font-semibold text-strato-gold">{formatAmount(summary.claimable)}</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-white/50">Unlocked</p>
+              <p className="text-xs uppercase tracking-wider text-white/50">Vested</p>
               <p className="mt-1 text-xl font-semibold">{formatAmount(summary.vested)}</p>
             </div>
             <div>
@@ -380,7 +381,7 @@ const ProgramHero = ({ summary, vestings }: ProgramHeroProps) => {
               <p className="mt-1 text-xl font-semibold">{formatAmount(summary.claimed)}</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-white/50">Still locked</p>
+              <p className="text-xs uppercase tracking-wider text-white/50">Vesting</p>
               <p className="mt-1 text-xl font-semibold">{formatAmount(summary.locked)}</p>
             </div>
             {toBigInt(summary.returned) > 0n && (
@@ -393,21 +394,21 @@ const ProgramHero = ({ summary, vestings }: ProgramHeroProps) => {
         </div>
 
         <div className="flex items-center gap-5 lg:flex-col lg:gap-3">
-          <UnlockRing
+          <VestingRing
             claimedPercent={percentOf(claimed, amount)}
-            vestedPercent={unlockedPercent}
+            vestedPercent={vestedPct}
             size={168}
             stroke={14}
             tone="hero"
-            label={`${unlockedPercent.toFixed(1)} percent of the allocation has unlocked`}
+            label={`${vestedPct.toFixed(1)} percent of the allocation has vested`}
           >
-            <span className="text-4xl font-bold leading-none">{unlockedPercent.toFixed(unlockedPercent >= 100 ? 0 : 1)}%</span>
-            <span className="mt-1 text-xs uppercase tracking-wider text-white/60">unlocked</span>
-          </UnlockRing>
+            <span className="text-4xl font-bold leading-none">{vestedPct.toFixed(vestedPct >= 100 ? 0 : 1)}%</span>
+            <span className="mt-1 text-xs uppercase tracking-wider text-white/60">vested</span>
+          </VestingRing>
           <div className="flex flex-col gap-1.5 text-xs text-white/70 lg:flex-row lg:gap-4">
             <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-white" />Claimed</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-white/55" />Claimable</span>
-            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: "rgba(255,255,255,0.16)" }} />Locked</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: "rgba(255,255,255,0.16)" }} />Vesting</span>
           </div>
         </div>
       </div>
@@ -418,69 +419,53 @@ const ProgramHero = ({ summary, vestings }: ProgramHeroProps) => {
 interface VestingCardProps {
   vesting: VestingView;
   now: number;
-  /** Progress label while a claim for this vesting is in flight; undefined when idle. */
-  progress?: string;
   onClaim: (vesting: VestingView) => void;
 }
 
-const VestingCard = ({ vesting, now, progress, onClaim }: VestingCardProps) => {
+const VestingCard = ({ vesting, now, onClaim }: VestingCardProps) => {
   const badge = STATUS_BADGE[vesting.status] ?? STATUS_BADGE.vesting;
   const amount = toBigInt(vesting.amount);
   const percent = vestedPercent(vesting);
-  const claiming = progress !== undefined;
   const notStarted = vesting.status === "not_started";
   // Keyed on the flag rather than the status: a pause before the start or after the end keeps
   // its not_started / fully_vested status, but the admin pause is still worth stating.
   const paused = vesting.pausingDate > 0 && !vesting.cancelled;
   // The flag, not the status: a cancelled vesting reads "complete" once its frozen part is claimed.
   const cancelled = vesting.cancelled;
-  const accruing = vesting.status === "vesting";
   const claimable = toBigInt(vesting.claimable);
-
-  const claimLabel = claiming
-    ? "Claiming"
-    : notStarted
-      ? `Starts in ${formatCountdown(vesting.startDate - now)}`
-      : claimable > 0n
-        ? `Claim ${formatStrato(claimable)}`
-        : vesting.status === "complete"
-          ? "Fully claimed"
-          : "Nothing to claim yet";
+  const badgeLabel = notStarted ? `Starts in ${formatCountdown(vesting.startDate - now)}` : badge.label;
 
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-5 md:p-6">
         <div className="flex items-start gap-5">
-          <UnlockRing
+          <VestingRing
             claimedPercent={percentOf(toBigInt(vesting.amountClaimed), amount)}
             vestedPercent={percent}
             size={88}
             stroke={9}
             tone="card"
-            label={`${percent.toFixed(1)} percent of this grant has unlocked`}
+            label={`${percent.toFixed(1)} percent of this grant has vested`}
           >
             <span className="text-lg font-bold leading-none">{percent.toFixed(percent >= 100 ? 0 : 1)}%</span>
-            <span className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">unlocked</span>
-          </UnlockRing>
+            <span className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">vested</span>
+          </VestingRing>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-2xl font-bold leading-tight tracking-tight">
-                  {formatAmount(vesting.amount)}
-                  <span className="ml-1.5 text-sm font-semibold text-muted-foreground">{TOKEN_SYMBOL}</span>
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">{formatDurationWeeks(vesting.durationWeeks)}</p>
-              </div>
+              <p className="text-2xl font-bold leading-tight tracking-tight">
+                {formatAmount(vesting.amount)}
+                <span className="ml-1.5 text-sm font-semibold text-muted-foreground">{TOKEN_SYMBOL}</span>
+              </p>
               <div className="flex items-center gap-2">
                 {vesting.managed && (
                   <Badge variant="outline" className="text-muted-foreground">Managed</Badge>
                 )}
-                <Badge variant={badge.variant} className={badge.className}>{badge.label}</Badge>
+                <Badge variant={badge.variant} className={`${badge.className ?? ""} tabular-nums`}>{badgeLabel}</Badge>
               </div>
             </div>
             <p className="mt-2 flex items-center text-xs text-muted-foreground font-mono">
-              Grant {truncateId(vesting.vestingId)}
+              Grant {truncateHex(vesting.vestingId)}
               <CopyButton address={vesting.vestingId} />
             </p>
           </div>
@@ -491,20 +476,10 @@ const VestingCard = ({ vesting, now, progress, onClaim }: VestingCardProps) => {
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Figure label="Claimable" value={formatAmount(vesting.claimable)} emphasis={claimable > 0n} />
+          <Figure label="Claimable now" value={formatAmount(vesting.claimable)} emphasis={claimable > 0n} />
+          <Figure label="Vested" value={formatAmount(vesting.vested)} />
           <Figure label="Claimed" value={formatAmount(vesting.amountClaimed)} />
-          {cancelled ? (
-            <Figure label="Returned to pool" value={formatAmount(vesting.returned)} />
-          ) : (
-            <Figure label="Locked" value={formatAmount(vesting.locked)} />
-          )}
-          {accruing ? (
-            <Figure label="Per day" value={formatAmount(dailyAccrual(vesting))} />
-          ) : notStarted ? (
-            <Figure label="Countdown" value={formatCountdown(vesting.startDate - now)} />
-          ) : (
-            <Figure label="Unlocked" value={formatAmount(vesting.vested)} />
-          )}
+          <Figure label="Vesting" value={formatAmount(vesting.locked)} />
         </div>
 
         {paused && (
@@ -515,27 +490,83 @@ const VestingCard = ({ vesting, now, progress, onClaim }: VestingCardProps) => {
         {cancelled && (
           <p className="mt-4 text-xs text-destructive">
             {toBigInt(vesting.vested) === 0n ? (
-              <>Cancelled before it started; the full amount was returned to the pool.</>
+              <>Cancelled before it started; the full {formatStrato(vesting.returned)} returned to the pool.</>
             ) : claimable > 0n ? (
-              <>Cancelled on <LocalDate seconds={vesting.pausingDate} />; the unlocked part remains claimable.</>
+              <>Cancelled on <LocalDate seconds={vesting.pausingDate} />; the vested part remains claimable and {formatStrato(vesting.returned)} returned to the pool.</>
             ) : (
-              <>Cancelled on <LocalDate seconds={vesting.pausingDate} />; the unlocked part has been claimed.</>
+              <>Cancelled on <LocalDate seconds={vesting.pausingDate} />; the vested part has been claimed and {formatStrato(vesting.returned)} returned to the pool.</>
             )}
           </p>
         )}
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-          <div className="text-xs text-muted-foreground">
-            <p>Each claim costs a {VESTING_CLAIM_FEE} USDST network fee.</p>
-            {progress && <p className="mt-1 text-foreground">{progress}</p>}
-          </div>
-          <Button onClick={() => onClaim(vesting)} disabled={claiming || !canClaim(vesting)} className="min-w-[11rem]">
-            {claiming && <Loader2 className="h-4 w-4 animate-spin" />}
-            {claimLabel}
+          <p className="text-xs text-muted-foreground">Each claim costs a {VESTING_CLAIM_FEE} USDST network fee.</p>
+          <Button onClick={() => onClaim(vesting)} disabled={!canClaim(vesting)} className="min-w-[8rem]">
+            Claim
           </Button>
         </div>
       </CardContent>
     </Card>
+  );
+};
+
+interface ClaimDialogProps {
+  vesting: VestingView | null;
+  recipient: string | null;
+  walletSigning: boolean;
+  /** Progress text while the claim is in flight; null when idle. */
+  progress: string | null;
+  error: string | null;
+  onConfirm: () => void;
+  onClose: () => void;
+}
+
+// The one irreversible step gets a confirmation: what is claimed, where it goes, what it costs.
+// The dialog stays open while the transaction is signed and submitted so the progress is visible.
+const ClaimDialog = ({ vesting, recipient, walletSigning, progress, error, onConfirm, onClose }: ClaimDialogProps) => {
+  const busy = progress !== null;
+  return (
+    <Dialog open={vesting !== null} onOpenChange={(open) => (!open && !busy ? onClose() : undefined)}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Claim vested STRATO</DialogTitle>
+          <DialogDescription>
+            Everything vested on this grant that has not been claimed yet is sent to your address.
+          </DialogDescription>
+        </DialogHeader>
+
+        {vesting && (
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
+            <dt className="text-muted-foreground">You claim</dt>
+            <dd className="text-right font-semibold tabular-nums">{formatStrato(vesting.claimable)}</dd>
+            <dt className="text-muted-foreground">Sent to</dt>
+            <dd className="text-right font-mono text-xs leading-5">{recipient ? truncateHex(recipient) : "your address"}</dd>
+            <dt className="text-muted-foreground">Grant</dt>
+            <dd className="text-right font-mono text-xs leading-5">{truncateHex(vesting.vestingId)}</dd>
+            <dt className="text-muted-foreground">Network fee</dt>
+            <dd className="text-right tabular-nums">{VESTING_CLAIM_FEE} USDST</dd>
+          </dl>
+        )}
+
+        {walletSigning && !busy && !error && (
+          <p className="text-xs text-muted-foreground">Your wallet will ask you to sign the transaction.</p>
+        )}
+        {progress && (
+          <p className="flex items-center gap-2 text-sm text-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {progress}
+          </p>
+        )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={onConfirm} disabled={busy || !vesting}>
+            {busy ? "Claiming…" : vesting ? `Claim ${formatStrato(vesting.claimable)}` : "Claim"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -604,7 +635,9 @@ const Vesting = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { vestings, summary, enabled, isLoading, isError, error, refetch } = useVestings();
-  const [claimProgress, setClaimProgress] = useState<Record<string, string>>({});
+  const [claimTarget, setClaimTarget] = useState<VestingView | null>(null);
+  const [claimProgress, setClaimProgress] = useState<string | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const startedRefetchRef = useRef<Set<string>>(new Set());
 
@@ -633,30 +666,41 @@ const Vesting = () => {
     refetch();
   }, [vestings, now, refetch]);
 
-  const handleClaim = async (vesting: VestingView) => {
-    const { vestingId } = vesting;
-    const claimedLabel = formatStrato(vesting.claimable);
-    const setProgress = (label: string) => setClaimProgress((prev) => ({ ...prev, [vestingId]: label }));
-    setProgress(useExternalWalletSigning ? "Preparing transaction…" : "Submitting…");
+  const openClaim = (vesting: VestingView) => {
+    setClaimError(null);
+    setClaimProgress(null);
+    setClaimTarget(vesting);
+  };
 
-    const walletTxProgress: WalletTxProgressHandler = (event) => setProgress(progressLabel(event));
+  const closeClaim = () => {
+    setClaimTarget(null);
+    setClaimError(null);
+    setClaimProgress(null);
+  };
+
+  const confirmClaim = async () => {
+    if (!claimTarget) return;
+    const { vestingId } = claimTarget;
+    const claimedLabel = formatStrato(claimTarget.claimable);
+    setClaimError(null);
+    setClaimProgress(useExternalWalletSigning ? "Preparing the transaction…" : "Submitting the transaction…");
+
+    const walletTxProgress: WalletTxProgressHandler = (event) => setClaimProgress(progressLabel(event));
     const txConfig: ClaimTxConfig | undefined = useExternalWalletSigning ? { walletAuth: true, walletTxProgress } : undefined;
 
     try {
       await api.post("/vesting/claim", { vestingId }, txConfig);
       toast({ title: "Claimed", description: `${claimedLabel} sent to your address`, variant: "success" });
+      closeClaim();
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: vestingsQueryKey(userAddress) });
         fetchTokens();
       }, CIRRUS_LAG_MS);
-    } catch (claimError: unknown) {
-      toast({ title: "Claim failed", description: claimErrorMessage(claimError), variant: "destructive" });
-    } finally {
-      setClaimProgress((prev) => {
-        const next = { ...prev };
-        delete next[vestingId];
-        return next;
-      });
+    } catch (failure: unknown) {
+      const message = claimErrorMessage(failure);
+      setClaimProgress(null);
+      setClaimError(message);
+      toast({ title: "Claim failed", description: message, variant: "destructive" });
     }
   };
 
@@ -670,13 +714,7 @@ const Vesting = () => {
         <ProgramHero summary={summary ?? sumVestings(vestings)} vestings={vestings} />
         <div className="grid gap-4 lg:grid-cols-2">
           {vestings.map((vesting) => (
-            <VestingCard
-              key={vesting.vestingId}
-              vesting={vesting}
-              now={now}
-              progress={claimProgress[vesting.vestingId]}
-              onClaim={handleClaim}
-            />
+            <VestingCard key={vesting.vestingId} vesting={vesting} now={now} onClaim={openClaim} />
           ))}
         </div>
       </>
@@ -695,6 +733,15 @@ const Vesting = () => {
         </main>
       </div>
 
+      <ClaimDialog
+        vesting={claimTarget}
+        recipient={userAddress}
+        walletSigning={useExternalWalletSigning}
+        progress={claimProgress}
+        error={claimError}
+        onConfirm={confirmClaim}
+        onClose={closeClaim}
+      />
       <MobileBottomNav />
     </div>
   );
