@@ -31,6 +31,7 @@ import contactRoutes from "./routes/contact.routes";
 import metricsRoutes from "./routes/metrics.routes";
 import stakingRoutes from "./routes/staking.routes";
 import psmRoutes from "./routes/psm.routes";
+import vestingRoutes from "./routes/vesting.routes";
 
 const router = Router();
 
@@ -119,6 +120,9 @@ router.use("/earn", earnRoutes);
 
 // ----- Staking Routes -----
 router.use("/staking", stakingRoutes);
+
+// ----- Vesting Routes -----
+router.use("/vesting", vestingRoutes);
 
 // ----- PSM Routes -----
 router.use("/psm", psmRoutes);

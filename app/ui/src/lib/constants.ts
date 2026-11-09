@@ -30,6 +30,9 @@ export const WAD = 10n ** 18n;
  */
 export const rewardsEnabled = false;
 
+/** Enable the Vesting tab and page. The tab also needs a configured pool and rows for the identity. */
+export const vestingEnabled = true;
+
 /** Enable MetalForge purchase controls and bridge-to-metal options in the UI. */
 export const metalPurchasesEnabled = false;
 
@@ -64,6 +67,7 @@ export const SAFETY_STAKE_FEE = "0.02"; // USDST fee for SafetyModule stake tran
 export const SAFETY_REDEEM_FEE = "0.01"; // USDST fee for SafetyModule redeem transactions
 export const STAKING_STAKE_FEE = "0.02"; // USDST fee for STRATO staking (approve + stake = 2 calls)
 export const STAKING_ACTION_FEE = "0.01"; // USDST fee for STRATO claim/unstake/withdraw (1 call)
+export const VESTING_CLAIM_FEE = "0.01"; // USDST fee for a vesting claim (1 call)
 export const METAL_BUY_FEE = "0.02"; // USDST fee for metal buy (approve + mintMetal = 2 calls)
 export const PSM_MINT_FEE = "0.02"; // USDST fee for PSM mint / mintAndSave (approve + mint = 2 calls)
 export const PSM_REDEEM_FEE = "0.02"; // USDST fee for PSM redeem (approve + redeem = 2 calls)
