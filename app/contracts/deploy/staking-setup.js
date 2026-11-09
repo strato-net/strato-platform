@@ -3,6 +3,12 @@
 //   node staking-setup.js grace <unixSeconds>              end of the self-bond grace period
 //   node staking-setup.js setoperator <validator> <operator>
 //   node staking-setup.js index                            (direct) index helium's existing set
+//   node staking-setup.js joinsfrom <block>                permissionless admission opens at this block
+//   node staking-setup.js selfbondmin <amountWei>          own bond a new seat needs (10,000 until set)
+//   node staking-setup.js fundreserve <amountWei>          (direct) fund the emission reserve
+//   node staking-setup.js emission <e0Wei> <s0Wei> <r0Wei> <startUnix>   commit the emission schedule, once
+// Addresses default to helium; set STAKING_PROXY, VALIDATOR_REGISTRY_PROXY and STRATO_TOKEN
+// for another network.
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
@@ -10,9 +16,9 @@ const { rest, util } = require('./strato');
 
 const REGISTRY = '000000000000000000000000000000000000100c';
 const GOVERNANCE = '0000000000000000000000000000000000000100';
-const STAKING = 'd6726e06c3c71a3bad80b5eb6925707a31729b81';
-const VREG = 'bfbb75bb6bd0bafa2f5c5b735fe518ade76808dd';
-const TOKEN = '8ee9a3391e38176feebf5d43cb2c1d6c4f728b04';
+const STAKING = (process.env.STAKING_PROXY || 'd6726e06c3c71a3bad80b5eb6925707a31729b81').replace(/^0x/, '');
+const VREG = (process.env.VALIDATOR_REGISTRY_PROXY || 'bfbb75bb6bd0bafa2f5c5b735fe518ade76808dd').replace(/^0x/, '');
+const TOKEN = (process.env.STRATO_TOKEN || '8ee9a3391e38176feebf5d43cb2c1d6c4f728b04').replace(/^0x/, '');
 const USDST = '937efa7e3a77e20bbdbd7c0d32b6514f368c1010';
 const FUNDER = '7b1f8cd02cd09ab9510e30fc8e15ff898a639771'; // blockapps_test_1
 // HeliumFeeRouter (payFees + payBlockRewards); set FEE_ROUTER to fund a newer router.
@@ -40,19 +46,20 @@ const STEPS = {
   govstaking: { target: GOVERNANCE, func: 'setStakingContract',
                 args: [{ type: 'address', value: STAKING }] },
   setvreg:   { target: STAKING, func: 'setValidatorRegistry', args: [VREG] },
-  // minStake (self-bond, see setSelfBondGraceUntil), proposerFeeBps, maxConsecutiveMisses, jailCooldown
+  // minStake (seats held from before the self-bond rule; new seats need selfBondMinimum, see
+  // selfbondmin and setSelfBondGraceUntil), proposerFeeBps, maxConsecutiveMisses, jailCooldown
   params:    { target: STAKING, func: 'setValidatorParams',
                args: [TEN_K, 1000, 100, 3600] },
   setparams: { target: STAKING, func: 'setSetParams',
-               args: ['50', '50', '500', '4', '86400', '86400', '10000', false] },
+               args: ['50', '50', '500', '4', '86400', '86400', '10000'] },
   // Genesis validators, each listed as its own operator (admin listing needs no key signature).
   validators: { target: VREG, func: 'addValidators',
                 args: [VALIDATORS, VALIDATORS, [0,0,0,0],
                        ['node1-validator','node2-validator','node3-validator','node4-validator'],
                        ['genesis validator','genesis validator','genesis validator','genesis validator'],
                        ['','','',''], ['','','','']] },
-  // From this time on minStake must be met by self-bond alone. A time in the past applies
-  // that immediately and removes validators without enough self-bond, so bond first.
+  // From this time on an incumbent seat's minStake must be met by self-bond alone. A time in
+  // the past applies that immediately and removes validators without enough self-bond, so bond first.
   grace:     ([until]) => {
     if (!/^[0-9]+$/.test(String(until || ''))) throw new Error('usage: grace <unixSeconds>');
     return { target: STAKING, func: 'setSelfBondGraceUntil', args: [until] };
@@ -71,6 +78,33 @@ const STEPS = {
   // predates StratoStaking.activeValidators. Idempotent.
   index:     { direct: true, target: STAKING, name: 'StratoStaking', func: 'indexValidatorSet',
                args: { validators: VALIDATORS } },
+  // From this block anyone may seat an eligible validator, and nobody before it. Can be set
+  // or moved only to a future block, and only until it is reached.
+  joinsfrom: ([blockNumber]) => {
+    if (!/^[1-9][0-9]*$/.test(String(blockNumber || ''))) throw new Error('usage: joinsfrom <block>');
+    return { target: STAKING, func: 'setJoinsOpenFromBlock', args: [blockNumber] };
+  },
+  // The operator's own bond a candidate, or a seat taken under the self-bond rule, needs.
+  selfbondmin: ([amount]) => {
+    if (!/^[1-9][0-9]*$/.test(String(amount || ''))) throw new Error('usage: selfbondmin <amountWei>');
+    return { target: STAKING, func: 'setSelfBondMinimum', args: [amount] };
+  },
+  // Anyone may fund the emission reserve, from the logged-in account; nothing takes it back out.
+  fundreserve: ([amount]) => {
+    if (!/^[1-9][0-9]*$/.test(String(amount || ''))) throw new Error('usage: fundreserve <amountWei>');
+    return { direct: true, calls: [
+      { target: TOKEN, name: 'Token', func: 'approve', args: { spender: STAKING, value: amount } },
+      { target: STAKING, name: 'StratoStaking', func: 'fundEmissionReserve', args: { amount } },
+    ] };
+  },
+  // Commit the emission schedule, once: E0 STRATO a year at S0 of consensus weight with R0 in
+  // reserve (funded first), from START (unix seconds; 0 = at execution).
+  emission:  ([e0, s0, r0, start]) => {
+    if (![e0, s0, r0, start].every((v) => /^[0-9]+$/.test(String(v || '')))) {
+      throw new Error('usage: emission <e0Wei> <s0Wei> <r0Wei> <startUnix>');
+    }
+    return { target: STAKING, func: 'commitEmissionSchedule', args: [e0, s0, r0, start] };
+  },
   mint:      { target: TOKEN, func: 'mint', args: [FUNDER, FORTY_K] },
   // Fund the fee router so it can pay the flat per-block reward. It pays 0.01
   // STRATO per block (~230/day at the current rate) and silently pays nothing
@@ -100,13 +134,15 @@ async function callAsync(tokenObj, callArgs) {
   const username = process.env.GLOBAL_ADMIN_NAME;
   const token = await auth.getUserToken(username, process.env.GLOBAL_ADMIN_PASSWORD);
   if (step.direct) {
-    const final = await callAsync({ token }, {
-      contract: { address: step.target, name: step.name },
-      method: step.func,
-      args: step.args,
-      txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
-    });
-    console.log(`${process.argv[2]} call by ${username}: ${final.status}`);
+    for (const call of step.calls || [step]) {
+      const final = await callAsync({ token }, {
+        contract: { address: call.target, name: call.name },
+        method: call.func,
+        args: call.args,
+        txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
+      });
+      console.log(`${process.argv[2]} ${call.func} call by ${username}: ${final.status}`);
+    }
     return;
   }
   const final = await callAsync({ token }, {

@@ -134,6 +134,8 @@ type StakingInfo = {
   rewardPeriodDescription: string;
   estimatedApy: string;
   minStake: string;
+  // V2: the operator's own bond a new seat needs (StratoStaking selfBondMinimum, 10,000 until set).
+  minSelfBond: string;
   proposerFeeBps: string;
   joinsPaused: boolean;
   validatorCount: string;
@@ -334,7 +336,6 @@ type OperatorPanelProps = {
   decimals: number;
   symbol: string;
   selfBondNote?: string;
-  selfBondRuleActive: boolean;
   validatorSetDeployed: boolean;
   canManage: boolean;
   joinsPaused: boolean;
@@ -369,7 +370,6 @@ const OperatorPanel = ({
   decimals,
   symbol,
   selfBondNote,
-  selfBondRuleActive,
   validatorSetDeployed,
   canManage,
   joinsPaused,
@@ -410,7 +410,8 @@ const OperatorPanel = ({
   const selfUnbondReady = canManage && selfUnbondParsed > 0n && selfUnbondParsed <= selfBond;
   const belowSelfBond = isV2 && !!validator && selfBond < BigInt(minStake || "0");
   const validatorLabel = validator ? validator.name || truncateAddress(validator.address, 8, 6) : "";
-  const activationStake = isV2 && selfBondRuleActive ? "self-bond" : "total stake";
+  // V2: a seat is only ever taken on self-bond (StratoStaking._meetsMinStake).
+  const activationStake = isV2 ? "self-bond" : "total stake";
 
   const buttonLabel = (action: ProcessingAction, label: string, pendingLabel: string) => (
     processing === action ? (
@@ -1250,7 +1251,7 @@ const EarnStaking = () => {
   };
 
   const selfBondNote = isV2 && info
-    ? selfBondRequirementText(`${formatToken(info.minStake, decimals, 0)} ${symbol}`)
+    ? selfBondRequirementText(`${formatToken(info.minSelfBond, decimals, 0)} ${symbol}`)
     : undefined;
 
   const renderOperatorPanel = (
@@ -1265,11 +1266,10 @@ const EarnStaking = () => {
       {...earnings}
       maxCommissionBps={info?.maxCommissionBps || "0"}
       walletBalance={info?.walletBalance || "0"}
-      minStake={info?.minStake || "0"}
+      minStake={(isV2 ? info?.minSelfBond : info?.minStake) || "0"}
       decimals={decimals}
       symbol={symbol}
       selfBondNote={selfBondNote}
-      selfBondRuleActive={Boolean(info?.selfBondRuleActive)}
       validatorSetDeployed={validatorSetDeployed}
       canManage={isLoggedIn && (isV2 || !!info?.isOperator)}
       joinsPaused={Boolean(info?.joinsPaused)}
@@ -1442,7 +1442,7 @@ const EarnStaking = () => {
             isV2={isV2}
             connectedAddress={userAddress}
             operatedValidator={operatedValidators[0] ?? null}
-            minStake={formatToken(info.minStake, decimals, 0)}
+            minStake={formatToken(isV2 ? info.minSelfBond : info.minStake, decimals, 0)}
             maxCommissionBps={info.maxCommissionBps}
             symbol={symbol}
             disabled={!canCoverActionFee}
@@ -1450,7 +1450,7 @@ const EarnStaking = () => {
             onRegister={handleRegister}
             onChangeOperator={isV2 ? handleChangeOperator : undefined}
             validators={validators}
-            minStakeRaw={info.minStake}
+            minStakeRaw={isV2 ? info.minSelfBond : info.minStake}
             joinsPaused={Boolean(info.joinsPaused)}
             errorMessage={bindingError}
             {...deepLinkProps}
