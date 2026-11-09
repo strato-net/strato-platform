@@ -178,6 +178,27 @@ contract Describe_VestingPoolManager {
         bob.doExpectingFailure(address(pool), "claimVestedTokens", "Can only be claimed by vesting owner", id, address(bob), uint128(1));
     }
 
+    // Guard against the upstream edge case pinned in VestingPoolSolidVM.test.sol: a managed
+    // zero-week grant cancelled before its start is paid twice. The manager refuses the
+    // combination; the two legitimate shapes still pass.
+    function it_rejects_managed_zero_week_grants() public {
+        uint64 start = uint64(block.timestamp);
+        bool reverted = false;
+        try manager.addVesting(address(alice), 0, true, 0, start, 1000) { } catch { reverted = true; }
+        require(reverted, "managed zero-week addVesting accepted");
+        require(pool.totalTokensInVesting() == 0, "addVesting changed state");
+        address[] memory accounts = new address[](1);
+        uint128[] memory amounts = new uint128[](1);
+        accounts[0] = address(alice); amounts[0] = 1000;
+        reverted = false;
+        try manager.addVestings(accounts, amounts, true, 0, start) { } catch { reverted = true; }
+        require(reverted, "managed zero-week batch accepted");
+        require(pool.totalTokensInVesting() == 0, "batch changed state");
+        manager.addVesting(address(alice), 0, false, 0, start, 1000); // instant unlock / sweep shape
+        manager.addVesting(address(bob), 0, true, 1, start, 500);     // revocable grant with a duration
+        require(pool.totalTokensInVesting() == 1500, "legitimate shapes rejected: " + string(pool.totalTokensInVesting()));
+    }
+
     function it_recycles_uncommitted_tokens_to_treasury_via_a_zero_week_vesting() public {
         uint64 start = uint64(block.timestamp);
         manager.addVesting(address(alice), 0, true, 104, start, 2400);

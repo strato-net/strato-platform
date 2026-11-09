@@ -114,6 +114,7 @@ function loadSchedule(file) {
     names.add(c.name);
     if (typeof c.managed !== 'boolean') throw new Error(`${c.name}: managed must be true/false`);
     if (!Number.isInteger(c.durationWeeks) || c.durationWeeks < 0 || c.durationWeeks > 65535) throw new Error(`${c.name}: durationWeeks must be 0..65535`);
+    if (c.managed && c.durationWeeks === 0) throw new Error(`${c.name}: a managed vesting needs a duration; the manager refuses managed zero-week grants (use managed=false for an instant unlock)`);
     if (c.startDate !== undefined) throw new Error(`${c.name}: startDate is derived from tge + cliffMonths; remove it`);
     if (!Number.isInteger(c.cliffMonths) || c.cliffMonths < 0 || c.cliffMonths > 1200) throw new Error(`${c.name}: cliffMonths must be an integer 0..1200`);
     c.startDate = s.secondsPerMonth ? s.tgeSeconds + c.cliffMonths * s.secondsPerMonth : addMonthsUtc(s.tgeSeconds, c.cliffMonths);

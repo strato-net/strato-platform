@@ -98,6 +98,40 @@ contract Describe_VestingPoolSolidVM {
         require(reverted, "cancelled vesting was unpaused");
     }
 
+    // Upstream edge case, byte-identical in the port and NOT fixed here: a MANAGED ZERO-WEEK
+    // grant cancelled BEFORE its start has its whole amount released back to the pool, yet
+    // after the start _calculateVestedAmount (elapsed 0 >= duration 0) still reports the
+    // full amount, so the claim deducts it a second time and pays it from tokens that back
+    // other vestings. VestingPoolManager refuses managed zero-week grants because of this.
+    function it_shows_why_managed_zero_week_grants_are_refused_by_the_manager() public {
+        User carol = new User();
+        VestingPool p = new VestingPool(address(strato), address(this));
+        strato.mint(address(p), 3400);                                  // exactly backs 1000 + 2400
+        uint64 start = uint64(block.timestamp + 1000);
+        p.addVesting(address(alice), 0, true, 0, start, 1000);         // managed, zero weeks
+        p.addVesting(address(bob), 0, false, 104, start, 2400);        // someone else's grant
+        bytes32 aliceId = p.vestingHash(address(alice), 0, true, 0, start, 1000);
+        bytes32 bobId = p.vestingHash(address(bob), 0, false, 104, start, 2400);
+        require(p.totalTokensInVesting() == 3400, "committed");
+        p.cancelVesting(aliceId);                                       // before start: whole 1000 released
+        require(p.totalTokensInVesting() == 2400, "cancel released the full grant");
+        fastForward(2000);
+        (uint128 vested, ) = p.calculateVestedAmount(aliceId);
+        require(vested == 1000, "cancelled zero-week grant still reports fully vested: " + string(vested));
+        alice.do(address(p), "claimVestedTokens", aliceId, address(alice), uint128(340282366920938463463374607431768211455));
+        require(strato.balanceOf(address(alice)) == 1000, "the cancelled grant was paid out");
+        require(p.totalTokensInVesting() == 1400, "committed deducted a second time: " + string(p.totalTokensInVesting()));
+        require(p.tokensAvailableForVesting() == 1000, "phantom availability: " + string(p.tokensAvailableForVesting()));
+        p.addVesting(address(carol), 0, false, 0, uint64(block.timestamp), 1000); // the phantom 1000 gets committed
+        fastForward(104 * WEEK);
+        bob.do(address(p), "claimVestedTokens", bobId, address(bob), uint128(340282366920938463463374607431768211455));
+        require(strato.balanceOf(address(p)) == 0, "pool drained by bob's legitimate claim");
+        bytes32 carolId = p.vestingHash(address(carol), 0, false, 0, uint64(block.timestamp - 104 * WEEK), 1000);
+        bool reverted = false;
+        try carol.do(address(p), "claimVestedTokens", carolId, address(carol), uint128(340282366920938463463374607431768211455)) { } catch { reverted = true; }
+        require(reverted, "the last claimant should have found the pool empty");
+    }
+
     function it_pauses_without_accrual_and_resumes_with_an_offset_start() public {
         uint64 start = uint64(block.timestamp);
         pool.addVesting(address(alice), 0, true, 104, start, 2400);

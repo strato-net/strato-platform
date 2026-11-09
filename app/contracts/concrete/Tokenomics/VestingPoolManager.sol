@@ -12,7 +12,15 @@ import "../../abstract/ERC20/access/Ownable.sol";
 //   - governance: `owner()` is whoever the platform wants (AdminRegistry, a multisig
 //     contract, or a key), and `transferOwnership` rotates control of the pool;
 //   - batch creation: `addVestings` creates one category's vestings in one call;
-//   - everything else is a one-line forward with the pool's own names and parameters.
+//   - everything else is a one-line forward with the pool's own names and parameters,
+//     except one guard: a MANAGED grant must have a non-zero duration. Upstream's
+//     cancelVesting releases a grant's whole amount when it is cancelled before its
+//     start, but for a zero-week grant the vested-amount formula (elapsed 0 >= duration 0)
+//     still reports the full amount after the start, so a later claim deducts it a
+//     second time and pays it from tokens backing other vestings. A zero-week grant that
+//     can be cancelled makes no sense anyway (it is a timelock); instant unlocks and the
+//     treasury sweep are unmanaged. See VestingPoolSolidVM.test.sol for the upstream
+//     behaviour and VestingPoolManager.test.sol for the guard.
 //
 // The manager holds no state of its own besides the immutable `pool`, and every
 // owner-only body only forwards, so either the pool call succeeded in full or nothing
@@ -46,6 +54,7 @@ contract record VestingPoolManager is Ownable {
         uint64 startDate,
         uint128 amount
     ) external onlyOwner {
+        require(!(managed && durationWeeks == 0), "VestingPoolManager: managed vesting needs a duration");
         pool.addVesting(account, curveType, managed, durationWeeks, startDate, amount);
     }
 
@@ -60,6 +69,7 @@ contract record VestingPoolManager is Ownable {
     ) external onlyOwner {
         require(accounts.length > 0, "VestingPoolManager: empty batch");
         require(accounts.length == amounts.length, "VestingPoolManager: length mismatch");
+        require(!(managed && durationWeeks == 0), "VestingPoolManager: managed vesting needs a duration");
         for (uint256 i = 0; i < accounts.length; i++) {
             pool.addVesting(accounts[i], 0, managed, durationWeeks, startDate, amounts[i]);
         }

@@ -107,6 +107,8 @@ All established on 2026-10-30 with the local `solid-vm-cli` (build of 2026-03), 
 
 Not probed and left to the audit: behaviour when the token is paused by its owner mid-claim; `block.chainid` value on helium, upquark and mainnet (ids differ per network by design); arithmetic at amounts near `uint128` max.
 
+**Upstream edge case, found 2026-11-09 and pinned by test (not fixed in the audited file):** a managed zero-week grant cancelled before its start is paid twice (see section 6). Neither the G0 nor the Ackee report mentions it; Ackee's medium finding reasons about zero-duration grants but not about cancelling one before start. Our mitigation lives in the manager.
+
 **Test-writing quirk, verified:** re-assigning previously destructured tuple locals, `(a, b) = f();`, fails to compile with "Cannot mutate immutable value". Declare fresh names for every destructuring.
 
 ## 6. The STRATO-side manager: `VestingPoolManager`
@@ -121,6 +123,7 @@ Decision: the pool's manager is a contract, `app/contracts/concrete/Tokenomics/V
 - Adds `addVestings(address[] accounts, uint128[] amounts, bool managed, uint16 durationWeeks, uint64 startDate)`: linear curve, one shape per call, one call per tokenomics category.
 - Rotation comes for free through `transferOwnership`.
 - Holds no state of its own.
+- Refuses a managed grant with `durationWeeks == 0` (`addVesting` and `addVestings`). Reason: in the audited pool, cancelling a zero-week managed grant before its start releases its whole amount, yet after the start the vested-amount formula (`elapsed 0 >= duration 0`) still reports the full amount, so a claim deducts it again and pays it from tokens backing other vestings. Pinned by a characterisation test in `VestingPoolSolidVM.test.sol`; the guard is tested in `VestingPoolManager.test.sol`; `create-vestings.js` rejects such a schedule at `plan`. Instant unlocks and the treasury sweep are unmanaged and unaffected.
 
 This closes all three gaps with zero edits to the audited file.
 
