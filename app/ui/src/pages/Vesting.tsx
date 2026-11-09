@@ -503,8 +503,7 @@ const VestingCard = ({ vesting, now, canPayFee, onClaim }: VestingCardProps) => 
           </p>
         )}
 
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-          <p className="text-xs text-muted-foreground">Network fee per claim: <NetworkFee calls={VESTING_CLAIM_CALLS} /></p>
+        <div className="mt-5 flex justify-end border-t border-border pt-4">
           <Button onClick={() => onClaim(vesting)} disabled={!canClaim(vesting) || !canPayFee} className="min-w-[8rem]">
             Claim
           </Button>
