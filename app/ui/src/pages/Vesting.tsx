@@ -117,7 +117,8 @@ const canClaim = (vesting: VestingView): boolean =>
 // ---- status ----
 
 // This branch's tailwind config has no success/warning tokens and Badge has only four variants,
-// so paused reuses the text-yellow-600 class EarnStaking already uses for warnings.
+// so paused reuses the text-yellow-600 class EarnStaking already uses for warnings. Cancelled text
+// uses the app's red-600/red-400 pair: the dark destructive token is a fill colour, unreadable as text.
 const STATUS_BADGE: Record<VestingStatus, { label: string; variant: BadgeProps["variant"]; className?: string }> = {
   not_started: { label: "Not started", variant: "outline" },
   vesting: { label: "Vesting", variant: "default" },
@@ -275,7 +276,7 @@ const Schedule = ({ vesting, now }: ScheduleProps) => {
     <div>
       <div className="relative h-2 rounded-full" style={{ background: "rgba(52,82,254,0.16)" }}>
         <div
-          className={`absolute left-0 top-0 h-2 rounded-full transition-[width] duration-1000 ease-out motion-reduce:transition-none ${vesting.cancelled ? "bg-destructive" : "bg-strato-lightblue"}`}
+          className={`absolute left-0 top-0 h-2 rounded-full transition-[width] duration-1000 ease-out motion-reduce:transition-none ${vesting.cancelled ? "bg-red-600 dark:bg-red-500" : "bg-strato-lightblue"}`}
           style={{ width: `${elapsedPercent}%` }}
         />
         {started && !ended && (
@@ -284,7 +285,7 @@ const Schedule = ({ vesting, now }: ScheduleProps) => {
             style={{ left: `${elapsedPercent}%` }}
           >
             {vesting.cancelled ? (
-              <CircleX className="h-4 w-4 text-destructive bg-card rounded-full" aria-label="Cancelled here" />
+              <CircleX className="h-4 w-4 text-red-600 dark:text-red-400 bg-card rounded-full" aria-label="Cancelled here" />
             ) : frozen ? (
               <CirclePause className="h-4 w-4 text-yellow-600 bg-card rounded-full" aria-label="Paused here" />
             ) : (
@@ -306,7 +307,7 @@ const Schedule = ({ vesting, now }: ScheduleProps) => {
         )}
         {vesting.cancelled && (
           <div className="text-center">
-            <p className="font-medium text-destructive"><LocalDate seconds={vesting.pausingDate} short /></p>
+            <p className="font-medium text-red-600 dark:text-red-400"><LocalDate seconds={vesting.pausingDate} short /></p>
             <p>Cancelled</p>
           </div>
         )}
@@ -492,7 +493,7 @@ const VestingCard = ({ vesting, now, canPayFee, onClaim }: VestingCardProps) => 
           </p>
         )}
         {cancelled && (
-          <p className="mt-4 text-xs text-destructive">
+          <p className="mt-4 text-xs text-red-600 dark:text-red-400">
             {toBigInt(vesting.vested) === 0n ? (
               <>Cancelled before it started; the full {formatStrato(vesting.returned)} returned to the pool.</>
             ) : claimable > 0n ? (
@@ -563,7 +564,7 @@ const ClaimDialog = ({ vesting, recipient, walletSigning, canPayFee, progress, e
             {progress}
           </p>
         )}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
