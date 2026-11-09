@@ -139,7 +139,7 @@ const progressLabel = (event: WalletTxProgressEvent): string => {
     case "failed":
       return event.error || "Transaction failed";
     default:
-      return "Submitted, waiting for the block…";
+      return "Submitted, waiting for confirmation…";
   }
 };
 
