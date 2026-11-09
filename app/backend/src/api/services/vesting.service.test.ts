@@ -7,10 +7,12 @@ import { StratoError } from "../../errors";
 import {
   ParsedVesting,
   VESTING_ROWS_PAGE,
+  VESTING_ROW_SELECT,
   WEEK_SECONDS,
   claimVesting,
   computeVestingView,
   getVestingsForAddress,
+  newestRowPerKey,
   parseVestingRow,
   summarise,
 } from "./vesting.service";
@@ -30,38 +32,33 @@ const ZERO40 = "0000000000000000000000000000000000000000";
 const heliumRows = [
   {
     key: TEAM_ID,
-    value: {
-      amount: "2500500000000000000000", account: TEAM_ACCOUNT, managed: true, cancelled: false,
+    block_number: "1036389",
+      amount: "2500500000000000000000", account: TEAM_ACCOUNT, managed: "true", cancelled: "false",
       curveType: ZERO40, startDate: "1793836800", pausingDate: ZERO40, amountClaimed: ZERO40, durationWeeks: "2",
-    },
   },
   {
     key: "2531dcdadc9dcf2c2e6c8aee2f4cbc56835760fa943b7b32831c698e1129a584",
-    value: {
-      amount: "10000000000000000000000", account: "1b5e295800f175a1f468d2f56af76a4985222e9e", managed: false, cancelled: false,
+    block_number: "1036389",
+      amount: "10000000000000000000000", account: "1b5e295800f175a1f468d2f56af76a4985222e9e", managed: "false", cancelled: "false",
       curveType: ZERO40, startDate: "1793815200", pausingDate: ZERO40, amountClaimed: "200677910052910052910", durationWeeks: "1",
-    },
   },
   {
     key: "4633656543ac99be4fca8b35da1b889932019630fbe8949a66ae958ff5b8cffe",
-    value: {
-      amount: "2710000000000000000000", account: "da9b6480b1cfe306b79e9fc9409666e1d233a964", managed: false, cancelled: false,
+    block_number: "1036389",
+      amount: "2710000000000000000000", account: "da9b6480b1cfe306b79e9fc9409666e1d233a964", managed: "false", cancelled: "false",
       curveType: ZERO40, startDate: "1793815200", pausingDate: ZERO40, amountClaimed: "2710000000000000000000", durationWeeks: ZERO40,
-    },
   },
   {
     key: "50056542149a3c5dd91db8d25b5f9e9d147e2d0fc5b59d1e2b46cf4ebf589177",
-    value: {
-      amount: "229999000000000000000000", account: "5201f735a84adb64404c981903391aed2d1d47ac", managed: true, cancelled: true,
+    block_number: "1036389",
+      amount: "229999000000000000000000", account: "5201f735a84adb64404c981903391aed2d1d47ac", managed: "true", cancelled: "true",
       curveType: ZERO40, startDate: "1793836800", pausingDate: "1793915888", amountClaimed: "15038162129629629629629", durationWeeks: "2",
-    },
   },
   {
     key: "6e06a2136ba1c2b8e1ebccc6bbcca093db3d14cf63b02b2d520520f706c43892",
-    value: {
-      amount: "334000000000000000000000", account: "40153b4bc0a02808dc127f38e6033c76256f097d", managed: false, cancelled: false,
+    block_number: "1036389",
+      amount: "334000000000000000000000", account: "40153b4bc0a02808dc127f38e6033c76256f097d", managed: "false", cancelled: "false",
       curveType: ZERO40, startDate: "1793815200", pausingDate: ZERO40, amountClaimed: ZERO40, durationWeeks: ZERO40,
-    },
   },
 ];
 
@@ -106,8 +103,6 @@ test("mid-vesting linear accrual floors like the contract", () => {
   assert.equal(view.claimable, "71428571428571428571");
   assert.equal(view.locked, "928571428571428571430");
   // floor(1000000000000000000001 / 1209600)
-  assert.equal(view.ratePerSecond, "826719576719576");
-  assert.equal(view.ratePerSecond, (ONE_TOKEN_PLUS_ONE / BigInt(TWO_WEEKS)).toString());
   assert.equal(view.status, "vesting");
 });
 
@@ -137,7 +132,6 @@ test("zero-week vesting is fully vested at startDate and not before", () => {
   assert.equal(at.status, "fully_vested");
   assert.equal(at.durationSeconds, 0);
   assert.equal(at.endDate, START);
-  assert.equal(at.ratePerSecond, "0");
 });
 
 test("paused vesting is frozen at pausingDate as now advances", () => {
@@ -233,14 +227,17 @@ test("parseVestingRow normalises the helium row shape", () => {
   assert.equal(zeroWeeks.amount, 334000000000000000000000n);
 });
 
-test("parseVestingRow accepts a JSON-string value, string booleans, numbers and 0x prefixes", () => {
-  // Amounts stay strings: a JSON number above 2^53 would already have lost precision upstream.
+test("parseVestingRow reads text columns exactly, with 0x prefixes, odd types and amounts above 2^53", () => {
+  // Fields are selected as text (alias:value->>field), so a uint128 never passes through
+  // JSON.parse as a double: 229999e18 has 24 digits and must survive to the atom.
+  const exact = parseVestingRow({ key: TEAM_ID, amount: "229999000000000000000001", amountClaimed: "15038162129629629629629" });
+  assert.equal(exact.amount, 229999000000000000000001n);
+  assert.equal(exact.amountClaimed, 15038162129629629629629n);
+
   const row = parseVestingRow({
     key: `0x${TEAM_ID.toUpperCase()}`,
-    value: JSON.stringify({
-      amount: "2500500000000000000000", account: `0x${TEAM_ACCOUNT.toUpperCase()}`, managed: "true", cancelled: "false",
-      curveType: 1, startDate: 1793836800, pausingDate: "1793915888", amountClaimed: 0, durationWeeks: 2,
-    }),
+    amount: "2500500000000000000000", account: `0x${TEAM_ACCOUNT.toUpperCase()}`, managed: "true", cancelled: "false",
+    curveType: 1, startDate: 1793836800, pausingDate: "1793915888", amountClaimed: 0, durationWeeks: 2,
   });
   assert.equal(row.vestingId, TEAM_ID);
   assert.equal(row.account, TEAM_ACCOUNT);
@@ -296,7 +293,8 @@ test("getVestingsForAddress filters by pool and account on the vestings table", 
     assert.equal(path, "/BlockApps-VestingPool-vestings");
     assert.equal(request.params.address, `eq.${POOL}`);
     assert.equal(request.params["value->>account"], `eq.${TEAM_ACCOUNT}`);
-    assert.equal(request.params.select, "key,value");
+    assert.equal(request.params.select, VESTING_ROW_SELECT);
+    assert.match(VESTING_ROW_SELECT, /^key,block_number,account:value->>account,/);
     assert.equal(request.params.limit, 5000);
     return { status: 200, data: [heliumRows[0]] };
   });
@@ -350,8 +348,8 @@ test("getVestingsForAddress falls back to pool rows when the JSON filter is reje
 
 test("getVestingsForAddress sorts newest startDate first", async (t) => {
   withPool(t, POOL);
-  const older = { ...heliumRows[0], key: "11".repeat(32), value: { ...heliumRows[0].value, startDate: "1793000000" } };
-  const newer = { ...heliumRows[0], key: "22".repeat(32), value: { ...heliumRows[0].value, startDate: "1794000000" } };
+  const older = { ...heliumRows[0], key: "11".repeat(32), startDate: "1793000000" };
+  const newer = { ...heliumRows[0], key: "22".repeat(32), startDate: "1794000000" };
   t.mock.method(cirrus, "get", async () => ({ status: 200, data: [older, heliumRows[0], newer] }));
 
   const result = await getVestingsForAddress("token", TEAM_ACCOUNT, 1795000000);
@@ -437,8 +435,9 @@ test("getVestingsForAddress pages the fallback until a short page, finding grant
   t.mock.method(console, "warn", (() => undefined) as typeof console.warn);
   // A full first page of other accounts' rows, then a short second page that holds the grant.
   const filler = Array.from({ length: VESTING_ROWS_PAGE }, (_, i) => ({
+    ...heliumRows[1],
     key: i.toString(16).padStart(64, "0"),
-    value: { ...heliumRows[1].value, account: "9999999999999999999999999999999999999999" },
+    account: "9999999999999999999999999999999999999999",
   }));
   const offsets: number[] = [];
   t.mock.method(cirrus, "get", async (_token: string, _path: string, request?: any) => {
@@ -453,4 +452,27 @@ test("getVestingsForAddress pages the fallback until a short page, finding grant
   const result = await getVestingsForAddress("token", TEAM_ACCOUNT, 1793836800 + DAY);
   assert.deepEqual(offsets, [0, VESTING_ROWS_PAGE]);
   assert.deepEqual(result.vestings.map((vesting) => vesting.vestingId), [TEAM_ID]);
+});
+
+test("newestRowPerKey keeps only the row from the highest block for each vesting id", () => {
+  const stale = { ...heliumRows[0], block_number: "1036389", amountClaimed: ZERO40 };
+  const live = { ...heliumRows[0], block_number: "1067491", amountClaimed: "316256608382936507936" };
+  const other = heliumRows[1];
+
+  const rows = newestRowPerKey([stale, other, live]);
+  assert.equal(rows.length, 2);
+  assert.equal(rows.find((row) => row.key === TEAM_ID)?.amountClaimed, "316256608382936507936");
+  assert.ok(rows.some((row) => row.key === other.key));
+});
+
+test("getVestingsForAddress collapses ghost rows before computing the view", async (t) => {
+  withPool(t, POOL);
+  const stale = { ...heliumRows[0], block_number: "1036389", amountClaimed: ZERO40 };
+  const live = { ...heliumRows[0], block_number: "1067491", amountClaimed: "316256608382936507936" };
+  t.mock.method(cirrus, "get", async () => ({ status: 200, data: [stale, live] }));
+
+  const result = await getVestingsForAddress("token", TEAM_ACCOUNT, 1793836800 + DAY);
+  assert.equal(result.vestings.length, 1);
+  assert.equal(result.vestings[0].amountClaimed, "316256608382936507936");
+  assert.equal(result.summary.claimed, "316256608382936507936");
 });

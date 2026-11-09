@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { AxiosRequestConfig } from "axios";
 import { CirclePause, CircleX, Loader2, RefreshCw } from "lucide-react";
@@ -69,31 +69,23 @@ const percentOf = (part: bigint, whole: bigint): number => {
 const vestedPercent = (vesting: VestingView): number =>
   percentOf(toBigInt(vesting.vested), toBigInt(vesting.amount));
 
-// amount / durationWeeks / 7 in atoms; only meaningful while the vesting is accruing.
-const dailyAccrual = (vesting: VestingView): bigint => {
-  if (vesting.durationWeeks <= 0) return 0n;
-  return toBigInt(vesting.amount) / BigInt(vesting.durationWeeks * 7);
+// Amount vested at `at`, mirroring VestingPool._calculateVestedAmount (linear or quadratic);
+// a paused grant is frozen at its pausing date.
+const vestedAt = (vesting: VestingView, at: number): bigint => {
+  const amount = toBigInt(vesting.amount);
+  if (at < vesting.startDate) return 0n;
+  const effective = vesting.pausingDate > 0 ? vesting.pausingDate : at;
+  const elapsed = BigInt(Math.max(0, effective - vesting.startDate));
+  const duration = BigInt(vesting.durationSeconds);
+  if (elapsed >= duration) return amount;
+  return vesting.curveType === 1
+    ? (amount * elapsed * elapsed) / (duration * duration)
+    : (amount * elapsed) / duration;
 };
 
-const sumVestings = (vestings: VestingView[]): VestingSummary => {
-  const totals = { amount: 0n, vested: 0n, claimed: 0n, claimable: 0n, locked: 0n, returned: 0n };
-  for (const vesting of vestings) {
-    totals.amount += toBigInt(vesting.amount);
-    totals.vested += toBigInt(vesting.vested);
-    totals.claimed += toBigInt(vesting.amountClaimed);
-    totals.claimable += toBigInt(vesting.claimable);
-    totals.locked += toBigInt(vesting.locked);
-    totals.returned += toBigInt(vesting.returned);
-  }
-  return {
-    amount: totals.amount.toString(),
-    vested: totals.vested.toString(),
-    claimed: totals.claimed.toString(),
-    claimable: totals.claimable.toString(),
-    locked: totals.locked.toString(),
-    returned: totals.returned.toString(),
-  };
-};
+// What the next 24 hours vest, in atoms; zero once the grant is frozen or finished.
+const dailyAccrual = (vesting: VestingView, now: number): bigint =>
+  vestedAt(vesting, now + 86400) - vestedAt(vesting, now);
 
 // ---- time ----
 
@@ -337,16 +329,17 @@ const Figure = ({ label, value, emphasis }: { label: string; value: string; emph
 interface ProgramHeroProps {
   summary: VestingSummary;
   vestings: VestingView[];
+  now: number;
 }
 
 // The thesis of the page: how much of the allocation has vested, as one ring and one figure.
-const ProgramHero = ({ summary, vestings }: ProgramHeroProps) => {
+const ProgramHero = ({ summary, vestings, now }: ProgramHeroProps) => {
   const amount = toBigInt(summary.amount);
   const vested = toBigInt(summary.vested);
   const claimed = toBigInt(summary.claimed);
   const vestedPct = percentOf(vested, amount);
   const accruing = vestings.filter((vesting) => vesting.status === "vesting");
-  const perDay = accruing.reduce((total, vesting) => total + dailyAccrual(vesting), 0n);
+  const perDay = accruing.reduce((total, vesting) => total + dailyAccrual(vesting, now), 0n);
   // Grants with anything left to vest, including ones that have not started or are paused.
   const outstanding = vestings.filter((vesting) => !vesting.cancelled && toBigInt(vesting.locked) > 0n);
   const lastEnd = outstanding.reduce((latest, vesting) => Math.max(latest, vesting.endDate), 0);
@@ -370,7 +363,7 @@ const ProgramHero = ({ summary, vestings }: ProgramHeroProps) => {
           </p>
           <p className="mt-3 text-sm text-white/60 md:text-base">
             {perDay > 0n ? (
-              <>Vesting {formatStrato(perDay)} a day.{lastEnd > 0 && ` Fully vested ${lastEndIsFloor ? "no earlier than" : "by"} ${formatDay(lastEnd)}.`}</>
+              <>Vesting about {formatStrato(perDay)} over the next day.{lastEnd > 0 && ` Fully vested ${lastEndIsFloor ? "no earlier than" : "by"} ${formatDay(lastEnd)}.`}</>
             ) : nextStart > 0 ? (
               <>Vesting starts on {formatDay(nextStart)}.</>
             ) : vestedPct >= 100 ? (
@@ -653,12 +646,25 @@ const Vesting = () => {
   const { feeQuote, fetchUsdstBalance } = useTokenContext();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { vestings, summary, enabled, isLoading, isError, error, refetch } = useVestings();
+  const { vestings, summary, enabled, isLoading, isError, error, refetch } = useVestings({ poll: true });
   const [claimTarget, setClaimTarget] = useState<VestingView | null>(null);
   const [claimProgress, setClaimProgress] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const startedRefetchRef = useRef<Set<string>>(new Set());
+  const refreshTimersRef = useRef<number[]>([]);
+
+  // Post-claim refreshes outlive the claim dialog but not the page.
+  useEffect(() => () => refreshTimersRef.current.forEach((id) => window.clearTimeout(id)), []);
+  const refreshAfter = useCallback((delays: number[]) => {
+    for (const delay of delays) {
+      refreshTimersRef.current.push(window.setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: vestingsQueryKey(userAddress) });
+        fetchTokens();
+        fetchUsdstBalance();
+      }, delay));
+    }
+  }, [queryClient, userAddress, fetchTokens, fetchUsdstBalance]);
 
   usePageTitle("Vesting");
 
@@ -702,7 +708,6 @@ const Vesting = () => {
   const confirmClaim = async () => {
     if (!claimTarget) return;
     const { vestingId } = claimTarget;
-    const claimedLabel = formatStrato(claimTarget.claimable);
     setClaimError(null);
     setClaimProgress(useExternalWalletSigning ? "Preparing the transaction…" : "Submitting the transaction…");
 
@@ -720,16 +725,12 @@ const Vesting = () => {
           description: `Waiting for the block to confirm${data?.hash ? ` (tx ${truncateHex(data.hash)})` : ""}. Balances update once it lands.`,
         });
       } else {
-        toast({ title: "Claimed", description: `${claimedLabel} sent to your address`, variant: "success" });
+        // The contract pays everything vested at block time, a little more than the figure shown
+        // when the dialog opened, so the toast names no amount.
+        toast({ title: "Claimed", description: "Vested STRATO sent to your address", variant: "success" });
       }
       closeClaim();
-      for (const delay of pending ? [...REFRESH_DELAYS_MS, ...PENDING_REFRESH_DELAYS_MS] : REFRESH_DELAYS_MS) {
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: vestingsQueryKey(userAddress) });
-          fetchTokens();
-          fetchUsdstBalance();
-        }, delay);
-      }
+      refreshAfter(pending ? [...REFRESH_DELAYS_MS, ...PENDING_REFRESH_DELAYS_MS] : REFRESH_DELAYS_MS);
     } catch (failure: unknown) {
       const message = claimErrorMessage(failure);
       setClaimProgress(null);
@@ -742,10 +743,10 @@ const Vesting = () => {
     if (!enabled) return <EmptyState />;
     if (isLoading) return <LoadingState />;
     if (isError) return <ErrorState message={apiErrorMessage(error)} onRetry={() => refetch()} />;
-    if (vestings.length === 0) return <EmptyState />;
+    if (vestings.length === 0 || !summary) return <EmptyState />;
     return (
       <>
-        <ProgramHero summary={summary ?? sumVestings(vestings)} vestings={vestings} />
+        <ProgramHero summary={summary} vestings={vestings} now={now} />
         <div className="grid gap-4 lg:grid-cols-2">
           {vestings.map((vesting) => (
             <VestingCard key={vesting.vestingId} vesting={vesting} now={now} canPayFee={canPayFee} onClaim={openClaim} />

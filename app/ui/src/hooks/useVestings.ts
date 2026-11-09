@@ -3,45 +3,9 @@ import { api } from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
 import { vestingEnabled } from "@/lib/constants";
 
-export type VestingStatus = "not_started" | "vesting" | "paused" | "cancelled" | "fully_vested" | "complete";
+import type { VestingStatus, VestingSummary, VestingView, VestingsResponse } from "@strato/shared-types";
 
-/** One VestingPool row as computed by GET /api/vesting. Amounts are decimal strings in atoms (18 decimals). */
-export interface VestingView {
-  vestingId: string;
-  account: string;
-  managed: boolean;
-  cancelled: boolean;
-  curveType: number;
-  durationWeeks: number;
-  durationSeconds: number;
-  startDate: number;
-  endDate: number;
-  pausingDate: number;
-  amount: string;
-  amountClaimed: string;
-  vested: string;
-  claimable: string;
-  locked: string;
-  // Unvested remainder returned to the pool by a cancel; "0" otherwise. locked is 0 when cancelled.
-  returned: string;
-  ratePerSecond: string;
-  status: VestingStatus;
-}
-
-export interface VestingSummary {
-  amount: string;
-  vested: string;
-  claimed: string;
-  claimable: string;
-  locked: string;
-  returned: string;
-}
-
-export interface VestingsResponse {
-  pool: string | null;
-  vestings: VestingView[];
-  summary: VestingSummary;
-}
+export type { VestingStatus, VestingSummary, VestingView, VestingsResponse };
 
 export const vestingsQueryKey = (userAddress: string | null | undefined) => ["vestings", userAddress ?? null];
 
@@ -50,7 +14,12 @@ export const vestingsQueryKey = (userAddress: string | null | undefined) => ["ve
  * axios already sends X-Wallet-Address). Off until the flag and an identity exist; a
  * network without a configured pool answers with `pool: null` and no rows, which hides the tab.
  */
-export function useVestings() {
+interface UseVestingsOptions {
+  /** Poll every minute while mounted: the page wants live amounts, the nav only needs to know rows exist. */
+  poll?: boolean;
+}
+
+export function useVestings({ poll = false }: UseVestingsOptions = {}) {
   const { userAddress } = useUser();
   const enabled = vestingEnabled && !!userAddress;
 
@@ -64,8 +33,8 @@ export function useVestings() {
     staleTime: 30_000,
     refetchOnWindowFocus: true,
     // Accrual, claimability and admin pause/cancel change while the page sits open; staleTime alone
-    // never refetches, so poll while any subscriber (page or nav) is mounted and the tab is visible.
-    refetchInterval: 60_000,
+    // never refetches. Only the page polls; the nav items share the cache without adding load.
+    refetchInterval: poll ? 60_000 : false,
     retry: 1,
   });
 

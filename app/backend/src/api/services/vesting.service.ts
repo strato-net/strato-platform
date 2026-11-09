@@ -5,6 +5,7 @@ import { StratoPaths, constants } from "../../config/constants";
 import { vestingPoolAddress } from "../../config/config";
 import { extractContractName } from "../../utils/utils";
 import { StratoError } from "../../errors";
+import type { VestingStatus, VestingSummary, VestingView, VestingsResponse } from "@strato/shared-types";
 
 // VestingPool.claimVestedTokens treats max uint128 as "claim everything available".
 export const MAX_UINT128 = "340282366920938463463374607431768211455";
@@ -13,47 +14,6 @@ export const WEEK_SECONDS = 604800;
 // Accrual is reported from the Cirrus row, not from the contract: the public
 // vestings(id) getter returns empty fields over RPC and calculateVestedAmount
 // reverts before startDate, which is exactly the state the page must show.
-
-export type VestingStatus = "not_started" | "vesting" | "paused" | "cancelled" | "fully_vested" | "complete";
-
-// Atom amounts as decimal strings, times as unix seconds. pausingDate is 0 when not paused.
-export interface VestingView {
-  vestingId: string;
-  account: string;
-  managed: boolean;
-  cancelled: boolean;
-  curveType: number;
-  durationWeeks: number;
-  durationSeconds: number;
-  startDate: number;
-  endDate: number;
-  pausingDate: number;
-  amount: string;
-  amountClaimed: string;
-  vested: string;
-  claimable: string;
-  // Still to vest. For a cancelled vesting this is 0 and `returned` holds the remainder.
-  locked: string;
-  // Unvested remainder that went back to the pool when the vesting was cancelled, else "0".
-  returned: string;
-  ratePerSecond: string;
-  status: VestingStatus;
-}
-
-export interface VestingSummary {
-  amount: string;
-  vested: string;
-  claimed: string;
-  claimable: string;
-  locked: string;
-  returned: string;
-}
-
-export interface VestingsResponse {
-  pool: string | null;
-  vestings: VestingView[];
-  summary: VestingSummary;
-}
 
 // The Vesting struct as stored on-chain, normalised from a Cirrus mapping row.
 export interface ParsedVesting {
@@ -69,9 +29,34 @@ export interface ParsedVesting {
   cancelled: boolean;
 }
 
-interface VestingRow {
+// Struct fields read out of the JSONB `value` column as text (alias:value->>field), so
+// uint128 amounts never pass through JSON.parse as doubles; block_number tells ghost rows apart.
+export const VESTING_ROW_SELECT = [
+  "key",
+  "block_number",
+  "account:value->>account",
+  "curveType:value->>curveType",
+  "managed:value->>managed",
+  "durationWeeks:value->>durationWeeks",
+  "startDate:value->>startDate",
+  "amount:value->>amount",
+  "amountClaimed:value->>amountClaimed",
+  "pausingDate:value->>pausingDate",
+  "cancelled:value->>cancelled",
+].join(",");
+
+export interface VestingRow {
   key: string;
-  value: unknown;
+  block_number?: unknown;
+  account?: unknown;
+  curveType?: unknown;
+  managed?: unknown;
+  durationWeeks?: unknown;
+  startDate?: unknown;
+  amount?: unknown;
+  amountClaimed?: unknown;
+  pausingDate?: unknown;
+  cancelled?: unknown;
 }
 
 // ---- row normalisation ----
@@ -95,23 +80,29 @@ const toBoolean = (value: unknown): boolean =>
 const normalizeHex = (value: unknown): string =>
   String(value ?? "").trim().replace(/^0x/i, "").toLowerCase();
 
-export const parseVestingRow = (row: VestingRow): ParsedVesting => {
-  // The value column is a JSON object, but some Cirrus paths hand it back as a JSON string.
-  const raw = typeof row.value === "string" ? JSON.parse(row.value) : row.value;
-  const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+export const parseVestingRow = (row: VestingRow): ParsedVesting => ({
+  vestingId: normalizeHex(row.key),
+  account: normalizeHex(row.account),
+  curveType: toNumber(row.curveType),
+  managed: toBoolean(row.managed),
+  durationWeeks: toNumber(row.durationWeeks),
+  startDate: toNumber(row.startDate),
+  amount: toBigInt(row.amount),
+  amountClaimed: toBigInt(row.amountClaimed),
+  pausingDate: toNumber(row.pausingDate),
+  cancelled: toBoolean(row.cancelled),
+});
 
-  return {
-    vestingId: normalizeHex(row.key),
-    account: normalizeHex(value.account),
-    curveType: toNumber(value.curveType),
-    managed: toBoolean(value.managed),
-    durationWeeks: toNumber(value.durationWeeks),
-    startDate: toNumber(value.startDate),
-    amount: toBigInt(value.amount),
-    amountClaimed: toBigInt(value.amountClaimed),
-    pausingDate: toNumber(value.pausingDate),
-    cancelled: toBoolean(value.cancelled),
-  };
+// Collection tables can hold stale ghost rows per key after a Cirrus rebuild; the row from
+// the highest block is the live one.
+export const newestRowPerKey = (rows: VestingRow[]): VestingRow[] => {
+  const newest = new Map<string, VestingRow>();
+  for (const row of rows) {
+    const key = normalizeHex(row.key);
+    const current = newest.get(key);
+    if (!current || toBigInt(row.block_number) > toBigInt(current.block_number)) newest.set(key, row);
+  }
+  return [...newest.values()];
 };
 
 // ---- accrual, mirroring VestingPool._calculateVestedAmount ----
@@ -146,7 +137,6 @@ export const computeVestingView = (parsed: ParsedVesting, nowSeconds: number): V
   const unvested = parsed.amount - vested;
   const locked = parsed.cancelled ? 0n : unvested;
   const returned = parsed.cancelled ? unvested : 0n;
-  const ratePerSecond = durationSeconds > 0 ? parsed.amount / BigInt(durationSeconds) : 0n;
 
   // A pause before the start (pausingDate == startDate) still reads not_started so the
   // countdown applies, and a pause after the end changes nothing, so ended wins over paused.
@@ -181,7 +171,6 @@ export const computeVestingView = (parsed: ParsedVesting, nowSeconds: number): V
     claimable: claimable.toString(),
     locked: locked.toString(),
     returned: returned.toString(),
-    ratePerSecond: ratePerSecond.toString(),
     status,
   };
 };
@@ -226,7 +215,7 @@ const fetchVestingRows = async (
   pool: string,
   account: string
 ): Promise<VestingRow[]> => {
-  const baseParams = { address: `eq.${pool}`, select: "key,value", limit: VESTING_ROWS_PAGE };
+  const baseParams = { address: `eq.${pool}`, select: VESTING_ROW_SELECT, limit: VESTING_ROWS_PAGE };
 
   try {
     const { data } = await cirrus.get(accessToken, vestingsTable(), {
@@ -267,7 +256,7 @@ export const getVestingsForAddress = async (
   }
 
   const rows = await fetchVestingRows(accessToken, pool, account);
-  const vestings = rows
+  const vestings = newestRowPerKey(rows)
     .map(parseVestingRow)
     .filter((parsed) => parsed.account === account)
     .map((parsed) => computeVestingView(parsed, nowSeconds))
