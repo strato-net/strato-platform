@@ -201,6 +201,43 @@ export function useSigners(walletAddress?: string | null) {
   });
 }
 
+export interface PendingSigner {
+  newAdmin: string;
+  adminToReplace: string;
+  configVersion: number;
+}
+
+/** Signer additions/replacements approved by the quorum and awaiting candidate acceptance. */
+export function usePendingSigners(walletAddress?: string | null) {
+  return useQuery({
+    queryKey: ["multisig-pending-signers", walletAddress],
+    enabled: !!walletAddress,
+    refetchInterval: 12_000,
+    queryFn: async (): Promise<PendingSigner[]> => {
+      const [rows, data] = await Promise.all([
+        cirrusGet(
+          "mapping",
+          `collection_name=eq.pendingSigners&address=eq.${strip0x(walletAddress!)}&select=key,value`
+        ),
+        fetchStorageData(walletAddress!),
+      ]);
+      const currentVersion = Number(data["configVersion"] ?? 0) || 0;
+      return rows.flatMap((row): PendingSigner[] => {
+        const value = row?.value;
+        const newAdmin = strip0x(String(row?.key?.key ?? ""));
+        const proposalVersion = Number(value?.configVersion ?? 0) || 0;
+        if (!newAdmin || proposalVersion !== currentVersion ||
+            !(value?.exists === true || value?.exists === "true")) return [];
+        return [{
+          newAdmin,
+          adminToReplace: strip0x(String(value?.adminToReplace ?? "")),
+          configVersion: proposalVersion,
+        }];
+      });
+    },
+  });
+}
+
 /** Per-(target,func) voting thresholds (bps), keyed `"<target>|<func>"`. */
 export function useVotingThresholds(walletAddress?: string | null) {
   return useQuery({
@@ -746,7 +783,7 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
       const clean = Array.from(
         new Set(signers.map(strip0x).filter((a) => a.length === 40 && !isZeroAddr(a)))
       );
-      if (clean.length === 0) throw new Error("At least one signer is required");
+      if (clean.length < 3) throw new Error("At least three signers are required");
       return callWallet("initialize", { _initialAdmins: clean });
     },
     [callWallet]
@@ -805,14 +842,15 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
   );
 
   /**
-   * Propose/vote to add a signer (executes once the vote threshold is met). Direct
+   * Propose/vote to nominate a signer. Once the vote threshold is met, the nominee
+   * must call acceptAdmin before the signer set changes. Direct
    * signers use the public `addAdmin` wrapper; a nested vote instead targets the
-   * internal `_addAdmin` issue the wrapper creates, so both land on the same issueId.
+   * internal `_proposeAdmin` issue the wrapper creates, so both land on the same issueId.
    */
   const addSigner = useCallback(
     (address: string) =>
       nested
-        ? castVote("_addAdmin", [strip0x(address)])
+        ? castVote("_proposeAdmin", [ZERO_ADDRESS, strip0x(address)])
         : callWallet("addAdmin", { _admin: strip0x(address) }),
     [nested, castVote, callWallet]
   );
@@ -826,16 +864,22 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
     [nested, castVote, callWallet]
   );
 
-  /** Propose/vote to swap a signer for a new address in a single issue. */
+  /** Propose/vote to nominate an atomic replacement; the nominee must then accept. */
   const swapSigner = useCallback(
     (oldAddress: string, newAddress: string) =>
       nested
-        ? castVote("_swapAdmin", [strip0x(oldAddress), strip0x(newAddress)])
+        ? castVote("_proposeAdmin", [strip0x(oldAddress), strip0x(newAddress)])
         : callWallet("swapAdmin", {
             _adminToReplace: strip0x(oldAddress),
             _newAdmin: strip0x(newAddress),
           }),
     [nested, castVote, callWallet]
+  );
+
+  /** Prove control of a nominated address and atomically activate its add/swap. */
+  const acceptSigner = useCallback(
+    () => callWallet("acceptAdmin", {}),
+    [callWallet]
   );
 
   /**
@@ -907,6 +951,7 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
     addSigner,
     removeSigner,
     swapSigner,
+    acceptSigner,
     setDefaultThreshold,
     castVote,
     dismissIssue,

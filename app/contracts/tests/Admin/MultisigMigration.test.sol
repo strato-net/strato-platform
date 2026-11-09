@@ -428,17 +428,21 @@ contract Describe_MultisigMigration {
     Signer c;
     Signer outsider;
 
+    function configureLegacy(address[] signers) internal {
+        wallet = new LegacyUser("ms2");
+        wallet.setLogicContract(address(new LegacyAdminRegistry()));
+        LegacyAdminRegistry(address(wallet)).initialize(signers);
+        wallet.transferOwnership(address(wallet));
+        token = new MockToken(address(wallet));
+        ms = Multisig(address(wallet));
+    }
+
     function beforeEach() {
         a = new Signer();
         b = new Signer();
         c = new Signer();
         outsider = new Signer();
-        wallet = new LegacyUser("ms2");
-        wallet.setLogicContract(address(new LegacyAdminRegistry()));
-        LegacyAdminRegistry(address(wallet)).initialize([address(a), address(b), address(c)]);
-        wallet.transferOwnership(address(wallet));
-        token = new MockToken(address(wallet));
-        ms = Multisig(address(wallet));
+        configureLegacy([address(a), address(b), address(c)]);
     }
 
     function vote(Signer who, address target, string func, variadic args) internal returns (bool) {
@@ -510,5 +514,55 @@ contract Describe_MultisigMigration {
         require(wallet.owner() == address(wallet), "owner changed");
         vote(a, address(token), "transfer", address(outsider), 1000);
         require(vote(b, address(token), "transfer", address(outsider), 1000), "lock was left set");
+    }
+
+    function it_quarantines_a_migrated_wallet_until_it_has_three_signers() {
+        configureLegacy([address(a)]);
+        address logic = address(new Multisig());
+        require(vote(a, address(wallet), "setLogicContract", logic), "switch did not execute");
+
+        require(
+            rejects(a, address(wallet), "castVoteOnIssue", address(token), "transfer", address(outsider), 1000),
+            "unsafe wallet spent funds"
+        );
+
+        require(vote(a, address(wallet), "_proposeAdmin", address(0), address(b)), "second signer was not proposed");
+        b.invoke(address(wallet), "acceptAdmin");
+        require(ms.isAdminAddress(address(b)), "second signer did not accept");
+        require(
+            rejects(a, address(wallet), "castVoteOnIssue", address(token), "transfer", address(outsider), 1000),
+            "two-signer wallet spent funds"
+        );
+
+        require(!vote(a, address(wallet), "_proposeAdmin", address(0), address(c)), "one of two signers proposed the third");
+        require(vote(b, address(wallet), "_proposeAdmin", address(0), address(c)), "third signer was not proposed");
+        c.invoke(address(wallet), "acceptAdmin");
+        require(ms.isAdminAddress(address(c)), "third signer did not accept");
+
+        require(!vote(a, address(token), "transfer", address(outsider), 1000), "one vote executed");
+        require(vote(b, address(token), "transfer", address(outsider), 1000), "safe wallet did not resume");
+        require(token.balanceOf(address(outsider)) == 1000, "transfer did not land");
+    }
+
+    function it_quarantines_a_migrated_unanimous_threshold_until_lowered() {
+        require(!vote(a, address(wallet), "setDefaultVotingThresholdBps", 10000), "one vote changed threshold");
+        require(vote(b, address(wallet), "setDefaultVotingThresholdBps", 10000), "threshold did not change");
+
+        address logic = address(new Multisig());
+        require(!vote(a, address(wallet), "setLogicContract", logic), "one vote switched logic");
+        require(!vote(b, address(wallet), "setLogicContract", logic), "two votes switched logic");
+        require(vote(c, address(wallet), "setLogicContract", logic), "switch did not execute");
+        require(
+            rejects(a, address(wallet), "castVoteOnIssue", address(token), "transfer", address(outsider), 1000),
+            "unanimous wallet spent funds"
+        );
+
+        require(!vote(a, address(wallet), "setDefaultVotingThresholdBps", 6000), "one vote lowered threshold");
+        require(!vote(b, address(wallet), "setDefaultVotingThresholdBps", 6000), "two votes lowered threshold");
+        require(vote(c, address(wallet), "setDefaultVotingThresholdBps", 6000), "threshold remediation failed");
+
+        require(!vote(a, address(token), "transfer", address(outsider), 1000), "one vote executed");
+        require(vote(b, address(token), "transfer", address(outsider), 1000), "safe wallet did not resume");
+        require(token.balanceOf(address(outsider)) == 1000, "transfer did not land");
     }
 }

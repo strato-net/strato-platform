@@ -11,11 +11,18 @@
 contract record Multisig {
     uint public constant MAXIMUM_DELAY = 2592000; // 30 days
     uint public constant GRACE_PERIOD = 604800; // 7 days
+    uint public constant MIN_ADMIN_COUNT = 3;
 
     struct Timelock {
         uint queuedAt;
         uint executableAt;
         uint expiresAt;
+    }
+
+    struct SignerProposal {
+        address adminToReplace;
+        uint configVersion;
+        bool exists;
     }
 
     // The wallet's Ownable owner; the logic contract itself owns itself
@@ -29,6 +36,7 @@ contract record Multisig {
     mapping (string => bool) public record currentIssues;
     mapping (string => uint) public record issueConfigVersions;
     mapping (string => Timelock) public record timelocks;
+    mapping (address => SignerProposal) public record pendingSigners;
 
     uint public defaultVotingThresholdBps = 6000; // 3/5
     uint public timelockDelay; // 0 executes an issue as soon as it passes
@@ -48,6 +56,8 @@ contract record Multisig {
     event AdminAdded(address indexed admin);
     event AdminRemoved(address indexed admin);
     event AdminSwapped(address indexed replacedAdmin, address indexed newAdmin);
+    event AdminProposed(address indexed adminToReplace, address indexed newAdmin);
+    event AdminAccepted(address indexed adminToReplace, address indexed newAdmin);
 
     event DefaultVotingThresholdSet(uint votingThresholdBps);
     event TimelockDelaySet(uint delay);
@@ -70,7 +80,7 @@ contract record Multisig {
     }
 
     function initialize(address[] _initialAdmins) external onlyOwner onlyOnce {
-        require(_initialAdmins.length > 0, "At least one admin is required");
+        require(_initialAdmins.length >= MIN_ADMIN_COUNT, "At least three admins are required");
         defaultVotingThresholdBps = 6000; // 3/5
         configVersion = 1;
         for (uint i = 0; i < _initialAdmins.length; i++) {
@@ -84,7 +94,7 @@ contract record Multisig {
     }
 
     function addAdmin(address _admin) external {
-        castVoteOnIssue(this, "_addAdmin", _admin);
+        castVoteOnIssue(this, "_proposeAdmin", address(0), _admin);
     }
 
     function removeAdmin(address _admin) external {
@@ -92,7 +102,29 @@ contract record Multisig {
     }
 
     function swapAdmin(address _adminToReplace, address _newAdmin) external {
-        castVoteOnIssue(this, "_swapAdmin", _adminToReplace, _newAdmin);
+        castVoteOnIssue(this, "_proposeAdmin", _adminToReplace, _newAdmin);
+    }
+
+    // A nominated signer proves control of the exact address before activation.
+    function acceptAdmin() external {
+        require(!executing, "Cannot accept while an issue is executing");
+        SignerProposal storage proposal = pendingSigners[msg.sender];
+        require(proposal.exists, "No signer proposal for this account");
+        require(proposal.configVersion == configVersion, "Signer proposal is stale");
+
+        address adminToReplace = proposal.adminToReplace;
+        proposal.adminToReplace = address(0);
+        proposal.configVersion = 0;
+        proposal.exists = false;
+
+        if (adminToReplace == address(0)) {
+            _activateAdmin(msg.sender);
+            emit AdminAdded(msg.sender);
+        } else {
+            _activateAdminSwap(adminToReplace, msg.sender);
+            emit AdminSwapped(adminToReplace, msg.sender);
+        }
+        emit AdminAccepted(adminToReplace, msg.sender);
     }
 
     function isAdminAddress(address _admin) external returns (bool) {
@@ -111,14 +143,20 @@ contract record Multisig {
     function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
         require(adminMap[msg.sender] != 0, "Only an admin can vote");
         require(!executing, "Cannot vote while an issue is executing");
+        // AdminRegistry did not enforce the Multisig signer invariants. If a legacy
+        // wallet switches with an unsafe configuration, quarantine its assets while
+        // still allowing the signers to repair the configuration or roll back.
+        require(
+            _isSafeConfiguration() || _isMigrationAction(_target, _func),
+            "Unsafe migrated configuration only permits remediation"
+        );
         // The wallet is the only caller its owner-only functions accept, so this is the one
         // route to them. Anything else (callContract, addUserAddress, ...) would let an issue
         // wrap a call the multisig never voted on, or hand out standing authority
         if (_target == address(this)) {
             require(
-                _func == "_addAdmin" ||
+                _func == "_proposeAdmin" ||
                 _func == "_removeAdmin" ||
-                _func == "_swapAdmin" ||
                 _func == "cancelIssue" ||
                 _func == "setDefaultVotingThresholdBps" ||
                 _func == "setTimelockDelay" ||
@@ -173,6 +211,10 @@ contract record Multisig {
     // Anyone can run a queued issue once its delay is up: the signers already decided it
     function executeIssue(address _target, string _func, variadic _args) external returns (variadic) {
         require(!executing, "Cannot execute while an issue is executing");
+        require(
+            _isSafeConfiguration() || _isMigrationAction(_target, _func),
+            "Unsafe migrated configuration only permits remediation"
+        );
         string issueId = _getIssueId(_target, _func, _args);
         Timelock storage timelock = timelocks[issueId];
         require(timelock.executableAt != 0, "Issue is not queued");
@@ -227,18 +269,18 @@ contract record Multisig {
         timelocks[_issueId].expiresAt = 0;
     }
 
-    function _addAdmin(address _admin) external onlyOwner {
-        require(_admin != address(0), "Invalid admin address");
-        require(_admin != address(this), "A multisig cannot be its own signer");
-        require(adminMap[_admin] == 0, "Account is already an admin");
-        admins.push(_admin);
-        adminMap[_admin] = admins.length;
-        configVersion++;
-        emit AdminAdded(_admin);
+    function _proposeAdmin(address _adminToReplace, address _admin) external onlyOwner {
+        _requireValidNewAdmin(_admin);
+        if (_adminToReplace != address(0)) {
+            require(adminMap[_adminToReplace] > 0, "Account to replace is not an admin");
+        }
+        pendingSigners[_admin] = SignerProposal(_adminToReplace, configVersion, true);
+        emit AdminProposed(_adminToReplace, _admin);
     }
 
     function _removeAdmin(address _admin) external onlyOwner {
-        require(admins.length > 1, "Cannot remove the last admin");
+        require(admins.length > MIN_ADMIN_COUNT, "At least three admins are required");
+        require(_isSafeThreshold(defaultVotingThresholdBps, admins.length - 1), "Removal would require every admin");
         uint index = adminMap[_admin];
         require(index > 0, "Account is not an admin");
         address swap = admins[admins.length - 1];
@@ -251,23 +293,58 @@ contract record Multisig {
         emit AdminRemoved(_admin);
     }
 
-    function _swapAdmin(address _adminToReplace, address _admin) external onlyOwner {
+    function _requireValidNewAdmin(address _admin) internal {
         require(_admin != address(0), "Invalid admin address");
         require(_admin != address(this), "A multisig cannot be its own signer");
-        uint index = adminMap[_admin];
-        require(index == 0, "Account is already an admin");
-        index = adminMap[_adminToReplace];
+        require(adminMap[_admin] == 0, "Account is already an admin");
+    }
+
+    function _activateAdmin(address _admin) internal {
+        _requireValidNewAdmin(_admin);
+        uint newAdminCount = admins.length + 1;
+        // Unsafe legacy wallets may need more than one accepted signer before they
+        // reach the minimum. Enforce the quorum invariant as soon as they reach it.
+        if (newAdminCount >= MIN_ADMIN_COUNT) {
+            require(_isSafeThreshold(defaultVotingThresholdBps, newAdminCount), "Addition would require every admin");
+        }
+        admins.push(_admin);
+        adminMap[_admin] = admins.length;
+        configVersion++;
+    }
+
+    function _activateAdminSwap(address _adminToReplace, address _admin) internal {
+        _requireValidNewAdmin(_admin);
+        uint index = adminMap[_adminToReplace];
         require(index > 0, "Account to replace is not an admin");
         admins[index - 1] = _admin;
         adminMap[_admin] = index;
         adminMap[_adminToReplace] = 0;
         configVersion++;
-        emit AdminSwapped(_adminToReplace, _admin);
+    }
+
+    function _isSafeThreshold(uint _thresholdBps, uint _adminCount) internal returns (bool) {
+        return _adminCount > 1 && _thresholdBps * _adminCount <= 10000 * (_adminCount - 1);
+    }
+
+    function _isSafeConfiguration() internal returns (bool) {
+        return admins.length >= MIN_ADMIN_COUNT && _isSafeThreshold(defaultVotingThresholdBps, admins.length);
+    }
+
+    function _isMigrationAction(address _target, string _func) internal returns (bool) {
+        return _target == address(this) && (
+            _func == "_proposeAdmin" ||
+            _func == "setDefaultVotingThresholdBps" ||
+            _func == "cancelIssue" ||
+            _func == "setLogicContract" ||
+            _func == "transferOwnership"
+        );
     }
 
     function setDefaultVotingThresholdBps(uint _defaultVotingThresholdBps) external onlyOwner {
         require(_defaultVotingThresholdBps > 0, "Default voting threshold must be greater than 0");
         require(_defaultVotingThresholdBps <= 10000, "Default voting threshold must be less than 100%");
+        uint validationCount = admins.length < MIN_ADMIN_COUNT ? MIN_ADMIN_COUNT : admins.length;
+        require(_isSafeThreshold(_defaultVotingThresholdBps, validationCount), "Threshold cannot require every admin");
         defaultVotingThresholdBps = _defaultVotingThresholdBps;
         configVersion++;
         emit DefaultVotingThresholdSet(_defaultVotingThresholdBps);

@@ -53,6 +53,7 @@ import type { UserWallet } from "@/services/userWallets";
 import {
   useIsMultisig,
   useSigners,
+  usePendingSigners,
   useVotingThresholds,
   useOpenIssues,
   useExecutedIssues,
@@ -71,6 +72,8 @@ import {
 /* --------------------------------------------------------------------------------- */
 
 const eq = (a?: string, b?: string) => !!a && !!b && strip0x(a) === strip0x(b);
+
+const isZeroAddress = (address?: string) => !address || /^0*$/.test(strip0x(address));
 
 const isAddressLike = (s: string) => /^(0x)?[0-9a-fA-F]{40}$/.test(s.trim());
 
@@ -108,6 +111,15 @@ function describeIssue(func: string, args: string[]): { label: string; canonical
         label: `Swap signer ${shortenHex(a0, 6, 4)} → ${shortenHex(args[1] ?? "", 6, 4)}`,
         canonical: [strip0x(a0), strip0x(args[1] ?? "")],
       };
+    case "_proposeAdmin": {
+      const replacement = args[1] ?? "";
+      return isZeroAddress(a0)
+        ? { label: `Nominate signer ${shortenHex(replacement, 6, 4)}`, canonical: [strip0x(a0), strip0x(replacement)] }
+        : {
+            label: `Nominate replacement ${shortenHex(a0, 6, 4)} → ${shortenHex(replacement, 6, 4)}`,
+            canonical: [strip0x(a0), strip0x(replacement)],
+          };
+    }
     case "setDefaultVotingThresholdBps":
       // Label is rendered as "M of N" by labelForIssue (needs the signer count).
       return { label: "Set approval threshold", canonical: [String(Number(a0) || 0)] };
@@ -317,6 +329,8 @@ function EnablePanel({
   const [step, setStep] = useState("");
 
   const logicSet = config.runsMultisigLogic;
+  const initialSigners = Array.from(new Set([me, ...extra.map((e) => e.addr)].filter(Boolean)));
+  const hasMinimumSigners = initialized || initialSigners.length >= 3;
 
   const run = async () => {
     if (!me) {
@@ -330,13 +344,16 @@ function EnablePanel({
       });
       return;
     }
-    const signers = [me, ...extra.map((e) => e.addr).filter(Boolean)];
+    if (!initialized && initialSigners.length < 3) {
+      toast.error("At least three signers are required");
+      return;
+    }
     setBusy(true);
     try {
       const logic = logicSet
         ? config.logicContract
         : await ensureMultisigLogic(isAppAuthenticated ? undefined : wallet.username);
-      await enableMultisig(logic, signers, { logicSet, initialized, selfOwned });
+      await enableMultisig(logic, initialSigners, { logicSet, initialized, selfOwned });
       queryClient.invalidateQueries({ queryKey: ["multisig-config", wallet.address] });
       queryClient.invalidateQueries({ queryKey: ["multisig-signers", wallet.address] });
       toast.success("Multisig enabled", {
@@ -428,15 +445,15 @@ function EnablePanel({
             Add signer
           </Button>
           <p className="text-xs text-muted-foreground">
-            By default ~60% of signers must approve each action (e.g. 2 of 2, 2 of 3). You can
-            change this once enabled.
+            At least three signers are required. By default, 2 of 3 signers approve each action;
+            the threshold can never require every signer.
           </p>
         </div>
       ) : null}
 
       <Button
         onClick={run}
-        disabled={busy || !canSubmit || !me}
+        disabled={busy || !canSubmit || !me || !hasMinimumSigners}
         className="w-full"
       >
         {busy ? step || "Working…" : partiallyEnabled ? "Finish enabling" : "Enable multisig"}
@@ -505,9 +522,18 @@ function UpgradeLogicPanel({ wallet, fullRoute }: { wallet: UserWallet; fullRout
   });
   const [busy, setBusy] = useState(false);
   const canVote = fullRoute.length > 1 || signers.some((s) => eq(s, userAddress ?? ""));
+  const thresholdBps = config.defaultThresholdBps || 6000;
+  const requiredVotes = votesNeeded(signers.length, thresholdBps);
+  const migrationSafe = signers.length >= 3 && requiredVotes <= signers.length - 1;
   if (!wallet.username || isLoading || config.runsMultisigLogic || !canVote) return null;
 
   const propose = async () => {
+    if (!migrationSafe) {
+      toast.error("Unsafe multisig configuration", {
+        description: "Repair the signer count or approval threshold under the current logic before upgrading.",
+      });
+      return;
+    }
     setBusy(true);
     try {
       await castVote("setLogicContract", [await ensureMultisigLogic()]);
@@ -532,7 +558,17 @@ function UpgradeLogicPanel({ wallet, fullRoute }: { wallet: UserWallet; fullRout
           have since been replaced and lets whitelisted accounts act without a vote. Switching
           to the Multisig logic keeps its signers, threshold and funds.
         </p>
-        <Button size="sm" onClick={propose} disabled={busy || !canSubmit}>
+        <p>
+          Resulting configuration: {requiredVotes} of {signers.length} approvals.
+        </p>
+        {!migrationSafe && (
+          <p className="font-medium text-destructive">
+            {signers.length < 3
+              ? `Add at least ${3 - signers.length} more signer${3 - signers.length === 1 ? "" : "s"} under the current logic before upgrading.`
+              : `Lower the approval requirement to at most ${signers.length - 1} of ${signers.length} under the current logic before upgrading.`}
+          </p>
+        )}
+        <Button size="sm" onClick={propose} disabled={busy || !canSubmit || !migrationSafe}>
           {busy ? "Proposing…" : "Propose upgrade"}
         </Button>
       </AlertDescription>
@@ -593,8 +629,9 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
   const queryClient = useQueryClient();
   const { config } = useIsMultisig(wallet.address);
   const { data: signers = [] } = useSigners(wallet.address);
+  const { data: pendingSigners = [] } = usePendingSigners(wallet.address);
   const nested = fullRoute.length > 1;
-  const { addSigner, removeSigner, setDefaultThreshold, setTimelockDelay } = useMultisigActions({
+  const { addSigner, removeSigner, swapSigner, acceptSigner, setDefaultThreshold, setTimelockDelay } = useMultisigActions({
     walletAddress: wallet.address,
     route: fullRoute.map((w) => w.address),
   });
@@ -608,17 +645,25 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
 
   const [newSigner, setNewSigner] = useState("");
   const [newSignerAddr, setNewSignerAddr] = useState("");
+  const [replaceSigner, setReplaceSigner] = useState("");
+  const [replacement, setReplacement] = useState("");
+  const [replacementAddr, setReplacementAddr] = useState("");
   const [targetM, setTargetM] = useState<number | null>(null);
   const [delayHours, setDelayHours] = useState("");
   const [busy, setBusy] = useState<string>("");
 
-  const selectedM = Math.min(Math.max(targetM ?? needed, 1), Math.max(1, signerCount));
+  const maxSafeM = Math.max(1, signerCount - 1);
+  const selectedM = Math.min(Math.max(targetM ?? needed, 1), maxSafeM);
+  const addNeeded = votesNeeded(signerCount + 1, config.defaultThresholdBps || 6000);
+  const removeNeeded = votesNeeded(Math.max(0, signerCount - 1), config.defaultThresholdBps || 6000);
+  const canRemove = signerCount > 3 && removeNeeded <= signerCount - 2;
   const delaySeconds = delayHours.trim() === "" ? null : Math.round(Number(delayHours) * 3600);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["multisig-signers", wallet.address] });
     queryClient.invalidateQueries({ queryKey: ["multisig-open-issues", wallet.address] });
     queryClient.invalidateQueries({ queryKey: ["multisig-config", wallet.address] });
+    queryClient.invalidateQueries({ queryKey: ["multisig-pending-signers", wallet.address] });
   };
 
   const guard = () => {
@@ -642,7 +687,9 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
     setBusy("add");
     try {
       await addSigner(newSignerAddr);
-      toast.success("Vote cast to add signer", { description: "Executes once the threshold is met." });
+      toast.success("Vote cast to nominate signer", {
+        description: "After approval, the nominee must accept before becoming a signer.",
+      });
       setNewSigner("");
       setNewSignerAddr("");
       invalidate();
@@ -655,8 +702,8 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
 
   const doRemove = async (addr: string) => {
     if (!guard()) return;
-    if (signers.length <= 1) {
-      toast.error("Cannot remove the last signer");
+    if (!canRemove) {
+      toast.error("Removal would violate signer safety");
       return;
     }
     setBusy(addr);
@@ -668,6 +715,46 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
       invalidate();
     } catch (err: any) {
       toast.error("Failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const doSwap = async () => {
+    if (!guard()) return;
+    if (!replaceSigner || strip0x(replacementAddr).length !== 40) {
+      toast.error("Choose a signer and enter a valid replacement");
+      return;
+    }
+    if (signers.some((s) => eq(s, replacementAddr))) {
+      toast.error("Replacement is already a signer");
+      return;
+    }
+    setBusy("swap");
+    try {
+      await swapSigner(replaceSigner, replacementAddr);
+      toast.success("Vote cast to nominate replacement", {
+        description: "After approval, the replacement must accept before the atomic swap.",
+      });
+      setReplaceSigner("");
+      setReplacement("");
+      setReplacementAddr("");
+      invalidate();
+    } catch (err: any) {
+      toast.error("Failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const doAccept = async () => {
+    setBusy("accept");
+    try {
+      await acceptSigner();
+      toast.success("Signer role accepted");
+      invalidate();
+    } catch (err: any) {
+      toast.error("Acceptance failed", { description: String(err?.message || err) });
     } finally {
       setBusy("");
     }
@@ -745,7 +832,7 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: Math.max(1, signerCount) }, (_, i) => i + 1).map((m) => (
+              {Array.from({ length: maxSafeM }, (_, i) => i + 1).map((m) => (
                 <SelectItem key={m} value={String(m)}>
                   {m}
                 </SelectItem>
@@ -763,6 +850,9 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
             {busy === "threshold" ? "Voting…" : "Propose change"}
           </Button>
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Result: {selectedM} of {signerCount}. At least one signer always remains optional.
+        </p>
       </div>
 
       {/* Timelock delay: only the Multisig logic has one */}
@@ -821,9 +911,18 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
               <Button
                 variant="ghost"
                 size="sm"
+                onClick={() => setReplaceSigner(s)}
+                disabled={busy !== "" || !canSubmit || !canVote}
+                className="ml-auto"
+              >
+                Replace
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => doRemove(s)}
-                disabled={busy !== "" || !canSubmit || !canVote || signers.length <= 1}
-                className="ml-auto text-destructive hover:text-destructive"
+                disabled={busy !== "" || !canSubmit || !canVote || !canRemove}
+                className="text-destructive hover:text-destructive"
               >
                 {busy === s ? "Voting…" : "Remove"}
               </Button>
@@ -832,6 +931,49 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
           {signers.length === 0 ? (
             <p className="text-sm text-muted-foreground">No signers found.</p>
           ) : null}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Removing produces {removeNeeded} of {Math.max(0, signerCount - 1)} and is blocked when it
+          would leave fewer than three signers or require every remaining signer.
+        </p>
+      </div>
+
+      {/* Replace signer atomically */}
+      <div className="space-y-2 rounded-lg border border-border p-3">
+        <Label>Replace a signer</Label>
+        <Select value={replaceSigner} onValueChange={setReplaceSigner}>
+          <SelectTrigger>
+            <SelectValue placeholder="Signer to replace" />
+          </SelectTrigger>
+          <SelectContent>
+            {signers.map((signer) => (
+              <SelectItem key={signer} value={signer}>
+                {shortenHex(signer, 8, 6)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <AddressInput
+          value={replacement}
+          resolved={replacementAddr}
+          onChange={(text, addr) => {
+            setReplacement(text);
+            setReplacementAddr(addr);
+          }}
+          placeholder="Replacement address or username"
+          className="font-mono text-xs"
+        />
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            Result: {needed} of {signerCount}. The old signer remains active until the replacement accepts.
+          </p>
+          <Button
+            size="sm"
+            onClick={doSwap}
+            disabled={busy !== "" || !canSubmit || !canVote || !replaceSigner || !replacement.trim()}
+          >
+            {busy === "swap" ? "Voting…" : "Propose replacement"}
+          </Button>
         </div>
       </div>
 
@@ -855,10 +997,40 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Adding, removing, and threshold changes are proposed as issues and take effect once
-          enough signers vote.
+          Result after acceptance: {addNeeded} of {signerCount + 1}. The nominee must prove control
+          by accepting before the signer set changes.
         </p>
       </div>
+
+      {pendingSigners.length > 0 ? (
+        <div className="space-y-2 rounded-lg border border-border p-3">
+          <Label>Awaiting signer acceptance</Label>
+          {pendingSigners.map((pending) => {
+            const replacing = !isZeroAddress(pending.adminToReplace);
+            const mine = eq(pending.newAdmin, me);
+            return (
+              <div key={pending.newAdmin} className="flex items-center gap-2 text-xs">
+                <span>
+                  {replacing ? `Replace ${shortenHex(pending.adminToReplace, 6, 4)} with ` : "Add "}
+                  <span className="font-mono">{shortenHex(pending.newAdmin, 6, 4)}</span>
+                </span>
+                {mine ? (
+                  <Button
+                    size="sm"
+                    onClick={doAccept}
+                    disabled={busy !== "" || !canSubmit}
+                    className="ml-auto"
+                  >
+                    {busy === "accept" ? "Accepting…" : "Accept signer role"}
+                  </Button>
+                ) : (
+                  <Badge variant="outline" className="ml-auto">Waiting</Badge>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

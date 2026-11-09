@@ -134,6 +134,9 @@ contract Describe_Multisig {
         Signer second = oldSigner == address(c) ? b : c;
         first.invoke(address(wallet), "swapAdmin", oldSigner, newSigner);
         second.invoke(address(wallet), "swapAdmin", oldSigner, newSigner);
+        require(!ms.isAdminAddress(newSigner), "signer activated before accepting");
+        require(ms.isAdminAddress(oldSigner), "old signer removed before replacement accepted");
+        Signer(newSigner).invoke(address(wallet), "acceptAdmin");
         require(ms.isAdminAddress(newSigner), "signer swap did not execute");
     }
 
@@ -189,8 +192,12 @@ contract Describe_Multisig {
         try { freshMs.initialize([address(a), address(fresh)]); } catch { selfReverted = true; }
         require(selfReverted, "wallet accepted as its own signer");
 
-        freshMs.initialize([address(a), address(b)]);
-        require(freshMs.isAdminAddress(address(a)) && freshMs.isAdminAddress(address(b)), "signers not set");
+        bool tooFewReverted = false;
+        try { freshMs.initialize([address(a), address(b)]); } catch { tooFewReverted = true; }
+        require(tooFewReverted, "fewer than three signers accepted");
+
+        freshMs.initialize([address(a), address(b), address(c)]);
+        require(freshMs.isAdminAddress(address(a)) && freshMs.isAdminAddress(address(b)) && freshMs.isAdminAddress(address(c)), "signers not set");
         require(freshMs.configVersion() == 1, "config version not set");
 
         Multisig bare = new Multisig();
@@ -240,6 +247,8 @@ contract Describe_Multisig {
         Signer d = new Signer();
         a.invoke(address(wallet), "addAdmin", address(d));
         c.invoke(address(wallet), "addAdmin", address(d));
+        require(!ms.isAdminAddress(address(d)), "signer activated before accepting");
+        d.invoke(address(wallet), "acceptAdmin");
         require(ms.isAdminAddress(address(d)) && ms.configVersion() == 2, "signer not added");
         // Four signers at 60% need three fresh votes; b's earlier vote is gone
         require(!vote(c, address(token), "transfer", address(outsider), 1000), "executed on one fresh vote");
@@ -249,23 +258,57 @@ contract Describe_Multisig {
 
     function it_drops_votes_when_the_threshold_changes() {
         vote(a, address(token), "transfer", address(outsider), 1000);
-        vote(b, address(wallet), "setDefaultVotingThresholdBps", 10000);
-        vote(c, address(wallet), "setDefaultVotingThresholdBps", 10000);
-        require(ms.defaultVotingThresholdBps() == 10000, "threshold not changed");
+        vote(b, address(wallet), "setDefaultVotingThresholdBps", 6666);
+        vote(c, address(wallet), "setDefaultVotingThresholdBps", 6666);
+        require(ms.defaultVotingThresholdBps() == 6666, "threshold not changed");
         require(!vote(b, address(token), "transfer", address(outsider), 1000), "stale vote counted");
-        require(!vote(c, address(token), "transfer", address(outsider), 1000), "stale vote counted");
-        require(vote(a, address(token), "transfer", address(outsider), 1000), "unanimous fresh votes did not execute");
+        require(vote(c, address(token), "transfer", address(outsider), 1000), "fresh votes did not execute");
     }
 
     function it_does_not_revive_votes_when_a_signer_is_re_added() {
         vote(a, address(token), "transfer", address(outsider), 1000);
+        Signer d = new Signer();
+        a.invoke(address(wallet), "addAdmin", address(d));
+        b.invoke(address(wallet), "addAdmin", address(d));
+        d.invoke(address(wallet), "acceptAdmin");
         b.invoke(address(wallet), "removeAdmin", address(a));
         c.invoke(address(wallet), "removeAdmin", address(a));
+        d.invoke(address(wallet), "removeAdmin", address(a));
         b.invoke(address(wallet), "addAdmin", address(a));
         c.invoke(address(wallet), "addAdmin", address(a));
+        a.invoke(address(wallet), "acceptAdmin");
         require(ms.isAdminAddress(address(a)), "a not re-added");
         require(!vote(b, address(token), "transfer", address(outsider), 1000), "re-added signer's old vote counted");
         require(token.balanceOf(address(wallet)) == 1000, "funds moved");
+    }
+
+    function it_rejects_unanimous_thresholds_and_unsafe_removals() {
+        vote(a, address(wallet), "setDefaultVotingThresholdBps", 10000);
+        require(rejects(b, address(wallet), "castVoteOnIssue", address(wallet), "setDefaultVotingThresholdBps", 10000), "unanimous threshold accepted");
+        a.invoke(address(wallet), "removeAdmin", address(c));
+        require(rejects(b, address(wallet), "removeAdmin", address(c)), "removed below three signers");
+
+        Signer d = new Signer();
+        a.invoke(address(wallet), "addAdmin", address(d));
+        b.invoke(address(wallet), "addAdmin", address(d));
+        d.invoke(address(wallet), "acceptAdmin");
+        vote(a, address(wallet), "setDefaultVotingThresholdBps", 7500);
+        vote(b, address(wallet), "setDefaultVotingThresholdBps", 7500);
+        vote(c, address(wallet), "setDefaultVotingThresholdBps", 7500);
+        a.invoke(address(wallet), "removeAdmin", address(d));
+        b.invoke(address(wallet), "removeAdmin", address(d));
+        require(rejects(c, address(wallet), "removeAdmin", address(d)), "unsafe removal succeeded");
+        require(ms.isAdminAddress(address(d)), "unsafe removal changed signers");
+    }
+
+    function it_rejects_stale_signer_acceptance() {
+        Signer d = new Signer();
+        a.invoke(address(wallet), "addAdmin", address(d));
+        b.invoke(address(wallet), "addAdmin", address(d));
+        vote(a, address(wallet), "setDefaultVotingThresholdBps", 6666);
+        vote(c, address(wallet), "setDefaultVotingThresholdBps", 6666);
+        require(rejects(d, address(wallet), "acceptAdmin"), "stale signer proposal accepted");
+        require(!ms.isAdminAddress(address(d)), "stale signer activated");
     }
 
     function it_keeps_votes_when_a_signer_change_fails() {
@@ -417,9 +460,10 @@ contract Describe_Multisig {
         enableTimelock();
         Signer d = new Signer();
         voteToQueue(address(token), "transfer", address(outsider), 1000);
-        voteToQueue(address(wallet), "_swapAdmin", address(c), address(d));
+        voteToQueue(address(wallet), "_proposeAdmin", address(c), address(d));
         fastForward(86400);
-        ms.executeIssue(address(wallet), "_swapAdmin", address(c), address(d));
+        ms.executeIssue(address(wallet), "_proposeAdmin", address(c), address(d));
+        d.invoke(address(wallet), "acceptAdmin");
         require(ms.isAdminAddress(address(d)) && !ms.isAdminAddress(address(c)), "signer swap did not run");
 
         require(rejects(d, address(wallet), "castVoteOnIssue", address(token), "transfer", address(outsider), 1000), "new signer voted on a queued issue");
