@@ -43,7 +43,7 @@ import { AddrLink } from "@/components/explorer/AddrLink";
 import { shortenHex } from "@/lib/utils";
 import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
-import { formatVariadicArg, parseArgText } from "@/lib/args";
+import { formatVariadicArg, parseArgText, typedVariadicArg, variadicArgValue } from "@/lib/args";
 import { useMyTokens, type TokenBalance } from "@/services/tokens";
 import { useContractGroups, useContractInfo, functionArgs } from "@/services/contracts";
 import { useSimulation } from "@/components/simulation/useSimulation";
@@ -167,7 +167,7 @@ function hopName(w: UserWallet): string {
  * vote hop, then one for the ultimate issue's action. When the issue itself is
  * a wrapped vote (castVoteOnIssue), each wrapper layer adds another hop.
  */
-function effectChainTitles(route: UserWallet[], issueFunc?: string, issueArgs?: string[]): string[] {
+function effectChainTitles(route: UserWallet[], issueFunc?: string, issueArgs?: unknown[]): string[] {
   const titles: string[] = [];
   for (let i = 1; i < route.length; i++) {
     titles.push(`Vote by ${hopName(route[i - 1])} in ${hopName(route[i])}`);
@@ -176,10 +176,10 @@ function effectChainTitles(route: UserWallet[], issueFunc?: string, issueArgs?: 
   let f = issueFunc ?? "";
   let a = issueArgs ?? [];
   while (f === "castVoteOnIssue" && a.length >= 2) {
-    const next = shortenHex(a[0] ?? "", 4, 4);
+    const next = shortenHex(String(variadicArgValue(a[0]) ?? ""), 4, 4);
     titles.push(`Vote by ${prev} in ${next}`);
     prev = next;
-    f = a[1] ?? "";
+    f = String(variadicArgValue(a[1]) ?? "");
     a = a.slice(2);
   }
   titles.push(titles.length > 0 ? "Final effect (if every threshold passes)" : "Effect if executed");
@@ -1472,13 +1472,11 @@ function ProposeIssueForm({
     return out.slice(0, 8);
   }, [groups, isAddr, searchQ]);
 
-  const buildArgs = (): string[] => {
+  const buildArgs = (): unknown[] => {
     if (useAbi && selectedFunc) {
       return abiFuncArgs.map((a) => {
-        const v = (abiArgs[a.name] ?? "").trim();
-        if (isPlainAddressType(a.type)) return strip0x(abiArgAddrs[a.name] || v);
-        if (a.type === "bool") return formatVariadicArg(parseArgText(v));
-        return /address/i.test(a.type) ? strip0x(v) : v;
+        const raw = abiArgs[a.name] ?? "";
+        return typedVariadicArg(a.type, raw, abiArgAddrs[a.name]);
       });
     }
     return manualArgs.map((a) => a.trim()).filter((a) => a.length > 0)

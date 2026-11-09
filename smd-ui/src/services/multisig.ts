@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { keccak256, stringToBytes } from "viem";
 import { api } from "@/lib/api";
-import { formatVariadicArg, parseJsonExact } from "@/lib/args";
+import { formatVariadicArg, parseJsonExact, variadicArgValue } from "@/lib/args";
 import { env } from "@/lib/env";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { useUser } from "@/context/UserContext";
@@ -683,7 +683,7 @@ export function buildWalletCallPayload(
 export function buildCastVotePayload(
   walletAddress: string,
   func: string,
-  args: string[],
+  args: unknown[],
   target?: string
 ): Record<string, unknown> {
   return buildWalletCallPayload(walletAddress, "castVoteOnIssue", {
@@ -705,16 +705,18 @@ export function buildCastVotePayload(
 export function buildNestedCastVotePayload(
   route: string[],
   func: string,
-  args: string[],
+  args: unknown[],
   target?: string
 ): Record<string, unknown> {
   if (route.length === 0) throw new Error("empty vote route");
   const finalWallet = strip0x(route[route.length - 1]);
   let t = strip0x(target || finalWallet);
   let f = func;
-  let a = args.map((x) => String(x));
+  let a = [...args];
   for (let i = route.length - 1; i >= 1; i--) {
-    a = [t, f, ...a];
+    // These become variadic arguments to the next castVoteOnIssue call, so keep
+    // their declared types too. This matters for all-digit wallet addresses.
+    a = [{ type: "address", value: t }, { type: "string", value: f }, ...a];
     f = "castVoteOnIssue";
     t = strip0x(route[i]);
   }
@@ -824,15 +826,15 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
    * of castVoteOnIssue issues (the issueId on this wallet still matches direct votes).
    */
   const castVote = useCallback(
-    async (func: string, args: string[], target?: string) => {
+    async (func: string, args: unknown[], target?: string) => {
       const payload = buildNestedCastVotePayload(voteRoute, func, args, target || walletAddress);
       const result = await submit("FUNCTION", payload);
-      const call = payload.args as { _target: string; _func: string; _args: string[] };
+      const call = payload.args as { _target: string; _func: string; _args: unknown[] };
       queryClient.setQueryData<OpenIssue[]>(["multisig-open-issues", voteRoute[0]], (cached = []) =>
         applyConfirmedVote(cached, result, {
           target: call._target,
           func: call._func,
-          args: call._args,
+          args: call._args.map((arg) => formatVariadicArg(variadicArgValue(arg))),
           voters: userAddress ? [strip0x(userAddress)] : [],
         })
       );

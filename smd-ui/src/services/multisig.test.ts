@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { applyConfirmedVote, buildNestedCastVotePayload, buildOpenIssues, mergeIndexedIssues, MULTISIG_SOURCE, normalizeArgs, votesNeeded } from "./multisig";
-import { formatVariadicArg, parseArgText } from "../lib/args";
+import { formatVariadicArg, parseArgText, typedVariadicArg } from "../lib/args";
 import { pollResults } from "../lib/walletTx";
 import { api } from "../lib/api";
 
@@ -33,7 +33,35 @@ test("a reloaded swap preserves its boolean and exact integer arguments for voti
 
 test("nested voting preserves the same typed swap arguments", () => {
   const payload = buildNestedCastVotePayload([signer, wallet], "swap", normalizeArgs(args), pool) as any;
-  assert.deepEqual(payload.args._args.slice(0, 4), [pool, "swap", wallet, "bool(false)"]);
+  assert.deepEqual(payload.args._args.slice(0, 4), [
+    { type: "address", value: pool },
+    { type: "string", value: "swap" },
+    wallet,
+    "bool(false)",
+  ]);
+});
+
+test("ABI type hints survive direct and nested proposal payloads", () => {
+  const allDigitAddress = "0000000000000000000000000000000000001008";
+  const hinted = [
+    typedVariadicArg("address", allDigitAddress),
+    typedVariadicArg("uint256[]", "[900719925474099312345678901234567890,2]"),
+    typedVariadicArg("Order", '{"recipient":"0000000000000000000000000000000000001008","amount":900719925474099312345678901234567890}'),
+  ];
+
+  const direct = buildNestedCastVotePayload([wallet], "configure", hinted, pool) as any;
+  assert.deepEqual(direct.args._args, [
+    { type: "address", value: allDigitAddress },
+    { type: "uint256[]", value: ["900719925474099312345678901234567890", 2] },
+    { type: "Order", value: { recipient: allDigitAddress, amount: "900719925474099312345678901234567890" } },
+  ]);
+
+  const nested = buildNestedCastVotePayload([signer, wallet], "configure", hinted, pool) as any;
+  assert.deepEqual(nested.args._args.slice(0, 2), [
+    { type: "address", value: pool },
+    { type: "string", value: "configure" },
+  ]);
+  assert.deepEqual(nested.args._args.slice(2), direct.args._args);
 });
 
 test("cleared vote rows and array metadata do not resurrect an executed issue", () => {

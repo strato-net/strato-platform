@@ -54,6 +54,43 @@ export function parseArgText(raw: string): unknown {
   }
 }
 
+export interface TypedVariadicArg {
+  type: string;
+  value: unknown;
+}
+
+/**
+ * Preserve an ABI argument's declared type while it travels through a variadic
+ * parameter. Without the hint, bloc must infer the type from the value and can,
+ * for example, interpret an all-digit address as an integer. The single outer
+ * type also describes every nested value in arrays and structs.
+ */
+export function typedVariadicArg(
+  type: string,
+  raw: string,
+  resolvedAddress?: string
+): TypedVariadicArg {
+  const normalizedType = type.trim();
+  const lowerType = normalizedType.toLowerCase();
+  const isAddress = lowerType === "address" || lowerType === "account";
+  const value = lowerType === "string"
+    ? raw
+    : isAddress
+      ? (resolvedAddress || raw).trim().replace(/^0x/i, "")
+      : parseArgText(raw);
+  return { type: normalizedType, value };
+}
+
+/** Strip a transaction-only type hint for issue-list display and optimistic state. */
+export function variadicArgValue(value: unknown): unknown {
+  if (value && typeof value === "object" && !Array.isArray(value) &&
+      typeof (value as Record<string, unknown>).type === "string" &&
+      Object.hasOwn(value as object, "value")) {
+    return (value as TypedVariadicArg).value;
+  }
+  return value;
+}
+
 /** Keep variadic arguments typed when they pass through a text field or event. */
 export function formatVariadicArg(value: unknown): string {
   if (typeof value === "boolean") return `bool(${value})`;
