@@ -12,7 +12,7 @@
 // Env: NODE_URL, OAUTH_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, GLOBAL_ADMIN_NAME,
 // GLOBAL_ADMIN_PASSWORD (+ OAUTH_TOTP if the account uses it), STRATO_TOKEN (the
 // $STRATO Token address, no 0x), ADMIN_REGISTRY (default: the backend's genesis
-// address 000000000000000000000000000000000000100c), VESTING_MANAGER_NAME (optional).
+// address 000000000000000000000000000000000000100c).
 require('dotenv').config();
 const config = require('./config');
 const path = require('path');
@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { rest, util, importer } = require('./strato'); // the repo's adapter (blockapps-rest is not a declared dependency)
 
-const NAME = process.env.VESTING_MANAGER_NAME || 'VestingPoolManager';
+const NAME = 'VestingPoolManager'; // fixed: it must match the contract declared in the flattened source
 const ARTIFACT = process.env.VESTING_SOURCE_OUT || 'vesting-source.txt';
 const ADDRESS_RE = /^[0-9a-fA-F]{40}$/;
 const clean = (v) => (v || '').trim().replace(/^0x/, '');
