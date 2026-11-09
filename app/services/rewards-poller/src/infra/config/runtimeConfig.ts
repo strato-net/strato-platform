@@ -62,6 +62,7 @@ const config = {
     maxDelay: getNumberEnvOrDefault("RETRY_MAX_DELAY", DEFAULTS.retryMaxDelayMs),
   },
   strato: {
+    tokenAddress: getEnv("STRATO_TOKEN_ADDRESS"),
     gas: {
       limit: DEFAULTS.stratoGasLimit,
       price: DEFAULTS.stratoGasPrice,

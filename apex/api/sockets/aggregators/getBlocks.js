@@ -7,6 +7,7 @@ const db = require('../../models/strato/eth/connection');
 const { hasBlockIndex } = require('../../lib/strato-db-data/block-index');
 const moment = require('moment');
 const bigInt = require('big-integer');
+const winston = require('winston-color');
 
 let difficulty = [];
 let txCount = [];
@@ -16,7 +17,7 @@ let globalBlocks = [];
 
 async function getBlocks() {
   if (!(await hasBlockIndex())) return;
-  BlockDataRef
+  return BlockDataRef
     .findAll(
       {
         attributes: [
@@ -40,7 +41,6 @@ async function getBlocks() {
       }
 
       if(blocks.length > 0 && lastBlockNumber.compare(bigInt(blocks[0].number)) < 0) {
-        lastBlockNumber = bigInt(blocks[0].number);
 
         let blockDifficulty = []
         let blockPropagation = []
@@ -68,7 +68,6 @@ async function getBlocks() {
           
         }
 
-        emitter.emit(ON_SOCKET_PUBLISH_EVENTS, LAST_BLOCK_NUMBER, lastBlockNumber.toString())
       
         difficulty = blockDifficulty
         emitter.emit(ON_SOCKET_PUBLISH_EVENTS, BLOCKS_DIFFICULTY, difficulty)        
@@ -76,12 +75,16 @@ async function getBlocks() {
         propagationDelay = blockPropagation
         emitter.emit(ON_SOCKET_PUBLISH_EVENTS, BLOCKS_PROPAGATION, propagationDelay)
 
-        getBlockTransactionCount(blockIds)
+        return getBlockTransactionCount(blockIds)
           .then(() => {
+            lastBlockNumber = bigInt(blocks[0].number);
+            emitter.emit(ON_SOCKET_PUBLISH_EVENTS, LAST_BLOCK_NUMBER, lastBlockNumber.toString())
             globalBlocks = blocks
           });
       }
       
+    }).catch((err) => {
+      winston.warn(`Could not fetch blocks, retrying next poll: ${err.message}`);
     })
 }
 

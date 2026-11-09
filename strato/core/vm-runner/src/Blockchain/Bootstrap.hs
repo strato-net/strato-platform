@@ -27,7 +27,9 @@ import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
 import Blockchain.Model.SyncState
 import Blockchain.VMContext (ContextM, startFromStateRoot)
-import Blockchain.VMOptions (flags_disableSqlIndexing, flags_disableCirrusIndexing)
+import Blockchain.VMOptions (flags_disableSqlIndexing, flags_disableCirrusIndexing, flags_publishAddressState)
+import Blockchain.EthConf (ethConf)
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Wiring ()
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Blockchain.SolidVM.CodeCollectionDB
@@ -96,7 +98,10 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
           squashMap f = mapM (uncurry f) . Map.toList
 
       accountDiffs <- mapM eventualAccountState addrStateMap
-      unless flags_disableSqlIndexing $
+      -- The genesis accounts' state for SQL: the mirror, or the balances and
+      -- nonces that stand in for it; neither on a node that keeps no account
+      -- state in SQL.
+      when (not flags_disableSqlIndexing && (Conf.sqlDiff (Conf.vmConfig ethConf) || flags_publishAddressState)) $
         void $ IdxKafka.produceIndexEvents [IdxModel.StateDiffEntry $ mkStateDiff accountDiffs]
       unless flags_disableCirrusIndexing $ do
         let addressEvents = Map.findWithDefault S.empty address  events'

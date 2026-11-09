@@ -3,7 +3,7 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
-const { rest, util } = require('blockapps-rest');
+const { rest, util } = require('./strato');
 (async () => {
   const [proxy, impl] = process.argv.slice(2);
   if (!proxy || !impl) throw new Error('usage: node vote-setlogic.js <proxy> <impl>');

@@ -31,6 +31,7 @@ const config = {
     minTransactionsThreshold: BigInt(process.env.MIN_TRANSACTIONS_THRESHOLD || '200'),
   },
   strato: {
+    tokenAddress: process.env.STRATO_TOKEN_ADDRESS,
     gas: {
       limit: 32_100_000_000,
       price: 1,

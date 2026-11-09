@@ -37,7 +37,9 @@ import { useEarnContext } from "@/context/EarnContext";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { EarnApyInfo } from "@/utils/earnUtils";
 import { useToast } from "@/hooks/use-toast";
-import { STAKING_STAKE_FEE, STAKING_ACTION_FEE } from "@/lib/constants";
+import { STAKING_STAKE_CALLS, STAKING_ACTION_CALLS } from "@/lib/constants";
+import { feeShortfall } from "@/utils/feeUtils";
+import { computeMaxTransferable } from "@/utils/transferValidation";
 import { safeParseUnits, truncateAddress, truncateDecimals } from "@/utils/numberUtils";
 import ValidatorStatusBadge, { type ValidatorLifecycle } from "@/components/staking/ValidatorStatusBadge";
 import { CopyableText } from "@/components/staking/AuthorizationInstructions";
@@ -679,7 +681,7 @@ const EarnStaking = () => {
   const { isLoggedIn, isAppAuthenticated, userAddress } = useUser();
   const { isConnected } = useAccount();
   const { resolvedTheme } = useTheme();
-  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
+  const { fetchUsdstBalance, feeQuote } = useTokenContext();
   const { tokenApys } = useEarnContext();
   const { toast } = useToast();
   const [info, setInfo] = useState<StakingInfo | null>(null);
@@ -741,13 +743,9 @@ const EarnStaking = () => {
     if (isLoggedIn) fetchUsdstBalance();
   }, [isLoggedIn, fetchUsdstBalance]);
 
-  // Fees are paid in USDST; vouchers also cover fees (same rule as the metals flow).
-  const feeFunds = useMemo(
-    () => BigInt(usdstBalance || "0") + BigInt(voucherBalance || "0"),
-    [usdstBalance, voucherBalance]
-  );
-  const canCoverStakeFee = feeFunds >= safeParseUnits(STAKING_STAKE_FEE);
-  const canCoverActionFee = feeFunds >= safeParseUnits(STAKING_ACTION_FEE);
+  // Vouchers cover fees first; the rest is charged in the quote's currency.
+  const canCoverStakeFee = !!feeQuote && !feeShortfall(feeQuote, STAKING_STAKE_CALLS);
+  const canCoverActionFee = !!feeQuote && !feeShortfall(feeQuote, STAKING_ACTION_CALLS);
 
   // CATA rewards APY for the staking activity, read from the same earn map the
   // portfolio uses so the two screens always show the same combined figure.
@@ -850,6 +848,11 @@ const EarnStaking = () => {
     : {};
   const claimableFees = useMemo(() => BigInt(info?.claimableFees || "0"), [info?.claimableFees]);
   const totalStakeAmount = useMemo(() => safeParseUnits(stakeAmount, decimals), [decimals, stakeAmount]);
+  // The stake fee comes out of the STRATO being staked: reserve it from the wallet balance.
+  const maxStakeAmount = useMemo(
+    () => BigInt(computeMaxTransferable(info?.walletBalance || "0", info?.stratoTokenAddress, STAKING_STAKE_CALLS, feeQuote, () => {})),
+    [feeQuote, info?.stratoTokenAddress, info?.walletBalance]
+  );
   const apyLabel = isV2 ? "APY (7d)" : "Est. APY";
 
   const filteredValidators = useMemo(() => {
@@ -900,7 +903,7 @@ const EarnStaking = () => {
     canCoverStakeFee &&
     !!actionValidator?.active &&
     totalStakeAmount > 0n &&
-    totalStakeAmount <= walletBalance;
+    totalStakeAmount <= maxStakeAmount;
   const claimReady =
     isLoggedIn &&
     canCoverActionFee &&
@@ -1236,7 +1239,7 @@ const EarnStaking = () => {
 
   const setMaxStakeAmount = () => {
     if (!info) return;
-    setStakeAmount(formatAmountInput(BigInt(info.walletBalance || "0"), decimals));
+    setStakeAmount(formatAmountInput(maxStakeAmount, decimals));
   };
 
   const setMaxUnstakeAmount = () => {
@@ -1350,7 +1353,7 @@ const EarnStaking = () => {
 
         {isLoggedIn && !canCoverStakeFee && (
           <p className="text-xs text-yellow-600">
-            You need USDST or vouchers to cover transaction fees — fund your account before staking.
+            You need {feeQuote?.currency ?? "STRATO"} or vouchers to cover transaction fees — fund your account before staking.
           </p>
         )}
 
