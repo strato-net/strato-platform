@@ -119,7 +119,9 @@ calls `StratoStaking.creditBlockReward(block.proposer, amount)`. Staking pulls t
 `claimOperatorRewards` pay it out. A proposer staking will not credit (unlisted, delisted) is not
 paid and the reward stays in the router. The Phase 1 funded reward schedule was removed from V2
 (an upgraded proxy settles what the schedule had already allocated to each record once, on its
-next touch).
+next touch). With the emission schedule below, `creditBlockReward` is disabled: it reverts
+`SS: block reward disabled` for every proposer, so the flat reward stays in the router and the
+schedule is the only STRATO producers earn.
 
 **The emission schedule** pays from a prefunded reserve inside the staking contract
 (`fundEmissionReserve`, anyone). Once per block `processBlock` pays the previous block's producer

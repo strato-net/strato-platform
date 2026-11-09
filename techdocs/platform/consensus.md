@@ -138,6 +138,7 @@ Every transaction pays a fee through the Decider (`0xDEC1DE`). The Decider runs 
 **Block rewards.** Once per block, before the block's transactions, the node calls `payBlockRewards()` on the current fee implementation. `FeeRouter` pays the proposer a flat 0.01 STRATO out of its own STRATO balance:
 
 - **An unfunded router pays nothing** and never reverts, so an empty reward pool can't stall the chain.
+- **Staking refuses it.** The staking contract's `creditBlockReward` is disabled in favour of the emission schedule below, so the reward stays in the router and no `BlockRewardsPaid` event is emitted.
 - **The `BlockRewardsPaid` event** is included in the block's first receipt, from the fork heights listed on [Networks](networks.md#fork-heights).
 
 **Emission schedule.** Once per block, `processBlock()` also pays the previous block's producer from a reserve prefunded in the staking contract: `E0 × √(S / S0) × (R / R0)` STRATO a year for the interval its block closed (at most an hour), where `S` is the consensus set's stake and `R` the reserve still unreleased. The schedule is committed once, by an admin vote, after the reserve holds `R0`. It can't be paused, and admins can't recover the reserve.

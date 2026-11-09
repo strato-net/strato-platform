@@ -195,7 +195,7 @@ contract Describe_StratoStaking {
     }
 
     function _reward(address validator, uint256 amount) internal {
-        funder.doSuccessfully(address(staking), "creditBlockReward(address,uint256)", validator, amount);
+        funder.doSuccessfully(address(staking), "distributeRewardsTo", _list(address(strato)), _amount(amount), _list(validator));
     }
 
     function _commissionOf(address validator) internal returns (uint256) {
@@ -451,7 +451,6 @@ contract Describe_StratoStaking {
 
         _reward(VALIDATOR_A, 100e18);
         require(staking.allocatedRewardLiability() == 100e18, "credited rewards are a liability");
-        require(staking.totalRewardsCredited() == 100e18, "counted");
         // weight 2000: self-bond 1000 -> 50, delegators 50 gross, 5% commission -> 2.5 + 47.5
         require(_pendingOperatorRewards(VALIDATOR_A) == 525e17, "operator self-bond share + commission");
 
@@ -465,19 +464,13 @@ contract Describe_StratoStaking {
         require(staking.allocatedRewardLiability() == 0, "all paid out");
     }
 
-    function it_only_credits_what_it_is_paid_and_only_to_listed_validators() public {
+    function it_refuses_the_flat_block_reward() public {
+        _bondBoth();
         uint256 held = strato.balanceOf(address(staking));
-        funder.doExpectingFailure(address(staking), "creditBlockReward(address,uint256)", "SS: validator not listed", address(0xdead), 1e18);
-        require(strato.balanceOf(address(staking)) == held, "nothing pulled for an unlisted proposer");
-
-        User broke = new User();
-        bool rejected = false;
-        try broke.do(address(staking), "creditBlockReward(address,uint256)", VALIDATOR_A, 1e18) {
-        } catch {
-            rejected = true;
-        }
-        require(rejected, "a credit must be paid for");
+        funder.doExpectingFailure(address(staking), "creditBlockReward(address,uint256)", "SS: block reward disabled", VALIDATOR_A, 1e18);
+        require(strato.balanceOf(address(staking)) == held, "nothing pulled");
         require(_pendingOperatorRewards(VALIDATOR_A) == 0, "nothing credited");
+        require(staking.totalRewardsCredited() == 0, "nothing counted");
     }
 
     // The retired funded reward schedule is gone: no way in, and a listed validator with no

@@ -12,7 +12,8 @@ import "./IStakingGovernance.sol";
 // Validators earn from what the chain produces, for blocks they propose:
 //   - the emission schedule: a prefunded reserve released at E0 * sqrt(S / S0) * (R / R0)
 //     STRATO a year, paid in processBlock to each block's producer (STRATO)
-//   - the block reward FeeRouter.payBlockRewards pushes through creditBlockReward (STRATO)
+//   - the block reward FeeRouter.payBlockRewards pushes through creditBlockReward (STRATO;
+//     disabled, see creditBlockReward)
 //   - the proposer's share of each transaction fee, attributed in processBlock (USDST)
 // and from discretionary rewards anyone may send in any token (distributeRewards /
 // distributeRewardsTo). STRATO and USDST income is split pro rata between the operator's
@@ -1105,7 +1106,11 @@ contract  StratoStaking is Ownable {
     // actually paid in; anyone else calling it simply adds their own STRATO to a validator's
     // income. The router catches a failure, and a SolidVM catch does not roll back, so every
     // check that can fail runs before the first write.
+    //
+    // Disabled: the emission schedule pays block producers, so the flat reward is refused
+    // and stays with the router. Kept so the router's call resolves and v2 stays detectable.
     function creditBlockReward(address validator, uint256 amount) external onlyInitialized {
+        require(false, "SS: block reward disabled");
         StakingValidator storage v = operators[validator];
         require(v.exists && v.active, "SS: validator not listed");
         require(amount > 0, "SS: amount=0");

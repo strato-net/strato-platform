@@ -35,7 +35,7 @@ export STRATO_TOKEN=2ca3e170e6714282da77815f7864b17f612f5f83
 | Reserve funder (holds the STRATO) | `FUNDER = ______` |
 | Start | `START = ______` unix seconds (`0` = when the vote executes) |
 | USDST fee share to proposers | `0` (gas fees are not validator income); voted in step 3 |
-| FeeRouter flat block reward (0.01 STRATO a block, paid while the router holds STRATO) | keep funding it, or let it run dry |
+| FeeRouter flat block reward (0.01 STRATO a block, paid while the router holds STRATO) | none: this logic refuses it (`creditBlockReward` is disabled), so stop funding the router |
 
 ## 1. Before the swap: record and check
 
