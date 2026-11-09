@@ -21,7 +21,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CopyButton from "@/components/ui/copy";
 import { api, type WalletTxProgressEvent, type WalletTxProgressHandler } from "@/lib/axios";
-import { VESTING_CLAIM_FEE } from "@/lib/constants";
+import { VESTING_CLAIM_CALLS } from "@/lib/constants";
+import NetworkFee, { FeeNotices } from "@/components/NetworkFee";
+import { feeShortfall } from "@/utils/feeUtils";
+import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useToast } from "@/hooks/use-toast";
@@ -170,7 +173,6 @@ const CONTRACT_ERROR_TEXT: Array<[needle: string, text: string]> = [
   ["Cannot claim to 0-address", "No beneficiary address was resolved."],
   ["Vesting not active yet", "This vesting has not started yet."],
   ["not whitelisted", "Claims are not enabled yet: the STRATO token is paused and the vesting pool is not yet allowed to transfer it."],
-  ["Insufficient gas fee coverage", "This account needs 0.01 USDST (or vouchers) to pay the claim fee. Fund it and try again."],
 ];
 
 const claimErrorMessage = (error: unknown): string => {
@@ -419,10 +421,12 @@ const ProgramHero = ({ summary, vestings }: ProgramHeroProps) => {
 interface VestingCardProps {
   vesting: VestingView;
   now: number;
+  /** Whether the signed-in identity can pay the claim's network fee right now. */
+  canPayFee: boolean;
   onClaim: (vesting: VestingView) => void;
 }
 
-const VestingCard = ({ vesting, now, onClaim }: VestingCardProps) => {
+const VestingCard = ({ vesting, now, canPayFee, onClaim }: VestingCardProps) => {
   const badge = STATUS_BADGE[vesting.status] ?? STATUS_BADGE.vesting;
   const amount = toBigInt(vesting.amount);
   const percent = vestedPercent(vesting);
@@ -500,8 +504,8 @@ const VestingCard = ({ vesting, now, onClaim }: VestingCardProps) => {
         )}
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-          <p className="text-xs text-muted-foreground">Each claim costs a {VESTING_CLAIM_FEE} USDST network fee.</p>
-          <Button onClick={() => onClaim(vesting)} disabled={!canClaim(vesting)} className="min-w-[8rem]">
+          <p className="text-xs text-muted-foreground">Network fee per claim: <NetworkFee calls={VESTING_CLAIM_CALLS} /></p>
+          <Button onClick={() => onClaim(vesting)} disabled={!canClaim(vesting) || !canPayFee} className="min-w-[8rem]">
             Claim
           </Button>
         </div>
@@ -514,6 +518,7 @@ interface ClaimDialogProps {
   vesting: VestingView | null;
   recipient: string | null;
   walletSigning: boolean;
+  canPayFee: boolean;
   /** Progress text while the claim is in flight; null when idle. */
   progress: string | null;
   error: string | null;
@@ -523,7 +528,7 @@ interface ClaimDialogProps {
 
 // The one irreversible step gets a confirmation: what is claimed, where it goes, what it costs.
 // The dialog stays open while the transaction is signed and submitted so the progress is visible.
-const ClaimDialog = ({ vesting, recipient, walletSigning, progress, error, onConfirm, onClose }: ClaimDialogProps) => {
+const ClaimDialog = ({ vesting, recipient, walletSigning, canPayFee, progress, error, onConfirm, onClose }: ClaimDialogProps) => {
   const busy = progress !== null;
   return (
     <Dialog open={vesting !== null} onOpenChange={(open) => (!open && !busy ? onClose() : undefined)}>
@@ -544,9 +549,11 @@ const ClaimDialog = ({ vesting, recipient, walletSigning, progress, error, onCon
             <dt className="text-muted-foreground">Grant</dt>
             <dd className="text-right font-mono text-xs leading-5">{truncateHex(vesting.vestingId)}</dd>
             <dt className="text-muted-foreground">Network fee</dt>
-            <dd className="text-right tabular-nums">{VESTING_CLAIM_FEE} USDST</dd>
+            <dd className="text-right tabular-nums"><NetworkFee calls={VESTING_CLAIM_CALLS} /></dd>
           </dl>
         )}
+
+        <FeeNotices calls={VESTING_CLAIM_CALLS} />
 
         {walletSigning && !busy && !error && (
           <p className="text-xs text-muted-foreground">Your wallet will ask you to sign the transaction.</p>
@@ -561,7 +568,7 @@ const ClaimDialog = ({ vesting, recipient, walletSigning, progress, error, onCon
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={onConfirm} disabled={busy || !vesting}>
+          <Button onClick={onConfirm} disabled={busy || !vesting || !canPayFee}>
             {busy ? "Claiming…" : "Claim"}
           </Button>
         </DialogFooter>
@@ -632,6 +639,7 @@ const LoadingState = () => (
 const Vesting = () => {
   const { userAddress, isAppAuthenticated, isExternalWalletConnected } = useUser();
   const { fetchTokens } = useUserTokens();
+  const { feeQuote } = useTokenContext();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { vestings, summary, enabled, isLoading, isError, error, refetch } = useVestings();
@@ -647,6 +655,8 @@ const Vesting = () => {
   // server-side, a wallet-only guest signs the unsigned tx in the wallet. isExternalWalletConnected
   // is UserContext's view of the wagmi isConnected that EarnStaking reads directly.
   const useExternalWalletSigning = isExternalWalletConnected && !isAppAuthenticated;
+  // Same gate as the staking actions: no quote yet, or a shortfall the fallback cannot cover, disables Claim.
+  const canPayFee = !!feeQuote && !feeShortfall(feeQuote, VESTING_CLAIM_CALLS);
 
   // The schedule markers and countdowns move with the clock; one tick a minute is plenty for
   // the markers, and every second only while a countdown is on screen.
@@ -714,7 +724,7 @@ const Vesting = () => {
         <ProgramHero summary={summary ?? sumVestings(vestings)} vestings={vestings} />
         <div className="grid gap-4 lg:grid-cols-2">
           {vestings.map((vesting) => (
-            <VestingCard key={vesting.vestingId} vesting={vesting} now={now} onClaim={openClaim} />
+            <VestingCard key={vesting.vestingId} vesting={vesting} now={now} canPayFee={canPayFee} onClaim={openClaim} />
           ))}
         </div>
       </>
@@ -737,6 +747,7 @@ const Vesting = () => {
         vesting={claimTarget}
         recipient={userAddress}
         walletSigning={useExternalWalletSigning}
+        canPayFee={canPayFee}
         progress={claimProgress}
         error={claimError}
         onConfirm={confirmClaim}

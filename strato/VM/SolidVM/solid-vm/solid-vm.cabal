@@ -124,6 +124,7 @@ test-suite solid-vm-spec
   other-modules:
       BLS12381Spec
       BuiltinsSpec
+      ErrorHandlingSpec
       OptimizerSpec
       SolidVMSpec
       Spec

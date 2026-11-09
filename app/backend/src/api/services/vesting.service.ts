@@ -289,22 +289,12 @@ export const claimVesting = async (
 
   // bytes32 goes in as 64 hex without 0x (the AdminRegistry _issueId precedent),
   // the beneficiary as 40 hex without 0x.
-  let builtTx;
-  try {
-    builtTx = await buildFunctionTx({
-      contractName: extractContractName(constants.VestingPool),
-      contractAddress: vestingPoolAddress,
-      method: "claimVestedTokens",
-      args: { vestingId: id, beneficiary: account, tokensToClaim: MAX_UINT128 },
-    }, account, accessToken);
-  } catch (error: any) {
-    // ensureFeeCoverage throws a bare Error, which the error handler renders as a sanitised
-    // 500; beneficiaries holding only vested STRATO need to be told about the fee.
-    if (error?.message === "Insufficient gas fee coverage") {
-      throw new StratoError("Insufficient gas fee coverage: the claim needs 0.01 USDST (or vouchers) in the claiming account", 400);
-    }
-    throw error;
-  }
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(constants.VestingPool),
+    contractAddress: vestingPoolAddress,
+    method: "claimVestedTokens",
+    args: { vestingId: id, beneficiary: account, tokensToClaim: MAX_UINT128 },
+  }, account, accessToken);
 
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)

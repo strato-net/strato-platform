@@ -204,9 +204,9 @@ export const constants = (() => {
     priceHistorySelectFields,
     DECIMALS: 10n ** 18n,
     GAS_FEE: 0.01,
-    GAS_FEE_WEI: 10n ** 16n, // 0.01 USDST in wei
     USDST: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
     ZERO_ADDRESS: "0000000000000000000000000000000000000000",
+    FEE_ADDRESS: "dead5712a70000000000000000000dead5712a70", // where the fee router sends STRATO fees
     DAY_MS: 24 * 60 * 60 * 1000,
     // Use getter to get current value after init
     get EXECUTED_ISSUES_LOOKBACK_DAYS() { return config.executedIssuesLookbackDays; },

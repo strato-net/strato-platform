@@ -2,6 +2,7 @@
 -- Builtins are ordinary actions. Selection happens while compiling the call.
 module SolidVM.Builtins where
 
+import Text.Format (format)
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import Blockchain.Data.Util (integer2Bytes)
@@ -31,13 +32,13 @@ flatten ds = case reverse ds of
   _ -> ds
 
 bad :: T.Text -> [Dyn] -> M a
-bad name ds = liftIO $ throwIO $ E.InvalidArguments (T.unpack name) (show (map showDyn ds))
+bad name ds = liftIO $ throwIO $ E.InvalidArguments (T.unpack name) (format (map showDyn ds))
 
 missingUserCert :: M a
 missingUserCert = liftIO $ throwIO $ E.UnknownVariable "not found" "getUserCert"
 
 invalidLowLevel :: [Dyn] -> M a
-invalidLowLevel ds = liftIO $ throwIO $ E.TypeError "low-level call needs first argument to be a string" (show (map showDyn ds))
+invalidLowLevel ds = liftIO $ throwIO $ E.TypeError "low-level call needs first argument to be a string" (format (map showDyn ds))
 
 modular :: (Integer -> Integer -> Integer) -> [Dyn] -> M Dyn
 modular op ds = case flatten ds of

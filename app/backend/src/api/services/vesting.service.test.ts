@@ -428,22 +428,3 @@ test("claimVesting builds claimVestedTokens for the caller's own vesting", async
     },
   });
 });
-
-test("claimVesting turns the fee-coverage failure into a readable 400", async (t) => {
-  withPool(t, POOL);
-  t.mock.method(cirrus, "get", async () => ({ status: 200, data: heliumRows }));
-  t.mock.method(txBuilder, "buildFunctionTx", async () => {
-    throw new Error("Insufficient gas fee coverage");
-  });
-  t.mock.method(strato, "post", async () => {
-    assert.fail("strato.post must not be called when the fee check fails");
-  });
-
-  await assert.rejects(claimVesting("token", TEAM_ACCOUNT, TEAM_ID), (error: any) => {
-    assert.ok(error instanceof StratoError);
-    assert.equal(error.status, 400);
-    assert.match(error.message, /Insufficient gas fee coverage/);
-    assert.match(error.message, /0\.01 USDST/);
-    return true;
-  });
-});

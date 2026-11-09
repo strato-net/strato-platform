@@ -104,16 +104,16 @@ Most fork heights are defined in `strato/core/vm-tools/src/Blockchain/Forks.hs`.
 | Change | `helium` | `upquark` | Other networks |
 |---|---|---|---|
 | SolidVM pass-by-reference semantics | 33,918 | Genesis | Genesis |
-| Receipts root in block headers | 250,000 | 1,000,000 | Genesis |
-| Block-reward event included in the block's first receipt | 300,000 | 1,000,000 | Staking activation height |
+| Receipts root in block headers | 250,000 | 2,000,000 | Genesis |
+| Block-reward event included in the block's first receipt | 300,000 | 2,000,000 | Staking activation height |
 | SolidVM Solidity operator precedence | Not scheduled | Not scheduled | Genesis |
 
 Staking activation is set per network in `ethconf.yaml` (`networkConfig`), with these defaults:
 
 | Setting | `helium` | `upquark` | `lithium` | New networks |
 |---|---|---|---|---|
-| `stakingActivationBlock`: stake-weighted proposer selection and votes | 250,000 | 1,000,000 | Not scheduled | Genesis |
-| `stakingEventsFromGovernanceBlock`: stake weights read from `MercataGovernance` | 300,000 | 1,000,000 | Not scheduled | Genesis |
+| `stakingActivationBlock`: stake-weighted proposer selection and votes | 250,000 | 2,000,000 | Not scheduled | Genesis |
+| `stakingEventsFromGovernanceBlock`: stake weights read from `MercataGovernance` | 300,000 | 2,000,000 | Not scheduled | Genesis |
 
 "Not scheduled" is a sentinel height that no real chain reaches.
 

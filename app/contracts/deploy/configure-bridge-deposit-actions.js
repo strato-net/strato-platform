@@ -210,7 +210,7 @@ async function main() {
 
   const config = require("./config");
   const auth = require("./auth");
-  const { rest, util } = require("blockapps-rest");
+  const { rest, util } = require("./strato");
   const token = await auth.getUserToken(
     process.env.GLOBAL_ADMIN_NAME,
     process.env.GLOBAL_ADMIN_PASSWORD,
