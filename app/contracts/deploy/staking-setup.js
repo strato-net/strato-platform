@@ -3,6 +3,7 @@
 //   node staking-setup.js grace <unixSeconds>              end of the self-bond grace period
 //   node staking-setup.js setoperator <validator> <operator>
 //   node staking-setup.js index                            (direct) index helium's existing set
+//   node staking-setup.js bootstrapstakes                  (direct) publish the full set after the staking fork
 //   node staking-setup.js joinsfrom <block>                permissionless admission opens at this block
 //   node staking-setup.js selfbondmin <amountWei>          own bond a new seat needs (10,000 until set)
 //   node staking-setup.js fundreserve <amountWei>          (direct) fund the emission reserve
@@ -79,6 +80,10 @@ const STEPS = {
   // sync every member's weight in the same transaction. Idempotent.
   index:     { direct: true, target: STAKING, name: 'StratoStaking', func: 'indexValidatorSet',
                args: {} },
+  // After the staking fork, publish every governance weight in one transaction.
+  // Pre-fork calls cannot populate V2 headers; retry after activation if needed.
+  bootstrapstakes: { direct: true, target: GOVERNANCE, name: 'MercataGovernance',
+                     func: 'publishValidatorStakeSnapshot', args: {} },
   // From this block anyone may seat an eligible validator, and nobody before it. Can be set
   // or moved only to a future block, and only until it is reached.
   joinsfrom: ([blockNumber]) => {
