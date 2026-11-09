@@ -381,7 +381,7 @@ const ProgramHero = ({ summary, vestings }: ProgramHeroProps) => {
               <p className="mt-1 text-xl font-semibold">{formatAmount(summary.claimed)}</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-white/50">Vesting</p>
+              <p className="text-xs uppercase tracking-wider text-white/50">Unvested</p>
               <p className="mt-1 text-xl font-semibold">{formatAmount(summary.locked)}</p>
             </div>
             {toBigInt(summary.returned) > 0n && (
@@ -408,7 +408,7 @@ const ProgramHero = ({ summary, vestings }: ProgramHeroProps) => {
           <div className="flex flex-col gap-1.5 text-xs text-white/70 lg:flex-row lg:gap-4">
             <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-white" />Claimed</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-white/55" />Claimable</span>
-            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: "rgba(255,255,255,0.16)" }} />Vesting</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: "rgba(255,255,255,0.16)" }} />Unvested</span>
           </div>
         </div>
       </div>
@@ -479,7 +479,7 @@ const VestingCard = ({ vesting, now, onClaim }: VestingCardProps) => {
           <Figure label="Claimable now" value={formatAmount(vesting.claimable)} emphasis={claimable > 0n} />
           <Figure label="Vested" value={formatAmount(vesting.vested)} />
           <Figure label="Claimed" value={formatAmount(vesting.amountClaimed)} />
-          <Figure label="Vesting" value={formatAmount(vesting.locked)} />
+          <Figure label="Unvested" value={formatAmount(vesting.locked)} />
         </div>
 
         {paused && (
@@ -562,7 +562,7 @@ const ClaimDialog = ({ vesting, recipient, walletSigning, progress, error, onCon
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button onClick={onConfirm} disabled={busy || !vesting}>
-            {busy ? "Claiming…" : vesting ? `Claim ${formatStrato(vesting.claimable)}` : "Claim"}
+            {busy ? "Claiming…" : "Claim"}
           </Button>
         </DialogFooter>
       </DialogContent>
