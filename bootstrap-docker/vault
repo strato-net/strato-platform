@@ -46,28 +46,35 @@ INITIAL_OAUTH_ISSUER              - (required) Issuer value for initial OAuth2 p
 INITIAL_OAUTH_JWT_USERNAME_CLAIM  - (default: sub) The claim (payload property) of JWT token to use as unique user id within STRATO Vault."
 }
 
+# Compose interpolates the two required password variables for every command,
+# but only `up` uses their values (checked before it runs); the commands that
+# create no container get placeholders so they work without the credentials.
+function composeWithoutCredentials {
+  postgres_password=${postgres_password:-unused} postgres_vault_password=${postgres_vault_password:-unused} ${docker_compose} "$@"
+}
+
 function wipe {
   echo -e "${Yellow}Removing Vault containers and wiping out volumes${NC}"
-  ${docker_compose} down -vt 0 --remove-orphans
+  composeWithoutCredentials down -vt 0 --remove-orphans
 }
 
 function down {
   echo -e "${Yellow}Removing Vault containers${NC}"
-  ${docker_compose} down --remove-orphans
+  composeWithoutCredentials down --remove-orphans
 }
 
 function stop {
   echo -e "${Yellow}Gently stopping Vault containers${NC}"
-  ${docker_compose} stop
+  composeWithoutCredentials stop
 }
 
 function start {
   echo -e "${Yellow}Starting the earlier stopped Vault containers${NC}"
-  ${docker_compose} start
+  composeWithoutCredentials start
 }
 
 function pullImages {
-  ${docker_compose} pull
+  composeWithoutCredentials pull
 }
 
 function setPassword {
