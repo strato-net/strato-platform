@@ -33,8 +33,9 @@ import { formatBalance } from "@/utils/numberUtils";
 
 const TOKEN_SYMBOL = "STRATO";
 const TOKEN_DECIMALS = 18;
-// Cirrus indexes a claim a few seconds after the block, so an immediate refetch would return the old row.
-const CIRRUS_LAG_MS = 2500;
+// Cirrus indexes a claim a few seconds after the block, so an immediate refetch would return the
+// old row; the data is pulled once after a short wait and once more in case indexing ran late.
+const REFRESH_DELAYS_MS = [2500, 9000];
 // The house hero banner (GuestPromoSection) and its eyebrow (MemberBenefitDialog).
 const HERO_GRADIENT = "linear-gradient(135deg, #0A0F29 0%, #001B70 55%, #102a80 100%)";
 
@@ -646,7 +647,8 @@ const LoadingState = () => (
 const Vesting = () => {
   const { userAddress, isAppAuthenticated, isExternalWalletConnected } = useUser();
   const { fetchTokens } = useUserTokens();
-  const { feeQuote } = useTokenContext();
+  // feeQuote drives the fee gate; fetchUsdstBalance refreshes the fee-currency balance box.
+  const { feeQuote, fetchUsdstBalance } = useTokenContext();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { vestings, summary, enabled, isLoading, isError, error, refetch } = useVestings();
@@ -709,10 +711,13 @@ const Vesting = () => {
       await api.post("/vesting/claim", { vestingId }, txConfig);
       toast({ title: "Claimed", description: `${claimedLabel} sent to your address`, variant: "success" });
       closeClaim();
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: vestingsQueryKey(userAddress) });
-        fetchTokens();
-      }, CIRRUS_LAG_MS);
+      for (const delay of REFRESH_DELAYS_MS) {
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: vestingsQueryKey(userAddress) });
+          fetchTokens();
+          fetchUsdstBalance();
+        }, delay);
+      }
     } catch (failure: unknown) {
       const message = claimErrorMessage(failure);
       setClaimProgress(null);
