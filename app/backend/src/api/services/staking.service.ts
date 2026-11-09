@@ -46,6 +46,10 @@ export interface StratoOperatorInfo {
   isValidator: boolean;
   eligible: boolean;
   isWaiter: boolean;
+  // The stake eligibility holds this record to, and whether delegated stake counts toward
+  // it (v2: only for a seat from before the self-bond rule, until its grace ends). "0" on v1.
+  requiredStake: string;
+  requiredStakeCountsDelegations: boolean;
   jailedUntil: string;
   exitReadyTime: string;
   blocksProposed: string;
@@ -754,6 +758,8 @@ type V2ValidatorRecord = {
   jailedUntil: bigint;
   exitReadyTime: bigint;
   status: StratoOperatorStatus;
+  requiredStake: bigint;
+  requiredStakeCountsDelegations: boolean;
   eligible: boolean;
 };
 
@@ -783,9 +789,10 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
       // _meetsMinStake: a candidate, or a seat taken under the self-bond rule, needs
       // selfBondMinimum of self-bond; a seat from before the rule keeps minStake, on combined
       // stake until the self-bond grace ends and on self-bond after.
-      const meetsMinStake = !isValidator || parseBoolLike(selfBondRuleSeatMap.get(validator))
-        ? selfBond >= selfBondMinimum
-        : selfBondRuleActive ? selfBond >= minStake : totalStake >= minStake;
+      const selfBondSeat = !isValidator || parseBoolLike(selfBondRuleSeatMap.get(validator));
+      const requiredStake = selfBondSeat ? selfBondMinimum : minStake;
+      const requiredStakeCountsDelegations = !selfBondSeat && !selfBondRuleActive;
+      const meetsMinStake = (requiredStakeCountsDelegations ? totalStake : selfBond) >= requiredStake;
 
       return {
         validator,
@@ -800,6 +807,8 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
         jailedUntil,
         exitReadyTime,
         status: !active ? 3 : isValidator ? 2 : 1,
+        requiredStake,
+        requiredStakeCountsDelegations,
         eligible: active && meetsMinStake && now >= jailedUntil && (exitReadyTime === 0n || now < exitReadyTime),
       };
     });
@@ -1265,6 +1274,8 @@ const getV1StakingInfo = async (
       isValidator: active,
       eligible: active,
       isWaiter: false,
+      requiredStake: "0",
+      requiredStakeCountsDelegations: false,
       jailedUntil: "0",
       exitReadyTime: "0",
       blocksProposed: "0",
@@ -1477,6 +1488,8 @@ const getV2StakingInfo = async (
       isValidator: record.isValidator,
       eligible: record.eligible,
       isWaiter: record.eligible && !record.isValidator,
+      requiredStake: record.requiredStake.toString(),
+      requiredStakeCountsDelegations: record.requiredStakeCountsDelegations,
       jailedUntil: record.jailedUntil.toString(),
       exitReadyTime: record.exitReadyTime.toString(),
       blocksProposed: uintString(blocksProposedMap.get(validator)),
