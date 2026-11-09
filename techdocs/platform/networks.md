@@ -114,7 +114,6 @@ Staking activation is set per network in `ethconf.yaml` (`networkConfig`), with 
 |---|---|---|---|---|
 | `stakingActivationBlock`: stake-weighted proposer selection and votes | 250,000 | 2,000,000 | Not scheduled | Genesis |
 | `stakingEventsFromGovernanceBlock`: stake weights read from `MercataGovernance` | 300,000 | 2,000,000 | Not scheduled | Genesis |
-| `completeStakeVectorBlock`: stake weights count only once every validator has one | 1,500,000 | 2,000,000 | Not scheduled | Genesis |
 
 "Not scheduled" is a sentinel height that no real chain reaches.
 

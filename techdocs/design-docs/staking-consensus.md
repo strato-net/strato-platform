@@ -67,20 +67,16 @@ block, so under normal operation the round rarely changes.
 From the same activation height, PREPARE / COMMIT and ROUNDCHANGE tallies in the event loop and the
 commit-seal check in `replayHistoricBlock` use `3 · voteStake > 2 · totalStake` (ROUNDCHANGE
 piggyback at `> 1/3`) over the weights in force for the block (`voteWeights`, `hasSupermajority` in
-`StateMachine.hs`). The weights are in force only once **every** validator has one (`stakeWeights`
-in `ProposerSelection.hs`); until then every validator weighs 1 (headcount), as before activation,
-and the leader is picked uniformly. Weights are published one validator at a time, so weighing a
-partly published set would make the first validator published the sole proposer and a
-one-validator quorum. Blocks committed before a network's `completeStakeVectorBlock` used the
-earlier rule (validators without stake weighed 0 as soon as anyone had some) and are replayed under
-it: helium's headers 253538–253540 carry partial weight vectors, so helium switches at block
-1,500,000, and every other network uses the current rule from activation. The VM's
-`block.prevIntendedProposer` follows the same height.
+`StateMachine.hs`): validators without stake weigh 0 and count on neither side; while **nobody**
+has stake every validator weighs 1 (headcount), as before activation.
 
-**Activation precondition:** every current validator must have its stake weight published
-(registered + `tryActivate`d, `setGovernance(…, true)`) *before* the activation height. Until every
-weight is published the set votes by headcount; under the earlier rule, one staked validator among
-unstaked peers was a one-validator quorum. Consequences of weighted
+**Activation precondition:** every current validator must have its stake weight stored in
+governance (registered + `tryActivate`d, `setGovernance(…, true)`) *before* the activation height.
+Headers before that height carry no stakes, so those weights reach consensus only when
+`MercataGovernance.publishValidatorStakeSnapshot()` re-emits all of them after it. With weights
+live, one staked validator among unstaked peers is a one-validator quorum, so none may be
+published alone first: staking's governance link is off (`setGovernance(…, false)`) from before
+the activation height until the snapshot is in a header. Consequences of weighted
 votes (Key Decision 16): an operator holding more than 1/3 of the stake can stall the chain and
 cannot be jailed (nothing commits without its seal) — the tools are the inbound cap
 `maxOperatorStakeBps` (3300) and `ValidatorRegistry.emergencyKick` by the `emergencyKicker` key

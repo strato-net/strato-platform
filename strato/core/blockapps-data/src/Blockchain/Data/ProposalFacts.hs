@@ -39,25 +39,22 @@ instance NFData ProposalFacts
 noProposalFacts :: ProposalFacts
 noProposalFacts = ProposalFacts (Address 0) (Address 0) 0
 
--- | @proposalFactsFromHeader chainId completeFrom parentRound header@.
--- Version-3 headers only; older headers yield 'noProposalFacts' by definition
--- so that every node derives the same values regardless of when it upgraded.
--- The intended proposer is the one selected for the round the height started
--- at, i.e. the parent's round (rounds persist across heights and only advance
--- on timeouts), so it differs from the actual proposer exactly when a round
--- change happened at this height. @completeFrom@ is the network's first block
--- for the complete-vector weight rule ('completeStakesAt'), so the selection
--- matches the one consensus made for this header.
-proposalFactsFromHeader :: Integer -> Maybe Integer -> Integer -> BlockHeader -> ProposalFacts
-proposalFactsFromHeader chainId completeFrom parentRound h
+-- | @proposalFactsFromHeader chainId parentRound header@. Version-3 headers
+-- only; older headers yield 'noProposalFacts' by definition so that every node
+-- derives the same values regardless of when it upgraded. The intended
+-- proposer is the one selected for the round the height started at, i.e. the
+-- parent's round (rounds persist across heights and only advance on timeouts),
+-- so it differs from the actual proposer exactly when a round change happened
+-- at this height.
+proposalFactsFromHeader :: Integer -> Integer -> BlockHeader -> ProposalFacts
+proposalFactsFromHeader chainId parentRound h
   | blockHeaderVersion h /= 3 = noProposalFacts
   | otherwise =
       ProposalFacts
         { pfProposer = fromMaybe (Address 0) (verifyProposerSeal h =<< getProposerSeal h),
           pfIntendedProposer =
             let Validator intended =
-                  selectProposer (completeStakesAt completeFrom (number h)) chainId (number h)
-                    (S.fromList $ getBlockValidators h) (M.fromList $ getBlockStakes h) parentRound parentRound
+                  selectProposer chainId (number h) (S.fromList $ getBlockValidators h) (M.fromList $ getBlockStakes h) parentRound parentRound
              in intended,
           pfRound = getBlockRound h
         }

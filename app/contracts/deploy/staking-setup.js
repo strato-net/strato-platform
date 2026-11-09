@@ -4,6 +4,7 @@
 //   node staking-setup.js setoperator <validator> <operator>
 //   node staking-setup.js index                            (direct) index helium's existing set
 //   node staking-setup.js bootstrapstakes                  (direct) publish the full set after the staking fork
+//   node staking-setup.js govsync <on|off>                 staking's governance link (off across the staking fork)
 //   node staking-setup.js joinsfrom <block>                permissionless admission opens at this block
 //   node staking-setup.js selfbondmin <amountWei>          own bond a new seat needs (10,000 until set)
 //   node staking-setup.js fundreserve <amountWei>          (direct) fund the emission reserve
@@ -84,6 +85,13 @@ const STEPS = {
   // Pre-fork calls cannot populate V2 headers; retry after activation if needed.
   bootstrapstakes: { direct: true, target: GOVERNANCE, name: 'MercataGovernance',
                      func: 'publishValidatorStakeSnapshot', args: {} },
+  // Staking's governance link. Off from before the staking fork until bootstrapstakes is in a
+  // header, so no weight is published alone first; turning it on resyncs the set.
+  govsync: ([state]) => {
+    if (state !== 'on' && state !== 'off') throw new Error('usage: govsync <on|off>');
+    return { target: STAKING, func: 'setGovernance',
+             args: [{ type: 'address', value: GOVERNANCE }, state === 'on'] };
+  },
   // From this block anyone may seat an eligible validator, and nobody before it. Can be set
   // or moved only to a future block, and only until it is reached.
   joinsfrom: ([blockNumber]) => {

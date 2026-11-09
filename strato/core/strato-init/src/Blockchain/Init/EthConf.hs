@@ -279,11 +279,6 @@ genEthConf nodeRole = do
             if flags_stakingActivationBlock < 0
               then defaultStakingEventsFromGovernanceBlock flags_network
               else Just flags_stakingActivationBlock
-        -- Re-derived from flags_network for the same reason as
-        -- stakingContractAddress: 'def' would write upquark's value into a
-        -- helium node's ethconf.yaml, and that node would then replay helium's
-        -- history under the wrong weight rule.
-        , completeStakeVectorBlock = defaultCompleteStakeVectorBlock flags_network
         }
     }
 

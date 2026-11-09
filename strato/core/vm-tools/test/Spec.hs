@@ -129,7 +129,7 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
 
   it "reads legacy block summaries with no proposal facts" $
     forAll genBlockHeaderV3 $ \h -> do
-      let bsum = blockHeaderToBSum 1 Nothing noProposalFacts h 3
+      let bsum = blockHeaderToBSum 1 noProposalFacts h 3
           legacy = case rlpEncode bsum of
             RLPArray fields -> RLPArray (take 6 fields)
             x -> x
@@ -171,23 +171,6 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
     -- and the switch really is exclusive: watching staking ignores governance
     getStakeDeltasFromEvents (Just stakingAddr) evs `shouldBe` M.fromList [(v2, 4)]
 
-  it "carries a full post-fork snapshot from the V2 boundary into the next V3 header" $ do
-    let govAddr = Address 0x100
-        published v st = stakeEvent govAddr "ValidatorStakeUpdated"
-          [("validator", SAddress v False), ("stake", SInteger st)]
-        parent = BlockHeaderV2 zeroHash "" "" "" "" 1999999
-          (posixSecondsToUTCTime 0) "" [v1, v2] [] [] Nothing []
-        snapshot = getStakeDeltasFromEvents (Just govAddr)
-          [published (Address 0x1) (10 :: Integer), published (Address 0x2) (20 :: Integer)]
-        first = buildNextBlockHeader parent zeroHash "" [] [] ""
-          (posixSecondsToUTCTime 1) mempty snapshot
-        next = buildNextBlockHeader first zeroHash "" [] [] ""
-          (posixSecondsToUTCTime 2) mempty M.empty
-    snd (nextValidatorsAndStakes parent) `shouldBe` M.empty
-    getBlockStakes first `shouldBe` []
-    getBlockStakeUpdates first `shouldBe` [(v1, 10), (v2, 20)]
-    getBlockStakes next `shouldBe` [(v1, 10), (v2, 20)]
-
   it "merges stake updates across transactions, later transaction wins" $ do
     let er st = (solidvmErrorResults undefined) { erException = Nothing, erStakeUpdates = st }
         trr st = TxRunResult undefined (Right $ er st) 0 M.empty M.empty []
@@ -220,11 +203,11 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
       getStakeDeltasFromResults before `shouldBe` M.fromList [(v2, 0)]
 
   it "derives no proposal facts from pre-v3 headers" $
-    forAll arbitrary $ \h -> proposalFactsFromHeader 1 Nothing 0 (h :: BlockHeader) `shouldBe` noProposalFacts
+    forAll arbitrary $ \h -> proposalFactsFromHeader 1 0 (h :: BlockHeader) `shouldBe` noProposalFacts
 
   it "derives proposal facts from v3 headers" $
     forAll genBlockHeaderV3 $ \h -> do
-      let facts = proposalFactsFromHeader 1 Nothing (getBlockRound h) h
+      let facts = proposalFactsFromHeader 1 (getBlockRound h) h
       pfProposer facts `shouldBe` Address 0 -- unsealed
       pfRound facts `shouldBe` getBlockRound h
       Validator (pfIntendedProposer facts) `shouldSatisfy` (`elem` getBlockValidators h)

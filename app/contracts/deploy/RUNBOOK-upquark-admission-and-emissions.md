@@ -1,8 +1,9 @@
 # Upquark: permissionless admission and the emission schedule
 
 Swaps the `StratoStaking` logic behind the Upquark staking proxy (`f30a022c…3988`) for this
-branch's and turns on two things. `ValidatorRegistry`, `MercataGovernance`, `FeeRouter` and the
-node are unchanged. Rehearse every step on helium first (same commands without the exports).
+branch's and turns on two things. `MercataGovernance` gains `publishValidatorStakeSnapshot()`
+(step 5); `ValidatorRegistry`, `FeeRouter` and the node are unchanged. Rehearse every step on
+helium first (same commands without the exports).
 
 1. **Staking by right from an agreed block.** From `joinsOpenFromBlock` anyone may seat
    (`tryActivate` / `reconcileSet`) a listed validator whose operator holds
@@ -28,7 +29,7 @@ export STRATO_TOKEN=2ca3e170e6714282da77815f7864b17f612f5f83
 
 | Item | Value |
 |---|---|
-| Agreed opening block | `JOINS_FROM = ______` (after block 2,000,000 and after every validator has a published stake weight) |
+| Agreed opening block | `JOINS_FROM = ______` (after step 5's bootstrap) |
 | Self-bond minimum for new seats | 10,000 STRATO by default; to change it, `node deploy/staking-setup.js selfbondmin <amountWei>` (vote) |
 | Rate at the reference point | `E0 = ______` wei a year (proposed: 500,000 STRATO = `500000000000000000000000`) |
 | Reference stake | `S0 = ______` wei (proposed: 5,000,000 STRATO = `5000000000000000000000000`) |
@@ -46,9 +47,11 @@ curl -s "$NODE_URL/bloc/v2.2/contracts/StratoStaking/$STAKING_PROXY/state" > upq
 
 Stop unless all of these hold (this branch assumes staking V2 is live on Upquark):
 
-- `governanceSyncEnabled` is `true` and `activeValidators` holds exactly governance's validators,
-  each with `isValidator` true. If the index is short, `node deploy/staking-setup.js index` with
-  the set in `VALIDATORS` first: an unindexed seat is left out of `S`.
+- `governanceSyncEnabled` is `true` (or already off for step 5) and `activeValidators` holds
+  exactly governance's validators, each with `isValidator` true. If the index is short, run
+  `node deploy/staking-setup.js index` first, with the link on: it indexes governance's whole set
+  and reverts if governance lists a validator staking has not seated. An unindexed seat is left
+  out of `S`.
 - Record `activeValidators`: these are the incumbents. Record `minStake` and `selfBondGraceUntil`
   as well, and do not change them for this rollout: they are now the incumbents' rule only.
 - Record `proposerFeeBps`, `maxConsecutiveMisses`, `jailCooldown` (step 3 re-submits them).
@@ -68,6 +71,10 @@ Verify against `upquark-staking-before.json`:
   `selfBondMinimum`, `emissionReserve` and `emissionStartTime` read 0 (a `selfBondMinimum` of 0
   means 10,000).
 - The chain keeps committing and `lastProcessedBlock` keeps advancing.
+
+Then swap the governance logic at `0x100`, which adds `publishValidatorStakeSnapshot()`:
+`node deploy/gen-governance-source.js` once, then `node deploy/deploy-governance.js` once per
+admin. Verify that the validator list, every `validatorStake` and `stakingContract` are unchanged.
 
 ## 3. Fee share (vote)
 
@@ -94,12 +101,41 @@ fee goes to the fee collector.
    Validators and delegators claim with the existing claim calls.
 4. **Top-ups**: `fundreserve` again at any time, by anyone. `R` rises; `R0` does not change.
 
-## 5. Open admission (vote)
+## 5. Bootstrap the stake weights (around block 2,000,000)
+
+Headers before block 2,000,000 carry no stakes, so the weights governance holds reach consensus
+only through `publishValidatorStakeSnapshot()`, which re-emits all of them in one transaction;
+until it lands every validator votes once. A weight published alone before it would make that
+validator the first-round proposer at every height and a one-validator quorum. So staking's
+governance link stays off from before the fork until the snapshot is in a header: while it is
+off, staking makes no governance calls, and the snapshot is the only way a weight gets published.
+
+1. **Dry run, before block 2,000,000** (direct, anyone), once every validator is seated with a
+   weight and governance runs this branch's logic: `node deploy/staking-setup.js bootstrapstakes`.
+   Its events are dropped before the fork, but it succeeds only if every governance validator has
+   a stored weight above 0 (`Validator has no stake weight` otherwise). Fix a missing weight now,
+   while the link is on.
+2. **Link off, before block 2,000,000** (vote): `node deploy/staking-setup.js govsync off`.
+   Verify `governanceSyncEnabled` reads `false`: a vote that opened a second issue instead of
+   executing leaves the link on. Until the link is back on, governance keeps the weights and set
+   it has (a validator that falls below its minimum keeps its seat until the resync), and no
+   validator may be voted into governance: it would have no stored weight, and the snapshot
+   would revert.
+3. **Snapshot, after block 2,000,000** (direct, anyone): `node deploy/staking-setup.js
+   bootstrapstakes`. For the block B that holds it, check
+   `curl -s "$NODE_URL/strato-api/eth/v1.2/block?number=<B>"`: B's `stakeUpdates` lists every
+   validator, and B+1's `currentStakes` lists every validator with a positive weight.
+4. **Link on** (vote): `node deploy/staking-setup.js govsync on`, the second vote only once the
+   snapshot checks out. It resyncs the set and publishes only the weights that moved while the
+   link was off, so before the snapshot it would publish those alone. Verify
+   `governanceSyncEnabled` reads `true`.
+
+## 6. Open admission (vote)
 
 `node deploy/staking-setup.js joinsfrom $JOINS_FROM` votes `setJoinsOpenFromBlock`. It can be
 moved, by another vote, only to a later block and only until the block is reached. Pick a block
-after block 2,000,000 and after every validator has a published stake weight: until then the
-nodes vote by headcount, and a seat bought at the minimum would count as much as any other.
+after step 5 has finished: until the snapshot is in a header the nodes vote by headcount, and a
+seat bought at the minimum would count as much as any other.
 
 If the admins want a self-bond minimum other than 10,000 STRATO, they vote
 `node deploy/staking-setup.js selfbondmin <amountWei>` (`setSelfBondMinimum`) before the opening
@@ -110,7 +146,7 @@ Verify: `joinsOpenFromBlock == JOINS_FROM`; before it `tryActivate` fails with
 shows as eligible on the staking page and seats itself (`ValidatorSynced`, then governance
 `ValidatorAdded`); one with less self-bond, however much is delegated, stays ineligible.
 
-## 6. Rollback
+## 7. Rollback
 
 Swap back to the previous logic with the same `upgrade.js` vote only before step 4: from the
 first funding on, the previous logic would count the reserve as untracked STRATO that

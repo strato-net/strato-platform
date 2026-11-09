@@ -180,7 +180,7 @@ spec = do
   describe "checkTimestampMonotonic" $ do
     let t = posixSecondsToUTCTime
         hdr n ts = BlockHeaderV2 zeroHash "" "" "" "" n ts "" [] [] [] Nothing []
-        parent = blockHeaderToBSum 1 Nothing noProposalFacts (hdr 10 (t 1000)) 0
+        parent = blockHeaderToBSum 1 noProposalFacts (hdr 10 (t 1000)) 0
         child ts = Block (hdr 11 ts) [] []
 
     it "accepts a child stamped at or after its parent" $ do
