@@ -329,7 +329,7 @@ chmod -R a+rwX "$staging/payload/jlog"      # usable by any uid after restore
 pg_dump -Fc --no-owner --no-privileges eth    > "$staging/payload/postgres-dumps/eth.dump"
 pg_dump -Fc --no-owner --no-privileges cirrus > "$staging/payload/postgres-dumps/cirrus.dump"
 # SNAPSHOT.json, then:
-tar -C "$staging" -cf - . | zstd -T0 -o "$OUTPUT"
+tar -C "$staging" -cf - . | zstd -T0 -9 --long=27 -o "$OUTPUT"
 ```
 
 The implementation stages into a working directory exactly like this; the interface requirement is the artifact layout, not these exact commands.

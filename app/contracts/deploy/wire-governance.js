@@ -3,7 +3,7 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
-const { rest, util } = require('blockapps-rest');
+const { rest, util } = require('./strato');
 const REGISTRY = '000000000000000000000000000000000000100c';
 const GOVERNANCE = '0000000000000000000000000000000000000100';
 const STAKING_PROXY = 'd6726e06c3c71a3bad80b5eb6925707a31729b81';

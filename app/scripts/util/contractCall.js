@@ -64,13 +64,7 @@ const contractCall = async (
       const errorData = error.response.data;
       
       if (errorData && typeof errorData === 'string') {
-        // Look for Solidity error messages in the response
-        const solidityMatch = errorData.match(/SString "([^"]+)"/);
-        
-        if (solidityMatch) {
-          console.log("Solidity error in contract call:", solidityMatch[1]);
-          throw new Error(solidityMatch[1]); // Throw just the original blockchain error
-        }
+        throw new Error(errorData);
       }
     }
     throw error; // Re-throw other errors

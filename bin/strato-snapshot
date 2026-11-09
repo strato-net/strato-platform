@@ -143,12 +143,19 @@ warn() {
 # early and names the override instead.
 require_free_space() {
   local dir="$1" needed_kb="$2" what="$3" avail_kb
+  local hint="${4:-}"
+  [[ -n "$hint" ]] || hint="Set STRATO_SNAPSHOT_WORKDIR to a directory on a volume with space (a cell's data drive, not /tmp)."
   avail_kb="$(df -Pk "$dir" 2>/dev/null | awk 'NR==2 {print $4}')"
   [[ -n "$avail_kb" ]] || return 0  # unknown filesystem: do not block the run
   if (( avail_kb < needed_kb )); then
     die "not enough room in $dir for $what: $((needed_kb / 1048576)) GiB needed, $((avail_kb / 1048576)) GiB free.
-Set STRATO_SNAPSHOT_WORKDIR to a directory on a volume with space (a cell's data drive, not /tmp)."
+$hint"
   fi
+}
+
+# The mount point holding a path, to tell whether two paths share a volume.
+mount_point() {
+  df -P "$1" 2>/dev/null | awk 'NR==2 {print $NF}'
 }
 
 # After die() and warn(), both of which it uses: the work directory may be
@@ -652,8 +659,14 @@ make_archive() {
 
   case "$output" in
     *.tar.zst|*.tzst)
+      # -9 --long=27 (128 MiB match window) is ~16% smaller than the default
+      # level on a real payload: the state LevelDB, ~80% of the bytes, shares a
+      # lot across its .ldb files, and the long window lets zstd find it. It
+      # costs ~2x CPU at create time only; a 128 MiB window is within what
+      # zstd -d accepts without flags, so restore and extract_archive are
+      # unchanged.
       if command -v zstd >/dev/null 2>&1; then
-        (cd "$staging" && tar_without_appledouble -cf - .) | zstd -T0 -q -o "$output"
+        (cd "$staging" && tar_without_appledouble -cf - .) | zstd -T0 -q -9 --long=27 -o "$output"
       else
         (cd "$staging" && tar_without_appledouble --zstd -cpf "$output" .)
       fi
@@ -670,24 +683,26 @@ make_archive() {
   esac
 }
 
+# Optional third argument: a file of tar exclude patterns (tar -X).
 extract_archive() {
   local archive="$1"
   local dest="$2"
+  local exclude_file="${3:-/dev/null}"
   mkdir -p "$dest"
 
   case "$archive" in
     *.tar.zst|*.tzst)
       if command -v zstd >/dev/null 2>&1; then
-        zstd -dc "$archive" | tar -xpf - -C "$dest"
+        zstd -dc "$archive" | tar -X "$exclude_file" -xpf - -C "$dest"
       else
-        tar --zstd -xpf "$archive" -C "$dest"
+        tar -X "$exclude_file" --zstd -xpf "$archive" -C "$dest"
       fi
       ;;
     *.tar.gz|*.tgz)
-      tar -xzpf "$archive" -C "$dest"
+      tar -X "$exclude_file" -xzpf "$archive" -C "$dest"
       ;;
     *.tar)
-      tar -xpf "$archive" -C "$dest"
+      tar -X "$exclude_file" -xpf "$archive" -C "$dest"
       ;;
     *)
       die "unsupported archive extension: $archive"
@@ -2038,6 +2053,45 @@ restore_payload() {
   [[ -d "$extracted/payload/jlog" ]] \
     || die "payload has no jlog/ streaming state; this looks like a pre-$SNAPSHOT_VERSION (kafka) snapshot, which this build cannot restore"
 
+  # Everything that can refuse the restore is checked before step 5 replaces
+  # the chain state, so a refusal leaves the node as it was.
+  local load_kb=0 state_kb=0 dump_kb factor db pg_dir="$node_dir/postgres"
+  if [[ -d "$extracted/payload/postgres-dumps" && "$SNAPSHOT_SKIP_DATABASES" != "true" ]]; then
+    if [[ -n "$SNAPSHOT_PG_HOST" ]]; then
+      [[ "$SNAPSHOT_REPLACE_DATABASES" == "true" ]] \
+        || die "loading dumps into $SNAPSHOT_PG_HOST replaces eth and cirrus for every node on that cluster; pass --replace-databases to confirm, or --skip-databases to keep them"
+    else
+      [[ -f "$node_dir/secrets/postgres_password" ]] \
+        || die "target node has no secrets/postgres_password; run strato-setup first"
+      # The rebuilt databases are far larger than their dumps, mostly indexes
+      # (measured: eth ~5x its dump, cirrus ~15x).
+      for db in $(selected_databases); do
+        dump_kb="$(du -k "$extracted/payload/postgres-dumps/$db.dump" 2>/dev/null | awk '{print $1}')"
+        factor=6
+        [[ "$db" == "cirrus" ]] && factor=16
+        load_kb=$((load_kb + ${dump_kb:-0} * factor))
+      done
+    fi
+  fi
+  # Step 5 moves the extracted state into the node: a rename on one
+  # filesystem, but a full copy when the work area is on another volume.
+  if [[ "$(mount_point "$extracted")" != "$(mount_point "$node_dir")" ]]; then
+    state_kb="$(du -sk "$extracted/payload/ethereumH" "$extracted/payload/redis" "$extracted/payload/jlog" 2>/dev/null | awk '{s += $1} END {print s + 0}')"
+  fi
+  [[ -d "$pg_dir" ]] || pg_dir="$node_dir"
+  local hint="Free space on that volume and run the restore again (a cached archive is reused, not downloaded again)."
+  local node_kb="$state_kb" node_what=""
+  (( state_kb > 0 )) && node_what="the chain state copied from the work area"
+  if [[ "$(mount_point "$pg_dir")" == "$(mount_point "$node_dir")" ]]; then
+    node_kb=$((node_kb + load_kb))
+    if (( load_kb > 0 )); then
+      node_what="${node_what:+$node_what and }the databases rebuilt from the dumps"
+    fi
+  else
+    require_free_space "$pg_dir" "$load_kb" "the databases rebuilt from the dumps" "$hint"
+  fi
+  require_free_space "$node_dir" "$node_kb" "$node_what" "$hint"
+
   info "[5/7] Replacing the node's chain state with the snapshot's"
   info "      Removing the old .ethereumH state (ethconf.yaml is kept), redis/, jlog/ and any pre-jlog kafka/"
   remove_restored_state "$node_dir"
@@ -2071,13 +2125,9 @@ restore_payload() {
   elif [[ "$SNAPSHOT_SKIP_DATABASES" == "true" ]]; then
     info "[6/7] --skip-databases: leaving the databases alone."
   elif [[ -n "$SNAPSHOT_PG_HOST" ]]; then
-    [[ "$SNAPSHOT_REPLACE_DATABASES" == "true" ]] \
-      || die "loading dumps into $SNAPSHOT_PG_HOST replaces eth and cirrus for every node on that cluster; pass --replace-databases to confirm, or --skip-databases to keep them"
     info "[6/7] Loading the public databases (eth, cirrus) into the shared cluster at $SNAPSHOT_PG_HOST"
     load_databases_external "$extracted/payload/postgres-dumps"
   else
-    [[ -f "$node_dir/secrets/postgres_password" ]] \
-      || die "target node has no secrets/postgres_password; run strato-setup first"
     info "[6/7] Loading the public databases ($(selected_databases | paste -sd, -)) into the node's own postgres cluster"
     info "      The node keeps its own postgres password and its local-only oauth database; only the databases named above are replaced"
     local node_password
@@ -2315,15 +2365,26 @@ cmd_restore() {
 
   extracted="$(mktemp_dir)"
   manifest="$extracted/SNAPSHOT.json"
-  # The payload expands well past the archive: a 15 GB helium archive carries a
-  # 17 GB .ethereumH alone. Three times the archive is the working rule.
+  # The payload expands to 1.5-1.8 times the archive (zstd -9 --long=27). The
+  # databases rebuilt from the dumps are checked separately before they load.
   local archive_kb
   archive_kb="$(du -k "$archive" 2>/dev/null | awk '{print $1}')"
-  [[ -n "$archive_kb" ]] && require_free_space "$extracted" "$((archive_kb * 3))" "the extracted snapshot"
+  [[ -n "$archive_kb" ]] && require_free_space "$extracted" "$((archive_kb * 2))" "the extracted snapshot"
+  # Only the dumps that will be loaded are extracted: a validator (--databases
+  # eth) never loads cirrus.dump.
+  local exclude_file selected db
+  exclude_file="$(mktemp_dir)/exclude"
+  selected=" $(selected_databases | tr '\n' ' ') "
+  for db in "${SNAPSHOT_PG_DATABASES[@]}"; do
+    if [[ "$SNAPSHOT_SKIP_DATABASES" == "true" || "$selected" != *" $db "* ]]; then
+      printf 'payload/postgres-dumps/%s.dump\n' "$db"
+    fi
+  done > "$exclude_file"
   t_step="$(date +%s)"
   info "[3/7] Extracting the $(human_bytes "$(file_size_bytes "$archive")") archive into $extracted"
   info "      (decompression is fast; this step is bound by writing the uncompressed state to disk, mostly the LevelDB state trie)"
-  extract_archive "$archive" "$extracted"
+  [[ -s "$exclude_file" ]] && info "      Leaving out the dumps that are not loaded: $(sed 's|.*/||' "$exclude_file" | paste -sd, -)"
+  extract_archive "$archive" "$extracted" "$exclude_file"
   [[ -f "$manifest" ]] || die "SNAPSHOT.json missing from archive"
   info "      Extracted $(human_bytes "$(dir_size_bytes "$extracted")") in $(find "$extracted" -type f | wc -l | tr -d ' ') files ($(elapsed_since "$t_step"))"
 

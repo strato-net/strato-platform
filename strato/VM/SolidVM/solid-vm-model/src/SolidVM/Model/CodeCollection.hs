@@ -159,7 +159,7 @@ getParents cc c =
   let toErr x p =
         maybe
           ( Left
-              ( InternalError "contract parent does not exist" (labelToString p),
+              ( MissingType "contract parent does not exist" (labelToString p),
                 x
               )
           )
@@ -173,7 +173,7 @@ getParentsAndUsings cc c = do
   let toErr x p =
         maybe
           ( Left
-              ( InternalError "contract using does not exist" (labelToString p),
+              ( MissingType "contract using does not exist" (labelToString p),
                 x
               )
           )
@@ -216,8 +216,8 @@ checkInheritance cc = () <$ foldM (\memo c -> snd <$> count S.empty memo (True, 
           Right (n, M.insert key n memo')
       where
         key = (withUsings, c ^. contractName)
-        err msg = Left (InternalError msg (labelToString $ c ^. contractName), c ^. contractContext)
-        find msg p = maybe (Left (InternalError msg (labelToString p), c ^. contractContext)) Right . M.lookup p $ cc ^. contracts
+        err msg = Left (TypeError msg (labelToString $ c ^. contractName), c ^. contractContext)
+        find msg p = maybe (Left (MissingType msg (labelToString p), c ^. contractContext)) Right . M.lookup p $ cc ^. contracts
 
 getInheritedContracts :: CodeCollection -> SolidString -> SolidEither [Contract]
 getInheritedContracts cc cName = map fst . filter snd <$> traverse go (M.elems $ cc ^. contracts)

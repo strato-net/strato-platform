@@ -28,6 +28,7 @@ module SolidVM.Blockchain
   )
 where
 
+import Control.Exception (throw)
 import Blockchain.DB.ModifyStateDB (pay)
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader (BlockHeader)
@@ -164,13 +165,13 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
             _gasMetadata = ""
           }
 
-  fmap (fmap $ either solidvmErrorResults id) . runTransaction (Just code) env' gasInfo' $ do
+  fmap (fmap $ either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
 
     opts <- parseOptionsForCurrentBlock
     (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 initCode
     addNewCodeCollection hsh cc
     let eArgExps = traverse (Fast.parseArg initialParserState "") argsStrings
-        !argExps = either (parseError "create arguments") id eArgExps
+        !argExps = either ((throw . ParseError "create arguments") . show) id eArgExps
     argVals <- argsToVals argExps
 
     create' sender' newAddress hsh cc (textToLabel contractName) argVals
@@ -178,7 +179,7 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
 createContractValues :: SolidString -> Maybe (SM Value) -> SM ValList -> SM Address
 createContractValues contractName' mSalt getArgs = do
   ro <- readOnly <$> getCurrentCallInfo
-  when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName'
+  when ro $ throw (InvalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ format contractName')
   creator <- getCurrentAddress
   (hsh, cc) <- getCurrentCodeCollection
   (newAddress, argVals) <- case mSalt of
@@ -192,12 +193,12 @@ createContractValues contractName' mSalt getArgs = do
       address <- getNewAddressWithSalt creator salt hsh (SString (labelToString contractName') : values)
       pure (address, values)
   execResults <- create' creator newAddress hsh cc contractName' argVals
-  pure $ fromMaybe (internalError "a call to create did not create an address" execResults) $ erNewContractAddress execResults
+  pure $ fromMaybe (throw (InternalError ("a call to create did not create an address: " ++ (maybe "no VM exception" (either displayException displayException) $ erException execResults)))) $ erNewContractAddress execResults
 
 create' :: Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> SM ExecResults
 create' creator newAddress ch cc contractName' valList = do
 
-  let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
+  let !contract' = fromMaybe (throw (MissingType "create'/contract" (labelToString contractName'))) (cc ^. CC.contracts . at contractName')
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
   -- $logInfoS "create': abstracts1' " . T.pack $ show $ abstracts'
 
@@ -314,12 +315,12 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
             _gasMetadata = ""
           }
 
-  fmap (fmap $ either solidvmErrorResults id) . runTransaction Nothing env' gasInfo' $ do
+  fmap (fmap $ either solidvmErrorResults id) . runSM Nothing env' gasInfo' $ do
     --requireOriginCert origin'
     let -- maybeSrcLength = M.lookup "srcLength" =<< metadata
         -- !srcLength = maybe 0 (\sl -> read (T.unpack sl) :: Int) maybeSrcLength
         srcLength = 0
-        !argExps = either (parseError "call arguments") id $
+        !argExps = either ((throw . ParseError "call arguments") . show) id $
           traverse (Fast.parseArg (initialParserStateWithLength srcLength) "") argsStrings
     argVals <- argsToVals argExps
 
@@ -428,7 +429,7 @@ call' from to' fnCalltype functionName valList = do
       (Just theFunction, CC.DefaultCall) -> do
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
         when (isExternal && isForbidden) $
-          unknownFunction "logFunctionCall" (functionName, "asdf2" :: String) -- contract) -- ^. CC.contractName)
+          throw (UnknownFunction "logFunctionCall" (labelToString functionName)) -- contract) -- ^. CC.contractName)
         resolvedValList <- resolveArgs shouldPushSender theFunction valList
         pure . bool id (pushSender from) shouldPushSender $
           runTheCall storageAddress codeAddress contract functionName' hsh cc theFunction resolvedValList currentReadOnly False
@@ -436,7 +437,7 @@ call' from to' fnCalltype functionName valList = do
       (Just theFunction, _) -> do
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
         when (isExternal && isForbidden) $
-          unknownFunction "logFunctionCall" (functionName, "asdf" :: String) -- contract ^. CC.contractName)
+          throw (UnknownFunction "logFunctionCall" (labelToString functionName)) -- contract ^. CC.contractName)
         validateFunctionArguments cc contract theFunction valList >>= \case
           Just (theFunction', valList') -> do
             resolvedValList <- resolveArgs shouldPushSender theFunction' valList'
@@ -451,7 +452,7 @@ call' from to' fnCalltype functionName valList = do
               resolvedValList <- resolveArgs shouldPushSender fallbackFunc valList
               pure . bool id (pushSender from) shouldPushSender $
                 runTheCall storageAddress codeAddress contract functionName' hsh cc fallbackFunc resolvedValList currentReadOnly False
-            _ -> unknownFunction "logFunctionCall" (functionName, valList) -- contract ^. CC.contractName)
+            _ -> throw (UnknownFunction "logFunctionCall" (format (functionName, map renderValueShallow valList))) -- contract ^. CC.contractName)
       -- Maybe the function is actually a getter
       _ -> case M.lookup functionName $ contract ^. CC.storageDefs of
         Just CC.VariableDecl {..} | not (isExternal && _varVisibility /= Just CC.Public) -> do
@@ -506,7 +507,7 @@ call' from to' fnCalltype functionName valList = do
             resolvedValList <- resolveArgs shouldPushSender fallbackFunc valList
             pure . bool id (pushSender from) shouldPushSender $
               runTheCall storageAddress codeAddress contract functionName hsh cc fallbackFunc resolvedValList currentReadOnly False
-          _ -> unknownFunction "logFunctionCall" (functionName, "asdf5" :: String) -- ^. CC.contractName)
+          _ -> throw (UnknownFunction "logFunctionCall" (labelToString functionName)) -- ^. CC.contractName)
 
   when (fnCalltype == CC.DelegateCall) $
     addDelegatecall storageAddress hsh (labelToText $ contract ^. CC.contractName)
@@ -544,7 +545,7 @@ logFunctionCall args address contract functionName f = do
 runTheConstructors :: Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> SM ()
 runTheConstructors from to hsh cc contractName' argVals' = do
   let !contract' =
-        fromMaybe (missingType "contract inherits from nonexistent parent" contractName') $
+        fromMaybe (throw (MissingType "contract inherits from nonexistent parent" (labelToString contractName'))) $
           cc ^. CC.contracts . at contractName'
       argPairs = fromMaybe [] . fmap CC._funcArgs $ contract' ^. CC.constructor
       argTypeNames =
@@ -563,7 +564,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
     Nothing -> pure argVals'
     Just theConstructor -> validateFunctionArguments cc contract' theConstructor argVals' >>= \case
       Just (_, vals) -> pure vals
-      Nothing -> invalidArguments "constructor arguments don't match" (contractName', argVals')
+      Nothing -> throw (InvalidArguments "constructor arguments don't match" (format (contractName', map renderValueShallow argVals')))
 
   nativeArgs <- liftIO $ newIORef $ maybe [] (const argVals) (contract' ^. CC.constructor)
   let runStage stage = do
@@ -577,10 +578,10 @@ runTheConstructors from to hsh cc contractName' argVals' = do
               case updated of
                 SVariadic parameters | length parameters == length argTypeNames ->
                   liftIO $ writeIORef nativeArgs parameters
-                _ -> internalError "constructor parameter snapshot" stage
+                _ -> throw (InternalError ("constructor parameter snapshot: " ++ labelToString stage))
               Just <$> getVar valueVar
-            _ -> internalError "constructor stage result" stage
-          _ -> internalError "constructor stage result" stage
+            _ -> throw (InternalError ("constructor stage result: " ++ labelToString stage))
+          _ -> throw (InternalError ("constructor stage result: " ++ labelToString stage))
 
   void . withCallInfo to to contract' "constructor" hsh cc M.empty False False . pushSender from $ do
 
@@ -604,7 +605,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
           result <- runStage parent
           vals <- case result of
             Just (SVariadic vs) -> pure vs
-            _ -> internalError "native parent constructor arguments" parent
+            _ -> throw (InternalError ("native parent constructor arguments: " ++ labelToString parent))
           runTheConstructors from to hsh cc parent vals
         Nothing -> do
           -- Only call parent constructor with empty args if it has no parameters
@@ -631,21 +632,6 @@ getPrevBlockFacts = do
       maybe noProposalFacts bSumProposalFacts
         <$> A.lookup (A.Proxy @BlockSummary) (BlockHeader.parentHash $ Env.blockHeader env')
 
--- The shared transaction-state runner treats unknown exceptions as receipts.
--- Engine and host failures must escape it and stop block execution.
-runTransaction :: Maybe Code -> Env.Environment -> GasInfo -> SM a -> ContextM (Env.Environment, Either SolidException a)
-runTransaction code environment gas action = do
-  fatal <- newIORef Nothing
-  result <- runSM code environment gas $ action `catch` (\(e :: SomeException) -> do
-    case fromException e :: Maybe SolidException of
-      Just InternalError{} -> writeIORef fatal (Just e)
-      Just TODO{} -> writeIORef fatal (Just e)
-      Just _ -> pure ()
-      Nothing -> writeIORef fatal (Just e)
-    throwIO e)
-  readIORef fatal >>= mapM_ throwIO
-  pure result
-
 argsToVals :: CC.ArgList -> SM ValList
 argsToVals = traverse literalValue
   where
@@ -662,10 +648,10 @@ argsToVals = traverse literalValue
         CC.StringLiteral _ s -> pure $ SString s
         CC.AddressLiteral _ a -> pure $ SAddress a False
         CC.BoolLiteral _ b -> pure $ SBool b
-        CC.HexaLiteral _ s -> pure $ SBytes $ either (parseError "hexadecimal argument") id (B16.decode (DT.encodeUtf8 s))
+        CC.HexaLiteral _ s -> pure $ SBytes $ either ((throw . ParseError "hexadecimal argument")) id (B16.decode (DT.encodeUtf8 s))
         CC.ArrayExpression _ xs -> SArray . V.fromList . map Constant <$> traverse literalValue xs
         CC.ObjectLiteral _ fields -> SStruct "" . M.map Constant <$> traverse literalValue fields
-        _ -> invalidArguments "transaction argument must be a literal" (unparseExpression expression)
+        _ -> throw (InvalidArguments "transaction argument must be a literal" (unparseExpression expression))
 
 data CallValidation = NeedsValidation | AlreadyValidated
 
@@ -686,7 +672,7 @@ runTheCallValidated validation address codeAddress contract name hsh cc original
     AlreadyValidated -> pure (original, args)
     NeedsValidation -> validateFunctionArguments cc contract original args >>= \case
       Just pair -> pure pair
-      Nothing -> typeError "function arguments do not match" (labelToString name)
+      Nothing -> throw (TypeError "function arguments do not match" (labelToString name))
   fun <- Runtime.compiledFunction hsh cc contract name selected
   decrementGas 5
   result <- withCallInfo address codeAddress contract name hsh cc M.empty ro ff $
@@ -698,13 +684,13 @@ runAction cc contract name annotation = Runtime.runAction (decrementGas . Gas) c
   where
     host = Runtime.Host createCode selfdestruct getPrevBlockFacts derive
     emit eventContractName event values = do
-      eventContract <- maybe (missingType "event contract" eventContractName) pure $ M.lookup eventContractName (cc ^. CC.contracts)
+      eventContract <- maybe (throw (MissingType "event contract" (labelToString eventContractName))) pure $ M.lookup eventContractName (cc ^. CC.contracts)
       void $ emitEventValuesForContract eventContract (CC.EmitStatement event [] annotation) event values
 
 createCode :: Maybe Value -> T.Text -> T.Text -> ValList -> SM Address
 createCode salt name source args = do
   ro <- readOnly <$> getCurrentCallInfo
-  when ro $ invalidWrite "contract creation during read-only access" (T.unpack name)
+  when ro $ throw (InvalidWrite "contract creation during read-only access" (T.unpack name))
   creator <- getCurrentAddress
   isRunningTests <- Env.runningTests <$> getEnv
   opts <- parseOptionsForCurrentBlock
@@ -714,12 +700,12 @@ createCode salt name source args = do
     Nothing -> getNewAddress creator
     Just s -> getNewAddressWithSalt creator s hsh (SString (T.unpack name) : args)
   result <- create' creator address hsh cc name args
-  pure $ fromMaybe (internalError "create did not produce an address" result) (erNewContractAddress result)
+  pure $ fromMaybe (throw (InternalError ("create did not produce an address: " ++ (maybe "no VM exception" (either displayException displayException) $ erException result)))) (erNewContractAddress result)
 
 selfdestruct :: Address -> SM Bool
 selfdestruct target = do
   ro <- readOnly <$> getCurrentCallInfo
-  when ro $ invalidWrite "selfdestruct during read-only access" (show target)
+  when ro $ throw (InvalidWrite "selfdestruct during read-only access" (format target))
   address <- getCurrentAddress
   balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) address
   A.adjustWithDefault_ (A.Proxy @AddressState) address $ \addressState ->

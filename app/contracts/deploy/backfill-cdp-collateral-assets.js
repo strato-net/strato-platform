@@ -20,7 +20,7 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
-const { rest, util } = require('blockapps-rest');
+const { rest, util } = require('./strato');
 
 function printUsage() {
   console.error('Usage: node backfill-cdp-collateral-assets.js --engine-address <address> --assets <addr1,addr2,...>');

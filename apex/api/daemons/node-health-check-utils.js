@@ -39,8 +39,6 @@ const neededJobs = process.env.HEALTH_CHECK_JOBS
 
 const maxStalledIntervals = config.healthCheck.maxStalledIntervals;
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
 async function singleCheck() {
   try {
     await queryHealthStatus();
@@ -76,6 +74,18 @@ function queryHealthStatus() {
   }).timeout(config.healthCheck.requestTimeout - 80);
 }
 
+// health_check is a gauge each process sets to 1 once at startup, so a
+// process that is gone shows only through its scrape failing. Prometheus
+// marks the series stale on a failed scrape, but not series it only replayed
+// from its WAL: after a restart (a host reboot that brought the containers
+// back without convoke) the last pre-restart samples stay visible for the
+// query lookback (5 minutes), and an instant query's timestamp is the
+// evaluation time, not the sample time, so the age check below cannot tell.
+// up is written on every scrape attempt, so keeping only the series whose
+// target is up now is right within one scrape interval. Matched on job alone:
+// metric_relabel_configs rewrite instance on scraped series, not on up.
+const healthCheckQuery = "health_check and on(job) (up == 1)";
+
 function getPrometheusMetrics() {
   if (!process.env["PROMETHEUS_HOST"]) {
     throw Error(
@@ -84,7 +94,8 @@ function getPrometheusMetrics() {
   }
   return axios({
     method: "GET",
-    url: `http://${process.env["PROMETHEUS_HOST"]}/prometheus/api/v1/query?query=health_check`,
+    url: `http://${process.env["PROMETHEUS_HOST"]}/prometheus/api/v1/query`,
+    params: { query: healthCheckQuery },
     maxRedirects: 0,
     timeout: config.healthCheck.requestTimeout - 100,
   }).then((res) => res.data);
@@ -308,7 +319,7 @@ async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics) {
   let currentTime = Date.now();
   let failedChecks = [];
 
-  Object.keys(prometheusHealthMetrics).forEach(async (keyProcess) => {
+  for (const keyProcess of Object.keys(prometheusHealthMetrics)) {
     if (!prometheusHealthMetrics[keyProcess]) {
       failedChecks.push(`${keyProcess} is unavailable`);
     }
@@ -318,7 +329,7 @@ async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics) {
       HealthStatus: prometheusHealthMetrics[keyProcess],
       timestamp: currentTime,
     });
-  });
+  }
 
   if (!process.env.vaultUrl) {
     winston.error('Vault URL not configured!');
