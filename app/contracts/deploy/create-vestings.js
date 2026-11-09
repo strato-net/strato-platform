@@ -11,9 +11,16 @@
 // GLOBAL_ADMIN_PASSWORD (+ OAUTH_TOTP). The schedule file carries the addresses.
 // VOTE_WAIT_MINUTES (default 60): how long `create` waits for the other admins.
 //
-// Admin flow: admin 1 runs `create`, which casts one vote per batch (an AdminRegistry
-// issue each) and prints the issue ids; admin 2 confirms them in the admin UI; the
-// script polls the pool's vestings table and reports each batch as it executes.
+// Admin flow: admin 1 runs `create`, which casts one vote per batch by calling
+// AdminRegistry.castVoteOnIssue(manager, "addVestings", typedArgs) directly (the
+// registry no longer accepts votes routed through the target's onlyOwner fallback;
+// calling manager.addVestings directly fails with "Only an admin or a whitelisted
+// account can call castVoteOnIssue"). Arguments go in the registry's variadic slot
+// with explicit Solidity type hints, exactly as the app backend does
+// (app/backend/src/api/services/user.service.ts hintedArg), so the issue id matches
+// what the admin UI computes. Admin 2 confirms the printed issues in the admin UI;
+// the script polls the pool's vestings table and reports each batch as it executes.
+// ADMIN_REGISTRY (env) or schedule.adminRegistry overrides the genesis address.
 //
 // schedule.json:
 // {
@@ -40,11 +47,13 @@ const config = require('./config');
 const fs = require('fs');
 const crypto = require('crypto');
 const axios = require('axios');
-const { rest, util } = require('blockapps-rest');
+// blockapps-rest is only used for auth here; transactions are posted directly so that
+// uint values in the registry's variadic slot can travel as bare JSON numbers.
 const { getIssueId } = require('./util');
 
 const ADDRESS_RE = /^[0-9a-fA-F]{40}$/;
 const MAX_UINT128 = (1n << 128n) - 1n;
+const DEFAULT_REGISTRY = '000000000000000000000000000000000000100c';
 const clean = (v) => String(v || '').trim().replace(/^0x/, '').toLowerCase();
 const iso = (s) => new Date(s * 1000).toISOString();
 
@@ -91,6 +100,8 @@ function loadSchedule(file) {
     if (!ADDRESS_RE.test(s[k])) throw new Error(`schedule.${k} must be a 20-byte hex address`);
   }
   s.decimals = Number.isInteger(s.decimals) ? s.decimals : 18;
+  s.adminRegistry = clean(s.adminRegistry || process.env.ADMIN_REGISTRY || DEFAULT_REGISTRY);
+  if (!ADDRESS_RE.test(s.adminRegistry)) throw new Error('adminRegistry must be a 20-byte hex address');
   if (s.tge === undefined) throw new Error('schedule.tge is required (ISO 8601 with timezone, or unix seconds)');
   s.tgeSeconds = parseTge(s.tge);
   if (s.secondsPerMonth !== undefined && (!Number.isInteger(s.secondsPerMonth) || s.secondsPerMonth <= 0)) throw new Error('secondsPerMonth must be a positive integer');
@@ -126,8 +137,19 @@ function loadSchedule(file) {
   return s;
 }
 
-const argsFor = (c, b) => ({ accounts: b.accounts, amounts: b.amounts, managed: c.managed, durationWeeks: c.durationWeeks, startDate: c.startDate });
-const argsHash = (c, b) => crypto.createHash('sha256').update(JSON.stringify(argsFor(c, b))).digest('hex');
+// addVestings(address[] accounts, uint128[] amounts, bool managed, uint16 durationWeeks, uint64 startDate)
+// as typed variadic arguments for AdminRegistry.castVoteOnIssue. Integers are BigInt and
+// are serialised as bare JSON numbers (see toBody), addresses carry 0x, like the backend.
+const typedArgsFor = (c, b) => ([
+  { type: 'address[]', value: b.accounts.map((a) => '0x' + a) },
+  { type: 'uint128[]', value: b.amounts.map((x) => BigInt(x)) },
+  { type: 'bool', value: c.managed },
+  { type: 'uint16', value: BigInt(c.durationWeeks) },
+  { type: 'uint64', value: BigInt(c.startDate) },
+]);
+// JSON with BigInt rendered as bare numbers (JSON.stringify cannot do it natively).
+const toBody = (obj) => JSON.stringify(obj, (_, v) => (typeof v === 'bigint' ? `__BIG__${v.toString()}__` : v)).replace(/"__BIG__(-?\d+)__"/g, '$1');
+const argsHash = (c, b) => crypto.createHash('sha256').update(toBody(typedArgsFor(c, b))).digest('hex');
 const batchLabel = (c, b) => c.batches.length > 1 ? `${c.name} batch ${b.index + 1}/${c.batches.length}` : c.name;
 const fmtTokens = (atoms, d) => (Number(atoms) / 10 ** d).toLocaleString('en-US');
 
@@ -140,7 +162,7 @@ function printPlan(s) {
     console.log(`\n== ${c.name}: ${c.accounts.length} entries in ${c.batches.length} transaction(s) of up to ${s.batchSize}; managed=${c.managed}; start ${iso(c.startDate)} (cliff ${c.cliffMonths} months); end ${iso(c.startDate + c.durationWeeks * 604800)}${c.durationWeeks === 0 ? ' (fully vested at start)' : ''}; total ${fmtTokens(c.total, s.decimals)} tokens`);
     for (const b of c.batches) {
       txs++;
-      console.log(`[${txs}] ${s.manager}.addVestings(accounts[${b.accounts.length}], amounts[${b.accounts.length}], managed=${c.managed}, durationWeeks=${c.durationWeeks}, startDate=${c.startDate})   # ${batchLabel(c, b)}`);
+      console.log(`[${txs}] AdminRegistry(${s.adminRegistry}).castVoteOnIssue(${s.manager}, "addVestings", [accounts[${b.accounts.length}], amounts[${b.accounts.length}], managed=${c.managed}, durationWeeks=${c.durationWeeks}, startDate=${c.startDate}])   # ${batchLabel(c, b)}`);
       b.accounts.forEach((a, j) => console.log(`    ${a}  ${b.amounts[j]} atoms  (${fmtTokens(b.amounts[j], s.decimals)} tokens)`));
       console.log(`    batch total ${b.total} atoms (${fmtTokens(b.total, s.decimals)} tokens)   args sha256 ${argsHash(c, b)}`);
     }
@@ -224,16 +246,50 @@ async function status(tokenObj, s, quiet) {
   return report;
 }
 
-async function callAndWait(tokenObj, callArgs) {
-  const resp = await rest.call(tokenObj, callArgs, { config, isAsync: true, cacheNonce: true });
-  const hashes = (Array.isArray(resp) ? resp : [resp]).map((r) => r && r.hash).filter(Boolean);
-  if (!hashes.length) throw new Error('no tx hash: ' + JSON.stringify(resp));
-  const results = await util.until(
-    (rs) => Array.isArray(rs) && rs.length > 0 && rs.every((r) => r && r.status && r.status !== 'Pending'),
-    (opts) => rest.getBlocResults(tokenObj, hashes, opts),
-    { config, isAsync: true }, 300000);
-  const final = Array.isArray(results) ? results[0] : results;
-  return { status: final && final.status, msg: (final && final.txResult && final.txResult.message) || '', hash: hashes[0], issueId: getIssueId(final) };
+// Submit one FUNCTION transaction through the node's parallel endpoint (what the app
+// backend does), with BigInt values as bare JSON numbers, and wait for its result.
+async function postFunctionTx(tokenObj, payload, gasLimit) {
+  const base = config.nodes[0].url;
+  const body = toBody({ txs: [{ type: 'FUNCTION', payload }], txParams: { gasLimit, gasPrice: config.gasPrice } });
+  const headers = { Authorization: `Bearer ${tokenObj.token}`, 'Content-Type': 'application/json', Accept: 'application/json' };
+  const { data } = await axios.post(`${base}/strato/v2.3/transaction/parallel?resolve=true`, body, { headers, timeout: 120000 });
+  let results = Array.isArray(data) ? data : [data];
+  const hashes = results.map((r) => r && r.hash).filter(Boolean);
+  if (!hashes.length) throw new Error('no tx hash: ' + JSON.stringify(data).slice(0, 300));
+  const deadline = Date.now() + 300000;
+  while (results.some((r) => !r || !r.status || r.status === 'Pending') && Date.now() < deadline) {
+    await sleep(3000);
+    const res = await axios.post(`${base}/bloc/v2.2/transactions/results`, JSON.stringify(hashes), { headers, timeout: 60000 });
+    results = Array.isArray(res.data) ? res.data : [res.data];
+  }
+  const final = results[0];
+  return { status: final && final.status, msg: (final && final.txResult && final.txResult.message) || '', hash: hashes[0] };
+}
+
+// The issue id the registry recorded for a vote transaction (IssueCreated for the first
+// vote, IssueVoted for later ones). Cirrus indexes a few seconds after the receipt.
+async function issueIdForTx(tokenObj, hash) {
+  const deadline = Date.now() + 20000;
+  while (Date.now() < deadline) {
+    for (const ev of ['IssueCreated', 'IssueVoted']) {
+      const rows = await cirrus(tokenObj, `BlockApps-AdminRegistry-${ev}`, { transaction_hash: `eq.${hash}`, select: 'issueId', limit: '1' });
+      if (rows.length && rows[0].issueId) return rows[0].issueId;
+    }
+    await sleep(3000);
+  }
+  return null;
+}
+
+async function castVote(tokenObj, s, c, b) {
+  const payload = {
+    contractName: 'AdminRegistry',
+    contractAddress: s.adminRegistry,
+    method: 'castVoteOnIssue',
+    args: { _target: s.manager, _func: 'addVestings', _args: typedArgsFor(c, b) },
+  };
+  const r = await postFunctionTx(tokenObj, payload, 8000000);
+  r.issueId = r.status === 'Success' ? await issueIdForTx(tokenObj, r.hash) : null;
+  return r;
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -301,9 +357,10 @@ async function waitForExecution(tokenObj, s, submitted) {
         const label = batchLabel(c, b);
         if (done === b.accounts.length) { console.log(`${label}: already scheduled (${done}/${done}), skipping`); continue; }
         if (done > 0) { console.error(`${label}: ${done}/${b.accounts.length} entries already exist; re-submitting would collide on their ids ("Vesting id already used"). Fix the file (or the batch boundaries) first.`); process.exit(1); }
-        console.log(`${label}: ${user} voting ${s.manager}.addVestings for ${b.accounts.length} entries, ${fmtTokens(b.total, s.decimals)} tokens, args sha256 ${argsHash(c, b)}`);
-        const r = await callAndWait(tokenObj, { contract: { name: 'VestingPoolManager', address: s.manager }, method: 'addVestings', args: argsFor(c, b), txParams: { gasPrice: config.gasPrice, gasLimit: 8000000 } });
-        console.log(`  vote tx ${r.status}${r.msg ? ' | ' + r.msg.slice(0, 120) : ''} (${r.hash})${r.issueId ? `  issue ${r.issueId}` : ''}`);
+        console.log(`${label}: ${user} voting castVoteOnIssue(${s.manager}, addVestings) for ${b.accounts.length} entries, ${fmtTokens(b.total, s.decimals)} tokens, args sha256 ${argsHash(c, b)}`);
+        const r = await castVote(tokenObj, s, c, b);
+        console.log(`  vote tx ${r.status}${r.msg ? ' | ' + r.msg.slice(0, 160) : ''} (${r.hash})${r.issueId ? `  issue ${r.issueId}` : ''}`);
+        if (r.status !== 'Success') { console.error(`  the vote itself failed; nothing was recorded for ${label}. Fix the cause and re-run.`); process.exit(1); }
         submitted.push({ c, b, label, issueId: r.issueId, hash: r.hash });
       }
     }
