@@ -63,6 +63,9 @@ export function useVestings() {
     enabled,
     staleTime: 30_000,
     refetchOnWindowFocus: true,
+    // Accrual, claimability and admin pause/cancel change while the page sits open; staleTime alone
+    // never refetches, so poll while any subscriber (page or nav) is mounted and the tab is visible.
+    refetchInterval: 60_000,
     retry: 1,
   });
 

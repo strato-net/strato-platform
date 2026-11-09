@@ -36,6 +36,8 @@ const TOKEN_DECIMALS = 18;
 // Cirrus indexes a claim a few seconds after the block, so an immediate refetch would return the
 // old row; the data is pulled once after a short wait and once more in case indexing ran late.
 const REFRESH_DELAYS_MS = [2500, 9000];
+// A claim the confirmation poll gave up on (status "Pending") usually lands soon after; pull again later.
+const PENDING_REFRESH_DELAYS_MS = [15000, 45000];
 // The house hero banner (GuestPromoSection) and its eyebrow (MemberBenefitDialog).
 const HERO_GRADIENT = "linear-gradient(135deg, #0A0F29 0%, #001B70 55%, #102a80 100%)";
 
@@ -708,10 +710,20 @@ const Vesting = () => {
     const txConfig: ClaimTxConfig | undefined = useExternalWalletSigning ? { walletAuth: true, walletTxProgress } : undefined;
 
     try {
-      await api.post("/vesting/claim", { vestingId }, txConfig);
-      toast({ title: "Claimed", description: `${claimedLabel} sent to your address`, variant: "success" });
+      const { data } = await api.post<{ status?: string; hash?: string }>("/vesting/claim", { vestingId }, txConfig);
+      // Both signing paths resolve with "Pending" when their confirmation poll times out before the
+      // block lands; that is a submitted claim, not a confirmed one.
+      const pending = data?.status === "Pending";
+      if (pending) {
+        toast({
+          title: "Claim submitted",
+          description: `Waiting for the block to confirm${data?.hash ? ` (tx ${truncateHex(data.hash)})` : ""}. Balances update once it lands.`,
+        });
+      } else {
+        toast({ title: "Claimed", description: `${claimedLabel} sent to your address`, variant: "success" });
+      }
       closeClaim();
-      for (const delay of REFRESH_DELAYS_MS) {
+      for (const delay of pending ? [...REFRESH_DELAYS_MS, ...PENDING_REFRESH_DELAYS_MS] : REFRESH_DELAYS_MS) {
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: vestingsQueryKey(userAddress) });
           fetchTokens();

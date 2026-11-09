@@ -213,15 +213,20 @@ const emptySummary = (): VestingSummary =>
 
 const vestingsTable = (): string => `/${constants.VestingPool}-vestings`;
 
+// Cirrus page size for the pool-wide fallback, and a ceiling that keeps a runaway table
+// from being paged forever (the pool holds a few hundred vestings at most).
+export const VESTING_ROWS_PAGE = 5000;
+const VESTING_ROWS_MAX = 200_000;
+
 // The pool's rows for one account. The PostgREST JSON filter (value->>account) is
-// tried first; if Cirrus rejects it, the pool's rows are fetched and filtered here.
-// Callers filter by account again either way.
+// tried first; if Cirrus rejects it, every row of the pool is paged in a fixed order
+// and filtered here. Callers filter by account again either way.
 const fetchVestingRows = async (
   accessToken: string,
   pool: string,
   account: string
 ): Promise<VestingRow[]> => {
-  const baseParams = { address: `eq.${pool}`, select: "key,value", limit: 5000 };
+  const baseParams = { address: `eq.${pool}`, select: "key,value", limit: VESTING_ROWS_PAGE };
 
   try {
     const { data } = await cirrus.get(accessToken, vestingsTable(), {
@@ -229,11 +234,20 @@ const fetchVestingRows = async (
     });
     if (Array.isArray(data)) return data;
   } catch (error: any) {
-    console.warn(`[vesting] account filter rejected by Cirrus, fetching pool rows: ${error?.message || error}`);
+    console.warn(`[vesting] account filter rejected by Cirrus, paging pool rows: ${error?.message || error}`);
   }
 
-  const { data } = await cirrus.get(accessToken, vestingsTable(), { params: baseParams });
-  return Array.isArray(data) ? data : [];
+  // Deterministic order so pages do not overlap or skip while rows are appended.
+  const rows: VestingRow[] = [];
+  for (let offset = 0; offset < VESTING_ROWS_MAX; offset += VESTING_ROWS_PAGE) {
+    const { data } = await cirrus.get(accessToken, vestingsTable(), {
+      params: { ...baseParams, order: "key.asc", offset },
+    });
+    const page: VestingRow[] = Array.isArray(data) ? data : [];
+    rows.push(...page);
+    if (page.length < VESTING_ROWS_PAGE) break;
+  }
+  return rows;
 };
 
 export const getVestingsForAddress = async (

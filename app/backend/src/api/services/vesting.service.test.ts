@@ -6,6 +6,7 @@ import * as config from "../../config/config";
 import { StratoError } from "../../errors";
 import {
   ParsedVesting,
+  VESTING_ROWS_PAGE,
   WEEK_SECONDS,
   claimVesting,
   computeVestingView,
@@ -325,7 +326,9 @@ test("getVestingsForAddress falls back to pool rows when the JSON filter is reje
       throw error;
     }
     assert.equal(request.params.address, `eq.${POOL}`);
-    assert.equal(request.params.limit, 5000);
+    assert.equal(request.params.limit, VESTING_ROWS_PAGE);
+    assert.equal(request.params.order, "key.asc");
+    assert.equal(request.params.offset, 0);
     return { status: 200, data: heliumRows };
   });
 
@@ -427,4 +430,27 @@ test("claimVesting builds claimVestedTokens for the caller's own vesting", async
       tokensToClaim: "340282366920938463463374607431768211455",
     },
   });
+});
+
+test("getVestingsForAddress pages the fallback until a short page, finding grants past the first page", async (t) => {
+  withPool(t, POOL);
+  t.mock.method(console, "warn", (() => undefined) as typeof console.warn);
+  // A full first page of other accounts' rows, then a short second page that holds the grant.
+  const filler = Array.from({ length: VESTING_ROWS_PAGE }, (_, i) => ({
+    key: i.toString(16).padStart(64, "0"),
+    value: { ...heliumRows[1].value, account: "9999999999999999999999999999999999999999" },
+  }));
+  const offsets: number[] = [];
+  t.mock.method(cirrus, "get", async (_token: string, _path: string, request?: any) => {
+    if (request?.params?.["value->>account"] !== undefined) {
+      throw new Error("Request failed with status code 400");
+    }
+    offsets.push(request.params.offset);
+    assert.equal(request.params.order, "key.asc");
+    return { status: 200, data: request.params.offset === 0 ? filler : [heliumRows[0]] };
+  });
+
+  const result = await getVestingsForAddress("token", TEAM_ACCOUNT, 1793836800 + DAY);
+  assert.deepEqual(offsets, [0, VESTING_ROWS_PAGE]);
+  assert.deepEqual(result.vestings.map((vesting) => vesting.vestingId), [TEAM_ID]);
 });
