@@ -39,18 +39,27 @@ HTTP_PORT          - (default: 8090) Port for HTTP traffic listener.
 HTTPS_PORT         - (default: 8093) Port for HTTPS traffic listener; only used with ssl=true.
 ssl                - (default: false) [true|false] to run the node with SSL/TLS.
 sslCertFileType    - (default: pem) [pem|crt] the SSL certificate type and file extension (should be accessible at ./ssl/certs/server.<sslCertFileType> at deploy time.)
-postgres_password                 - (required) PostgreSQL administrator password; a volume created by an earlier release used the password 'api' unless it was set.
-postgres_vault_password           - (required) Password pg-init sets for the strato_vault login the Vault connects with.
+COMPOSE_PROFILES                  - (default: postgres) Runs the bundled PostgreSQL and pg-init; set it empty to use an external database that already has the Vault's login.
+postgres_password                 - (required with the bundled PostgreSQL) PostgreSQL administrator password; a volume created by an earlier release used the password 'api' unless it was set.
+postgres_user                     - (default: postgres) PostgreSQL administrator login pg-init provisions with; set it when an external database's administrator has another name.
+postgres_vault_password           - (required) Password of the login the Vault connects with; pg-init sets it for strato_vault.
+postgres_host                     - (default: postgres) PostgreSQL host; set it, with the two below, for an external database.
+postgres_vault_user               - (default: strato_vault) Login the Vault connects with.
+postgres_vault_wrapper_db         - (default: oauth) The Vault's database.
 INITIAL_OAUTH_DISCOVERY_URL       - (required) OpenID Connect discovery URL for initial OAuth2 provider. Additional ones can be added at run time.
 INITIAL_OAUTH_ISSUER              - (required) Issuer value for initial OAuth2 provider.
 INITIAL_OAUTH_JWT_USERNAME_CLAIM  - (default: sub) The claim (payload property) of JWT token to use as unique user id within STRATO Vault."
 }
 
-# Compose interpolates the two required password variables for every command,
-# but only `up` uses their values (checked before it runs); the commands that
-# create no container get placeholders so they work without the credentials.
+# Compose interpolates the required Vault login password for every command,
+# but only `up` uses its value (checked before it runs); the commands that
+# create no container get a placeholder so they work without the credentials.
 function composeWithoutCredentials {
-  postgres_password=${postgres_password:-unused} postgres_vault_password=${postgres_vault_password:-unused} ${docker_compose} "$@"
+  postgres_vault_password=${postgres_vault_password:-unused} ${docker_compose} "$@"
+}
+
+function bundledPostgres {
+  [[ ",${COMPOSE_PROFILES}," == *,postgres,* ]]
 }
 
 function wipe {
@@ -132,6 +141,10 @@ else
   fi
 fi
 
+# The bundled PostgreSQL and pg-init run under the "postgres" Compose profile;
+# an explicitly empty COMPOSE_PROFILES leaves them out for an external database.
+export COMPOSE_PROFILES=${COMPOSE_PROFILES-postgres}
+
 while [ ${#} -gt 0 ]; do
   case "${1}" in
   --help|-h)
@@ -187,8 +200,8 @@ if [[ -z ${INITIAL_OAUTH_DISCOVERY_URL} || -z ${INITIAL_OAUTH_ISSUER} ]] ; then
   exit 13
 fi
 
-if [[ -z ${postgres_password} || -z ${postgres_vault_password} ]] ; then
-  echo -e "${Red}postgres_password and postgres_vault_password are required to start STRATO Vault.\nFor additional help see './vault --help'${NC}"
+if [[ -z ${postgres_vault_password} ]] || { bundledPostgres && [[ -z ${postgres_password} ]]; } ; then
+  echo -e "${Red}postgres_vault_password, and postgres_password with the bundled PostgreSQL, are required to start STRATO Vault.\nFor additional help see './vault --help'${NC}"
   exit 14
 fi
 
@@ -234,6 +247,14 @@ fi
 # END OF COMPOSE FILE PRE-PROCESSING
 
 ${docker_compose} -f docker-compose-vault-temp.yml up -d --remove-orphans
+# The Vault's dependency on pg-init is optional, because an external database
+# has no pg-init, so Compose only warns when pg-init fails: stop here instead.
+pg_init=vault${CNAME_SEP}pg-init${CNAME_SEP}1
+if bundledPostgres && [ "$(docker inspect -f '{{.State.ExitCode}}' ${pg_init})" != 0 ]; then
+  docker logs ${pg_init} >&2 || true
+  echo -e "${Red}pg-init failed, its log is above. If it rejected the PostgreSQL administrator password, correct postgres_password and run this script again.${NC}"
+  exit 16
+fi
 # Wait until the vault is reachable. /_ping returns 200 when the password is
 # already set (e.g. via vaultPasswordFile) and 503 when it is awaiting password
 # initialization — either response means the container is up and ready for

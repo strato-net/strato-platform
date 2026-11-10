@@ -58,4 +58,4 @@ curl -s https://<host>/health
 
 - **Logs.** The node processes and the containers write to `mynode/logs/`, as with a built node (see [Logs](operations.md#logs)). `convoke`'s own output is the `strato` container's log: `docker compose -p strato logs -f strato`.
 - **Stop and start.** `strato-down` runs `docker compose down`; `strato-up` on the existing directory runs `docker compose up -d --wait`. Data is kept.
-- **Upgrade.** Check out the new release tag or commit and do a [clean restart](operations.md#clean-restart) with the same flags. With `--localAuth`, keep the recovery phrases: the keys live in the node directory.
+- **Upgrade.** Check out the new release tag or commit and do a [clean restart](operations.md#clean-restart) with the same flags. With `--localAuth`, keep the recovery phrases: the keys live in the node directory. To keep the node's databases instead, see [PostgreSQL runtime roles](operations.md#postgresql-runtime-roles).

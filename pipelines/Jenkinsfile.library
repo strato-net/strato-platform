@@ -153,6 +153,8 @@ def spinUpVault() {
     postgres_password="$(openssl rand -hex 32)"
     postgres_vault_password="$(openssl rand -hex 32)"
     export postgres_password postgres_vault_password
+    # The local Vault runs its own PostgreSQL: the bundled database profile.
+    export COMPOSE_PROFILES=postgres
     export ssl=true
     export HTTPS_PORT=8093
     export INITIAL_OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration

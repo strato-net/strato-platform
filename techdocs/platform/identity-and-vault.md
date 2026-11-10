@@ -105,6 +105,7 @@ The STRATO Vault (`strato/vault`) holds users' private keys custodially and sign
 `strato/vault/vault-runner` has a minimal self-hosted setup (`run-vault.sh` with `docker-compose.vault.yml`):
 
 - **Transport.** It serves plain HTTP on port 8080 by default. Its README describes switching it to HTTPS on 8443 with your own certificate.
+- **Database.** It runs its own PostgreSQL by default. Its README describes pointing it at an external database instead.
 - **Connecting a node.** Start the node with `--vaultUrl=http://<vault-host>:8080/strato/v2.3`, or with the matching `https://` URL.
 - **Identity providers.** The Vault's nginx (`vault-nginx`) accepts tokens from configured issuers. The initial issuer is set with `INITIAL_OAUTH_DISCOVERY_URL`, `INITIAL_OAUTH_ISSUER` and `INITIAL_OAUTH_JWT_USER_ID_CLAIM` (default `sub`).
 - **Admin tools.** `make change-vault-password` rotates the Vault password. `make migrate-key` moves a single user's key between Vaults. The procedures are in `strato/vault/vault-runner/README.md`.

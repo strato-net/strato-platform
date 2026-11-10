@@ -173,6 +173,15 @@ strato-setup mynode --regenerate <original setup flags>
 strato-up mynode
 ```
 
+A node run from [prebuilt images](prebuilt.md) has no host `strato-setup`: add
+`--regenerate` to its usual `strato-up` flags instead, and `strato-up`
+regenerates the directory from the image before starting it:
+
+```bash
+strato-down mynode
+strato-up mynode --dockerMode=all --prebuilt <original setup flags> --regenerate
+```
+
 Check `logs/pg-init.log` if startup stops at provisioning. Its administrator
 credential must be allowed to create roles and databases and change ownership
 of existing objects. On a split deployment, provision the shared database

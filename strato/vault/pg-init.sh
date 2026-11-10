@@ -1,7 +1,9 @@
 #!/bin/sh
 set -eu
 
-export PGHOST="${postgres_host:-postgres}" PGPORT="${postgres_port:-5432}" PGUSER=postgres
+# The cluster administrator this script provisions as. Earlier releases ran
+# the Vault itself as this login, so its objects are the ones handed over.
+export PGHOST="${postgres_host:-postgres}" PGPORT="${postgres_port:-5432}" PGUSER="${postgres_admin_user:-postgres}"
 export PGPASSWORD="${postgres_admin_password:?}"
 export PGCONNECT_TIMEOUT=3
 
@@ -41,7 +43,7 @@ SELECT format('REVOKE CONNECT ON DATABASE %I FROM PUBLIC', :'db')
 \gexec
 SQL
 
-psql -X -v ON_ERROR_STOP=1 -d "${postgres_vault_wrapper_db:-oauth}" <<'SQL'
+psql -X -v ON_ERROR_STOP=1 -d "${postgres_vault_wrapper_db:-oauth}" -v source_owner="$PGUSER" <<'SQL'
 BEGIN;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
@@ -55,7 +57,7 @@ SELECT format('ALTER %s %I.%I OWNER TO strato_vault',
               n.nspname, c.relname)
   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
  WHERE n.nspname = 'public' AND c.relkind IN ('r', 'v', 'm', 'f', 'S')
-   AND pg_get_userbyid(c.relowner) = 'postgres'
+   AND pg_get_userbyid(c.relowner) = :'source_owner'
    AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_class'::regclass
                      AND d.objid = c.oid AND d.refclassid = 'pg_extension'::regclass AND d.deptype = 'e')
  ORDER BY CASE WHEN c.relkind = 'S' THEN 1 ELSE 0 END, c.oid
@@ -63,7 +65,7 @@ SELECT format('ALTER %s %I.%I OWNER TO strato_vault',
 SELECT format('ALTER FUNCTION %I.%I(%s) OWNER TO strato_vault',
               n.nspname, p.proname, pg_get_function_identity_arguments(p.oid))
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
- WHERE n.nspname = 'public' AND pg_get_userbyid(p.proowner) = 'postgres'
+ WHERE n.nspname = 'public' AND pg_get_userbyid(p.proowner) = :'source_owner'
    AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_proc'::regclass
                      AND d.objid = p.oid AND d.refclassid = 'pg_extension'::regclass AND d.deptype = 'e')
 \gexec

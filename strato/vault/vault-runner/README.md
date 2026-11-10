@@ -14,7 +14,7 @@ cp docker-compose.vault.yml strato/vault/vault-runner/
 
 ### Prerequisites
 
-- Docker with Compose v2 and OpenSSL
+- Docker with Compose v2.20 or newer, and OpenSSL
 
 ### Run
 
@@ -29,10 +29,40 @@ Vault login passwords. Keep this file with the `vaultpgdata` volume across
 restarts. When upgrading an existing volume, the script asks for its current
 PostgreSQL administrator password (the old Compose default was `api`) unless an
 existing `.env` already holds it, and adds the new Vault login password to that
-file, keeping its other settings. If the stack does not start, the script prints
-`pg-init`'s log; a rejected administrator password is fixed by correcting
+file, keeping its other settings. If `pg-init` fails, the script prints its log;
+a rejected administrator password is fixed by correcting
 `postgres_password` in `.env` and running the script again. The Vault encryption
 password prompted by `enter-password.sh` is separate from both database passwords.
+
+The script also sets `COMPOSE_PROFILES=postgres` in `.env`. The bundled
+`postgres` and `pg-init` services run only under that Compose profile, and
+`.env` applies it to every `docker compose` command typed in this directory.
+
+### Run with an external database
+
+Without the `postgres` profile only the Vault and its nginx start, and the
+Vault connects to a database you manage, on port 5432. The database and the
+login must already exist. The login needs no superuser rights, only to create
+tables in that database. Start the stack directly, without `run-vault.sh` and
+without a `.env` that sets `COMPOSE_PROFILES`:
+
+```
+sudo \
+  ssl=false \
+  HTTP_PORT=8080 \
+  INITIAL_OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration' \
+  INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/mercata' \
+  INITIAL_OAUTH_JWT_USERNAME_CLAIM='sub' \
+  postgres_host=<database host> \
+  postgres_vault_user=<login> \
+  postgres_vault_password=<its password> \
+  postgres_vault_wrapper_db=<database> \
+  docker compose -f docker-compose.vault.yml -p vault up -d
+bash enter-password.sh
+```
+
+Compose checks `postgres_vault_password` for every command, so the `down`
+commands below need it set as well; any value will do there.
 
 ### Configure your local STRATO with the local vault
 

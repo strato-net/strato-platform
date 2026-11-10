@@ -274,6 +274,7 @@ NODE_DIR_ABS="$(pwd)"
 if grep -Eq '^[[:space:]]+user:[[:space:]]*"?postgres"?([[:space:]]|$)' .ethereumH/ethconf.yaml; then
     echo "Error: this node still has PostgreSQL superuser connections in ethconf.yaml." >&2
     echo "Run strato-down, then strato-setup $NODE_DIR_ABS --regenerate with the node's original flags, then strato-up." >&2
+    echo "On a node run from the prebuilt images (no host strato-setup), run strato-up $NODE_DIR_ABS with the original flags plus --regenerate instead." >&2
     exit 1
 fi
 

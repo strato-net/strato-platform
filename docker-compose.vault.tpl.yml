@@ -11,12 +11,13 @@ services:
     depends_on:
       pg-init:
         condition: service_completed_successfully
+        required: false
     environment:
     - keyStoreCacheTimeout=${keyStoreCacheTimeout:-60}
     - postgres_host=${postgres_host:-postgres}
     - postgres_password=${postgres_vault_password:?postgres_vault_password is required}
     - postgres_port=5432
-    - postgres_user=strato_vault
+    - postgres_user=${postgres_vault_user:-strato_vault}
     - postgres_vault_wrapper_db=${postgres_vault_wrapper_db:-oauth}
     - VAULTWRAPPER_DEBUG=${VAULTWRAPPER_DEBUG}
     build: .
@@ -27,21 +28,27 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
+  # The bundled database and its provisioning run only under the "postgres"
+  # profile. Without it the Vault connects to an external database as
+  # postgres_vault_user, a login that database's operator manages.
   pg-init:
+    profiles: ["postgres"]
     image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
     entrypoint: ["/vault-wrapper/pg-init.sh"]
     environment:
       - postgres_host=${postgres_host:-postgres}
       - postgres_port=5432
-      - postgres_admin_password=${postgres_password:?postgres_password is required}
+      - postgres_admin_user=${postgres_user:-postgres}
+      - postgres_admin_password=${postgres_password:-}
       - postgres_vault_password=${postgres_vault_password:?postgres_vault_password is required}
       - postgres_vault_wrapper_db=${postgres_vault_wrapper_db:-oauth}
     depends_on:
       - postgres
     restart: "no"
   postgres:
+    profiles: ["postgres"]
     environment:
-      - POSTGRES_PASSWORD=${postgres_password:?postgres_password is required}
+      - POSTGRES_PASSWORD=${postgres_password:-}
     image: postgres:9.6
     volumes:
       - vaultpgdata:/var/lib/postgresql/data
