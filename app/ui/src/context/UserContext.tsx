@@ -329,8 +329,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     enabled: !loading && !isLoggedIn && !!externalEvmWalletAddress,
   });
   const effectiveIsAdmin = isLoggedIn ? isAdmin : walletAdmin.data === true;
-  // A reloaded admin page must not redirect before the wallet has reconnected and answered
-  const isAdminLoading = loading || account.isReconnecting || walletAdmin.isLoading;
+  // The admin page must not redirect a wallet admin while that answer is still on its way
+  const isAdminLoading = loading || walletAdmin.isLoading;
 
   // Layout effect, not a passive one: React runs children's passive effects
   // before the parent's, so a consumer (e.g. the dashboard's member-benefit
