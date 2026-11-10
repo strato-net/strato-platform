@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useAccount } from 'wagmi';
 import { useUser } from '@/context/UserContext';
 import { redirectToLogin } from '@/lib/auth';
 
@@ -7,7 +8,11 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { isLoggedIn, loading } = useUser();
+  const { isLoggedIn, loading: authLoading } = useUser();
+  // On a reload a wallet session exists only once the wallet has reconnected, which
+  // can take longer than the vault session check
+  const { isReconnecting } = useAccount();
+  const loading = authLoading || isReconnecting;
 
   useEffect(() => {
     // Only redirect if not loading and not authenticated

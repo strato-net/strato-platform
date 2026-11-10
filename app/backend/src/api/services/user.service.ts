@@ -472,7 +472,11 @@ const simulateCall = async (
     txs: [{ payload: { ...call, metadata: {} }, type: "FUNCTION" }],
     address: userAddress.replace(/^0x/, ""),
   };
-  const response = await bloc.post(accessToken, "/transaction/simulate", body, { params });
+  const response = await bloc.post(accessToken, "/transaction/simulate", body, {
+    params,
+    // A replayed call's large integers are BigInts (formatArg), which JSON.stringify rejects
+    transformRequest: [(data) => JSONBigNumber.stringify(data)],
+  });
   const data = response.data;
   return Array.isArray(data) ? data[0] : data;
 };

@@ -240,7 +240,9 @@ const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
   const simulated: any[] = [];
   const txLookups: string[] = [];
 
-  t.mock.method(bloc, "post", (async (_token: string, _path: string, body: any) => {
+  t.mock.method(bloc, "post", (async (_token: string, _path: string, body: any, config: any) => {
+    // Encoded as axios would send it: a replayed call's BigInts must survive
+    (config?.transformRequest?.[0] ?? JSON.stringify)(body);
     simulated.push(body);
     return { status: 200, data: [simulations.shift()] };
   }) as typeof bloc.post);
@@ -483,7 +485,8 @@ const registryEvent = (name: string, issueId: string = ISSUE_ID) =>
 
 const simulatedSuccess = (...events: any[]) => ({ status: "Success", events });
 
-const DECODABLE_TX_ARGS = ["\"UI Arg Probe\"", "0", "\"0xdead0001\"", '[{"eventName":"d","actionType":"Deposit"}]'];
+// An 18-decimal amount: past Number.MAX_SAFE_INTEGER, so the replayed call carries a BigInt
+const DECODABLE_TX_ARGS = ["\"UI Arg Probe\"", "1000000000000000000000", "\"0xdead0001\"", '[{"eventName":"d","actionType":"Deposit"}]'];
 
 test("a wallet vote replays the original transaction when it simulates as a vote on the issue", async (t) => {
   const posted = mockVoteScenario(t, {
