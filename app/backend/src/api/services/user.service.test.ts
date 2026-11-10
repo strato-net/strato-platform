@@ -563,7 +563,8 @@ test("a wallet vote is refused when it would vote on a different issue", async (
 
   await assert.rejects(
     () => asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID)),
-    /would vote on issue aaaa0000/,
+    // A 4xx, so the admin sees why rather than a generic server error
+    (error: any) => error.status === 409 && /would vote on issue aaaa0000/.test(error.message),
   );
   assert.equal(posted.length, 0);
 });

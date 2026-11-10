@@ -52,9 +52,12 @@ export async function simulateAdminVote(issue: {
   func: string;
   args: unknown[];
 }): Promise<SimulationResult> {
+  // Parsed issue args carry large integers as BigInts, which JSON cannot encode: send
+  // them as decimal strings, which the backend reads at full precision
+  const args = JSON.parse(JSON.stringify(issue.args, (_k, v) => (typeof v === "bigint" ? v.toString() : v)));
   const { data } = await api.post(
     "/user/admin/vote/simulate",
-    { target: issue.target, func: issue.func, args: issue.args }
+    { target: issue.target, func: issue.func, args }
   );
   if (!data) throw new Error("Empty simulation response");
   return data as SimulationResult;

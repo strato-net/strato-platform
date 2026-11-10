@@ -626,8 +626,9 @@ const walletVoteCall = async (
 
   const call = await registryVoteCall(accessToken, issue);
   const problem = await voteProblem(call);
+  // A conflict with the issue's state, not a server fault: the reason reaches the admin
   if (problem) {
-    throw new Error(`Voting through the registry: ${problem} (after replaying the original transaction: ${replayProblem})`);
+    throw new StratoError(`Voting through the registry: ${problem} (after replaying the original transaction: ${replayProblem})`, 409);
   }
   return { call, votedVia: "registry" };
 };
