@@ -309,13 +309,23 @@ async function status(tokenObj, s, quiet) {
   return report;
 }
 
+// With resolve=true the node answers a transaction whose execution reverted with HTTP 422
+// and the revert message as a plain-text body (e.g. "Not enough tokens available"); axios
+// would otherwise only say "Request failed with status code 422". Returns the status and
+// body of an HTTP error, or null for anything else (timeouts, DNS, bugs).
+const httpBody = (e) => (e && e.response)
+  ? `HTTP ${e.response.status} | ${typeof e.response.data === 'string' ? e.response.data : JSON.stringify(e.response.data)}`.slice(0, 400)
+  : null;
+
 // Submit one FUNCTION transaction through the node's parallel endpoint (what the app
 // backend does), with BigInt values as bare JSON numbers, and wait for its result.
 async function postFunctionTx(tokenObj, payload, gasLimit) {
   const base = config.nodes[0].url;
   const body = toBody({ txs: [{ type: 'FUNCTION', payload }], txParams: { gasLimit, gasPrice: config.gasPrice } });
   const headers = { Authorization: `Bearer ${tokenObj.token}`, 'Content-Type': 'application/json', Accept: 'application/json' };
-  const { data } = await axios.post(`${base}/strato/v2.3/transaction/parallel?resolve=true`, body, { headers, timeout: 120000 });
+  let data;
+  try { ({ data } = await axios.post(`${base}/strato/v2.3/transaction/parallel?resolve=true`, body, { headers, timeout: 120000 })); }
+  catch (e) { const body = httpBody(e); if (!body) throw e; return { status: 'Rejected', msg: body, hash: null }; }
   let results = Array.isArray(data) ? data : [data];
   const hashes = results.map((r) => r && r.hash).filter(Boolean);
   if (!hashes.length) throw new Error('no tx hash: ' + JSON.stringify(data).slice(0, 300));
@@ -424,7 +434,7 @@ async function waitForExecution(tokenObj, s, submitted) {
         if (done > 0) { console.error(`${label}: ${done}/${b.accounts.length} entries already exist; re-submitting would collide on their ids ("Vesting id already used"). Fix the file (or the batch boundaries) first.`); process.exit(1); }
         console.log(`${label}: ${user} voting castVoteOnIssue(${s.manager}, addVestings) for ${b.accounts.length} entries, ${fmtTokens(b.total, s.decimals)} tokens, args sha256 ${argsHash(c, b)}`);
         const r = await castVote(tokenObj, s, c, b);
-        console.log(`  vote tx ${r.status}${r.msg ? ' | ' + r.msg.slice(0, 160) : ''} (${r.hash})${r.issueId ? `  issue ${r.issueId}` : ''}`);
+        console.log(`  vote tx ${r.status}${r.msg ? ' | ' + r.msg.slice(0, 400) : ''} (${r.hash || 'no receipt'})${r.issueId ? `  issue ${r.issueId}` : ''}`);
         if (r.status !== 'Success') { console.error(`  the vote itself failed; nothing was recorded for ${label}. Fix the cause and re-run.`); process.exit(1); }
         submitted.push({ c, b, label, issueId: r.issueId, hash: r.hash });
       }

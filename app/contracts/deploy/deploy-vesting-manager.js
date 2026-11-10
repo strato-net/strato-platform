@@ -124,6 +124,14 @@ async function resolveCreatorWallet(userRegistry, adminRegistry) {
   return wallet;
 }
 
+// With resolve=true the node answers a transaction whose execution reverted with HTTP 422
+// and the revert message as a plain-text body (e.g. "Not enough tokens available"); axios
+// would otherwise only say "Request failed with status code 422". Returns the status and
+// body of an HTTP error, or null for anything else (timeouts, DNS, bugs).
+const httpBody = (e) => (e && e.response)
+  ? `HTTP ${e.response.status} | ${typeof e.response.data === 'string' ? e.response.data : JSON.stringify(e.response.data)}`.slice(0, 400)
+  : null;
+
 // The issue id the registry recorded for a vote transaction, with the vote's block number.
 async function issueForTx(tokenObj, hash) {
   const deadline = Date.now() + 60000;
@@ -211,8 +219,11 @@ async function managerRowAmong(tokenObj, addresses) {
   };
   const headers = { Authorization: `Bearer ${tokenObj.token}`, 'Content-Type': 'application/json', Accept: 'application/json' };
   console.log(`${user}: voting AdminRegistry(${ADMIN_REGISTRY}).castVoteOnIssue(wallet ${WALLET}, "createContract", [${NAME}, <source>, token_=${STRATO_TOKEN}, initialOwner=${ADMIN_REGISTRY}]) on ${base()}`);
-  const { data } = await axios.post(`${base()}/strato/v2.3/transaction/parallel?resolve=true`,
-    JSON.stringify({ txs: [{ type: 'FUNCTION', payload }], txParams: { gasLimit: 8000000, gasPrice: config.gasPrice } }), { headers, timeout: 180000 });
+  let data;
+  try {
+    ({ data } = await axios.post(`${base()}/strato/v2.3/transaction/parallel?resolve=true`,
+      JSON.stringify({ txs: [{ type: 'FUNCTION', payload }], txParams: { gasLimit: 8000000, gasPrice: config.gasPrice } }), { headers, timeout: 180000 }));
+  } catch (e) { const body = httpBody(e); if (!body) throw e; console.error(`${user} vote FAILED: ${body}`); process.exit(1); }
   let results = Array.isArray(data) ? data : [data];
   const hashes = results.map((r) => r && r.hash).filter(Boolean);
   if (!hashes.length) throw new Error('no tx hash: ' + JSON.stringify(data).slice(0, 300));
