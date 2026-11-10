@@ -6,7 +6,8 @@
   "scripts": {
     "start": "ts-node src/index.ts",
     "dev": "nodemon src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "node --test --require ts-node/register test/*.test.cjs"
   },
   "engines": {
     "node": ">=22.12 <23.0"

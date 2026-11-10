@@ -1,6 +1,17 @@
 // ---------------- Utility Types ----------------
 export type NonEmptyArray<T> = [T, ...T[]];
 
+export interface ReferralDepositState {
+  field: string | null;
+  sender: string | null;
+  quantity: string | null;
+  length: string | null;
+}
+
+export interface ReferralRecipientState {
+  value: boolean | string;
+}
+
 // ---------------- Transaction Types ----------------
 export type TxPayloadArgs = Record<string, any>;
 
@@ -53,6 +64,7 @@ export interface ClientOptions {
   authenticated?: boolean;
   timeout?: number;
   logPrefix?: string;
+  maxAttempts?: number;
 }
 
 export interface ApiClient {
