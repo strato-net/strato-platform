@@ -578,21 +578,19 @@ const registryVoteCall = async (accessToken: string, issue: any): Promise<Contra
   return castVoteCall(issue.target, issue.func, typedArgs);
 };
 
-// Why a simulated call is not a vote on this open issue, or null when it is. Every
-// vote the registry counts emits IssueVoted; one that also emits IssueCreated would
-// open the issue anew (it was executed, dismissed or invalidated since) or open a
-// different one. Events from other contracts, such as a nested multisig the issue
-// would execute, are not this vote
-const simulatedVoteProblem = (result: any, issueId: string): string | null => {
-  if (result?.status !== "Success") return result?.error || "its simulation failed";
+// What a simulated call would do to this issue: count a vote on it, count a vote that
+// opens it anew (it has no current votes: it was executed or dismissed, or a registry
+// config change cleared them, since it was proposed), or the reason it is not a vote on
+// it at all. Every vote the registry counts emits IssueVoted. Events from other
+// contracts, such as a nested multisig the issue would execute, are not this vote
+const simulatedVote = (result: any, issueId: string): { reopens: boolean } | { problem: string } => {
+  if (result?.status !== "Success") return { problem: result?.error || "its simulation failed" };
   const registryEvent = (name: string) => (result.events ?? [])
     .find((event: any) => event.name === name && sameAddress(event.address, adminRegistry));
-  const created = registryEvent("IssueCreated");
   const voted = registryEvent("IssueVoted");
-  if (created) return `it would open issue ${created.args?.issueId} instead of voting on an open one`;
-  if (!voted) return "it would record no vote: this admin has already voted on the issue";
-  if (!sameIssueId(voted.args?.issueId, issueId)) return `it would vote on issue ${voted.args?.issueId} instead`;
-  return null;
+  if (!voted) return { problem: "it would record no vote: this admin has already voted on the issue" };
+  if (!sameIssueId(voted.args?.issueId, issueId)) return { problem: `it would vote on issue ${voted.args?.issueId} instead` };
+  return { reopens: !!registryEvent("IssueCreated") };
 };
 
 // A wallet signs and submits the vote after the request returns, so neither the check
@@ -605,10 +603,21 @@ const walletVoteCall = async (
   issue: any,
   replayCall: () => Promise<ContractCall>,
 ): Promise<{ call: ContractCall; votedVia: "replay" | "registry" }> => {
+  // A vote that opens the issue anew restarts it, which is this vote unless the issue
+  // was executed since it was proposed: then it would resurrect a finished action
+  const voteProblem = async (call: ContractCall): Promise<string | null> => {
+    const vote = simulatedVote(await simulateCall(accessToken, userAddress, call), issue.issueId);
+    if ("problem" in vote) return vote.problem;
+    if (vote.reopens && !(await voteStillPending(accessToken, issue, userAddress))) {
+      return "it would open the issue anew, and the chain does not show it still waiting for this admin's vote";
+    }
+    return null;
+  };
+
   let replayProblem: string;
   try {
     const replay = await replayCall();
-    const problem = simulatedVoteProblem(await simulateCall(accessToken, userAddress, replay), issue.issueId);
+    const problem = await voteProblem(replay);
     if (!problem) return { call: replay, votedVia: "replay" };
     replayProblem = problem;
   } catch (error: any) {
@@ -616,7 +625,7 @@ const walletVoteCall = async (
   }
 
   const call = await registryVoteCall(accessToken, issue);
-  const problem = simulatedVoteProblem(await simulateCall(accessToken, userAddress, call), issue.issueId);
+  const problem = await voteProblem(call);
   if (problem) {
     throw new Error(`Voting through the registry: ${problem} (after replaying the original transaction: ${replayProblem})`);
   }

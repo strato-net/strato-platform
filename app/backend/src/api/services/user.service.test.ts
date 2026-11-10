@@ -531,16 +531,30 @@ test("a wallet vote goes through the registry when the recorded arguments cannot
   assert.equal(posted[0].method, "castVoteOnIssue");
 });
 
-test("a wallet vote is refused when it would open the issue anew", async (t) => {
-  // An issue executed or dismissed since it was listed: the same arguments open it again
-  const reopened = simulatedSuccess(registryEvent("IssueCreated"), registryEvent("IssueVoted"));
-  const posted = mockVoteScenario(t, { txArgs: DECODABLE_TX_ARGS, simulations: [reopened, reopened] });
+// The issue has no current votes, so the vote opens it anew
+const reopened = simulatedSuccess(registryEvent("IssueCreated"), registryEvent("IssueVoted"));
+
+test("a wallet vote restarts an issue whose votes a registry config change cleared", async (t) => {
+  const posted = mockVoteScenario(t, { txArgs: DECODABLE_TX_ARGS, simulations: [reopened] });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.equal(result.votedVia, "replay");
+  assert.equal(posted.length, 1, "a vote OAuth would cast must not be refused for a wallet");
+});
+
+test("a wallet vote is refused when it would reopen an executed issue", async (t) => {
+  const posted = mockVoteScenario(t, {
+    txArgs: DECODABLE_TX_ARGS,
+    executed: [{ issueId: ISSUE_ID, block_number: "101" }],
+    simulations: [reopened, reopened],
+  });
 
   await assert.rejects(
     () => asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID)),
-    /would open issue 7b7c1564/,
+    /would open the issue anew/,
   );
-  assert.equal(posted.length, 0);
+  assert.equal(posted.length, 0, "re-voting an executed issue would resurrect it");
 });
 
 test("a wallet vote is refused when it would vote on a different issue", async (t) => {
