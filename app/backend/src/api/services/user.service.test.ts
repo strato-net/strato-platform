@@ -334,6 +334,15 @@ const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
   return Object.assign(posted, { simulated, txLookups });
 };
 
+// The node's simulate result for a vote: the registry's events for it
+const registryEvent = (name: string, issueId: string = ISSUE_ID) =>
+  ({ address: constants.adminRegistry, name, args: { issueId } });
+
+const simulatedSuccess = (...events: any[]) => ({ status: "Success", events });
+
+// A registry fallback is chosen on simulations: this one counts as a vote on the issue
+const votesOnIssue = simulatedSuccess(registryEvent("IssueVoted"));
+
 test("ownerInput calls an account-owned target directly and votes through a registry owner", async (t) => {
   const token = "0x3333333333333333333333333333333333333333";
   const account = "4444444444444444444444444444444444444444";
@@ -380,7 +389,7 @@ test("votes by replaying the original transaction when it decodes", async (t) =>
 });
 
 test("falls back to the registry when the recorded arguments cannot be decoded", async (t) => {
-  const posted = mockVoteScenario(t);
+  const posted = mockVoteScenario(t, { simulations: [votesOnIssue] });
 
   const result = await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
 
@@ -407,6 +416,7 @@ test("falls back to the registry when the node rejects the replayed transaction"
   const posted = mockVoteScenario(t, {
     txArgs: ["\"UI Arg Probe\"", "0", "\"0xdead0001\"", '[{"eventName":"d","actionType":0}]'],
     replayFailure: "node",
+    simulations: [votesOnIssue],
   });
 
   const result = await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
@@ -414,6 +424,54 @@ test("falls back to the registry when the node rejects the replayed transaction"
   assert.equal(result.votedVia, "registry");
   assert.equal(posted.length, 2, "the replay was submitted and failed, then the fallback was sent");
   assert.equal(posted[1].method, "castVoteOnIssue");
+  // The original transaction's arguments (the event records two other actionable events)
+  assert.equal(posted[1].args._args[3].value[0].eventName, "d");
+});
+
+test("an OAuth vote on a forwarded issue goes through the registry with its variadic tail flat", async (t) => {
+  // A User contract's createContract forwarded the issue: the replay is rejected, and the
+  // event renders the variadic tail nested where the issueId covers it flat
+  const posted = mockVoteScenario(t, {
+    func: {
+      contractName: "User",
+      name: "createContract",
+      funcArgs: [
+        ["contractName", { index: 0, type: { tag: "String" } }],
+        ["contractSrc", { index: 1, type: { tag: "String" } }],
+        ["args", { index: 2, type: { tag: "Variadic" } }],
+      ],
+    },
+    txArgs: ["\"CDPEngine\"", "\"contract CDPEngine {}\"", "\"00000000000000000000000000000000deadbeef\""],
+    replayFailure: "node",
+    simulations: [votesOnIssue],
+  });
+
+  const result = await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
+
+  assert.equal(result.votedVia, "registry");
+  assert.equal(posted.length, 2);
+  assert.deepEqual(posted[1].args._args, [
+    { type: "string", value: "CDPEngine" },
+    { type: "string", value: "contract CDPEngine {}" },
+    "\"00000000000000000000000000000000deadbeef\"",
+  ]);
+});
+
+test("an OAuth fallback that no registry vote reaches submits nothing more", async (t) => {
+  // Submitting a vote that misses the issue would open another one
+  const elsewhere = simulatedSuccess(registryEvent("IssueVoted", "aaaa000000000000000000000000000000000000000000000000000000000000"));
+  const posted = mockVoteScenario(t, {
+    txArgs: ["\"UI Arg Probe\"", "0", "\"0xdead0001\"", '[{"eventName":"d","actionType":0}]'],
+    replayFailure: "node",
+    simulations: [elsewhere, elsewhere],
+  });
+
+  await assert.rejects(
+    () => castVoteOnIssueById("access-token", VOTER, ISSUE_ID),
+    (error: any) => error.status === 409 && /No vote reaches this issue/.test(error.message)
+      && /after replaying the original transaction failed/.test(error.message),
+  );
+  assert.equal(posted.length, 1, "only the failed replay was submitted");
 });
 
 test("refuses the fallback once this admin's vote is already recorded", async (t) => {
@@ -435,7 +493,7 @@ test("refuses the fallback once the issue has been executed", async (t) => {
 });
 
 test("allows the fallback when the only execution predates this issue", async (t) => {
-  const posted = mockVoteScenario(t, { executed: [{ issueId: ISSUE_ID, block_number: "99" }] });
+  const posted = mockVoteScenario(t, { executed: [{ issueId: ISSUE_ID, block_number: "99" }], simulations: [votesOnIssue] });
 
   const result = await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
 
@@ -481,11 +539,6 @@ test("reports a vote that hashed to a different issue instead of claiming succes
 
 const asWallet = <T>(fn: () => Promise<T>): Promise<T> =>
   requestContext.run({ externalSigning: true, userAddress: VOTER.replace(/^0x/, "") }, fn);
-
-const registryEvent = (name: string, issueId: string = ISSUE_ID) =>
-  ({ address: constants.adminRegistry, name, args: { issueId } });
-
-const simulatedSuccess = (...events: any[]) => ({ status: "Success", events });
 
 // An 18-decimal amount: past Number.MAX_SAFE_INTEGER, so the replayed call carries a BigInt
 const DECODABLE_TX_ARGS = ["\"UI Arg Probe\"", "1000000000000000000000", "\"0xdead0001\"", '[{"eventName":"d","actionType":"Deposit"}]'];

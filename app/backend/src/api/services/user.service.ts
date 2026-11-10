@@ -593,15 +593,42 @@ const simulatedVote = (result: any, issueId: string): { reopens: boolean } | { p
   return { reopens: !!registryEvent("IssueCreated") };
 };
 
-// A wallet signs and submits the vote after the request returns, so neither the check
-// that it landed on this issue nor the fallback on a failed replay can run on the real
-// transaction. Both run on a simulation of it instead, and the wallet is handed
-// whichever call simulates as a vote on this issue
-const walletVoteCall = async (
+type VoteAttempt = { what: string; via: "replay" | "registry"; call: () => Promise<ContractCall> };
+
+// The registry votes that run an issue, in order: the original transaction's decoded
+// call sent through the registry, for a transaction its target forwarded the old way
+// (which the registry now rejects), its variadic tail flat as the issueId covers it (the
+// event renders the tail nested); and the vote rebuilt from the event, for a transaction
+// record that does not decode
+const registryVoteAttempts = (accessToken: string, issue: any, replay: Promise<ContractCall>): VoteAttempt[] => [
+  {
+    what: "voting through the registry with the original transaction's arguments",
+    via: "registry",
+    call: async () => {
+      const original = await replay;
+      if (sameAddress(original.contractAddress, adminRegistry)) {
+        throw new Error("the original transaction already went through the registry");
+      }
+      // The replay's args are already typed: only its variadic tail is laid out flat
+      const { funcArgs } = await fetchFuncArgs(accessToken, original.contractAddress, original.method);
+      return castVoteCall(original.contractAddress, original.method, funcArgs.flatMap(([name, type]) =>
+        type.tag === "Variadic" ? original.args[name] ?? [] : [original.args[name]]));
+    },
+  },
+  {
+    what: "voting through the registry with the issue's recorded arguments",
+    via: "registry",
+    call: () => registryVoteCall(accessToken, issue),
+  },
+];
+
+// The first attempt whose simulation is this admin's vote on the issue, so no call that
+// would miss it (opening another issue) is ever submitted
+const chooseVoteCall = async (
   accessToken: string,
   userAddress: string,
   issue: any,
-  replayCall: () => Promise<ContractCall>,
+  attempts: VoteAttempt[],
 ): Promise<{ call: ContractCall; votedVia: "replay" | "registry" }> => {
   // A vote that opens the issue anew restarts it, which is this vote unless the issue
   // was executed since it was proposed: then it would resurrect a finished action
@@ -613,34 +640,6 @@ const walletVoteCall = async (
     }
     return null;
   };
-
-  // In order: the original transaction; that decoded call sent through the registry, for
-  // a transaction its target forwarded the old way (which the registry now rejects), its
-  // variadic tail flat as the issueId covers it (the event renders the tail nested); and
-  // the registry vote rebuilt from the event, for a transaction record that does not decode
-  const replay = replayCall();
-  const attempts: { what: string; via: "replay" | "registry"; call: () => Promise<ContractCall> }[] = [
-    { what: "replaying the original transaction", via: "replay", call: () => replay },
-    {
-      what: "voting through the registry with the original transaction's arguments",
-      via: "registry",
-      call: async () => {
-        const original = await replay;
-        if (sameAddress(original.contractAddress, adminRegistry)) {
-          throw new Error("the original transaction already went through the registry");
-        }
-        // The replay's args are already typed: only its variadic tail is laid out flat
-        const { funcArgs } = await fetchFuncArgs(accessToken, original.contractAddress, original.method);
-        return castVoteCall(original.contractAddress, original.method, funcArgs.flatMap(([name, type]) =>
-          type.tag === "Variadic" ? original.args[name] ?? [] : [original.args[name]]));
-      },
-    },
-    {
-      what: "voting through the registry with the issue's recorded arguments",
-      via: "registry",
-      call: () => registryVoteCall(accessToken, issue),
-    },
-  ];
 
   const problems: string[] = [];
   for (const attempt of attempts) {
@@ -663,10 +662,10 @@ const walletVoteCall = async (
 // The replay decodes the node's record of the arguments back into the target's declared
 // types, which the node cannot always accept back — a struct array does not survive as
 // strict JSON, and an enum comes back as an ordinal where only its member name parses.
-// When that happens, fall back to the registry's variadic castVoteOnIssue, which infers
-// types instead and reaches the same issueId. The fallback is gated on the chain still
-// showing the vote as pending, so a first attempt that actually succeeded is never
-// submitted twice.
+// When that happens, fall back to a vote through the registry's castVoteOnIssue, the
+// first of registryVoteAttempts that simulates as a vote on this issue. The fallback is
+// gated on the chain still showing the vote as pending, so a first attempt that actually
+// succeeded is never submitted twice.
 export const castVoteOnIssueById = async (
   accessToken: string,
   userAddress: string,
@@ -702,9 +701,16 @@ export const castVoteOnIssueById = async (
 
     return { contractName, contractAddress: tx.to, method: tx.funcName, args: namedArgs };
   };
+  const replay = replayCall();
 
+  // A wallet signs and submits the vote after the request returns, so neither the check
+  // that it landed on this issue nor the fallback on a failed replay can run on the real
+  // transaction. Both run on simulations instead, the replay first
   if (requestContext.getStore()?.externalSigning) {
-    const { call, votedVia } = await walletVoteCall(accessToken, userAddress, issue, replayCall);
+    const { call, votedVia } = await chooseVoteCall(accessToken, userAddress, issue, [
+      { what: "replaying the original transaction", via: "replay", call: () => replay },
+      ...registryVoteAttempts(accessToken, issue, replay),
+    ]);
     return { ...(await submit(call)), votedVia };
   }
 
@@ -712,7 +718,7 @@ export const castVoteOnIssueById = async (
   // changed nothing on chain; a failure after it may or may not have
   let replaySubmitted = false;
   const replayOriginalTransaction = async (): Promise<{ status: string; hash: string }> => {
-    const call = await replayCall();
+    const call = await replay;
     replaySubmitted = true;
     return submit(call);
   };
@@ -748,7 +754,8 @@ export const castVoteOnIssueById = async (
 
   let result: { status: string; hash: string };
   try {
-    result = await submit(await registryVoteCall(accessToken, issue));
+    const { call } = await chooseVoteCall(accessToken, userAddress, issue, registryVoteAttempts(accessToken, issue, replay));
+    result = await submit(call);
   } catch (error: any) {
     if (error instanceof Error) {
       error.message = `${error.message} (after replaying the original transaction failed: ${replayError?.message ?? replayError})`;
