@@ -34,8 +34,9 @@ export const MAX_TIMELOCK_DELAY = 2592000;
 
 export type ProtocolActionKind =
   | "stake" | "unstake" | "cdpDeposit" | "cdpBorrow"
-  | "addLiquidity" | "addLiquiditySingle" | "addLiquidityStable"
-  | "removeLiquidity" | "removeLiquidityStable" | "removeLiquidityOneCoin";
+  | "addLiquidity" | "addLiquidityStable"
+  | "removeLiquidity" | "removeLiquidityStable" | "removeLiquidityOneCoin"
+  | "v3Mint" | "v3Increase" | "v3Decrease" | "v3Collect";
 
 export interface ProtocolActionInput {
   target: string;
@@ -47,7 +48,11 @@ export interface ProtocolActionInput {
   amounts?: string[];
   receiver?: string;
   coinIndex?: string;
-  isAToB?: boolean;
+  pool?: string;
+  tokenId?: string;
+  tickLower?: string;
+  tickUpper?: string;
+  liquidity?: string;
 }
 
 /** Exact target call carried by each SMD protocol-action issue. */
@@ -87,16 +92,6 @@ export function buildProtocolActionCall(
         args: [
           typedVariadicArg("uint256", input.amount),
           typedVariadicArg("uint256", input.amount2 || ""),
-          typedVariadicArg("uint256", String(nowSeconds + 60 * 24 * 60 * 60)),
-        ],
-      };
-    case "addLiquiditySingle":
-      return {
-        target,
-        func: "addLiquiditySingleToken",
-        args: [
-          typedVariadicArg("bool", String(!!input.isAToB)),
-          typedVariadicArg("uint256", input.amount),
           typedVariadicArg("uint256", String(nowSeconds + 60 * 24 * 60 * 60)),
         ],
       };
@@ -141,6 +136,58 @@ export function buildProtocolActionCall(
           typedVariadicArg("uint256", input.coinIndex || ""),
           typedVariadicArg("uint256", input.amount2 || ""),
           typedVariadicArg("address", input.receiver || ""),
+        ],
+      };
+    case "v3Mint":
+      return {
+        target,
+        func: "mint",
+        args: [
+          typedVariadicArg("address", input.pool || ""),
+          typedVariadicArg("int256", input.tickLower || ""),
+          typedVariadicArg("int256", input.tickUpper || ""),
+          typedVariadicArg("uint256", input.amount),
+          typedVariadicArg("uint256", input.amount2 || ""),
+          typedVariadicArg("uint256", input.amount3 || ""),
+          typedVariadicArg("uint256", input.amounts?.[0] || ""),
+          typedVariadicArg("address", input.receiver || ""),
+          typedVariadicArg("uint256", String(nowSeconds + 60 * 24 * 60 * 60)),
+        ],
+      };
+    case "v3Increase":
+      return {
+        target,
+        func: "increaseLiquidity",
+        args: [
+          typedVariadicArg("uint256", input.tokenId || ""),
+          typedVariadicArg("uint256", input.amount),
+          typedVariadicArg("uint256", input.amount2 || ""),
+          typedVariadicArg("uint256", input.amount3 || ""),
+          typedVariadicArg("uint256", input.amounts?.[0] || ""),
+          typedVariadicArg("uint256", String(nowSeconds + 60 * 24 * 60 * 60)),
+        ],
+      };
+    case "v3Decrease":
+      return {
+        target,
+        func: "decreaseLiquidity",
+        args: [
+          typedVariadicArg("uint256", input.tokenId || ""),
+          typedVariadicArg("uint256", input.liquidity || ""),
+          typedVariadicArg("uint256", input.amount || ""),
+          typedVariadicArg("uint256", input.amount2 || ""),
+          typedVariadicArg("uint256", String(nowSeconds + 60 * 24 * 60 * 60)),
+        ],
+      };
+    case "v3Collect":
+      return {
+        target,
+        func: "collect",
+        args: [
+          typedVariadicArg("uint256", input.tokenId || ""),
+          typedVariadicArg("address", input.receiver || ""),
+          typedVariadicArg("uint256", input.amount || ""),
+          typedVariadicArg("uint256", input.amount2 || ""),
         ],
       };
   }

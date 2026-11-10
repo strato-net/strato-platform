@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { applyConfirmedVote, buildNestedCastVotePayload, buildOpenIssues, buildProtocolActionCall, buildProtocolWorkflowCalls, mergeIndexedIssues, MULTISIG_SOURCE, normalizeArgs, votesNeeded } from "./multisig";
-import { formatVariadicArg, parseArgText, typedVariadicArg } from "../lib/args";
+import { formatVariadicArg, parseArgText, parseVariadicBoolean, typedVariadicArg } from "../lib/args";
 import { pollResults } from "../lib/walletTx";
 import { api } from "../lib/api";
 
@@ -90,18 +90,6 @@ test("protocol workflows build the exact typed target calls", () => {
     ],
   });
 
-  assert.deepEqual(buildProtocolActionCall("addLiquiditySingle", {
-    target: pool, amount: "40", isAToB: false,
-  }, 1000), {
-    target: pool,
-    func: "addLiquiditySingleToken",
-    args: [
-      { type: "bool", value: false },
-      { type: "uint256", value: 40 },
-      { type: "uint256", value: 5185000 },
-    ],
-  });
-
   assert.deepEqual(buildProtocolActionCall("addLiquidityStable", {
     target: pool, amount: "", amount2: "5", amounts: ["10", "20"], receiver: wallet,
   }), {
@@ -137,6 +125,50 @@ test("protocol workflows build the exact typed target calls", () => {
       { type: "uint256", value: 0 },
       { type: "uint256", value: 45 },
       { type: "address", value: wallet },
+    ],
+  });
+
+  assert.deepEqual(buildProtocolActionCall("v3Mint", {
+    target: signer,
+    pool,
+    tickLower: "-120",
+    tickUpper: "120",
+    amount: "100",
+    amount2: "200",
+    amount3: "90",
+    amounts: ["180"],
+    receiver: wallet,
+  }, 1000), {
+    target: signer,
+    func: "mint",
+    args: [
+      { type: "address", value: pool },
+      { type: "int256", value: -120 },
+      { type: "int256", value: 120 },
+      { type: "uint256", value: 100 },
+      { type: "uint256", value: 200 },
+      { type: "uint256", value: 90 },
+      { type: "uint256", value: 180 },
+      { type: "address", value: wallet },
+      { type: "uint256", value: 5185000 },
+    ],
+  });
+
+  assert.deepEqual(buildProtocolActionCall("v3Decrease", {
+    target: signer,
+    tokenId: "7",
+    liquidity: "500",
+    amount: "10",
+    amount2: "20",
+  }, 1000), {
+    target: signer,
+    func: "decreaseLiquidity",
+    args: [
+      { type: "uint256", value: 7 },
+      { type: "uint256", value: 500 },
+      { type: "uint256", value: 10 },
+      { type: "uint256", value: 20 },
+      { type: "uint256", value: 5185000 },
     ],
   });
 
@@ -190,6 +222,11 @@ test("plain boolean form input and the explicit cast produce the same typed argu
   assert.equal(formatVariadicArg(parseArgText("false")), "bool(false)");
   assert.equal(formatVariadicArg(parseArgText("bool(false)")), "bool(false)");
   assert.equal(formatVariadicArg(parseArgText("true")), "bool(true)");
+  assert.equal(parseVariadicBoolean("true"), true);
+  assert.equal(parseVariadicBoolean("bool(true)"), true);
+  assert.equal(parseVariadicBoolean("false"), false);
+  assert.equal(parseVariadicBoolean("bool(false)"), false);
+  assert.equal(parseVariadicBoolean("not-a-bool"), null);
 });
 
 const proposal = { target: pool, func: "swap", args: normalizeArgs(args), voters: [signer] };

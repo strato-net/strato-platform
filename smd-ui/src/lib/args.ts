@@ -97,3 +97,11 @@ export function formatVariadicArg(value: unknown): string {
   if (value !== null && typeof value === "object") return JSON.stringify(bigintsToStrings(value));
   return String(value);
 }
+
+/** Decode a boolean rendered by Cirrus/SolidVM, including its explicit cast form. */
+export function parseVariadicBoolean(value: unknown): boolean | null {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === "true" || normalized === "bool(true)") return true;
+  if (normalized === "false" || normalized === "bool(false)") return false;
+  return null;
+}

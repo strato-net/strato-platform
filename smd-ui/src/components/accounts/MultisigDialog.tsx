@@ -43,7 +43,7 @@ import { AddrLink } from "@/components/explorer/AddrLink";
 import { shortenHex } from "@/lib/utils";
 import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
-import { formatVariadicArg, parseArgText, typedVariadicArg, variadicArgValue } from "@/lib/args";
+import { formatVariadicArg, parseArgText, parseVariadicBoolean, typedVariadicArg, variadicArgValue } from "@/lib/args";
 import {
   useMyTokens,
   useTokenAllowances,
@@ -786,6 +786,17 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
     }
   };
 
+  const chooseReplacementSigner = (addr: string) => {
+    setReplaceSigner(addr);
+    // The replacement editor is below the signer list. Bring it into view and
+    // focus the candidate field so the row-level Replace action is explicit.
+    requestAnimationFrame(() => {
+      const input = document.getElementById("replacement-signer");
+      input?.scrollIntoView({ behavior: "smooth", block: "center" });
+      input?.focus({ preventScroll: true });
+    });
+  };
+
   const doSwap = async () => {
     if (!guard()) return;
     if (!replaceSigner || strip0x(replacementAddr).length !== 40) {
@@ -977,7 +988,7 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setReplaceSigner(s)}
+                onClick={() => chooseReplacementSigner(s)}
                 disabled={busy !== "" || !canSubmit || !canVote}
                 className="ml-auto"
               >
@@ -1020,6 +1031,7 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
           </SelectContent>
         </Select>
         <AddressInput
+          id="replacement-signer"
           value={replacement}
           resolved={replacementAddr}
           onChange={(text, addr) => {
@@ -1036,7 +1048,7 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
           <Button
             size="sm"
             onClick={doSwap}
-            disabled={busy !== "" || !canSubmit || !canVote || !replaceSigner || !replacement.trim()}
+            disabled={busy !== "" || !canSubmit || !canVote || !replaceSigner || !validContractAddress(replacementAddr)}
           >
             {busy === "swap" ? "Voting…" : "Propose replacement"}
           </Button>
@@ -1142,7 +1154,7 @@ function issueAllowanceRequirements(
   }
   if (issue.func === "addLiquiditySingleToken") {
     const amount = issue.args[1] ?? "0";
-    const token = String(issue.args[0]).toLowerCase() === "true" ? pool.tokenA : pool.tokenB;
+    const token = parseVariadicBoolean(issue.args[0]) === true ? pool.tokenA : pool.tokenB;
     return validAmount(amount) ? [requirement(token.address, issue.target, amount)] : [];
   }
   if (issue.func === "addLiquidityGeneral" && pool.coins?.length) {
@@ -1270,6 +1282,11 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
           ? { description: "It lands here once each multisig on the route passes its own vote." }
           : undefined
       );
+      if (issue.func === "approve") {
+        // The dependent issue can be unlocked as soon as Cirrus indexes the new
+        // allowance; do not leave the button waiting for the periodic refresh.
+        queryClient.invalidateQueries({ queryKey: ["token-allowance"] });
+      }
       invalidate();
     } catch (err: any) {
       toast.error("Vote failed", { description: String(err?.message || err) });
@@ -2111,13 +2128,20 @@ const ACTION_LABELS: Record<ProtocolActionKind, string> = {
   unstake: "Unstake",
   cdpDeposit: "CDP deposit",
   cdpBorrow: "CDP borrow",
-  addLiquidity: "Add dual-token liquidity",
-  addLiquiditySingle: "Add single-token liquidity",
+  addLiquidity: "Add liquidity",
   addLiquidityStable: "Add stable multi-token liquidity",
-  removeLiquidity: "Remove dual-token liquidity",
+  removeLiquidity: "Remove liquidity",
   removeLiquidityStable: "Remove stable multi-token liquidity",
   removeLiquidityOneCoin: "Remove stable liquidity as one coin",
+  v3Mint: "Create V3 position",
+  v3Increase: "Increase V3 position",
+  v3Decrease: "Decrease V3 position",
+  v3Collect: "Collect V3 position",
 };
+
+const ACTION_MENU: ProtocolActionKind[] = [
+  "stake", "unstake", "cdpDeposit", "cdpBorrow", "addLiquidity", "removeLiquidity",
+];
 
 /** Action label as part of a sentence, while preserving protocol acronyms. */
 const proposalActionLabel = (action: ProtocolActionKind): string => {
@@ -2170,26 +2194,46 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
   const [tokensText, setTokensText] = useState("");
   const [amountsText, setAmountsText] = useState("");
   const [coinIndex, setCoinIndex] = useState("");
-  const [isAToB, setIsAToB] = useState(true);
+  const [liquidityVersion, setLiquidityVersion] = useState<"v2" | "stable" | "v3">("v2");
+  const [stableRemoveMode, setStableRemoveMode] = useState<"balanced" | "oneCoin">("balanced");
+  const [v3AddMode, setV3AddMode] = useState<"mint" | "increase">("mint");
+  const [v3RemoveMode, setV3RemoveMode] = useState<"decrease" | "collect">("decrease");
+  const [v3Manager, setV3Manager] = useState("");
+  const [v3Pool, setV3Pool] = useState("");
+  const [v3Token0, setV3Token0] = useState("");
+  const [v3Token1, setV3Token1] = useState("");
+  const [v3TokenId, setV3TokenId] = useState("");
+  const [v3TickLower, setV3TickLower] = useState("");
+  const [v3TickUpper, setV3TickUpper] = useState("");
+  const [v3Liquidity, setV3Liquidity] = useState("");
+  const [v3Amount1Min, setV3Amount1Min] = useState("");
   const [busy, setBusy] = useState<"action" | "">("");
 
   const isStakingAction = action === "stake" || action === "unstake";
   const isCDPAction = action === "cdpDeposit" || action === "cdpBorrow";
-  const isStablePoolAction = action === "addLiquidityStable" ||
-    action === "removeLiquidityStable" || action === "removeLiquidityOneCoin";
+  const isLiquidityAction = action === "addLiquidity" || action === "removeLiquidity";
+  const isStablePoolAction = isLiquidityAction && liquidityVersion === "stable";
   const isPoolAction = !!action && !isStakingAction && !isCDPAction;
   const availablePools = useMemo(() => (poolMetadata.data ?? []).filter((pool) =>
     !pool.isPaused && !pool.isDisabled &&
     (isStablePoolAction ? !!pool.coins?.length : !pool.coins?.length)
   ), [poolMetadata.data, isStablePoolAction]);
   const selectedPool = availablePools.find((pool) => eq(pool.address, target));
+  const effectiveAction: ProtocolActionKind | null = action === "addLiquidity"
+    ? liquidityVersion === "stable" ? "addLiquidityStable"
+      : liquidityVersion === "v3" ? (v3AddMode === "mint" ? "v3Mint" : "v3Increase")
+      : "addLiquidity"
+    : action === "removeLiquidity"
+      ? liquidityVersion === "stable" ? (stableRemoveMode === "oneCoin" ? "removeLiquidityOneCoin" : "removeLiquidityStable")
+        : liquidityVersion === "v3" ? (v3RemoveMode === "decrease" ? "v3Decrease" : "v3Collect")
+        : "removeLiquidity"
+      : action;
 
   const applyPool = (pool: PoolMetadata) => {
     setTarget(pool.address);
     setTokenA(pool.tokenA.address);
     setTokenB(pool.tokenB.address);
     if (pool.coins?.length) setTokensText(JSON.stringify(pool.coins.map((coin) => coin.address)));
-    if (action === "addLiquiditySingle") setAsset(isAToB ? pool.tokenA.address : pool.tokenB.address);
   };
 
   useEffect(() => {
@@ -2207,12 +2251,12 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
   }, [manualAddresses, action, isCDPAction, cdpMetadata.data]);
 
   useEffect(() => {
-    if (manualAddresses || !isPoolAction || !availablePools.length) return;
+    if (manualAddresses || !isPoolAction || liquidityVersion === "v3" || !availablePools.length) return;
     const pool = availablePools.find((item) => eq(item.address, target)) ?? availablePools[0];
     applyPool(pool);
     // Action changes intentionally reset the target, so the first compatible pool is selected.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manualAddresses, action, poolMetadata.data]);
+  }, [manualAddresses, action, liquidityVersion, poolMetadata.data]);
 
   const changeAction = (value: ProtocolActionKind) => {
     setAction(value);
@@ -2230,23 +2274,34 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
     setTokensText("");
     setAmountsText("");
     setCoinIndex("");
-    setIsAToB(true);
+    setV3Pool("");
+    setV3Token0("");
+    setV3Token1("");
+    setV3TokenId("");
+    setV3TickLower("");
+    setV3TickUpper("");
+    setV3Liquidity("");
+    setV3Amount1Min("");
   };
 
   const stableTokens = textArray(tokensText);
   const stableAmounts = textArray(amountsText);
-  const approvalSpender = action === "stake" || action === "addLiquidity" ||
-      action === "addLiquiditySingle" || action === "addLiquidityStable"
-    ? target
+  const isV3Add = effectiveAction === "v3Mint" || effectiveAction === "v3Increase";
+  const approvalSpender = action === "stake" ? target
+    : effectiveAction === "addLiquidity" || effectiveAction === "addLiquidityStable" ? target
+    : isV3Add ? v3Manager
     : action === "cdpDeposit"
       ? spender
       : "";
   const approvalRequired = action === "stake" || action === "cdpDeposit" ||
-    action === "addLiquidity" || action === "addLiquiditySingle" || action === "addLiquidityStable";
-  const approvalSpecs = action === "addLiquidity"
+    effectiveAction === "addLiquidity" || effectiveAction === "addLiquidityStable" || isV3Add;
+  const approvalSpecs = effectiveAction === "addLiquidity"
     ? [{ token: tokenA, value: amount2 }, { token: tokenB, value: amount }]
-    : action === "addLiquidityStable"
+    : effectiveAction === "addLiquidityStable"
       ? stableTokens.map((token, index) => ({ token, value: stableAmounts[index] ?? "0" }))
+          .filter(({ value }) => positiveInteger(value))
+      : isV3Add
+        ? [{ token: v3Token0, value: amount }, { token: v3Token1, value: amount2 }]
           .filter(({ value }) => positiveInteger(value))
       : approvalRequired
         ? [{ token: asset, value: amount }]
@@ -2254,7 +2309,7 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
   const approvalInputsComplete = approvalRequired && validContractAddress(approvalSpender) &&
     approvalSpecs.length > 0 && approvalSpecs.every(({ token, value }) =>
       validContractAddress(token) && positiveInteger(value)) &&
-    (action !== "addLiquidityStable" || (stableTokens.length === stableAmounts.length &&
+    (effectiveAction !== "addLiquidityStable" || (stableTokens.length === stableAmounts.length &&
       stableTokens.length > 0 && stableTokens.every(validContractAddress) &&
       stableAmounts.every(nonNegativeInteger)));
   const allowances = useTokenAllowances(
@@ -2281,10 +2336,12 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
 
   const proposeWorkflow = async () => {
     if (!canVote) return toast.error("Only a signer can propose this action");
-    if (!action) return toast.error("Select a protocol operation");
-    const selectedAction = action;
-    if (!validContractAddress(target)) return toast.error("Enter a valid protocol contract address");
-    if (!manualAddresses && isPoolAction && !selectedPool) {
+    if (!action || !effectiveAction) return toast.error("Select a protocol operation");
+    const selectedAction = effectiveAction;
+    const v3Action = selectedAction.startsWith("v3");
+    const actionTarget = v3Action ? v3Manager : target;
+    if (!validContractAddress(actionTarget)) return toast.error("Enter a valid protocol contract address");
+    if (!manualAddresses && isPoolAction && liquidityVersion !== "v3" && !selectedPool) {
       return toast.error("Select a valid pool for this liquidity action");
     }
     if (approvalRequired && !approvalInputsComplete) {
@@ -2315,10 +2372,6 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
           if (!validContractAddress(tokenA) || !validContractAddress(tokenB)) throw new Error("Enter both pool token addresses");
           if (!positiveInteger(amount) || !positiveInteger(amount2)) throw new Error("Enter positive token amounts in raw units");
           break;
-        case "addLiquiditySingle":
-          if (!validContractAddress(asset)) throw new Error("Enter the deposited token address");
-          if (!positiveInteger(amount)) throw new Error("Enter a positive token amount in raw units");
-          break;
         case "addLiquidityStable":
           if (!approvalInputsComplete) throw new Error("Enter matching token and amount arrays");
           if (!positiveInteger(amount2)) throw new Error("Enter a positive minimum LP mint amount");
@@ -2336,24 +2389,57 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
             throw new Error("Enter a positive LP amount, coin index, and minimum received amount");
           }
           break;
+        case "v3Mint":
+          if (![v3Pool, v3Token0, v3Token1].every(validContractAddress)) throw new Error("Enter valid V3 pool and token addresses");
+          if (!/^-?\d+$/.test(v3TickLower) || !/^-?\d+$/.test(v3TickUpper) || BigInt(v3TickLower) >= BigInt(v3TickUpper)) {
+            throw new Error("Enter an ordered lower and upper tick");
+          }
+          if (![amount, amount2, amount3, v3Amount1Min].every(nonNegativeInteger) ||
+              !(positiveInteger(amount) || positiveInteger(amount2))) throw new Error("Enter valid V3 desired and minimum amounts");
+          break;
+        case "v3Increase":
+          if (![v3Token0, v3Token1].every(validContractAddress) || !positiveInteger(v3TokenId)) throw new Error("Enter valid V3 tokens and token ID");
+          if (![amount, amount2, amount3, v3Amount1Min].every(nonNegativeInteger) ||
+              !(positiveInteger(amount) || positiveInteger(amount2))) throw new Error("Enter valid V3 desired and minimum amounts");
+          break;
+        case "v3Decrease":
+          if (!positiveInteger(v3TokenId) || !positiveInteger(v3Liquidity) ||
+              ![amount, amount2].every(nonNegativeInteger)) throw new Error("Enter a token ID, liquidity, and minimum amounts");
+          break;
+        case "v3Collect":
+          if (!positiveInteger(v3TokenId) || ![amount, amount2].every(nonNegativeInteger) ||
+              !(positiveInteger(amount) || positiveInteger(amount2))) throw new Error("Enter a token ID and collection maximums");
+          break;
       }
       const workflow = buildProtocolWorkflowCalls(selectedAction, {
-        target, validator, asset, amount, amount2, amount3,
-        amounts: stableAmounts,
+        target: actionTarget, validator, asset, amount, amount2, amount3,
+        amounts: v3Action ? [v3Amount1Min] : stableAmounts,
         receiver: wallet.address,
         coinIndex,
-        isAToB,
+        pool: v3Pool,
+        tokenId: v3TokenId,
+        tickLower: v3TickLower,
+        tickUpper: v3TickUpper,
+        liquidity: v3Liquidity,
       }, missingApprovals.map((approval) => ({
         token: approval.token,
         spender: approvalSpender,
         amount: approval.value,
       })));
+      // V3 mint/increase issues do not carry their approval-token addresses, so they
+      // cannot be reconstructed safely for allowance gating after a reload. Submit
+      // approvals first, and only create the action once those allowances are indexed.
+      const callsToSubmit = isV3Add && missingApprovals.length ? workflow.slice(0, -1) : workflow;
       setBusy("action");
-      for (const call of workflow) {
+      for (const call of callsToSubmit) {
         await castVote(call.func, call.args, call.target);
       }
-      toast.success(`${ACTION_LABELS[selectedAction]} workflow proposed`, {
-        description: missingApprovals.length
+      toast.success(isV3Add && missingApprovals.length
+        ? `${missingApprovals.length === 1 ? "Approval" : "Approvals"} proposed`
+        : `${ACTION_LABELS[selectedAction]} workflow proposed`, {
+        description: isV3Add && missingApprovals.length
+          ? "Execute the approval issues, then return here to propose the V3 action."
+          : missingApprovals.length
           ? "Approval issues were created first. The action unlocks for more votes after they execute."
           : "Signers can review and vote on it in the Issues tab.",
       });
@@ -2385,7 +2471,7 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         <Select value={action ?? undefined} onValueChange={(value) => changeAction(value as ProtocolActionKind)}>
           <SelectTrigger><SelectValue placeholder="Select an operation" /></SelectTrigger>
           <SelectContent>
-            {(Object.keys(ACTION_LABELS) as ProtocolActionKind[]).map((value) => (
+            {ACTION_MENU.map((value) => (
               <SelectItem key={value} value={value}>{ACTION_LABELS[value]}</SelectItem>
             ))}
           </SelectContent>
@@ -2408,12 +2494,56 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         <Alert><AlertTriangle className="h-4 w-4" /><AlertDescription>Only a signer can propose protocol actions.</AlertDescription></Alert>
       ) : null}
 
-      {manualAddresses && action ? addressInput(
+      {isLiquidityAction ? <>
+        <div className="space-y-1">
+          <Label>Liquidity version</Label>
+          <Select value={liquidityVersion} onValueChange={(value) => {
+            setLiquidityVersion(value as "v2" | "stable" | "v3");
+            setTarget("");
+          }}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="v2">V2 standard pool</SelectItem>
+              <SelectItem value="stable">V2 stable pool</SelectItem>
+              <SelectItem value="v3">V3 position</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {liquidityVersion === "v3" && action === "addLiquidity" ? (
+          <div className="space-y-1">
+            <Label>V3 operation</Label>
+            <Select value={v3AddMode} onValueChange={(value) => setV3AddMode(value as "mint" | "increase")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="mint">Create new position</SelectItem><SelectItem value="increase">Increase existing position</SelectItem></SelectContent>
+            </Select>
+          </div>
+        ) : null}
+        {liquidityVersion === "v3" && action === "removeLiquidity" ? (
+          <div className="space-y-1">
+            <Label>V3 operation</Label>
+            <Select value={v3RemoveMode} onValueChange={(value) => setV3RemoveMode(value as "decrease" | "collect")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="decrease">Decrease liquidity</SelectItem><SelectItem value="collect">Collect owed tokens</SelectItem></SelectContent>
+            </Select>
+          </div>
+        ) : null}
+        {liquidityVersion === "stable" && action === "removeLiquidity" ? (
+          <div className="space-y-1">
+            <Label>Stable removal</Label>
+            <Select value={stableRemoveMode} onValueChange={(value) => setStableRemoveMode(value as "balanced" | "oneCoin")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="balanced">All coins proportionally</SelectItem><SelectItem value="oneCoin">One coin</SelectItem></SelectContent>
+            </Select>
+          </div>
+        ) : null}
+      </> : null}
+
+      {manualAddresses && action && (!isLiquidityAction || liquidityVersion !== "v3") ? addressInput(
         isStakingAction ? "Staking contract" : isCDPAction ? "CDP engine" : "Pool contract",
         target, setTarget, "40-character contract address"
       ) : null}
 
-      {!manualAddresses && isPoolAction ? (
+      {!manualAddresses && isPoolAction && liquidityVersion !== "v3" ? (
         <div className="space-y-1">
           <Label>Pool</Label>
           <Select value={target} onValueChange={(value) => {
@@ -2432,12 +2562,12 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         </div>
       ) : null}
 
-      {!manualAddresses && validContractAddress(target) ? (
+      {!manualAddresses && (!isLiquidityAction || liquidityVersion !== "v3") && validContractAddress(target) ? (
         <p className="break-all font-mono text-xs text-muted-foreground">Contract: {target}</p>
       ) : null}
 
       {!manualAddresses && ((isStakingAction && stakingMetadata.isError) ||
-        (isCDPAction && cdpMetadata.isError) || (isPoolAction && poolMetadata.isError)) ? (
+        (isCDPAction && cdpMetadata.isError) || (isPoolAction && liquidityVersion !== "v3" && poolMetadata.isError)) ? (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>Protocol metadata could not be loaded. Use manual address entry to continue.</AlertDescription>
@@ -2482,7 +2612,7 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         {amountInput(action === "cdpBorrow" ? "USDST to borrow (raw units)" : "Collateral amount (raw units)", amount, setAmount)}
       </>}
 
-      {action === "addLiquidity" && <>
+      {effectiveAction === "addLiquidity" && <>
         {manualAddresses ? addressInput("Token A", tokenA, setTokenA, "Token A contract address") :
           <p className="text-xs text-muted-foreground">Token A: {selectedPool?.tokenA._symbol || "—"}</p>}
         {amountInput("Maximum token A amount (raw units)", amount2, setAmount2)}
@@ -2491,28 +2621,7 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         {amountInput("Token B amount (raw units)", amount, setAmount)}
       </>}
 
-      {action === "addLiquiditySingle" && <>
-        {manualAddresses ? addressInput("Deposited token", asset, setAsset, "Token contract address") : null}
-        <div className="space-y-1">
-          <Label>Deposited side</Label>
-          <Select value={isAToB ? "a" : "b"} onValueChange={(value) => {
-            const nextIsAToB = value === "a";
-            setIsAToB(nextIsAToB);
-            if (!manualAddresses && selectedPool) {
-              setAsset(nextIsAToB ? selectedPool.tokenA.address : selectedPool.tokenB.address);
-            }
-          }}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="a">Token A{selectedPool ? ` · ${selectedPool.tokenA._symbol}` : ""}</SelectItem>
-              <SelectItem value="b">Token B{selectedPool ? ` · ${selectedPool.tokenB._symbol}` : ""}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {amountInput("Token amount (raw units)", amount, setAmount)}
-      </>}
-
-      {action === "addLiquidityStable" && <>
+      {effectiveAction === "addLiquidityStable" && <>
         {manualAddresses ? <div className="space-y-1">
           <Label>Coin contract addresses</Label>
           <Input value={tokensText} onChange={(e) => setTokensText(e.target.value)} placeholder='["address0","address1",…]' className="font-mono text-xs" />
@@ -2526,13 +2635,13 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         {amountInput("Minimum LP tokens minted (raw units)", amount2, setAmount2)}
       </>}
 
-      {action === "removeLiquidity" && <>
+      {effectiveAction === "removeLiquidity" && <>
         {amountInput("LP token amount (raw units)", amount, setAmount)}
         {amountInput("Minimum token B amount (raw units)", amount2, setAmount2)}
         {amountInput("Minimum token A amount (raw units)", amount3, setAmount3)}
       </>}
 
-      {action === "removeLiquidityStable" && <>
+      {effectiveAction === "removeLiquidityStable" && <>
         {amountInput("LP token amount (raw units)", amount, setAmount)}
         <div className="space-y-1">
           <Label>Minimum coin amounts (raw units, pool order)</Label>
@@ -2540,7 +2649,7 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         </div>
       </>}
 
-      {action === "removeLiquidityOneCoin" && <>
+      {effectiveAction === "removeLiquidityOneCoin" && <>
         {amountInput("LP token amount (raw units)", amount, setAmount)}
         <div className="space-y-1">
           <Label>Coin index</Label>
@@ -2557,6 +2666,42 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         </div>
         {amountInput("Minimum coin amount received (raw units)", amount2, setAmount2)}
       </>}
+
+      {(effectiveAction === "v3Mint" || effectiveAction === "v3Increase" ||
+        effectiveAction === "v3Decrease" || effectiveAction === "v3Collect") ? <>
+        {addressInput("PositionManagerV3", v3Manager, setV3Manager, "Position manager contract address")}
+        {effectiveAction === "v3Mint" ? <>
+          {addressInput("V3 pool", v3Pool, setV3Pool, "PoolV3 contract address")}
+          {addressInput("Token 0", v3Token0, setV3Token0, "Token 0 contract address")}
+          {addressInput("Token 1", v3Token1, setV3Token1, "Token 1 contract address")}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1"><Label>Lower tick</Label><Input value={v3TickLower} onChange={(e) => setV3TickLower(e.target.value)} inputMode="numeric" /></div>
+            <div className="space-y-1"><Label>Upper tick</Label><Input value={v3TickUpper} onChange={(e) => setV3TickUpper(e.target.value)} inputMode="numeric" /></div>
+          </div>
+        </> : null}
+        {effectiveAction === "v3Increase" ? <>
+          {addressInput("Token 0", v3Token0, setV3Token0, "Token 0 contract address")}
+          {addressInput("Token 1", v3Token1, setV3Token1, "Token 1 contract address")}
+        </> : null}
+        {(effectiveAction === "v3Increase" || effectiveAction === "v3Decrease" || effectiveAction === "v3Collect") ?
+          amountInput("Position token ID", v3TokenId, setV3TokenId) : null}
+        {(effectiveAction === "v3Mint" || effectiveAction === "v3Increase") ? <>
+          {amountInput("Token 0 desired (raw units)", amount, setAmount)}
+          {amountInput("Token 1 desired (raw units)", amount2, setAmount2)}
+          {amountInput("Token 0 minimum (raw units)", amount3, setAmount3)}
+          {amountInput("Token 1 minimum (raw units)", v3Amount1Min, setV3Amount1Min)}
+        </> : null}
+        {effectiveAction === "v3Decrease" ? <>
+          {amountInput("Liquidity units to remove", v3Liquidity, setV3Liquidity)}
+          {amountInput("Token 0 minimum (raw units)", amount, setAmount)}
+          {amountInput("Token 1 minimum (raw units)", amount2, setAmount2)}
+        </> : null}
+        {effectiveAction === "v3Collect" ? <>
+          {amountInput("Token 0 maximum to collect", amount, setAmount)}
+          {amountInput("Token 1 maximum to collect", amount2, setAmount2)}
+        </> : null}
+        <p className="text-xs text-muted-foreground">V3 token amounts and ticks are raw values. The recipient is fixed to this multisig wallet.</p>
+      </> : null}
 
       {approvalRequired ? (
         <div className="space-y-2 rounded-md border border-border p-3">
@@ -2577,7 +2722,7 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         </div>
       ) : null}
 
-      {(action === "addLiquidity" || action === "addLiquiditySingle" || action === "removeLiquidity") ? (
+      {isLiquidityAction && effectiveAction !== "v3Collect" ? (
         <p className="text-xs text-muted-foreground">The proposal uses a deadline 60 days from submission; minimum amounts still enforce slippage protection.</p>
       ) : null}
 
