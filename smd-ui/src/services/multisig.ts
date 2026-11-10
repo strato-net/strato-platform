@@ -1046,6 +1046,17 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
     [callWallet]
   );
 
+  /** Retract the connected direct signer's vote; may move a queued issue below quorum. */
+  const withdrawVote = useCallback(
+    (issue: { target: string; func: string; args: unknown[] }) =>
+      callWallet("withdrawVote", {
+        _target: strip0x(issue.target || walletAddress),
+        _func: issue.func,
+        _args: issue.args,
+      }),
+    [callWallet, walletAddress]
+  );
+
   /**
    * Run a queued issue once its timelock is up. Anyone may, so it goes straight to the
    * wallet even on a nested route, with the args its votes carried (same issueId).
@@ -1097,6 +1108,7 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
     setDefaultThreshold,
     castVote,
     dismissIssue,
+    withdrawVote,
     executeIssue,
     cancelIssue,
     setTimelockDelay,

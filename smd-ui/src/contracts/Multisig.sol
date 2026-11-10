@@ -48,6 +48,7 @@ contract record Multisig {
 
     event IssueCreated(address creator, string issueId, address target, string func, variadic args);
     event IssueVoted(address voter, string issueId, address target, string func, variadic args);
+    event IssueVoteWithdrawn(address voter, string issueId);
     event IssueQueued(address queuer, string issueId, address target, string func, uint executableAt, uint expiresAt, variadic args);
     event IssueExecuted(address executor, string issueId, address target, string func, variadic args);
     event IssueDismissed(address sender, string issueId);
@@ -138,6 +139,21 @@ contract record Multisig {
         require(votes[_issueId][0] == msg.sender, "Only the proposer can dismiss their issue");
         _clearIssue(_issueId);
         emit IssueDismissed(msg.sender, _issueId);
+    }
+
+    function withdrawVote(address _target, string _func, variadic _args) external {
+        string issueId = _getIssueId(_target, _func, _args);
+        require(currentIssues[issueId], "Issue does not exist or is not active");
+        require(votesMap[issueId][msg.sender] != 0, "Caller has not voted on this issue");
+
+        _removeVote(issueId, msg.sender);
+        emit IssueVoteWithdrawn(msg.sender, issueId);
+
+        if (votes[issueId].length == 0) {
+            _clearIssue(issueId);
+        } else if (timelocks[issueId].executableAt != 0 && !_shouldExecute(issueId, _target, _func)) {
+            _clearTimelock(issueId);
+        }
     }
 
     function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
@@ -261,6 +277,16 @@ contract record Multisig {
         votes[_issueId].length = 0;
         delete currentIssues[_issueId];
         _clearTimelock(_issueId);
+    }
+
+    function _removeVote(string _issueId, address _voter) internal {
+        uint index = votesMap[_issueId][_voter];
+        address swap = votes[_issueId][votes[_issueId].length - 1];
+        votes[_issueId][index - 1] = swap;
+        votesMap[_issueId][swap] = index;
+        votesMap[_issueId][_voter] = 0;
+        votes[_issueId][votes[_issueId].length - 1] = address(0);
+        votes[_issueId].length -= 1;
     }
 
     function _clearTimelock(string _issueId) internal {

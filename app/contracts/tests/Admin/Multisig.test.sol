@@ -325,6 +325,16 @@ contract Describe_Multisig {
         require(!vote(b, address(token), "transfer", address(outsider), 1000), "dismissed vote counted");
     }
 
+    function it_lets_a_signer_withdraw_their_vote() {
+        string issueId = ms.getIssueId(address(token), "transfer", address(outsider), 1000);
+        vote(a, address(token), "transfer", address(outsider), 1000);
+        require(rejects(outsider, address(wallet), "withdrawVote", address(token), "transfer", address(outsider), 1000), "non-voter withdrew a vote");
+        a.invoke(address(wallet), "withdrawVote", address(token), "transfer", address(outsider), 1000);
+        require(!ms.currentIssues(issueId), "empty issue remained open");
+        require(ms.votesMap(issueId, address(a)) == 0, "withdrawn vote remained recorded");
+        require(!vote(b, address(token), "transfer", address(outsider), 1000), "withdrawn vote counted");
+    }
+
     function it_executes_once_when_the_target_reenters() {
         ReentrantSigner r = new ReentrantSigner();
         swapSigner(address(c), address(r));
@@ -454,6 +464,17 @@ contract Describe_Multisig {
         require(rejects(b, address(wallet), "castVoteOnIssue", address(token), "transfer", address(outsider), 1000), "voted on a queued issue");
         require(rejects(a, address(wallet), "dismissIssue", issueId), "dismissed a queued issue");
         require(ms.currentIssues(issueId), "queued issue was dropped");
+    }
+
+    function it_unqueues_an_issue_when_a_signer_withdraws() {
+        enableTimelock();
+        string issueId = voteToQueue(address(token), "transfer", address(outsider), 1000);
+        b.invoke(address(wallet), "withdrawVote", address(token), "transfer", address(outsider), 1000);
+        require(ms.currentIssues(issueId), "issue was cleared while one vote remained");
+        require(issueExecutableAt(issueId) == 0, "issue stayed queued below quorum");
+        require(ms.votesMap(issueId, address(b)) == 0, "withdrawn queued vote remained recorded");
+        require(!vote(c, address(token), "transfer", address(outsider), 1000), "re-approved issue ran before its delay");
+        require(issueExecutableAt(issueId) != 0, "re-approved issue was not queued again");
     }
 
     function it_runs_a_queued_issue_after_a_signer_change() {

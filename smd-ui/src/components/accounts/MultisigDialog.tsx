@@ -563,10 +563,9 @@ function EnabledView({ wallet, route }: { wallet: UserWallet; route?: UserWallet
 }
 
 /**
- * User wallets enabled before the Multisig logic existed run the AdminRegistry logic,
- * which keeps counting votes from replaced signers and lets whitelisted accounts act
- * without a vote. Offer their signers a vote to switch; signers, threshold and funds
- * stay. Registries without a username (the global 0x100c) keep their logic.
+ * Wallets whose logic does not match the current Multisig source can vote to upgrade;
+ * signers, threshold and funds stay. Registries without a username (the global 0x100c)
+ * keep their logic.
  */
 function UpgradeLogicPanel({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserWallet[] }) {
   const { userAddress } = useUser();
@@ -612,9 +611,9 @@ function UpgradeLogicPanel({ wallet, fullRoute }: { wallet: UserWallet; fullRout
       <AlertTitle>Older multisig logic</AlertTitle>
       <AlertDescription className="space-y-2">
         <p>
-          This wallet runs the AdminRegistry logic, which keeps counting votes from signers who
-          have since been replaced and lets whitelisted accounts act without a vote. Switching
-          to the Multisig logic keeps its signers, threshold and funds.
+          This wallet runs an earlier governance logic version. AdminRegistry-based versions can
+          count votes from replaced signers and let whitelisted accounts act without a vote.
+          Switching to the current Multisig logic keeps its signers, threshold and funds.
         </p>
         <p>
           Resulting configuration: {requiredVotes} of {signers.length} approvals.
@@ -1190,6 +1189,7 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
     swapSigner,
     setDefaultThreshold,
     dismissIssue,
+    withdrawVote,
     executeIssue,
     cancelIssue,
     proposeTransfer,
@@ -1286,6 +1286,19 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
       invalidate();
     } catch (err: any) {
       toast.error("Dismiss failed", { description: String(err?.message || err) });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const withdraw = async (issue: OpenIssue) => {
+    setBusy(`${issue.issueId}:withdraw`);
+    try {
+      await withdrawVote({ ...issue, args: await typedIssueArgs(issue.target, issue.func, issue.args) });
+      toast.success("Vote withdrawn");
+      invalidate();
+    } catch (err: any) {
+      toast.error("Vote withdrawal failed", { description: String(err?.message || err) });
     } finally {
       setBusy("");
     }
@@ -1389,19 +1402,15 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
           eq(issue.target, wallet.address);
         const needed = unanimous ? signers.length : votesNeeded(signers.length, bps);
         const remaining = Math.max(0, needed - count);
-        const iVoted = !issue.invalidated && issue.voters.some((v) => eq(v, voterAddr));
+        const recordedMyVote = issue.voters.some((v) => eq(v, voterAddr));
+        const iVoted = !issue.invalidated && recordedMyVote;
         const pct = needed > 0 ? Math.min(100, (count / needed) * 100) : 0;
         const queued = issue.queued;
         const ready = !!queued && now >= queued.executableAt && now <= queued.expiresAt;
         const waitingForAllowance = blockedActionIssues.has(issue.issueId);
         // Mirrors the contract's dismissIssue gate: a single vote, cast by the caller.
         const canDismiss = issue.voters.length === 1 && eq(issue.voters[0], me);
-        const dismissHint =
-          issue.voters.length !== 1
-            ? "Only issues with a single vote can be dismissed"
-            : !canDismiss
-              ? "Only the proposer can dismiss this issue"
-              : "Withdraw this issue before anyone else votes on it";
+        const canWithdraw = !nested && recordedMyVote && (queued || !canDismiss);
         return (
           <div key={issue.issueId} className="rounded-lg border border-border p-3">
             <div className="flex items-start justify-between gap-3">
@@ -1417,6 +1426,17 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
               <div className="flex shrink-0 items-center gap-2">
                 {queued ? (
                   <>
+                    {canWithdraw ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => withdraw(issue)}
+                        disabled={busy !== "" || !canSubmit}
+                        title="Retract your approval and move the issue below quorum if necessary"
+                      >
+                        {busy === `${issue.issueId}:withdraw` ? "Withdrawing…" : "Withdraw vote"}
+                      </Button>
+                    ) : null}
                     {canVote ? (
                       <Button
                         size="sm"
@@ -1448,16 +1468,27 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
                     label="Simulate"
                   />
                 ) : null}
-                {!queued && iAmSigner ? (
+                {!queued && canDismiss ? (
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => dismiss(issue)}
-                    disabled={busy !== "" || !canSubmit || !canDismiss}
-                    title={dismissHint}
+                    disabled={busy !== "" || !canSubmit}
+                    title="Withdraw this issue before anyone else votes on it"
                     className="text-destructive hover:text-destructive"
                   >
                     {busy === `${issue.issueId}:dismiss` ? "Dismissing…" : "Dismiss"}
+                  </Button>
+                ) : null}
+                {!queued && canWithdraw ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => withdraw(issue)}
+                    disabled={busy !== "" || !canSubmit}
+                    title="Retract your approval without affecting other signers' votes"
+                  >
+                    {busy === `${issue.issueId}:withdraw` ? "Withdrawing…" : "Withdraw vote"}
                   </Button>
                 ) : null}
                 {!queued ? (
