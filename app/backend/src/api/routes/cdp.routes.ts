@@ -14,6 +14,13 @@ router.get("/metadata", authHandler.authorizeRequest(true), CDPController.getMet
  *   get:
  *     summary: List CDP vaults for the signed-in user
  *     tags: [CDP]
+ *     parameters:
+ *       - name: address
+ *         in: query
+ *         required: false
+ *         description: Account whose read-only vault positions should be returned
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: Vault collection

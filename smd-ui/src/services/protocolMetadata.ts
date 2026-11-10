@@ -54,6 +54,26 @@ export interface PoolMetadata {
   lpToken?: PoolTokenMetadata;
 }
 
+export interface DeployedCollateralPosition {
+  asset: string;
+  symbol: string;
+  amount: string;
+  decimals: number;
+}
+
+export interface DeployedStakingPosition {
+  tokenSymbol: string;
+  tokenDecimals: number;
+  stakedAmount: string;
+  unbondingAmount: string;
+  validatorCount: number;
+}
+
+export interface DeployedPositions {
+  collateral: DeployedCollateralPosition[];
+  staking: DeployedStakingPosition;
+}
+
 export function useStakingMetadata() {
   return useQuery({
     queryKey: ["protocol-metadata", "staking"],
@@ -125,6 +145,67 @@ export function usePoolMetadata() {
         coins: Array.isArray(pool?.coins) ? pool.coins.map(token) : undefined,
         lpToken: pool?.lpToken ? token(pool.lpToken) : undefined,
       })).filter((pool: PoolMetadata) => pool.address && !pool.isDisabled);
+    },
+  });
+}
+
+/** Assets held by protocol contracts on behalf of a multisig treasury. */
+export function useDeployedPositions(ownerAddress?: string | null) {
+  const owner = strip0x(ownerAddress ?? "");
+  return useQuery({
+    queryKey: ["deployed-positions", owner],
+    enabled: owner.length === 40,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+    queryFn: async (): Promise<DeployedPositions> => {
+      const [vaultResult, stakingResult] = await Promise.allSettled([
+        api.get(`/api/cdp/vaults?address=${owner}`, { skipErrorToast: true }),
+        api.get(`/api/staking/info?address=${owner}`, { skipErrorToast: true }),
+      ]);
+      if (vaultResult.status === "rejected" && stakingResult.status === "rejected") {
+        throw vaultResult.reason;
+      }
+      const vaults = vaultResult.status === "fulfilled" ? vaultResult.value.data : [];
+      const staking = stakingResult.status === "fulfilled" ? stakingResult.value.data : {};
+      const collateral = (Array.isArray(vaults) ? vaults : []).map((vault: any) => ({
+        asset: strip0x(String(vault?.asset ?? "")),
+        symbol: String(vault?.symbol ?? "ASSET"),
+        amount: String(vault?.collateralAmount ?? "0"),
+        decimals: Number(vault?.collateralAmountDecimals ?? 18),
+      })).filter((position: DeployedCollateralPosition) => {
+        try {
+          return BigInt(position.amount) > 0n;
+        } catch {
+          return false;
+        }
+      });
+      const validators = Array.isArray(staking?.validators) ? staking.validators : [];
+      const validatorCount = validators.filter((validator: any) => {
+        try {
+          return BigInt(validator?.userStake ?? "0") > 0n;
+        } catch {
+          return false;
+        }
+      }).length;
+      const unbondingAmount = (Array.isArray(staking?.unbondingRequests) ? staking.unbondingRequests : [])
+        .filter((request: any) => !request?.claimed)
+        .reduce((sum: bigint, request: any) => {
+          try {
+            return sum + BigInt(request?.amount ?? "0");
+          } catch {
+            return sum;
+          }
+        }, 0n);
+      return {
+        collateral,
+        staking: {
+          tokenSymbol: String(staking?.tokenSymbol ?? "STRATO"),
+          tokenDecimals: Number(staking?.tokenDecimals ?? 18),
+          stakedAmount: String(staking?.userTotalStake ?? "0"),
+          unbondingAmount: unbondingAmount.toString(),
+          validatorCount,
+        },
+      };
     },
   });
 }

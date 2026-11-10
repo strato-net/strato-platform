@@ -53,6 +53,7 @@ import {
 } from "@/services/tokens";
 import {
   useCDPMetadata,
+  useDeployedPositions,
   usePoolMetadata,
   useStakingMetadata,
   type CDPMetadata,
@@ -257,6 +258,14 @@ function safeFormatUnits(raw: string, decimals: number): string {
     return formatUnits(BigInt(raw), decimals);
   } catch {
     return raw;
+  }
+}
+
+function isPositiveRaw(raw?: string): boolean {
+  try {
+    return BigInt(raw ?? "0") > 0n;
+  } catch {
+    return false;
   }
 }
 
@@ -1990,6 +1999,10 @@ function TreasuryTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: Use
 
   const { data: myTokens = [] } = useMyTokens(userAddress); // depositor's balances
   const { data: treasury = [] } = useMyTokens(wallet.address); // multisig's balances
+  const { data: deployed, isLoading: deployedLoading, isError: deployedError } = useDeployedPositions(wallet.address);
+  const hasStaked = isPositiveRaw(deployed?.staking.stakedAmount);
+  const hasUnbonding = isPositiveRaw(deployed?.staking.unbondingAmount);
+  const hasDeployedPositions = hasStaked || hasUnbonding || !!deployed?.collateral.length;
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["my-tokens", userAddress] });
@@ -2001,7 +2014,7 @@ function TreasuryTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: Use
     <div className="space-y-6">
       {/* Holdings */}
       <div className="space-y-2">
-        <Label>Treasury holdings</Label>
+        <Label>Available holdings</Label>
         {treasury.length === 0 ? (
           <p className="text-sm text-muted-foreground">This multisig holds no tokens yet.</p>
         ) : (
@@ -2013,6 +2026,56 @@ function TreasuryTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: Use
               >
                 <span className="font-medium">{t.symbol}</span>
                 <span className="font-mono text-xs">{humanBalance(t)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label>Deployed positions</Label>
+        {deployedLoading ? (
+          <p className="text-sm text-muted-foreground">Loading deployed positions…</p>
+        ) : deployedError ? (
+          <p className="text-sm text-muted-foreground">Deployed positions are temporarily unavailable.</p>
+        ) : !hasDeployedPositions ? (
+          <p className="text-sm text-muted-foreground">No staked tokens or supplied collateral.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {hasStaked ? (
+              <div className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                <div>
+                  <span className="font-medium">Staked {deployed!.staking.tokenSymbol}</span>
+                  <p className="text-xs text-muted-foreground">
+                    {deployed!.staking.validatorCount} validator{deployed!.staking.validatorCount === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <span className="font-mono text-xs">
+                  {safeFormatUnits(deployed!.staking.stakedAmount, deployed!.staking.tokenDecimals)}
+                </span>
+              </div>
+            ) : null}
+            {hasUnbonding ? (
+              <div className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                <div>
+                  <span className="font-medium">Unbonding {deployed!.staking.tokenSymbol}</span>
+                  <p className="text-xs text-muted-foreground">Held by the staking contract</p>
+                </div>
+                <span className="font-mono text-xs">
+                  {safeFormatUnits(deployed!.staking.unbondingAmount, deployed!.staking.tokenDecimals)}
+                </span>
+              </div>
+            ) : null}
+            {deployed?.collateral.map((position) => (
+              <div
+                key={position.asset}
+                className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
+              >
+                <div>
+                  <span className="font-medium">{position.symbol} collateral</span>
+                  <p className="text-xs text-muted-foreground">Supplied to CDP</p>
+                </div>
+                <span className="font-mono text-xs">{safeFormatUnits(position.amount, position.decimals)}</span>
               </div>
             ))}
           </div>

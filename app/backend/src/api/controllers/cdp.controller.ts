@@ -48,6 +48,7 @@ import {
   validateTopUpJuniorNoteArgs,
   validateSetCollateralConfigArgs
 } from "../validators/cdp.validator";
+import { validateAddressField } from "../validators/common.validators";
 
 class CDPController {
   static async getMetadata(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -65,7 +66,13 @@ class CDPController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress } = req;
-      const vaults = await getVaults(accessToken, userAddress as string);
+      const requestedAddress = req.query?.address;
+      if (requestedAddress !== undefined) {
+        const { error } = validateAddressField("address").validate(requestedAddress);
+        if (error) throw error;
+      }
+      const ownerAddress = String(requestedAddress ?? userAddress).replace(/^0x/i, "");
+      const vaults = await getVaults(accessToken, ownerAddress);
       res.status(RestStatus.OK).json(vaults);
     } catch (error) {
       next(error);
