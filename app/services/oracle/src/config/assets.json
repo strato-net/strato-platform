@@ -322,7 +322,6 @@
             "PAXG",
             "XAUT",
             "SUSDS",
-            "WSTETH",
             "SYRUPUSDC",
             "RETH",
             "USDC",
@@ -332,6 +331,20 @@
             "WHYPE",
             "KHYPE"
           ]
+        },
+        "AlchemyByAddress": {
+          "url": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/by-address",
+          "method": "POST",
+          "parse": "alchemyByAddress",
+          "timestamp": "data[].prices[0].lastUpdatedAt",
+          "apiKeyEnvVar": "ALCHEMY_API_KEY",
+          "comment": "Alchemy by contract address (DEX-weighted), max 25 addresses over 3 networks per request. symbolMapping is '<alchemy network>:<token address>'. Alchemy's by-symbol endpoint returned $133,085,818 for WSTETH on 2026-11-10 (by-address: $2,551), so WSTETH is priced here instead of in Alchemy.",
+          "assets": [
+            "WSTETH"
+          ],
+          "symbolMapping": {
+            "WSTETH": "eth-mainnet:0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+          }
         },
         "CoinMarketCap": {
           "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
@@ -930,7 +943,6 @@
             "PAXG",
             "XAUT",
             "SUSDS",
-            "WSTETH",
             "SYRUPUSDC",
             "RETH",
             "USDC",
@@ -940,6 +952,20 @@
             "WHYPE",
             "KHYPE"
           ]
+        },
+        "AlchemyByAddress": {
+          "url": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/by-address",
+          "method": "POST",
+          "parse": "alchemyByAddress",
+          "timestamp": "data[].prices[0].lastUpdatedAt",
+          "apiKeyEnvVar": "ALCHEMY_API_KEY",
+          "comment": "Alchemy by contract address (DEX-weighted), max 25 addresses over 3 networks per request. symbolMapping is '<alchemy network>:<token address>'. Alchemy's by-symbol endpoint returned $133,085,818 for WSTETH on 2026-11-10 (by-address: $2,551), so WSTETH is priced here instead of in Alchemy.",
+          "assets": [
+            "WSTETH"
+          ],
+          "symbolMapping": {
+            "WSTETH": "eth-mainnet:0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+          }
         },
         "CoinMarketCap": {
           "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
