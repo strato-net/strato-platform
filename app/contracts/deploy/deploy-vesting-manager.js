@@ -3,13 +3,21 @@
 // itself, so there is nothing to generate first; it prints the sha256 of the source
 // it submits so every admin can confirm they are creating byte-identical code.
 //
-// Creation is an AdminRegistry vote: the script calls
-// AdminRegistry.castVoteOnIssue(registry, "createContract", [name, source, token_, initialOwner])
-// directly (the registry no longer accepts votes routed through a target's onlyOwner
-// fallback, which is how the previous bloc "username" wrapper reached it). Run it once
-// per admin, or let the second admin confirm the printed issue in the admin UI; the
-// script waits for the registry's ContractCreated event and prints the manager and
-// pool addresses.
+// Creation is an AdminRegistry vote whose TARGET is the "BlockApps" User wallet:
+//   AdminRegistry.castVoteOnIssue(<BlockApps User wallet>, "createContract", [name, source, token_, initialOwner])
+// The registry itself also has a createContract, but the node only indexes a new
+// contract into Cirrus when a User wallet is in the call stack at creation time: the
+// wallet's username becomes the table namespace (BlockApps-VestingPoolManager,
+// BlockApps-VestingPool, ...), and a contract created with no wallet in the stack gets
+// no Cirrus tables at all (solid-vm SM.hs, getUsername/addNewCodeCollection). The
+// create-vestings script and the app read those tables, so the wallet must be the
+// creator. The registry owns the BlockApps wallet, so its vote may call the wallet's
+// onlyOwner createContract; the script resolves the wallet from the UserRegistry and
+// checks both facts before voting. Votes routed through a target's onlyOwner fallback
+// are no longer accepted by the registry, so the vote is cast directly.
+//
+// Run it once per admin, or let the second admin confirm the printed issue in the admin
+// UI; the script waits for the manager's Cirrus row and prints the manager and pool.
 //
 //   STRATO_TOKEN=<40 hex> [ADMIN_REGISTRY=<40 hex>] GLOBAL_ADMIN_NAME=... node deploy-vesting-manager.js
 //   DRY_RUN=1 node deploy-vesting-manager.js      # only writes vesting-source.txt + hash, no network
@@ -17,7 +25,10 @@
 // Env: NODE_URL, OAUTH_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, GLOBAL_ADMIN_NAME,
 // GLOBAL_ADMIN_PASSWORD (+ OAUTH_TOTP if the account uses it), STRATO_TOKEN (the
 // $STRATO Token address, no 0x), ADMIN_REGISTRY (default: the backend's genesis
-// address 000000000000000000000000000000000000100c), VOTE_WAIT_MINUTES (default 60).
+// address 000000000000000000000000000000000000100c), USER_REGISTRY (default: genesis
+// 0x720), CREATOR_USERNAME (default BlockApps; the Cirrus namespace), CREATOR_WALLET
+// (optional: skip the derivation and use this User wallet, still verified),
+// VOTE_WAIT_MINUTES (default 60).
 require('dotenv').config();
 const config = require('./config');
 const path = require('path');
@@ -64,32 +75,55 @@ async function buildSource() {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const base = () => config.nodes[0].url.replace(/\/$/, '');
 
 async function cirrus(tokenObj, table, params) {
-  const url = `${config.nodes[0].url}/cirrus/search/${table}`;
+  const url = `${base()}/cirrus/search/${table}`;
   try {
     const { data } = await axios.get(url, { headers: { Authorization: `Bearer ${tokenObj.token}` }, params });
     return Array.isArray(data) ? data : [];
   } catch (e) { return []; } // table may not exist yet
 }
 
-// The creation transaction creates TWO contracts: the pool (inside the manager's
-// constructor, so it is listed first) and the manager. Whichever address the receipt
-// helper hands back, resolve both through Cirrus: both contracts are `record`s, and
-// the pool row names its manager while the manager row names its pool and _owner.
-async function resolveManagerAndPool(tokenObj, address) {
-  const deadline = Date.now() + 180000;
-  while (Date.now() < deadline) {
-    const asManager = await cirrus(tokenObj, `BlockApps-${NAME}`, { address: `eq.${address}`, select: 'address,pool,_owner', limit: '1' });
-    if (asManager.length) return { manager: asManager[0].address, pool: asManager[0].pool, owner: asManager[0]._owner };
-    const asPool = await cirrus(tokenObj, 'BlockApps-VestingPool', { address: `eq.${address}`, select: 'address,poolManager', limit: '1' });
-    if (asPool.length) {
-      const mgr = await cirrus(tokenObj, `BlockApps-${NAME}`, { address: `eq.${asPool[0].poolManager}`, select: 'address,pool,_owner', limit: '1' });
-      return { manager: asPool[0].poolManager, pool: asPool[0].address, owner: mgr.length ? mgr[0]._owner : '(manager row not indexed yet)' };
-    }
-    await new Promise((r) => setTimeout(r, 5000));
+// Read-only calls through the node's JSON-RPC (same as create-vestings.js). Selectors are
+// keccak256 of the signatures; SolidVM answers eth_call with ABI-encoded words.
+const SEL = { deriveUserAddress: 'd36a884a', username: '61fac54d', owner: '8da5cb5b' };
+const word = (v) => BigInt(v).toString(16).padStart(64, '0');
+const encodeString = (s) => { // ABI: offset, length, utf8 bytes right-padded to 32
+  const hex = Buffer.from(s, 'utf8').toString('hex');
+  return word(32) + word(hex.length / 2) + hex.padEnd(Math.ceil(hex.length / 64) * 64, '0');
+};
+const decodeString = (hex) => { // ABI: offset word, length word, bytes
+  const off = Number(BigInt('0x' + hex.slice(0, 64))) * 2;
+  const len = Number(BigInt('0x' + hex.slice(off, off + 64))) * 2;
+  return Buffer.from(hex.slice(off + 64, off + 64 + len), 'hex').toString('utf8');
+};
+async function ethCall(to, data, what) {
+  const { data: res } = await axios.post(`${base()}/rpc`,
+    { jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: '0x' + to, data: '0x' + data }, 'latest'] },
+    { headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (deploy-vesting-manager)' }, timeout: 30000 });
+  if (!res || typeof res.result !== 'string' || !/^0x([0-9a-fA-F]{64})+$/.test(res.result)) throw new Error(`${what}: eth_call to ${to} failed: ${JSON.stringify(res).slice(0, 200)}`);
+  return clean(res.result);
+}
+const addressFromWord = (w) => w.slice(24, 64);
+
+// The User wallet whose username namespaces the Cirrus tables. UserRegistry derives wallet
+// addresses from the username (the same derivation bloc uses), so nothing is hard-coded per
+// chain; the wallet is then checked to carry that username and to be owned by the registry,
+// otherwise the registry's createContract call on it would revert as unauthorized.
+async function resolveCreatorWallet(userRegistry, username, adminRegistry) {
+  let wallet = clean(process.env.CREATOR_WALLET);
+  if (wallet) {
+    if (!ADDRESS_RE.test(wallet)) throw new Error('CREATOR_WALLET must be a 20-byte hex address');
+  } else {
+    wallet = addressFromWord(await ethCall(userRegistry, SEL.deriveUserAddress + encodeString(username), `UserRegistry.deriveUserAddress("${username}")`));
+    if (!/^[0-9a-f]{40}$/.test(wallet) || /^0+$/.test(wallet)) throw new Error(`UserRegistry ${userRegistry} derived no wallet for "${username}"`);
   }
-  return null;
+  const name = decodeString(await ethCall(wallet, SEL.username, 'wallet.username()'));
+  if (name !== username) throw new Error(`wallet ${wallet} has username "${name}", expected "${username}": Cirrus tables would be namespaced "${name}-"`);
+  const owner = addressFromWord(await ethCall(wallet, SEL.owner, 'wallet.owner()'));
+  if (owner.toLowerCase() !== adminRegistry.toLowerCase()) throw new Error(`wallet ${wallet} ("${username}") is owned by ${owner}, not the AdminRegistry ${adminRegistry}; the registry cannot call its createContract`);
+  return wallet;
 }
 
 // The issue id the registry recorded for a vote transaction.
@@ -105,15 +139,15 @@ async function issueIdForTx(tokenObj, hash) {
   return null;
 }
 
-// AdminRegistry.createContract emits ContractCreated(contractAddress, contractName) when the
-// issue executes; the manager is the only contract created with this name by the registry
-// after `since`.
-async function waitForCreation(tokenObj, since) {
+// User.createContract emits nothing, so wait for the thing we actually need: the
+// manager's row in its Cirrus table, created after `since` under the creator namespace.
+// The row names the pool (set in the constructor, same transaction) and the owner.
+async function waitForManagerRow(tokenObj, namespace, since) {
   const deadline = Date.now() + Number(process.env.VOTE_WAIT_MINUTES || 60) * 60000;
   let tick = 0;
   while (Date.now() < deadline) {
-    const rows = await cirrus(tokenObj, 'BlockApps-AdminRegistry-ContractCreated', { contractName: `eq.${NAME}`, block_timestamp: `gte.${since}`, select: 'contractAddress,block_timestamp', order: 'block_timestamp.desc', limit: '1' });
-    if (rows.length && rows[0].contractAddress) return clean(rows[0].contractAddress);
+    const rows = await cirrus(tokenObj, `${namespace}-${NAME}`, { creator: `eq.${namespace}`, block_timestamp: `gte.${since}`, select: 'address,pool,_owner,block_timestamp', order: 'block_timestamp.desc', limit: '1' });
+    if (rows.length && rows[0].address) return rows[0];
     if (tick % 4 === 0) console.log(`  waiting for the create issue to be confirmed by another admin... [${new Date().toISOString()}]`);
     tick++;
     await sleep(15000);
@@ -130,32 +164,38 @@ const cirrusTime = (d) => d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '
 
   const STRATO_TOKEN = clean(process.env.STRATO_TOKEN);
   const ADMIN_REGISTRY = clean(process.env.ADMIN_REGISTRY || '000000000000000000000000000000000000100c');
+  const USER_REGISTRY = clean(process.env.USER_REGISTRY || '0000000000000000000000000000000000000720');
+  const NAMESPACE = (process.env.CREATOR_USERNAME || 'BlockApps').trim();
   if (!ADDRESS_RE.test(STRATO_TOKEN)) throw new Error('STRATO_TOKEN must be a 20-byte hex address');
   if (!ADDRESS_RE.test(ADMIN_REGISTRY)) throw new Error('ADMIN_REGISTRY must be a 20-byte hex address');
+  if (!ADDRESS_RE.test(USER_REGISTRY)) throw new Error('USER_REGISTRY must be a 20-byte hex address');
+  if (!NAMESPACE) throw new Error('CREATOR_USERNAME is empty');
 
   const auth = require('./auth');
   const user = process.env.GLOBAL_ADMIN_NAME;
   if (!user) throw new Error('GLOBAL_ADMIN_NAME is not set');
   const token = await auth.getUserToken(user, process.env.GLOBAL_ADMIN_PASSWORD);
   const tokenObj = { token };
+
+  const WALLET = await resolveCreatorWallet(USER_REGISTRY, NAMESPACE, ADMIN_REGISTRY);
+  console.log(`creator: User wallet ${WALLET} ("${NAMESPACE}", owned by AdminRegistry ${ADMIN_REGISTRY}); tables will be ${NAMESPACE}-${NAME} and ${NAMESPACE}-VestingPool`);
   const since = cirrusTime(new Date(Date.now() - 60000)); // a minute of slack for clock skew
 
-  // AdminRegistry.createContract(string _contractName, string _contractSrc, variadic _args):
-  // the constructor arguments ride in the variadic tail with explicit address hints.
+  // User.createContract(string contractName, string contractSrc, variadic args): the
+  // constructor arguments ride in the variadic tail with explicit address hints.
   const payload = {
     contractName: 'AdminRegistry',
     contractAddress: ADMIN_REGISTRY,
     method: 'castVoteOnIssue',
     args: {
-      _target: ADMIN_REGISTRY,
+      _target: WALLET,
       _func: 'createContract',
       _args: [NAME, source, { type: 'address', value: '0x' + STRATO_TOKEN }, { type: 'address', value: '0x' + ADMIN_REGISTRY }],
     },
   };
-  const base = config.nodes[0].url.replace(/\/$/, '');
   const headers = { Authorization: `Bearer ${tokenObj.token}`, 'Content-Type': 'application/json', Accept: 'application/json' };
-  console.log(`${user}: voting AdminRegistry(${ADMIN_REGISTRY}).castVoteOnIssue(registry, "createContract", [${NAME}, <source>, token_=${STRATO_TOKEN}, initialOwner=${ADMIN_REGISTRY}]) on ${base}`);
-  const { data } = await axios.post(`${base}/strato/v2.3/transaction/parallel?resolve=true`,
+  console.log(`${user}: voting AdminRegistry(${ADMIN_REGISTRY}).castVoteOnIssue(wallet ${WALLET}, "createContract", [${NAME}, <source>, token_=${STRATO_TOKEN}, initialOwner=${ADMIN_REGISTRY}]) on ${base()}`);
+  const { data } = await axios.post(`${base()}/strato/v2.3/transaction/parallel?resolve=true`,
     JSON.stringify({ txs: [{ type: 'FUNCTION', payload }], txParams: { gasLimit: 8000000, gasPrice: config.gasPrice } }), { headers, timeout: 180000 });
   let results = Array.isArray(data) ? data : [data];
   const hashes = results.map((r) => r && r.hash).filter(Boolean);
@@ -163,7 +203,7 @@ const cirrusTime = (d) => d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '
   const deadline = Date.now() + 300000;
   while (results.some((r) => !r || !r.status || r.status === 'Pending') && Date.now() < deadline) {
     await sleep(3000);
-    const res = await axios.post(`${base}/bloc/v2.2/transactions/results`, JSON.stringify(hashes), { headers, timeout: 60000 });
+    const res = await axios.post(`${base()}/bloc/v2.2/transactions/results`, JSON.stringify(hashes), { headers, timeout: 60000 });
     results = Array.isArray(res.data) ? res.data : [res.data];
   }
   const final = results[0];
@@ -174,14 +214,12 @@ const cirrusTime = (d) => d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '
   }
   const issueId = await issueIdForTx(tokenObj, hashes[0]);
   console.log(`${user} vote tx Success (${hashes[0]})${issueId ? `  issue ${issueId}` : ''}`);
-  console.log(`If the registry needs more votes, confirm issue ${issueId || '(see the admin UI, target AdminRegistry, function createContract)'} in the admin UI. Waiting up to ${process.env.VOTE_WAIT_MINUTES || 60} minutes for ContractCreated...`);
+  console.log(`If the registry needs more votes, confirm issue ${issueId || `(see the admin UI: target ${WALLET}, function createContract)`} in the admin UI. Waiting up to ${process.env.VOTE_WAIT_MINUTES || 60} minutes for the ${NAMESPACE}-${NAME} row...`);
 
-  const manager = await waitForCreation(tokenObj, since);
-  if (!manager) { console.error('TIMEOUT: no ContractCreated for ' + NAME + ' yet; re-run later or check the admin UI.'); process.exit(1); }
-  const r = await resolveManagerAndPool(tokenObj, manager);
-  if (!r) { console.log(`created ${NAME} at ${manager}; Cirrus rows not visible yet, look up BlockApps-${NAME} for the pool address later.`); return; }
-  console.log(`VestingPoolManager: ${r.manager}`);
-  console.log(`VestingPool:        ${r.pool}`);
-  console.log(`manager owner:      ${r.owner}`);
-  if (clean(r.owner).toLowerCase() !== ADMIN_REGISTRY.toLowerCase()) console.error('WARNING: manager owner is not the AdminRegistry you passed');
+  const row = await waitForManagerRow(tokenObj, NAMESPACE, since);
+  if (!row) { console.error(`TIMEOUT: no new ${NAMESPACE}-${NAME} row yet; re-run later or check the admin UI.`); process.exit(1); }
+  console.log(`VestingPoolManager: ${clean(row.address)}`);
+  console.log(`VestingPool:        ${clean(row.pool) || '(pool column empty: look up BlockApps-VestingPool by poolManager)'}`);
+  console.log(`manager owner:      ${clean(row._owner)}`);
+  if (clean(row._owner).toLowerCase() !== ADMIN_REGISTRY.toLowerCase()) console.error('WARNING: manager owner is not the AdminRegistry you passed');
 })().catch((e) => { console.error(process.env.GLOBAL_ADMIN_NAME || 'deploy', 'FAILED:', (e.message || String(e)).slice(0, 300)); process.exit(1); });
