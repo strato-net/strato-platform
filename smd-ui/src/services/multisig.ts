@@ -146,6 +146,32 @@ export function buildProtocolActionCall(
   }
 }
 
+export interface ProtocolApprovalInput {
+  token: string;
+  spender: string;
+  amount: string;
+}
+
+/** Approval issues always precede their dependent protocol-action issue. */
+export function buildProtocolWorkflowCalls(
+  action: ProtocolActionKind,
+  input: ProtocolActionInput,
+  approvals: ProtocolApprovalInput[],
+  nowSeconds = Math.floor(Date.now() / 1000)
+): { target: string; func: string; args: unknown[] }[] {
+  return [
+    ...approvals.map((approval) => ({
+      target: strip0x(approval.token),
+      func: "approve",
+      args: [
+        typedVariadicArg("address", approval.spender),
+        typedVariadicArg("uint256", approval.amount),
+      ],
+    })),
+    buildProtocolActionCall(action, input, nowSeconds),
+  ];
+}
+
 /** thresholds are stored in basis points: 6000 = 60%. */
 export const bpsToPct = (bps: number) => Math.round((bps / 100) * 10) / 10;
 export const pctToBps = (pct: number) => Math.round(pct * 100);

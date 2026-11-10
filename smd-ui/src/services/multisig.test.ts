@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { applyConfirmedVote, buildNestedCastVotePayload, buildOpenIssues, buildProtocolActionCall, mergeIndexedIssues, MULTISIG_SOURCE, normalizeArgs, votesNeeded } from "./multisig";
+import { applyConfirmedVote, buildNestedCastVotePayload, buildOpenIssues, buildProtocolActionCall, buildProtocolWorkflowCalls, mergeIndexedIssues, MULTISIG_SOURCE, normalizeArgs, votesNeeded } from "./multisig";
 import { formatVariadicArg, parseArgText, typedVariadicArg } from "../lib/args";
 import { pollResults } from "../lib/walletTx";
 import { api } from "../lib/api";
@@ -152,6 +152,31 @@ test("protocol workflows build the exact typed target calls", () => {
   assert.equal(buildProtocolActionCall("removeLiquidity", {
     target: pool, amount: "10", amount2: "1", amount3: "1",
   }).func, "removeLiquidity");
+});
+
+test("approval-dependent workflows put exact approvals before the action", () => {
+  const tokenA = "0000000000000000000000000000000000001008";
+  const tokenB = "0000000000000000000000000000000000001009";
+  const calls = buildProtocolWorkflowCalls("addLiquidity", {
+    target: pool, amount: "20", amount2: "30",
+  }, [
+    { token: tokenA, spender: pool, amount: "30" },
+    { token: tokenB, spender: pool, amount: "20" },
+  ], 1000);
+
+  assert.deepEqual(calls.map(({ target, func }) => ({ target, func })), [
+    { target: tokenA, func: "approve" },
+    { target: tokenB, func: "approve" },
+    { target: pool, func: "addLiquidity" },
+  ]);
+  assert.deepEqual(calls[0].args, [
+    { type: "address", value: pool },
+    { type: "uint256", value: 30 },
+  ]);
+  assert.deepEqual(calls[1].args, [
+    { type: "address", value: pool },
+    { type: "uint256", value: 20 },
+  ]);
 });
 
 test("cleared vote rows and array metadata do not resurrect an executed issue", () => {

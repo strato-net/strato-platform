@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { env } from "@/lib/env";
 import { strip0x } from "@/services/userWallets";
@@ -105,5 +105,50 @@ export function useTokenAllowances(
         return String(Array.isArray(data) ? data[0]?.value ?? "0" : "0");
       }));
     },
+  });
+}
+
+export interface TokenAllowanceRequirement {
+  issueId: string;
+  tokenAddress: string;
+  ownerAddress: string;
+  spenderAddress: string;
+  amount: string;
+}
+
+/** On-chain allowance checks used to keep dependent multisig issues in execution order. */
+export function useTokenAllowanceRequirements(requirements: TokenAllowanceRequirement[]) {
+  const results = useQueries({
+    queries: requirements.map((requirement) => ({
+      queryKey: [
+        "token-allowance",
+        requirement.tokenAddress,
+        requirement.ownerAddress,
+        requirement.spenderAddress,
+      ],
+      refetchInterval: 12_000,
+      queryFn: async (): Promise<string> => {
+        const token = strip0x(requirement.tokenAddress);
+        const owner = strip0x(requirement.ownerAddress);
+        const spender = strip0x(requirement.spenderAddress);
+        const { data } = await api.get(
+          `${env.CIRRUS_URL}/mapping?collection_name=eq._allowances` +
+            `&address=eq.${token}&key-%3E%3Ekey=eq.${owner}` +
+            `&key-%3E%3Ekey2=eq.${spender}&select=value&limit=1`
+        );
+        return String(Array.isArray(data) ? data[0]?.value ?? "0" : "0");
+      },
+    })),
+  });
+
+  return requirements.map((requirement, index) => {
+    const result = results[index];
+    let ready = false;
+    try {
+      ready = BigInt(result.data ?? "0") >= BigInt(requirement.amount);
+    } catch {
+      ready = false;
+    }
+    return { ...requirement, ready, isLoading: result.isLoading, isError: result.isError };
   });
 }

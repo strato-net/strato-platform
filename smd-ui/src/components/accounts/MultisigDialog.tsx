@@ -44,12 +44,20 @@ import { shortenHex } from "@/lib/utils";
 import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { formatVariadicArg, parseArgText, typedVariadicArg, variadicArgValue } from "@/lib/args";
-import { useMyTokens, useTokenAllowances, type TokenBalance } from "@/services/tokens";
+import {
+  useMyTokens,
+  useTokenAllowances,
+  useTokenAllowanceRequirements,
+  type TokenAllowanceRequirement,
+  type TokenBalance,
+} from "@/services/tokens";
 import {
   useCDPMetadata,
   usePoolMetadata,
   useStakingMetadata,
+  type CDPMetadata,
   type PoolMetadata,
+  type StakingMetadata,
 } from "@/services/protocolMetadata";
 import { useContractGroups, useContractInfo, functionArgs, fetchFunctionArgs } from "@/services/contracts";
 import { useSimulation } from "@/components/simulation/useSimulation";
@@ -70,7 +78,7 @@ import {
   votesNeeded,
   strip0x,
   MAX_TIMELOCK_DELAY,
-  buildProtocolActionCall,
+  buildProtocolWorkflowCalls,
   type ProtocolActionKind,
   type OpenIssue,
 } from "@/services/multisig";
@@ -1089,6 +1097,57 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
 /* Issues tab                                                                         */
 /* --------------------------------------------------------------------------------- */
 
+function issueAllowanceRequirements(
+  issue: OpenIssue,
+  ownerAddress: string,
+  staking?: StakingMetadata,
+  cdp?: CDPMetadata,
+  pools: PoolMetadata[] = []
+): TokenAllowanceRequirement[] {
+  const requirement = (tokenAddress: string, spenderAddress: string, amount: string) => ({
+    issueId: issue.issueId,
+    tokenAddress: strip0x(tokenAddress),
+    ownerAddress: strip0x(ownerAddress),
+    spenderAddress: strip0x(spenderAddress),
+    amount: String(amount),
+  });
+  const validAmount = (value: string) => /^\d+$/.test(value) && BigInt(value) > 0n;
+
+  if (issue.func === "stake" && staking && eq(issue.target, staking.stakingAddress)) {
+    const amount = issue.args[1] ?? "0";
+    return validAmount(amount) ? [requirement(staking.stratoTokenAddress, issue.target, amount)] : [];
+  }
+  if (issue.func === "deposit" && cdp && eq(issue.target, cdp.engineAddress)) {
+    const amount = issue.args[1] ?? "0";
+    return validAmount(amount) ? [requirement(issue.args[0] ?? "", cdp.vaultAddress, amount)] : [];
+  }
+
+  const pool = pools.find((item) => eq(item.address, issue.target));
+  if (!pool) return [];
+  if (issue.func === "addLiquidity") {
+    const tokenBAmount = issue.args[0] ?? "0";
+    const tokenAAmount = issue.args[1] ?? "0";
+    return [
+      ...(validAmount(tokenAAmount) ? [requirement(pool.tokenA.address, issue.target, tokenAAmount)] : []),
+      ...(validAmount(tokenBAmount) ? [requirement(pool.tokenB.address, issue.target, tokenBAmount)] : []),
+    ];
+  }
+  if (issue.func === "addLiquiditySingleToken") {
+    const amount = issue.args[1] ?? "0";
+    const token = String(issue.args[0]).toLowerCase() === "true" ? pool.tokenA : pool.tokenB;
+    return validAmount(amount) ? [requirement(token.address, issue.target, amount)] : [];
+  }
+  if (issue.func === "addLiquidityGeneral" && pool.coins?.length) {
+    const parsed = parseArgText(issue.args[0] ?? "[]");
+    const amounts = Array.isArray(parsed) ? parsed.map(String) : [];
+    return pool.coins.flatMap((coin, index) => {
+      const amount = amounts[index] ?? "0";
+      return validAmount(amount) ? [requirement(coin.address, issue.target, amount)] : [];
+    });
+  }
+  return [];
+}
+
 function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserWallet[] }) {
   const { userAddress } = useUser();
   const { canSubmit } = useSubmitTransaction();
@@ -1100,6 +1159,28 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
   const now = Math.floor(dataUpdatedAt / 1000);
   const { data: thresholds = {} } = useVotingThresholds(wallet.address);
   const tokenMeta = useTokenMeta(wallet.address);
+  const stakingMetadata = useStakingMetadata();
+  const cdpMetadata = useCDPMetadata();
+  const poolMetadata = usePoolMetadata();
+  const allowanceRequirements = useMemo(() => issues.flatMap((issue) =>
+    issueAllowanceRequirements(
+      issue,
+      wallet.address,
+      stakingMetadata.data,
+      cdpMetadata.data,
+      poolMetadata.data
+    )
+  ), [issues, wallet.address, stakingMetadata.data, cdpMetadata.data, poolMetadata.data]);
+  const allowanceChecks = useTokenAllowanceRequirements(allowanceRequirements);
+  const blockedActionIssues = new Set([
+    ...allowanceChecks.filter((check) => !check.ready).map((check) => check.issueId),
+    ...issues.filter((issue) =>
+      (issue.func === "stake" && !stakingMetadata.data) ||
+      (issue.func === "deposit" && !cdpMetadata.data) ||
+      (["addLiquidity", "addLiquiditySingleToken", "addLiquidityGeneral"].includes(issue.func) &&
+        !poolMetadata.data)
+    ).map((issue) => issue.issueId),
+  ]);
   const nested = fullRoute.length > 1;
   const routeAddrs = fullRoute.map((w) => w.address);
   const {
@@ -1137,6 +1218,10 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
   const vote = async (issue: OpenIssue) => {
     if (!canVote) {
       toast.error("Only a signer (or nested member) can vote");
+      return;
+    }
+    if (blockedActionIssues.has(issue.issueId)) {
+      toast.error("Complete the linked token approval first");
       return;
     }
     setBusy(issue.issueId);
@@ -1207,6 +1292,10 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
   };
 
   const execute = async (issue: OpenIssue) => {
+    if (blockedActionIssues.has(issue.issueId)) {
+      toast.error("Complete the linked token approval first");
+      return;
+    }
     setBusy(`${issue.issueId}:execute`);
     try {
       await executeIssue({ ...issue, args: await typedIssueArgs(issue.target, issue.func, issue.args) });
@@ -1304,6 +1393,7 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
         const pct = needed > 0 ? Math.min(100, (count / needed) * 100) : 0;
         const queued = issue.queued;
         const ready = !!queued && now >= queued.executableAt && now <= queued.expiresAt;
+        const waitingForAllowance = blockedActionIssues.has(issue.issueId);
         // Mirrors the contract's dismissIssue gate: a single vote, cast by the caller.
         const canDismiss = issue.voters.length === 1 && eq(issue.voters[0], me);
         const dismissHint =
@@ -1342,8 +1432,9 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
                     <Button
                       size="sm"
                       onClick={() => execute(issue)}
-                      disabled={busy !== "" || !canSubmit || !ready}
-                      title={ready ? "Anyone can execute a queued issue once its delay is up" : "Not executable now"}
+                      disabled={busy !== "" || !canSubmit || !ready || waitingForAllowance}
+                      title={waitingForAllowance ? "Complete the linked token approval first" :
+                        ready ? "Anyone can execute a queued issue once its delay is up" : "Not executable now"}
                     >
                       {busy === `${issue.issueId}:execute` ? "Executing…" : "Execute"}
                     </Button>
@@ -1373,9 +1464,11 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
                   <Button
                     size="sm"
                     onClick={() => vote(issue)}
-                    disabled={busy !== "" || !canSubmit || !canVote || iVoted}
+                    disabled={busy !== "" || !canSubmit || !canVote || iVoted || waitingForAllowance}
                     title={
-                      nested
+                      waitingForAllowance
+                        ? "Complete the linked token approval first"
+                        : nested
                         ? `Casts your vote in ${viaName}; it arrives here through the membership chain.`
                         : undefined
                     }
@@ -1414,6 +1507,11 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
               ) : null}
               {issue.indexing ? (
                 <p className="mt-1 text-xs text-muted-foreground">Proposal confirmed; syncing the issue list.</p>
+              ) : null}
+              {waitingForAllowance ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Waiting for the linked token approval to execute and index before more votes can be cast.
+                </p>
               ) : null}
               {issue.invalidated ? (
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -1938,8 +2036,8 @@ const textArray = (value: string): string[] => {
 /**
  * Protocol calls made from a self-owned wallet must originate in the wallet, so SMD
  * creates typed multisig issues instead of sending the protocol transaction directly.
- * Approval-dependent actions stay disabled until Cirrus shows that the approval issue
- * executed; this prevents the dependent issue from racing its prerequisite.
+ * Approval-dependent workflows create approval issues first and the action issue second.
+ * The Issues tab prevents later action votes until Cirrus confirms every allowance.
  */
 function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserWallet[] }) {
   const { userAddress } = useUser();
@@ -1971,7 +2069,7 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
   const [amountsText, setAmountsText] = useState("");
   const [coinIndex, setCoinIndex] = useState("");
   const [isAToB, setIsAToB] = useState(true);
-  const [busy, setBusy] = useState<"approve" | "action" | "">("");
+  const [busy, setBusy] = useState<"action" | "">("");
 
   const isStakingAction = action === "stake" || action === "unstake";
   const isCDPAction = action === "cdpDeposit" || action === "cdpBorrow";
@@ -2079,35 +2177,15 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
     allowances.refetch();
   };
 
-  const proposeApprovals = async () => {
-    if (!canVote) return toast.error("Only a signer can propose approvals");
-    if (!validContractAddress(approvalSpender)) return toast.error("Enter a valid spender address");
-    if (!approvalInputsComplete) return toast.error("Enter valid token addresses and approval amounts");
-    const approvals = missingApprovals;
-    if (!approvals.length) return toast.info("Required allowances are already available");
-    setBusy("approve");
-    try {
-      for (const approval of approvals) {
-        await castVote("approve", [
-          typedVariadicArg("address", approvalSpender),
-          typedVariadicArg("uint256", approval.value),
-        ], approval.token);
-      }
-      toast.success(`${approvals.length === 1 ? "Approval" : "Approvals"} proposed`, {
-        description: "The action unlocks after the approval proposal executes.",
-      });
-      refresh();
-    } catch (err: any) {
-      toast.error("Approval proposal failed", { description: String(err?.message || err) });
-    } finally {
-      setBusy("");
-    }
-  };
-
-  const proposeAction = async () => {
+  const proposeWorkflow = async () => {
     if (!canVote) return toast.error("Only a signer can propose this action");
     if (!validContractAddress(target)) return toast.error("Enter a valid protocol contract address");
-    if (!approvalReady) return toast.error("Execute the required approval proposal first");
+    if (approvalRequired && !approvalInputsComplete) {
+      return toast.error("Enter valid token addresses and approval amounts");
+    }
+    if (approvalRequired && !allowances.isSuccess) {
+      return toast.info("Checking existing token allowances");
+    }
 
     try {
       switch (action) {
@@ -2152,21 +2230,29 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
           }
           break;
       }
-      const call = buildProtocolActionCall(action, {
+      const workflow = buildProtocolWorkflowCalls(action, {
         target, validator, asset, amount, amount2, amount3,
         amounts: stableAmounts,
         receiver: wallet.address,
         coinIndex,
         isAToB,
-      });
+      }, missingApprovals.map((approval) => ({
+        token: approval.token,
+        spender: approvalSpender,
+        amount: approval.value,
+      })));
       setBusy("action");
-      await castVote(call.func, call.args, call.target);
-      toast.success(`${ACTION_LABELS[action]} proposed`, {
-        description: "Signers can review and vote on it in the Issues tab.",
+      for (const call of workflow) {
+        await castVote(call.func, call.args, call.target);
+      }
+      toast.success(`${ACTION_LABELS[action]} workflow proposed`, {
+        description: missingApprovals.length
+          ? "Approval issues were created first. The action unlocks for more votes after they execute."
+          : "Signers can review and vote on it in the Issues tab.",
       });
       refresh();
     } catch (err: any) {
-      toast.error("Action proposal failed", { description: String(err?.message || err) });
+      toast.error("Workflow proposal failed", { description: String(err?.message || err) });
     } finally {
       setBusy("");
     }
@@ -2369,16 +2455,18 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         <div className="space-y-2 rounded-md border border-border p-3">
           <div className="flex items-center justify-between gap-2 text-sm">
             <span>Prerequisite allowance{approvalSpecs.length > 1 ? "s" : ""}</span>
-            <Badge variant={approvalReady ? "secondary" : "outline"}>{approvalReady ? "Ready" : "Required"}</Badge>
+            <Badge variant={approvalReady ? "secondary" : "outline"}>
+              {allowances.isError ? "Unavailable" : !allowances.isSuccess ? "Checking…" :
+                approvalReady ? "Already approved" : `${missingApprovals.length} required`}
+            </Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            The protocol action remains locked until every approval proposal executes on-chain.
+            {allowances.isError
+              ? "Allowances could not be verified. Retry after the indexer is available."
+              : approvalReady
+              ? "The existing allowance is sufficient, so only the action issue will be created."
+              : "Submitting creates the exact approval issue(s) first and the action issue second. Signers complete approvals before voting on the action."}
           </p>
-          {!approvalReady ? (
-            <Button onClick={proposeApprovals} disabled={busy !== "" || !canSubmit || !canVote || !approvalInputsComplete} variant="outline" className="w-full">
-              {busy === "approve" ? "Proposing approval…" : `Propose approval${missingApprovals.length > 1 ? "s" : ""}`}
-            </Button>
-          ) : null}
         </div>
       ) : null}
 
@@ -2386,8 +2474,14 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         <p className="text-xs text-muted-foreground">The proposal uses a deadline 60 days from submission; minimum amounts still enforce slippage protection.</p>
       ) : null}
 
-      <Button onClick={proposeAction} disabled={busy !== "" || !canSubmit || !canVote || !approvalReady} className="w-full">
-        {busy === "action" ? "Proposing…" : `Propose ${ACTION_LABELS[action].toLowerCase()}`}
+      <Button
+        onClick={proposeWorkflow}
+        disabled={busy !== "" || !canSubmit || !canVote ||
+          (approvalRequired && (!approvalInputsComplete || !allowances.isSuccess))}
+        className="w-full"
+      >
+        {busy === "action" ? "Proposing workflow…" :
+          `Propose ${missingApprovals.length ? "approvals + " : ""}${ACTION_LABELS[action].toLowerCase()}`}
       </Button>
     </div>
   );
