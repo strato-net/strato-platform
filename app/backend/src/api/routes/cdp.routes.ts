@@ -5,6 +5,9 @@ import CDPController from "../controllers/cdp.controller";
 const router = Router();
 const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
+/** Read-only contract and collateral metadata for governance-aware clients. */
+router.get("/metadata", authHandler.authorizeRequest(true), CDPController.getMetadata);
+
 /**
  * @openapi
  * /cdp/vaults:

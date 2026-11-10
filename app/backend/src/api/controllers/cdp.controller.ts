@@ -33,6 +33,7 @@ import {
   getCDPStats,
   getInterestAccrued,
   getVaultCandidates,
+  getCDPMetadata,
 } from "../services/cdp.service";
 import {
   validateDepositArgs,
@@ -49,6 +50,14 @@ import {
 } from "../validators/cdp.validator";
 
 class CDPController {
+  static async getMetadata(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      res.status(RestStatus.OK).json(await getCDPMetadata(req.accessToken));
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getVaults(
     req: Request,
     res: Response,

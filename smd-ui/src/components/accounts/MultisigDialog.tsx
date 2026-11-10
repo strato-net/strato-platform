@@ -45,6 +45,12 @@ import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { formatVariadicArg, parseArgText, typedVariadicArg, variadicArgValue } from "@/lib/args";
 import { useMyTokens, useTokenAllowances, type TokenBalance } from "@/services/tokens";
+import {
+  useCDPMetadata,
+  usePoolMetadata,
+  useStakingMetadata,
+  type PoolMetadata,
+} from "@/services/protocolMetadata";
 import { useContractGroups, useContractInfo, functionArgs, fetchFunctionArgs } from "@/services/contracts";
 import { useSimulation } from "@/components/simulation/useSimulation";
 import { SimulateButton } from "@/components/simulation/SimulateButton";
@@ -1946,8 +1952,12 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
   });
   const nested = fullRoute.length > 1;
   const canVote = nested || signers.some((s) => eq(s, userAddress ?? ""));
+  const stakingMetadata = useStakingMetadata();
+  const cdpMetadata = useCDPMetadata();
+  const poolMetadata = usePoolMetadata();
 
   const [action, setAction] = useState<ProtocolActionKind>("stake");
+  const [manualAddresses, setManualAddresses] = useState(false);
   const [target, setTarget] = useState("");
   const [validator, setValidator] = useState("");
   const [asset, setAsset] = useState("");
@@ -1962,6 +1972,47 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
   const [coinIndex, setCoinIndex] = useState("");
   const [isAToB, setIsAToB] = useState(true);
   const [busy, setBusy] = useState<"approve" | "action" | "">("");
+
+  const isStakingAction = action === "stake" || action === "unstake";
+  const isCDPAction = action === "cdpDeposit" || action === "cdpBorrow";
+  const isStablePoolAction = action === "addLiquidityStable" ||
+    action === "removeLiquidityStable" || action === "removeLiquidityOneCoin";
+  const isPoolAction = !isStakingAction && !isCDPAction;
+  const availablePools = useMemo(() => (poolMetadata.data ?? []).filter((pool) =>
+    !pool.isPaused && !pool.isDisabled &&
+    (isStablePoolAction ? !!pool.coins?.length : !pool.coins?.length)
+  ), [poolMetadata.data, isStablePoolAction]);
+  const selectedPool = availablePools.find((pool) => eq(pool.address, target));
+
+  const applyPool = (pool: PoolMetadata) => {
+    setTarget(pool.address);
+    setTokenA(pool.tokenA.address);
+    setTokenB(pool.tokenB.address);
+    if (pool.coins?.length) setTokensText(JSON.stringify(pool.coins.map((coin) => coin.address)));
+    if (action === "addLiquiditySingle") setAsset(isAToB ? pool.tokenA.address : pool.tokenB.address);
+  };
+
+  useEffect(() => {
+    if (manualAddresses || !isStakingAction || !stakingMetadata.data) return;
+    setTarget(stakingMetadata.data.stakingAddress);
+    setAsset(stakingMetadata.data.stratoTokenAddress);
+    setValidator(stakingMetadata.data.validators.find((item) => item.active)?.address || "");
+  }, [manualAddresses, action, isStakingAction, stakingMetadata.data]);
+
+  useEffect(() => {
+    if (manualAddresses || !isCDPAction || !cdpMetadata.data) return;
+    setTarget(cdpMetadata.data.engineAddress);
+    setSpender(cdpMetadata.data.vaultAddress);
+    setAsset(cdpMetadata.data.assets.find((item) => item.isSupported && !item.isPaused)?.asset || "");
+  }, [manualAddresses, action, isCDPAction, cdpMetadata.data]);
+
+  useEffect(() => {
+    if (manualAddresses || !isPoolAction || !availablePools.length) return;
+    const pool = availablePools.find((item) => eq(item.address, target)) ?? availablePools[0];
+    applyPool(pool);
+    // Action changes intentionally reset the target, so the first compatible pool is selected.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manualAddresses, action, poolMetadata.data]);
 
   const changeAction = (value: ProtocolActionKind) => {
     setAction(value);
@@ -2148,44 +2199,120 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         </Select>
       </div>
 
+      <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
+        <div>
+          <p className="text-sm font-medium">{manualAddresses ? "Manual contract addresses" : "App protocol configuration"}</p>
+          <p className="text-xs text-muted-foreground">
+            {manualAddresses ? "Advanced mode bypasses metadata prefills." : "Contracts, assets, validators, and pool coin order come from the app backend."}
+          </p>
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={() => setManualAddresses((value) => !value)}>
+          {manualAddresses ? "Use app defaults" : "Enter manually"}
+        </Button>
+      </div>
+
       {!canVote ? (
         <Alert><AlertTriangle className="h-4 w-4" /><AlertDescription>Only a signer can propose protocol actions.</AlertDescription></Alert>
       ) : null}
 
-      {addressInput(
-        action === "stake" || action === "unstake" ? "Staking contract" :
-          action === "cdpDeposit" || action === "cdpBorrow" ? "CDP engine" : "Pool contract",
+      {manualAddresses ? addressInput(
+        isStakingAction ? "Staking contract" : isCDPAction ? "CDP engine" : "Pool contract",
         target, setTarget, "40-character contract address"
-      )}
+      ) : null}
 
-      {(action === "stake" || action === "unstake") && <>
-        {action === "stake" ? addressInput("STRATO token", asset, setAsset, "Token contract used for approval") : null}
-        {addressInput("Validator", validator, setValidator, "Validator address")}
+      {!manualAddresses && isPoolAction ? (
+        <div className="space-y-1">
+          <Label>Pool</Label>
+          <Select value={target} onValueChange={(value) => {
+            const pool = availablePools.find((item) => item.address === value);
+            if (pool) applyPool(pool);
+          }}>
+            <SelectTrigger><SelectValue placeholder={poolMetadata.isLoading ? "Loading pools…" : "Select a pool"} /></SelectTrigger>
+            <SelectContent>
+              {availablePools.map((pool) => (
+                <SelectItem key={pool.address} value={pool.address}>
+                  {pool.poolName} ({shortenHex(pool.address, 6, 4)})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
+      {!manualAddresses && validContractAddress(target) ? (
+        <p className="break-all font-mono text-xs text-muted-foreground">Contract: {target}</p>
+      ) : null}
+
+      {!manualAddresses && ((isStakingAction && stakingMetadata.isError) ||
+        (isCDPAction && cdpMetadata.isError) || (isPoolAction && poolMetadata.isError)) ? (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>Protocol metadata could not be loaded. Use manual address entry to continue.</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {isStakingAction && <>
+        {manualAddresses && action === "stake" ? addressInput("STRATO token", asset, setAsset, "Token contract used for approval") : null}
+        {manualAddresses ? addressInput("Validator", validator, setValidator, "Validator address") : (
+          <div className="space-y-1">
+            <Label>Validator</Label>
+            <Select value={validator} onValueChange={setValidator}>
+              <SelectTrigger><SelectValue placeholder={stakingMetadata.isLoading ? "Loading validators…" : "Select a validator"} /></SelectTrigger>
+              <SelectContent>
+                {(stakingMetadata.data?.validators ?? []).filter((item) => item.active && validContractAddress(item.address)).map((item) => (
+                  <SelectItem key={item.address} value={item.address}>
+                    {item.name || shortenHex(item.address, 6, 4)}{item.estimatedApy ? ` · ${item.estimatedApy}% APY` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         {amountInput("Amount (raw units)", amount, setAmount)}
       </>}
 
-      {(action === "cdpDeposit" || action === "cdpBorrow") && <>
-        {addressInput("Collateral token", asset, setAsset, "Collateral asset address")}
-        {action === "cdpDeposit" ? addressInput("CDP vault / approval spender", spender, setSpender, "Vault contract address") : null}
+      {isCDPAction && <>
+        {manualAddresses ? addressInput("Collateral token", asset, setAsset, "Collateral asset address") : (
+          <div className="space-y-1">
+            <Label>Collateral asset</Label>
+            <Select value={asset} onValueChange={setAsset}>
+              <SelectTrigger><SelectValue placeholder={cdpMetadata.isLoading ? "Loading collateral…" : "Select collateral"} /></SelectTrigger>
+              <SelectContent>
+                {(cdpMetadata.data?.assets ?? []).filter((item) => item.isSupported && !item.isPaused && validContractAddress(item.asset)).map((item) => (
+                  <SelectItem key={item.asset} value={item.asset}>{item.symbol}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {manualAddresses && action === "cdpDeposit" ? addressInput("CDP vault / approval spender", spender, setSpender, "Vault contract address") : null}
         {amountInput(action === "cdpBorrow" ? "USDST to borrow (raw units)" : "Collateral amount (raw units)", amount, setAmount)}
       </>}
 
       {action === "addLiquidity" && <>
-        {addressInput("Token A", tokenA, setTokenA, "Token A contract address")}
+        {manualAddresses ? addressInput("Token A", tokenA, setTokenA, "Token A contract address") :
+          <p className="text-xs text-muted-foreground">Token A: {selectedPool?.tokenA._symbol || "—"}</p>}
         {amountInput("Maximum token A amount (raw units)", amount2, setAmount2)}
-        {addressInput("Token B", tokenB, setTokenB, "Token B contract address")}
+        {manualAddresses ? addressInput("Token B", tokenB, setTokenB, "Token B contract address") :
+          <p className="text-xs text-muted-foreground">Token B: {selectedPool?.tokenB._symbol || "—"}</p>}
         {amountInput("Token B amount (raw units)", amount, setAmount)}
       </>}
 
       {action === "addLiquiditySingle" && <>
-        {addressInput("Deposited token", asset, setAsset, "Token contract address")}
+        {manualAddresses ? addressInput("Deposited token", asset, setAsset, "Token contract address") : null}
         <div className="space-y-1">
           <Label>Deposited side</Label>
-          <Select value={isAToB ? "a" : "b"} onValueChange={(value) => setIsAToB(value === "a")}>
+          <Select value={isAToB ? "a" : "b"} onValueChange={(value) => {
+            const nextIsAToB = value === "a";
+            setIsAToB(nextIsAToB);
+            if (!manualAddresses && selectedPool) {
+              setAsset(nextIsAToB ? selectedPool.tokenA.address : selectedPool.tokenB.address);
+            }
+          }}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="a">Token A</SelectItem>
-              <SelectItem value="b">Token B</SelectItem>
+              <SelectItem value="a">Token A{selectedPool ? ` · ${selectedPool.tokenA._symbol}` : ""}</SelectItem>
+              <SelectItem value="b">Token B{selectedPool ? ` · ${selectedPool.tokenB._symbol}` : ""}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -2193,10 +2320,12 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
       </>}
 
       {action === "addLiquidityStable" && <>
-        <div className="space-y-1">
+        {manualAddresses ? <div className="space-y-1">
           <Label>Coin contract addresses</Label>
           <Input value={tokensText} onChange={(e) => setTokensText(e.target.value)} placeholder='["address0","address1",…]' className="font-mono text-xs" />
-        </div>
+        </div> : <p className="text-xs text-muted-foreground">
+          Pool coin order: {selectedPool?.coins?.map((coin) => coin._symbol).join(", ") || "—"}
+        </p>}
         <div className="space-y-1">
           <Label>Coin amounts (raw units, same order)</Label>
           <Input value={amountsText} onChange={(e) => setAmountsText(e.target.value)} placeholder='["1000","0",…]' className="font-mono text-xs" />
@@ -2222,7 +2351,16 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         {amountInput("LP token amount (raw units)", amount, setAmount)}
         <div className="space-y-1">
           <Label>Coin index</Label>
-          <Input value={coinIndex} onChange={(e) => setCoinIndex(e.target.value)} placeholder="0" inputMode="numeric" />
+          {!manualAddresses && selectedPool?.coins?.length ? (
+            <Select value={coinIndex} onValueChange={setCoinIndex}>
+              <SelectTrigger><SelectValue placeholder="Select coin" /></SelectTrigger>
+              <SelectContent>
+                {selectedPool.coins.map((coin, index) => (
+                  <SelectItem key={coin.address} value={String(index)}>{index} · {coin._symbol}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : <Input value={coinIndex} onChange={(e) => setCoinIndex(e.target.value)} placeholder="0" inputMode="numeric" />}
         </div>
         {amountInput("Minimum coin amount received (raw units)", amount2, setAmount2)}
       </>}
