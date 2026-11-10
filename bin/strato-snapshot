@@ -1688,12 +1688,20 @@ pg_temp_start() {
   local run_user="${3:-}"
   local mode="${4:-}"
   local dumps_dir="${5:-}"
+  local config_dir="${6:-}"
   need_cmd docker
   local args=(-d --rm -v "$data_dir:/var/lib/postgresql/data")
   [[ -n "$run_user" ]] && args+=(--user "$run_user")
   # Optional read-only mount of the extracted dumps at /dumps, so pg_restore
   # reads them in place instead of a docker cp writing them a second time.
   [[ -n "$dumps_dir" ]] && args+=(-v "$dumps_dir:/dumps:ro")
+  if [[ -n "$config_dir" ]]; then
+    [[ -f "$config_dir/init-permissions.sql" && -f "$config_dir/pg_hba.conf" ]] \
+      || die "incomplete PostgreSQL configuration in $config_dir"
+    args+=(-e POSTGRES_USER=strato_admin
+           -v "$config_dir/init-permissions.sql:/docker-entrypoint-initdb.d/10-runtime-permissions.sql:ro"
+           -v "$config_dir/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro")
+  fi
   if postgres_data_dir_initialized "$data_dir"; then
     args+=(-e POSTGRES_HOST_AUTH_METHOD=trust)
   else
@@ -1703,6 +1711,7 @@ pg_temp_start() {
   # Server-side postgres args. In "fast" mode (bulk restore into a disposable
   # cluster) relax durability and grow bulk-load buffers for a much faster load.
   local pg_args=(-c max_connections=300)
+  [[ -n "$config_dir" ]] && pg_args+=(-c hba_file=/etc/postgresql/pg_hba.conf)
   if [[ "$mode" == "fast" ]]; then
     pg_args+=(-c fsync=off -c synchronous_commit=off -c full_page_writes=off \
       -c max_wal_size=4GB -c checkpoint_timeout=30min -c maintenance_work_mem=1GB)
@@ -1813,6 +1822,8 @@ load_databases() {
   local node_password="$3"
   [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && return 0
   local cid db run_user jobs t0 t1 restore_log
+  local config_dir="$(dirname "$data_dir")/config/postgres"
+  [[ -d "$config_dir" ]] || config_dir=""
   run_user="$(postgres_run_user "$(dirname "$data_dir")")"
   jobs="$(snapshot_pg_jobs)"
   # The dumps are bind-mounted read-only into the throwaway container: pg_restore
@@ -1829,7 +1840,7 @@ load_databases() {
   # "fast" mode relaxes durability on the throwaway load container for a much
   # faster bulk restore; safe because the data is disposable until restore
   # completes (on failure we just retry the whole restore).
-  cid="$(pg_temp_start "$data_dir" "$node_password" "$run_user" fast "$dumps_dir")"
+  cid="$(pg_temp_start "$data_dir" "$node_password" "$run_user" fast "$dumps_dir" "$config_dir")"
   info "      Temporary postgres ready after $(elapsed_since "$t0") (container ${cid:0:12}); dumps mounted read-only at /dumps"
   for db in $(selected_databases); do
     [[ -f "$dumps_dir/$db.dump" ]] || { pg_temp_stop "$cid"; die "snapshot missing database dump: $db.dump"; }
