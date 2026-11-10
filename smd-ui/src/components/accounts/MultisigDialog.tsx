@@ -2119,6 +2119,12 @@ const ACTION_LABELS: Record<ProtocolActionKind, string> = {
   removeLiquidityOneCoin: "Remove stable liquidity as one coin",
 };
 
+/** Action label as part of a sentence, while preserving protocol acronyms. */
+const proposalActionLabel = (action: ProtocolActionKind): string => {
+  const label = ACTION_LABELS[action];
+  return label.startsWith("CDP ") ? label : label.charAt(0).toLowerCase() + label.slice(1);
+};
+
 const validContractAddress = (value: string) => strip0x(value.trim()).length === 40 && isAddressLike(value.trim());
 const positiveInteger = (value: string) => /^\d+$/.test(value.trim()) && BigInt(value.trim()) > 0n;
 const nonNegativeInteger = (value: string) => /^\d+$/.test(value.trim());
@@ -2148,7 +2154,9 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
   const cdpMetadata = useCDPMetadata();
   const poolMetadata = usePoolMetadata();
 
-  const [action, setAction] = useState<ProtocolActionKind>("stake");
+  // Require an explicit operation choice. Defaulting to Stake is unsafe because a
+  // remount could silently replace a user's previous liquidity/CDP selection.
+  const [action, setAction] = useState<ProtocolActionKind | null>(null);
   const [manualAddresses, setManualAddresses] = useState(false);
   const [target, setTarget] = useState("");
   const [validator, setValidator] = useState("");
@@ -2169,7 +2177,7 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
   const isCDPAction = action === "cdpDeposit" || action === "cdpBorrow";
   const isStablePoolAction = action === "addLiquidityStable" ||
     action === "removeLiquidityStable" || action === "removeLiquidityOneCoin";
-  const isPoolAction = !isStakingAction && !isCDPAction;
+  const isPoolAction = !!action && !isStakingAction && !isCDPAction;
   const availablePools = useMemo(() => (poolMetadata.data ?? []).filter((pool) =>
     !pool.isPaused && !pool.isDisabled &&
     (isStablePoolAction ? !!pool.coins?.length : !pool.coins?.length)
@@ -2273,7 +2281,12 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
 
   const proposeWorkflow = async () => {
     if (!canVote) return toast.error("Only a signer can propose this action");
+    if (!action) return toast.error("Select a protocol operation");
+    const selectedAction = action;
     if (!validContractAddress(target)) return toast.error("Enter a valid protocol contract address");
+    if (!manualAddresses && isPoolAction && !selectedPool) {
+      return toast.error("Select a valid pool for this liquidity action");
+    }
     if (approvalRequired && !approvalInputsComplete) {
       return toast.error("Enter valid token addresses and approval amounts");
     }
@@ -2282,11 +2295,11 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
     }
 
     try {
-      switch (action) {
+      switch (selectedAction) {
         case "stake":
         case "unstake":
           if (!validContractAddress(validator)) throw new Error("Enter a valid validator address");
-          if (action === "stake" && !validContractAddress(asset)) throw new Error("Enter a valid STRATO token address");
+          if (selectedAction === "stake" && !validContractAddress(asset)) throw new Error("Enter a valid STRATO token address");
           if (!positiveInteger(amount)) throw new Error("Enter a positive amount in raw units");
           break;
         case "cdpDeposit":
@@ -2324,7 +2337,7 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
           }
           break;
       }
-      const workflow = buildProtocolWorkflowCalls(action, {
+      const workflow = buildProtocolWorkflowCalls(selectedAction, {
         target, validator, asset, amount, amount2, amount3,
         amounts: stableAmounts,
         receiver: wallet.address,
@@ -2339,7 +2352,7 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
       for (const call of workflow) {
         await castVote(call.func, call.args, call.target);
       }
-      toast.success(`${ACTION_LABELS[action]} workflow proposed`, {
+      toast.success(`${ACTION_LABELS[selectedAction]} workflow proposed`, {
         description: missingApprovals.length
           ? "Approval issues were created first. The action unlocks for more votes after they execute."
           : "Signers can review and vote on it in the Issues tab.",
@@ -2369,8 +2382,8 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
     <div className="space-y-4">
       <div className="space-y-1">
         <Label>Protocol operation</Label>
-        <Select value={action} onValueChange={(value) => changeAction(value as ProtocolActionKind)}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+        <Select value={action ?? undefined} onValueChange={(value) => changeAction(value as ProtocolActionKind)}>
+          <SelectTrigger><SelectValue placeholder="Select an operation" /></SelectTrigger>
           <SelectContent>
             {(Object.keys(ACTION_LABELS) as ProtocolActionKind[]).map((value) => (
               <SelectItem key={value} value={value}>{ACTION_LABELS[value]}</SelectItem>
@@ -2395,7 +2408,7 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         <Alert><AlertTriangle className="h-4 w-4" /><AlertDescription>Only a signer can propose protocol actions.</AlertDescription></Alert>
       ) : null}
 
-      {manualAddresses ? addressInput(
+      {manualAddresses && action ? addressInput(
         isStakingAction ? "Staking contract" : isCDPAction ? "CDP engine" : "Pool contract",
         target, setTarget, "40-character contract address"
       ) : null}
@@ -2570,12 +2583,15 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
 
       <Button
         onClick={proposeWorkflow}
-        disabled={busy !== "" || !canSubmit || !canVote ||
+        disabled={!action || busy !== "" || !canSubmit || !canVote ||
           (approvalRequired && (!approvalInputsComplete || !allowances.isSuccess))}
         className="w-full"
       >
-        {busy === "action" ? "Proposing workflow…" :
-          `Propose ${missingApprovals.length ? "approvals + " : ""}${ACTION_LABELS[action].toLowerCase()}`}
+        {busy === "action" ? "Proposing workflow…" : action
+          ? `Propose ${missingApprovals.length
+            ? `${missingApprovals.length === 1 ? "approval" : "approvals"} + `
+            : ""}${proposalActionLabel(action)}`
+          : "Select an operation"}
       </Button>
     </div>
   );

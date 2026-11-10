@@ -1381,12 +1381,16 @@ export const getCDPMetadata = async (accessToken: string) => {
     }, "getCDPMetadata"),
     getSupportedAssets(accessToken),
   ]);
+  const usdstAddress = String(registry.usdst || "").replace(/^0x/i, "").toLowerCase();
   return {
     registryAddress: registry.address,
     engineAddress: registry.cdpEngine?.address || registry.cdpEngine,
     vaultAddress: registry.cdpVault?.address || registry.cdpVault,
     usdstAddress: registry.usdst,
-    assets,
+    // USDST may be enabled in the engine for protocol bookkeeping, but it cannot be
+    // selected as collateral. Keep it out of governance-aware client pickers.
+    assets: assets.filter((asset) =>
+      String(asset.asset || "").replace(/^0x/i, "").toLowerCase() !== usdstAddress),
   };
 };
 
