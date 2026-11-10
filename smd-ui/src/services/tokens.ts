@@ -80,3 +80,30 @@ export function useTokenAllowance(
     },
   });
 }
+
+/** Batch allowance lookup for multi-coin liquidity workflows. Order matches `tokenAddresses`. */
+export function useTokenAllowances(
+  tokenAddresses: string[],
+  ownerAddress?: string | null,
+  spenderAddress?: string | null
+) {
+  const tokens = tokenAddresses.map(strip0x);
+  return useQuery({
+    queryKey: ["token-allowances", ownerAddress, spenderAddress, tokens],
+    enabled: tokens.length > 0 && tokens.every((token) => token.length === 40) &&
+      !!ownerAddress && !!spenderAddress,
+    refetchInterval: 12_000,
+    queryFn: async (): Promise<string[]> => {
+      const owner = strip0x(ownerAddress!);
+      const spender = strip0x(spenderAddress!);
+      return Promise.all(tokens.map(async (token) => {
+        const { data } = await api.get(
+          `${env.CIRRUS_URL}/mapping?collection_name=eq._allowances` +
+            `&address=eq.${token}&key-%3E%3Ekey=eq.${owner}` +
+            `&key-%3E%3Ekey2=eq.${spender}&select=value&limit=1`
+        );
+        return String(Array.isArray(data) ? data[0]?.value ?? "0" : "0");
+      }));
+    },
+  });
+}

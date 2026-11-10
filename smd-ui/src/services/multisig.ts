@@ -32,7 +32,10 @@ export const MULTISIG_CODE_HASH = strip0x(keccak256(stringToBytes(multisigSource
 /** The contract's MAXIMUM_DELAY: a timelock delay can be at most 30 days (in seconds). */
 export const MAX_TIMELOCK_DELAY = 2592000;
 
-export type ProtocolActionKind = "stake" | "unstake" | "cdpDeposit" | "cdpBorrow" | "addLiquidity" | "removeLiquidity";
+export type ProtocolActionKind =
+  | "stake" | "unstake" | "cdpDeposit" | "cdpBorrow"
+  | "addLiquidity" | "addLiquiditySingle" | "addLiquidityStable"
+  | "removeLiquidity" | "removeLiquidityStable" | "removeLiquidityOneCoin";
 
 export interface ProtocolActionInput {
   target: string;
@@ -41,6 +44,10 @@ export interface ProtocolActionInput {
   amount: string;
   amount2?: string;
   amount3?: string;
+  amounts?: string[];
+  receiver?: string;
+  coinIndex?: string;
+  isAToB?: boolean;
 }
 
 /** Exact target call carried by each SMD protocol-action issue. */
@@ -83,6 +90,26 @@ export function buildProtocolActionCall(
           typedVariadicArg("uint256", String(nowSeconds + 60 * 24 * 60 * 60)),
         ],
       };
+    case "addLiquiditySingle":
+      return {
+        target,
+        func: "addLiquiditySingleToken",
+        args: [
+          typedVariadicArg("bool", String(!!input.isAToB)),
+          typedVariadicArg("uint256", input.amount),
+          typedVariadicArg("uint256", String(nowSeconds + 60 * 24 * 60 * 60)),
+        ],
+      };
+    case "addLiquidityStable":
+      return {
+        target,
+        func: "addLiquidityGeneral",
+        args: [
+          typedVariadicArg("uint256[]", JSON.stringify(input.amounts || [])),
+          typedVariadicArg("uint256", input.amount2 || ""),
+          typedVariadicArg("address", input.receiver || ""),
+        ],
+      };
     case "removeLiquidity":
       return {
         target,
@@ -92,6 +119,28 @@ export function buildProtocolActionCall(
           typedVariadicArg("uint256", input.amount2 || ""),
           typedVariadicArg("uint256", input.amount3 || ""),
           typedVariadicArg("uint256", String(nowSeconds + 60 * 24 * 60 * 60)),
+        ],
+      };
+    case "removeLiquidityStable":
+      return {
+        target,
+        func: "removeLiquidityGeneral",
+        args: [
+          typedVariadicArg("uint256", input.amount),
+          typedVariadicArg("uint256[]", JSON.stringify(input.amounts || [])),
+          typedVariadicArg("address", input.receiver || ""),
+          typedVariadicArg("bool", "true"),
+        ],
+      };
+    case "removeLiquidityOneCoin":
+      return {
+        target,
+        func: "removeliquidityOneCoin",
+        args: [
+          typedVariadicArg("uint256", input.amount),
+          typedVariadicArg("uint256", input.coinIndex || ""),
+          typedVariadicArg("uint256", input.amount2 || ""),
+          typedVariadicArg("address", input.receiver || ""),
         ],
       };
   }

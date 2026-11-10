@@ -44,7 +44,7 @@ import { shortenHex } from "@/lib/utils";
 import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { formatVariadicArg, parseArgText, typedVariadicArg, variadicArgValue } from "@/lib/args";
-import { useMyTokens, useTokenAllowance, type TokenBalance } from "@/services/tokens";
+import { useMyTokens, useTokenAllowances, type TokenBalance } from "@/services/tokens";
 import { useContractGroups, useContractInfo, functionArgs, fetchFunctionArgs } from "@/services/contracts";
 import { useSimulation } from "@/components/simulation/useSimulation";
 import { SimulateButton } from "@/components/simulation/SimulateButton";
@@ -1913,12 +1913,21 @@ const ACTION_LABELS: Record<ProtocolActionKind, string> = {
   unstake: "Unstake",
   cdpDeposit: "CDP deposit",
   cdpBorrow: "CDP borrow",
-  addLiquidity: "Add pool liquidity",
-  removeLiquidity: "Remove pool liquidity",
+  addLiquidity: "Add dual-token liquidity",
+  addLiquiditySingle: "Add single-token liquidity",
+  addLiquidityStable: "Add stable multi-token liquidity",
+  removeLiquidity: "Remove dual-token liquidity",
+  removeLiquidityStable: "Remove stable multi-token liquidity",
+  removeLiquidityOneCoin: "Remove stable liquidity as one coin",
 };
 
 const validContractAddress = (value: string) => strip0x(value.trim()).length === 40 && isAddressLike(value.trim());
 const positiveInteger = (value: string) => /^\d+$/.test(value.trim()) && BigInt(value.trim()) > 0n;
+const nonNegativeInteger = (value: string) => /^\d+$/.test(value.trim());
+const textArray = (value: string): string[] => {
+  const parsed = parseArgText(value);
+  return Array.isArray(parsed) ? parsed.map(String) : [];
+};
 
 /**
  * Protocol calls made from a self-owned wallet must originate in the wallet, so SMD
@@ -1948,6 +1957,10 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
   const [amount, setAmount] = useState("");
   const [amount2, setAmount2] = useState("");
   const [amount3, setAmount3] = useState("");
+  const [tokensText, setTokensText] = useState("");
+  const [amountsText, setAmountsText] = useState("");
+  const [coinIndex, setCoinIndex] = useState("");
+  const [isAToB, setIsAToB] = useState(true);
   const [busy, setBusy] = useState<"approve" | "action" | "">("");
 
   const changeAction = (value: ProtocolActionKind) => {
@@ -1963,26 +1976,38 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
     setAmount("");
     setAmount2("");
     setAmount3("");
+    setTokensText("");
+    setAmountsText("");
+    setCoinIndex("");
+    setIsAToB(true);
   };
 
-  const approvalSpender = action === "stake" || action === "addLiquidity"
+  const stableTokens = textArray(tokensText);
+  const stableAmounts = textArray(amountsText);
+  const approvalSpender = action === "stake" || action === "addLiquidity" ||
+      action === "addLiquiditySingle" || action === "addLiquidityStable"
     ? target
     : action === "cdpDeposit"
       ? spender
       : "";
-  const approvalTokenA = action === "addLiquidity" ? tokenA : action === "stake" || action === "cdpDeposit" ? asset : "";
-  const approvalAmountA = action === "addLiquidity" ? amount2 : amount;
-  const approvalTokenB = action === "addLiquidity" ? tokenB : "";
-  const approvalAmountB = action === "addLiquidity" ? amount : "";
-  const approvalRequired = action === "stake" || action === "cdpDeposit" || action === "addLiquidity";
-
-  const allowanceA = useTokenAllowance(
-    validContractAddress(approvalTokenA) ? approvalTokenA : null,
-    wallet.address,
-    validContractAddress(approvalSpender) ? approvalSpender : null
-  );
-  const allowanceB = useTokenAllowance(
-    validContractAddress(approvalTokenB) ? approvalTokenB : null,
+  const approvalRequired = action === "stake" || action === "cdpDeposit" ||
+    action === "addLiquidity" || action === "addLiquiditySingle" || action === "addLiquidityStable";
+  const approvalSpecs = action === "addLiquidity"
+    ? [{ token: tokenA, value: amount2 }, { token: tokenB, value: amount }]
+    : action === "addLiquidityStable"
+      ? stableTokens.map((token, index) => ({ token, value: stableAmounts[index] ?? "0" }))
+          .filter(({ value }) => positiveInteger(value))
+      : approvalRequired
+        ? [{ token: asset, value: amount }]
+        : [];
+  const approvalInputsComplete = approvalRequired && validContractAddress(approvalSpender) &&
+    approvalSpecs.length > 0 && approvalSpecs.every(({ token, value }) =>
+      validContractAddress(token) && positiveInteger(value)) &&
+    (action !== "addLiquidityStable" || (stableTokens.length === stableAmounts.length &&
+      stableTokens.length > 0 && stableTokens.every(validContractAddress) &&
+      stableAmounts.every(nonNegativeInteger)));
+  const allowances = useTokenAllowances(
+    approvalSpecs.map(({ token }) => token),
     wallet.address,
     validContractAddress(approvalSpender) ? approvalSpender : null
   );
@@ -1994,36 +2019,20 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
       return false;
     }
   };
-  const approvalInputsComplete = validContractAddress(approvalSpender) &&
-    validContractAddress(approvalTokenA) && positiveInteger(approvalAmountA) &&
-    (action !== "addLiquidity" || (validContractAddress(approvalTokenB) && positiveInteger(approvalAmountB)));
-  const needsApprovalA = approvalRequired && validContractAddress(approvalTokenA) && positiveInteger(approvalAmountA) &&
-    !allowanceEnough(allowanceA.data, approvalAmountA);
-  const needsApprovalB = action === "addLiquidity" && validContractAddress(approvalTokenB) && positiveInteger(approvalAmountB) &&
-    !allowanceEnough(allowanceB.data, approvalAmountB);
-  const approvalReady = !approvalRequired || (approvalInputsComplete &&
-    allowanceEnough(allowanceA.data, approvalAmountA) &&
-    (action !== "addLiquidity" || allowanceEnough(allowanceB.data, approvalAmountB)));
+  const missingApprovals = approvalSpecs.filter(({ value }, index) =>
+    !allowanceEnough(allowances.data?.[index], value));
+  const approvalReady = !approvalRequired || (approvalInputsComplete && missingApprovals.length === 0);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["multisig-open-issues", wallet.address] });
-    allowanceA.refetch();
-    allowanceB.refetch();
+    allowances.refetch();
   };
 
   const proposeApprovals = async () => {
     if (!canVote) return toast.error("Only a signer can propose approvals");
     if (!validContractAddress(approvalSpender)) return toast.error("Enter a valid spender address");
-    if (!validContractAddress(approvalTokenA) || !positiveInteger(approvalAmountA)) {
-      return toast.error("Enter a valid token and positive approval amount");
-    }
-    if (action === "addLiquidity" && (!validContractAddress(approvalTokenB) || !positiveInteger(approvalAmountB))) {
-      return toast.error("Enter both pool tokens and positive amounts");
-    }
-    const approvals = [
-      ...(needsApprovalA ? [{ token: approvalTokenA, value: approvalAmountA }] : []),
-      ...(needsApprovalB ? [{ token: approvalTokenB, value: approvalAmountB }] : []),
-    ];
+    if (!approvalInputsComplete) return toast.error("Enter valid token addresses and approval amounts");
+    const approvals = missingApprovals;
     if (!approvals.length) return toast.info("Required allowances are already available");
     setBusy("approve");
     try {
@@ -2070,11 +2079,35 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
           if (!validContractAddress(tokenA) || !validContractAddress(tokenB)) throw new Error("Enter both pool token addresses");
           if (!positiveInteger(amount) || !positiveInteger(amount2)) throw new Error("Enter positive token amounts in raw units");
           break;
+        case "addLiquiditySingle":
+          if (!validContractAddress(asset)) throw new Error("Enter the deposited token address");
+          if (!positiveInteger(amount)) throw new Error("Enter a positive token amount in raw units");
+          break;
+        case "addLiquidityStable":
+          if (!approvalInputsComplete) throw new Error("Enter matching token and amount arrays");
+          if (!positiveInteger(amount2)) throw new Error("Enter a positive minimum LP mint amount");
+          break;
         case "removeLiquidity":
           if (![amount, amount2, amount3].every(positiveInteger)) throw new Error("Enter positive LP and minimum token amounts");
           break;
+        case "removeLiquidityStable":
+          if (!positiveInteger(amount) || stableAmounts.length === 0 || !stableAmounts.every(nonNegativeInteger)) {
+            throw new Error("Enter a positive LP amount and a valid minimum-amount array");
+          }
+          break;
+        case "removeLiquidityOneCoin":
+          if (!positiveInteger(amount) || !nonNegativeInteger(coinIndex) || !positiveInteger(amount2)) {
+            throw new Error("Enter a positive LP amount, coin index, and minimum received amount");
+          }
+          break;
       }
-      const call = buildProtocolActionCall(action, { target, validator, asset, amount, amount2, amount3 });
+      const call = buildProtocolActionCall(action, {
+        target, validator, asset, amount, amount2, amount3,
+        amounts: stableAmounts,
+        receiver: wallet.address,
+        coinIndex,
+        isAToB,
+      });
       setBusy("action");
       await castVote(call.func, call.args, call.target);
       toast.success(`${ACTION_LABELS[action]} proposed`, {
@@ -2144,16 +2177,60 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         {amountInput("Token B amount (raw units)", amount, setAmount)}
       </>}
 
+      {action === "addLiquiditySingle" && <>
+        {addressInput("Deposited token", asset, setAsset, "Token contract address")}
+        <div className="space-y-1">
+          <Label>Deposited side</Label>
+          <Select value={isAToB ? "a" : "b"} onValueChange={(value) => setIsAToB(value === "a")}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="a">Token A</SelectItem>
+              <SelectItem value="b">Token B</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {amountInput("Token amount (raw units)", amount, setAmount)}
+      </>}
+
+      {action === "addLiquidityStable" && <>
+        <div className="space-y-1">
+          <Label>Coin contract addresses</Label>
+          <Input value={tokensText} onChange={(e) => setTokensText(e.target.value)} placeholder='["address0","address1",…]' className="font-mono text-xs" />
+        </div>
+        <div className="space-y-1">
+          <Label>Coin amounts (raw units, same order)</Label>
+          <Input value={amountsText} onChange={(e) => setAmountsText(e.target.value)} placeholder='["1000","0",…]' className="font-mono text-xs" />
+        </div>
+        {amountInput("Minimum LP tokens minted (raw units)", amount2, setAmount2)}
+      </>}
+
       {action === "removeLiquidity" && <>
         {amountInput("LP token amount (raw units)", amount, setAmount)}
         {amountInput("Minimum token B amount (raw units)", amount2, setAmount2)}
         {amountInput("Minimum token A amount (raw units)", amount3, setAmount3)}
       </>}
 
+      {action === "removeLiquidityStable" && <>
+        {amountInput("LP token amount (raw units)", amount, setAmount)}
+        <div className="space-y-1">
+          <Label>Minimum coin amounts (raw units, pool order)</Label>
+          <Input value={amountsText} onChange={(e) => setAmountsText(e.target.value)} placeholder='["100","200",…]' className="font-mono text-xs" />
+        </div>
+      </>}
+
+      {action === "removeLiquidityOneCoin" && <>
+        {amountInput("LP token amount (raw units)", amount, setAmount)}
+        <div className="space-y-1">
+          <Label>Coin index</Label>
+          <Input value={coinIndex} onChange={(e) => setCoinIndex(e.target.value)} placeholder="0" inputMode="numeric" />
+        </div>
+        {amountInput("Minimum coin amount received (raw units)", amount2, setAmount2)}
+      </>}
+
       {approvalRequired ? (
         <div className="space-y-2 rounded-md border border-border p-3">
           <div className="flex items-center justify-between gap-2 text-sm">
-            <span>Prerequisite allowance{approvalTokenB ? "s" : ""}</span>
+            <span>Prerequisite allowance{approvalSpecs.length > 1 ? "s" : ""}</span>
             <Badge variant={approvalReady ? "secondary" : "outline"}>{approvalReady ? "Ready" : "Required"}</Badge>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -2161,13 +2238,13 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
           </p>
           {!approvalReady ? (
             <Button onClick={proposeApprovals} disabled={busy !== "" || !canSubmit || !canVote || !approvalInputsComplete} variant="outline" className="w-full">
-              {busy === "approve" ? "Proposing approval…" : `Propose approval${needsApprovalA && needsApprovalB ? "s" : ""}`}
+              {busy === "approve" ? "Proposing approval…" : `Propose approval${missingApprovals.length > 1 ? "s" : ""}`}
             </Button>
           ) : null}
         </div>
       ) : null}
 
-      {(action === "addLiquidity" || action === "removeLiquidity") ? (
+      {(action === "addLiquidity" || action === "addLiquiditySingle" || action === "removeLiquidity") ? (
         <p className="text-xs text-muted-foreground">The proposal uses a deadline 60 days from submission; minimum amounts still enforce slippage protection.</p>
       ) : null}
 

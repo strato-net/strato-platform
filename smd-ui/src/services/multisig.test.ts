@@ -89,6 +89,69 @@ test("protocol workflows build the exact typed target calls", () => {
       { type: "uint256", value: 5185000 },
     ],
   });
+
+  assert.deepEqual(buildProtocolActionCall("addLiquiditySingle", {
+    target: pool, amount: "40", isAToB: false,
+  }, 1000), {
+    target: pool,
+    func: "addLiquiditySingleToken",
+    args: [
+      { type: "bool", value: false },
+      { type: "uint256", value: 40 },
+      { type: "uint256", value: 5185000 },
+    ],
+  });
+
+  assert.deepEqual(buildProtocolActionCall("addLiquidityStable", {
+    target: pool, amount: "", amount2: "5", amounts: ["10", "20"], receiver: wallet,
+  }), {
+    target: pool,
+    func: "addLiquidityGeneral",
+    args: [
+      { type: "uint256[]", value: ["10", "20"] },
+      { type: "uint256", value: 5 },
+      { type: "address", value: wallet },
+    ],
+  });
+
+  assert.deepEqual(buildProtocolActionCall("removeLiquidityStable", {
+    target: pool, amount: "50", amounts: ["1", "2"], receiver: wallet,
+  }), {
+    target: pool,
+    func: "removeLiquidityGeneral",
+    args: [
+      { type: "uint256", value: 50 },
+      { type: "uint256[]", value: ["1", "2"] },
+      { type: "address", value: wallet },
+      { type: "bool", value: true },
+    ],
+  });
+
+  assert.deepEqual(buildProtocolActionCall("removeLiquidityOneCoin", {
+    target: pool, amount: "50", amount2: "45", coinIndex: "0", receiver: wallet,
+  }), {
+    target: pool,
+    func: "removeliquidityOneCoin",
+    args: [
+      { type: "uint256", value: 50 },
+      { type: "uint256", value: 0 },
+      { type: "uint256", value: 45 },
+      { type: "address", value: wallet },
+    ],
+  });
+
+  assert.equal(buildProtocolActionCall("unstake", {
+    target: wallet, validator: signer, amount: "1",
+  }).func, "unstake");
+  assert.equal(buildProtocolActionCall("cdpDeposit", {
+    target: wallet, asset: pool, amount: "1",
+  }).func, "deposit");
+  assert.equal(buildProtocolActionCall("cdpBorrow", {
+    target: wallet, asset: pool, amount: "1",
+  }).func, "mint");
+  assert.equal(buildProtocolActionCall("removeLiquidity", {
+    target: pool, amount: "10", amount2: "1", amount3: "1",
+  }).func, "removeLiquidity");
 });
 
 test("cleared vote rows and array metadata do not resurrect an executed issue", () => {
