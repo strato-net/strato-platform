@@ -17,10 +17,7 @@ done
 
 psql -X -v ON_ERROR_STOP=1 -d postgres -f /strato/pg-roles.sql
 
-db_name() { yq "$1" /config/ethconf.yaml; }
-eth_db=$(db_name '.sqlConfig.database')
-cirrus_db=$(db_name '.cirrusConfig.database')
-peer_db=$(db_name '.peerDbConfig.database // ""')
+eth_db=${PG_ETH_DB:?} cirrus_db=${PG_CIRRUS_DB:?} peer_db=${PG_PEER_DB:-}
 
 # A statement here and Slipstream on the primary (CREATE OR REPLACE FUNCTION,
 # DROP VIEW, ALTER TABLE) can rewrite the same catalog row; PostgreSQL then

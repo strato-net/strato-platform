@@ -17,7 +17,7 @@ import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
 import Blockchain.Init.Options (flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer, flags_disableSqlIndexing, flags_disableCirrusIndexing, flags_syncFromFile)
-import Blockchain.Init.PgRoles (writeRolePasswords, writeSecretFile)
+import Blockchain.Init.PgRoles (writePgInitFiles, writeRolePasswords, writeSecretFile)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -398,6 +398,9 @@ mkFilesAndGenesis nodeDir hasFlags network = do
           defaultNodeFile = stratoDir </> "default-node"
       createDirectoryIfMissing True stratoDir
       writeFile defaultNodeFile cwd
+
+    -- The script and SQL the pg-init container mounts
+    when (roleRunsCore role) $ liftIO writePgInitFiles
 
     -- Generate docker-compose.yml
     liftIO $ generateDockerCompose role

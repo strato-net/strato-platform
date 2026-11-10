@@ -24,8 +24,9 @@ if [[ -f .strato.pid ]]; then
     source .strato.pid
     if [[ -n "$CONVOKE_PID" ]] && kill -0 "$CONVOKE_PID" 2>/dev/null; then
         kill "$CONVOKE_PID" 2>/dev/null || true
-        for _ in $(seq 1 30); do
-            kill -0 "$CONVOKE_PID" 2>/dev/null || break
+        # No time limit: removing the pidfile or the containers while convoke
+        # is still stopping its processes would orphan them mid-write.
+        while kill -0 "$CONVOKE_PID" 2>/dev/null; do
             sleep 1
         done
     fi

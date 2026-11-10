@@ -241,21 +241,19 @@ history:
 
 all: local
 
-local: build_common strato_docker apex nginx postgrest prometheus smd app-backend app-ui bridge bridge-nginx oracle local-auth
+local: build_common apex nginx postgrest prometheus smd app-backend app-ui bridge bridge-nginx oracle local-auth
 
-# What a --role=validator directory runs: the binaries plus pg-init's strato
-# image and the two service images it starts (postgres and redis are stock
-# images, pulled by compose). No app, SMD,
+# What a --role=validator directory runs: the binaries plus the two images it
+# starts (postgres and redis are stock images, pulled by compose). No app, SMD,
 # nginx, PostgREST, bridge, oracle or local-auth builds.
-validator: build_common strato_docker apex prometheus
+validator: build_common apex prometheus
 
-# What a --role=api-node directory runs: the binaries plus pg-init's strato
-# image and the four service images it starts (postgres and redis are stock
-# images, pulled by compose). With
+# What a --role=api-node directory runs: the binaries plus the four images it
+# starts (postgres and redis are stock images, pulled by compose). With
 # --monitoring=false the apex and prometheus images go unused; with
 # --localAuth add the local-auth image (make api-node local-auth). No app,
 # SMD, bridge or oracle builds.
-api-node: build_common strato_docker nginx apex prometheus postgrest
+api-node: build_common nginx apex prometheus postgrest
 
 docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle local-auth docker-compose
 

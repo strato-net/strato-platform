@@ -77,7 +77,7 @@ For how the consensus settings are used, see [Consensus](../platform/consensus.m
 
 `strato-setup` writes the resolved configuration to `mynode/.ethereumH/ethconf.yaml`, readable only by its owner, and a copy with the database passwords blanked to `ethconf-public.yaml` beside it. `ethconf.yaml` is the node's single source of truth:
 
-- The node processes and `pg-init` read it directly.
+- The node processes read it directly.
 - Containers that only need settings (nginx, apex, prometheus, the app, smd, local-auth) mount `ethconf-public.yaml` read-only at `/config/ethconf.yaml`.
 
 Main sections:
@@ -99,6 +99,7 @@ Main sections:
 | `.ethereumH/` | `ethconf.yaml`, `ethconf-public.yaml` and the node's chain databases |
 | `secrets/` | `postgres_password`, the per-role `pg_*_password` files, `oauth_credentials.yaml`, `ssl/` (copied certificate and key); with `--localAuth`, also `vault_password` and the local-auth secrets |
 | `docker-compose.yml` | The generated container definitions, pinned to the image tags of the build that created the node |
+| `pg-init/` | The script and SQL the `pg-init` container runs to provision the database roles |
 | `commands.txt` | The node processes `convoke` runs, with their runtime flags |
 | `genesis.json` | The genesis block |
 | `postgres/`, `redis/`, `jlog/`, `prometheus/` | Data. `jlog/` holds the embedded streaming log. |

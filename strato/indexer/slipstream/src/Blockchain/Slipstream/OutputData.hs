@@ -503,6 +503,9 @@ slipstreamQueryText _ InsertTable{..} = T.concat $
         ";"
       ])
 slipstreamQueryText _ InsertDelegatecall{} = ""
+-- pg-init.sh (strato-init) recognises these functions by their shape to keep
+-- their anonymous EXECUTE grant on every start: one argument, LANGUAGE sql,
+-- STABLE, SETOF a table, a body that begins "SELECT v.*". Change both together.
 slipstreamQueryText _ (CreateFkeyFunction ForeignKeyInfo{..}) = T.concat
   [ "CREATE OR REPLACE FUNCTION \""
   , fkiFunctionName

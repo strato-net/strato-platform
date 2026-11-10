@@ -69,7 +69,9 @@ npm start
 ```
 
 The standalone app Compose file reads `postgres_history_password` from its
-environment. Node services read `secrets/pg_history_password`.
+environment. A node that runs Cirrus provisions the `history` database for the
+`strato_history` login, whose password is the node directory's
+`secrets/pg_history_password`; no node service reads it.
 
 `npm test` runs the feed-independent checks, then the Postgres suite
 (`test/db.test.ts`: partitions, idempotent replay, feed ordering) when

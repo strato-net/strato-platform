@@ -5,11 +5,12 @@ module Blockchain.Init.DockerCompose (generateDockerCompose) where
 import Prelude hiding (init)
 
 import Blockchain.EthConf (ethConf)
-import Blockchain.EthConf.Model (apiConfig, apiPort, jsonRpcPort, networkConfig, httpPort)
+import Blockchain.EthConf.Model (apiConfig, apiPort, cirrusConfig, database, jsonRpcPort, networkConfig, httpPort, peerDbConfig, sqlConfig)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.EthConf (containerMode, nodeHostname)
 import Blockchain.Init.Role
+import Blockchain.Init.PgRoles (pgInitSecrets)
 import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_discoveryPort, flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_p2pPort, flags_pghost, flags_pguser, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_monitoring, flags_publicStratoRpc, flags_repoUrl, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
@@ -84,6 +85,8 @@ generateDockerCompose role = do
       -- The BlockApps images: built locally, or pulled with the --repoUrl
       -- prefix (bin/strato-up --prebuilt).
       imageRef name hash = flags_repoUrl ++ name ++ ":" ++ stratoVersionTag ++ "-" ++ hash
+      -- The stock PostgreSQL image: the database, and the psql pg-init runs.
+      postgresImage = "postgres:14.18"
       -- Settings only the containers of a --dockerMode=all node get.
       containerOnly xs = [ x | containerMode, x <- xs ]
       -- Ports published on the loopback for the host-side processes; a
@@ -261,7 +264,7 @@ generateDockerCompose role = do
         }
 
   let postgres = def
-        { image = "postgres:14.18"
+        { image = postgresImage
         , shm_size = Just "1g"
         , user = Just userGid
         , environment = Just $ Map.fromList
@@ -292,7 +295,7 @@ generateDockerCompose role = do
         }
 
   let pgInit = def
-        { image = imageRef "strato" hashStrato
+        { image = postgresImage
         , user = Just userGid
         , depends_on = if externalPostgres then Nothing else Just $ DependsOnMap $ Map.singleton "postgres" (DependsOnCondition "service_healthy")
         , extra_hosts = hostGateway
@@ -300,19 +303,24 @@ generateDockerCompose role = do
             [ ("PG_ADMIN_HOST", pgWriterHost)
             , ("PG_ADMIN_PORT", "5432")
             , ("PG_ADMIN_USER", flags_pguser)
+            , ("PG_ETH_DB", database (sqlConfig conf))
+            , ("PG_CIRRUS_DB", database (cirrusConfig conf))
+            , ("PG_PEER_DB", maybe "" database (peerDbConfig conf))
             , ("PG_HAS_CIRRUS", if roleRunsCirrus role then "true" else "false")
             , ("PG_HAS_APEX", if hasService "apex" then "true" else "false")
             , ("PG_HAS_LOCAL_AUTH", if flags_localAuth then "true" else "false")
             , ("PG_HAS_HISTORY", if roleRunsCirrus role then "true" else "false")
             , ("LOCAL_AUTH_RESET", "${LOCAL_AUTH_RESET:-false}")
             ]
-        , volumes = Just
-            [ "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
-            , "./secrets:/run/secrets:ro"
+        , volumes = Just $
+            [ "./pg-init:/strato:ro"
             , "./logs:/logs"
-            ]
+            ] ++ [ "./secrets/" ++ f ++ ":/run/secrets/" ++ f ++ ":ro" | f <- pgInitSecrets ]
+        -- The image declares its data directory a volume: without this, every
+        -- new pg-init container would leave an anonymous volume behind.
+        , tmpfs = Just ["/var/lib/postgresql/data"]
         , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["/strato/pg-init.sh >> /logs/pg-init.log 2>&1"]
+        , command = Just ["sh /strato/pg-init.sh >> /logs/pg-init.log 2>&1"]
         , healthcheck = Just $ def { test = ["NONE"] }
         , restart = Just "no"
         , logging = noLogging
