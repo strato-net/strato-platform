@@ -3,6 +3,7 @@ import test from "node:test";
 import JSONBig from "json-bigint";
 import { bloc, cirrus, eth, strato } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
+import { requestContext } from "../../utils/requestContext";
 import {
   castVoteOnIssueById,
   createIssue,
@@ -229,10 +230,20 @@ type VoteScenario = {
   votes?: any[];
   unreadableIndex?: boolean;
   landedIssueId?: string;
+  // Results of the node's simulate endpoint, one per simulation in order
+  simulations?: any[];
 };
 
 const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
   const posted: any[] = [];
+  const simulations = [...(scenario.simulations ?? [])];
+  const simulated: any[] = [];
+  const txLookups: string[] = [];
+
+  t.mock.method(bloc, "post", (async (_token: string, _path: string, body: any) => {
+    simulated.push(body);
+    return { status: 200, data: [simulations.shift()] };
+  }) as typeof bloc.post);
 
   t.mock.method(bloc, "get", (async (_token: string, _path: string) => ({
     status: 200,
@@ -265,6 +276,7 @@ const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
 
   t.mock.method(cirrus, "get", (async (_token: string, path: string, config: any) => {
     const params = config?.params ?? {};
+    if (params.transaction_hash) txLookups.push(params.transaction_hash);
     if (path.endsWith("-IssueCreated") && params.issueId?.startsWith("eq.")) {
       return {
         status: 200,
@@ -293,6 +305,10 @@ const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
 
   t.mock.method(strato, "post", (async (_token: string, _path: string, body: any) => {
     posted.push(body.txs[0].payload);
+    // Signing in a wallet: the node returns the transaction unsigned
+    if (requestContext.getStore()?.externalSigning) {
+      return { status: 200, data: [{ hash: "0xunsigned", data: { nonce: 7 } }] };
+    }
     if (posted.length === 1 && scenario.replayFailure === "node") {
       return {
         status: 200,
@@ -311,7 +327,7 @@ const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
     return { status: 200, data: [{ status: "Success", hash: `0xvote${posted.length}` }] };
   }) as typeof strato.post);
 
-  return posted;
+  return Object.assign(posted, { simulated, txLookups });
 };
 
 test("ownerInput calls an account-owned target directly and votes through a registry owner", async (t) => {
@@ -452,6 +468,110 @@ test("reports a vote that hashed to a different issue instead of claiming succes
     () => castVoteOnIssueById("access-token", VOTER, ISSUE_ID),
     /landed on issue aaaa0000/,
   );
+});
+
+// ── castVoteOnIssueById: signing in a wallet ─────────────────────────────────
+// A wallet signs the vote after the request returns, so the replay and its fallback
+// are chosen on simulations of them, and the wallet is never handed a call that would
+// open an issue rather than vote on this one.
+
+const asWallet = <T>(fn: () => Promise<T>): Promise<T> =>
+  requestContext.run({ externalSigning: true, userAddress: VOTER.replace(/^0x/, "") }, fn);
+
+const registryEvent = (name: string, issueId: string = ISSUE_ID) =>
+  ({ address: constants.adminRegistry, name, args: { issueId } });
+
+const simulatedSuccess = (...events: any[]) => ({ status: "Success", events });
+
+const DECODABLE_TX_ARGS = ["\"UI Arg Probe\"", "0", "\"0xdead0001\"", '[{"eventName":"d","actionType":"Deposit"}]'];
+
+test("a wallet vote replays the original transaction when it simulates as a vote on the issue", async (t) => {
+  const posted = mockVoteScenario(t, {
+    txArgs: DECODABLE_TX_ARGS,
+    simulations: [simulatedSuccess(registryEvent("IssueVoted"))],
+  });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.deepEqual(result, { status: "unsigned", hash: "0xunsigned", votedVia: "replay" });
+  assert.equal(posted.simulated.length, 1);
+  assert.equal(posted.simulated[0].address, VOTER.replace(/^0x/, ""), "simulated as the wallet");
+  assert.equal(posted.length, 1);
+  assert.equal(posted[0].method, "addPositionActivity");
+  assert.deepEqual(posted.txLookups, [], "an unsigned transaction has no events to wait for");
+});
+
+test("a wallet vote goes through the registry when the replay would fail on chain", async (t) => {
+  const posted = mockVoteScenario(t, {
+    txArgs: DECODABLE_TX_ARGS,
+    simulations: [
+      { status: "Failure", error: "argValueToValue: Expected TypeEnum to be a string", events: [] },
+      simulatedSuccess(registryEvent("IssueVoted")),
+    ],
+  });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.equal(result.votedVia, "registry");
+  assert.equal(posted.length, 1, "only the call that simulated as a vote is handed to the wallet");
+  assert.equal(posted[0].method, "castVoteOnIssue");
+  assert.equal(posted[0].contractAddress, constants.adminRegistry);
+});
+
+test("a wallet vote goes through the registry when the recorded arguments cannot be decoded", async (t) => {
+  const posted = mockVoteScenario(t, { simulations: [simulatedSuccess(registryEvent("IssueVoted"))] });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.equal(result.votedVia, "registry");
+  assert.equal(posted.simulated.length, 1, "an undecodable replay is never simulated");
+  assert.equal(posted[0].method, "castVoteOnIssue");
+});
+
+test("a wallet vote is refused when it would open the issue anew", async (t) => {
+  // An issue executed or dismissed since it was listed: the same arguments open it again
+  const reopened = simulatedSuccess(registryEvent("IssueCreated"), registryEvent("IssueVoted"));
+  const posted = mockVoteScenario(t, { txArgs: DECODABLE_TX_ARGS, simulations: [reopened, reopened] });
+
+  await assert.rejects(
+    () => asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID)),
+    /would open issue 7b7c1564/,
+  );
+  assert.equal(posted.length, 0);
+});
+
+test("a wallet vote is refused when it would vote on a different issue", async (t) => {
+  const elsewhere = simulatedSuccess(registryEvent("IssueVoted", "aaaa000000000000000000000000000000000000000000000000000000000000"));
+  const posted = mockVoteScenario(t, { txArgs: DECODABLE_TX_ARGS, simulations: [elsewhere, elsewhere] });
+
+  await assert.rejects(
+    () => asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID)),
+    /would vote on issue aaaa0000/,
+  );
+  assert.equal(posted.length, 0);
+});
+
+test("a wallet vote counts only the registry's events", async (t) => {
+  // A nested multisig the issue executes emits its own IssueVoted, which is not this vote
+  const nested = simulatedSuccess({ address: REWARDS, name: "IssueVoted", args: { issueId: ISSUE_ID } });
+  const posted = mockVoteScenario(t, { txArgs: DECODABLE_TX_ARGS, simulations: [nested, nested] });
+
+  await assert.rejects(
+    () => asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID)),
+    /would record no vote/,
+  );
+  assert.equal(posted.length, 0);
+});
+
+test("a wallet-signed issue is handed back without waiting for its events", async (t) => {
+  const posted = mockVoteScenario(t);
+
+  const result = await asWallet(() => createIssue("access-token", VOTER, REWARDS, "addPositionActivity",
+    ["UI Arg Probe", 0, "0xdead0001", [{ eventName: "d", actionType: 0 }]]));
+
+  assert.deepEqual(result, { status: "unsigned", hash: "0xunsigned", issueId: null, governed: false });
+  assert.equal(posted[0].method, "castVoteOnIssue");
+  assert.deepEqual(posted.txLookups, [], "an unsigned transaction has no events to look up");
 });
 
 // ── castVoteOnIssueById: replaying a registry-created issue ──────────────────

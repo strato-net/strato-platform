@@ -9,6 +9,7 @@ import JSONBig from "json-bigint";
 import { normalizeLegacyEscapes, repairStructuredJson } from "../helpers/jsonStringParsing.helper";
 import { FunctionInput } from "../../types/types";
 import { validateAddressField } from "../validators/common.validators";
+import { requestContext } from "../../utils/requestContext";
 const { AdminRegistry, adminRegistry, DAY_MS } = constants;
 const JSONBigString = JSONBig({ storeAsString: true });
 const JSONBigNumber = JSONBig({ useNativeBigInt: true });
@@ -453,16 +454,34 @@ export const createIssue = async (
   const { call } = await resolveIssueCall(accessToken, target, func, args);
   const { status, hash } = await callTargetFunction(
     accessToken, userAddress, call.contractName, call.contractAddress, call.method, call.args);
-  const issueId = await findIssueIdForTx(accessToken, hash);
+  // A wallet signs and submits the transaction after this returns: nothing to look up yet
+  const issueId = status === "unsigned" ? null : await findIssueIdForTx(accessToken, hash);
 
   return { status, hash, issueId, governed: issueId !== null };
+};
+
+// Run a call in the node's VM sandbox as userAddress: nothing is signed or committed.
+// Forwarded to the node's bloc simulate endpoint, which the UI can't reach
+const simulateCall = async (
+  accessToken: string,
+  userAddress: string,
+  call: ContractCall,
+  params?: Record<string, unknown>,
+): Promise<any> => {
+  const body = {
+    txs: [{ payload: { ...call, metadata: {} }, type: "FUNCTION" }],
+    address: userAddress.replace(/^0x/, ""),
+  };
+  const response = await bloc.post(accessToken, "/transaction/simulate", body, { params });
+  const data = response.data;
+  return Array.isArray(data) ? data[0] : data;
 };
 
 // Dry-run the issue in the node's VM sandbox (nothing is signed or committed), so
 // admins can preview its real impact before voting. Always simulated as the
 // registry's castVoteOnIssue, since the node derives the issue's `effect` only for
 // that method, using the same typed args the live call sends so both agree on the
-// issueId. Forwarded to the node's bloc simulate endpoint, which the UI can't reach.
+// issueId.
 export const simulateCastVoteOnIssue = async (
   accessToken: string,
   userAddress: string,
@@ -471,15 +490,7 @@ export const simulateCastVoteOnIssue = async (
   args: any[],
 ): Promise<any> => {
   const { typedArgs } = await resolveIssueCall(accessToken, target, func, args);
-  const body = {
-    txs: [{ payload: { ...castVoteCall(target, func, typedArgs), metadata: {} }, type: "FUNCTION" }],
-    address: userAddress.replace(/^0x/, ""),
-  };
-  const response = await bloc.post(accessToken, "/transaction/simulate", body, {
-    params: { trace: true },
-  });
-  const data = response.data;
-  return Array.isArray(data) ? data[0] : data;
+  return simulateCall(accessToken, userAddress, castVoteCall(target, func, typedArgs), { trace: true });
 };
 
 // Arguments as the node rendered them into the IssueCreated event. They are not
@@ -556,18 +567,56 @@ const voteStillPending = async (
 // enum member, rendered as its ordinal — still reach the same issueId. keccak256 hashes
 // an enum as its bare ordinal (rlpEncodeValue: SEnumVal _ _ i -> rlpEncode i), so the id
 // is unchanged, and coerceFromInt restores the member on execution
-const castVoteViaRegistry = async (
-  accessToken: string,
-  userAddress: string,
-  issue: any,
-): Promise<{ status: string; hash: string }> => {
+const registryVoteCall = async (accessToken: string, issue: any): Promise<ContractCall> => {
   const { funcArgs } = await fetchFuncArgs(accessToken, issue.target, issue.func);
   const typedArgs = parseIssueEventArgs(issue.args)
     .map((arg, i) => hintedArg(funcArgs[i]?.[1] || {}, arg));
-  const call = castVoteCall(issue.target, issue.func, typedArgs);
+  return castVoteCall(issue.target, issue.func, typedArgs);
+};
 
-  return callTargetFunction(
-    accessToken, userAddress, call.contractName, call.contractAddress, call.method, call.args);
+// Why a simulated call is not a vote on this open issue, or null when it is. Every
+// vote the registry counts emits IssueVoted; one that also emits IssueCreated would
+// open the issue anew (it was executed, dismissed or invalidated since) or open a
+// different one. Events from other contracts, such as a nested multisig the issue
+// would execute, are not this vote
+const simulatedVoteProblem = (result: any, issueId: string): string | null => {
+  if (result?.status !== "Success") return result?.error || "its simulation failed";
+  const registryEvent = (name: string) => (result.events ?? [])
+    .find((event: any) => event.name === name && sameAddress(event.address, adminRegistry));
+  const created = registryEvent("IssueCreated");
+  const voted = registryEvent("IssueVoted");
+  if (created) return `it would open issue ${created.args?.issueId} instead of voting on an open one`;
+  if (!voted) return "it would record no vote: this admin has already voted on the issue";
+  if (!sameIssueId(voted.args?.issueId, issueId)) return `it would vote on issue ${voted.args?.issueId} instead`;
+  return null;
+};
+
+// A wallet signs and submits the vote after the request returns, so neither the check
+// that it landed on this issue nor the fallback on a failed replay can run on the real
+// transaction. Both run on a simulation of it instead, and the wallet is handed
+// whichever call simulates as a vote on this issue
+const walletVoteCall = async (
+  accessToken: string,
+  userAddress: string,
+  issue: any,
+  replayCall: () => Promise<ContractCall>,
+): Promise<{ call: ContractCall; votedVia: "replay" | "registry" }> => {
+  let replayProblem: string;
+  try {
+    const replay = await replayCall();
+    const problem = simulatedVoteProblem(await simulateCall(accessToken, userAddress, replay), issue.issueId);
+    if (!problem) return { call: replay, votedVia: "replay" };
+    replayProblem = problem;
+  } catch (error: any) {
+    replayProblem = error?.message ?? String(error);
+  }
+
+  const call = await registryVoteCall(accessToken, issue);
+  const problem = simulatedVoteProblem(await simulateCall(accessToken, userAddress, call), issue.issueId);
+  if (problem) {
+    throw new Error(`Voting through the registry: ${problem} (after replaying the original transaction: ${replayProblem})`);
+  }
+  return { call, votedVia: "registry" };
 };
 
 // Cast a vote on an existing issue by replaying the exact transaction that created
@@ -596,10 +645,10 @@ export const castVoteOnIssueById = async (
     throw new Error("Issue not found");
   }
 
-  // Whether the replay got as far as submitting. A decode that fails before this
-  // changed nothing on chain; a failure after it may or may not have
-  let replaySubmitted = false;
-  const replayOriginalTransaction = async (): Promise<{ status: string; hash: string }> => {
+  const submit = (call: ContractCall) => callTargetFunction(
+    accessToken, userAddress, call.contractName, call.contractAddress, call.method, call.args);
+
+  const replayCall = async (): Promise<ContractCall> => {
     const txResponse = await eth.get(accessToken, "/transaction", { params: { hash: issue.transaction_hash } });
     const tx = Array.isArray(txResponse.data) ? txResponse.data[0] : null;
     if (!tx?.funcName || !Array.isArray(tx.args)) {
@@ -613,8 +662,21 @@ export const castVoteOnIssueById = async (
     const namedArgs = Object.fromEntries(funcArgs.map(([name, type], i) =>
       [name, type.tag === "Variadic" ? tx.args.slice(i).map(parseVariadicArg) : hintedArg(type, parseTxArg(tx.args[i]))]));
 
+    return { contractName, contractAddress: tx.to, method: tx.funcName, args: namedArgs };
+  };
+
+  if (requestContext.getStore()?.externalSigning) {
+    const { call, votedVia } = await walletVoteCall(accessToken, userAddress, issue, replayCall);
+    return { ...(await submit(call)), votedVia };
+  }
+
+  // Whether the replay got as far as submitting. A decode that fails before this
+  // changed nothing on chain; a failure after it may or may not have
+  let replaySubmitted = false;
+  const replayOriginalTransaction = async (): Promise<{ status: string; hash: string }> => {
+    const call = await replayCall();
     replaySubmitted = true;
-    return callTargetFunction(accessToken, userAddress, contractName, tx.to, tx.funcName, namedArgs);
+    return submit(call);
   };
 
   let replayed: { status: string; hash: string } | null = null;
@@ -648,7 +710,7 @@ export const castVoteOnIssueById = async (
 
   let result: { status: string; hash: string };
   try {
-    result = await castVoteViaRegistry(accessToken, userAddress, issue);
+    result = await submit(await registryVoteCall(accessToken, issue));
   } catch (error: any) {
     if (error instanceof Error) {
       error.message = `${error.message} (after replaying the original transaction failed: ${replayError?.message ?? replayError})`;
