@@ -105,6 +105,9 @@
     "bufferutil": "^4.0.8"
   },
   "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.1"
+    },
     "postcss-selector-parser": "6.1.5",
     "@walletconnect/ethereum-provider": "2.23.10",
     "qr": "0.5.3",

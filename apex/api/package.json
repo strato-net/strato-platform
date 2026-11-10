@@ -52,6 +52,13 @@
     "node": true
   },
   "overrides": {
+    "editorconfig": {
+      "minimatch": "11.0.1"
+    },
+    "mocha": {
+      "minimatch": "11.0.1"
+    },
+    "glob": "14.0.2",
     "uuid": "^11.1.1"
   }
 }
