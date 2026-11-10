@@ -258,16 +258,19 @@ generateDockerCompose role = do
         , shm_size = Just "1g"
         , user = Just userGid
         , environment = Just $ Map.fromList
-            [ ("POSTGRES_DB", "eth")
+            [ ("POSTGRES_USER", "strato_admin")
+            , ("POSTGRES_DB", "eth")
             , ("POSTGRES_PASSWORD_FILE", "/run/secrets/postgres_password")
             ]
         , volumes = Just
             [ "./logs:/logs"
             , "./postgres:/var/lib/postgresql/data"
+            , "./config/postgres/init-permissions.sql:/docker-entrypoint-initdb.d/10-runtime-permissions.sql:ro"
+            , "./config/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro"
             , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["exec docker-entrypoint.sh postgres -c max_connections=800 -c shared_buffers=512MB >> /logs/postgres.log 2>&1"]
+        , command = Just ["exec docker-entrypoint.sh postgres -c hba_file=/etc/postgresql/pg_hba.conf -c max_connections=800 -c shared_buffers=512MB >> /logs/postgres.log 2>&1"]
         , restart = Just "unless-stopped"
         , healthcheck = Just Healthcheck
             { test = ["CMD-SHELL", "pg_isready -U postgres"]
