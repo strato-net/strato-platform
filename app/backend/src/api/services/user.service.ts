@@ -614,23 +614,47 @@ const walletVoteCall = async (
     return null;
   };
 
-  let replayProblem: string;
-  try {
-    const replay = await replayCall();
-    const problem = await voteProblem(replay);
-    if (!problem) return { call: replay, votedVia: "replay" };
-    replayProblem = problem;
-  } catch (error: any) {
-    replayProblem = error?.message ?? String(error);
-  }
+  // In order: the original transaction; that decoded call sent through the registry, for
+  // a transaction its target forwarded the old way (which the registry now rejects), its
+  // variadic tail flat as the issueId covers it (the event renders the tail nested); and
+  // the registry vote rebuilt from the event, for a transaction record that does not decode
+  const replay = replayCall();
+  const attempts: { what: string; via: "replay" | "registry"; call: () => Promise<ContractCall> }[] = [
+    { what: "replaying the original transaction", via: "replay", call: () => replay },
+    {
+      what: "voting through the registry with the original transaction's arguments",
+      via: "registry",
+      call: async () => {
+        const original = await replay;
+        if (sameAddress(original.contractAddress, adminRegistry)) {
+          throw new Error("the original transaction already went through the registry");
+        }
+        // The replay's args are already typed: only its variadic tail is laid out flat
+        const { funcArgs } = await fetchFuncArgs(accessToken, original.contractAddress, original.method);
+        return castVoteCall(original.contractAddress, original.method, funcArgs.flatMap(([name, type]) =>
+          type.tag === "Variadic" ? original.args[name] ?? [] : [original.args[name]]));
+      },
+    },
+    {
+      what: "voting through the registry with the issue's recorded arguments",
+      via: "registry",
+      call: () => registryVoteCall(accessToken, issue),
+    },
+  ];
 
-  const call = await registryVoteCall(accessToken, issue);
-  const problem = await voteProblem(call);
-  // A conflict with the issue's state, not a server fault: the reason reaches the admin
-  if (problem) {
-    throw new StratoError(`Voting through the registry: ${problem} (after replaying the original transaction: ${replayProblem})`, 409);
+  const problems: string[] = [];
+  for (const attempt of attempts) {
+    try {
+      const call = await attempt.call();
+      const problem = await voteProblem(call);
+      if (!problem) return { call, votedVia: attempt.via };
+      problems.push(`${attempt.what}: ${problem}`);
+    } catch (error: any) {
+      problems.push(`${attempt.what}: ${error?.message ?? String(error)}`);
+    }
   }
-  return { call, votedVia: "registry" };
+  // A conflict with the issue's state, not a server fault: the reason reaches the admin
+  throw new StratoError(`No vote reaches this issue (${problems.join("; ")})`, 409);
 };
 
 // Cast a vote on an existing issue by replaying the exact transaction that created

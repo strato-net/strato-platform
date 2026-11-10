@@ -232,6 +232,8 @@ type VoteScenario = {
   landedIssueId?: string;
   // Results of the node's simulate endpoint, one per simulation in order
   simulations?: any[];
+  // The target's function, when not Rewards.addPositionActivity
+  func?: { contractName: string; name: string; funcArgs: any[] };
 };
 
 const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
@@ -250,10 +252,10 @@ const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
   t.mock.method(bloc, "get", (async (_token: string, _path: string) => ({
     status: 200,
     data: {
-      _contractName: "Rewards",
+      _contractName: scenario.func?.contractName ?? "Rewards",
       _functions: {
-        addPositionActivity: {
-          _funcArgs: [
+        [scenario.func?.name ?? "addPositionActivity"]: {
+          _funcArgs: scenario.func?.funcArgs ?? [
             ["name", { index: 0, type: { tag: "String" } }],
             ["emissionRate", { index: 1, type: { tag: "Int", signed: false, bytes: 32 } }],
             ["sourceContract", { index: 2, type: { tag: "Address" } }],
@@ -271,7 +273,7 @@ const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
     status: 200,
     data: [{
       to: REWARDS,
-      funcName: "addPositionActivity",
+      funcName: scenario.func?.name ?? "addPositionActivity",
       args: scenario.txArgs ?? ["\"UI Arg Probe\"", "0", "\"0xdead0001\"", RENDERED_EVENTS],
     }],
   })) as typeof eth.get);
@@ -504,13 +506,12 @@ test("a wallet vote replays the original transaction when it simulates as a vote
   assert.deepEqual(posted.txLookups, [], "an unsigned transaction has no events to wait for");
 });
 
-test("a wallet vote goes through the registry when the replay would fail on chain", async (t) => {
+const failedOnChain = { status: "Failure", error: "Only an admin or a whitelisted account can call castVoteOnIssue", events: [] };
+
+test("a wallet vote sends the original transaction's arguments through the registry when the replay would fail on chain", async (t) => {
   const posted = mockVoteScenario(t, {
     txArgs: DECODABLE_TX_ARGS,
-    simulations: [
-      { status: "Failure", error: "argValueToValue: Expected TypeEnum to be a string", events: [] },
-      simulatedSuccess(registryEvent("IssueVoted")),
-    ],
+    simulations: [failedOnChain, simulatedSuccess(registryEvent("IssueVoted"))],
   });
 
   const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
@@ -519,6 +520,50 @@ test("a wallet vote goes through the registry when the replay would fail on chai
   assert.equal(posted.length, 1, "only the call that simulated as a vote is handed to the wallet");
   assert.equal(posted[0].method, "castVoteOnIssue");
   assert.equal(posted[0].contractAddress, constants.adminRegistry);
+  assert.equal(posted[0].args._func, "addPositionActivity");
+  // Decoded from the transaction (the event records this argument as 0)
+  assert.equal(String(posted[0].args._args[1].value), "1000000000000000000000");
+});
+
+test("a wallet vote lays a forwarded call's variadic tail flat in the registry vote", async (t) => {
+  // An issue a User contract's createContract forwarded to the registry: the event renders
+  // the variadic tail as a nested list, but the issueId covers it flat
+  const posted = mockVoteScenario(t, {
+    func: {
+      contractName: "User",
+      name: "createContract",
+      funcArgs: [
+        ["contractName", { index: 0, type: { tag: "String" } }],
+        ["contractSrc", { index: 1, type: { tag: "String" } }],
+        ["args", { index: 2, type: { tag: "Variadic" } }],
+      ],
+    },
+    txArgs: ["\"CDPEngine\"", "\"contract CDPEngine {}\"", "\"00000000000000000000000000000000deadbeef\""],
+    simulations: [failedOnChain, simulatedSuccess(registryEvent("IssueVoted"))],
+  });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.equal(result.votedVia, "registry");
+  assert.deepEqual(posted[0].args._args, [
+    { type: "string", value: "CDPEngine" },
+    { type: "string", value: "contract CDPEngine {}" },
+    "\"00000000000000000000000000000000deadbeef\"",
+  ]);
+});
+
+test("a wallet vote falls back to the issue's recorded arguments when neither transaction-based vote counts", async (t) => {
+  const posted = mockVoteScenario(t, {
+    txArgs: DECODABLE_TX_ARGS,
+    simulations: [failedOnChain, failedOnChain, simulatedSuccess(registryEvent("IssueVoted"))],
+  });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.equal(result.votedVia, "registry");
+  assert.equal(posted.simulated.length, 3);
+  // Rebuilt from the event, which records this argument as 0
+  assert.equal(String(posted[0].args._args[1].value), "0");
 });
 
 test("a wallet vote goes through the registry when the recorded arguments cannot be decoded", async (t) => {
@@ -547,7 +592,7 @@ test("a wallet vote is refused when it would reopen an executed issue", async (t
   const posted = mockVoteScenario(t, {
     txArgs: DECODABLE_TX_ARGS,
     executed: [{ issueId: ISSUE_ID, block_number: "101" }],
-    simulations: [reopened, reopened],
+    simulations: [reopened, reopened, reopened],
   });
 
   await assert.rejects(
@@ -559,7 +604,7 @@ test("a wallet vote is refused when it would reopen an executed issue", async (t
 
 test("a wallet vote is refused when it would vote on a different issue", async (t) => {
   const elsewhere = simulatedSuccess(registryEvent("IssueVoted", "aaaa000000000000000000000000000000000000000000000000000000000000"));
-  const posted = mockVoteScenario(t, { txArgs: DECODABLE_TX_ARGS, simulations: [elsewhere, elsewhere] });
+  const posted = mockVoteScenario(t, { txArgs: DECODABLE_TX_ARGS, simulations: [elsewhere, elsewhere, elsewhere] });
 
   await assert.rejects(
     () => asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID)),
@@ -572,7 +617,7 @@ test("a wallet vote is refused when it would vote on a different issue", async (
 test("a wallet vote counts only the registry's events", async (t) => {
   // A nested multisig the issue executes emits its own IssueVoted, which is not this vote
   const nested = simulatedSuccess({ address: REWARDS, name: "IssueVoted", args: { issueId: ISSUE_ID } });
-  const posted = mockVoteScenario(t, { txArgs: DECODABLE_TX_ARGS, simulations: [nested, nested] });
+  const posted = mockVoteScenario(t, { txArgs: DECODABLE_TX_ARGS, simulations: [nested, nested, nested] });
 
   await assert.rejects(
     () => asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID)),
