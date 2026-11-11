@@ -465,6 +465,13 @@ export interface MultisigMembership {
   route: UserWallet[];
 }
 
+export interface PendingSignerInvitation {
+  target: UserWallet;
+  nominee: UserWallet;
+  mode: "user" | "multisig";
+  route: UserWallet[];
+}
+
 /** Display name for a multisig that may not be a username'd User wallet. */
 export function multisigDisplayName(w: { address: string; username?: string }): string {
   if (w.username) return w.username;
@@ -552,6 +559,71 @@ export function useNestedMultisigs(myWallets?: UserWallet[]) {
         frontier = next;
       }
       return out;
+    },
+  });
+}
+
+/** Signer nominations addressed to a User wallet or multisig the account controls. */
+export function usePendingSignerInvitations(
+  myWallets?: UserWallet[],
+  nestedMemberships: MultisigMembership[] = []
+) {
+  const candidates = new Map<string, Omit<PendingSignerInvitation, "target">>();
+  for (const wallet of myWallets ?? []) {
+    if (wallet.pendingSigner) continue;
+    const key = strip0x(wallet.address);
+    if (wallet.ownerControlled) {
+      candidates.set(key, { nominee: wallet, mode: "user", route: [] });
+    } else if (wallet.multisig) {
+      candidates.set(key, { nominee: wallet, mode: "multisig", route: [wallet] });
+    }
+  }
+  for (const membership of nestedMemberships) {
+    const key = strip0x(membership.wallet.address);
+    if (membership.wallet.username && !candidates.has(key)) {
+      candidates.set(key, {
+        nominee: membership.wallet,
+        mode: "multisig",
+        route: membership.route,
+      });
+    }
+  }
+  const nomineeKey = [...candidates.keys()].sort().join(",");
+
+  return useQuery({
+    queryKey: ["pending-signer-invitations", nomineeKey],
+    enabled: candidates.size > 0,
+    refetchInterval: 15_000,
+    queryFn: async (): Promise<PendingSignerInvitation[]> => {
+      const rows = await cirrusGet(
+        "mapping",
+        `collection_name=eq.pendingSigners&key-%3E%3Ekey=in.(${nomineeKey})` +
+          `&select=address,key,value,storage(data-%3E%3Eusername,data-%3E%3EconfigVersion)`
+      );
+      const invitations: PendingSignerInvitation[] = [];
+      for (const row of rows) {
+        const nomineeAddress = strip0x(String(row?.key?.key ?? ""));
+        const candidate = candidates.get(nomineeAddress);
+        const value = row?.value;
+        const exists = value?.exists === true || value?.exists === "true";
+        const proposalVersion = Number(value?.configVersion ?? 0) || 0;
+        const storage = Array.isArray(row?.storage) ? row.storage[0] : row?.storage;
+        const data = storage?.data ?? storage ?? {};
+        const currentVersion = Number(data?.configVersion ?? 0) || 0;
+        const targetAddress = strip0x(String(row?.address ?? ""));
+        if (!candidate || !targetAddress || !data?.username || !exists ||
+            (currentVersion > 0 && proposalVersion !== currentVersion)) continue;
+        invitations.push({
+          ...candidate,
+          target: {
+            address: targetAddress,
+            username: String(data?.username ?? ""),
+            multisig: true,
+            pendingSigner: true,
+          },
+        });
+      }
+      return invitations;
     },
   });
 }
@@ -992,6 +1064,28 @@ export function buildNestedCastVotePayload(
     _func: f,
     _args: a,
   });
+}
+
+/** Build an acceptance call whose on-chain sender is the nominated controlled wallet. */
+export function buildControlledWalletAcceptance(invitation: PendingSignerInvitation): {
+  payload: Record<string, unknown>;
+  options?: { username: string };
+} {
+  if (invitation.mode === "user") {
+    if (!invitation.nominee.username) throw new Error("The nominated User wallet has no username");
+    return {
+      payload: buildWalletCallPayload(invitation.target.address, "acceptAdmin", {}),
+      options: { username: invitation.nominee.username },
+    };
+  }
+  return {
+    payload: buildNestedCastVotePayload(
+      invitation.route.map((wallet) => wallet.address),
+      "acceptAdmin",
+      [],
+      invitation.target.address
+    ),
+  };
 }
 
 export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) {

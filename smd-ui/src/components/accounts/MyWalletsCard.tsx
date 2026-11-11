@@ -14,13 +14,18 @@ import { AddrLink } from "@/components/explorer/AddrLink";
 import { WalletPolicyDialog } from "@/components/accounts/WalletPolicyDialog";
 import { MultisigDialog } from "@/components/accounts/MultisigDialog";
 import { useMyUserWallets } from "@/services/userWallets";
-import { useNestedMultisigs, multisigDisplayName } from "@/services/multisig";
+import {
+  useNestedMultisigs,
+  usePendingSignerInvitations,
+  multisigDisplayName,
+} from "@/services/multisig";
 import { shortenHex } from "@/lib/utils";
 
 /** Lists User wallets the connected account controls, signs, or is nominated to sign. */
 export function MyWalletsCard({ ownerAddress }: { ownerAddress?: string | null }) {
   const { data: wallets, isLoading } = useMyUserWallets(ownerAddress);
   const { data: nested = [] } = useNestedMultisigs(wallets);
+  const { data: invitations = [] } = usePendingSignerInvitations(wallets, nested);
 
   return (
     <Card>
@@ -87,6 +92,41 @@ export function MyWalletsCard({ ownerAddress }: { ownerAddress?: string | null }
             </TableBody>
           </Table>
         )}
+
+        {invitations.length > 0 ? (
+          <div className="mt-6">
+            <div className="text-sm font-medium">Pending signer invitations</div>
+            <p className="mb-2 text-xs text-muted-foreground">
+              User wallets and multisigs you control that have been nominated as signers.
+            </p>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Multisig</TableHead>
+                  <TableHead>Nominated wallet</TableHead>
+                  <TableHead className="text-right">Manage</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invitations.map((invitation) => (
+                  <TableRow key={`${invitation.target.address}:${invitation.nominee.address}`}>
+                    <TableCell className="font-medium">
+                      {multisigDisplayName(invitation.target) ||
+                        shortenHex(invitation.target.address, 6, 4)}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {multisigDisplayName(invitation.nominee) ||
+                        shortenHex(invitation.nominee.address, 6, 4)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <MultisigDialog wallet={invitation.target} acceptance={invitation} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : null}
 
         {nested.length > 0 ? (
           <div className="mt-6">

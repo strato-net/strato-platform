@@ -12,6 +12,8 @@ export interface UserWallet {
   /** The User wallet contract address. */
   address: string;
   username: string;
+  /** The connected account is an owner/authorized account on this User wallet. */
+  ownerControlled?: boolean;
   /**
    * True when the connected account controls this wallet as a multisig **signer**
    * (it's in the wallet's `adminMap`) rather than as a direct owner/authorized
@@ -65,7 +67,12 @@ export function useMyUserWallets(ownerAddress?: string | null) {
       for (const row of Array.isArray(ownedRes.data) ? ownedRes.data : []) {
         const address = row?.address ?? "";
         if (!address) continue;
-        byAddr.set(address, { address, username: extractUsername(row), multisig: false });
+        byAddr.set(address, {
+          address,
+          username: extractUsername(row),
+          ownerControlled: true,
+          multisig: false,
+        });
       }
       for (const row of Array.isArray(signerRes.data) ? signerRes.data : []) {
         const address = row?.address ?? "";

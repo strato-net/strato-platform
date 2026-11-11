@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { applyConfirmedVote, buildNestedCastVotePayload, buildOpenIssues, buildProtocolActionCall, buildProtocolWorkflowCalls, mergeIndexedIssues, MULTISIG_SOURCE, normalizeArgs, typedProgrammaticIssueArgs, unwrapNestedIssueAction, votesNeeded } from "./multisig";
+import { applyConfirmedVote, buildControlledWalletAcceptance, buildNestedCastVotePayload, buildOpenIssues, buildProtocolActionCall, buildProtocolWorkflowCalls, buildWalletCallPayload, mergeIndexedIssues, MULTISIG_SOURCE, normalizeArgs, typedProgrammaticIssueArgs, unwrapNestedIssueAction, votesNeeded } from "./multisig";
 import { formatVariadicArg, parseArgText, parseVariadicBoolean, typedVariadicArg } from "../lib/args";
 import { pollResults } from "../lib/walletTx";
 import { api } from "../lib/api";
@@ -72,6 +72,51 @@ test("programmatic nested signer nomination preserves all-digit addresses", () =
     { type: "address", value: "0000000000000000000000000000000000000000" },
     { type: "address", value: allDigitSigner },
   ]);
+});
+
+test("controlled-wallet acceptance preserves the direct EOA call and routes from the nominee", () => {
+  const target = "1111111111111111111111111111111111111111";
+  const nominee = "2222222222222222222222222222222222222222";
+  const direct = buildWalletCallPayload(target, "acceptAdmin", {});
+  assert.deepEqual(direct, {
+    contractName: "User",
+    contractAddress: target,
+    value: 0,
+    method: "acceptAdmin",
+    args: {},
+    metadata: {},
+  });
+
+  const userAcceptance = buildControlledWalletAcceptance({
+    target: { address: target, username: "target", multisig: true, pendingSigner: true },
+    nominee: { address: nominee, username: "nominee", ownerControlled: true },
+    mode: "user",
+    route: [],
+  });
+  assert.deepEqual(userAcceptance, {
+    payload: direct,
+    options: { username: "nominee" },
+  });
+
+  const firstHop = "3333333333333333333333333333333333333333";
+  const multisigAcceptance = buildControlledWalletAcceptance({
+    target: { address: target, username: "target", multisig: true, pendingSigner: true },
+    nominee: { address: nominee, username: "nominee", multisig: true },
+    mode: "multisig",
+    route: [
+      { address: firstHop, username: "first", multisig: true },
+      { address: nominee, username: "nominee", multisig: true },
+    ],
+  }) as any;
+  assert.equal(multisigAcceptance.options, undefined);
+  assert.deepEqual(multisigAcceptance.payload.args, {
+    _target: nominee,
+    _func: "castVoteOnIssue",
+    _args: [
+      { type: "address", value: target },
+      { type: "string", value: "acceptAdmin" },
+    ],
+  });
 });
 
 test("all programmatic issue builders retain their declared ABI types", () => {

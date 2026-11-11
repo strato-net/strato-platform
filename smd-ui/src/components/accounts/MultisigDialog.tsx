@@ -75,6 +75,7 @@ import {
   useMultisigActions,
   useParentMultisigs,
   buildNestedCastVotePayload,
+  buildControlledWalletAcceptance,
   multisigDisplayName,
   votesNeeded,
   strip0x,
@@ -84,6 +85,7 @@ import {
   unwrapNestedIssueAction,
   type ProtocolActionKind,
   type OpenIssue,
+  type PendingSignerInvitation,
 } from "@/services/multisig";
 
 /* --------------------------------------------------------------------------------- */
@@ -187,15 +189,26 @@ const KNOWN_ISSUE_ARG_TYPES: Record<string, string[]> = {
   cancelIssue: ["string"],
 };
 
+class MissingIssueArgTypesError extends Error {
+  constructor(readonly values: string[]) {
+    super("Enter the original Solidity type for every argument");
+  }
+}
+
 /** Rebuild the typed variadic values needed to reproduce an issue's exact hash. */
-async function typedIssueArgs(target: string, func: string, args: string[]): Promise<unknown[]> {
+async function typedIssueArgs(
+  target: string,
+  func: string,
+  args: string[],
+  suppliedTypes?: string[]
+): Promise<unknown[]> {
   if (func === "castVoteOnIssue" && args.length >= 2) {
     const innerTarget = strip0x(args[0] ?? "");
     const innerFunc = args[1] ?? "";
     return [
       typedVariadicArg("address", innerTarget),
       typedVariadicArg("string", innerFunc),
-      ...await typedIssueArgs(innerTarget, innerFunc, args.slice(2)),
+      ...await typedIssueArgs(innerTarget, innerFunc, args.slice(2), suppliedTypes),
     ];
   }
 
@@ -207,9 +220,15 @@ async function typedIssueArgs(target: string, func: string, args: string[]): Pro
       types = declared.map((arg) => arg.type);
     }
   } catch {
-    // Known functions retain their fixed types; unknown calls use their event values.
+    // Known functions retain their fixed types; unknown calls request them below.
   }
-  if (types.length !== canonical.length) return canonical;
+  if (types.length !== canonical.length) {
+    const provided = suppliedTypes?.map((type) => type.trim()) ?? [];
+    if (provided.length !== canonical.length || provided.some((type) => !type)) {
+      throw new MissingIssueArgTypesError(canonical);
+    }
+    types = provided;
+  }
   return canonical.map((value, index) => typedVariadicArg(types[index], value));
 }
 
@@ -309,6 +328,7 @@ function labelForIssue(
 export function MultisigDialog({
   wallet,
   route,
+  acceptance,
 }: {
   wallet: UserWallet;
   /**
@@ -318,6 +338,7 @@ export function MultisigDialog({
    * castVoteOnIssue issues instead of being cast directly.
    */
   route?: UserWallet[];
+  acceptance?: PendingSignerInvitation;
 }) {
   const [open, setOpen] = useState(false);
   const { isMultisig, fullyEnabled, isLoading } = useIsMultisig(open ? wallet.address : null);
@@ -358,7 +379,7 @@ export function MultisigDialog({
         {isLoading ? (
           <p className="py-8 text-center text-sm text-muted-foreground">Loading wallet state…</p>
         ) : fullyEnabled || (nested && isMultisig) ? (
-          <EnabledView wallet={wallet} route={nested ? route : undefined} />
+          <EnabledView wallet={wallet} route={nested ? route : undefined} acceptance={acceptance} />
         ) : nested ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             This multisig isn't fully enabled yet, so nested voting is unavailable.
@@ -534,7 +555,15 @@ function EnablePanel({
 /* Enabled view                                                                       */
 /* --------------------------------------------------------------------------------- */
 
-function EnabledView({ wallet, route }: { wallet: UserWallet; route?: UserWallet[] }) {
+function EnabledView({
+  wallet,
+  route,
+  acceptance,
+}: {
+  wallet: UserWallet;
+  route?: UserWallet[];
+  acceptance?: PendingSignerInvitation;
+}) {
   // Normalized voting route: always ends at this wallet; a single entry means
   // the connected account votes here directly.
   const fullRoute = useMemo(
@@ -560,7 +589,7 @@ function EnabledView({ wallet, route }: { wallet: UserWallet; route?: UserWallet
         <ProtocolActionsTab wallet={wallet} fullRoute={fullRoute} />
       </TabsContent>
       <TabsContent value="signers" className="mt-4">
-        <SignersTab wallet={wallet} fullRoute={fullRoute} />
+        <SignersTab wallet={wallet} fullRoute={fullRoute} acceptance={acceptance} />
       </TabsContent>
       <TabsContent value="issues" className="mt-4">
         <IssuesTab wallet={wallet} fullRoute={fullRoute} />
@@ -694,9 +723,17 @@ function MemberOfPanel({ fullRoute }: { fullRoute: UserWallet[] }) {
 /* Signers tab                                                                        */
 /* --------------------------------------------------------------------------------- */
 
-function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserWallet[] }) {
+function SignersTab({
+  wallet,
+  fullRoute,
+  acceptance,
+}: {
+  wallet: UserWallet;
+  fullRoute: UserWallet[];
+  acceptance?: PendingSignerInvitation;
+}) {
   const { userAddress } = useUser();
-  const { canSubmit } = useSubmitTransaction();
+  const { submit, canSubmit } = useSubmitTransaction();
   const queryClient = useQueryClient();
   const { config } = useIsMultisig(wallet.address);
   const { data: signers = [] } = useSigners(wallet.address);
@@ -732,6 +769,7 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["my-user-wallets"] });
+    queryClient.invalidateQueries({ queryKey: ["pending-signer-invitations"] });
     queryClient.invalidateQueries({ queryKey: ["multisig-signers", wallet.address] });
     queryClient.invalidateQueries({ queryKey: ["multisig-open-issues", wallet.address] });
     queryClient.invalidateQueries({ queryKey: ["multisig-config", wallet.address] });
@@ -830,11 +868,20 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
     }
   };
 
-  const doAccept = async () => {
+  const doAccept = async (pending: { newAdmin: string }) => {
     setBusy("accept");
     try {
-      await acceptSigner();
-      toast.success("Signer role accepted");
+      const controlledAcceptance = acceptance && eq(acceptance.nominee.address, pending.newAdmin);
+      if (controlledAcceptance) {
+        const { payload, options } = buildControlledWalletAcceptance(acceptance);
+        await submit("FUNCTION", payload, options);
+        toast.success(acceptance.mode === "multisig"
+          ? "Acceptance vote submitted through the nominated multisig"
+          : "Signer role accepted through the nominated User wallet");
+      } else {
+        await acceptSigner();
+        toast.success("Signer role accepted");
+      }
       invalidate();
     } catch (err: any) {
       toast.error("Acceptance failed", { description: String(err?.message || err) });
@@ -1091,7 +1138,8 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
           <Label>Awaiting signer acceptance</Label>
           {pendingSigners.map((pending) => {
             const replacing = !isZeroAddress(pending.adminToReplace);
-            const mine = eq(pending.newAdmin, me);
+            const mine = eq(pending.newAdmin, me) ||
+              (!!acceptance && eq(pending.newAdmin, acceptance.nominee.address));
             return (
               <div key={pending.newAdmin} className="flex items-center gap-2 text-xs">
                 <span>
@@ -1101,7 +1149,7 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
                 {mine ? (
                   <Button
                     size="sm"
-                    onClick={doAccept}
+                    onClick={() => doAccept(pending)}
                     disabled={busy !== "" || !canSubmit}
                     className="ml-auto"
                   >
@@ -1235,6 +1283,31 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
   const viaName = nested ? hopName(fullRoute[0]) : "";
   const [busy, setBusy] = useState<string>("");
   const [proposing, setProposing] = useState(false);
+  const [issueTypeRequests, setIssueTypeRequests] = useState<
+    Record<string, { values: string[]; types: string[] }>
+  >({});
+
+  const resolveIssueArgs = async (issue: OpenIssue): Promise<unknown[] | null> => {
+    try {
+      return await typedIssueArgs(
+        issue.target,
+        issue.func,
+        issue.args,
+        issueTypeRequests[issue.issueId]?.types
+      );
+    } catch (err) {
+      if (!(err instanceof MissingIssueArgTypesError)) throw err;
+      setIssueTypeRequests((current) => ({
+        ...current,
+        [issue.issueId]: {
+          values: err.values,
+          types: current[issue.issueId]?.types ?? err.values.map(() => ""),
+        },
+      }));
+      toast.error(err.message);
+      return null;
+    }
+  };
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["multisig-open-issues", wallet.address] });
@@ -1255,7 +1328,8 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
     }
     setBusy(issue.issueId);
     try {
-      const canonical = await typedIssueArgs(issue.target, issue.func, issue.args);
+      const canonical = await resolveIssueArgs(issue);
+      if (!canonical) return;
       if (nested) {
         // A nested vote always goes through castVoteOnIssue with the issue's raw
         // target/func/args, wrapped once per hop; the issueId here still matches
@@ -1304,7 +1378,8 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
   };
 
   const simulateVote = async (issue: OpenIssue) => {
-    const canonical = await typedIssueArgs(issue.target, issue.func, issue.args);
+    const canonical = await resolveIssueArgs(issue);
+    if (!canonical) return;
     setSimFor(issue.issueId);
     issueSim.run(
       "FUNCTION",
@@ -1328,7 +1403,9 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
   const withdraw = async (issue: OpenIssue) => {
     setBusy(`${issue.issueId}:withdraw`);
     try {
-      await withdrawVote({ ...issue, args: await typedIssueArgs(issue.target, issue.func, issue.args) });
+      const args = await resolveIssueArgs(issue);
+      if (!args) return;
+      await withdrawVote({ ...issue, args });
       queryClient.setQueryData<OpenIssue[]>(["multisig-open-issues", wallet.address], (cached = []) =>
         cached.flatMap((current) => {
           if (current.issueId !== issue.issueId) return [current];
@@ -1352,7 +1429,9 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
     }
     setBusy(`${issue.issueId}:execute`);
     try {
-      await executeIssue({ ...issue, args: await typedIssueArgs(issue.target, issue.func, issue.args) });
+      const args = await resolveIssueArgs(issue);
+      if (!args) return;
+      await executeIssue({ ...issue, args });
       toast.success("Issue executed");
       invalidate();
     } catch (err: any) {
@@ -1446,6 +1525,7 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
         const queued = issue.queued;
         const ready = !!queued && now >= queued.executableAt && now <= queued.expiresAt;
         const waitingForAllowance = blockedActionIssues.has(issue.issueId);
+        const typeRequest = issueTypeRequests[issue.issueId];
         // Mirrors the contract's dismissIssue gate: a single vote, cast by the caller.
         const canDismiss = issue.voters.length === 1 && eq(issue.voters[0], me);
         // A direct signer may always retract their recorded vote. Dismiss remains
@@ -1583,6 +1663,32 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
                 <p className="mt-1 text-xs text-muted-foreground">
                   Waiting for the linked token approval to execute and index before more votes can be cast.
                 </p>
+              ) : null}
+              {typeRequest ? (
+                <div className="mt-3 space-y-2 rounded-md border border-border p-2">
+                  <p className="text-xs text-muted-foreground">
+                    ABI metadata is unavailable. Enter each argument&apos;s original Solidity type.
+                  </p>
+                  {typeRequest.values.map((value, index) => (
+                    <div key={index} className="grid grid-cols-[1fr_1fr] items-center gap-2">
+                      <span className="truncate font-mono text-xs" title={value}>{value}</span>
+                      <Input
+                        value={typeRequest.types[index] ?? ""}
+                        onChange={(event) => setIssueTypeRequests((current) => ({
+                          ...current,
+                          [issue.issueId]: {
+                            ...current[issue.issueId],
+                            types: current[issue.issueId].types.map((type, typeIndex) =>
+                              typeIndex === index ? event.target.value : type
+                            ),
+                          },
+                        }))}
+                        placeholder="e.g. string, uint256"
+                        className="h-8 font-mono text-xs"
+                      />
+                    </div>
+                  ))}
+                </div>
               ) : null}
               {issue.invalidated ? (
                 <p className="mt-1 text-xs text-muted-foreground">

@@ -142,7 +142,9 @@ export function usePoolMetadata() {
         isDisabled: !!pool?.isDisabled,
         tokenA: token(pool?.tokenA),
         tokenB: token(pool?.tokenB),
-        coins: Array.isArray(pool?.coins) ? pool.coins.map(token) : undefined,
+        coins: Array.isArray(pool?.coins)
+          ? [...pool.coins].sort((a: any, b: any) => Number(a.coinIndex) - Number(b.coinIndex)).map(token)
+          : undefined,
         lpToken: pool?.lpToken ? token(pool.lpToken) : undefined,
       })).filter((pool: PoolMetadata) => pool.address && !pool.isDisabled);
     },
@@ -158,18 +160,15 @@ export function useDeployedPositions(ownerAddress?: string | null) {
     staleTime: 15_000,
     refetchInterval: 15_000,
     queryFn: async (): Promise<DeployedPositions> => {
-      const [vaultResult, stakingResult] = await Promise.allSettled([
+      const [vaultResult, stakingResult] = await Promise.all([
         api.get(`/api/cdp/vaults?address=${owner}`, {
           skipErrorToast: true,
           headers: { "X-Wallet-Address": owner },
         }),
         api.get(`/api/staking/info?address=${owner}`, { skipErrorToast: true }),
       ]);
-      if (vaultResult.status === "rejected" && stakingResult.status === "rejected") {
-        throw vaultResult.reason;
-      }
-      const vaults = vaultResult.status === "fulfilled" ? vaultResult.value.data : [];
-      const staking = stakingResult.status === "fulfilled" ? stakingResult.value.data : {};
+      const vaults = vaultResult.data;
+      const staking = stakingResult.data;
       const collateral = (Array.isArray(vaults) ? vaults : []).map((vault: any) => ({
         asset: strip0x(String(vault?.asset ?? "")),
         symbol: String(vault?.symbol ?? "ASSET"),
