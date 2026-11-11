@@ -64,7 +64,7 @@ them can be added later without touching the submit path.
   to `commands.txt` (`--ingressPort` changes it) and scrapes its metrics
   (`strato_ingest_accepted_total`, `strato_ingest_dropped_total` on 10781).
 - API directory: `strato-setup --role=api --ingressUrls=http://cell-a:8600,http://cell-b:8600 --vmQuery --vmQueryUrls=http://api-b:8546 ...`.
-- API container (`docker-compose.api.tpl.yml`, the ha-infra api-tier app):
+- API container (the ha-infra api-tier app):
   `INGRESS_URLS` (required), `VM_QUERY` (default true), `VM_QUERY_URLS`.
 - The core tier's load balancer and the cells' external Kafka listener are
   gone: the API tier addresses cells directly, on port 8600.
