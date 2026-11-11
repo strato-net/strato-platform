@@ -55,10 +55,13 @@ import {
   useCDPMetadata,
   useDeployedPositions,
   usePoolMetadata,
+  useV3AllowanceMetadata,
   useStakingMetadata,
+  resolveV3AllowanceInputs,
   type CDPMetadata,
   type PoolMetadata,
   type StakingMetadata,
+  type V3AllowanceMetadata,
 } from "@/services/protocolMetadata";
 import { useContractGroups, useContractInfo, functionArgs, fetchFunctionArgs } from "@/services/contracts";
 import { useSimulation } from "@/components/simulation/useSimulation";
@@ -1171,12 +1174,17 @@ function SignersTab({
 /* Issues tab                                                                         */
 /* --------------------------------------------------------------------------------- */
 
+const isV3AllowanceAction = (func: string, args: string[]) =>
+  (func === "mint" && args.length >= 9) ||
+  (func === "increaseLiquidity" && args.length >= 6);
+
 function issueAllowanceRequirements(
   issue: OpenIssue,
   ownerAddress: string,
   staking?: StakingMetadata,
   cdp?: CDPMetadata,
-  pools: PoolMetadata[] = []
+  pools: PoolMetadata[] = [],
+  v3?: V3AllowanceMetadata
 ): TokenAllowanceRequirement[] {
   const action = unwrapNestedIssueAction(issue, ownerAddress);
   const requirement = (tokenAddress: string, spenderAddress: string, amount: string) => ({
@@ -1195,6 +1203,12 @@ function issueAllowanceRequirements(
   if (action.func === "deposit" && cdp && eq(action.target, cdp.engineAddress)) {
     const amount = action.args[1] ?? "0";
     return validAmount(amount) ? [requirement(action.args[0] ?? "", cdp.vaultAddress, amount)] : [];
+  }
+
+  if (isV3AllowanceAction(action.func, action.args)) {
+    return resolveV3AllowanceInputs(action.func, action.args, v3).flatMap(({ tokenAddress, amount }) =>
+      validAmount(amount) ? [requirement(tokenAddress, action.target, amount)] : []
+    );
   }
 
   const pool = pools.find((item) => eq(item.address, action.target));
@@ -1237,18 +1251,38 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
   const stakingMetadata = useStakingMetadata();
   const cdpMetadata = useCDPMetadata();
   const poolMetadata = usePoolMetadata();
+  const v3AllowanceOwners = issues.flatMap((issue) => {
+    const action = unwrapNestedIssueAction(issue, wallet.address);
+    return isV3AllowanceAction(action.func, action.args) ? [action.ownerAddress] : [];
+  });
+  const v3Metadata = useV3AllowanceMetadata(v3AllowanceOwners, v3AllowanceOwners.length > 0);
   const allowanceRequirements = useMemo(() => issues.flatMap((issue) =>
     issueAllowanceRequirements(
       issue,
       wallet.address,
       stakingMetadata.data,
       cdpMetadata.data,
-      poolMetadata.data
+      poolMetadata.data,
+      v3Metadata.data
     )
-  ), [issues, wallet.address, stakingMetadata.data, cdpMetadata.data, poolMetadata.data]);
+  ), [
+    issues,
+    wallet.address,
+    stakingMetadata.data,
+    cdpMetadata.data,
+    poolMetadata.data,
+    v3Metadata.data,
+  ]);
   const allowanceChecks = useTokenAllowanceRequirements(allowanceRequirements);
+  const v3MetadataUnavailableIssues = new Set(issues.filter((issue) => {
+    const action = unwrapNestedIssueAction(issue, wallet.address);
+    return isV3AllowanceAction(action.func, action.args) &&
+      (!v3Metadata.isSuccess ||
+        resolveV3AllowanceInputs(action.func, action.args, v3Metadata.data).length === 0);
+  }).map((issue) => issue.issueId));
   const blockedActionIssues = new Set([
     ...allowanceChecks.filter((check) => !check.ready).map((check) => check.issueId),
+    ...v3MetadataUnavailableIssues,
     ...issues.filter((issue) => {
       const action = unwrapNestedIssueAction(issue, wallet.address);
       return (action.func === "stake" && stakingMetadata.isLoading) ||
@@ -1323,7 +1357,9 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
       return;
     }
     if (blockedActionIssues.has(issue.issueId)) {
-      toast.error("Complete the linked token approval first");
+      toast.error(v3MetadataUnavailableIssues.has(issue.issueId)
+        ? "V3 pool or position metadata is unavailable; refresh and try again"
+        : "Complete the linked token approval first");
       return;
     }
     setBusy(issue.issueId);
@@ -1424,7 +1460,9 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
 
   const execute = async (issue: OpenIssue) => {
     if (blockedActionIssues.has(issue.issueId)) {
-      toast.error("Complete the linked token approval first");
+      toast.error(v3MetadataUnavailableIssues.has(issue.issueId)
+        ? "V3 pool or position metadata is unavailable; refresh and try again"
+        : "Complete the linked token approval first");
       return;
     }
     setBusy(`${issue.issueId}:execute`);
@@ -1525,6 +1563,7 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
         const queued = issue.queued;
         const ready = !!queued && now >= queued.executableAt && now <= queued.expiresAt;
         const waitingForAllowance = blockedActionIssues.has(issue.issueId);
+        const waitingForV3Metadata = v3MetadataUnavailableIssues.has(issue.issueId);
         const typeRequest = issueTypeRequests[issue.issueId];
         // Mirrors the contract's dismissIssue gate: a single vote, cast by the caller.
         const canDismiss = issue.voters.length === 1 && eq(issue.voters[0], me);
@@ -1573,7 +1612,8 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
                       size="sm"
                       onClick={() => execute(issue)}
                       disabled={busy !== "" || !canSubmit || !ready || waitingForAllowance}
-                      title={waitingForAllowance ? "Complete the linked token approval first" :
+                      title={waitingForV3Metadata ? "V3 pool or position metadata is unavailable" :
+                        waitingForAllowance ? "Complete the linked token approval first" :
                         ready ? "Anyone can execute a queued issue once its delay is up" : "Not executable now"}
                     >
                       {busy === `${issue.issueId}:execute` ? "Executing…" : "Execute"}
@@ -1618,7 +1658,9 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
                     disabled={busy !== "" || !canSubmit || !canVote || iVoted || waitingForAllowance}
                     title={
                       waitingForAllowance
-                        ? "Complete the linked token approval first"
+                        ? waitingForV3Metadata
+                          ? "V3 pool or position metadata is unavailable"
+                          : "Complete the linked token approval first"
                         : nested
                         ? `Casts your vote in ${viaName}; it arrives here through the membership chain.`
                         : undefined
@@ -1661,7 +1703,9 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
               ) : null}
               {waitingForAllowance ? (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Waiting for the linked token approval to execute and index before more votes can be cast.
+                  {waitingForV3Metadata
+                    ? "V3 pool or position metadata is unavailable. Refresh before voting or executing."
+                    : "Waiting for the linked token approval to execute and index before more votes can be cast."}
                 </p>
               ) : null}
               {typeRequest ? (
@@ -2343,8 +2387,6 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
   const [v3RemoveMode, setV3RemoveMode] = useState<"decrease" | "collect">("decrease");
   const [v3Manager, setV3Manager] = useState("");
   const [v3Pool, setV3Pool] = useState("");
-  const [v3Token0, setV3Token0] = useState("");
-  const [v3Token1, setV3Token1] = useState("");
   const [v3TokenId, setV3TokenId] = useState("");
   const [v3TickLower, setV3TickLower] = useState("");
   const [v3TickUpper, setV3TickUpper] = useState("");
@@ -2376,6 +2418,13 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         : liquidityVersion === "v3" ? (v3RemoveMode === "decrease" ? "v3Decrease" : "v3Collect")
         : "removeLiquidity"
       : action;
+  const v3Metadata = useV3AllowanceMetadata(wallet.address, liquidityVersion === "v3");
+  const selectedV3Position = v3Metadata.data?.positions.find((position) =>
+    position.tokenId === v3TokenId
+  );
+  const selectedV3PoolMetadata = v3Metadata.data?.pools.find((pool) =>
+    eq(pool.address, effectiveAction === "v3Mint" ? v3Pool : selectedV3Position?.poolAddress)
+  );
 
   const applyPool = (pool: PoolMetadata) => {
     setTarget(pool.address);
@@ -2438,8 +2487,6 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
     setAmountsText("");
     setCoinIndex("");
     setV3Pool("");
-    setV3Token0("");
-    setV3Token1("");
     setV3TokenId("");
     setV3TickLower("");
     setV3TickUpper("");
@@ -2464,7 +2511,10 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
       ? stableTokens.map((token, index) => ({ token, value: stableAmounts[index] ?? "0" }))
           .filter(({ value }) => positiveInteger(value))
       : isV3Add
-        ? [{ token: v3Token0, value: amount }, { token: v3Token1, value: amount2 }]
+        ? [
+            { token: selectedV3PoolMetadata?.token0.address ?? "", value: amount },
+            { token: selectedV3PoolMetadata?.token1.address ?? "", value: amount2 },
+          ]
           .filter(({ value }) => positiveInteger(value))
       : approvalRequired
         ? [{ token: asset, value: amount }]
@@ -2506,6 +2556,14 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
     if (!validContractAddress(actionTarget)) return toast.error("Enter a valid protocol contract address");
     if (!manualAddresses && isPoolAction && liquidityVersion !== "v3" && !selectedPool) {
       return toast.error("Select a valid pool for this liquidity action");
+    }
+    if (isV3Add && !v3Metadata.isSuccess) {
+      return toast.info("Loading V3 pool and position metadata");
+    }
+    if (isV3Add && !selectedV3PoolMetadata) {
+      return toast.error(effectiveAction === "v3Mint"
+        ? "Enter a valid indexed V3 pool"
+        : "Enter an owned V3 position token ID");
     }
     if (approvalRequired && !approvalInputsComplete) {
       return toast.error("Enter valid token addresses and approval amounts");
@@ -2553,7 +2611,7 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
           }
           break;
         case "v3Mint":
-          if (![v3Pool, v3Token0, v3Token1].every(validContractAddress)) throw new Error("Enter valid V3 pool and token addresses");
+          if (!validContractAddress(v3Pool) || !selectedV3PoolMetadata) throw new Error("Enter a valid indexed V3 pool");
           if (!/^-?\d+$/.test(v3TickLower) || !/^-?\d+$/.test(v3TickUpper) || BigInt(v3TickLower) >= BigInt(v3TickUpper)) {
             throw new Error("Enter an ordered lower and upper tick");
           }
@@ -2561,7 +2619,9 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
               !(positiveInteger(amount) || positiveInteger(amount2))) throw new Error("Enter valid V3 desired and minimum amounts");
           break;
         case "v3Increase":
-          if (![v3Token0, v3Token1].every(validContractAddress) || !positiveInteger(v3TokenId)) throw new Error("Enter valid V3 tokens and token ID");
+          if (!positiveInteger(v3TokenId) || !selectedV3Position || !selectedV3PoolMetadata) {
+            throw new Error("Enter an owned V3 position token ID");
+          }
           if (![amount, amount2, amount3, v3Amount1Min].every(nonNegativeInteger) ||
               !(positiveInteger(amount) || positiveInteger(amount2))) throw new Error("Enter valid V3 desired and minimum amounts");
           break;
@@ -2589,20 +2649,12 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         spender: approvalSpender,
         amount: approval.value,
       })));
-      // V3 mint/increase issues do not carry their approval-token addresses, so they
-      // cannot be reconstructed safely for allowance gating after a reload. Submit
-      // approvals first, and only create the action once those allowances are indexed.
-      const callsToSubmit = isV3Add && missingApprovals.length ? workflow.slice(0, -1) : workflow;
       setBusy("action");
-      for (const call of callsToSubmit) {
+      for (const call of workflow) {
         await castVote(call.func, call.args, call.target);
       }
-      toast.success(isV3Add && missingApprovals.length
-        ? `${missingApprovals.length === 1 ? "Approval" : "Approvals"} proposed`
-        : `${ACTION_LABELS[selectedAction]} workflow proposed`, {
-        description: isV3Add && missingApprovals.length
-          ? "Execute the approval issues, then return here to propose the V3 action."
-          : missingApprovals.length
+      toast.success(`${ACTION_LABELS[selectedAction]} workflow proposed`, {
+        description: missingApprovals.length
           ? "Approval issues were created first. The action unlocks for more votes after they execute."
           : "Signers can review and vote on it in the Issues tab.",
       });
@@ -2840,19 +2892,19 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
         {addressInput("PositionManagerV3", v3Manager, setV3Manager, "Position manager contract address")}
         {effectiveAction === "v3Mint" ? <>
           {addressInput("V3 pool", v3Pool, setV3Pool, "PoolV3 contract address")}
-          {addressInput("Token 0", v3Token0, setV3Token0, "Token 0 contract address")}
-          {addressInput("Token 1", v3Token1, setV3Token1, "Token 1 contract address")}
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1"><Label>Lower tick</Label><Input value={v3TickLower} onChange={(e) => setV3TickLower(e.target.value)} inputMode="numeric" /></div>
             <div className="space-y-1"><Label>Upper tick</Label><Input value={v3TickUpper} onChange={(e) => setV3TickUpper(e.target.value)} inputMode="numeric" /></div>
           </div>
         </> : null}
-        {effectiveAction === "v3Increase" ? <>
-          {addressInput("Token 0", v3Token0, setV3Token0, "Token 0 contract address")}
-          {addressInput("Token 1", v3Token1, setV3Token1, "Token 1 contract address")}
-        </> : null}
         {(effectiveAction === "v3Increase" || effectiveAction === "v3Decrease" || effectiveAction === "v3Collect") ?
           amountInput("Position token ID", v3TokenId, setV3TokenId) : null}
+        {(effectiveAction === "v3Mint" || effectiveAction === "v3Increase") && selectedV3PoolMetadata ? (
+          <div className="space-y-1 text-xs text-muted-foreground">
+            <p>Token 0: {selectedV3PoolMetadata.token0._symbol} · <span className="font-mono">{selectedV3PoolMetadata.token0.address}</span></p>
+            <p>Token 1: {selectedV3PoolMetadata.token1._symbol} · <span className="font-mono">{selectedV3PoolMetadata.token1.address}</span></p>
+          </div>
+        ) : null}
         {(effectiveAction === "v3Mint" || effectiveAction === "v3Increase") ? <>
           {amountInput("Token 0 desired (raw units)", amount, setAmount)}
           {amountInput("Token 1 desired (raw units)", amount2, setAmount2)}

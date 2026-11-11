@@ -54,6 +54,51 @@ export interface PoolMetadata {
   lpToken?: PoolTokenMetadata;
 }
 
+export interface PoolV3Metadata {
+  address: string;
+  token0: PoolTokenMetadata;
+  token1: PoolTokenMetadata;
+}
+
+export interface PositionV3Metadata {
+  tokenId: string;
+  poolAddress: string;
+}
+
+export interface V3AllowanceMetadata {
+  pools: PoolV3Metadata[];
+  positions: PositionV3Metadata[];
+}
+
+export function resolveV3AllowanceInputs(
+  func: string,
+  args: string[],
+  metadata?: V3AllowanceMetadata
+): { tokenAddress: string; amount: string }[] {
+  let poolAddress = "";
+  let amount0 = "0";
+  let amount1 = "0";
+  if (func === "mint" && args.length >= 9) {
+    poolAddress = args[0] ?? "";
+    amount0 = args[3] ?? "0";
+    amount1 = args[4] ?? "0";
+  } else if (func === "increaseLiquidity" && args.length >= 6) {
+    poolAddress = metadata?.positions.find((position) =>
+      position.tokenId === String(args[0] ?? "")
+    )?.poolAddress ?? "";
+    amount0 = args[1] ?? "0";
+    amount1 = args[2] ?? "0";
+  }
+  const pool = metadata?.pools.find((item) =>
+    strip0x(item.address) === strip0x(poolAddress)
+  );
+  if (!pool) return [];
+  return [
+    { tokenAddress: pool.token0.address, amount: amount0 },
+    { tokenAddress: pool.token1.address, amount: amount1 },
+  ];
+}
+
 export interface DeployedCollateralPosition {
   asset: string;
   symbol: string;
@@ -147,6 +192,54 @@ export function usePoolMetadata() {
           : undefined,
         lpToken: pool?.lpToken ? token(pool.lpToken) : undefined,
       })).filter((pool: PoolMetadata) => pool.address && !pool.isDisabled);
+    },
+  });
+}
+
+/** Pool tokens and owned position-to-pool links needed to reconstruct V3 allowances. */
+export function useV3AllowanceMetadata(
+  ownerAddresses?: string | string[] | null,
+  enabled = true
+) {
+  const owners = [...new Set(
+    (Array.isArray(ownerAddresses) ? ownerAddresses : [ownerAddresses])
+      .map((address) => strip0x(address ?? ""))
+      .filter((address) => address.length === 40)
+  )].sort();
+  return useQuery({
+    queryKey: ["protocol-metadata", "v3-allowances", owners],
+    enabled: enabled && owners.length > 0,
+    staleTime: 30_000,
+    queryFn: async (): Promise<V3AllowanceMetadata> => {
+      const [poolsResult, ...positionResults] = await Promise.all([
+        api.get("/api/poolv3/pools", { skipErrorToast: true }),
+        ...owners.map((owner) => api.get("/api/poolv3/positions", {
+          skipErrorToast: true,
+          headers: { "X-Wallet-Address": owner },
+        })),
+      ]);
+      const token = (raw: any): PoolTokenMetadata => ({
+        address: strip0x(String(raw?.address ?? "")),
+        _symbol: String(raw?._symbol ?? "TOKEN"),
+        customDecimals: Number(raw?.customDecimals ?? 18),
+      });
+      return {
+        pools: (Array.isArray(poolsResult.data) ? poolsResult.data : []).map((pool: any) => ({
+          address: strip0x(String(pool?.address ?? "")),
+          token0: token(pool?.token0),
+          token1: token(pool?.token1),
+        })).filter((pool: PoolV3Metadata) =>
+          pool.address && pool.token0.address && pool.token1.address
+        ),
+        positions: positionResults.flatMap((result) =>
+          Array.isArray(result.data) ? result.data : []
+        ).map((position: any) => ({
+          tokenId: String(position?.tokenId ?? ""),
+          poolAddress: strip0x(String(position?.poolAddress ?? "")),
+        })).filter((position: PositionV3Metadata) =>
+          position.tokenId && position.poolAddress
+        ),
+      };
     },
   });
 }

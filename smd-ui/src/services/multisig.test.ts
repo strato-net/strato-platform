@@ -5,6 +5,7 @@ import { applyConfirmedVote, buildControlledWalletAcceptance, buildNestedCastVot
 import { formatVariadicArg, parseArgText, parseVariadicBoolean, typedVariadicArg } from "../lib/args";
 import { pollResults } from "../lib/walletTx";
 import { api } from "../lib/api";
+import { resolveV3AllowanceInputs } from "./protocolMetadata";
 
 const wallet = "efa890674cad5e3a7640bb720c2a70bf3ae76709";
 const pool = "5b8f21b53d3a5ea7dd66710ff18d161bb62e9a71";
@@ -300,6 +301,51 @@ test("approval-dependent workflows put exact approvals before the action", () =>
   assert.deepEqual(calls[1].args, [
     { type: "address", value: pool },
     { type: "uint256", value: 20 },
+  ]);
+
+  const v3Calls = buildProtocolWorkflowCalls("v3Mint", {
+    target: signer,
+    pool,
+    tickLower: "-120",
+    tickUpper: "120",
+    amount: "100",
+    amount2: "200",
+    amount3: "90",
+    amounts: ["180"],
+    receiver: wallet,
+  }, [
+    { token: tokenA, spender: signer, amount: "100" },
+    { token: tokenB, spender: signer, amount: "200" },
+  ], 1000);
+  assert.deepEqual(v3Calls.map(({ target, func }) => ({ target, func })), [
+    { target: tokenA, func: "approve" },
+    { target: tokenB, func: "approve" },
+    { target: signer, func: "mint" },
+  ]);
+});
+
+test("V3 allowance requirements reconstruct pool tokens after reload", () => {
+  const token0 = "0000000000000000000000000000000000001008";
+  const token1 = "0000000000000000000000000000000000001009";
+  const metadata = {
+    pools: [{
+      address: pool,
+      token0: { address: token0, _symbol: "T0", customDecimals: 18 },
+      token1: { address: token1, _symbol: "T1", customDecimals: 18 },
+    }],
+    positions: [{ tokenId: "7", poolAddress: pool }],
+  };
+  assert.deepEqual(resolveV3AllowanceInputs("mint", [
+    pool, "-120", "120", "100", "200", "90", "180", wallet, "9999",
+  ], metadata), [
+    { tokenAddress: token0, amount: "100" },
+    { tokenAddress: token1, amount: "200" },
+  ]);
+  assert.deepEqual(resolveV3AllowanceInputs("increaseLiquidity", [
+    "7", "300", "400", "270", "360", "9999",
+  ], metadata), [
+    { tokenAddress: token0, amount: "300" },
+    { tokenAddress: token1, amount: "400" },
   ]);
 });
 
