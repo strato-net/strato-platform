@@ -145,7 +145,7 @@ def checkNodeIsGettingBlocks() {
 }
 
 def spinUpVault() {
-  writeFile file: "vault.pgpass", text: "postgres:5432:*:postgres:api\n"
+  writeFile file: "vault.pgpass", text: "postgres:5432:*:strato:api\n"
   sh 'chmod 600 vault.pgpass'
   writeFile file: "run-vault.sh", text: """#!/bin/bash
   sudo \\
