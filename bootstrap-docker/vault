@@ -205,10 +205,13 @@ function cleanup {
 trap cleanup EXIT
 
 if [ "$ssl" != true ]; then
-  sed 's|^[[:space:]]*- .*#TAG_REMOVE_WHEN_NO_SSL$|    - ${VAULT_NGINX_PORT:-${HTTP_PORT:-8090}:80}|' docker-compose.vault.yml > docker-compose-vault-temp.yml
+  port_mapping='${VAULT_NGINX_PORT:-${HTTP_PORT:-8090}:80}'
 else
-  cp docker-compose.vault.yml docker-compose-vault-temp.yml
+  port_mapping='${VAULT_NGINX_PORT:-${HTTPS_PORT:-8093}:443}'
 fi
+sed -e '/#TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT/d' \
+    -e "s|^[[:space:]]*- .*#TAG_REMOVE_WHEN_NO_SSL$|    - ${port_mapping}|" \
+    docker-compose.vault.yml > docker-compose-vault-temp.yml
 # END OF COMPOSE FILE PRE-PROCESSING
 
 ${docker_compose} -f docker-compose-vault-temp.yml up -d --remove-orphans

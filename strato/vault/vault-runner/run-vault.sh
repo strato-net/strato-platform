@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+if [ ! -f docker-compose.vault.yml ]; then
+  echo 'Generate docker-compose.vault.yml at the repo root and copy it here first.' >&2
+  exit 1
+fi
+
 umask 077
 printf '%s\n' 'postgres:5432:*:postgres:api' > vault.pgpass
 chmod 600 vault.pgpass

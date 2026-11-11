@@ -2,9 +2,9 @@
 
 - This is a simple example of how to run and manage a local Vault
 - It's deploying the Vault on plain HTTP, so it's only acceptable for using within one secure host.
-- It is using a specific version of docker-compose.vault.yml with prebuilt images to avoid building from source and installing all build dependencies
+- It uses the Compose file generated from the repository root.
 
-If you still want to build from source:
+Build the images and copy the generated Compose file before running it:
 ```
 cd strato-platform
 ./install_deps.sh
