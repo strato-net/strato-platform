@@ -8,4 +8,6 @@ export const formatPrice = (price: number, decimals?: number): string => {
 export const formatQuantity = (quantity: number): string =>
   quantity >= 100_000
     ? quantity.toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 2 })
-    : quantity.toLocaleString(undefined, { maximumFractionDigits: quantity >= 100 ? 2 : quantity >= 1 ? 4 : 6 });
+    : quantity > 0 && quantity < 0.000001
+      ? "<0.000001"
+      : quantity.toLocaleString(undefined, { maximumFractionDigits: quantity >= 100 ? 2 : quantity >= 1 ? 4 : 6 });

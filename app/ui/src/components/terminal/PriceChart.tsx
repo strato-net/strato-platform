@@ -106,7 +106,7 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
     const key = `${poolAddress}:${resolution}`;
     if (rows.length > 0 && current.fitted !== key) {
       // open on the most recent bars; the rest of the history is a scroll away
-      current.chart.timeScale().setVisibleLogicalRange({ from: rows.length - INITIAL_VISIBLE_BARS, to: rows.length + 2 });
+      current.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, rows.length - INITIAL_VISIBLE_BARS), to: rows.length + 2 });
       current.fitted = key;
     }
   }, [candles, poolAddress, resolution, resolvedTheme]);

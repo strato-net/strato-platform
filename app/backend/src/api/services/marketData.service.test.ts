@@ -9,6 +9,7 @@ import {
   marketPrice,
   marketStats,
 } from "../helpers/marketData.helper";
+import { MAX_SQRT_RATIO } from "../helpers/poolV3Math.helper";
 
 const FEE_ADDRESS = "f".repeat(40);
 const TRADER = "a".repeat(40);
@@ -45,12 +46,13 @@ test("foldSwap builds candles that open at the previous close", () => {
   foldSwap(state, swap(3, "2026-11-11 10:01:10 UTC", 2n * WAD, -8n * WAD, 2n), base0, FEE_ADDRESS);
 
   const t0 = Date.parse("2026-11-11T10:00:00Z") / 1000;
-  assert.deepEqual(candlesFrom(state, "1m"), [
+  const now = (t0 + 90) * 1000;
+  assert.deepEqual(candlesFrom(state, "1m", now), [
     [t0, 4, 9, 4, 9, 13, 2],
     [t0 + 60, 9, 9, 4, 4, 8, 1],
   ]);
-  assert.deepEqual(candlesFrom(state, "1h"), [[t0, 4, 9, 4, 4, 21, 3]]);
-  assert.deepEqual(candlesFrom(state, "1m", t0 + 60), [[t0 + 60, 9, 9, 4, 4, 8, 1]]);
+  assert.deepEqual(candlesFrom(state, "1h", now), [[t0, 4, 9, 4, 4, 21, 3]]);
+  assert.deepEqual(candlesFrom(state, "1m", now, t0 + 60), [[t0 + 60, 9, 9, 4, 4, 8, 1]]);
   assert.equal(state.lastId, 3);
   assert.equal(state.price, 4);
 });
@@ -73,8 +75,49 @@ test("a swap stamped before the newest bucket folds into it", () => {
   const state = emptyMarketState();
   foldSwap(state, swap(1, "2026-11-11 10:05:00 UTC", -1n * WAD, 4n * WAD, 2n), base0, FEE_ADDRESS);
   foldSwap(state, swap(2, "2026-11-11 10:01:00 UTC", -1n * WAD, 9n * WAD, 3n), base0, FEE_ADDRESS);
-  assert.equal(candlesFrom(state, "1m").length, 1);
-  assert.equal(candlesFrom(state, "1m")[0][6], 2);
+  const candles = candlesFrom(state, "1m", Date.parse("2026-11-11T10:05:30Z"));
+  assert.equal(candles.length, 1);
+  assert.equal(candles[0][6], 2);
+});
+
+test("candlesFrom fills buckets without swaps flat at the previous close", () => {
+  const state = emptyMarketState();
+  foldSwap(state, swap(1, "2026-11-11 10:00:05 UTC", -1n * WAD, 4n * WAD, 2n), base0, FEE_ADDRESS);
+  foldSwap(state, swap(2, "2026-11-11 10:03:00 UTC", -1n * WAD, 9n * WAD, 3n), base0, FEE_ADDRESS);
+
+  const t0 = Date.parse("2026-11-11T10:00:00Z") / 1000;
+  const now = (t0 + 5 * 60 + 20) * 1000;
+  assert.deepEqual(candlesFrom(state, "1m", now), [
+    [t0, 4, 4, 4, 4, 4, 1],
+    [t0 + 60, 4, 4, 4, 4, 0, 0],
+    [t0 + 120, 4, 4, 4, 4, 0, 0],
+    [t0 + 180, 4, 9, 4, 9, 9, 1],
+    [t0 + 240, 9, 9, 9, 9, 0, 0],
+    [t0 + 300, 9, 9, 9, 9, 0, 0],
+  ]);
+  // a poll from inside a gap, and the newest-`limit` cap
+  assert.deepEqual(candlesFrom(state, "1m", now, t0 + 120).map((c) => c[0]), [t0 + 120, t0 + 180, t0 + 240, t0 + 300]);
+  assert.deepEqual(candlesFrom(state, "1m", now, 0, 2), [
+    [t0 + 240, 9, 9, 9, 9, 0, 0],
+    [t0 + 300, 9, 9, 9, 9, 0, 0],
+  ]);
+  // a server clock behind the chain still returns the newest candle
+  assert.equal(candlesFrom(state, "1m", (t0 + 30) * 1000).length, 4);
+  assert.deepEqual(candlesFrom(emptyMarketState(), "1m", now), []);
+});
+
+test("a swap that strands the pool at the tick bound is priced at its execution", () => {
+  const state = emptyMarketState();
+  const drained = { ...swap(1, "2026-11-11 10:00:00 UTC", -1n * WAD, 5n * WAD, 2n), sqrtPriceX96: (MAX_SQRT_RATIO - 1n).toString() };
+  foldSwap(state, drained, base0, FEE_ADDRESS);
+  assert.equal(state.price, 5);
+  assert.deepEqual(candlesFrom(state, "1m", Date.parse("2026-11-11T10:00:30Z")), [[Date.parse("2026-11-11T10:00:00Z") / 1000, 5, 5, 5, 5, 5, 1]]);
+});
+
+test("a swap of a few wei is taped at the pool price", () => {
+  const state = emptyMarketState();
+  foldSwap(state, swap(1, "2026-11-11 10:00:00 UTC", 2n, -4501n, 47n), base0, FEE_ADDRESS);
+  assert.equal(state.tape[0].price, 47 * 47);
 });
 
 test("marketStats covers only the trailing 24 hours", () => {

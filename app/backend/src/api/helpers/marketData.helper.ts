@@ -3,6 +3,7 @@
  * tape and 24h stats. No I/O — the service feeds rows in ascending event-id order.
  */
 import { CandleResolution, MarketCandle, MarketStats, MarketTrade } from "@strato/shared-types";
+import { MAX_SQRT_RATIO, MIN_SQRT_RATIO } from "./poolV3Math.helper";
 
 export const RESOLUTION_SECONDS: Record<CandleResolution, number> = {
   "1m": 60,
@@ -17,6 +18,8 @@ export const CANDLE_RESOLUTIONS = Object.keys(RESOLUTION_SECONDS) as CandleResol
 /** Candles kept per resolution (1m: 7 days, 5m: 30 days); the others keep everything */
 const MAX_CANDLES: Partial<Record<CandleResolution, number>> = { "1m": 7 * 1440, "5m": 30 * 288 };
 const TAPE_SIZE = 200;
+/** Below this many base units on either side, rounding swamps the ratio (bots probe with 2 wei) */
+const MIN_PRICED_AMOUNT = 1_000_000n;
 const DAY_SECONDS = 86400;
 
 /** How a pool maps onto a BASE/QUOTE market */
@@ -78,9 +81,15 @@ export const foldSwap = (state: MarketState, row: RawSwapRow, o: MarketOrientati
   const [baseRaw, quoteRaw] = o.baseIsToken0
     ? [BigInt(row.amount0), BigInt(row.amount1)]
     : [BigInt(row.amount1), BigInt(row.amount0)];
-  const amountBase = Math.abs(Number(baseRaw)) / 10 ** o.baseDecimals;
-  const amountQuote = Math.abs(Number(quoteRaw)) / 10 ** o.quoteDecimals;
-  const price = marketPrice(row.sqrtPriceX96, o);
+  const [baseUnits, quoteUnits] = [baseRaw < 0n ? -baseRaw : baseRaw, quoteRaw < 0n ? -quoteRaw : quoteRaw];
+  const amountBase = Number(baseUnits) / 10 ** o.baseDecimals;
+  const amountQuote = Number(quoteUnits) / 10 ** o.quoteDecimals;
+  const executed = baseUnits >= MIN_PRICED_AMOUNT && quoteUnits >= MIN_PRICED_AMOUNT ? amountQuote / amountBase : undefined;
+  // a swap that runs the pool out of liquidity strands its price at the tick bound; the
+  // last real price is then the one the swap executed at
+  const sqrtPrice = BigInt(row.sqrtPriceX96);
+  const stranded = sqrtPrice <= MIN_SQRT_RATIO + 1n || sqrtPrice >= MAX_SQRT_RATIO - 1n;
+  const price = stranded ? (executed ?? state.price) : marketPrice(row.sqrtPriceX96, o);
   const kind = row.recipient === feeAddress ? "gas" : "user";
   const time = Date.parse(row.block_timestamp.replace(" UTC", "Z").replace(" ", "T"));
 
@@ -112,7 +121,7 @@ export const foldSwap = (state: MarketState, row: RawSwapRow, o: MarketOrientati
     id: row.id,
     time,
     side: baseRaw < 0n ? "buy" : "sell",
-    price: amountBase > 0 ? amountQuote / amountBase : price,
+    price: executed ?? price,
     amountBase,
     amountQuote,
     sender: row.sender,
@@ -123,12 +132,33 @@ export const foldSwap = (state: MarketState, row: RawSwapRow, o: MarketOrientati
   state.price = price;
 };
 
-/** Candles at `resolution` with bucket start >= `from` (unix s), capped to the newest `limit` */
-export const candlesFrom = (state: MarketState, resolution: CandleResolution, from = 0, limit = 1500): MarketCandle[] => {
+/**
+ * Candles at `resolution` from bucket `from` (unix s) through the current bucket, capped to
+ * the newest `limit`. A bucket without swaps is flat at the previous close: the pool price
+ * only moves when someone swaps.
+ */
+export const candlesFrom = (
+  state: MarketState,
+  resolution: CandleResolution,
+  nowMs: number,
+  from = 0,
+  limit = 1500
+): MarketCandle[] => {
   const candles = state.candles[resolution];
-  let start = candles.length;
-  while (start > 0 && candles[start - 1].t >= from && candles.length - start < limit) start--;
-  return candles.slice(start).map((c) => [c.t, c.o, c.h, c.l, c.c, c.volumeQuote, c.count]);
+  if (candles.length === 0) return [];
+  const seconds = RESOLUTION_SECONDS[resolution];
+  const end = Math.max(candles[candles.length - 1].t, Math.floor(nowMs / 1000 / seconds) * seconds);
+  const start = Math.max(candles[0].t, Math.ceil(from / seconds) * seconds, end - (limit - 1) * seconds);
+  // the newest swap-bearing candle at or before `start`
+  let i = candles.length - 1;
+  while (candles[i].t > start) i--;
+  const filled: MarketCandle[] = [];
+  for (let t = start; t <= end; t += seconds) {
+    if (candles[i + 1]?.t === t) i++;
+    const c = candles[i];
+    filled.push(c.t === t ? [t, c.o, c.h, c.l, c.c, c.volumeQuote, c.count] : [t, c.c, c.c, c.c, c.c, 0, 0]);
+  }
+  return filled;
 };
 
 /** Trailing-24h stats from the 1m candles (minute granularity at the window edge) */

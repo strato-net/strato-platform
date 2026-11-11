@@ -171,7 +171,7 @@ export const getMarketCandles = async (
   poolAddress: string,
   resolution: CandleResolution,
   from?: number
-): Promise<MarketCandle[]> => candlesFrom(await getMarketState(accessToken, poolAddress), resolution, from);
+): Promise<MarketCandle[]> => candlesFrom(await getMarketState(accessToken, poolAddress), resolution, Date.now(), from);
 
 export const getMarketTrades = async (accessToken: string, poolAddress: string, limit: number): Promise<MarketTrade[]> =>
   (await getMarketState(accessToken, poolAddress)).tape.slice(-limit).reverse();

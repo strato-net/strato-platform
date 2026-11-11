@@ -237,7 +237,7 @@ router.get("/markets", authHandler.authorizeRequest(true), TradeController.marke
  *           type: integer
  *     responses:
  *       200:
- *         description: Candles as [time, open, high, low, close, quoteVolume, count], oldest first
+ *         description: Candles as [time, open, high, low, close, quoteVolume, count], oldest first; buckets without swaps are flat at the previous close
  */
 router.get("/markets/:poolAddress/candles", authHandler.authorizeRequest(true), TradeController.marketCandles);
 

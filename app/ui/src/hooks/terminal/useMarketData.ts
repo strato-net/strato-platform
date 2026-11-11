@@ -70,7 +70,8 @@ export function useMarketCandles(poolAddress: string | undefined, resolution: Ca
         signal,
       });
       const fresh = data ?? [];
-      if (!from || fresh.length === 0) return fresh.length > 0 ? fresh : cached;
+      // a poll resumed after a long pause returns only the newest buckets: start over from those
+      if (!from || fresh.length === 0 || fresh[0][0] > from) return fresh.length > 0 ? fresh : cached;
       return [...cached.filter((c) => c[0] < fresh[0][0]), ...fresh];
     },
     enabled: !!poolAddress,
