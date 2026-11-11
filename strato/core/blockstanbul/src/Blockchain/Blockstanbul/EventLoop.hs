@@ -456,7 +456,12 @@ eventLoop ctx = execStateC ctx $
                   yieldR $ GapFound (intSeq v) (intSeq v') (sender auth)
                 when (_sequence v > _sequence v') $
                   yieldR $ LeadFound (intSeq v) (intSeq v') (sender auth)
-                roundChange
+                -- An older view means a late or re-sent copy of a proposal
+                -- this proposer made before, which says nothing about the
+                -- current view. Voting to change round on it would let anyone
+                -- holding an old proposal skip the proposer, so ignore it and
+                -- wait for the real proposal or the view timer.
+                when (v < v') roundChange
               | isJust mBlockLock && Just pp /= mBlockLock -> do
                 $logWarnS "blockstanbul/ppl" "Rejecting proposal: block does not match lock"
                 $logInfoS "blockstanbul/roundchange" "lock mismatch"

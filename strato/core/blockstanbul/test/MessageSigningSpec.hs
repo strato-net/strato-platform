@@ -169,6 +169,17 @@ spec = describe "consensus message signatures" $ do
     [b | RunPreprepare b <- out] `shouldBe` [block]
     [() | OMsg _ RoundChange {} <- out] `shouldBe` []
 
+  it "ignores the proposer's proposal for an older view, and changes round on one for a later view" $ do
+    let k = fromMaybe (error "leader key") $ lookup (_proposer ctx) [(Validator (fromPrivateKey x), x) | x <- keys]
+        proposalFor v = signed testChain k (Preprepare v block)
+        older = [proposalFor (View 20 17), proposalFor (View 19 18)]
+    -- genuine messages: they pass every signature check
+    mapM (accepted ctx) older `shouldReturn` [True, True]
+    out <- run ctx $ sendMessages older
+    [() | OMsg _ RoundChange {} <- out] `shouldBe` []
+    later <- run ctx $ sendMessages [proposalFor (View 20 19)]
+    [_round v | OMsg _ (RoundChange v _) <- later] `shouldBe` [21]
+
   it "rejects a committed block whose body is not the header's, and still takes the real one" $ do
     let sealedBlk = addCommitmentSeals (map seal [k1, k2, k3]) block
         altered = sealedBlk {blockBlockUncles = [blockBlockData block]}
