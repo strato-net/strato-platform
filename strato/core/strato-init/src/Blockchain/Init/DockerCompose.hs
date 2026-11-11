@@ -255,7 +255,7 @@ generateDockerCompose role = do
         }
 
   let postgres = def
-        { image = "postgres:14.18"
+        { image = imageRef "postgres" hashPostgres
         , shm_size = Just "1g"
         , user = Just userGid
         , environment = Just $ Map.fromList
