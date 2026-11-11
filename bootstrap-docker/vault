@@ -217,7 +217,7 @@ sed -e '/#TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT/d' \
 ${docker_compose} -f docker-compose-vault-temp.yml up -d --remove-orphans
 published=$(${docker_compose} -f docker-compose-vault-temp.yml port nginx "$container_port")
 while IFS= read -r binding; do
-  if [[ $binding != '[::]:'* ]]; then
+  if [[ $binding != '[::]:'* && $binding != ':::'* ]]; then
     published=$binding
     break
   fi
@@ -231,7 +231,8 @@ main_host=${published%:*}
 main_port=${published##*:}
 case "$main_host" in
   0.0.0.0) main_host=127.0.0.1 ;;
-  '[::]') main_host='[::1]' ;;
+  '[::]'|'::') main_host='[::1]' ;;
+  *:*) [[ $main_host == \[*\] ]] || main_host="[$main_host]" ;;
 esac
 # Wait until the vault is reachable. /_ping returns 200 when the password is
 # already set (e.g. via vaultPasswordFile) and 503 when it is awaiting password
