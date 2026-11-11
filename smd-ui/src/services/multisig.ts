@@ -591,6 +591,38 @@ export interface OpenIssue {
   transactionHash?: string;
 }
 
+export interface ResolvedIssueAction {
+  /** Wallet whose balance and allowances are used by the final action. */
+  ownerAddress: string;
+  target: string;
+  func: string;
+  args: string[];
+}
+
+/**
+ * Resolve a possibly nested vote to the protocol action it will ultimately run.
+ * Each castVoteOnIssue target is the wallet executing the next inner issue, while
+ * its first two variadic arguments identify that issue's target and function.
+ */
+export function unwrapNestedIssueAction(
+  issue: Pick<OpenIssue, "target" | "func" | "args">,
+  ownerAddress: string
+): ResolvedIssueAction {
+  let owner = strip0x(ownerAddress);
+  let target = strip0x(issue.target);
+  let func = issue.func;
+  let args = [...issue.args];
+
+  while (func === "castVoteOnIssue" && args.length >= 2) {
+    owner = target;
+    target = strip0x(args[0] ?? "");
+    func = args[1] ?? "";
+    args = args.slice(2);
+  }
+
+  return { ownerAddress: owner, target, func, args };
+}
+
 export interface QueuedWindow {
   executableAt: number;
   expiresAt: number;

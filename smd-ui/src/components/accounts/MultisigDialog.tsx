@@ -81,6 +81,7 @@ import {
   MAX_TIMELOCK_DELAY,
   buildProtocolWorkflowCalls,
   typedProgrammaticIssueArgs,
+  unwrapNestedIssueAction,
   type ProtocolActionKind,
   type OpenIssue,
 } from "@/services/multisig";
@@ -1129,45 +1130,46 @@ function issueAllowanceRequirements(
   cdp?: CDPMetadata,
   pools: PoolMetadata[] = []
 ): TokenAllowanceRequirement[] {
+  const action = unwrapNestedIssueAction(issue, ownerAddress);
   const requirement = (tokenAddress: string, spenderAddress: string, amount: string) => ({
     issueId: issue.issueId,
     tokenAddress: strip0x(tokenAddress),
-    ownerAddress: strip0x(ownerAddress),
+    ownerAddress: action.ownerAddress,
     spenderAddress: strip0x(spenderAddress),
     amount: String(amount),
   });
   const validAmount = (value: string) => /^\d+$/.test(value) && BigInt(value) > 0n;
 
-  if (issue.func === "stake" && staking && eq(issue.target, staking.stakingAddress)) {
-    const amount = issue.args[1] ?? "0";
-    return validAmount(amount) ? [requirement(staking.stratoTokenAddress, issue.target, amount)] : [];
+  if (action.func === "stake" && staking && eq(action.target, staking.stakingAddress)) {
+    const amount = action.args[1] ?? "0";
+    return validAmount(amount) ? [requirement(staking.stratoTokenAddress, action.target, amount)] : [];
   }
-  if (issue.func === "deposit" && cdp && eq(issue.target, cdp.engineAddress)) {
-    const amount = issue.args[1] ?? "0";
-    return validAmount(amount) ? [requirement(issue.args[0] ?? "", cdp.vaultAddress, amount)] : [];
+  if (action.func === "deposit" && cdp && eq(action.target, cdp.engineAddress)) {
+    const amount = action.args[1] ?? "0";
+    return validAmount(amount) ? [requirement(action.args[0] ?? "", cdp.vaultAddress, amount)] : [];
   }
 
-  const pool = pools.find((item) => eq(item.address, issue.target));
+  const pool = pools.find((item) => eq(item.address, action.target));
   if (!pool) return [];
-  if (issue.func === "addLiquidity") {
-    const tokenBAmount = issue.args[0] ?? "0";
-    const tokenAAmount = issue.args[1] ?? "0";
+  if (action.func === "addLiquidity") {
+    const tokenBAmount = action.args[0] ?? "0";
+    const tokenAAmount = action.args[1] ?? "0";
     return [
-      ...(validAmount(tokenAAmount) ? [requirement(pool.tokenA.address, issue.target, tokenAAmount)] : []),
-      ...(validAmount(tokenBAmount) ? [requirement(pool.tokenB.address, issue.target, tokenBAmount)] : []),
+      ...(validAmount(tokenAAmount) ? [requirement(pool.tokenA.address, action.target, tokenAAmount)] : []),
+      ...(validAmount(tokenBAmount) ? [requirement(pool.tokenB.address, action.target, tokenBAmount)] : []),
     ];
   }
-  if (issue.func === "addLiquiditySingleToken") {
-    const amount = issue.args[1] ?? "0";
-    const token = parseVariadicBoolean(issue.args[0]) === true ? pool.tokenA : pool.tokenB;
-    return validAmount(amount) ? [requirement(token.address, issue.target, amount)] : [];
+  if (action.func === "addLiquiditySingleToken") {
+    const amount = action.args[1] ?? "0";
+    const token = parseVariadicBoolean(action.args[0]) === true ? pool.tokenA : pool.tokenB;
+    return validAmount(amount) ? [requirement(token.address, action.target, amount)] : [];
   }
-  if (issue.func === "addLiquidityGeneral" && pool.coins?.length) {
-    const parsed = parseArgText(issue.args[0] ?? "[]");
+  if (action.func === "addLiquidityGeneral" && pool.coins?.length) {
+    const parsed = parseArgText(action.args[0] ?? "[]");
     const amounts = Array.isArray(parsed) ? parsed.map(String) : [];
     return pool.coins.flatMap((coin, index) => {
       const amount = amounts[index] ?? "0";
-      return validAmount(amount) ? [requirement(coin.address, issue.target, amount)] : [];
+      return validAmount(amount) ? [requirement(coin.address, action.target, amount)] : [];
     });
   }
   return [];
@@ -1199,12 +1201,13 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
   const allowanceChecks = useTokenAllowanceRequirements(allowanceRequirements);
   const blockedActionIssues = new Set([
     ...allowanceChecks.filter((check) => !check.ready).map((check) => check.issueId),
-    ...issues.filter((issue) =>
-      (issue.func === "stake" && !stakingMetadata.data) ||
-      (issue.func === "deposit" && !cdpMetadata.data) ||
-      (["addLiquidity", "addLiquiditySingleToken", "addLiquidityGeneral"].includes(issue.func) &&
-        !poolMetadata.data)
-    ).map((issue) => issue.issueId),
+    ...issues.filter((issue) => {
+      const action = unwrapNestedIssueAction(issue, wallet.address);
+      return (action.func === "stake" && stakingMetadata.isLoading) ||
+        (action.func === "deposit" && cdpMetadata.isLoading) ||
+        (["addLiquidity", "addLiquiditySingleToken", "addLiquidityGeneral"].includes(action.func) &&
+          poolMetadata.isLoading);
+    }).map((issue) => issue.issueId),
   ]);
   const nested = fullRoute.length > 1;
   const routeAddrs = fullRoute.map((w) => w.address);
@@ -1326,6 +1329,13 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
     setBusy(`${issue.issueId}:withdraw`);
     try {
       await withdrawVote({ ...issue, args: await typedIssueArgs(issue.target, issue.func, issue.args) });
+      queryClient.setQueryData<OpenIssue[]>(["multisig-open-issues", wallet.address], (cached = []) =>
+        cached.flatMap((current) => {
+          if (current.issueId !== issue.issueId) return [current];
+          const voters = current.voters.filter((voter) => !eq(voter, me));
+          return voters.length ? [{ ...current, voters }] : [];
+        })
+      );
       toast.success("Vote withdrawn");
       invalidate();
     } catch (err: any) {
@@ -2241,9 +2251,11 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
   const isLiquidityAction = action === "addLiquidity" || action === "removeLiquidity";
   const isPoolAction = !!action && !isStakingAction && !isCDPAction;
   const availablePools = useMemo(() => (poolMetadata.data ?? []).filter((pool) =>
-    !pool.isPaused && !pool.isDisabled &&
+    !pool.isDisabled &&
+    (!pool.isPaused || (action === "removeLiquidity" &&
+      (liquidityVersion !== "stable" || !pool.coins?.length || stableRemoveMode === "balanced"))) &&
     (liquidityVersion === "stable" ? pool.isStable : !pool.isStable)
-  ), [poolMetadata.data, liquidityVersion]);
+  ), [poolMetadata.data, liquidityVersion, action, stableRemoveMode]);
   const selectedPool = availablePools.find((pool) => eq(pool.address, target));
   const selectedIsMultiTokenStable = liquidityVersion === "stable" &&
     (manualAddresses || !!selectedPool?.coins?.length);
@@ -2615,7 +2627,9 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
             <Select value={validator} onValueChange={setValidator}>
               <SelectTrigger><SelectValue placeholder={stakingMetadata.isLoading ? "Loading validators…" : "Select a validator"} /></SelectTrigger>
               <SelectContent>
-                {(stakingMetadata.data?.validators ?? []).filter((item) => item.active && validContractAddress(item.address)).map((item) => (
+                {(stakingMetadata.data?.validators ?? []).filter((item) =>
+                  (action === "unstake" || item.active) && validContractAddress(item.address)
+                ).map((item) => (
                   <SelectItem key={item.address} value={item.address}>
                     {item.name || shortenHex(item.address, 6, 4)}{item.estimatedApy ? ` · ${item.estimatedApy}% APY` : ""}
                   </SelectItem>

@@ -159,7 +159,10 @@ export function useDeployedPositions(ownerAddress?: string | null) {
     refetchInterval: 15_000,
     queryFn: async (): Promise<DeployedPositions> => {
       const [vaultResult, stakingResult] = await Promise.allSettled([
-        api.get(`/api/cdp/vaults?address=${owner}`, { skipErrorToast: true }),
+        api.get(`/api/cdp/vaults?address=${owner}`, {
+          skipErrorToast: true,
+          headers: { "X-Wallet-Address": owner },
+        }),
         api.get(`/api/staking/info?address=${owner}`, { skipErrorToast: true }),
       ]);
       if (vaultResult.status === "rejected" && stakingResult.status === "rejected") {

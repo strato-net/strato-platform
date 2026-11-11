@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { applyConfirmedVote, buildNestedCastVotePayload, buildOpenIssues, buildProtocolActionCall, buildProtocolWorkflowCalls, mergeIndexedIssues, MULTISIG_SOURCE, normalizeArgs, typedProgrammaticIssueArgs, votesNeeded } from "./multisig";
+import { applyConfirmedVote, buildNestedCastVotePayload, buildOpenIssues, buildProtocolActionCall, buildProtocolWorkflowCalls, mergeIndexedIssues, MULTISIG_SOURCE, normalizeArgs, typedProgrammaticIssueArgs, unwrapNestedIssueAction, votesNeeded } from "./multisig";
 import { formatVariadicArg, parseArgText, parseVariadicBoolean, typedVariadicArg } from "../lib/args";
 import { pollResults } from "../lib/walletTx";
 import { api } from "../lib/api";
@@ -39,6 +39,24 @@ test("nested voting preserves the same typed swap arguments", () => {
     wallet,
     "bool(false)",
   ]);
+});
+
+test("nested issue unwrapping resolves the final action and executing wallet", () => {
+  const outerWallet = "1111111111111111111111111111111111111111";
+  const middleWallet = "2222222222222222222222222222222222222222";
+  const finalWallet = "3333333333333333333333333333333333333333";
+  const staking = "4444444444444444444444444444444444444444";
+
+  assert.deepEqual(unwrapNestedIssueAction({
+    target: middleWallet,
+    func: "castVoteOnIssue",
+    args: [finalWallet, "castVoteOnIssue", staking, "stake", signer, "1000000000000000000"],
+  }, outerWallet), {
+    ownerAddress: finalWallet,
+    target: staking,
+    func: "stake",
+    args: [signer, "1000000000000000000"],
+  });
 });
 
 test("programmatic nested signer nomination preserves all-digit addresses", () => {
@@ -255,6 +273,8 @@ test("plain boolean form input and the explicit cast produce the same typed argu
   assert.equal(parseVariadicBoolean("bool(true)"), true);
   assert.equal(parseVariadicBoolean("false"), false);
   assert.equal(parseVariadicBoolean("bool(false)"), false);
+  assert.deepEqual(typedVariadicArg("bool", "bool(true)"), { type: "bool", value: true });
+  assert.deepEqual(typedVariadicArg("bool", "bool(false)"), { type: "bool", value: false });
   assert.equal(parseVariadicBoolean("not-a-bool"), null);
 });
 

@@ -77,7 +77,9 @@ export function typedVariadicArg(
     ? raw
     : isAddress
       ? (resolvedAddress || raw).trim().replace(/^0x/i, "")
-      : parseArgText(raw);
+      : lowerType === "bool"
+        ? (parseVariadicBoolean(raw) ?? parseArgText(raw))
+        : parseArgText(raw);
   return { type: normalizedType, value };
 }
 

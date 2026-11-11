@@ -74,7 +74,7 @@ export function useTokenAllowance(
       const { data } = await api.get(
         `${env.CIRRUS_URL}/mapping?collection_name=eq._allowances` +
           `&address=eq.${token}&key-%3E%3Ekey=eq.${owner}` +
-          `&key-%3E%3Ekey2=eq.${spender}&select=value&limit=1`
+          `&key-%3E%3Ekey2=eq.${spender}&select=value::text&limit=1`
       );
       return String(Array.isArray(data) ? data[0]?.value ?? "0" : "0");
     },
@@ -100,7 +100,7 @@ export function useTokenAllowances(
         const { data } = await api.get(
           `${env.CIRRUS_URL}/mapping?collection_name=eq._allowances` +
             `&address=eq.${token}&key-%3E%3Ekey=eq.${owner}` +
-            `&key-%3E%3Ekey2=eq.${spender}&select=value&limit=1`
+            `&key-%3E%3Ekey2=eq.${spender}&select=value::text&limit=1`
         );
         return String(Array.isArray(data) ? data[0]?.value ?? "0" : "0");
       }));
@@ -134,7 +134,7 @@ export function useTokenAllowanceRequirements(requirements: TokenAllowanceRequir
         const { data } = await api.get(
           `${env.CIRRUS_URL}/mapping?collection_name=eq._allowances` +
             `&address=eq.${token}&key-%3E%3Ekey=eq.${owner}` +
-            `&key-%3E%3Ekey2=eq.${spender}&select=value&limit=1`
+            `&key-%3E%3Ekey2=eq.${spender}&select=value::text&limit=1`
         );
         return String(Array.isArray(data) ? data[0]?.value ?? "0" : "0");
       },
