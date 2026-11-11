@@ -2,7 +2,6 @@
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Init.Generator (
   createGenesisInfo,
@@ -17,7 +16,7 @@ import Blockchain.Init.DockerCompose
 import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer, flags_disableSqlIndexing, flags_disableCirrusIndexing, flags_syncFromFile)
+import Blockchain.Init.Options (flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_pguser, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer, flags_disableSqlIndexing, flags_disableCirrusIndexing, flags_syncFromFile)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -30,7 +29,6 @@ import Control.Monad.Change.Alter ()
 import Control.Monad.Composable.Base (runEff, withNoLogger, withResources)
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy as BL
-import Data.FileEmbed (embedFile)
 import Data.Maybe
 import qualified Data.Yaml as YAML
 import System.Environment (lookupEnv)
@@ -100,7 +98,7 @@ createCommandsFile role = do
       -- loopback (postgres publishes on 127.0.0.1 only, but "localhost"
       -- resolves to ::1 first on macOS), in a container the service name. See
       -- storeHost.
-      return [restartable $ "blockapps-vault-wrapper-server --pghost " ++ storeHost "postgres" flags_pghost ++ " --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
+      return [restartable $ "blockapps-vault-wrapper-server --pghost " ++ storeHost "postgres" flags_pghost ++ " --pguser " ++ flags_pguser ++ " --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
     else return []
 
   coreCommands <- if not (roleRunsCore role) then return [] else do
@@ -256,15 +254,6 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     liftIO $ mapM_ (createDirectoryIfMissing True) $
       ["logs", "secrets", ".ethereumH"]
         ++ (if roleRunsCore role then coreDirs else [])
-
-    when (roleRunsCore role && flags_pghost `elem` ["localhost", "127.0.0.1"]) $ liftIO $ do
-      createDirectoryIfMissing True ("config" </> "postgres")
-      forM_ [ ("init-permissions.sql", $(embedFile "config/postgres/init-permissions.sql"))
-            , ("pg_hba.conf", $(embedFile "config/postgres/pg_hba.conf"))
-            ] $ \(name, contents) -> do
-        let path = "config" </> "postgres" </> name
-        BS.writeFile path contents
-        setFileMode path 0o644
 
     -- Make logs directory world-writable for containers running as non-root users (e.g. prometheus)
     liftIO $ setFileMode "logs" (ownerModes .|. groupModes .|. otherModes)

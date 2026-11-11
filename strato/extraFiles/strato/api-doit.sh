@@ -3,21 +3,19 @@
 # ethereum-jsonrpc from the strato image, with nginx as a sidecar container.
 #
 # Config: a node's ethconf.yaml mounted at /config/ethconf.yaml supplies the
-# network parameters (chain id, gas limit, vault URL, ...). The endpoints the
-# API tier must reach are overridden from the environment below, and the
-# result is written to $STRATO_API_DIR/ethconf.yaml and pointed at through
-# STRATO_CONF, so nothing here depends on the working-directory convention.
+# network and database parameters. Service endpoints can be overridden from
+# the environment below. The result is written to $STRATO_API_DIR/ethconf.yaml
+# and pointed at through STRATO_CONF, so nothing here depends on the
+# working-directory convention.
 #
 # Environment (all optional unless noted):
-#   postgres_host, postgres_port, postgres_user   writer endpoint (host required)
-#   postgres_reader_host                          replica endpoint for reads
 #   ETHCONF_BASE64                                the node config, when not mounted
 #   INGRESS_URLS (required)                       the core cells' transaction ingress
 #                                                 (strato-ingest), comma-separated;
 #                                                 a batch is posted to every one
 #   VM_QUERY (default true), VM_QUERY_URLS        this copy's vm-query, and other
 #                                                 copies' to try when it is down
-#   postgres_password | /run/secrets/postgres_password
+#   /run/secrets/postgres_password                optional database password file
 #   VAULT_URL                                     vault-wrapper base URL
 #   OAUTH_CREDENTIALS_YAML | /run/secrets/oauth_credentials.yaml
 #     | OAUTH_DISCOVERY_URL + OAUTH_CLIENT_ID + OAUTH_CLIENT_SECRET
@@ -51,10 +49,6 @@ cd "$STRATO_API_DIR"
 CONF="$STRATO_API_DIR/ethconf.yaml"
 cp "$ETHCONF_FILE" "$CONF"
 
-if [[ -z "${postgres_password:-}" && -f /run/secrets/postgres_password ]]; then
-  postgres_password=$(tr -d '[:space:]' < /run/secrets/postgres_password)
-fi
-
 # Endpoint overrides. Anything unset keeps the mounted config's value.
 override() {
   local path=$1 value=$2
@@ -63,19 +57,14 @@ override() {
   [[ -n "$value" ]] && OVERRIDE_VALUE="$value" yq -i "$path = strenv(OVERRIDE_VALUE)" "$CONF"
   return 0
 }
-override_num() {
-  local path=$1 value=$2
-  [[ -n "$value" ]] && yq -i "$path = $value" "$CONF"
-  return 0
-}
-override     '.sqlConfig.host'                 "${postgres_host:-}"
-override     '.cirrusConfig.host'              "${postgres_reader_host:-${postgres_host:-}}"
-override_num '.sqlConfig.port'                 "${postgres_port:-}"
-override_num '.cirrusConfig.port'              "${postgres_port:-}"
-override     '.sqlConfig.user'                 "${postgres_user:-}"
-override     '.cirrusConfig.user'              "${postgres_user:-}"
-override     '.sqlConfig.password'             "${postgres_password:-}"
-override     '.cirrusConfig.password'          "${postgres_password:-}"
+if [[ -f /run/secrets/postgres_password ]]; then
+  postgres_password=$(tr -d '[:space:]' < /run/secrets/postgres_password)
+  override '.sqlConfig.password' "$postgres_password"
+  override '.cirrusConfig.password' "$postgres_password"
+  if [[ "$(yq '.sqlReaderConfig != null' "$CONF")" == "true" ]]; then
+    override '.sqlReaderConfig.password' "$postgres_password"
+  fi
+fi
 override     '.urlConfig.vaultUrl'             "${VAULT_URL:-}"
 # Submitted transactions go to every core cell's ingress (strato-ingest);
 # this tier runs no sequencer and never writes a stream of its own.
@@ -84,12 +73,6 @@ if [[ -z "${INGRESS_URLS:-}" ]]; then
   exit 8
 fi
 INGRESS_LIST="$INGRESS_URLS" yq -i '.ingressUrls = (strenv(INGRESS_LIST) | split(",") | map(trim) | map(select(. != "")))' "$CONF"
-# General eth reads go to the replica endpoint; writes and the resolve poll
-# stay on the writer (see Blockchain.DB.SQLDB).
-if [[ -n "${postgres_reader_host:-}" ]]; then
-  yq -i '.sqlReaderConfig = .sqlConfig' "$CONF"
-  override   '.sqlReaderConfig.host'           "$postgres_reader_host"
-fi
 override     '.apiConfig.apiListenAddress'     "$API_LISTEN_ADDRESS"
 # ethereum-jsonrpc binds apiListenAddress as well, and bloc reaches it in this
 # same container on loopback for simulations (strato-api derives the URL).

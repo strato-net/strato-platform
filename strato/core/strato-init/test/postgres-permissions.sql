@@ -16,6 +16,12 @@ CREATE VIEW strato_permission_test.entry_view AS SELECT * FROM strato_permission
 DO $$
 DECLARE statement text;
 BEGIN
+  IF current_user <> 'strato'
+     OR EXISTS (SELECT 1 FROM pg_roles WHERE rolcanlogin AND rolname <> 'strato')
+     OR EXISTS (SELECT 1 FROM pg_roles WHERE rolsuper AND (rolcanlogin OR rolname <> 'strato_admin'))
+     OR pg_has_role(current_user, 'strato_admin', 'MEMBER') THEN
+    RAISE EXCEPTION 'Unexpected application or bootstrap role privileges';
+  END IF;
   IF (SELECT value FROM strato_permission_test.entry_view) <> 2 THEN
     RAISE EXCEPTION 'Normal indexing operations failed';
   END IF;
@@ -31,6 +37,8 @@ BEGIN
     format('GRANT pg_execute_server_program TO %I', current_user),
     format('GRANT pg_read_server_files TO %I', current_user),
     format('GRANT pg_write_server_files TO %I', current_user),
+    'ALTER ROLE strato_admin LOGIN',
+    format('GRANT strato_admin TO %I', current_user),
     'SET ROLE strato_admin'
   ] LOOP
     BEGIN

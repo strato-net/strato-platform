@@ -2,7 +2,7 @@
 # STRATO API tier: strato-api + ethereum-jsonrpc (+ vm-query) behind an nginx
 # sidecar, with PostgREST for Cirrus. Stateless; run as many copies as needed
 # behind a load balancer. Everything it needs is reached over the network:
-#   Postgres (eth + cirrus)   postgres_host / postgres_password
+#   Postgres (eth + cirrus)   sqlConfig / cirrusConfig in ethconf.yaml
 #   core cells (tx submission) INGRESS_URLS: every cell's strato-ingest
 #   vault                     VAULT_URL
 # Reads are served from the SQL mirror by vm-query: this copy's own
@@ -16,10 +16,6 @@ services:
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>-<HASH_STRATO>}
     entrypoint: ["/strato/api-doit.sh"]
     environment:
-      - postgres_host=${postgres_host:?postgres_host is required}
-      - postgres_port=${postgres_port:-5432}
-      - postgres_user=${postgres_user:-postgres}
-      - postgres_password=${postgres_password:-}
       # Comma-separated; a submitted batch is posted to every cell.
       - INGRESS_URLS=${INGRESS_URLS:?INGRESS_URLS is required (http://<cell>:8600, comma-separated)}
       - VM_QUERY=${VM_QUERY:-true}
@@ -46,16 +42,13 @@ services:
   postgrest:
     image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>-<HASH_POSTGREST>}
     environment:
-      - PG_ENV_POSTGRES_DB=cirrus
-      # A read replica endpoint serves PostgREST fine; defaults to the writer.
-      - PG_ENV_POSTGRES_HOST=${postgres_reader_host:-${postgres_host}}
-      - PG_ENV_POSTGRES_USER=${postgres_user:-postgres}
-      - PG_PORT_5432_TCP_PORT=${postgres_port:-5432}
+      - ETHCONF_FILE=/config/ethconf.yaml
       - POSTGREST_LOG_LEVEL=error
       # On a replica the writer's schema-reload NOTIFY never arrives; the
       # entrypoint polls the schema and reloads on change (0 disables).
       - POSTGREST_SCHEMA_RELOAD_SECONDS=${POSTGREST_SCHEMA_RELOAD_SECONDS:-30}
     volumes:
+      - ./config/ethconf.yaml:/config/ethconf.yaml:ro
       - ./secrets/postgres_password:/run/secrets/postgres_password:ro
     restart: unless-stopped
     logging:

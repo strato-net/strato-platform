@@ -35,7 +35,7 @@ main = do
         ConnectInfo
           { connectHost = "postgres",
             connectPort = 5432,
-            connectUser = "postgres",
+            connectUser = flags_pguser,
             connectPassword = "api",
             connectDatabase = "oauth"
           }
