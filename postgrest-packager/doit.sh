@@ -8,11 +8,16 @@ set -e
 if [ -n "${ETHCONF_FILE:-}" ]; then
   PG_ENV_POSTGRES_HOST=$(yq -er '.cirrusConfig.host' "$ETHCONF_FILE")
   PG_PORT_5432_TCP_PORT=$(yq -er '.cirrusConfig.port' "$ETHCONF_FILE")
-  PG_ENV_POSTGRES_USER=$(yq -er '.cirrusConfig.user' "$ETHCONF_FILE")
+  PG_ENV_POSTGRES_USER=$(yq -er '.cirrusConfig.user | select(type == "string" and length > 0)' "$ETHCONF_FILE") || {
+    echo "ERROR: $ETHCONF_FILE must define a non-empty string for cirrusConfig.user" >&2
+    exit 1
+  }
   PG_ENV_POSTGRES_DB=$(yq -er '.cirrusConfig.database' "$ETHCONF_FILE")
   PG_ENV_POSTGRES_PASSWORD=$(yq -r '.cirrusConfig.password // ""' "$ETHCONF_FILE")
   POSTGREST_ANONYMOUS=$PG_ENV_POSTGRES_USER
 fi
+
+: "${PG_ENV_POSTGRES_USER:?A PostgreSQL username is required in ETHCONF_FILE or PG_ENV_POSTGRES_USER}"
 
 # Read postgres password from mounted secrets file
 if [ -f /run/secrets/postgres_password ]; then
@@ -22,7 +27,7 @@ export PGPASSWORD="${PG_ENV_POSTGRES_PASSWORD:-}"
 
 echo "the pg host and port are: ${PG_ENV_POSTGRES_HOST} ${PG_PORT_5432_TCP_PORT}"
 
-until psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER:-postgres}" -d postgres -c '\q'; do
+until psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" -d postgres -c '\q'; do
   >&2 echo "Postgres is unavailable - sleeping"
   sleep 1
 done
@@ -57,7 +62,7 @@ FINGERPRINT_SQL="select md5(coalesce(string_agg(x, ',' order by x), '')) from (
 ) s"
 
 schema_fingerprint() {
-  psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER:-postgres}" \
+  psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" \
        -d "${PG_ENV_POSTGRES_DB}" -Atq -c "$FINGERPRINT_SQL" 2>/dev/null || true
 }
 

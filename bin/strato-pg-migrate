@@ -56,7 +56,9 @@ import re
 text = open(".ethereumH/ethconf.yaml").read()
 match = re.search(r"^sqlConfig:(.*?)(?=^\S|\Z)", text, re.S | re.M)
 user = re.search(r"user:\s*['\"]?([^'\",}\s]+)", match.group(1) if match else "")
-print(user.group(1) if user else "postgres")
+if user is None:
+    raise SystemExit("ethconf.yaml must define sqlConfig.user")
+print(user.group(1))
 PYUSER
 )
 PG_USER=${PG_USER:-$LOCAL_PG_USER}

@@ -132,10 +132,11 @@ block = m.group(1) if m else ""
 host = re.search(r"host:\s*['\"]?([^'\",}\s]+)", block)
 port = re.search(r"port:\s*['\"]?([0-9]+)", block)
 user = re.search(r"user:\s*['\"]?([^'\",}\s]+)", block)
-print((host.group(1) if host else "localhost"), (port.group(1) if port else "5432"), (user.group(1) if user else "postgres"))
+if not all((host, port, user)):
+    raise SystemExit("ethconf.yaml must define sqlConfig.host, sqlConfig.port and sqlConfig.user")
+print(host.group(1), port.group(1), user.group(1))
 PY
 )
-PG_HOST="${PG_HOST:-localhost}"; PG_PORT="${PG_PORT:-5432}"
 if "${COMPOSE[@]}" config --services 2>/dev/null | grep -qx "postgres"; then
   PG_MODE=container
   for _ in $(seq 1 90); do
