@@ -7,7 +7,7 @@ if [ ! -f docker-compose.vault.yml ]; then
 fi
 
 umask 077
-printf '%s\n' 'postgres:5432:*:postgres:api' > vault.pgpass
+printf '%s\n' 'postgres:5432:*:strato:api' > vault.pgpass
 chmod 600 vault.pgpass
 
 sudo \
