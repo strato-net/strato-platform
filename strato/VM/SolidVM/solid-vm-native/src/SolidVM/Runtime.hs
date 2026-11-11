@@ -40,7 +40,7 @@ getCodeAndCollection :: Address -> SM (CC.Contract, Keccak256, CC.CodeCollection
 getCodeAndCollection = getCodeAndCollectionWithTypeCheck False
 
 {-# NOINLINE compilationCache #-}
-compilationCache :: IORef (LRU.LRU (Keccak256, Bool, T.Text) (Either T.Text N.CompiledContract))
+compilationCache :: IORef (LRU.LRU (Keccak256, Bool, T.Text) (Either SolidException N.CompiledContract))
 compilationCache = unsafePerformIO $ newIORef $ LRU.newLRU (Just 128)
 
 -- Admit the whole contract before executing any entry. Cache failures as well.
@@ -51,17 +51,23 @@ compiledContract hsh cc contract = do
       duplicateArities f =
         let arities = map (length . CC._funcArgs) (f : CC._funcOverload f)
          in length arities /= M.size (M.fromList [(a, ()) | a <- arities])
+      context = T.unpack $ contract ^. CC.contractName
+      compilationFailure errors =
+        let details = T.unpack $ T.intercalate "; " $ map (N.showErr . snd) errors
+         in if any ((== N.Internal) . N.eKind . snd) errors then InternalError (context ++ ": " ++ details)
+            else if any ((== N.Unsupported) . N.eKind . snd) errors then UnsupportedFeature context details
+            else TypeError context details
   cached <- liftIO $ atomicModifyIORef' compilationCache $ \cache ->
     let (cache', found) = LRU.lookup key cache in (cache', found)
   result <- case cached of
     Just value -> pure value
     Nothing -> do
       let value = if any duplicateArities (M.elems (contract ^. CC.functions))
-            then Left "overloads with the same arity"
-            else either (Left . T.intercalate "; " . map (N.showErr . snd)) Right (N.compileContractChecked cc contract)
+            then Left $ InvalidArguments context "overloads with the same arity"
+            else either (Left . compilationFailure) Right (N.compileContractChecked cc contract)
       liftIO $ atomicModifyIORef' compilationCache $ \cache -> (LRU.insert key value cache, ())
       pure value
-  either (throwIO . N.NativeUnavailable . ((contract ^. CC.contractName <> ": ") <>)) pure result
+  either throwIO pure result
 
 compiledFunction :: Keccak256 -> CC.CodeCollection -> CC.Contract -> T.Text -> CC.Func -> SM N.Fun
 compiledFunction hsh cc contract name selected = do
@@ -70,7 +76,7 @@ compiledFunction hsh cc contract name selected = do
       key = entryName <> "/" <> T.pack (show (length (CC._funcArgs selected)))
   case M.lookup key (N.ccFuns compiled) of
     Just (Right fun) -> pure fun
-    _ -> throwIO $ N.NativeUnavailable ("compiled function unavailable: " <> key)
+    _ -> throwIO $ InternalError ("compiled function unavailable: " ++ T.unpack key)
 
 constructorStage :: Keccak256 -> CC.CodeCollection -> CC.Contract -> T.Text -> SM N.Fun
 constructorStage hsh cc contract stage = do
@@ -81,7 +87,7 @@ constructorStage hsh cc contract stage = do
         parent -> M.lookup parent (N.ccParentArguments compiled)
   case selected of
     Just (Right fun) -> pure fun
-    _ -> throwIO $ N.NativeUnavailable ("compiled constructor stage unavailable: " <> stage)
+    _ -> throwIO $ InternalError ("compiled constructor stage unavailable: " ++ T.unpack stage)
 
 runAction ::
   CC.CodeCollection -> CC.Contract -> T.Text -> N.Fun -> ValList -> SM (Maybe Value)
@@ -190,7 +196,7 @@ copyStorage destination source = setVar (Constant $ SReference destination) =<< 
 emitContractEvent :: T.Text -> T.Text -> [(T.Text, N.Dyn)] -> SM ()
 emitContractEvent contractName event fields = do
   (_, collection) <- getCurrentCodeCollection
-  contract <- maybe (missingType "event contract" contractName) pure $ M.lookup contractName (collection ^. CC.contracts)
+  contract <- maybe (throwIO (MissingType "event contract" (T.unpack contractName))) pure $ M.lookup contractName (collection ^. CC.contracts)
   info <- getCurrentCallInfo
   let annotation = maybe (CC._contractContext contract) CC._funcContext $
         M.lookup (currentFunctionName info) (currentContract info ^. CC.functions)

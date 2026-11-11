@@ -5,7 +5,9 @@
 
 module Blockchain.SolidVM.Builtins.Signatures (RecoverHash, ecrecover, verifyP256, p256PublicKeyFromHex) where
 
-import Blockchain.VM.SolidException (invalidArguments)
+import Blockchain.VM.SolidException (SolidException (InvalidArguments))
+import Control.Exception (throw)
+import Text.Format (format)
 import qualified Data.ByteString as B
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as DT
@@ -53,7 +55,7 @@ ecrecover input v r s = fromMaybe 0 $ fromPublicKey <$> EC.recoverPub sig mesg
 
 verifyP256 :: Monad m => B.ByteString -> m (Either (Integer, Integer) B.ByteString) -> m (Integer, Integer) -> m Bool
 verifyP256 h publicKey signature = case digestFromByteString @SHA256 h of
-  Nothing -> invalidArguments "Could not decode hash from string" h
+  Nothing -> throw (InvalidArguments "Could not decode hash from string" (format h))
   Just digest -> do
     key <- publicKey
     pub <- case key of
@@ -62,18 +64,18 @@ verifyP256 h publicKey signature = case digestFromByteString @SHA256 h of
         pubBS <- case B.length pubBS' of
           65 -> pure $ B.drop 1 pubBS'
           64 -> pure pubBS'
-          _ -> invalidArguments "Could not decode public key from bytestring: invalid length" pubBS'
+          _ -> throw (InvalidArguments "Could not decode public key from bytestring: invalid length" (format pubBS'))
         case P256.pointFromBinary pubBS of
           CryptoPassed p -> pure p
-          CryptoFailed e -> invalidArguments "Could not decode public key from bytestring" (pubBS', e)
+          CryptoFailed e -> throw (InvalidArguments "Could not decode public key from bytestring" (format pubBS' ++ ": " ++ show e))
     (r,s) <- signature
     sig <- case signatureFromIntegers (Proxy @Curve_P256R1) (r, s) of
       CryptoPassed sig' -> pure sig'
-      CryptoFailed e -> invalidArguments "Invalid P256 signature" e
+      CryptoFailed e -> throw (InvalidArguments "Invalid P256 signature" (show e))
     let !isValidSig = verifyDigest (Proxy @Curve_P256R1) pub sig digest
     pure isValidSig
 
 p256PublicKeyFromHex :: String -> B.ByteString
 p256PublicKeyFromHex value = case B16.decode $ DT.encodeUtf8 $ T.pack value of
-  Left e -> invalidArguments "Could not decode public key from string: invalid hex" (value, e)
+  Left e -> throw (InvalidArguments "Could not decode public key from string: invalid hex" (value ++ ": " ++ e))
   Right bytes -> bytes

@@ -6,7 +6,7 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
-const { rest, util } = require('blockapps-rest');
+const { rest, util } = require('./strato');
 
 const REGISTRY = '000000000000000000000000000000000000100c';
 const GOVERNANCE = '0000000000000000000000000000000000000100';

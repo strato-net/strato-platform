@@ -3,6 +3,7 @@
 module SolidVM.Builtins where
 
 import Blockchain.SolidVM.SM (SM)
+import Text.Format (format)
 import Blockchain.Data.RLP
 import qualified Blockchain.SolidVM.Exception as E
 import Blockchain.Strato.Model.Address (Address (..))
@@ -30,13 +31,13 @@ flatten ds = case reverse ds of
   _ -> ds
 
 bad :: T.Text -> [Dyn] -> SM a
-bad name ds = liftIO $ throwIO $ E.InvalidArguments (T.unpack name) (show (map showDyn ds))
+bad name ds = liftIO $ throwIO $ E.InvalidArguments (T.unpack name) (format (map showDyn ds))
 
 missingUserCert :: SM a
 missingUserCert = liftIO $ throwIO $ E.UnknownVariable "not found" "getUserCert"
 
 invalidLowLevel :: [Dyn] -> SM a
-invalidLowLevel ds = liftIO $ throwIO $ E.TypeError "low-level call needs first argument to be a string" (show (map showDyn ds))
+invalidLowLevel ds = liftIO $ throwIO $ E.TypeError "low-level call needs first argument to be a string" (format (map showDyn ds))
 
 modular :: (Integer -> Integer -> Integer -> SM Integer) -> [Dyn] -> SM Dyn
 modular op ds = case flatten ds of
@@ -44,7 +45,7 @@ modular op ds = case flatten ds of
   xs -> bad "modular arithmetic expects three integers" xs
 
 invalidCast :: T.Text -> Ty a -> a -> SM b
-invalidCast name t value = liftIO $ throwIO $ E.InvalidArguments (T.unpack name) (show [formatValue t value])
+invalidCast name t value = liftIO $ throwIO $ E.InvalidArguments (T.unpack name) (format [formatValue t value])
 
 parseInteger :: T.Text -> Integer -> SM Integer
 parseInteger value base = MeteredCasts.int (value, base)

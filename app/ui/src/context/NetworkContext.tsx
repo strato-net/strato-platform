@@ -4,9 +4,18 @@ import { api } from '@/lib/axios';
 // Testnet network ID
 const TESTNET_NETWORK_ID = "114784819836269"; // Helium testnet
 
+export type StratoNetwork = 'helium' | 'upquark' | 'forktest';
+
+const NETWORK_NAMES: Record<string, StratoNetwork> = {
+  [TESTNET_NETWORK_ID]: 'helium',
+  "33056204878082667": 'upquark',
+  "7381244120123405172": 'forktest', // mainnet fork for rehearsals
+};
+
 interface NetworkContextType {
   networkId: string | null;
   isTestnet: boolean;
+  network: StratoNetwork | null;
   contactEnabled: boolean;
   loading: boolean;
 }
@@ -48,9 +57,10 @@ export const NetworkProvider = ({ children, initialNetworkId, initialContactEnab
   }, [initialNetworkId, initialContactEnabled]);
 
   const isTestnet = networkId === TESTNET_NETWORK_ID;
+  const network = (networkId && NETWORK_NAMES[networkId]) || null;
 
   return (
-    <NetworkContext.Provider value={{ networkId, isTestnet, contactEnabled, loading }}>
+    <NetworkContext.Provider value={{ networkId, isTestnet, network, contactEnabled, loading }}>
       {children}
     </NetworkContext.Provider>
   );

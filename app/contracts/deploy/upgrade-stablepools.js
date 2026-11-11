@@ -529,7 +529,7 @@ async function main() {
   // config.js reads NODE_URL at load time, so require it only after setting it.
   const config = require('./config');
   const auth = require('./auth');
-  const { rest, importer, util } = require('blockapps-rest');
+  const { rest, importer, util } = require('./strato');
 
   console.log(`\nNode:               ${config.nodes[0].url}`);
   console.log(`Authenticating as ${process.env.GLOBAL_ADMIN_NAME}...`);

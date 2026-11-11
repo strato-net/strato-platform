@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import Joi from "@hapi/joi";
+import Joi from "joi";
 import { sendMetalsInquiry } from "../services/contact.service";
 
 const metalsInquirySchema = Joi.object({

@@ -42,6 +42,7 @@ import { AddrLink } from "@/components/explorer/AddrLink";
 import { shortenHex } from "@/lib/utils";
 import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
+import { formatVariadicArg, parseArgText } from "@/lib/args";
 import { useMyTokens, type TokenBalance } from "@/services/tokens";
 import { useContractGroups, useContractInfo, functionArgs } from "@/services/contracts";
 import { useSimulation } from "@/components/simulation/useSimulation";
@@ -52,6 +53,7 @@ import {
   useAdminRegistryLogic,
   useIsMultisig,
   useSigners,
+  useVotingThresholds,
   useOpenIssues,
   useExecutedIssues,
   useMultisigActions,
@@ -736,7 +738,8 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
   const queryClient = useQueryClient();
   const { config } = useIsMultisig(wallet.address);
   const { data: signers = [] } = useSigners(wallet.address);
-  const { data: issues = [], isLoading } = useOpenIssues(wallet.address);
+  const { data: issues = [], isLoading, error: issuesError, refetch, isFetching } = useOpenIssues(wallet.address);
+  const { data: thresholds = {} } = useVotingThresholds(wallet.address);
   const tokenMeta = useTokenMeta(wallet.address);
   const nested = fullRoute.length > 1;
   const routeAddrs = fullRoute.map((w) => w.address);
@@ -759,7 +762,6 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
   // directly, otherwise the last multisig on the route before this wallet.
   const voterAddr = nested ? strip0x(fullRoute[fullRoute.length - 2].address) : me;
   const viaName = nested ? hopName(fullRoute[0]) : "";
-  const needed = votesNeeded(signers.length, config.defaultThresholdBps || 6000);
   const [busy, setBusy] = useState<string>("");
   const [proposing, setProposing] = useState(false);
 
@@ -847,6 +849,9 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="text-sm font-medium">Open issues</div>
+        <Button size="sm" variant="ghost" onClick={() => refetch()} disabled={isFetching}>
+          {isFetching ? "Refreshing…" : "Refresh"}
+        </Button>
         <Button
           size="sm"
           variant={proposing ? "secondary" : "outline"}
@@ -880,17 +885,27 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
         />
       ) : null}
 
+      {issuesError ? (
+        <p role="alert" className="text-sm text-destructive">
+          Could not load proposals: {issuesError.message}
+        </p>
+      ) : null}
+
       {isLoading ? (
         <p className="py-6 text-center text-sm text-muted-foreground">Loading issues…</p>
       ) : issues.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
-          No open issues. Proposals appear here for signers to vote on.
+          {issuesError ? "Use Refresh to try loading the proposals again." :
+            "No open issues. Proposals appear here for signers to vote on."}
         </p>
       ) : (
         <div className="space-y-3">
           {issues.map((issue) => {
         const label = labelForIssue(issue, tokenMeta, signers.length);
         const count = issue.voters.length;
+        const needed = votesNeeded(signers.length,
+          thresholds[`${issue.target}|${issue.func}`] || config.defaultThresholdBps || 6000);
+        const remaining = Math.max(0, needed - count);
         const iVoted = issue.voters.some((v) => eq(v, voterAddr));
         const pct = needed > 0 ? Math.min(100, (count / needed) * 100) : 0;
         // Mirrors the contract's dismissIssue gate: a single vote, cast by the caller.
@@ -961,9 +976,13 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
             <div className="mt-3">
               <Progress value={pct} className="h-1.5" />
               <div className="mt-1 text-xs text-muted-foreground">
-                {count} of {needed} vote{needed === 1 ? "" : "s"}
+                {count} of {needed} approvals · {needed} of {signers.length} signers required
+                {remaining > 0 ? ` · ${remaining} more approval${remaining === 1 ? "" : "s"} needed` : ""}
                 {nested && iVoted ? ` — includes ${hopName(fullRoute[fullRoute.length - 2])}` : ""}
               </div>
+              {issue.indexing ? (
+                <p className="mt-1 text-xs text-muted-foreground">Proposal confirmed; syncing the issue list.</p>
+              ) : null}
             </div>
             {simFor === issue.issueId ? (
               <div className="mt-3">
@@ -1070,10 +1089,12 @@ function ProposeIssueForm({
       return abiFuncArgs.map((a) => {
         const v = (abiArgs[a.name] ?? "").trim();
         if (isPlainAddressType(a.type)) return strip0x(abiArgAddrs[a.name] || v);
+        if (a.type === "bool") return formatVariadicArg(parseArgText(v));
         return /address/i.test(a.type) ? strip0x(v) : v;
       });
     }
-    return manualArgs.map((a) => a.trim()).filter((a) => a.length > 0);
+    return manualArgs.map((a) => a.trim()).filter((a) => a.length > 0)
+      .map((a) => formatVariadicArg(parseArgText(a)));
   };
 
   const reset = () => {

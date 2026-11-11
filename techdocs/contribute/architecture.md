@@ -19,7 +19,6 @@ How the `strato-platform` monorepo is organized and how its parts fit together a
 | `bin/` | Node lifecycle scripts: `strato-login`, `strato-up`, `strato-down`, `strato-ps`, `strato-snapshot`, `strato-patch-app`, `strato-user-add`, `strato-logrotate` |
 | `pipelines/` | Jenkins pipelines |
 | `scripts/` | Repository scripts, including the `pre-commit` hook |
-| `strato-vscode/` | VS Code extension |
 | `design-documents/`, `load-testing/` | Design notes and load tests |
 | `techdocs/` + `mkdocs.yml` | This documentation site |
 | `Makefile`, `install_deps.sh`, `Dockerfile.multi` | Build entry points |
@@ -213,7 +212,7 @@ These services are not part of the node's generated compose file. They are deplo
 |-----------|----------|---------------------|
 | Core node processes | Haskell | Stack |
 | Contract execution | Haskell | SolidVM |
-| Smart contracts | Solidity syntax (SolidVM dialect) | `solid-vm-cli` tests; Node.js deploy scripts (`blockapps-rest`, ethers) |
+| Smart contracts | Solidity syntax (SolidVM dialect) | `solid-vm-cli` tests; Node.js deploy scripts (Axios REST helpers, ethers) |
 | Edge proxy | Lua | OpenResty, lua-resty-openidc |
 | App backend | TypeScript | Node.js 22, Express 5 |
 | App UI | TypeScript | React 18, Vite, Tailwind/shadcn-ui, wagmi/viem |

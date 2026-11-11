@@ -137,6 +137,31 @@ contract Describe_PoolV3 is Authorizable {
 
     // ============ HELPERS ============
 
+    function it_preserves_pool_state_and_gas_restriction_across_a_proxy_upgrade() {
+        _mintRange(-6000, 6000, 1e20);
+        address router = address(new User());
+        pool.setGasSwapRouter(router);
+        uint price = pool.sqrtPriceX96();
+        uint activeLiquidity = pool.liquidity();
+        uint balance0 = pool.token0Balance();
+        uint balance1 = pool.token1Balance();
+        Proxy(poolAddress).setLogicContract(address(new PoolV3(address(this))));
+        require(pool.gasSwapRouter() == router, "router lost on upgrade");
+        require(pool.sqrtPriceX96() == price && pool.liquidity() == activeLiquidity, "price or liquidity changed");
+        require(pool.token0Balance() == balance0 && pool.token1Balance() == balance1, "reserves changed");
+        (uint positionLiquidity, , ) = pool.getPosition(address(this), -6000, 6000);
+        require(positionLiquidity == 1e20, "LP position changed");
+    }
+
+    function it_gas_restrictions_are_per_pool_and_can_only_be_cleared_by_the_owner() {
+        _mintRange(-6000, 6000, 1e20);
+        address other = factory.createPoolV3(token0Address, token1Address, 500, Q96);
+        pool.setGasSwapRouter(address(new User()));
+        require(PoolV3(other).gasSwapRouter() == address(0), "another pool was restricted");
+        pool.setGasSwapRouter(address(0));
+        require(_swap(true, 1e16) > 0, "owner could not restore ordinary trading");
+    }
+
     function _approveBoth(uint amount0, uint amount1) internal {
         require(ERC20(token0Address).approve(address(pool), amount0), "Token0 approval failed");
         require(ERC20(token1Address).approve(address(pool), amount1), "Token1 approval failed");
@@ -1030,6 +1055,23 @@ contract Describe_PoolV3 is Authorizable {
     }
 
     // ============ EXACT-OUTPUT SWAP TESTS (canonical amountSpecified < 0) ============
+
+    function _checkGasQuoteAcrossTicks(bool zeroForOne) internal {
+        _mintRange(-6000, 6000, 100000e18);
+        _mintRange(-60, 60, 100000e18);
+        uint beforePrice = pool.sqrtPriceX96();
+        int beforeTick = pool.currentTick();
+        int beforeGrowth0 = pool.feeGrowthGlobal0X128();
+        int beforeGrowth1 = pool.feeGrowthGlobal1X128();
+        (uint input, uint rounding, bool complete) = pool.quoteGasExactOutput(zeroForOne, 5000e18);
+        require(complete && input > rounding, "bad multistep quote");
+        require(pool.sqrtPriceX96() == beforePrice && pool.currentTick() == beforeTick && pool.feeGrowthGlobal0X128() == beforeGrowth0 && pool.feeGrowthGlobal1X128() == beforeGrowth1, "quote wrote pool state");
+        uint spent = _swapExactOut(zeroForOne, 5000e18, input);
+        require(spent == input, "multistep quote differs from swap");
+        require(zeroForOne ? pool.currentTick() < -60 : pool.currentTick() > 60, "did not cross initialized tick");
+    }
+    function it_quotes_gas_output_across_initialized_ticks_zero_for_one() public { _checkGasQuoteAcrossTicks(true); }
+    function it_quotes_gas_output_across_initialized_ticks_one_for_zero() public { _checkGasQuoteAcrossTicks(false); }
 
     function it_swap_exact_output_within_range() {
         _mintRange(-6000, 6000, 100000e18);

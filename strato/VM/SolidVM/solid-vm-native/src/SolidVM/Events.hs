@@ -4,6 +4,7 @@
 
 module SolidVM.Events (emitEventValuesForContract) where
 
+import Control.Exception (throw)
 import BlockApps.Solidity.ABI.Bridge (encodeEventToLogValues)
 import SolidVM.Model.Event (Event (Event))
 import qualified Blockchain.SolidVM.Environment as Env
@@ -28,10 +29,10 @@ emitEventValuesForContract curCnct st eventName values = do
       mEv = M.lookup eventName evs
   case mEv of
     Nothing ->
-      missingType "no corresponding event has been declared for the following emit statement: " (unparseStatement st)
+      throw (MissingType "no corresponding event has been declared for the following emit statement: " (unparseStatement st))
     Just ev -> do
       if (length expVals) /= (length $ CC._eventLogs ev)
-        then invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
+        then throw (InvalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st))
         else do
           let address = currentAddress curInfo
           -- pair up field names with values one-by-one (no type checking tho, lol)

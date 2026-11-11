@@ -56,7 +56,7 @@ runTest ctx = runNoLoggingT . flip evalStateT ctx
 baseCtx :: Bool -> Maybe Address -> BlockstanbulContext
 baseCtx valB self =
   let ckpt = Checkpoint (View 20 18) [Validator other] Nothing [] 0
-      ctx = newContext "" 1 ckpt self valB Nothing
+      ctx = newContext "" 1 ckpt self valB Nothing 15
    in ctx & productionAuth .~ False
 
 roundChanges :: [OutEvent] -> [TrustedMessage]

@@ -4,6 +4,7 @@
 -- No `Value` sum type at runtime: every compiled closure has an exact Haskell type.
 module SolidVM.Core where
 
+import Text.Format (format)
 import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
@@ -30,7 +31,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Type.Equality
-import Blockchain.SolidVM.Exception (SolidException (TooMuchGas))
+import Blockchain.SolidVM.Exception (SolidException (InternalError, TooMuchGas))
 import qualified Blockchain.SolidVM.Builtins.Size as SharedSize
 import Blockchain.Strato.Model.Gas (Gas (..))
 import Blockchain.Strato.Model.Address (Address (..))
@@ -139,13 +140,13 @@ showDyn (Dyn t v) = formatValue t v
 formatValue :: Ty t -> t -> T.Text
 formatValue t v = case t of
   TDecimal -> T.pack (show v)
-  TInt -> T.pack (show v); TBool -> T.pack (show v); TAddr -> T.pack (show v); TStr -> T.pack (show v)
-  TBytes -> T.pack (show v); TEnum n ns -> let i = enumNumber v in n <> "." <> (if i >= 0 && fromIntegral i < length ns then ns !! fromIntegral i else T.pack (show i))
+  TInt -> T.pack (show v); TBool -> T.pack (show v); TAddr -> T.pack (show v); TStr -> v
+  TBytes -> T.pack (format v); TEnum n ns -> let i = enumNumber v in n <> "." <> (if i >= 0 && fromIntegral i < length ns then ns !! fromIntegral i else T.pack (show i))
   TContract n -> n <> "(" <> T.pack (show v) <> ")"; TUnit -> "()"
   TArr et -> "[" <> T.intercalate "," (map (formatValue et) (F.toList v)) <> "]"
   TStruct n fs -> n <> "{" <> T.intercalate "," (showFields fs v) <> "}"
   TTuple fs -> "(" <> T.intercalate "," (showFields fs v) <> ")"
-  TVariadic -> "[" <> T.intercalate "," (map showDyn v) <> "]"; TMaybe _ -> "<maybe>"; TRef _ -> T.pack (show v)
+  TVariadic -> "[" <> T.intercalate "," (map showDyn v) <> "]"; TMaybe _ -> "<maybe>"; TRef _ -> T.pack (format v)
   TAlias _ _ -> "<alias>"
   TRaw -> "[" <> T.intercalate "," (map showDyn v) <> "]"
   TWireArray -> "[" <> T.intercalate "," (map showDyn v) <> "]"
@@ -245,7 +246,7 @@ fromBasic t v = case (t, v) of
   (TStr, BString s) -> Right (TE.decodeUtf8 s)
   (TBytes, BBytes s) -> Right s
   (TBytes, BString s) -> Right s
-  _ -> Left ("storage value " <> T.pack (show v) <> " does not fit declared type " <> showTy t)
+  _ -> Left ("storage value " <> T.pack (format v) <> " does not fit declared type " <> showTy t)
 
 -- Keep the existing storage format (tags, BDefault for zero values).
 -- Preserve scalar tags for action diffs; the storage backend normalizes defaults.
@@ -309,16 +310,19 @@ data CallKind = Call | RawCall | DelegateCall deriving (Eq, Show)
 
 -- A revert carries a message; it unwinds to the nearest try/catch or external call boundary.
 newtype Revert = Revert T.Text deriving Show
-instance Exception Revert
+instance Exception Revert where
+  displayException (Revert message) = T.unpack message
 
 -- Semantic divergence from the typed model (e.g. storage tag mismatch, dynamic arg of wrong type).
 -- Reported, never papered over (criterion 12).
 newtype Divergence = Divergence T.Text deriving Show
-instance Exception Divergence
+instance Exception Divergence where
+  displayException (Divergence message) = "native execution mismatch: " ++ T.unpack message
 
 -- A required native entry is unavailable; this is an engine failure, not a revert.
 newtype NativeUnavailable = NativeUnavailable T.Text deriving Show
-instance Exception NativeUnavailable
+instance Exception NativeUnavailable where
+  displayException (NativeUnavailable message) = "native execution unavailable: " ++ T.unpack message
 
 -- An action executes in a typed local environment. Composition uses the
 -- underlying monad's ordinary sequencing.
@@ -392,6 +396,7 @@ catchContractFailure :: SM a -> SM a -> SM a
 catchContractFailure action handler = action `U.catches`
   [ U.Handler (\(_ :: Revert) -> handler)
   , U.Handler (\(e :: SolidException) -> case e of
+      InternalError{} -> U.throwIO e
       TooMuchGas{} -> U.throwIO e
       _ -> handler)
   ]
@@ -419,7 +424,7 @@ readBasic path = do
 writeBasic :: StoragePath -> BasicValue -> SM ()
 writeBasic path value = do
   info <- SM.getCurrentCallInfo
-  when (SM.readOnly info) $ U.throwIO (InvalidWrite "native write during read-only access" (show path))
+  when (SM.readOnly info) $ U.throwIO (InvalidWrite "native write during read-only access" (format path))
   Metered.storageWrite (basicSize value)
   let address = SM.currentAddress info
   SM.markDiffForAction address path value

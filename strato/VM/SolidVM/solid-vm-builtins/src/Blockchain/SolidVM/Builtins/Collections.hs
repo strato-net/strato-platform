@@ -6,7 +6,9 @@
 module Blockchain.SolidVM.Builtins.Collections (identity, variadic, push, stringConcat) where
 
 import Blockchain.SolidVM.Execution
-import Blockchain.VM.SolidException (invalidArguments)
+import Blockchain.VM.SolidException (SolidException (InvalidArguments))
+import Control.Exception (throw)
+import Text.Format (format)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified SolidVM.Model.Storable as MS
@@ -36,7 +38,7 @@ push (SArray vec) (Just (Variable ref)) vals = do
   let newArr = V.snoc vec newVar
   writeBuiltinVariable @engine (Variable ref) (SArray newArr)
   pure $ Constant (SInteger $ fromIntegral $ V.length newArr)
-push v mv argVals = invalidArguments "push" (v, mv, argVals)
+push v mv argVals = throw (InvalidArguments "push" (format (renderValueShallow v, mv, map renderValueShallow argVals)))
 
 stringConcat :: [String] -> String
 stringConcat = concat

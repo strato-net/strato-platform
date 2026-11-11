@@ -10,8 +10,6 @@ const config = require('../config/app.config');
 
 
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
 const timeout = config.healthCheck.pollFrequency;
 
 // TODO: remove global password from here after the node-health-check.js is refactored, change tests accordingly

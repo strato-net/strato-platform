@@ -53,3 +53,10 @@ export function parseArgText(raw: string): unknown {
     return raw;
   }
 }
+
+/** Keep variadic arguments typed when they pass through a text field or event. */
+export function formatVariadicArg(value: unknown): string {
+  if (typeof value === "boolean") return `bool(${value})`;
+  if (value !== null && typeof value === "object") return JSON.stringify(bigintsToStrings(value));
+  return String(value);
+}

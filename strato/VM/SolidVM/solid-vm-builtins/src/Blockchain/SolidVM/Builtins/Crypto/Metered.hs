@@ -16,8 +16,9 @@ import Blockchain.SolidVM.GasInfo (MonadBuiltinGas (..))
 import qualified Blockchain.SolidVM.Builtins.Crypto as Crypto
 import Blockchain.SolidVM.Builtins.Gas
 import Blockchain.Strato.Model.Gas (Gas)
-import Blockchain.VM.SolidException (invalidArguments, typeError)
-import Control.Exception (evaluate)
+import Blockchain.VM.SolidException (SolidException (InvalidArguments, TypeError))
+import Control.Exception (evaluate, throw)
+import Text.Format (Format, format)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.ByteString as B
 
@@ -42,8 +43,8 @@ chargePerTerm :: MonadBuiltinGas m => Gas -> Gas -> Int -> Int -> m ()
 chargePerTerm base perTerm width count =
   chargeBuiltinGas $ max 1 (base + perTerm * fromIntegral ((count + width - 1) `div` width))
 
-bytesResult :: (MonadIO m, Show input) => String -> input -> Either String B.ByteString -> m B.ByteString
-bytesResult name input = either (\message -> invalidArguments (name ++ ": " ++ message) input) pure
+bytesResult :: (MonadIO m, Format input) => String -> input -> Either String B.ByteString -> m B.ByteString
+bytesResult name input = either (\message -> throw (InvalidArguments (name ++ ": " ++ message) (format input))) pure
 
 modExp :: MonadBuiltinGas m => Integer -> Integer -> Integer -> m Integer
 modExp b e m = do
@@ -84,7 +85,7 @@ bls12381Pairing :: MonadBuiltinGas m => B.ByteString -> m Bool
 bls12381Pairing input = do
   -- 384 bytes per (G1, G2) pair
   chargePerTerm gasBlsPairingBase gasBlsPairingPerPair 384 (B.length input)
-  either (\message -> invalidArguments ("bls12381Pairing: " ++ message) input) pure (Crypto.bls12381Pairing input)
+  either (\message -> throw (InvalidArguments ("bls12381Pairing: " ++ message) (format input))) pure (Crypto.bls12381Pairing input)
 
 bls12381G1AddInts :: MonadBuiltinGas m => Integer -> Integer -> Integer -> Integer -> m (Integer, Integer)
 bls12381G1AddInts a b c d = do
@@ -104,7 +105,7 @@ bls12381G1MsmInts :: MonadBuiltinGas m => [Integer] -> m (Integer, Integer)
 bls12381G1MsmInts values = do
   chargePerTerm 0 gasBlsG1MsmPerTerm 3 (length values)
   ints <- traverse force values
-  triples <- maybe (invalidArguments "bls12381G1Msm: expected a multiple of 3 integer args (x, y, k per term)" values) pure (chunks ints)
+  triples <- maybe (throw (InvalidArguments "bls12381G1Msm: expected a multiple of 3 integer args (x, y, k per term)" (format values))) pure (chunks ints)
   forcePair $ Crypto.bls12381G1MsmInts triples
   where
     chunks [] = Just []
@@ -117,7 +118,7 @@ bls12381G2MsmInts :: MonadBuiltinGas m => [Integer] -> m ((Integer, Integer), (I
 bls12381G2MsmInts values = do
   chargePerTerm 0 gasBlsG2MsmPerTerm 5 (length values)
   ints <- traverse force values
-  terms <- maybe (invalidArguments "bls12381G2Msm: expected a multiple of 5 integer args (xc0, xc1, yc0, yc1, k per term)" values) pure (chunks ints)
+  terms <- maybe (throw (InvalidArguments "bls12381G2Msm: expected a multiple of 5 integer args (xc0, xc1, yc0, yc1, k per term)" (format values))) pure (chunks ints)
   forcePoint $ Crypto.bls12381G2MsmInts terms
   where
     chunks [] = Just []
@@ -130,7 +131,7 @@ bls12381PairingInts :: MonadBuiltinGas m => [Integer] -> m Bool
 bls12381PairingInts values = do
   chargePerTerm gasBlsPairingBase gasBlsPairingPerPair 6 (length values)
   ints <- traverse force values
-  pairs <- maybe (invalidArguments "bls12381Pairing: expected a multiple of 6 integer args (G1.x, G1.y, G2.xc0, G2.xc1, G2.yc0, G2.yc1 per term)" values) pure (chunks ints)
+  pairs <- maybe (throw (InvalidArguments "bls12381Pairing: expected a multiple of 6 integer args (G1.x, G1.y, G2.xc0, G2.xc1, G2.yc0, G2.yc1 per term)" (format values))) pure (chunks ints)
   force $ Crypto.bls12381PairingInts pairs
   where
     chunks [] = Just []
@@ -156,14 +157,14 @@ poseidon, poseidon2 :: MonadBuiltinGas m => [Integer] -> m Integer
 poseidon values = do
   chargeBuiltinGas $ gasPoseidonBase + gasPoseidonPerInput * fromIntegral (max 1 $ length values)
   if null values || length values > 8
-    then typeError "invalid args passed to poseidon" (show values)
+    then throw (TypeError "invalid args passed to poseidon" (format values))
     else traverse force values >>= force . Crypto.poseidonHash
 -- | Poseidon2 is Merkle-Damgard over a 2-to-1 compression, so it runs one
 -- permutation per input element and has no arity cap.
 poseidon2 values = do
   chargeBuiltinGas $ gasPoseidonBase + gasPoseidonPerInput * fromIntegral (max 1 $ length values)
   if null values
-    then typeError "invalid args passed to poseidon2" (show values)
+    then throw (TypeError "invalid args passed to poseidon2" (format values))
     else traverse force values >>= force . Crypto.poseidon2Hash
 
 poseidon2Compress :: MonadBuiltinGas m => Integer -> Integer -> m Integer
@@ -174,7 +175,7 @@ poseidon2Compress a b = do
 
 -- | Resolve a parametrized-Poseidon2 params block, rejecting unknown instances.
 poseidon2Instance :: Monad m => B.ByteString -> m Crypto.P2Instance
-poseidon2Instance input = either (invalidArguments "poseidon2 params") pure (Crypto.parsePoseidon2Params input)
+poseidon2Instance input = either (throw . InvalidArguments "poseidon2 params") pure (Crypto.parsePoseidon2Params input)
 
 poseidon2GasFor :: MonadBuiltinGas m => Crypto.P2Instance -> Int -> Int -> m ()
 poseidon2GasFor inst nIn nOut = case inst of

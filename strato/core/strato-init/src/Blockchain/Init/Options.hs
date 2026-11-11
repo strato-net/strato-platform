@@ -10,7 +10,7 @@ parseBootnodeString "" = []
 parseBootnodeString s | not $ elem '[' s = [s]
 parseBootnodeString s = read s
 
-defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
+defineFlag "u:pguser" ("strato" :: String) "Postgres user"
 defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname. Anything other than localhost is an external cluster (e.g. the Aurora writer endpoint): no postgres container is generated and --password must carry its password"
 defineFlag "pgReaderHost" ("" :: String) "Read-only Postgres endpoint (e.g. the Aurora reader endpoint) for PostgREST; defaults to --pghost"
 defineFlag "regenerate" (False :: Bool) "Re-generate ethconf.yaml, docker-compose.yml and commands.txt for an EXISTING directory from the flags given (state, secrets and genesis are kept). Pass the same flags as the original setup plus the changes; the network identity must not change"
@@ -104,6 +104,7 @@ defineFlag "mempoolLivenessCutoff" (60 :: Integer) "Max age of a transaction in 
 -- Consensus timing flags
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag "blockstanbul_round_period_s" (3600 :: Int) "Seconds without progress before a forced PBFT round change (a missed proposal is detected within seconds regardless)"
+defineFlag "blockstanbul_max_timestamp_drift_s" (15 :: Int) "Seconds a proposed block's timestamp may run ahead of this node's clock before the node refuses to vote for it (local policy, not consensus)"
 defineFlag "stakingActivationBlock" (-1 :: Integer) "Block number from which stake-weighted proposer selection is in force (-1 = network default: from genesis for new networks, unscheduled for existing ones)"
 
 -- VM config flags

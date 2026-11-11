@@ -70,7 +70,7 @@ import qualified Database.Persist.Postgresql as SQL
 import System.Clock
 
 instance TransactionLike Transaction where
-  txHash = hash . rlpSerialize . rlpEncode
+  txHash = transactionHash
   txPartialHash = partialTransactionHash
   txChainHash = error "Transaction.txChainHash: Not a private transaction"
   txSigner = whoSignedThisTransaction
@@ -120,22 +120,28 @@ instance TransactionLike Transaction where
 
   txTxVersion MessageTX {..} = Just txVersion
   txTxVersion ContractCreationTX {..} = Just txVersion
-  txTxVersion EthereumTX {} = Nothing
+  txTxVersion EthereumTX {..} = Just txVersion
 
   txAttribution MessageTX {..} = attribution
   txAttribution _ = B.empty
+
+  txEnvelopeType EthereumTX {..} = txVersion
+  txEnvelopeType _ = 0
+
+  txMaxPriorityFeePerGas EthereumTX {..} = maxPriorityFeePerGas
+  txMaxPriorityFeePerGas _ = 0
 
   morphTx t = case txType t of
     Message
       | Just fn <- txFuncName t ->
           MessageTX n gl (fromJust $ txDestination t) fn args network cid r s v ver (txAttribution t)
       | otherwise ->
-          EthereumTX n gp gl (txDestination t) val (fromJust $ txTxData t) cid r s v
+          EthereumTX n gp gl (txDestination t) val (fromJust $ txTxData t) cid r s v ver (txMaxPriorityFeePerGas t)
     ContractCreation
       | Just cn <- txContractName t ->
           ContractCreationTX n gl cn args network (fromJust $ txCode t) cid r s v ver
       | otherwise ->
-          EthereumTX n gp gl Nothing val (fromJust $ txTxData t) cid r s v
+          EthereumTX n gp gl Nothing val (fromJust $ txTxData t) cid r s v ver (txMaxPriorityFeePerGas t)
     where
       n = txNonce t
       gp = txGasPrice t
@@ -156,12 +162,12 @@ codePtrName (SolidVMCode n _) = Just n
 codePtrName _ = Nothing
 
 rawTX2TX :: RawTransaction -> Transaction
-rawTX2TX (RawTransaction _ _ nonce' gl (Just to') (Just fn) Nothing ags net Nothing cid r' s' v' _ _ _ _ _ _ tv attr) =
+rawTX2TX (RawTransaction _ _ nonce' gl (Just to') (Just fn) Nothing ags net Nothing cid r' s' v' _ _ _ _ _ _ tv attr _) =
   MessageTX nonce' gl to' fn ags net cid r' s' v' tv (fromMaybe B.empty attr)
-rawTX2TX (RawTransaction _ _ nonce' gl Nothing Nothing (Just cn) ags net (Just cd) cid r' s' v' _ _ _ _ _ _ tv _) =
+rawTX2TX (RawTransaction _ _ nonce' gl Nothing Nothing (Just cn) ags net (Just cd) cid r' s' v' _ _ _ _ _ _ tv _ _) =
   ContractCreationTX nonce' gl cn ags net cd cid r' s' v' tv
-rawTX2TX (RawTransaction _ _ nonce' gl mTo Nothing Nothing [] _ Nothing cid r' s' v' _ _ _ mgp mval mdata _ _) =
-  EthereumTX nonce' (fromMaybe 0 mgp) gl mTo (fromMaybe 0 mval) (fromMaybe B.empty mdata) cid r' s' v'
+rawTX2TX (RawTransaction _ _ nonce' gl mTo Nothing Nothing [] _ Nothing cid r' s' v' _ _ _ mgp mval mdata tv _ mprio) =
+  EthereumTX nonce' (fromMaybe 0 mgp) gl mTo (fromMaybe 0 mval) (fromMaybe B.empty mdata) cid r' s' v' tv (fromMaybe 0 mprio)
 rawTX2TX rt = error $ "rawTX2TX: " ++ show rt
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
@@ -172,11 +178,11 @@ txAndTime2RawTXWithSigner :: Address -> TXOrigin -> Transaction -> Integer -> UT
 txAndTime2RawTXWithSigner signer origin tx blkNum time =
   case tx of
     MessageTX{..} ->
-      RawTransaction time signer nonce gasLimit (Just to) (Just funcName) Nothing args network Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing txVersion (if B.null attribution then Nothing else Just attribution)
+      RawTransaction time signer nonce gasLimit (Just to) (Just funcName) Nothing args network Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing txVersion (if B.null attribution then Nothing else Just attribution) Nothing
     ContractCreationTX{..} ->
-      RawTransaction time signer nonce gasLimit Nothing Nothing (Just contractName) args network (Just code) chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing txVersion Nothing
+      RawTransaction time signer nonce gasLimit Nothing Nothing (Just contractName) args network (Just code) chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing txVersion Nothing Nothing
     EthereumTX{..} ->
-      RawTransaction time signer nonce gasLimit ethTo Nothing Nothing [] "" Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin (Just gasPrice) (Just value) (Just txData) 0 Nothing
+      RawTransaction time signer nonce gasLimit ethTo Nothing Nothing [] "" Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin (Just gasPrice) (Just value) (Just txData) txVersion Nothing (Just maxPriorityFeePerGas)
 
 tx2RawTXAndTime :: (MonadIO m) => TXOrigin -> Transaction -> m RawTransaction
 tx2RawTXAndTime origin tx = do
@@ -236,9 +242,11 @@ whoSignedThisTransaction tx@EthereumTX{..} = fromPublicKey <$> EC.recoverPub sig
     where
       intToBSS = BSS.toShort . word256ToBytes . fromInteger
       sig = EC.Signature (SEC.CompactRecSig (intToBSS r) (intToBSS s) v)
-      mesg = keccak256ToByteString $ hash $ rlpSerialize $ case chainId of
-        Nothing  -> partialRLPEncode tx
-        Just cid -> case partialRLPEncode tx of
+      mesg = keccak256ToByteString $ hash $ case (txVersion, chainId) of
+        -- EIP-1559 signs the typed payload, type byte included.
+        (2, _) -> B.cons 2 $ rlpSerialize $ partialRLPEncode tx
+        (_, Nothing) -> rlpSerialize $ partialRLPEncode tx
+        (_, Just cid) -> rlpSerialize $ case partialRLPEncode tx of
           RLPArray items -> RLPArray $ items ++ [rlpEncode cid, rlpEncode (0::Integer), rlpEncode (0::Integer)]
           x -> x
 whoSignedThisTransaction tx = fromPublicKey <$> EC.recoverPub sig mesg
@@ -269,7 +277,11 @@ isContractCreationTX EthereumTX {ethTo = Nothing} = True
 isContractCreationTX _ = False
 
 transactionHash :: Transaction -> Keccak256
-transactionHash = hash . rlpSerialize . rlpEncode
+transactionHash tx = case rlpEncode tx of
+  -- An Ethereum typed envelope is hashed as its bytes (EIP-2718), not as the
+  -- RLP string it travels as inside a block.
+  RLPString envelope | EthereumTX {} <- tx -> hash envelope
+  encoded -> hash (rlpSerialize encoded)
 
 partialTransactionHash :: Transaction -> Keccak256
 partialTransactionHash tx = hash $ rlpSerialize $ case (tx, chainId tx, partialRLPEncode tx) of

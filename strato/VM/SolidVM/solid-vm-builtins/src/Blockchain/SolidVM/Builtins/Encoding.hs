@@ -1,6 +1,8 @@
 module Blockchain.SolidVM.Builtins.Encoding (b16encode, b16decode, normalizeHex, bytes32ToString) where
 
-import Blockchain.VM.SolidException (invalidArguments)
+import Blockchain.VM.SolidException (SolidException (InvalidArguments))
+import Control.Exception (throw)
+import Text.Format (format)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Text as T
@@ -15,7 +17,7 @@ b16decode input =
   let padded = if odd (B.length input) then B.cons 48 input else input
    in case B16.decode padded of
         Right decoded -> decoded
-        Left _ -> invalidArguments "b16decode: invalid hex string" input
+        Left _ -> throw (InvalidArguments "b16decode: invalid hex string" (format input))
 
 normalizeHex :: String -> String
 normalizeHex input =
@@ -26,7 +28,7 @@ normalizeHex input =
       padded = if odd (B.length encoded) then B.cons 48 encoded else encoded
    in case B16.decode padded of
         Right decoded -> "0x" ++ BC.unpack (B16.encode decoded)
-        Left _ -> invalidArguments "normalizeHex: invalid hex string" input
+        Left _ -> throw (InvalidArguments "normalizeHex: invalid hex string" input)
 
 bytes32ToString :: String -> String
 bytes32ToString = id

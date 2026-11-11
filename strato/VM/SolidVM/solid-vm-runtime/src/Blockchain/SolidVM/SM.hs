@@ -72,6 +72,7 @@ where
 
 --import           Data.IORef
 
+import Control.Exception (throw)
 import BlockApps.Logging
 import qualified Blockchain.DB.AddressStateDB as DB
 import Blockchain.DB.CodeDB
@@ -445,7 +446,7 @@ instance MonadBuiltinGas SM where
     when (gi' ^. gasLeft < Gas 0) $ do
       let msg = "out of gas: " ++ show (gi' ^. gasLeft) ++ " < " ++ show gas
       liftIO $ putStrLn $ CL.red msg
-      tooMuchGas (getGasValue $ _gasInitialAllotment gi') (getGasValue $ gi' ^. gasUsed)
+      throw (TooMuchGas (getGasValue $ _gasInitialAllotment gi') (getGasValue $ gi' ^. gasUsed))
 
 instance Mod.Modifiable Action SM where
   get _ = gets _action
@@ -515,24 +516,22 @@ runSM maybeCode envBefore gi f = do
   sstateAfter <- readIORef startingStateRef
   let envAfter = env sstateAfter
   case eVal of
-    -- NO errors will crash the VM.
-    -- InternalError should *never* happen.
-    -- TODO should also not happen, but since this is a work in progress they
-    -- are a fact of life and should be fixed on demand.
-    -- The rest should always be a user error and handled safely
+    -- Internal and unexpected host failures must stop execution, not become receipts.
+    -- Contract errors, including unsupported features, fail only the transaction.
     Left (e :: SomeException) -> do
       let se = case fromException e of
             Just solidEx -> solidEx
-            Nothing -> InternalError "Uncaught internal exception" (show e)
+            Nothing -> InternalError ("Uncaught internal exception: " ++ displayException e)
       case se of
         Require _ -> $logDebugLS "runSM/error" se
         _ -> $logErrorLS "runSM/error" se
       restoreAccountDBEnv accounts accountsBefore
-      if flags_svmDev
-        then do
-          $logErrorLS "runSM/error_code" maybeCode
-          throwIO se
-        else return (envAfter, Left se)
+      case se of
+        InternalError{} -> throwIO se
+        _ | flags_svmDev -> do
+              $logErrorLS "runSM/error_code" maybeCode
+              throwIO se
+          | otherwise -> return (envAfter, Left se)
     Right value -> return (envAfter, Right value)
 
 -- When calling a remote contract, the new `msg.sender` is the contract
@@ -573,7 +572,7 @@ getVariableOfName name = do
   cStack <- Mod.get (Mod.Proxy @[CallInfo])
   let currentCallInfo =
         case cStack of
-          [] -> internalError "getVariableValue called with an empty stack" name
+          [] -> throw (InternalError ("getVariableValue called with an empty stack: " ++ labelToString name))
           (x : _) ->
             if (isFreeFunction x)
               then
@@ -744,7 +743,7 @@ getVariableOfName name = do
     Nothing -> case maybeStorageItem of
       Just value -> pure value
       Nothing ->
-        return . fromMaybe (unknownVariable "getVariableOfName" name) $
+        return . fromMaybe (throw (UnknownVariable "getVariableOfName" (labelToString name))) $
           maybeContractFunction
             <|> maybeFreeFunction
             <|> maybeBuiltinFunction
@@ -754,7 +753,7 @@ getVariableOfName name = do
             <|> maybeContract
             <|> maybeThis
             <|> maybeConstant
-            <|> unknownVariable "not found" name
+            <|> throw (UnknownVariable "not found" (labelToString name))
 
 withCallInfo ::
   MonadSM m =>
@@ -800,7 +799,7 @@ withCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff f = do
       for_ mTracer $ \_ -> do
         GasInfo {_gasLeft = Gas gasAfter} <- Mod.get (Mod.Proxy @GasInfo)
         traceExitFrame mTracer gasAfter $ case eRes of
-          Left (e :: SomeException) -> Just . T.pack $ show e
+          Left (e :: SomeException) -> Just . T.pack $ displayException e
           Right _ -> Nothing
       popCallInfo $ isLeft eRes
       case eRes of
@@ -815,22 +814,6 @@ renderArgShallow (name, var) = do
     Constant v -> pure v
     Variable ref -> readIORef ref
   pure $ labelToText name <> "=" <> renderValueShallow val
-
--- | Shallow, pure rendering of a value: scalars verbatim, compounds
--- summarized without dereferencing nested variables or storage.
-renderValueShallow :: Value -> Text
-renderValueShallow = \case
-  SInteger i -> T.pack (show i)
-  SDecimal d -> T.pack (show d)
-  SString str -> T.pack (show str)
-  SBool b -> if b then "true" else "false"
-  SAddress addr _ -> T.pack (show addr)
-  SEnumVal enumName valName _ -> labelToText enumName <> "." <> labelToText valName
-  SStruct sname _ -> "<struct " <> labelToText sname <> ">"
-  STuple _ -> "<tuple>"
-  SArray _ -> "<array>"
-  SMap _ -> "<mapping>"
-  v -> T.take 100 . T.pack $ show v
 
 addCallInfo ::
   MonadSM m =>
@@ -867,13 +850,13 @@ addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
 
 uncheckedCallInfo :: MonadSM m => m ()
 uncheckedCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-  [] -> internalError "uncheckedCallInfo was called on an already empty stack" ()
+  [] -> throw (InternalError "uncheckedCallInfo was called on an already empty stack")
   (ci : rest) -> pure $ ci {isUncheckedSection = True} : ci : rest
 
 popCallInfo :: MonadSM m => Bool -> m ()
 popCallInfo reverted = do
   popCallInfoState >>= \case
-    Nothing -> internalError "popCallInfo was called on an already empty stack" ()
+    Nothing -> throw (InternalError "popCallInfo was called on an already empty stack")
     Just ci -> unless reverted $ do
       A.insertMany (A.Proxy @RawStorageValue) $ storageMap ci
       let fromASM ASDeleted = Left ()
@@ -887,7 +870,7 @@ withLocalVars = bracket_ pushLocalVars popLocalVars
 
 pushLocalVars :: MonadSM m => m ()
 pushLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-  [] -> internalError "pushLocalVars was called with an empty stack" ()
+  [] -> throw (InternalError "pushLocalVars was called with an empty stack")
   (curFrame : rest) -> do
     let lvs = case localVariables curFrame of
                 v NE.:| vs -> v NE.:| v:vs
@@ -896,16 +879,16 @@ pushLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
 -- The inverse operation as above, called when exiting a statement block and those declared variables need to be destroyed
 popLocalVars :: MonadSM m => m ()
 popLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-  [] -> internalError "popLocalVars was called with an empty stack" ()
+  [] -> throw (InternalError "popLocalVars was called with an empty stack")
   (curFrame : rest) -> case localVariables curFrame of
     _ NE.:| v:vs -> pure $ curFrame{localVariables = v NE.:| vs} : rest
-    _ -> internalError "popLocalVars was called with an empty stack" ()
+    _ -> throw (InternalError "popLocalVars was called with an empty stack")
 
 withStaticCallInfo :: MonadSM m => m a -> m a
 withStaticCallInfo f = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
-    [] -> internalError "withStaticCallInfo was called with an empty stack" ()
+    [] -> throw (InternalError "withStaticCallInfo was called with an empty stack")
     (curFrame : rest) -> do
       Mod.put (Mod.Proxy @[CallInfo]) $ curFrame{readOnly = True} : rest
       eResult <- try f
@@ -927,7 +910,7 @@ getCurrentCallInfo :: MonadSM m => m CallInfo
 getCurrentCallInfo = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
-    [] -> internalError "getCurrentCallInfo called with an empty stack" ()
+    [] -> throw (InternalError "getCurrentCallInfo called with an empty stack")
     (currentCallInfo : _) -> return currentCallInfo
 
 getCallStackDepth :: MonadSM m => m Int
@@ -945,35 +928,35 @@ getCurrentContract = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo : _) -> return $ currentContract currentCallInfo
-    _ -> internalError "getCurrentContract called with an empty stack" ()
+    _ -> throw (InternalError "getCurrentContract called with an empty stack")
 
 getCurrentAddress :: Mod.Modifiable [CallInfo] m => m Address
 getCurrentAddress = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo : _) -> return $ currentAddress currentCallInfo
-    _ -> internalError "getCurrentAccount called with an empty stack" ()
+    _ -> throw (InternalError "getCurrentAccount called with an empty stack")
 
 getCurrentCodeAddress :: MonadSM m => m Address
 getCurrentCodeAddress = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo : _) -> return $ currentCodeAddress currentCallInfo
-    _ -> internalError "getCurrentCodeAddress called with an empty stack" ()
+    _ -> throw (InternalError "getCurrentCodeAddress called with an empty stack")
 {-
 getCurrentChainId :: MonadSM m => m (Maybe Word256)
 getCurrentChainId = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo : _) -> return $ _accountChainId $ currentAddress currentCallInfo
-    _ -> internalError "getCurrentChainId called with an empty stack" ()
+    _ -> internalError "getCurrentChainId called with an empty stack" ""
 -}
 getCurrentFunctionName :: MonadSM m => m SolidString
 getCurrentFunctionName = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo : _) -> return $ currentFunctionName currentCallInfo
-    _ -> internalError "getCurrentFunctionName called with an empty stack" ()
+    _ -> throw (InternalError "getCurrentFunctionName called with an empty stack")
 
 addFunctionToCurrentContractInCurrentCallInfo :: MonadSM m => SolidString -> CC.Func -> m ()
 addFunctionToCurrentContractInCurrentCallInfo funcName funcObject = do
@@ -984,9 +967,9 @@ addFunctionToCurrentContractInCurrentCallInfo funcName funcObject = do
           -- _functions :: Map SolidString (FuncF a),
           newContract = contract {CC._functions = M.insert funcName funcObject $ CC._functions contract}
       Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-        [] -> internalError "addFunctionToCurrentContractInCurrentCallInfo called with an empty stack" ()
+        [] -> throw (InternalError "addFunctionToCurrentContractInCurrentCallInfo called with an empty stack")
         (ci : rest) -> pure $ ci {currentContract = newContract} : rest
-    _ -> internalError "addFunctionToCurrentContractInCurrentCallInfo called with an empty stack" ()
+    _ -> throw (InternalError "addFunctionToCurrentContractInCurrentCallInfo called with an empty stack")
 
 removeFunctionFromCurrentContractInCurrentCallInfo :: MonadSM m => SolidString -> m ()
 removeFunctionFromCurrentContractInCurrentCallInfo funcName = do
@@ -997,16 +980,16 @@ removeFunctionFromCurrentContractInCurrentCallInfo funcName = do
           -- _functions :: Map SolidString (FuncF a),
           newContract = contract {CC._functions = M.delete funcName $ CC._functions contract}
       Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-        [] -> internalError "removeFunctionFromCurrentContractInCurrentCallInfo called with an empty stack" ()
+        [] -> throw (InternalError "removeFunctionFromCurrentContractInCurrentCallInfo called with an empty stack")
         (ci : rest) -> pure $ ci {currentContract = newContract} : rest
-    _ -> internalError "removeFunctionFromCurrentContractInCurrentCallInfo called with an empty stack" ()
+    _ -> throw (InternalError "removeFunctionFromCurrentContractInCurrentCallInfo called with an empty stack")
 
 getCurrentCodeCollection :: MonadSM m => m (Keccak256, CC.CodeCollection)
 getCurrentCodeCollection = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo : _) -> return (collectionHash currentCallInfo, codeCollection currentCallInfo)
-    _ -> internalError "getCurrentCodeCollection called with an empty stack" ()
+    _ -> throw (InternalError "getCurrentCodeCollection called with an empty stack")
 
 initializeAction :: MonadSM m =>
                     Address -> m ()
@@ -1126,7 +1109,7 @@ getContractNameAndHash address' = do
 
   case codeHash of
     SolidVMCode cn ch' -> return (stringToLabel cn, ch')
-    _ -> missingCodeCollection ("contract call to address 0x" ++ formatAddressWithoutColor address' ++ " failed") ("no contract deployed at this address" :: String)
+    _ -> throw (MissingCodeCollection ("contract call to address 0x" ++ formatAddressWithoutColor address' ++ " failed") ("no contract deployed at this address" :: String))
 
 -- | How source must be parsed for the block being executed. Consensus-visible:
 -- see 'isOperatorPrecedenceForkActive'.
@@ -1144,7 +1127,7 @@ getCodeAndCollectionWithTypeCheck typeCheck address' = do
   isRunningTests <- Env.runningTests <$> getEnv
   opts <- parseOptionsForCurrentBlock
   cc <- codeCollectionFromHashWith opts isRunningTests typeCheck ch
-  let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
+  let !contract' = fromMaybe (throw (MissingType "getCodeAndCollection" (labelToString contractName'))) $ M.lookup contractName' $ cc ^. CC.contracts
   return (contract', ch, cc)
 
 getContractsForParents :: [SolidString] -> M.Map SolidString (CC.ContractF a) -> [CC.ContractF a]

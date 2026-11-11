@@ -16,7 +16,7 @@ import Blockchain.Init.DockerCompose
 import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer, flags_disableSqlIndexing, flags_disableCirrusIndexing, flags_syncFromFile)
+import Blockchain.Init.Options (flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_pguser, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer, flags_disableSqlIndexing, flags_disableCirrusIndexing, flags_syncFromFile)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -36,9 +36,8 @@ import System.FilePath ((</>))
 import System.Entropy (getEntropy)
 import qualified Data.ByteString as BS
 import Data.Char (toLower)
-import Turtle (chmod, roo)
 import UnliftIO.Directory
-import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes, ownerReadMode, ownerWriteMode, groupReadMode, otherReadMode)
+import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes, ownerReadMode, ownerWriteMode)
 import Data.Bits ((.|.))
 
 -- | Create a GenesisInfo from network name. Does NOT write to file.
@@ -92,13 +91,12 @@ createCommandsFile :: Role -> IO ()
 createCommandsFile role = do
   localAuthCommands <- if flags_localAuth
     then do
-      pgPassword <- filter (/= '\n') <$> readFile "secrets/postgres_password"
       -- The vault wrapper runs next to the other node processes, so it reaches
       -- Postgres the way genEthConf's sqlConfig does: on a host the IPv4
       -- loopback (postgres publishes on 127.0.0.1 only, but "localhost"
       -- resolves to ::1 first on macOS), in a container the service name. See
       -- storeHost.
-      return [restartable $ "blockapps-vault-wrapper-server --pghost " ++ storeHost "postgres" flags_pghost ++ " --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
+      return [restartable $ "blockapps-vault-wrapper-server --pghost " ++ storeHost "postgres" flags_pghost ++ " --pguser " ++ flags_pguser ++ " --postgresPasswordFile secrets/postgres_password --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
     else return []
 
   coreCommands <- if not (roleRunsCore role) then return [] else do
@@ -129,10 +127,10 @@ createCommandsFile role = do
     -- never votes, proposes or drives round changes, even if its key is in
     -- the validator set.
     let followerFlag = if flags_validatorBehavior then "" else " --validatorBehavior=false"
-        -- A validator's indexer keeps the Redis block index only: no SQL
-        -- side, so no writer lease either.
+        -- Every role that runs the chain keeps the SQL block index, a
+        -- validator included: strato-p2p and vm-runner read blocks from it.
+        -- Only the writer lease is a choice.
         indexerFlags
-          | role == RoleValidator = " --sql=false"
           | flags_writer = ""
           | otherwise = " --writer=false"
     return $
@@ -142,10 +140,14 @@ createCommandsFile role = do
       , "vm-runner " ++ vmRunnerRts
           ++ (if flags_disableSqlIndexing then " --disableSqlIndexing" else "")
           ++ (if flags_disableCirrusIndexing then " --disableCirrusIndexing" else "")
+          -- A validator keeps no account state in SQL: not the state mirror
+          -- (sqlDiff, off through roleRunsCirrus in ethconf) and not the
+          -- balance and nonce updates the VM publishes in its place.
+          ++ (if roleRunsCirrus role then "" else " --publishAddressState=false")
       , restartable ("strato-indexer" ++ indexerFlags)
       ]
       -- Cirrus serves the API; a validator has none to serve.
-      ++ [restartable "slipstream +RTS -T -RTS" | roleIndexesSql role]
+      ++ [restartable "slipstream +RTS -T -RTS" | roleRunsCirrus role]
       ++ [restartable "strato-network-monitor"]
       -- A core cell takes the API tier's transactions through its ingress;
       -- a monolith's strato-api writes its own stream directly.
@@ -250,6 +252,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     liftIO $ mapM_ (createDirectoryIfMissing True) $
       ["logs", "secrets", ".ethereumH"]
         ++ (if roleRunsCore role then coreDirs else [])
+    liftIO $ mapM_ (`setFileMode` ownerModes) ["secrets", ".ethereumH"]
 
     -- Make logs directory world-writable for containers running as non-root users (e.g. prometheus)
     liftIO $ setFileMode "logs" (ownerModes .|. groupModes .|. otherModes)
@@ -301,7 +304,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
           | otherwise -> generatePassword 32
       putStrLn $ "  Creating postgres password file: " ++ pgPasswordFile
       writeFile pgPasswordFile password
-      void $ chmod roo pgPasswordFile
+    liftIO $ setFileMode pgPasswordFile ownerReadMode
 
     -- Session secret for nginx's encrypted session cookies. Every API-tier
     -- nginx must share it, or a cookie minted by one instance fails to
@@ -315,7 +318,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
         _ -> generatePassword 64
       putStrLn $ "  Creating session secret file: " ++ sessionSecretFile
       writeFile sessionSecretFile secret
-      void $ chmod roo sessionSecretFile
+    when (roleRunsApi role) $ liftIO $ setFileMode sessionSecretFile ownerReadMode
 
     when flags_localAuth $ liftIO setupLocalAuthSecrets
 
@@ -345,7 +348,6 @@ mkFilesAndGenesis nodeDir hasFlags network = do
                 , "clientSecret: \"" ++ clientSecret ++ "\""
                 ]
           writeFile destOauth localOauthConfig
-          void $ chmod roo destOauth
           putStrLn $ "  ✓ Generated secure local OAuth credentials: " ++ destOauth
         else do
           home <- getHomeDirectory
@@ -354,7 +356,6 @@ mkFilesAndGenesis nodeDir hasFlags network = do
           if sourceExists
             then do
               copyFile sourceOauth destOauth
-              void $ chmod roo destOauth
             else
               error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first."
     -- Setup OAuth credentials
@@ -370,16 +371,15 @@ mkFilesAndGenesis nodeDir hasFlags network = do
           if sourceExists
             then do
               copyFile sourceOauth destOauth'
-              void $ chmod roo destOauth'
             else
               error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first."
+      setFileMode destOauth' ownerReadMode
 
     ethconf <- liftIO $ genEthConf role
 
     let dir = ".ethereumH"
-    -- Writable for the rewrite, then back to the world-readable, read-only
-    -- mode the containers mounting it expect.
-    when regenerate $ liftIO $ setFileMode (dir </> "ethconf.yaml") (ownerReadMode .|. ownerWriteMode .|. groupReadMode .|. otherReadMode)
+    -- Writable for the rewrite, then back to owner-readable, read-only mode.
+    when regenerate $ liftIO $ setFileMode (dir </> "ethconf.yaml") (ownerReadMode .|. ownerWriteMode)
     liftIO $ YAML.encodeFile (dir </> "ethconf.yaml") ethconf
     liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
     liftIO $ putStrLn "  ✓ Generated ethconf.yaml"
@@ -438,7 +438,7 @@ normalizeGenesisInfo :: GenesisInfo -> GenesisInfo
 normalizeGenesisInfo = fromMaybe (error "Internal Error in normalizeGenesisInfo: this shouldn't happen") . JSON.decode . JSON.encode
 
 makeReadOnly :: FilePath -> IO ()
-makeReadOnly = void . chmod roo
+makeReadOnly path = setFileMode path ownerReadMode
 
 generatePassword :: Int -> IO String
 generatePassword len = do

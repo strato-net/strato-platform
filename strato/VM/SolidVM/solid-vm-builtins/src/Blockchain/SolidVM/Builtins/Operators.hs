@@ -10,6 +10,7 @@ module Blockchain.SolidVM.Builtins.Operators
   ) where
 
 import qualified Blockchain.VM.SolidException as Exception
+import Control.Exception (throw)
 import Data.Bits
 import Data.Decimal
 import qualified Data.ByteString as B
@@ -33,7 +34,7 @@ integerRemainder a b = checkDivisor b `seq` (a `rem` b)
 
 integerPower :: Integer -> Integer -> Integer
 integerPower a b
-  | b < 0 = Exception.arithmeticException "negative exponent" b
+  | b < 0 = throw (Exception.ArithmeticException "negative exponent" (show b))
   | otherwise = a ^ b
 
 integerOr :: Integer -> Integer -> Integer
@@ -118,5 +119,5 @@ integerShiftLeftAssign a b = shiftL a (fromInteger b)
 
 checkDivisor :: (Eq a, Num a, Show a) => a -> ()
 checkDivisor value
-  | value == 0 = Exception.divideByZero value
+  | value == 0 = throw (Exception.DivideByZero (show value))
   | otherwise = ()

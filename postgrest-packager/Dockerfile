@@ -15,7 +15,7 @@ ENV POSTGREST_SOURCE=https://github.com/PostgREST/postgrest/releases/download \
     DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-    apt-get install -y tar xz-utils wget postgresql-client curl lsof && \
+    apt-get install -y tar xz-utils wget postgresql-client curl lsof yq && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     wget "$POSTGREST_SOURCE/$POSTGREST_VERSION/$POSTGREST_FILE" && \

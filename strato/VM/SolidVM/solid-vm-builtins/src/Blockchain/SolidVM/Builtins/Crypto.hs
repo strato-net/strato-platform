@@ -65,6 +65,7 @@ import Blockchain.SolidVM.BLS12381.HashToCurve
   )
 
 import Blockchain.VM.SolidException
+import Control.Exception (throw)
 import qualified Crypto.Hash.Poseidon as Poseidon
 import Crypto.Hash.Poseidon.Field (fieldPrime)
 import qualified Crypto.Hash.Poseidon2 as Poseidon2
@@ -82,7 +83,7 @@ import GHC.Exts (IsList(fromList))
 
 modExp :: Integer -> Integer -> Integer -> Integer
 modExp _ _ 0 = 0 -- EIP-198: a zero modulus yields zero
-modExp _ e _ | e < 0 = invalidArguments "modExp" ("negative exponent" :: String)
+modExp _ e _ | e < 0 = throw (InvalidArguments "modExp" ("negative exponent" :: String))
 modExp b e m =
   case (b, e, even e) of
     (_, 0, _) -> 1 -- 0^0 == 1, per EIP-198
@@ -110,10 +111,10 @@ outOfRange c = c < 0 || c >= bnP
 g1Point :: String -> (Integer, Integer) -> Point Weierstrass Affine BN254 Fq Fr
 g1Point caller (x, y)
   | outOfRange x || outOfRange y =
-      invalidArguments caller $ "G1 coordinate out of range [0, p): " ++ show (x, y)
+      throw (InvalidArguments caller $ "G1 coordinate out of range [0, p): " ++ show (x, y))
   | x == 0 && y == 0 = O
   | def p = p
-  | otherwise = invalidArguments caller $ "G1 point is not on the curve: " ++ show (x, y)
+  | otherwise = throw (InvalidArguments caller $ "G1 point is not on the curve: " ++ show (x, y))
   where
     p :: Point Weierstrass Affine BN254 Fq Fr
     p = A (fromInteger x) (fromInteger y)
@@ -126,12 +127,12 @@ g1Point caller (x, y)
 g2Point :: String -> ((Integer, Integer), (Integer, Integer)) -> G2'
 g2Point caller ((xr, xi), (yr, yi))
   | any outOfRange [xr, xi, yr, yi] =
-      invalidArguments caller $ "G2 coordinate out of range [0, p): " ++ show ((xr, xi), (yr, yi))
+      throw (InvalidArguments caller $ "G2 coordinate out of range [0, p): " ++ show ((xr, xi), (yr, yi)))
   | all (== 0) [xr, xi, yr, yi] = O
   | not (g2OnTwist x y) =
-      invalidArguments caller $ "G2 point is not on the twist curve: " ++ show ((xr, xi), (yr, yi))
+      throw (InvalidArguments caller $ "G2 point is not on the twist curve: " ++ show ((xr, xi), (yr, yi)))
   | not (g2InSubgroup (x, y)) =
-      invalidArguments caller $ "G2 point is not in the r-order subgroup: " ++ show ((xr, xi), (yr, yi))
+      throw (InvalidArguments caller $ "G2 point is not in the r-order subgroup: " ++ show ((xr, xi), (yr, yi)))
   | otherwise = A x y
   where
     toFq2 :: (Integer, Integer) -> Fq2
@@ -200,7 +201,7 @@ ecPairing = doPairing . toTrios
   -- which is the order in which pairing library (and poly library under the hood) expects
   where toTrios (a:b:c:d:e:f:g) = ((a, b), ((d, c), (f, e))) : toTrios g
         toTrios [] = []
-        toTrios _ = invalidArguments "ecPairing" ("input length must be a multiple of 6" :: String)
+        toTrios _ = throw (InvalidArguments "ecPairing" ("input length must be a multiple of 6" :: String))
         doPairing trios =
           let -- a pair containing the point at infinity contributes the
               -- identity, so it is validated but excluded from the product
@@ -303,27 +304,27 @@ instanceWidth P2Goldilocks12 = 12
 canonicalGL :: String -> Integer -> Word64
 canonicalGL caller v
   | v < 0 || v >= goldilocksPrimeInteger =
-      invalidArguments caller $ "input is not a canonical Goldilocks element: " ++ show v
+      throw (InvalidArguments caller $ "input is not a canonical Goldilocks element: " ++ show v)
   | otherwise = fromInteger v
 
 -- | The raw permutation on a full state (t elements).
 poseidon2Permute :: P2Instance -> [Integer] -> [Integer]
 poseidon2Permute inst st
   | length st /= instanceWidth inst =
-      invalidArguments "poseidon2Permute" $ "state must have " ++ show (instanceWidth inst) ++ " elements"
+      throw (InvalidArguments "poseidon2Permute" $ "state must have " ++ show (instanceWidth inst) ++ " elements")
 poseidon2Permute P2BN254 [a, b] =
   let (x, y) = Poseidon2.permutation (canonicalF "poseidon2Permute" a, canonicalF "poseidon2Permute" b)
    in [Poseidon.fromF x, Poseidon.fromF y]
 poseidon2Permute P2Goldilocks12 st = map toInteger . P2GL.permutation $ map (canonicalGL "poseidon2Permute") st
-poseidon2Permute _ st = invalidArguments "poseidon2Permute" $ show st
+poseidon2Permute _ st = throw (InvalidArguments "poseidon2Permute" $ show st)
 
 -- | Hash inputs to n outputs in the instance's mode.
 poseidon2ParamHash :: P2Instance -> Int -> [Integer] -> [Integer]
 poseidon2ParamHash P2BN254 n xs
-  | n /= 1 = invalidArguments "poseidon2Hash" ("the BN254 MD instance produces exactly one output" :: String)
+  | n /= 1 = throw (InvalidArguments "poseidon2Hash" ("the BN254 MD instance produces exactly one output" :: String))
   | otherwise = [poseidon2Hash xs]
 poseidon2ParamHash P2Goldilocks12 n xs
-  | n < 1 || n > 12 = invalidArguments "poseidon2Hash" ("output count must be in [1, 12]" :: String)
+  | n < 1 || n > 12 = throw (InvalidArguments "poseidon2Hash" ("output count must be in [1, 12]" :: String))
   | otherwise = map toInteger . P2GL.hashNToM n $ map (canonicalGL "poseidon2Hash") xs
 
 -- | Hash a byte string: pack it into canonical elements — little-endian
@@ -357,5 +358,5 @@ poseidon2Permutations P2Goldilocks12 nIn nOut =
 canonicalF :: String -> Integer -> Poseidon.F
 canonicalF caller v
   | v < 0 || v >= fieldPrime =
-      invalidArguments caller $ "input is not a canonical field element in [0, r): " ++ show v
+      throw (InvalidArguments caller $ "input is not a canonical field element in [0, r): " ++ show v)
   | otherwise = Poseidon.toF v

@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { logInfo, logError, logWarning, logFeedUpdate } from './utils/logger';
 import { fetchPrices, generateConstantPrices, fetchRebaseFactor, fetchExchangeRate } from './adapters/genericRestAdapter';
+import { fetchPoolTwaps } from './adapters/poolTwapAdapter';
 import { pushAssetPrices, pushRebaseFactors, pushExchangeRates } from './utils/oraclePusher';
 import { checkBalances } from './utils/balanceChecker';
 import { fetchPreviousPrices } from './utils/priceReader';
@@ -90,7 +91,7 @@ async function fetchSource(sourceName: string, sourceConfig: SourceConfig, confi
     try {
         const fetchPromise = sourceName === 'constant'
             ? Promise.resolve(generateConstantPrices(sourceConfig.assets, configLoader.getAllAssets()))
-            : fetchPrices(sourceConfig);
+            : sourceConfig.pools ? fetchPoolTwaps(sourceConfig) : fetchPrices(sourceConfig);
         const prices = await withTimeout(fetchPromise, TIMEOUTS.FETCH);
         return { sourceName, prices, success: true, duration: Date.now() - startTime };
     } catch (err) {
@@ -145,7 +146,11 @@ function aggregatePrices(
             names.forEach(name => {
                 const result = sourceResults.get(name);
                 const data = result?.success && result?.prices[symbol];
-                if (data) {
+                const ageSec = data ? (Date.now() - new Date(data.feedTimestamp).getTime()) / 1000 : 0;
+                if (data && asset.maxAgeSec !== undefined && !(ageSec <= asset.maxAgeSec)) {
+                    logInfo('CronScheduler', `${assetKey}: dropping ${name}, age ${Math.round(ageSec)}s > maxAgeSec ${asset.maxAgeSec}s`);
+                    failedSources.push(`${name}(stale ${Math.round(ageSec)}s)`);
+                } else if (data) {
                     sources.push({ name, price: data.price });
                 } else if (result?.success) {
                     failedSources.push(`${name}(no ${symbol})`);

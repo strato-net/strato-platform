@@ -19,6 +19,7 @@ import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Stream.VMEvent
 import Blockchain.Timing
 import Blockchain.VMContext
+import Blockchain.VMOptions (flags_publishAddressState)
 import Blockchain.VMMetrics
 import Blockchain.Wiring ()
 import Control.Monad
@@ -27,8 +28,10 @@ emitOut :: VmOutEvent -> ContextM ()
 emitOut (OutVMEvents vmes) = void $ produceVMEvents vmes
 emitOut (OutIndexEvent e) = void $ produceIndexEvents [e]
 emitOut (OutStateDiff diff) = void $ produceIndexEvents [StateDiffEntry diff]
+-- Balances and nonces stand in for the state mirror where that is off; a
+-- node that keeps no account state in SQL at all turns them off too.
 emitOut (OutASM asm) =
-  when (not $ Conf.sqlDiff $ Conf.vmConfig ethConf) $
+  when (not (Conf.sqlDiff $ Conf.vmConfig ethConf) && flags_publishAddressState) $
     timeit "produceAddressStateUpdates" (Just vmBlockInsertionMined) $
       void $ produceIndexEvents [AddressStateUpdates asm]
 emitOut (OutJSONRPC r) = produceResponse r

@@ -13,6 +13,7 @@
 -- Maintainer: Steven Glasford <steven_glasford@blockapps.net>
 module SolidVM.Solidity.Parse.Declarations where
 
+import Control.Exception (throw)
 import Blockchain.VM.SolidException
 import Control.DeepSeq
 import Control.Monad (when)
@@ -111,7 +112,7 @@ solidityContract = do
           newParamTypes = fmap snd $ SolidVM._funcArgs new
           overloadParamTypes = concatMap (\x -> [fmap snd $ SolidVM._funcArgs x]) $ SolidVM._funcOverload old
        in if ((oldParamTypes == newParamTypes) || (newParamTypes `elem` overloadParamTypes))
-            then invalidArguments ("Function is already defined with similar params.") $ SolidVM._funcArgs new
+            then throw (InvalidArguments ("Function is already defined with similar params.") $ "(" ++ intercalate ", " [maybe "<unnamed>" labelToString name | (name, _) <- SolidVM._funcArgs new] ++ ")")
             else old {SolidVM._funcOverload = SolidVM._funcOverload old ++ [new]}
 
 -- | Parses a free function
@@ -319,7 +320,7 @@ solidityFLConstant = do
   semi
   let ctx = SourceAnnotation start end ()
   if isConstant
-    then return $ FLConstant variableName (SolidVM.ConstantDecl variableType visibility (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
+    then return $ FLConstant variableName (SolidVM.ConstantDecl variableType visibility (fromMaybe (throw (ParseError "constants must be initialized" (labelToString variableName))) value) ctx)
     else fail "only constants can be declared in the top level"
 
 -- | Parses the declaration part of a variable definition, which is
@@ -345,7 +346,7 @@ simpleVariableDeclaration = do
   let isImmutable = KImmutable `elem` keywords
   let isConstant = KConstant `elem` keywords
   if isConstant
-    then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType visibility (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
+    then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType visibility (fromMaybe (throw (ParseError "constants must be initialized" (labelToString variableName))) value) ctx)
     else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType visibility value ctx isImmutable)
 
 errorDeclaration :: SolidityParser (SolidString, Declaration)

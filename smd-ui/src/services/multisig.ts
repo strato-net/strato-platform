@@ -1,9 +1,10 @@
 import { useCallback, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { parseJsonExact } from "@/lib/args";
+import { formatVariadicArg, parseJsonExact } from "@/lib/args";
 import { env } from "@/lib/env";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
+import { useUser } from "@/context/UserContext";
 import { strip0x, ZERO_ADDRESS, type UserWallet } from "@/services/userWallets";
 
 /**
@@ -300,10 +301,12 @@ export interface OpenIssue {
   /** Addresses that have voted so far. */
   voters: string[];
   createdBlock?: number;
+  indexing?: boolean;
+  transactionHash?: string;
 }
 
-function normalizeArgs(raw: unknown): string[] {
-  if (Array.isArray(raw)) return raw.map((x) => String(x));
+export function normalizeArgs(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(formatVariadicArg);
   if (raw == null || raw === "") return [];
   if (typeof raw === "string") {
     const s = raw.trim();
@@ -313,7 +316,7 @@ function normalizeArgs(raw: unknown): string[] {
         // 2^53 through a double, so re-cast votes would carry corrupted args
         // (in scientific notation, no less) and miss the original issueId.
         const parsed = parseJsonExact(s);
-        if (Array.isArray(parsed)) return parsed.map((x) => String(x));
+        if (Array.isArray(parsed)) return parsed.map(formatVariadicArg);
       } catch {
         /* fall through */
       }
@@ -323,65 +326,127 @@ function normalizeArgs(raw: unknown): string[] {
   return [String(raw)];
 }
 
+export function buildOpenIssues(voteRows: any[], created: any[]): OpenIssue[] {
+  // Group live votes by issueId (drop zeroed-out / cleared entries).
+  const votersByIssue = new Map<string, string[]>();
+  for (const r of voteRows) {
+    const issueId = String(r?.key?.key ?? "");
+    const voter = typeof r?.value === "string" ? strip0x(r.value) : "";
+    if (!issueId || r?.key?.key2 == null || !/^[0-9a-f]{40}$/.test(voter) || isZeroAddr(voter)) continue;
+    const list = votersByIssue.get(issueId) ?? [];
+    if (!list.includes(voter)) list.push(voter);
+    votersByIssue.set(issueId, list);
+  }
+
+  // Latest IssueCreated per issueId for the call details.
+  const detailsByIssue = new Map<string, { target: string; func: string; args: string[]; block?: number }>();
+  for (const ev of created) {
+    if (ev.event_name && ev.event_name !== "IssueCreated") continue;
+    const a = ev?.attributes ?? {};
+    const issueId = String(a.issueId ?? "");
+    if (!issueId || detailsByIssue.has(issueId)) continue;
+    detailsByIssue.set(issueId, {
+      target: strip0x(String(a.target ?? "")),
+      func: String(a.func ?? ""),
+      args: normalizeArgs(a.args),
+      block: ev?.block_number ? Number(ev.block_number) : undefined,
+    });
+  }
+
+  const issues: OpenIssue[] = [];
+  for (const [issueId, voters] of votersByIssue) {
+    const d = detailsByIssue.get(issueId);
+    if (created.some((ev) =>
+      (ev.event_name === "IssueExecuted" || ev.event_name === "IssueDismissed") &&
+      ev.attributes?.issueId === issueId && Number(ev.block_number) >= (d?.block ?? 0)
+    )) continue;
+    issues.push({
+      issueId,
+      target: d?.target ?? "",
+      func: d?.func ?? "",
+      args: d?.args ?? [],
+      voters,
+      createdBlock: d?.block,
+    });
+  }
+  issues.sort((a, b) => (b.createdBlock ?? 0) - (a.createdBlock ?? 0));
+  return issues;
+}
+
+/** Retain a confirmed vote while the indexer is still catching up to its receipt. */
+export function mergeIndexedIssues(indexed: OpenIssue[], cached: OpenIssue[] = [], events: any[] = []): OpenIssue[] {
+  const issues = new Map(indexed.map((issue) => [issue.issueId, issue]));
+  for (const pending of cached.filter((issue) => issue.indexing)) {
+    const creation = events.find((event) => event.event_name === "IssueCreated" &&
+      event.attributes?.issueId === pending.issueId && event.transaction_hash === pending.transactionHash);
+    if (creation && events.some((event) =>
+      (event.event_name === "IssueExecuted" || event.event_name === "IssueDismissed") &&
+      event.attributes?.issueId === pending.issueId && Number(event.block_number) >= Number(creation.block_number)
+    )) continue;
+    const current = issues.get(pending.issueId);
+    if (current && pending.voters.every((voter) => current.voters.includes(voter)) && current.func) continue;
+    issues.set(pending.issueId, {
+      ...pending,
+      ...current,
+      target: current?.target || pending.target,
+      func: current?.func || pending.func,
+      args: current?.func ? current.args : pending.args,
+      voters: Array.from(new Set([...pending.voters, ...(current?.voters ?? [])])),
+      indexing: true,
+    });
+  }
+  return [...issues.values()].sort((a, b) => Number(!!b.indexing) - Number(!!a.indexing) ||
+    (b.createdBlock ?? 0) - (a.createdBlock ?? 0));
+}
+
+/** Only an actual successful vote receipt can add or remove a cached proposal. */
+export function applyConfirmedVote(cached: OpenIssue[], result: any, proposal: Omit<OpenIssue, "issueId">): OpenIssue[] {
+  if (result?.status !== "Success") return cached;
+  const response = result.txResult?.response ?? result.response;
+  const values = response?.t === "tup" ? response.v : [];
+  const contents = result.data?.tag === "Call" ? result.data.contents : null;
+  const executed = Array.isArray(contents) ? contents[0] : values[0]?.t === "bool" ? values[0].v : undefined;
+  if (typeof executed !== "boolean") return cached;
+  if (executed) return cached.filter((issue) => !(issue.target === proposal.target && issue.func === proposal.func &&
+    JSON.stringify(issue.args) === JSON.stringify(proposal.args)));
+  const issueId = Array.isArray(contents) ? contents[1] : values[1]?.v;
+  if (typeof issueId !== "string" || !/^[0-9a-f]{64}$/i.test(issueId)) return cached;
+  const existing = cached.find((issue) => issue.issueId === issueId);
+  return [{
+    ...existing,
+    ...proposal,
+    issueId,
+    voters: Array.from(new Set([...(existing?.voters ?? []), ...proposal.voters])),
+    indexing: true,
+    transactionHash: result.hash ?? result.txResult?.transactionHash,
+  }, ...cached.filter((issue) => issue.issueId !== issueId)];
+}
+
 /**
  * Open (unexecuted) issues for a multisig wallet. Derived from the `votes` collection
  * — an issue is open while it still has non-zero voters (execution/dismissal clears
  * them) — joined to its `IssueCreated` event for target/func/args.
  */
 export function useOpenIssues(walletAddress?: string | null) {
+  const queryClient = useQueryClient();
+  const queryKey = ["multisig-open-issues", walletAddress];
   return useQuery({
-    queryKey: ["multisig-open-issues", walletAddress],
+    queryKey,
     enabled: !!walletAddress,
-    refetchInterval: 10_000,
+    refetchInterval: 3_000,
+    refetchIntervalInBackground: true,
     queryFn: async (): Promise<OpenIssue[]> => {
       const addr = strip0x(walletAddress!);
       const [voteRows, created] = await Promise.all([
         cirrusGet("mapping", `collection_name=eq.votes&address=eq.${addr}&select=key,value`),
         cirrusGet(
           "event",
-          `address=eq.${addr}&event_name=eq.IssueCreated&order=block_timestamp.desc&select=attributes,block_number`
+          `address=eq.${addr}&event_name=in.(IssueCreated,IssueExecuted,IssueDismissed)&order=block_number.desc` +
+            `&select=event_name,attributes,block_number,transaction_hash`
         ),
       ]);
 
-      // Group live votes by issueId (drop zeroed-out / cleared entries).
-      const votersByIssue = new Map<string, string[]>();
-      for (const r of voteRows) {
-        const issueId = String(r?.key?.key ?? "");
-        const voter = strip0x(String(r?.value ?? ""));
-        if (!issueId || isZeroAddr(voter)) continue;
-        const list = votersByIssue.get(issueId) ?? [];
-        if (!list.includes(voter)) list.push(voter);
-        votersByIssue.set(issueId, list);
-      }
-
-      // Latest IssueCreated per issueId for the call details.
-      const detailsByIssue = new Map<string, { target: string; func: string; args: string[]; block?: number }>();
-      for (const ev of created) {
-        const a = ev?.attributes ?? {};
-        const issueId = String(a.issueId ?? "");
-        if (!issueId || detailsByIssue.has(issueId)) continue;
-        detailsByIssue.set(issueId, {
-          target: strip0x(String(a.target ?? "")),
-          func: String(a.func ?? ""),
-          args: normalizeArgs(a.args),
-          block: ev?.block_number ? Number(ev.block_number) : undefined,
-        });
-      }
-
-      const issues: OpenIssue[] = [];
-      for (const [issueId, voters] of votersByIssue) {
-        const d = detailsByIssue.get(issueId);
-        issues.push({
-          issueId,
-          target: d?.target ?? "",
-          func: d?.func ?? "",
-          args: d?.args ?? [],
-          voters,
-          createdBlock: d?.block,
-        });
-      }
-      issues.sort((a, b) => (b.createdBlock ?? 0) - (a.createdBlock ?? 0));
-      return issues;
+      return mergeIndexedIssues(buildOpenIssues(voteRows, created), queryClient.getQueryData(queryKey), created);
     },
   });
 }
@@ -518,6 +583,8 @@ export function buildNestedCastVotePayload(
 
 export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) {
   const { submit } = useSubmitTransaction();
+  const { userAddress } = useUser();
+  const queryClient = useQueryClient();
   // A route is only "nested" once it has an intermediate hop before the wallet.
   const routeKey = (route ?? [walletAddress]).map(strip0x).join(">");
   const voteRoute = useMemo(
@@ -586,12 +653,21 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
    * of castVoteOnIssue issues (the issueId on this wallet still matches direct votes).
    */
   const castVote = useCallback(
-    (func: string, args: string[], target?: string) =>
-      submit(
-        "FUNCTION",
-        buildNestedCastVotePayload(voteRoute, func, args, target || walletAddress)
-      ),
-    [submit, voteRoute, walletAddress]
+    async (func: string, args: string[], target?: string) => {
+      const payload = buildNestedCastVotePayload(voteRoute, func, args, target || walletAddress);
+      const result = await submit("FUNCTION", payload);
+      const call = payload.args as { _target: string; _func: string; _args: string[] };
+      queryClient.setQueryData<OpenIssue[]>(["multisig-open-issues", voteRoute[0]], (cached = []) =>
+        applyConfirmedVote(cached, result, {
+          target: call._target,
+          func: call._func,
+          args: call._args,
+          voters: userAddress ? [strip0x(userAddress)] : [],
+        })
+      );
+      return result;
+    },
+    [submit, voteRoute, walletAddress, queryClient, userAddress]
   );
 
   /**
