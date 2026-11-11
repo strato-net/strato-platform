@@ -163,7 +163,7 @@ if [[ ! -d $NODE_DIR ]]; then
   # 4a. The node directory (ethconf, secrets, genesis, docker-compose.yml, commands.txt).
   sudo -u $NODE_USER -H env PATH="$PATH" \
     strato-setup "$NODE_DIR" --role="$ROLE" --network="$NETWORK" --nodeHost="$node_host" \
-      --pghost="$PG_WRITER_HOST" --pgReaderHost="$PG_READER_HOST" --password="$pg_password" \
+      --pghost="$PG_WRITER_HOST" --pgReaderHost="$PG_READER_HOST" --pguser="$PG_USER" --password="$pg_password" \
       --cellId="$CELL_ID" "${peerdb[@]}" --peerStore="${PEER_STORE:-postgres}" \
       --writer="$WRITER" --validatorBehavior="$VALIDATOR_BEHAVIOR" --repoUrl="$REPO_URL" \
       "${vmq[@]}" "${apps[@]}" "${auth[@]}" "${ssl[@]}" "${extra[@]}"
