@@ -124,14 +124,15 @@ fi
 # cluster named in ethconf's sqlConfig (--pghost at setup); psql goes through
 # the container in the first case and runs on the host in the second.
 pg_password="$(tr -d '\n' < secrets/postgres_password)"
-read -r PG_HOST PG_PORT < <(python3 - <<'PY'
+read -r PG_HOST PG_PORT PG_USER < <(python3 - <<'PY'
 import re
 text = open(".ethereumH/ethconf.yaml").read()
 m = re.search(r"^sqlConfig:(.*?)(?=^\S|\Z)", text, re.S | re.M)
 block = m.group(1) if m else ""
 host = re.search(r"host:\s*['\"]?([^'\",}\s]+)", block)
 port = re.search(r"port:\s*['\"]?([0-9]+)", block)
-print((host.group(1) if host else ""), (port.group(1) if port else ""))
+user = re.search(r"user:\s*['\"]?([^'\",}\s]+)", block)
+print((host.group(1) if host else "localhost"), (port.group(1) if port else "5432"), (user.group(1) if user else "postgres"))
 PY
 )
 PG_HOST="${PG_HOST:-localhost}"; PG_PORT="${PG_PORT:-5432}"
@@ -157,9 +158,9 @@ else
 fi
 pg_psql() {
   if [[ "$PG_MODE" == container ]]; then
-    "${COMPOSE[@]}" exec -T postgres psql -U postgres "$@"
+    "${COMPOSE[@]}" exec -T postgres psql -U "$PG_USER" "$@"
   else
-    PGPASSWORD="$pg_password" psql -h "$PG_HOST" -p "$PG_PORT" -U postgres "$@"
+    PGPASSWORD="$pg_password" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" "$@"
   fi
 }
 

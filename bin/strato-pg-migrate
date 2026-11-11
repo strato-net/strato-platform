@@ -3,7 +3,7 @@
 # databases when present) from its Postgres container to an external cluster
 # (Phase 2 of the tiered deployment) and re-point the node.
 #
-#   strato-pg-migrate <node-dir> --writer <host> [--reader <host>] \
+#   strato-pg-migrate <node-dir> --writer <host> [--reader <host>] [--pguser <user>] \
 #       (--password <pw> | --password-file <file>) [-- <original strato-setup flags>]
 #
 # Steps, each idempotent enough to re-run:
@@ -24,10 +24,11 @@ JOBS=${JOBS:-4}
 die() { echo "error: $*" >&2; exit 1; }
 usage() { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 
-NODE_DIR=""; WRITER=""; READER=""; PASSWORD=""; SETUP_FLAGS=()
+NODE_DIR=""; WRITER=""; READER=""; PASSWORD=""; PG_USER=""; SETUP_FLAGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --writer) WRITER=$2; shift 2 ;;
+    --pguser) PG_USER=$2; shift 2 ;;
     --reader) READER=$2; shift 2 ;;
     --password) PASSWORD=$2; shift 2 ;;
     --password-file) PASSWORD=$(tr -d '[:space:]' < "$2"); shift 2 ;;
@@ -50,6 +51,15 @@ if [[ -f .strato.pid ]]; then
   fi
 fi
 grep -q '^  postgres:$' docker-compose.yml || die "this node already uses an external Postgres (no postgres service in docker-compose.yml)"
+LOCAL_PG_USER=$(python3 - <<'PYUSER'
+import re
+text = open(".ethereumH/ethconf.yaml").read()
+match = re.search(r"^sqlConfig:(.*?)(?=^\S|\Z)", text, re.S | re.M)
+user = re.search(r"user:\s*['\"]?([^'\",}\s]+)", match.group(1) if match else "")
+print(user.group(1) if user else "postgres")
+PYUSER
+)
+PG_USER=${PG_USER:-$LOCAL_PG_USER}
 LOCAL_PASSWORD=$(tr -d '[:space:]' < secrets/postgres_password)
 
 # The cluster is reached from a throwaway client container on the node's
@@ -57,7 +67,9 @@ LOCAL_PASSWORD=$(tr -d '[:space:]' < secrets/postgres_password)
 NETWORK=strato_default
 pg() { # pg <host> <password> <db> <psql args...>
   local host=$1 pw=$2 db=$3; shift 3
-  docker run --rm -i --network "$NETWORK" -e PGPASSWORD="$pw" "$PG_IMAGE" psql -h "$host" -U postgres -d "$db" -v ON_ERROR_STOP=1 -tA "$@"
+  local pg_user="$PG_USER"
+  [[ "$host" == postgres ]] && pg_user="$LOCAL_PG_USER"
+  docker run --rm -i --network "$NETWORK" -e PGPASSWORD="$pw" "$PG_IMAGE" psql -h "$host" -U "$pg_user" -d "$db" -v ON_ERROR_STOP=1 -tA "$@"
 }
 
 echo "== starting the node's postgres container"
@@ -82,7 +94,7 @@ echo "== databases to move: ${DBS[*]}"
 for db in "${DBS[@]}"; do
   echo "== dumping $db"
   docker run --rm --network "$NETWORK" -e PGPASSWORD="$LOCAL_PASSWORD" "$PG_IMAGE" \
-    pg_dump -h postgres -U postgres --no-owner --no-privileges -Fc "$db" > "pg-migration/$db.dump"
+    pg_dump -h postgres -U "$LOCAL_PG_USER" --no-owner --no-privileges -Fc "$db" > "pg-migration/$db.dump"
   ls -lh "pg-migration/$db.dump"
 done
 
@@ -92,7 +104,7 @@ for db in "${DBS[@]}"; do
     pg "$WRITER" "$PASSWORD" postgres -c "create database \"$db\""
   fi
   docker run --rm -i --network "$NETWORK" -e PGPASSWORD="$PASSWORD" "$PG_IMAGE" \
-    pg_restore -h "$WRITER" -U postgres -d "$db" --no-owner --no-privileges -j "$JOBS" --exit-on-error < "pg-migration/$db.dump"
+    pg_restore -h "$WRITER" -U "$PG_USER" -d "$db" --no-owner --no-privileges -j "$JOBS" --exit-on-error < "pg-migration/$db.dump"
 done
 
 echo "== verifying"
@@ -124,7 +136,7 @@ echo "== re-pointing the node"
 # --regenerate --password overwrites secrets/postgres_password; keep the
 # container's so the rollback in the header stays possible.
 [[ -f pg-migration/postgres_password.local ]] || cp secrets/postgres_password pg-migration/postgres_password.local
-strato-setup "$(pwd)" --regenerate --pghost="$WRITER" --pgReaderHost="$READER" --password="$PASSWORD" "${SETUP_FLAGS[@]}"
+strato-setup "$(pwd)" --regenerate --pghost="$WRITER" --pgReaderHost="$READER" --pguser="$PG_USER" --password="$PASSWORD" "${SETUP_FLAGS[@]}"
 echo
 echo "Done. Start the node with strato-up; it now writes $WRITER and PostgREST reads $READER."
 echo "Rollback: strato-down, then strato-setup $(pwd) --regenerate --pghost=localhost --password=\$(cat pg-migration/postgres_password.local) <original flags>, then strato-up."

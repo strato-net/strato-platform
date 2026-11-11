@@ -5,6 +5,15 @@ set -e
 # No "set -x": the trace echoes PGPASSWORD and the rendered db-uri, which
 # put the Postgres password into the container log.
 
+if [ -n "${ETHCONF_FILE:-}" ]; then
+  PG_ENV_POSTGRES_HOST=$(yq -er '.cirrusConfig.host' "$ETHCONF_FILE")
+  PG_PORT_5432_TCP_PORT=$(yq -er '.cirrusConfig.port' "$ETHCONF_FILE")
+  PG_ENV_POSTGRES_USER=$(yq -er '.cirrusConfig.user' "$ETHCONF_FILE")
+  PG_ENV_POSTGRES_DB=$(yq -er '.cirrusConfig.database' "$ETHCONF_FILE")
+  PG_ENV_POSTGRES_PASSWORD=$(yq -r '.cirrusConfig.password // ""' "$ETHCONF_FILE")
+  POSTGREST_ANONYMOUS=$PG_ENV_POSTGRES_USER
+fi
+
 # Read postgres password from mounted secrets file
 if [ -f /run/secrets/postgres_password ]; then
   PG_ENV_POSTGRES_PASSWORD=$(cat /run/secrets/postgres_password)
@@ -13,7 +22,7 @@ export PGPASSWORD="${PG_ENV_POSTGRES_PASSWORD:-}"
 
 echo "the pg host and port are: ${PG_ENV_POSTGRES_HOST} ${PG_PORT_5432_TCP_PORT}"
 
-until psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER:-postgres}" -c '\q'; do
+until psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER:-postgres}" -d postgres -c '\q'; do
   >&2 echo "Postgres is unavailable - sleeping"
   sleep 1
 done

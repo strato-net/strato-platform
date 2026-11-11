@@ -17,7 +17,7 @@ import Blockchain.Init.DockerCompose
 import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer, flags_disableSqlIndexing, flags_disableCirrusIndexing, flags_syncFromFile)
+import Blockchain.Init.Options (flags_ingressListen, flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_pguser, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer, flags_disableSqlIndexing, flags_disableCirrusIndexing, flags_syncFromFile)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -100,7 +100,7 @@ createCommandsFile role = do
       -- loopback (postgres publishes on 127.0.0.1 only, but "localhost"
       -- resolves to ::1 first on macOS), in a container the service name. See
       -- storeHost.
-      return [restartable $ "blockapps-vault-wrapper-server --pghost " ++ storeHost "postgres" flags_pghost ++ " --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
+      return [restartable $ "blockapps-vault-wrapper-server --pghost " ++ storeHost "postgres" flags_pghost ++ " --pguser " ++ flags_pguser ++ " --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
     else return []
 
   coreCommands <- if not (roleRunsCore role) then return [] else do
