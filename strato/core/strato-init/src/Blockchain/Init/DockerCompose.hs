@@ -274,7 +274,7 @@ generateDockerCompose role = do
         , command = Just ["exec docker-entrypoint.sh postgres -c hba_file=/etc/postgresql/pg_hba.conf -c max_connections=800 -c shared_buffers=512MB >> /logs/postgres.log 2>&1"]
         , restart = Just "unless-stopped"
         , healthcheck = Just Healthcheck
-            { test = ["CMD-SHELL", "pg_isready -U postgres"]
+            { test = ["CMD-SHELL", "pg_isready -U " ++ flags_pguser ++ " -d postgres"]
             , interval = Just "2s"
             , timeout = Just "2s"
             , retries = Just 10
