@@ -49,8 +49,11 @@ assert.deepStrictEqual(activityOf(ev("Swap", pool, swap), state), {
 });
 assert.strictEqual(usd(ev("Swap", "ee".repeat(20), swap)), null, "a Swap from an unknown contract is not counted");
 assert.strictEqual(usd(ev("Swap", pool, { ...swap, tokenIn: unpriced })), "1", "falls back to the output leg");
-// PoolV3: signed amounts, tokens from the factory's NewPoolV3
-assert.strictEqual(usd(ev("Swap", poolV3, { amount0: "-1000000000000000000", amount1: "5" })), (2000n * 10n ** 18n).toString());
+// PoolV3: signed amounts, tokens from the factory's NewPoolV3; the positive amount is the input
+assert.strictEqual(usd(ev("Swap", poolV3, { amount0: "-1000000000000000000", amount1: "5" })), (2000n * 10n ** 18n).toString(), "unpriced input: output leg");
+learn(ev("NewPoolV3", factory, { pool: "d4".repeat(20), tokenA: eth, tokenB: usdst, fee: "500" }), state);
+assert.strictEqual(usd(ev("Swap", "d4".repeat(20), { amount0: "-1000000000000000000", amount1: "1900000000000000000000" })), (1900n * 10n ** 18n).toString(), "token1 in");
+assert.strictEqual(usd(ev("Swap", "d4".repeat(20), { amount0: "1000000000000000000", amount1: "-1900000000000000000000" })), (2000n * 10n ** 18n).toString(), "token0 in");
 
 // The other counted events, each from its trusted contract only
 const deposit = { asset: usdst, amount: "250000000000000000000" };

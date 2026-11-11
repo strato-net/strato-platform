@@ -86,10 +86,13 @@ export const activityOf = (e: ChainEvent, state: State): Activity | null => {
     // The swap's sender can be a router, so the trader is the transaction's sender.
     account = e.txSender;
     const [token0, token1] = state.pools.get(e.address)!;
-    legs =
-      a.tokenIn !== undefined
-        ? [[a.tokenIn, a.amountIn], [a.tokenOut, a.amountOut]]
-        : [[token0, a.amount0], [token1, a.amount1]]; // PoolV3: signed amounts, no tokens
+    if (a.tokenIn !== undefined) {
+      legs = [[a.tokenIn, a.amountIn], [a.tokenOut, a.amountOut]];
+    } else {
+      // PoolV3 names no tokens and signs its amounts: the positive one is the input.
+      const zeroForOne = (toBigInt(a.amount0) ?? 0n) > 0n;
+      legs = zeroForOne ? [[token0, a.amount0], [token1, a.amount1]] : [[token1, a.amount1], [token0, a.amount0]];
+    }
   } else if (e.name === "MetalMinted" && sources.metalForges.has(e.address)) {
     account = a.buyer;
     legs = [[a.payToken, a.payAmount]];
