@@ -15,7 +15,7 @@ require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
 const axios = require('axios');
-const { rest, util } = require('blockapps-rest');
+const { rest, util } = require('./strato');
 
 const DECIDER_STATE = '00000000000000000000000000000000dec1de02';
 const LEGACY = DECIDER_STATE; // DeciderState is its own default implementation

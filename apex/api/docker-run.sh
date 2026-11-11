@@ -1,6 +1,5 @@
 #!/usr/bin/env sh
 set -e
-set -x
 
 # TODO: Set POSTGRES vars defaults here, remove default from docker-compose.yml, rename postgres vars using uppercase
 # These must be exported so Node.js can access them via process.env

@@ -129,7 +129,7 @@ getAncestors cc c0 = reverse . snd <$> go (S.singleton $ c0 ^. contractName) (S.
   where
     go onPath acc c = foldM (visit onPath) acc =<< getParentsAndUsings cc c
     visit onPath acc@(seen, out) p
-      | n `S.member` onPath = Left (InternalError "inheritance cycle" (labelToString n), p ^. contractContext)
+      | n `S.member` onPath = Left (TypeError "inheritance cycle" (labelToString n), p ^. contractContext)
       | n `S.member` seen = Right acc
       | otherwise = go (S.insert n onPath) (S.insert n seen, p : out) p
       where n = p ^. contractName

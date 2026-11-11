@@ -24,6 +24,10 @@ PG_HOST=$(printf '%s' "${DSN:-}" | sed -E 's#^[a-z]+://[^@]*@([^:/?]+).*$#\1#')
 PG_PORT=$(printf '%s' "${DSN:-}" | sed -nE 's#^[a-z]+://[^@]*@[^:/?]+:([0-9]+)/.*$#\1#p')
 PG_PORT=${PG_PORT:-5432}
 export PGHOST="$PG_HOST" PGPORT="$PG_PORT"
+PGUSER=${PGUSER:-$(printf '%s' "${DSN:-}" | sed -nE 's#^[a-z]+://([^:/@?]+).*#\1#p')}
+PGUSER=${PGUSER:-postgres}
+export PGUSER
+export PGDATABASE=postgres
 echo "  postgres: ${PG_HOST}:${PG_PORT}"
 
 # Percent-encode a string for use inside a URL (the generated cluster
@@ -47,12 +51,12 @@ if [ -f /run/secrets/postgres_password ]; then
     echo "Using postgres password from secrets"
     # Update DSN with password for Kratos
     if [ -n "$DSN" ]; then
-        export DSN="postgres://postgres:${PGPASSWORD_URL}@${PG_HOST}:${PG_PORT}/kratos?sslmode=disable"
+        export DSN="postgres://${PGUSER}:${PGPASSWORD_URL}@${PG_HOST}:${PG_PORT}/kratos?sslmode=disable"
         echo "Updated Kratos DSN with password"
     fi
     # Update DSN with password for Hydra
     if [ -n "$HYDRA_DSN" ]; then
-        export HYDRA_DSN="postgres://postgres:${PGPASSWORD_URL}@${PG_HOST}:${PG_PORT}/hydra?sslmode=disable"
+        export HYDRA_DSN="postgres://${PGUSER}:${PGPASSWORD_URL}@${PG_HOST}:${PG_PORT}/hydra?sslmode=disable"
         echo "Updated Hydra DSN with password"
     fi
 else
@@ -100,7 +104,7 @@ wait_for_postgres() {
     
     echo "Waiting for PostgreSQL to be ready..."
     while [ $attempt -le $max_attempts ]; do
-        if pg_isready -h "$PG_HOST" -p "$PG_PORT" -U postgres > /dev/null 2>&1; then
+        if pg_isready -h "$PG_HOST" -p "$PG_PORT" -U "$PGUSER" -d postgres > /dev/null 2>&1; then
             echo "PostgreSQL is ready!"
             return 0
         fi
@@ -144,22 +148,22 @@ wait_for_postgres
 echo "Setting up databases..."
 if [ "${LOCAL_AUTH_RESET:-false}" = "true" ]; then
     echo "  LOCAL_AUTH_RESET: dropping kratos and hydra databases"
-    psql -h "$PG_HOST" -p "$PG_PORT" -U postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN ('kratos', 'hydra') AND pid <> pg_backend_pid();" 2>/dev/null || true
-    psql -h "$PG_HOST" -p "$PG_PORT" -U postgres -c "DROP DATABASE IF EXISTS kratos" && echo "    Done" || echo "    FAILED"
-    psql -h "$PG_HOST" -p "$PG_PORT" -U postgres -c "DROP DATABASE IF EXISTS hydra" && echo "    Done" || echo "    FAILED"
+    psql -h "$PG_HOST" -p "$PG_PORT" -U "$PGUSER" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN ('kratos', 'hydra') AND pid <> pg_backend_pid();" 2>/dev/null || true
+    psql -h "$PG_HOST" -p "$PG_PORT" -U "$PGUSER" -c "DROP DATABASE IF EXISTS kratos" && echo "    Done" || echo "    FAILED"
+    psql -h "$PG_HOST" -p "$PG_PORT" -U "$PGUSER" -c "DROP DATABASE IF EXISTS hydra" && echo "    Done" || echo "    FAILED"
 fi
 for db in kratos hydra; do
-    if psql -h "$PG_HOST" -p "$PG_PORT" -U postgres -Atc "SELECT 1 FROM pg_database WHERE datname = '$db'" | grep -q 1; then
+    if psql -h "$PG_HOST" -p "$PG_PORT" -U "$PGUSER" -Atc "SELECT 1 FROM pg_database WHERE datname = '$db'" | grep -q 1; then
         echo "  $db database exists"
     else
         echo "  Creating $db database..."
-        psql -h "$PG_HOST" -p "$PG_PORT" -U postgres -c "CREATE DATABASE $db" && echo "    Done" || echo "    FAILED"
+        psql -h "$PG_HOST" -p "$PG_PORT" -U "$PGUSER" -c "CREATE DATABASE $db" && echo "    Done" || echo "    FAILED"
     fi
 done
 echo "  Databases AFTER setup:"
-psql -h "$PG_HOST" -p "$PG_PORT" -U postgres -c "SELECT datname FROM pg_database WHERE datistemplate = false;"
+psql -h "$PG_HOST" -p "$PG_PORT" -U "$PGUSER" -c "SELECT datname FROM pg_database WHERE datistemplate = false;"
 echo "  Checking hydra database is empty..."
-psql -h "$PG_HOST" -p "$PG_PORT" -U postgres -d hydra -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public';"
+psql -h "$PG_HOST" -p "$PG_PORT" -U "$PGUSER" -d hydra -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public';"
 
 # Run migrations - must set DSN explicitly for each tool since -e reads from DSN env var
 echo "Running Kratos migrations..."
