@@ -1,0 +1,159 @@
+import crypto from "crypto";
+import express from "express";
+import { config, sha256 } from "../config";
+import { query } from "../db/pool";
+import { toAddress } from "../utils/num";
+
+class ApiError extends Error {
+  constructor(public status: number, public code: string, message: string) {
+    super(message);
+  }
+}
+
+const badRequest = (message: string) => new ApiError(400, "BAD_REQUEST", message);
+
+const asyncHandler =
+  (fn: (req: express.Request, res: express.Response) => Promise<void>) =>
+  (req: express.Request, res: express.Response, next: express.NextFunction) =>
+    fn(req, res).catch(next);
+
+const bearerHash = (req: express.Request): string => {
+  const [scheme, token] = (req.headers.authorization || "").split(" ");
+  if (scheme !== "Bearer" || !token) throw new ApiError(401, "UNAUTHORIZED", "Missing bearer key");
+  return sha256(token);
+};
+
+/** The partner a request's key belongs to; each key reads only the codes issued through it. */
+const partnerOf = (req: express.Request): string => {
+  const partner = config.apiKeys.get(bearerHash(req));
+  if (!partner) throw new ApiError(401, "UNAUTHORIZED", "Unknown key");
+  return partner;
+};
+
+/** An optional string field: absent and null are both "not shared". */
+const optional = (body: any, field: string): string | null => {
+  const v = body[field];
+  if (v === undefined || v === null) return null;
+  if (typeof v !== "string" || !v.trim() || v.length > 320) throw badRequest(`${field} must be a non-empty string`);
+  return v.trim();
+};
+
+const time = (v: unknown, what: string): Date => {
+  const d = new Date(typeof v === "string" ? v : "");
+  if (Number.isNaN(d.getTime())) throw badRequest(`${what} must be an ISO 8601 timestamp`);
+  return d;
+};
+
+// No 0/O or 1/I/L, so a code survives being read aloud or retyped.
+const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const newCode = (): string =>
+  Array.from({ length: 10 }, () => CODE_ALPHABET[crypto.randomInt(CODE_ALPHABET.length)]).join("");
+
+export const router = express.Router();
+router.use(express.json());
+
+router.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
+// Issue a user's referral code. One code per (partner, external_user_id):
+// calling again returns the same code and takes in any identifier newly shared.
+router.post(
+  "/referrals/codes",
+  asyncHandler(async (req, res) => {
+    const partner = partnerOf(req);
+    const body = req.body ?? {};
+    const externalUserId = optional(body, "external_user_id");
+    if (!externalUserId) throw badRequest("external_user_id is required");
+    const wallet = optional(body, "wallet");
+    if (wallet && !toAddress(wallet)) throw badRequest("wallet must be a 20-byte hex address");
+    // Two users drawing the same code is a primary-key error: a 5xx the caller retries.
+    const { rows } = await query<{ code: string; created: boolean }>(
+      `INSERT INTO codes (code, partner, external_user_id, x_user_id, email, wallet) VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (partner, external_user_id) DO UPDATE SET
+         x_user_id = COALESCE(EXCLUDED.x_user_id, codes.x_user_id),
+         email = COALESCE(EXCLUDED.email, codes.email),
+         wallet = COALESCE(EXCLUDED.wallet, codes.wallet)
+       RETURNING code, (xmax = 0) AS created`,
+      [newCode(), partner, externalUserId, optional(body, "x_user_id"), optional(body, "email")?.toLowerCase() ?? null, toAddress(wallet)]
+    );
+    const { code, created } = rows[0];
+    res.json({
+      code,
+      ...(config.refLinkBase ? { ref_link: `${config.refLinkBase}?ref=${code}` } : {}),
+      created,
+    });
+  })
+);
+
+// Referrals, traders and volume per code of the calling key, for [from, to).
+router.get(
+  "/referrals/metrics",
+  asyncHandler(async (req, res) => {
+    const partner = partnerOf(req);
+    const from = time(req.query.from, "from");
+    const to = time(req.query.to, "to");
+    if (from >= to) throw badRequest("from must be before to");
+    const limit = req.query.limit === undefined ? 100 : Number(req.query.limit);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw badRequest("limit must be an integer from 1 to 1000");
+    const cursor = typeof req.query.cursor === "string" ? req.query.cursor : "";
+    const [codes, progress] = await Promise.all([
+      query<{ code: string; external_user_id: string; referrals: string; traders: string; volume_usd: string }>(
+        `SELECT c.code, c.external_user_id,
+                COUNT(DISTINCT r.account) FILTER (WHERE r.created_at >= $2 AND r.created_at < $3) AS referrals,
+                COUNT(DISTINCT a.account) AS traders,
+                ROUND(COALESCE(SUM(a.usd_wad), 0) / 1e18, 2)::text AS volume_usd
+         FROM codes c
+         LEFT JOIN referrals r ON r.code = c.code
+         LEFT JOIN activity a ON a.account = r.account AND a.block_ts >= $2 AND a.block_ts < $3
+         WHERE c.partner = $1 AND c.code > $4
+         GROUP BY c.code
+         ORDER BY c.code
+         LIMIT $5`,
+        [partner, from, to, cursor, limit + 1]
+      ),
+      query<{ as_of: Date }>("SELECT as_of FROM progress WHERE name = 'cirrus'"),
+    ]);
+    const page = codes.rows.slice(0, limit);
+    res.json({
+      data_as_of: progress.rows[0]?.as_of.toISOString() ?? null,
+      codes: page.map((r) => ({
+        code: r.code,
+        external_user_id: r.external_user_id,
+        referrals: Number(r.referrals),
+        traders: Number(r.traders),
+        volume_usd: r.volume_usd,
+      })),
+      next_cursor: codes.rows.length > limit ? page[page.length - 1].code : null,
+    });
+  })
+);
+
+// Internal, called by the app backend when a new account signed up through
+// a ref link. First code wins, and an owner's own account (by the wallet or
+// email they shared) is not their referral.
+router.post(
+  "/referrals/signups",
+  asyncHandler(async (req, res) => {
+    if (!config.internalKeyHash || bearerHash(req) !== config.internalKeyHash) throw new ApiError(401, "UNAUTHORIZED", "Unknown key");
+    const body = req.body ?? {};
+    const account = toAddress(body.account);
+    const code = optional(body, "code");
+    if (!account || !code) throw badRequest("code and account are required");
+    const { rowCount } = await query(
+      `INSERT INTO referrals (account, code)
+       SELECT $1, code FROM codes
+       WHERE code = $2 AND wallet IS DISTINCT FROM $1 AND ($3::text IS NULL OR email IS DISTINCT FROM $3)
+       ON CONFLICT (account) DO NOTHING`,
+      [account, code.toUpperCase(), optional(body, "username")?.toLowerCase() ?? null]
+    );
+    res.json({ recorded: rowCount === 1 });
+  })
+);
+
+router.use((error: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // express.json() rejects a malformed body with a 4xx of its own
+  const apiError = error instanceof ApiError ? error : error?.type === "entity.parse.failed" ? badRequest("Malformed JSON body") : null;
+  if (!apiError) return next(error);
+  res.status(apiError.status).json({ error: { code: apiError.code, message: apiError.message } });
+});

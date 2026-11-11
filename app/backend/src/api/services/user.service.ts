@@ -8,6 +8,7 @@ import { StratoError } from "../../errors";
 import JSONBig from "json-bigint";
 import { normalizeLegacyEscapes, repairStructuredJson } from "../helpers/jsonStringParsing.helper";
 import { validateAddressField } from "../validators/common.validators";
+import { partnerReferralsUrl, partnerReferralsKey } from "../../config/config";
 const { AdminRegistry, adminRegistry, DAY_MS } = constants;
 const JSONBigString = JSONBig({ storeAsString: true });
 const JSONBigNumber = JSONBig({ useNativeBigInt: true });
@@ -21,6 +22,20 @@ type AbiType = {
   actual?: AbiType;
   contents?: string;
   typedef?: string;
+};
+
+/**
+ * Records the partner referral code a new account signed up with. Best
+ * effort and not awaited: a signup never waits on, or fails with, the
+ * partner referrals service.
+ */
+export const recordPartnerReferral = (code: string, account: string, username?: string): void => {
+  if (!partnerReferralsUrl || !partnerReferralsKey) return;
+  fetch(`${partnerReferralsUrl}/partner-api/referrals/signups`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${partnerReferralsKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ code, account, username }),
+  }).catch((error) => console.error("Failed to record partner referral:", error));
 };
 
 export const isUserAdmin = async (

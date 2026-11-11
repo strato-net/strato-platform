@@ -22,6 +22,14 @@ export interface AttributionData {
 export function captureAttribution(): void {
   try {
     const params = new URLSearchParams(window.location.search);
+
+    // A partner ref link (?ref=CODE): kept in a cookie so the backend sees it
+    // on the /api/user/me call that creates the account. First-touch wins.
+    const ref = params.get('ref');
+    if (ref && /^[A-Za-z0-9]{1,32}$/.test(ref) && !/(?:^|;\s*)ref=/.test(document.cookie)) {
+      document.cookie = `ref=${ref}; path=/; max-age=${TTL_MS / 1000}; SameSite=Lax`;
+    }
+
     const utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'via'] as const;
     const captured: Partial<AttributionData> = {};
     let hasAny = false;
@@ -67,6 +75,7 @@ export function readAttribution(): AttributionData | null {
 export function clearAttribution(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
+    document.cookie = 'ref=; path=/; max-age=0';
   } catch {
     // ignore
   }

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import { getAdmin, isUserAdmin, addAdmin, removeAdmin, createIssue, castVoteOnIssueById, simulateCastVoteOnIssue, dismissIssue, getOpenIssues,
-         getExecutedIssues, contractSearch, getContractDetails,
+         getExecutedIssues, contractSearch, getContractDetails, recordPartnerReferral,
  } from "../services/user.service";
 import { validateUserAddress } from "../validators/common.validators";
 import { validateIssuesQuery } from "../validators/user.validator";
@@ -15,6 +15,10 @@ class UserController {
     try {
       const { address: userAddress, accessToken, userName, isNewUser } = req;
       const isAdmin = await isUserAdmin(accessToken, userAddress);
+
+      // A partner ref link's code, set as a cookie by the UI when the user landed
+      const ref = isNewUser && /(?:^|;\s*)ref=([A-Za-z0-9]{1,32})(?:;|$)/.exec(req.headers.cookie ?? "")?.[1];
+      if (ref) recordPartnerReferral(ref, userAddress, userName);
 
       res.status(RestStatus.OK).json({ userAddress, isAdmin, userName, isNewUser: !!isNewUser });
       next();
