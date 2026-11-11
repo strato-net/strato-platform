@@ -323,6 +323,12 @@ test("plain boolean form input and the explicit cast produce the same typed argu
   assert.equal(parseVariadicBoolean("not-a-bool"), null);
 });
 
+test("digit-only byte arguments remain exact hex strings", () => {
+  assert.deepEqual(typedVariadicArg("bytes2", "1234"), { type: "bytes2", value: "1234" });
+  assert.deepEqual(typedVariadicArg("bytes", "001234"), { type: "bytes", value: "001234" });
+  assert.deepEqual(typedVariadicArg("byte", '"12"'), { type: "byte", value: "12" });
+});
+
 const proposal = { target: pool, func: "swap", args: normalizeArgs(args), voters: [signer] };
 const receipt = { status: "Success", hash: "receipt", data: { tag: "Call", contents: [false, issueId] } };
 

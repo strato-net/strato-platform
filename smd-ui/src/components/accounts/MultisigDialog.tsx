@@ -2388,23 +2388,38 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
     if (manualAddresses || !isStakingAction || !stakingMetadata.data) return;
     setTarget(stakingMetadata.data.stakingAddress);
     setAsset(stakingMetadata.data.stratoTokenAddress);
-    setValidator(stakingMetadata.data.validators.find((item) => item.active)?.address || "");
+    const eligible = stakingMetadata.data.validators.filter((item) =>
+      (action === "unstake" || item.active) && validContractAddress(item.address)
+    );
+    setValidator((current) =>
+      eligible.some((item) => eq(item.address, current)) ? current : eligible[0]?.address || ""
+    );
   }, [manualAddresses, action, isStakingAction, stakingMetadata.data]);
 
   useEffect(() => {
     if (manualAddresses || !isCDPAction || !cdpMetadata.data) return;
     setTarget(cdpMetadata.data.engineAddress);
     setSpender(cdpMetadata.data.vaultAddress);
-    setAsset(cdpMetadata.data.assets.find((item) => item.isSupported && !item.isPaused)?.asset || "");
+    const eligible = cdpMetadata.data.assets.filter((item) =>
+      item.isSupported && !item.isPaused && validContractAddress(item.asset)
+    );
+    setAsset((current) =>
+      eligible.some((item) => eq(item.asset, current)) ? current : eligible[0]?.asset || ""
+    );
   }, [manualAddresses, action, isCDPAction, cdpMetadata.data]);
 
   useEffect(() => {
-    if (manualAddresses || !isPoolAction || liquidityVersion === "v3" || !availablePools.length) return;
-    const pool = availablePools.find((item) => eq(item.address, target)) ?? availablePools[0];
-    applyPool(pool);
-    // Action changes intentionally reset the target, so the first compatible pool is selected.
+    if (manualAddresses || !isPoolAction || liquidityVersion === "v3" || !poolMetadata.data) return;
+    const pool = availablePools.find((item) => eq(item.address, target));
+    if (pool) applyPool(pool);
+    else {
+      setTarget("");
+      setTokenA("");
+      setTokenB("");
+      setTokensText("");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manualAddresses, action, liquidityVersion, availablePools]);
+  }, [manualAddresses, action, liquidityVersion, availablePools, poolMetadata.data]);
 
   const changeAction = (value: ProtocolActionKind) => {
     setAction(value);

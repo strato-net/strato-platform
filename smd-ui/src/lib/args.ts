@@ -79,6 +79,8 @@ export function typedVariadicArg(
       ? (resolvedAddress || raw).trim().replace(/^0x/i, "")
       : lowerType === "bool"
         ? (parseVariadicBoolean(raw) ?? parseArgText(raw))
+        : lowerType === "byte" || /^bytes(?:\d+)?$/.test(lowerType)
+          ? (raw.trim().startsWith('"') ? parseArgText(raw) : raw.trim())
         : parseArgText(raw);
   return { type: normalizedType, value };
 }
@@ -87,7 +89,7 @@ export function typedVariadicArg(
 export function variadicArgValue(value: unknown): unknown {
   if (value && typeof value === "object" && !Array.isArray(value) &&
       typeof (value as Record<string, unknown>).type === "string" &&
-      Object.hasOwn(value as object, "value")) {
+      Object.prototype.hasOwnProperty.call(value, "value")) {
     return (value as TypedVariadicArg).value;
   }
   return value;
