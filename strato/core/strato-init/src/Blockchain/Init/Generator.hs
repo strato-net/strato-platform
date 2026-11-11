@@ -92,13 +92,12 @@ createCommandsFile :: Role -> IO ()
 createCommandsFile role = do
   localAuthCommands <- if flags_localAuth
     then do
-      pgPassword <- filter (/= '\n') <$> readFile "secrets/postgres_password"
       -- The vault wrapper runs next to the other node processes, so it reaches
       -- Postgres the way genEthConf's sqlConfig does: on a host the IPv4
       -- loopback (postgres publishes on 127.0.0.1 only, but "localhost"
       -- resolves to ::1 first on macOS), in a container the service name. See
       -- storeHost.
-      return [restartable $ "blockapps-vault-wrapper-server --pghost " ++ storeHost "postgres" flags_pghost ++ " --pguser " ++ flags_pguser ++ " --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
+      return [restartable $ "blockapps-vault-wrapper-server --pghost " ++ storeHost "postgres" flags_pghost ++ " --pguser " ++ flags_pguser ++ " --postgresPasswordFile secrets/postgres_password --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
     else return []
 
   coreCommands <- if not (roleRunsCore role) then return [] else do

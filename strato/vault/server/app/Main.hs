@@ -56,12 +56,15 @@ main = do
     ]
   _ <- $initHFlags "Setup Vault Wrapper DBs"
 
+  postgresPassword <- if null flags_postgresPasswordFile
+    then pure flags_password
+    else filter (/= '\n') <$> readFile flags_postgresPasswordFile
   let dbConnectInfo =
         ConnectInfo
           { connectHost = flags_pghost,
             connectPort = read flags_pgport,
             connectUser = flags_pguser,
-            connectPassword = flags_password,
+            connectPassword = postgresPassword,
             connectDatabase = flags_database
           }
 
