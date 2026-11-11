@@ -18,7 +18,8 @@ import {
   HandCoins,
   Layers,
   ArrowDownToLine,
-  Compass
+  Compass,
+  CandlestickChart
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
@@ -49,6 +50,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     items: [
       { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
       { icon: ArrowLeftRight, label: 'Trade', path: '/dashboard/swap' },
+      { icon: CandlestickChart, label: 'Terminal', path: '/dashboard/terminal', badge: 'New' },
       { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
       { icon: Send, label: 'Send', path: '/dashboard/transfer' },
       { icon: Download, label: 'Bridge Out', path: '/dashboard/withdrawals' },

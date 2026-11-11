@@ -9,13 +9,18 @@ import {
   getTradeHistory,
   getTradeTokenHistory,
 } from "../services/trade.service";
+import { getMarkets, getMarketCandles, getMarketTrades, getMarketStats } from "../services/marketData.service";
 import {
   validateTradeTokenArgs,
   validateTradePairArgs,
   validateTradeQuoteArgs,
   validateTradeSwapArgs,
   validateTradeHistoryQuery,
+  validateMarketArgs,
+  validateMarketCandlesQuery,
+  validateMarketTradesQuery,
 } from "../validators/trade.validator";
+import { CandleResolution } from "@strato/shared-types";
 
 class TradeController {
   static async tokens(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -108,6 +113,56 @@ class TradeController {
       const limit = query.limit ? parseInt(query.limit as string, 10) : 10;
       const history = await getTradeTokenHistory(accessToken, params.tokenAddress, page, limit);
       res.status(RestStatus.OK).json(history);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async markets(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const markets = await getMarkets(req.accessToken);
+      res.status(RestStatus.OK).json(markets);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async marketCandles(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, params, query } = req;
+      validateMarketArgs(params);
+      validateMarketCandlesQuery(query);
+      const candles = await getMarketCandles(
+        accessToken,
+        params.poolAddress,
+        query.resolution as CandleResolution,
+        query.from ? parseInt(query.from as string, 10) : undefined
+      );
+      res.status(RestStatus.OK).json(candles);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async marketTrades(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, params, query } = req;
+      validateMarketArgs(params);
+      validateMarketTradesQuery(query);
+      const limit = query.limit ? parseInt(query.limit as string, 10) : 50;
+      const trades = await getMarketTrades(accessToken, params.poolAddress, limit);
+      res.status(RestStatus.OK).json(trades);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async marketStats(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, params } = req;
+      validateMarketArgs(params);
+      const stats = await getMarketStats(accessToken, params.poolAddress);
+      res.status(RestStatus.OK).json(stats);
     } catch (error) {
       next(error);
     }

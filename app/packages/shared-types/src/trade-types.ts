@@ -5,6 +5,8 @@
 // multi-token), and Uniswap-V3-style PoolV3.
 // ============================================================================
 
+import { PoolV3Token } from "./poolv3-types";
+
 export type TradePoolType = "v2" | "stable" | "v3";
 
 /** One side of a pool, oriented to the requested trading pair */
@@ -83,4 +85,62 @@ export interface TradeSwapParams {
   tokenOut: string;
   amountIn: string;
   minAmountOut: string;
+}
+
+// ============================================================================
+// TRADING TERMINAL (market data for one V3 pool, oriented base/quote)
+// ============================================================================
+
+/** A terminal market: one V3 pool presented as BASE/QUOTE (price = quote per base) */
+export interface Market {
+  /** url slug, e.g. "STRATO-USDST"; a pair's shallower fee tiers add their fee, "ETH-USDST-30" */
+  id: string;
+  poolAddress: string;
+  base: PoolV3Token;
+  quote: PoolV3Token;
+  /** false when the base token is the pool's token1 (market price inverts the pool price) */
+  baseIsToken0: boolean;
+  feeBps: number;
+  /** pool price, quote per base */
+  price: number;
+  /** pool balances, wei strings */
+  baseBalance: string;
+  quoteBalance: string;
+  totalLiquidityUSD: number;
+  /** false while the pool is paused, hidden from trading or gas-only locked */
+  tradable: boolean;
+}
+
+export type CandleResolution = "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+
+/** [bucket start (unix s), open, high, low, close, quote volume, swap count] */
+export type MarketCandle = [number, number, number, number, number, number, number];
+
+export interface MarketTrade {
+  id: number;
+  /** unix ms */
+  time: number;
+  /** buy = base left the pool */
+  side: "buy" | "sell";
+  /** execution price, quote per base */
+  price: number;
+  amountBase: number;
+  amountQuote: number;
+  sender: string;
+  /** "gas" = network-fee purchase by the fee router */
+  kind: "user" | "gas";
+}
+
+export interface MarketStats {
+  /** pool price, quote per base */
+  price: number;
+  open24h: number;
+  high24h: number;
+  low24h: number;
+  changePct24h: number;
+  volumeQuote24h: number;
+  volumeBase24h: number;
+  /** part of volumeQuote24h that was network-fee purchases */
+  gasVolumeQuote24h: number;
+  trades24h: number;
 }

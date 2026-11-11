@@ -66,7 +66,6 @@ export const hiddenSwapPools: Set<string> = new Set([
   "9c75280f9e2368005d2b7342f19c59f9176b5962", // sUSDST-USDST swap pool - This is a hot fix to hide the pool from the user
   // STRATO-USDST V3 pools - hot fix to keep the pair off the Trade page until trading is opened
   "50317b2b6cc99bbbca91358df8340947ef811250", // Upquark mainnet (fee 500)
-  "6df32c9b8012794dc7d02bca289d918bb4633165", // Helium testnet (fee 3000)
 ]);
 
 // Yield-bearing tokens. APY computed from on-chain exchange rate history mapping.

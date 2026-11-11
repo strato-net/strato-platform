@@ -19,6 +19,7 @@ import { OracleProvider } from "@/context/OracleContext";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import SwapAsset from "./pages/SwapAsset";
+import Terminal from "./pages/Terminal";
 import Transfer from "./pages/Transfer";
 import DepositsPage from "./pages/DepositsPage";
 import AssetDetail from "./pages/AssetDetail";
@@ -276,6 +277,14 @@ const App = () => {
                                                   element={
                                                     <GuestAccessibleRoute>
                                                       <SwapAsset />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/terminal/:pair?"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <Terminal />
                                                     </GuestAccessibleRoute>
                                                   }
                                                 />
