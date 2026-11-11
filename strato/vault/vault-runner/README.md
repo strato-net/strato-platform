@@ -2,9 +2,9 @@
 
 - This is a simple example of how to run and manage a local Vault
 - It's deploying the Vault on plain HTTP, so it's only acceptable for using within one secure host.
-- It is using a specific version of docker-compose.vault.yml with prebuilt images to avoid building from source and installing all build dependencies
+- It uses the Compose file generated from the repository root.
 
-If you still want to build from source:
+Build the images and copy the generated Compose file before running it:
 ```
 cd strato-platform
 ./install_deps.sh
@@ -41,7 +41,7 @@ strato-up mynode \
         - server.pem
       - private/
         - server.key
-2. Update run-vault.sh to use `ssl=true`, and replace `HTTP_PORT=8080` with `HTTPS_PORT=8443`
+2. Update run-vault.sh to use `ssl=true` and replace `VAULT_NGINX_PORT=8080:80` with `VAULT_NGINX_PORT=8443:443`
 3. STRATO configuration should use the https url with domain of the SSL cert, e.g.:
    - `--vaultUrl=https://example.com:8443/strato/v2.3 \`
 4. Make sure the domain and port are accessible from the STRATO node's host.
@@ -200,25 +200,27 @@ in shell history.
 
 ### Postgres connection settings
 
-Postgres connection settings are resolved with the standard CLI > env > default
+Postgres connection settings are resolved with CLI > env > passfile > default
 precedence:
 
-1. **CLI flag** if explicitly passed: `--pghost`, `--pgport`, `--pguser`,
+1. **CLI flag** if set to a non-default value: `--pghost`, `--pgport`, `--pguser`,
    `--password`, `--database`.
-2. **Environment variable** (the same names the vault-wrapper daemon already
-   reads from `docker-compose.vault.yml`):
+2. **Environment variable** (the same names used by vault-wrapper):
    - `postgres_host`
    - `postgres_port`
    - `postgres_user`
    - `postgres_password`
    - `postgres_vault_wrapper_db`
-3. **Default** if neither is set: `postgres` / `5432` / `postgres` / `api` /
+3. **`PGPASSFILE`** for the password if no non-default password flag or
+   nonempty `postgres_password` is set. The generated Compose template mounts
+   this file.
+4. **Default** if none is set: `postgres` / `5432` / `postgres` / `api` /
    `oauth`.
 
 When running `migrate-key` via `docker exec` inside a `vault-wrapper-*`
-container, those env vars are already set by the compose file, so on the
-destination vault you usually don't need any `--pghost`/`--pguser`/`--password`/
-`--database` flags even if the destination vault uses non-default settings.
+container, Compose supplies the connection settings through those env vars or
+`PGPASSFILE`, so you usually don't need connection flags even if the destination
+vault uses non-default settings.
 
 ### Build and prepare
 
@@ -252,10 +254,9 @@ printf '%s\n%s\n' "$SRC_VAULT_PW" "$TRANSPORT_PW" \
       --x_user_unique_name='alice@example.com' \
       --x_identity_provider_id='https://my-oauth.example.com' \
       --out=/tmp/alice.key.json
-# Inside the vault-wrapper container, $postgres_host/$postgres_user/$postgres_password
-# /$postgres_vault_wrapper_db are already set by docker-compose.vault.yml, so
-# migrate-key picks them up automatically. To override, pass --pghost / --pguser /
-# --password / --database / --pgport explicitly.
+# The vault-wrapper container has its Postgres settings and either
+# $postgres_password or $PGPASSFILE from Compose; migrate-key uses them.
+# Override non-secret settings with --pghost / --pguser / --database / --pgport.
 
 sudo docker cp vault-vault-wrapper-1:/tmp/alice.key.json ./alice.key.json
 sudo docker exec vault-vault-wrapper-1 rm -f /tmp/alice.key.json
@@ -273,11 +274,10 @@ sudo docker cp ./alice.key.json vault-vault-wrapper-1:/tmp/alice.key.json
 
 printf '%s\n%s\n' "$TRANSPORT_PW" "$DST_VAULT_PW" \
   | sudo docker exec -i vault-vault-wrapper-1 /usr/local/bin/migrate-key --in=/tmp/alice.key.json
-# Connection settings come from the container's env vars (postgres_host etc.).
-# If the destination vault uses a different host/user/password/db that is NOT
-# already in the vault-wrapper container's environment, pass the flags
-# explicitly, e.g.:
-#     --pghost=my-pg-host --pguser=myuser --password=mypass --database=mydb
+# Connection settings come from the container environment and PGPASSFILE.
+# For a different database, pass non-secret flags as needed, for example:
+#     --pghost=my-pg-host --pguser=myuser --database=mydb
+# In passfile-based deployments, ensure it has a matching host:port:db:user entry.
 
 sudo docker exec vault-vault-wrapper-1 rm -f /tmp/alice.key.json
 rm -f ./alice.key.json

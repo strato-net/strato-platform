@@ -145,13 +145,20 @@ def checkNodeIsGettingBlocks() {
 }
 
 def spinUpVault() {
+  writeFile file: "vault.pgpass", text: "postgres:5432:*:postgres:api\n"
+  sh 'chmod 600 vault.pgpass'
   writeFile file: "run-vault.sh", text: """#!/bin/bash
   sudo \\
+    COMPOSE_PROFILES=local-postgres \\
+    VAULT_CREATE_DB=true \\
+    VAULT_PGPASS_FILE=./vault.pgpass \\
+    PGSSLMODE=disable \\
+    PGSSLROOTCERT=/etc/ssl/certs/ca-certificates.crt \\
     ssl=true \\
     HTTPS_PORT=8093 \\
     INITIAL_OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration' \\
     INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/mercata' \\
-    INITIAL_OAUTH_JWT_USERNAME_CLAIM='sub' \\
+    INITIAL_OAUTH_JWT_USER_ID_CLAIM='sub' \\
     PASSWORD=123 \\
     ./vault
   """
