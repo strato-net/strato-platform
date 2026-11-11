@@ -41,7 +41,7 @@ strato-up mynode \
         - server.pem
       - private/
         - server.key
-2. Update run-vault.sh to use `ssl=true`, and replace `HTTP_PORT=8080` with `HTTPS_PORT=8443`
+2. Update run-vault.sh to use `ssl=true` and replace `VAULT_NGINX_PORT=8080:80` with `VAULT_NGINX_PORT=8443:443`
 3. STRATO configuration should use the https url with domain of the SSL cert, e.g.:
    - `--vaultUrl=https://example.com:8443/strato/v2.3 \`
 4. Make sure the domain and port are accessible from the STRATO node's host.

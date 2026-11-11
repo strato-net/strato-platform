@@ -16,6 +16,7 @@ services:
     - postgres_port=5432
     - postgres_user=postgres
     - postgres_vault_wrapper_db=oauth
+    - VAULT_CREATE_DB=true
     - VAULTWRAPPER_DEBUG=${VAULTWRAPPER_DEBUG}
     image: ${VAULTWRAPPER_IMAGE:-registry-aws.blockapps.net:5000/blockapps/vault-wrapper:14.5.2-e324a42}
     restart: unless-stopped
@@ -54,8 +55,7 @@ services:
     - VAULT_WRAPPER_HOST=${VAULT_WRAPPER_HOST}
     image: ${VAULTNGINX_IMAGE:-registry-aws.blockapps.net:5000/blockapps/vault-nginx:14.5.2-e324a42}
     ports:
-    - ${HTTP_PORT:-8090}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
-    - ${HTTPS_PORT:-8093}:443 #TAG_REMOVE_WHEN_NO_SSL
+    - ${VAULT_NGINX_PORT:-${HTTP_PORT:-8090}:80}
     volumes:
     - ./ssl:/tmp/ssl:ro
     - idpconfig:/config

@@ -41,31 +41,31 @@ ssl                - (default: false) [true|false] to run the node with SSL/TLS.
 sslCertFileType    - (default: pem) [pem|crt] the SSL certificate type and file extension (should be accessible at ./ssl/certs/server.<sslCertFileType> at deploy time.)
 INITIAL_OAUTH_DISCOVERY_URL       - (required) OpenID Connect discovery URL for initial OAuth2 provider. Additional ones can be added at run time.
 INITIAL_OAUTH_ISSUER              - (required) Issuer value for initial OAuth2 provider.
-INITIAL_OAUTH_JWT_USERNAME_CLAIM  - (default: sub) The claim (payload property) of JWT token to use as unique user id within STRATO Vault."
+INITIAL_OAUTH_JWT_USER_ID_CLAIM   - (default: sub) The claim (payload property) of JWT token to use as unique user id within STRATO Vault."
 }
 
 function wipe {
   echo -e "${Yellow}Removing Vault containers and wiping out volumes${NC}"
-  ${docker_compose} down -vt 0 --remove-orphans
+  ${docker_compose} -f docker-compose.vault.yml down -vt 0 --remove-orphans
 }
 
 function down {
   echo -e "${Yellow}Removing Vault containers${NC}"
-  ${docker_compose} down --remove-orphans
+  ${docker_compose} -f docker-compose.vault.yml down --remove-orphans
 }
 
 function stop {
   echo -e "${Yellow}Gently stopping Vault containers${NC}"
-  ${docker_compose} stop
+  ${docker_compose} -f docker-compose.vault.yml stop
 }
 
 function start {
   echo -e "${Yellow}Starting the earlier stopped Vault containers${NC}"
-  ${docker_compose} start
+  ${docker_compose} -f docker-compose.vault.yml start
 }
 
 function pullImages {
-  ${docker_compose} pull
+  ${docker_compose} -f docker-compose.vault.yml pull
 }
 
 function setPassword {
@@ -115,10 +115,10 @@ then
 else
   if ! docker compose version &> /dev/null
   then
-    docker_compose="docker-compose -p vault -f docker-compose.vault.yml --log-level ERROR"
+    docker_compose="docker-compose -p vault --log-level ERROR"
     CNAME_SEP="_"
   else
-    docker_compose="docker -l error compose -p vault -f docker-compose.vault.yml"
+    docker_compose="docker -l error compose -p vault"
     CNAME_SEP="-"
   fi
 fi
@@ -185,7 +185,7 @@ echo "ssl: $ssl"
 echo "sslCertFileType: $sslCertFileType"
 echo "INITIAL_OAUTH_DISCOVERY_URL: ${INITIAL_OAUTH_DISCOVERY_URL}"
 echo "INITIAL_OAUTH_ISSUER: ${INITIAL_OAUTH_ISSUER}"
-echo "INITIAL_OAUTH_JWT_USERNAME_CLAIM: ${INITIAL_OAUTH_ISSUER:-'using default'}"
+echo "INITIAL_OAUTH_JWT_USER_ID_CLAIM: ${INITIAL_OAUTH_JWT_USER_ID_CLAIM:-'using default'}"
 echo "PASSWORD: $(if [ -z ${PASSWORD} ]; then echo "not provided (to be set in stdin)"; else echo "provided in env var"; fi)"
 
 
@@ -209,13 +209,9 @@ function cleanup {
 trap cleanup EXIT
 
 if [ "$ssl" != true ]; then
-  sed -n '/#TAG_REMOVE_WHEN_NO_SSL/!p' docker-compose.vault.yml > docker-compose-vault-temp.yml
+  sed 's|^[[:space:]]*- .*#TAG_REMOVE_WHEN_NO_SSL$|    - ${HTTP_PORT:-8090}:80|' docker-compose.vault.yml > docker-compose-vault-temp.yml
 else
-  if [ ${HTTPS_PORT} != "8093" ]; then
-    sed -n '/#TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT/!p' docker-compose.vault.yml > docker-compose-vault-temp.yml
-  else
-    cp docker-compose.vault.yml docker-compose-vault-temp.yml
-  fi
+  cp docker-compose.vault.yml docker-compose-vault-temp.yml
 fi
 # END OF COMPOSE FILE PRE-PROCESSING
 
