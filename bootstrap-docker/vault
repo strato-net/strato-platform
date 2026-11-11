@@ -37,6 +37,7 @@ ${Yellow}Environment variables:${NC}
 PASSWORD           - STRATO Vault's in-memory password. To be requested interactively if skipped.
 HTTP_PORT          - (default: 8090) Port for HTTP traffic listener.
 HTTPS_PORT         - (default: 8093) Port for HTTPS traffic listener; only used with ssl=true.
+VAULT_NGINX_PORT   - Override the nginx host-to-container port mapping, including an optional bind address.
 ssl                - (default: false) [true|false] to run the node with SSL/TLS.
 sslCertFileType    - (default: pem) [pem|crt] the SSL certificate type and file extension (should be accessible at ./ssl/certs/server.<sslCertFileType> at deploy time.)
 INITIAL_OAUTH_DISCOVERY_URL       - (required) OpenID Connect discovery URL for initial OAuth2 provider. Additional ones can be added at run time.
@@ -166,10 +167,10 @@ outputLogo
 
 if [ "$ssl" = true ] ; then
   http_protocol=https
-  main_port=${HTTPS_PORT}
+  container_port=443
 else
   http_protocol=http
-  main_port=${HTTP_PORT}
+  container_port=80
 fi
 export sslCertFileType=${sslCertFileType:-pem}
 
@@ -189,11 +190,6 @@ echo "INITIAL_OAUTH_JWT_USER_ID_CLAIM: ${INITIAL_OAUTH_JWT_USER_ID_CLAIM:-'using
 echo "PASSWORD: $(if [ -z ${PASSWORD} ]; then echo "not provided (to be set in stdin)"; else echo "provided in env var"; fi)"
 
 
-if [[ ${HTTP_PORT} == ${HTTPS_PORT} ]]; then
-  echo -e "${Red}Can not bind HTTP and HTTPS listeners to same port (${HTTP_PORT})${NC}"
-  exit 7
-fi
-
 if [ ! -f docker-compose.vault.yml ]
 then
   echo -e "${Red}docker-compose.vault.yml not found. Please download the docker-compose.vault.yml first or build the platform (see README.md).${NC}"
@@ -209,21 +205,40 @@ function cleanup {
 trap cleanup EXIT
 
 if [ "$ssl" != true ]; then
-  sed 's|^[[:space:]]*- .*#TAG_REMOVE_WHEN_NO_SSL$|    - ${HTTP_PORT:-8090}:80|' docker-compose.vault.yml > docker-compose-vault-temp.yml
+  sed 's|^[[:space:]]*- .*#TAG_REMOVE_WHEN_NO_SSL$|    - ${VAULT_NGINX_PORT:-${HTTP_PORT:-8090}:80}|' docker-compose.vault.yml > docker-compose-vault-temp.yml
 else
   cp docker-compose.vault.yml docker-compose-vault-temp.yml
 fi
 # END OF COMPOSE FILE PRE-PROCESSING
 
 ${docker_compose} -f docker-compose-vault-temp.yml up -d --remove-orphans
+published=$(${docker_compose} -f docker-compose-vault-temp.yml port nginx "$container_port")
+while IFS= read -r binding; do
+  if [[ $binding != '[::]:'* ]]; then
+    published=$binding
+    break
+  fi
+done <<< "$published"
+published=${published%%$'\n'*}
+if [ -z "$published" ]; then
+  echo -e "${Red}No published nginx port found for container port ${container_port}${NC}"
+  exit 7
+fi
+main_host=${published%:*}
+main_port=${published##*:}
+case "$main_host" in
+  0.0.0.0) main_host=127.0.0.1 ;;
+  '[::]') main_host='[::1]' ;;
+esac
 # Wait until the vault is reachable. /_ping returns 200 when the password is
 # already set (e.g. via vaultPasswordFile) and 503 when it is awaiting password
 # initialization — either response means the container is up and ready for
 # setPassword to proceed. Any other condition (connection refused, timeout,
 # transient 5xx from a fronting proxy) keeps the loop waiting.
-until status=$(curl --silent --output /dev/null --insecure --location \
+# nginx exposes the wrapper's /_ping response at /ping.
+until status=$(curl --silent --output /dev/null --insecure --location --noproxy '*' \
                     --write-out '%{http_code}' --max-time 2 \
-                    "${http_protocol}://localhost:${main_port}/_ping") \
+                    "${http_protocol}://${main_host}:${main_port}/ping") \
        && { [ "$status" = "200" ] || [ "$status" = "503" ]; }
 do
   sleep 0.5

@@ -152,12 +152,12 @@ if [ "${LOCAL_AUTH_RESET:-false}" = "true" ]; then
     psql -h "$PG_HOST" -p "$PG_PORT" -U "$PGUSER" -c "DROP DATABASE IF EXISTS kratos" && echo "    Done" || echo "    FAILED"
     psql -h "$PG_HOST" -p "$PG_PORT" -U "$PGUSER" -c "DROP DATABASE IF EXISTS hydra" && echo "    Done" || echo "    FAILED"
 fi
-for db in kratos hydra; do
+for db in kratos hydra oauth; do
     if psql -h "$PG_HOST" -p "$PG_PORT" -U "$PGUSER" -Atc "SELECT 1 FROM pg_database WHERE datname = '$db'" | grep -q 1; then
         echo "  $db database exists"
     else
         echo "  Creating $db database..."
-        psql -h "$PG_HOST" -p "$PG_PORT" -U "$PGUSER" -c "CREATE DATABASE $db" && echo "    Done" || echo "    FAILED"
+        psql -h "$PG_HOST" -p "$PG_PORT" -U "$PGUSER" -c "CREATE DATABASE $db" && echo "    Done" || { echo "    FAILED"; exit 1; }
     fi
 done
 echo "  Databases AFTER setup:"
