@@ -472,7 +472,7 @@ import_key() {
     import_cmd=("${COMPOSE[@]}" exec -T strato strato-vault-import-key)
   fi
   printf "%s" "$private_key" | "${import_cmd[@]}" \
-    --pghost "$PG_HOST" --pgport "$PG_PORT" \
+    --pghost "$PG_HOST" --pgport "$PG_PORT" --pguser "$PG_USER" \
     --password "$pg_password" \
     --database oauth \
     --vaultPasswordFile secrets/vault_password \

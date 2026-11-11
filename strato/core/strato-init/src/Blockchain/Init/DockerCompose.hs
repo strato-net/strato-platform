@@ -266,8 +266,6 @@ generateDockerCompose role = do
         , volumes = Just
             [ "./logs:/logs"
             , "./postgres:/var/lib/postgresql/data"
-            , "./config/postgres/init-permissions.sql:/docker-entrypoint-initdb.d/10-runtime-permissions.sql:ro"
-            , "./config/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro"
             , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]

@@ -13,9 +13,6 @@ author:         Jamshid
 maintainer:     jamshidnh@gmail.com
 license:        Apache-2.0
 build-type:     Simple
-extra-source-files:
-    config/postgres/init-permissions.sql
-    config/postgres/pg_hba.conf
 
 library
   exposed-modules:

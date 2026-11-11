@@ -2,7 +2,6 @@
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Init.Generator (
   createGenesisInfo,
@@ -30,7 +29,6 @@ import Control.Monad.Change.Alter ()
 import Control.Monad.Composable.Base (runEff, withNoLogger, withResources)
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy as BL
-import Data.FileEmbed (embedFile)
 import Data.Maybe
 import qualified Data.Yaml as YAML
 import System.Environment (lookupEnv)
@@ -256,15 +254,6 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     liftIO $ mapM_ (createDirectoryIfMissing True) $
       ["logs", "secrets", ".ethereumH"]
         ++ (if roleRunsCore role then coreDirs else [])
-
-    when (roleRunsCore role && flags_pghost `elem` ["localhost", "127.0.0.1"]) $ liftIO $ do
-      createDirectoryIfMissing True ("config" </> "postgres")
-      forM_ [ ("init-permissions.sql", $(embedFile "config/postgres/init-permissions.sql"))
-            , ("pg_hba.conf", $(embedFile "config/postgres/pg_hba.conf"))
-            ] $ \(name, contents) -> do
-        let path = "config" </> "postgres" </> name
-        BS.writeFile path contents
-        setFileMode path 0o644
 
     -- Make logs directory world-writable for containers running as non-root users (e.g. prometheus)
     liftIO $ setFileMode "logs" (ownerModes .|. groupModes .|. otherModes)

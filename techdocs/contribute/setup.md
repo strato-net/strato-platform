@@ -326,15 +326,13 @@ Open [http://localhost](http://localhost).
 
 ## PostgreSQL permissions
 
-Setup copies the PostgreSQL files from
-`strato/core/strato-init/config/postgres/` into the node's `config/postgres/`
-directory. They are embedded in `strato-setup`, so the installed binary does not
-need the checkout to generate them. Compose mounts these copies read-only into
-the upstream `postgres:14.18` container; no custom PostgreSQL image is built.
+`postgres-packager/` installs the existing PostgreSQL configuration files into
+its image. Setup selects that image in Compose without generating or mounting
+separate PostgreSQL configuration files.
 
 `init-permissions.sql` preserves PostgreSQL's bootstrap administrator as
-`strato_admin` and creates a restricted application account with the existing
-`postgres` username and password. The application account has no superuser,
+`strato_admin` and creates a restricted application account named
+`strato` using the node's database password. The application account has no superuser,
 role-administration, replication or row-security-bypass privileges. Database creation and ownership rights remain
 available for startup and indexing. No Unix users or ownership are changed.
 
@@ -346,8 +344,8 @@ No administrative credentials are supplied to services.
 
 Initialization SQL runs only when PostgreSQL creates a fresh data directory.
 Use the normal clean rebuild/resync workflow to apply it; regenerating config
-alone does not change an existing database's roles. Snapshot restore mounts the
-same files when initializing its destination database. External clusters need
+alone does not change an existing database's roles. Snapshot restore uses the
+node's PostgreSQL image when initializing its destination database. External clusters need
 equivalent permissions configured by their administrator.
 
 `strato/core/strato-init/test/postgres-permissions.sql` checks normal schema
