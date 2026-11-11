@@ -17,7 +17,7 @@ import { useMyUserWallets } from "@/services/userWallets";
 import { useNestedMultisigs, multisigDisplayName } from "@/services/multisig";
 import { shortenHex } from "@/lib/utils";
 
-/** Lists the User wallet contracts the connected account is authorized on. */
+/** Lists User wallets the connected account controls, signs, or is nominated to sign. */
 export function MyWalletsCard({ ownerAddress }: { ownerAddress?: string | null }) {
   const { data: wallets, isLoading } = useMyUserWallets(ownerAddress);
   const { data: nested = [] } = useNestedMultisigs(wallets);
@@ -27,7 +27,7 @@ export function MyWalletsCard({ ownerAddress }: { ownerAddress?: string | null }
       <CardHeader>
         <CardTitle>My User wallets</CardTitle>
         <CardDescription>
-          User wallet contracts your connected account controls or is a multisig signer on.
+          User wallet contracts your connected account controls, signs, or is awaiting signer acceptance on.
           Manage each wallet's policy or multisig below.
         </CardDescription>
       </CardHeader>
@@ -52,7 +52,11 @@ export function MyWalletsCard({ ownerAddress }: { ownerAddress?: string | null }
                   <TableCell className="font-medium">
                     <span className="inline-flex items-center gap-2">
                       {w.username || "—"}
-                      {w.multisig ? (
+                      {w.pendingSigner ? (
+                        <Badge variant="outline" className="text-[10px]">
+                          Pending signer
+                        </Badge>
+                      ) : w.multisig ? (
                         <Badge variant="secondary" className="text-[10px]">
                           Multisig
                         </Badge>
@@ -68,7 +72,7 @@ export function MyWalletsCard({ ownerAddress }: { ownerAddress?: string | null }
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
                       <MultisigDialog wallet={w} />
-                      <WalletPolicyDialog wallet={w} />
+                      {!w.pendingSigner ? <WalletPolicyDialog wallet={w} /> : null}
                     </div>
                   </TableCell>
                 </TableRow>

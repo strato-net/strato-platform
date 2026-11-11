@@ -514,7 +514,9 @@ async function fetchParentMultisigs(children: string[]): Promise<Map<string, Use
  * so each ancestor is reported with its shortest membership route.
  */
 export function useNestedMultisigs(myWallets?: UserWallet[]) {
-  const seeds = (myWallets ?? []).filter((w) => w.multisig);
+  // A pending nominee can open the wallet only to accept. Until then it cannot
+  // cast that wallet's vote into any parent multisig.
+  const seeds = (myWallets ?? []).filter((w) => w.multisig && !w.pendingSigner);
   const seedKey = seeds
     .map((w) => strip0x(w.address))
     .sort()
@@ -597,6 +599,21 @@ export interface QueuedWindow {
 /** Events after an issue's creation that close it. */
 const CLOSING_EVENTS = ["IssueExecuted", "IssueDismissed", "IssueCancelled"];
 
+type EventPosition = { block_number?: unknown; event_index?: unknown };
+
+/** Compare Cirrus events in chain order, including multiple events in one block. */
+function compareEventPosition(a: EventPosition, b: EventPosition): number {
+  const blockA = Number(a?.block_number ?? 0);
+  const blockB = Number(b?.block_number ?? 0);
+  if (blockA !== blockB) return blockA - blockB;
+  const indexA = Number(a?.event_index);
+  const indexB = Number(b?.event_index);
+  // Same-block ordering is unknowable for legacy fixtures without event_index;
+  // do not let an ambiguous close hide a currently-live mapping entry.
+  if (!Number.isFinite(indexA) || !Number.isFinite(indexB)) return 0;
+  return indexA - indexB;
+}
+
 export function normalizeArgs(raw: unknown): string[] {
   if (Array.isArray(raw)) return raw.map(formatVariadicArg);
   if (raw == null || raw === "") return [];
@@ -636,26 +653,37 @@ export function buildOpenIssues(
   }
 
   // Latest IssueCreated per issueId for the call details.
-  const detailsByIssue = new Map<string, { target: string; func: string; args: string[]; block?: number }>();
+  const detailsByIssue = new Map<string, {
+    target: string; func: string; args: string[]; block?: number; eventIndex?: number;
+  }>();
   for (const ev of created) {
     if (ev.event_name && ev.event_name !== "IssueCreated") continue;
     const a = ev?.attributes ?? {};
     const issueId = String(a.issueId ?? "");
-    if (!issueId || detailsByIssue.has(issueId)) continue;
+    if (!issueId) continue;
+    const existing = detailsByIssue.get(issueId);
+    if (existing && compareEventPosition(ev, {
+      block_number: existing.block,
+      event_index: existing.eventIndex,
+    }) <= 0) continue;
     detailsByIssue.set(issueId, {
       target: strip0x(String(a.target ?? "")),
       func: String(a.func ?? ""),
       args: normalizeArgs(a.args),
       block: ev?.block_number ? Number(ev.block_number) : undefined,
+      eventIndex: ev?.event_index != null ? Number(ev.event_index) : undefined,
     });
   }
 
   const issues: OpenIssue[] = [];
   for (const [issueId, voters] of votersByIssue) {
     const d = detailsByIssue.get(issueId);
-    if (created.some((ev) =>
+    if (d && created.some((ev) =>
       CLOSING_EVENTS.includes(ev.event_name) &&
-      ev.attributes?.issueId === issueId && Number(ev.block_number) >= (d?.block ?? 0)
+      ev.attributes?.issueId === issueId && compareEventPosition(ev, {
+        block_number: d.block,
+        event_index: d.eventIndex,
+      }) > 0
     )) continue;
     // A queued issue already passed, so a later signer or threshold change doesn't reset it
     const queued = timelocks?.get(issueId);
@@ -684,7 +712,7 @@ export function mergeIndexedIssues(indexed: OpenIssue[], cached: OpenIssue[] = [
       event.attributes?.issueId === pending.issueId && event.transaction_hash === pending.transactionHash);
     if (creation && events.some((event) =>
       CLOSING_EVENTS.includes(event.event_name) &&
-      event.attributes?.issueId === pending.issueId && Number(event.block_number) >= Number(creation.block_number)
+      event.attributes?.issueId === pending.issueId && compareEventPosition(event, creation) > 0
     )) continue;
     const current = issues.get(pending.issueId);
     if (current && pending.voters.every((voter) => current.voters.includes(voter)) && current.func) continue;
@@ -755,8 +783,9 @@ export function useOpenIssues(walletAddress?: string | null) {
         ),
         cirrusGet(
           "event",
-          `address=eq.${addr}&event_name=in.(IssueCreated,${CLOSING_EVENTS.join(",")})&order=block_number.desc` +
-            `&select=event_name,attributes,block_number,transaction_hash`
+          `address=eq.${addr}&event_name=in.(IssueCreated,${CLOSING_EVENTS.join(",")})` +
+            `&order=block_number.desc,event_index.desc` +
+            `&select=event_name,attributes,block_number,event_index,transaction_hash`
         ),
         fetchStorageData(addr),
       ]);
@@ -878,6 +907,25 @@ export function buildCastVotePayload(
     _func: func,
     _args: args,
   });
+}
+
+/** ABI types for issues created by SMD without first loading a target ABI. */
+const PROGRAMMATIC_ISSUE_ARG_TYPES: Record<string, string[]> = {
+  _proposeAdmin: ["address", "address"],
+  _removeAdmin: ["address"],
+  setDefaultVotingThresholdBps: ["uint256"],
+  setTimelockDelay: ["uint256"],
+  setLogicContract: ["address"],
+  transferOwnership: ["address"],
+  cancelIssue: ["string"],
+  transfer: ["address", "uint256"],
+};
+
+/** Preserve exact ABI types for every programmatically constructed variadic issue. */
+export function typedProgrammaticIssueArgs(func: string, args: string[]): unknown[] {
+  const types = PROGRAMMATIC_ISSUE_ARG_TYPES[func];
+  if (!types || types.length !== args.length) return args;
+  return args.map((value, index) => typedVariadicArg(types[index], value));
 }
 
 /**
@@ -1039,7 +1087,7 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
   const addSigner = useCallback(
     (address: string) =>
       nested
-        ? castVote("_proposeAdmin", [ZERO_ADDRESS, strip0x(address)])
+        ? castVote("_proposeAdmin", typedProgrammaticIssueArgs("_proposeAdmin", [ZERO_ADDRESS, strip0x(address)]))
         : callWallet("addAdmin", { _admin: strip0x(address) }),
     [nested, castVote, callWallet]
   );
@@ -1048,7 +1096,7 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
   const removeSigner = useCallback(
     (address: string) =>
       nested
-        ? castVote("_removeAdmin", [strip0x(address)])
+        ? castVote("_removeAdmin", typedProgrammaticIssueArgs("_removeAdmin", [strip0x(address)]))
         : callWallet("removeAdmin", { _admin: strip0x(address) }),
     [nested, castVote, callWallet]
   );
@@ -1057,7 +1105,7 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
   const swapSigner = useCallback(
     (oldAddress: string, newAddress: string) =>
       nested
-        ? castVote("_proposeAdmin", [strip0x(oldAddress), strip0x(newAddress)])
+        ? castVote("_proposeAdmin", typedProgrammaticIssueArgs("_proposeAdmin", [strip0x(oldAddress), strip0x(newAddress)]))
         : callWallet("swapAdmin", {
             _adminToReplace: strip0x(oldAddress),
             _newAdmin: strip0x(newAddress),
@@ -1078,7 +1126,10 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
    * it on itself once the threshold is met).
    */
   const setDefaultThreshold = useCallback(
-    (bps: number) => castVote("setDefaultVotingThresholdBps", [String(bps)]),
+    (bps: number) => castVote(
+      "setDefaultVotingThresholdBps",
+      typedProgrammaticIssueArgs("setDefaultVotingThresholdBps", [String(bps)])
+    ),
     [castVote]
   );
 
@@ -1120,13 +1171,16 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
 
   /** Propose/vote to cancel a queued issue; the cancel runs as soon as it passes. */
   const cancelIssue = useCallback(
-    (issueId: string) => castVote("cancelIssue", [issueId]),
+    (issueId: string) => castVote("cancelIssue", typedProgrammaticIssueArgs("cancelIssue", [issueId])),
     [castVote]
   );
 
   /** Propose/vote to change the timelock delay, in seconds (0 turns it off). */
   const setTimelockDelay = useCallback(
-    (seconds: number) => castVote("setTimelockDelay", [String(seconds)]),
+    (seconds: number) => castVote(
+      "setTimelockDelay",
+      typedProgrammaticIssueArgs("setTimelockDelay", [String(seconds)])
+    ),
     [castVote]
   );
 
@@ -1138,7 +1192,11 @@ export function useMultisigActions({ walletAddress, route }: MultisigActionCtx) 
    */
   const proposeTransfer = useCallback(
     (tokenAddress: string, to: string, amountRaw: string) =>
-      castVote("transfer", [strip0x(to), String(amountRaw)], tokenAddress),
+      castVote(
+        "transfer",
+        typedProgrammaticIssueArgs("transfer", [strip0x(to), String(amountRaw)]),
+        tokenAddress
+      ),
     [castVote]
   );
 

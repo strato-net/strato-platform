@@ -18,12 +18,18 @@ export interface UserWallet {
    * account. Multisig wallets are self-owned, so signers aren't in `userAddressMap`.
    */
   multisig?: boolean;
+  /** The connected account is nominated but has not yet accepted signer status. */
+  pendingSigner?: boolean;
+}
+
+function extractStorageData(row: any): any {
+  const storage = row?.storage;
+  const entry = Array.isArray(storage) ? storage[0] : storage;
+  return entry?.data ?? entry ?? {};
 }
 
 function extractUsername(row: any): string {
-  const s = row?.storage;
-  const data = Array.isArray(s) ? s[0] : s;
-  return data?.username ?? "";
+  return extractStorageData(row)?.username ?? "";
 }
 
 /**
@@ -32,7 +38,9 @@ function extractUsername(row: any): string {
  *  - `adminMap` (address => uint, value = index+1): wallets it's a multisig **signer**
  *    on. Once a wallet is converted to a self-owned multisig, `transferOwnership`
  *    clears its owner out of `userAddressMap`, so signers only appear here.
- * Both cirrus queries key on the connected account and join `storage` for the username;
+ * A third source, `pendingSigners`, makes an approved nomination discoverable before
+ * it is activated, so the nominee can open the wallet and call `acceptAdmin`.
+ * All Cirrus queries key on the connected account and join `storage` for the username;
  * the global AdminRegistry/Governance also have an `adminMap` but no username, so
  * requiring a username naturally excludes them. Removed accounts are zeroed out in the
  * mappings rather than deleted, so both queries require value > 0.
@@ -44,9 +52,13 @@ export function useMyUserWallets(ownerAddress?: string | null) {
     queryFn: async (): Promise<UserWallet[]> => {
       const key = strip0x(ownerAddress!);
       const select = "select=address,storage(data-%3E%3Eusername)";
-      const [ownedRes, signerRes] = await Promise.all([
+      const [ownedRes, signerRes, pendingRes] = await Promise.all([
         api.get(`${env.CIRRUS_URL}/mapping?collection_name=eq.userAddressMap&key-%3E%3Ekey=eq.${key}&value=gt.0&${select}`),
         api.get(`${env.CIRRUS_URL}/mapping?collection_name=eq.adminMap&key-%3E%3Ekey=eq.${key}&value=gt.0&${select}`),
+        api.get(
+          `${env.CIRRUS_URL}/mapping?collection_name=eq.pendingSigners&key-%3E%3Ekey=eq.${key}` +
+          `&select=address,value,storage(data-%3E%3Eusername,data-%3E%3EconfigVersion)`
+        ),
       ]);
 
       const byAddr = new Map<string, UserWallet>();
@@ -62,6 +74,22 @@ export function useMyUserWallets(ownerAddress?: string | null) {
         const existing = byAddr.get(address);
         if (existing) existing.multisig = true;
         else byAddr.set(address, { address, username, multisig: true });
+      }
+      for (const row of Array.isArray(pendingRes.data) ? pendingRes.data : []) {
+        const address = row?.address ?? "";
+        const value = row?.value;
+        const exists = value?.exists === true || value?.exists === "true";
+        const proposalVersion = Number(value?.configVersion ?? 0) || 0;
+        const currentVersion = Number(extractStorageData(row)?.configVersion ?? 0) || 0;
+        if (!address || !exists || (currentVersion > 0 && proposalVersion !== currentVersion)) continue;
+        const existing = byAddr.get(address);
+        if (existing) existing.pendingSigner = true;
+        else byAddr.set(address, {
+          address,
+          username: extractUsername(row),
+          multisig: true,
+          pendingSigner: true,
+        });
       }
       return [...byAddr.values()];
     },

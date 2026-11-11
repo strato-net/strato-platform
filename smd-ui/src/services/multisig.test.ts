@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { applyConfirmedVote, buildNestedCastVotePayload, buildOpenIssues, buildProtocolActionCall, buildProtocolWorkflowCalls, mergeIndexedIssues, MULTISIG_SOURCE, normalizeArgs, votesNeeded } from "./multisig";
+import { applyConfirmedVote, buildNestedCastVotePayload, buildOpenIssues, buildProtocolActionCall, buildProtocolWorkflowCalls, mergeIndexedIssues, MULTISIG_SOURCE, normalizeArgs, typedProgrammaticIssueArgs, votesNeeded } from "./multisig";
 import { formatVariadicArg, parseArgText, parseVariadicBoolean, typedVariadicArg } from "../lib/args";
 import { pollResults } from "../lib/walletTx";
 import { api } from "../lib/api";
@@ -38,6 +38,35 @@ test("nested voting preserves the same typed swap arguments", () => {
     { type: "string", value: "swap" },
     wallet,
     "bool(false)",
+  ]);
+});
+
+test("programmatic nested signer nomination preserves all-digit addresses", () => {
+  const allDigitSigner = "0000000000000000000000000000000000001008";
+  const nomination = typedProgrammaticIssueArgs("_proposeAdmin", [
+    "0000000000000000000000000000000000000000",
+    allDigitSigner,
+  ]);
+  const payload = buildNestedCastVotePayload([signer, wallet], "_proposeAdmin", nomination) as any;
+  assert.deepEqual(payload.args._args, [
+    { type: "address", value: wallet },
+    { type: "string", value: "_proposeAdmin" },
+    { type: "address", value: "0000000000000000000000000000000000000000" },
+    { type: "address", value: allDigitSigner },
+  ]);
+});
+
+test("all programmatic issue builders retain their declared ABI types", () => {
+  const allDigitAddress = "0000000000000000000000000000000000001008";
+  assert.deepEqual(typedProgrammaticIssueArgs("setLogicContract", [allDigitAddress]), [
+    { type: "address", value: allDigitAddress },
+  ]);
+  assert.deepEqual(typedProgrammaticIssueArgs("transfer", [allDigitAddress, "50000000000000001"]), [
+    { type: "address", value: allDigitAddress },
+    { type: "uint256", value: "50000000000000001" },
+  ]);
+  assert.deepEqual(typedProgrammaticIssueArgs("cancelIssue", ["1234567890"]), [
+    { type: "string", value: "1234567890" },
   ]);
 });
 
@@ -253,6 +282,25 @@ test("a confirmed proposal is removed once its execution is indexed", () => {
   ];
   assert.deepEqual(mergeIndexedIssues([], cached, events), []);
   const staleVotes = [{ key: { key: issueId, key2: "0" }, value: signer }];
+  assert.deepEqual(buildOpenIssues(staleVotes, events), []);
+});
+
+test("an issue recreated later in the same block remains visible", () => {
+  const staleVotes = [{ key: { key: issueId, key2: "0" }, value: signer }];
+  const events = [
+    { event_name: "IssueCreated", attributes: { issueId, target: pool, func: "swap", args }, block_number: "867162", event_index: 1 },
+    { event_name: "IssueExecuted", attributes: { issueId }, block_number: "867162", event_index: 2 },
+    { event_name: "IssueCreated", attributes: { issueId, target: pool, func: "swap", args }, block_number: "867162", event_index: 3 },
+  ];
+  assert.equal(buildOpenIssues(staleVotes, events).length, 1);
+});
+
+test("a same-block close after the latest creation hides the issue", () => {
+  const staleVotes = [{ key: { key: issueId, key2: "0" }, value: signer }];
+  const events = [
+    { event_name: "IssueCreated", attributes: { issueId, target: pool, func: "swap", args }, block_number: "867162", event_index: 3 },
+    { event_name: "IssueExecuted", attributes: { issueId }, block_number: "867162", event_index: 4 },
+  ];
   assert.deepEqual(buildOpenIssues(staleVotes, events), []);
 });
 

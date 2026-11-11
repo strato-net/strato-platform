@@ -406,12 +406,11 @@ contract Describe_Multisig {
         require(ms.votesMap(ms.getIssueId(address(trap), "noop"), address(a)) == 0, "signer's vote recorded");
     }
 
-    function it_needs_every_signer_to_transfer_ownership() {
+    function it_uses_the_configured_quorum_to_transfer_ownership() {
         vote(a, address(wallet), "transferOwnership", address(outsider));
-        vote(b, address(wallet), "transferOwnership", address(outsider));
-        require(wallet.owner() == address(wallet), "two of three transferred ownership");
-        vote(c, address(wallet), "transferOwnership", address(outsider));
-        require(wallet.owner() == address(outsider), "unanimous vote did not transfer ownership");
+        require(wallet.owner() == address(wallet), "one of three transferred ownership");
+        require(vote(b, address(wallet), "transferOwnership", address(outsider)), "quorum did not execute");
+        require(wallet.owner() == address(outsider), "quorum did not transfer ownership");
     }
 
     function it_runs_a_passed_issue_at_once_without_a_timelock_delay() {
@@ -492,6 +491,25 @@ contract Describe_Multisig {
         require(token.balanceOf(address(outsider)) == 1000, "queued issue did not survive the signer change");
     }
 
+    function it_does_not_let_a_removed_signer_unqueue_an_issue() {
+        enableTimelock();
+        string issueId = voteToQueue(address(token), "transfer", address(outsider), 1000);
+        Signer d = new Signer();
+        voteToQueue(address(wallet), "_proposeAdmin", address(b), address(d));
+        fastForward(86400);
+        ms.executeIssue(address(wallet), "_proposeAdmin", address(b), address(d));
+        d.invoke(address(wallet), "acceptAdmin");
+
+        require(!ms.isAdminAddress(address(b)), "old signer was not removed");
+        require(
+            rejects(b, address(wallet), "withdrawVote", address(token), "transfer", address(outsider), 1000),
+            "removed signer withdrew a queued vote"
+        );
+        require(issueExecutableAt(issueId) != 0, "removed signer cleared the timelock");
+        ms.executeIssue(address(token), "transfer", address(outsider), 1000);
+        require(token.balanceOf(address(outsider)) == 1000, "queued issue did not execute");
+    }
+
     function it_lets_the_signers_cancel_a_queued_issue_before_its_delay_is_up() {
         enableTimelock();
         string issueId = voteToQueue(address(token), "transfer", address(outsider), 1000);
@@ -515,8 +533,7 @@ contract Describe_Multisig {
     function it_waits_out_the_delay_to_hand_the_wallet_over() {
         enableTimelock();
         vote(a, address(wallet), "transferOwnership", address(outsider));
-        vote(b, address(wallet), "transferOwnership", address(outsider));
-        require(!vote(c, address(wallet), "transferOwnership", address(outsider)), "ownership moved before the delay");
+        require(!vote(b, address(wallet), "transferOwnership", address(outsider)), "ownership moved before the delay");
         require(wallet.owner() == address(wallet), "ownership moved before the delay");
 
         fastForward(86400);

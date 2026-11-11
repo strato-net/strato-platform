@@ -509,8 +509,7 @@ contract Describe_MultisigMigration {
         switchToMultisig();
         // The call reverts inside onlyOwner, whose catch then asks the wallet to vote as itself
         vote(a, address(wallet), "transferOwnership", address(0));
-        vote(b, address(wallet), "transferOwnership", address(0));
-        require(rejects(c, address(wallet), "castVoteOnIssue", address(wallet), "transferOwnership", address(0)), "failing call succeeded");
+        require(rejects(b, address(wallet), "castVoteOnIssue", address(wallet), "transferOwnership", address(0)), "failing call succeeded");
         require(wallet.owner() == address(wallet), "owner changed");
         vote(a, address(token), "transfer", address(outsider), 1000);
         require(vote(b, address(token), "transfer", address(outsider), 1000), "lock was left set");

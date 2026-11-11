@@ -142,6 +142,7 @@ contract record Multisig {
     }
 
     function withdrawVote(address _target, string _func, variadic _args) external {
+        require(adminMap[msg.sender] != 0, "Only an admin can withdraw a vote");
         string issueId = _getIssueId(_target, _func, _args);
         require(currentIssues[issueId], "Issue does not exist or is not active");
         require(votesMap[issueId][msg.sender] != 0, "Caller has not voted on this issue");
@@ -217,10 +218,6 @@ contract record Multisig {
 
     function _shouldExecute(string _issueId, address _target, string _func) internal returns (bool) {
         uint issueVotes = votes[_issueId].length;
-        // Handing the wallet to a new owner takes every signer
-        if (_target == address(this) && _func == "transferOwnership") {
-            return issueVotes == admins.length;
-        }
         return 10000 * issueVotes >= defaultVotingThresholdBps * admins.length;
     }
 

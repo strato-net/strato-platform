@@ -80,6 +80,7 @@ import {
   strip0x,
   MAX_TIMELOCK_DELAY,
   buildProtocolWorkflowCalls,
+  typedProgrammaticIssueArgs,
   type ProtocolActionKind,
   type OpenIssue,
 } from "@/services/multisig";
@@ -543,13 +544,13 @@ function EnabledView({ wallet, route }: { wallet: UserWallet; route?: UserWallet
     <>
       <UpgradeLogicPanel wallet={wallet} fullRoute={fullRoute} />
       <MemberOfPanel fullRoute={fullRoute} />
-      <Tabs defaultValue={fullRoute.length > 1 ? "issues" : "treasury"} className="mt-1">
+      <Tabs defaultValue={wallet.pendingSigner ? "signers" : fullRoute.length > 1 ? "issues" : "treasury"} className="mt-1">
       <TabsList className="grid w-full grid-cols-5">
-        <TabsTrigger value="treasury">Treasury</TabsTrigger>
-        <TabsTrigger value="actions">Actions</TabsTrigger>
+        <TabsTrigger value="treasury" disabled={wallet.pendingSigner}>Treasury</TabsTrigger>
+        <TabsTrigger value="actions" disabled={wallet.pendingSigner}>Actions</TabsTrigger>
         <TabsTrigger value="signers">Signers</TabsTrigger>
-        <TabsTrigger value="issues">Issues</TabsTrigger>
-        <TabsTrigger value="history">History</TabsTrigger>
+        <TabsTrigger value="issues" disabled={wallet.pendingSigner}>Issues</TabsTrigger>
+        <TabsTrigger value="history" disabled={wallet.pendingSigner}>History</TabsTrigger>
       </TabsList>
       <TabsContent value="treasury" className="mt-4">
         <TreasuryTab wallet={wallet} fullRoute={fullRoute} />
@@ -602,7 +603,10 @@ function UpgradeLogicPanel({ wallet, fullRoute }: { wallet: UserWallet; fullRout
     }
     setBusy(true);
     try {
-      await castVote("setLogicContract", [await ensureMultisigLogic()]);
+      await castVote(
+        "setLogicContract",
+        typedProgrammaticIssueArgs("setLogicContract", [await ensureMultisigLogic()])
+      );
       queryClient.invalidateQueries({ queryKey: ["multisig-open-issues", wallet.address] });
       toast.success("Upgrade proposed", {
         description: "It runs once enough signers vote for it under Issues.",
@@ -726,6 +730,7 @@ function SignersTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: User
   const delaySeconds = delayHours.trim() === "" ? null : Math.round(Number(delayHours) * 3600);
 
   const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["my-user-wallets"] });
     queryClient.invalidateQueries({ queryKey: ["multisig-signers", wallet.address] });
     queryClient.invalidateQueries({ queryKey: ["multisig-open-issues", wallet.address] });
     queryClient.invalidateQueries({ queryKey: ["multisig-config", wallet.address] });
@@ -1420,13 +1425,10 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
           {issues.map((issue) => {
         const label = labelForIssue(issue, tokenMeta, signers.length);
         const count = issue.invalidated ? 0 : issue.voters.length;
-        // The Multisig logic has one threshold, except that handing the wallet to a new
-        // owner takes every signer
+        // Current Multisig logic applies the configured M-of-N threshold uniformly.
         const bps = (!config.runsMultisigLogic && thresholds[`${issue.target}|${issue.func}`]) ||
           config.defaultThresholdBps || 6000;
-        const unanimous = config.runsMultisigLogic && issue.func === "transferOwnership" &&
-          eq(issue.target, wallet.address);
-        const needed = unanimous ? signers.length : votesNeeded(signers.length, bps);
+        const needed = votesNeeded(signers.length, bps);
         const remaining = Math.max(0, needed - count);
         const recordedMyVote = issue.voters.some((v) => eq(v, voterAddr));
         const iVoted = !issue.invalidated && recordedMyVote;
@@ -1436,7 +1438,9 @@ function IssuesTab({ wallet, fullRoute }: { wallet: UserWallet; fullRoute: UserW
         const waitingForAllowance = blockedActionIssues.has(issue.issueId);
         // Mirrors the contract's dismissIssue gate: a single vote, cast by the caller.
         const canDismiss = issue.voters.length === 1 && eq(issue.voters[0], me);
-        const canWithdraw = !nested && recordedMyVote && (queued || !canDismiss);
+        // A direct signer may always retract their recorded vote. Dismiss remains
+        // available for a sole proposer, but it is not the only withdrawal path.
+        const canWithdraw = !nested && recordedMyVote;
         return (
           <div key={issue.issueId} className="rounded-lg border border-border p-3">
             <div className="flex items-start justify-between gap-3">
@@ -1631,6 +1635,7 @@ function ProposeIssueForm({
   const [abiArgs, setAbiArgs] = useState<Record<string, string>>({});
   const [abiArgAddrs, setAbiArgAddrs] = useState<Record<string, string>>({});
   const [manualArgs, setManualArgs] = useState<string[]>([""]);
+  const [manualArgTypes, setManualArgTypes] = useState<string[]>([""]);
   const [busy, setBusy] = useState(false);
 
   // A stale dry-run is misleading once the proposal inputs change; clear the
@@ -1638,7 +1643,7 @@ function ProposeIssueForm({
   const proposalSimReset = proposalSim.reset;
   useEffect(() => {
     proposalSimReset();
-  }, [proposalSimReset, target, manualMode, selectedFunc, manualFunc, abiArgs, abiArgAddrs, manualArgs]);
+  }, [proposalSimReset, target, manualMode, selectedFunc, manualFunc, abiArgs, abiArgAddrs, manualArgs, manualArgTypes]);
 
   const isAddr = isAddressLike(target);
   const searchQ = isAddr ? strip0x(target) : target.trim().length >= 2 ? target.trim() : "";
@@ -1684,8 +1689,11 @@ function ProposeIssueForm({
         return typedVariadicArg(a.type, raw, abiArgAddrs[a.name]);
       });
     }
-    return manualArgs.map((a) => a.trim()).filter((a) => a.length > 0)
-      .map((a) => formatVariadicArg(parseArgText(a)));
+    return manualArgs.flatMap((raw, index) => {
+      const value = raw.trim();
+      if (!value) return [];
+      return [typedVariadicArg(manualArgTypes[index]?.trim() || "", value)];
+    });
   };
 
   const reset = () => {
@@ -1695,6 +1703,7 @@ function ProposeIssueForm({
     setAbiArgs({});
     setAbiArgAddrs({});
     setManualArgs([""]);
+    setManualArgTypes([""]);
     setManualMode(false);
     proposalSim.reset();
   };
@@ -1706,6 +1715,10 @@ function ProposeIssueForm({
     }
     if (!func) {
       toast.error("Enter a function name");
+      return;
+    }
+    if (!useAbi && manualArgs.some((value, index) => value.trim() && !manualArgTypes[index]?.trim())) {
+      toast.error("Enter a Solidity type for every argument");
       return;
     }
     setBusy(true);
@@ -1728,6 +1741,10 @@ function ProposeIssueForm({
   const simulate = async () => {
     if (resolvedAddress.length !== 40 || !func) {
       toast.error("Enter a target contract and function first");
+      return;
+    }
+    if (!useAbi && manualArgs.some((value, index) => value.trim() && !manualArgTypes[index]?.trim())) {
+      toast.error("Enter a Solidity type for every argument");
       return;
     }
     // Simulate the (possibly route-wrapped) castVoteOnIssue tx; the endpoint
@@ -1858,7 +1875,15 @@ function ProposeIssueForm({
             {manualArgs.map((a, i) => (
               <div key={i} className="flex items-center gap-2">
                 <Input
-                  placeholder={`arg ${i + 1}`}
+                  placeholder="type (e.g. address)"
+                  value={manualArgTypes[i] ?? ""}
+                  onChange={(e) =>
+                    setManualArgTypes((prev) => prev.map((x, idx) => (idx === i ? e.target.value : x)))
+                  }
+                  className="w-40 font-mono text-xs"
+                />
+                <Input
+                  placeholder={`arg ${i + 1} value`}
                   value={a}
                   onChange={(e) =>
                     setManualArgs((prev) => prev.map((x, idx) => (idx === i ? e.target.value : x)))
@@ -1868,11 +1893,10 @@ function ProposeIssueForm({
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() =>
-                    setManualArgs((prev) =>
-                      prev.length === 1 ? [""] : prev.filter((_, idx) => idx !== i)
-                    )
-                  }
+                  onClick={() => {
+                    setManualArgs((prev) => prev.length === 1 ? [""] : prev.filter((_, idx) => idx !== i));
+                    setManualArgTypes((prev) => prev.length === 1 ? [""] : prev.filter((_, idx) => idx !== i));
+                  }}
                   aria-label="Remove argument"
                 >
                   <X className="h-4 w-4" />
@@ -1882,7 +1906,10 @@ function ProposeIssueForm({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setManualArgs((prev) => [...prev, ""])}
+              onClick={() => {
+                setManualArgs((prev) => [...prev, ""]);
+                setManualArgTypes((prev) => [...prev, ""]);
+              }}
               className="gap-1.5"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -1893,8 +1920,8 @@ function ProposeIssueForm({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Arguments are passed positionally. When the vote passes, the multisig calls the function
-        on the target contract.
+        Arguments are passed positionally with their declared Solidity types. When the vote passes,
+        the multisig calls the function on the target contract.
       </p>
 
       {/* The panel nests the issue's effect chain (one hop per multisig on the
@@ -2212,19 +2239,22 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
   const isStakingAction = action === "stake" || action === "unstake";
   const isCDPAction = action === "cdpDeposit" || action === "cdpBorrow";
   const isLiquidityAction = action === "addLiquidity" || action === "removeLiquidity";
-  const isStablePoolAction = isLiquidityAction && liquidityVersion === "stable";
   const isPoolAction = !!action && !isStakingAction && !isCDPAction;
   const availablePools = useMemo(() => (poolMetadata.data ?? []).filter((pool) =>
     !pool.isPaused && !pool.isDisabled &&
-    (isStablePoolAction ? !!pool.coins?.length : !pool.coins?.length)
-  ), [poolMetadata.data, isStablePoolAction]);
+    (liquidityVersion === "stable" ? pool.isStable : !pool.isStable)
+  ), [poolMetadata.data, liquidityVersion]);
   const selectedPool = availablePools.find((pool) => eq(pool.address, target));
+  const selectedIsMultiTokenStable = liquidityVersion === "stable" &&
+    (manualAddresses || !!selectedPool?.coins?.length);
   const effectiveAction: ProtocolActionKind | null = action === "addLiquidity"
-    ? liquidityVersion === "stable" ? "addLiquidityStable"
+    ? liquidityVersion === "stable" ? (selectedIsMultiTokenStable ? "addLiquidityStable" : "addLiquidity")
       : liquidityVersion === "v3" ? (v3AddMode === "mint" ? "v3Mint" : "v3Increase")
       : "addLiquidity"
     : action === "removeLiquidity"
-      ? liquidityVersion === "stable" ? (stableRemoveMode === "oneCoin" ? "removeLiquidityOneCoin" : "removeLiquidityStable")
+      ? liquidityVersion === "stable" ? (selectedIsMultiTokenStable
+          ? (stableRemoveMode === "oneCoin" ? "removeLiquidityOneCoin" : "removeLiquidityStable")
+          : "removeLiquidity")
         : liquidityVersion === "v3" ? (v3RemoveMode === "decrease" ? "v3Decrease" : "v3Collect")
         : "removeLiquidity"
       : action;
@@ -2256,7 +2286,7 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
     applyPool(pool);
     // Action changes intentionally reset the target, so the first compatible pool is selected.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manualAddresses, action, liquidityVersion, poolMetadata.data]);
+  }, [manualAddresses, action, liquidityVersion, availablePools]);
 
   const changeAction = (value: ProtocolActionKind) => {
     setAction(value);
@@ -2527,7 +2557,7 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
             </Select>
           </div>
         ) : null}
-        {liquidityVersion === "stable" && action === "removeLiquidity" ? (
+        {selectedIsMultiTokenStable && action === "removeLiquidity" ? (
           <div className="space-y-1">
             <Label>Stable removal</Label>
             <Select value={stableRemoveMode} onValueChange={(value) => setStableRemoveMode(value as "balanced" | "oneCoin")}>
@@ -2552,6 +2582,9 @@ function ProtocolActionsTab({ wallet, fullRoute }: { wallet: UserWallet; fullRou
           }}>
             <SelectTrigger><SelectValue placeholder={poolMetadata.isLoading ? "Loading pools…" : "Select a pool"} /></SelectTrigger>
             <SelectContent>
+              {!poolMetadata.isLoading && availablePools.length === 0 ? (
+                <div className="px-2 py-1.5 text-sm text-muted-foreground">No compatible pools found</div>
+              ) : null}
               {availablePools.map((pool) => (
                 <SelectItem key={pool.address} value={pool.address}>
                   {pool.poolName} ({shortenHex(pool.address, 6, 4)})
