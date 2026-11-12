@@ -89,23 +89,23 @@ not automatically applied to wallets.
 
 The creator supplies:
 
+- A public, immutable wallet label of at most 64 bytes.
 - At least three signer addresses.
 - Required approvals `M`.
 - Transaction timelock.
 - Initial approved logic version.
-- Optional deterministic salt.
 
 The factory:
 
+- Assigns a unique internal setup nonce.
 - Sorts signer addresses canonically.
 - Rejects duplicates, zero addresses, and the future wallet address.
 - Requires `2 <= M < N`.
 - Requires the transaction timelock to be at most `MAX_TRANSACTION_TIMELOCK`.
 - Requires the initial logic version to be approved and not revoked.
-- Computes a setup hash committing to the creator namespace, signers, M, transaction timelock, initial version, and salt.
-- Derives the salted deployment address from the complete configuration.
-
-The fixed upgrade delay is a shell constant and is not part of the setup hash.
+- Computes the setup hash from the factory address and setup nonce.
+- Stores the label with the pending setup and includes it in the registration and creation events.
+- Derives the salted deployment address from the setup hash.
 
 The creator receives no ownership or special authority.
 
@@ -336,7 +336,7 @@ Shell function names are prohibited in logic ABIs to avoid dispatch ambiguity; r
 
 SMD displays:
 
-- Wallet label.
+- The public wallet label alongside the wallet address.
 - Signer identities and account types.
 - M-of-N requirement.
 - Transaction timelock.
@@ -442,7 +442,8 @@ The upgrade controls reduce accidental and look-alike upgrades. They do not prot
 - Every initial signer type can confirm setup.
 - Duplicate, zero, and future wallet addresses are rejected as signers.
 - Deployment cannot complete unless every initial signer proves control.
-- The salted deployment address commits to the canonical configuration; a different configuration yields a different address.
+- The factory counter assigns a unique setup hash and deployment address to every registered setup.
+- Labels longer than 64 bytes are rejected, and the accepted label remains available after deployment.
 - Pending setups expire and can be cancelled by the creator or a named signer, and by no one else.
 - A setup whose initial version was revoked while pending cannot deploy.
 - Initialization cannot be called again after deployment.

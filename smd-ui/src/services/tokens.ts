@@ -12,6 +12,8 @@ export interface TokenBalance {
   balance: string;
 }
 
+export type TokenMetadata = Omit<TokenBalance, "balance">;
+
 function toRawString(value: unknown): string {
   if (typeof value === "number") {
     // JSON parses large balances as (possibly imprecise) numbers; coerce to an
@@ -54,6 +56,28 @@ export function useMyTokens(ownerAddress?: string | null) {
         .filter((t) => t.address);
     },
     refetchInterval: 15000,
+  });
+}
+
+/** Token names and decimals by contract address, independent of the wallet's balance. */
+export function useTokenMetadata(addresses: string[]) {
+  const normalized = [...new Set(addresses.map(strip0x).filter((address) => address.length === 40))].sort();
+  return useQuery({
+    queryKey: ["token-metadata", normalized],
+    enabled: normalized.length > 0,
+    staleTime: 60_000,
+    queryFn: async (): Promise<TokenMetadata[]> => {
+      const { data } = await api.get(
+        `${env.CIRRUS_URL}/storage?address=in.(${normalized.join(",")})` +
+          `&select=address,data-%3E%3E_symbol,data-%3E%3EcustomDecimals`
+      );
+      if (!Array.isArray(data)) return [];
+      return data.map((row: any) => ({
+        address: strip0x(String(row?.address ?? "")),
+        symbol: String(row?._symbol ?? row?.data?._symbol ?? "TOKEN"),
+        decimals: Number(row?.customDecimals ?? row?.data?.customDecimals ?? 18),
+      })).filter((token) => token.address);
+    },
   });
 }
 

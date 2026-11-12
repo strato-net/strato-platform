@@ -27,6 +27,7 @@ contract record MultisigFactory is Ownable {
         bool exists;
         bool deployed;
         bool cancelled;
+        string label;
     }
 
     mapping (string => LogicVersion) public record logicVersions;
@@ -38,15 +39,16 @@ contract record MultisigFactory is Ownable {
 
     mapping (address => bool) public record factoryWallets;
     address public registryGovernance;
+    uint public setupNonce;
 
     event RegistryGovernanceChanged(address previousGovernance, address newGovernance);
     event LogicVersionPublished(string version, address logic);
     event LogicVersionRevoked(string version, address logic);
     event UpgradePathSet(string fromVersion, string toVersion, bool approved);
-    event MultisigSetupRegistered(string setupHash, address creator, address expectedWallet, address[] signers, uint requiredApprovals, uint transactionTimelock, string initialVersion, uint expiresAt);
+    event MultisigSetupRegistered(string setupHash, address creator, address expectedWallet, address[] signers, uint requiredApprovals, uint transactionTimelock, string initialVersion, uint expiresAt, string label);
     event InitialSignerConfirmed(string setupHash, address signer, uint confirmations, uint totalSigners);
     event MultisigSetupCancelled(string setupHash, address sender);
-    event MultisigCreated(address wallet, address creator, address[] signers, uint requiredApprovals, uint transactionTimelock, string initialVersion, string setupHash);
+    event MultisigCreated(address wallet, address creator, address[] signers, uint requiredApprovals, uint transactionTimelock, string initialVersion, string setupHash, string label);
 
     constructor(address _governance) Ownable(_governance) {}
 
@@ -107,24 +109,18 @@ contract record MultisigFactory is Ownable {
         uint _requiredApprovals,
         uint _transactionTimelock,
         string _initialVersion,
-        string _salt
+        string _label
     ) external returns (string, address) {
         address[] canonicalSigners = _canonicalSigners(_signers);
         _validateConfiguration(canonicalSigners, _requiredApprovals);
         require(_transactionTimelock <= MAX_TRANSACTION_TIMELOCK, "Timelock exceeds maximum");
+        require(bytes(_label).length <= 64, "Label exceeds 64 bytes");
 
         LogicVersion storage version = logicVersions[_initialVersion];
         require(version.approved && !version.revoked, "Initial version is not approved");
 
-        string setupHash = keccak256(
-            msg.sender,
-            canonicalSigners,
-            _requiredApprovals,
-            _transactionTimelock,
-            _initialVersion,
-            _salt
-        );
-        require(!pendingSetups[setupHash].exists, "Setup already exists");
+        string setupHash = keccak256(address(this), setupNonce);
+        setupNonce++;
 
         address expectedWallet = this.derive(
             setupHash,
@@ -149,7 +145,8 @@ contract record MultisigFactory is Ownable {
             0,
             true,
             false,
-            false
+            false,
+            _label
         );
         emit MultisigSetupRegistered(
             setupHash,
@@ -159,7 +156,8 @@ contract record MultisigFactory is Ownable {
             _requiredApprovals,
             _transactionTimelock,
             _initialVersion,
-            expiresAt
+            expiresAt,
+            _label
         );
         return (setupHash, expectedWallet);
     }
@@ -216,7 +214,8 @@ contract record MultisigFactory is Ownable {
             _setup.requiredApprovals,
             _setup.transactionTimelock,
             _setup.initialVersion,
-            _setupHash
+            _setupHash,
+            _setup.label
         );
         return address(wallet);
     }

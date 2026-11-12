@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { formatUnits, parseUnits } from "viem";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,19 +11,21 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
-import { parseJsonExact } from "@/lib/args";
 import { shortenHex } from "@/lib/utils";
+import { describeProposal, type ProposalMetadata } from "@/services/dedicatedProposal";
 import {
   buildDedicatedProtocolWorkflow,
   type DedicatedProtocolAction,
+  type MultisigWalletSummary,
   useDedicatedHistory,
   useDedicatedMultisigActions,
 } from "@/services/dedicatedMultisig";
@@ -36,10 +38,12 @@ import {
 } from "@/services/protocolMetadata";
 import {
   useMyTokens,
+  useTokenMetadata,
   useTokenAllowances,
   type TokenBalance,
+  type TokenMetadata,
 } from "@/services/tokens";
-import { strip0x, type UserWallet } from "@/services/userWallets";
+import { strip0x } from "@/services/userWallets";
 
 const PERCENTS = [25, 50, 75, 100] as const;
 const validAddress = (value: string) => /^[0-9a-f]{40}$/i.test(strip0x(value.trim()));
@@ -130,7 +134,15 @@ function TokenAmount({
   );
 }
 
-export function DedicatedTreasuryTab({ wallet, disabled }: { wallet: UserWallet; disabled: boolean }) {
+export function DedicatedTreasuryTab({
+  wallet,
+  disabled,
+  onProposalCreated,
+}: {
+  wallet: MultisigWalletSummary;
+  disabled: boolean;
+  onProposalCreated?: () => void;
+}) {
   const { userAddress } = useUser();
   const { submit, canSubmit } = useSubmitTransaction();
   const queryClient = useQueryClient();
@@ -207,9 +219,10 @@ export function DedicatedTreasuryTab({ wallet, disabled }: { wallet: UserWallet;
       setTransferAmount("");
       setRecipient("");
       refresh();
-      toast.success("Transfer issue created");
+      toast.success("Proposal created");
+      onProposalCreated?.();
     } catch (error: any) {
-      toast.error(error?.message || "Could not create transfer issue");
+      toast.error(error?.message || "Could not create proposal");
     } finally {
       setBusy("");
     }
@@ -233,11 +246,11 @@ export function DedicatedTreasuryTab({ wallet, disabled }: { wallet: UserWallet;
             <span className="font-medium">{token.symbol}</span>
             <span className="font-mono text-xs">{humanBalance(token)}</span>
           </div>
-        )) : <p className="text-sm text-muted-foreground">This multisig holds no tokens yet.</p>}
+        )) : <p className="text-sm text-muted-foreground">This multisig wallet holds no tokens yet.</p>}
       </div>
 
       <div className="space-y-2">
-        <Label>Deployed positions</Label>
+        <Label>Staked and supplied</Label>
         {positionsLoading ? <p className="text-sm text-muted-foreground">Loading positions…</p> : (
           <>
             {hasStaking ? (
@@ -290,7 +303,7 @@ export function DedicatedTreasuryTab({ wallet, disabled }: { wallet: UserWallet;
         <Label>Recipient</Label>
         <Input value={recipient} onChange={(event) => setRecipient(event.target.value)} className="font-mono text-xs" />
         <Button disabled={disabled || !canSubmit || busy !== "" || !treasury.length} onClick={() => void proposeTransfer()}>
-          {busy === "transfer" ? "Creating issue…" : "Create transfer issue"}
+          {busy === "transfer" ? "Creating proposal…" : "Propose transfer"}
         </Button>
       </div>
     </div>
@@ -309,7 +322,15 @@ const amountField = (
   </div>
 );
 
-export function DedicatedProtocolActionsTab({ wallet, disabled }: { wallet: UserWallet; disabled: boolean }) {
+export function DedicatedProtocolActionsTab({
+  wallet,
+  disabled,
+  onProposalCreated,
+}: {
+  wallet: MultisigWalletSummary;
+  disabled: boolean;
+  onProposalCreated?: () => void;
+}) {
   const actions = useDedicatedMultisigActions(wallet.address);
   const staking = useStakingMetadata();
   const cdp = useCDPMetadata();
@@ -329,7 +350,7 @@ export function DedicatedProtocolActionsTab({ wallet, disabled }: { wallet: User
   const [tickUpper, setTickUpper] = useState("");
   const [liquidity, setLiquidity] = useState("");
   const [coinIndex, setCoinIndex] = useState("");
-  const [amountsText, setAmountsText] = useState("[]");
+  const [stableAmounts, setStableAmounts] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
   const stableAction = action === "addLiquidityStable" ||
@@ -351,14 +372,6 @@ export function DedicatedProtocolActionsTab({ wallet, disabled }: { wallet: User
   );
   const selectedAsset = cdp.data?.assets.find((item) => item.asset === asset);
   const selectedValidator = staking.data?.validators.find((item) => item.address === validator);
-  const stableAmounts = useMemo(() => {
-    try {
-      const parsed = parseJsonExact(amountsText);
-      return Array.isArray(parsed) ? parsed.map(String) : [];
-    } catch {
-      return [];
-    }
-  }, [amountsText]);
   const stableRawAmounts = stableAmounts.map((value, index) =>
     toRawUnits(value, selectedPool?.coins?.[index]?.customDecimals ?? 18)
   );
@@ -455,11 +468,11 @@ export function DedicatedProtocolActionsTab({ wallet, disabled }: { wallet: User
     setTickUpper("");
     setLiquidity("");
     setCoinIndex("");
-    setAmountsText("[]");
+    setStableAmounts([]);
   };
 
   const validate = () => {
-    if (!action || !validAddress(target)) throw new Error("Select an operation and valid protocol target");
+    if (!action || !validAddress(target)) throw new Error("Select an action");
     if (action === "stake" || action === "unstake") {
       if (!selectedValidator || (action === "stake" && !selectedValidator.active)) throw new Error("Select an eligible validator");
       if (!positiveInteger(callAmount)) throw new Error("Enter a positive amount");
@@ -486,28 +499,28 @@ export function DedicatedProtocolActionsTab({ wallet, disabled }: { wallet: User
         throw new Error("Enter an LP amount, pool coin, and minimum received amount");
       }
     } else if (action === "v3Mint") {
-      if (!selectedV3Pool) throw new Error("Select an indexed V3 pool");
+      if (!selectedV3Pool) throw new Error("Select a pool");
       if (!/^-?\d+$/.test(tickLower) || !/^-?\d+$/.test(tickUpper) || BigInt(tickLower) >= BigInt(tickUpper)) {
         throw new Error("Enter ordered lower and upper ticks");
       }
       if (![callAmount, callAmount2, callAmount3, callAmount4].every(nonNegativeInteger) ||
           !(positiveInteger(callAmount) || positiveInteger(callAmount2))) throw new Error("Enter valid desired and minimum amounts");
     } else if (action === "v3Increase") {
-      if (!selectedPosition || !selectedV3Pool) throw new Error("Select an owned indexed V3 position");
+      if (!selectedPosition || !selectedV3Pool) throw new Error("Select a position");
       if (![callAmount, callAmount2, callAmount3, callAmount4].every(nonNegativeInteger) ||
           !(positiveInteger(callAmount) || positiveInteger(callAmount2))) throw new Error("Enter valid desired and minimum amounts");
     } else if (action === "v3Decrease") {
       if (!selectedPosition || !selectedV3Pool || !positiveInteger(liquidity) ||
           ![callAmount, callAmount2].every(nonNegativeInteger)) {
-        throw new Error("Select an owned position and enter liquidity and minimum amounts");
+        throw new Error("Select a position and enter liquidity and minimum amounts");
       }
     } else if (action === "v3Collect") {
       if (!selectedPosition || !selectedV3Pool || ![callAmount, callAmount2].every(nonNegativeInteger) ||
-          !(positiveInteger(callAmount) || positiveInteger(callAmount2))) throw new Error("Select an owned position and collection maximums");
+          !(positiveInteger(callAmount) || positiveInteger(callAmount2))) throw new Error("Select a position and collection maximums");
     }
     if (approvalSpecs.length && (!validAddress(approvalSpender) ||
         approvalSpecs.some((item) => !validAddress(item.token) || !positiveInteger(item.amount)) ||
-        !allowances.isSuccess)) throw new Error("Token allowances are not ready");
+        !allowances.isSuccess)) throw new Error("Still checking token permissions");
   };
 
   const propose = async () => {
@@ -535,13 +548,14 @@ export function DedicatedProtocolActionsTab({ wallet, disabled }: { wallet: User
       })));
       setBusy(true);
       for (const call of workflow) await actions.proposeCall(call, wallet.signerUsername || undefined);
-      toast.success(`${ACTION_LABELS[action as DedicatedProtocolAction]} workflow created`, {
+      toast.success("Proposal created", {
         description: missingApprovals.length
-          ? "Approval issues were created before the protocol action."
+          ? `${missingApprovals.length} permission proposals were created before the protocol action.`
           : "The protocol action is ready for signer review.",
       });
+      onProposalCreated?.();
     } catch (error: any) {
-      toast.error(error?.message || "Could not create protocol workflow");
+      toast.error(error?.message || "Could not create proposal");
     } finally {
       setBusy(false);
     }
@@ -551,21 +565,44 @@ export function DedicatedProtocolActionsTab({ wallet, disabled }: { wallet: User
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <Label>Protocol operation</Label>
+        <Label>Action</Label>
         <Select value={action} onValueChange={(value) => resetAction(value as DedicatedProtocolAction)}>
-          <SelectTrigger><SelectValue placeholder="Select an operation" /></SelectTrigger>
+          <SelectTrigger><SelectValue placeholder="Select an action" /></SelectTrigger>
           <SelectContent>
-            {(Object.keys(ACTION_LABELS) as DedicatedProtocolAction[]).map((value) => (
-              <SelectItem key={value} value={value}>{ACTION_LABELS[value]}</SelectItem>
-            ))}
+            <SelectGroup>
+              <SelectLabel>Stake</SelectLabel>
+              {(["stake", "unstake"] as DedicatedProtocolAction[]).map((value) => (
+                <SelectItem key={value} value={value}>{ACTION_LABELS[value]}</SelectItem>
+              ))}
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel>Borrow</SelectLabel>
+              {(["cdpDeposit", "cdpBorrow"] as DedicatedProtocolAction[]).map((value) => (
+                <SelectItem key={value} value={value}>{ACTION_LABELS[value]}</SelectItem>
+              ))}
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel>Liquidity</SelectLabel>
+              {([
+                "addLiquidity", "addLiquidityStable", "removeLiquidity",
+                "removeLiquidityStable", "removeLiquidityOneCoin", "v3Mint",
+                "v3Increase", "v3Decrease", "v3Collect",
+              ] as DedicatedProtocolAction[]).map((value) => (
+                <SelectItem key={value} value={value}>{ACTION_LABELS[value]}</SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       </div>
 
       {(standardPoolAction || stableAction) ? (
         <div className="space-y-1">
-          <Label>Indexed pool</Label>
-          <Select value={poolAddress} onValueChange={setPoolAddress}>
+          <Label>Pool</Label>
+          <Select value={poolAddress} onValueChange={(value) => {
+            setPoolAddress(value);
+            const coinCount = (pools.data ?? []).find((pool) => pool.address === value)?.coins?.length ?? 0;
+            setStableAmounts(Array.from({ length: coinCount }, () => ""));
+          }}>
             <SelectTrigger><SelectValue placeholder="Select a pool" /></SelectTrigger>
             <SelectContent>
               {compatiblePools.map((pool) => (
@@ -622,13 +659,19 @@ export function DedicatedProtocolActionsTab({ wallet, disabled }: { wallet: User
       {effectiveAction === "addLiquidityStable" || effectiveAction === "removeLiquidityStable" ? (
         <>
           {effectiveAction === "removeLiquidityStable" ? amountField("LP token amount", amount, setAmount) : null}
-          <Label>{effectiveAction === "addLiquidityStable" ? "Coin amounts" : "Minimum coin amounts"} (decimal units, pool order)</Label>
-          <Textarea
-            value={amountsText}
-            onChange={(event) => setAmountsText(event.target.value)}
-            placeholder={JSON.stringify((selectedPool?.coins ?? []).map(() => "0"))}
-            className="font-mono text-xs"
-          />
+          {(selectedPool?.coins ?? []).map((coin, index) => (
+            <div key={coin.address}>
+              {amountField(
+              `${effectiveAction === "addLiquidityStable" ? "" : "Minimum "}${coin._symbol}`,
+              stableAmounts[index] ?? "",
+              (value) => setStableAmounts((current) => {
+                const next = [...current];
+                next[index] = value;
+                return next;
+              })
+              )}
+            </div>
+          ))}
           {effectiveAction === "addLiquidityStable" ? amountField("Minimum LP tokens minted", amount2, setAmount2) : null}
         </>
       ) : null}
@@ -655,7 +698,7 @@ export function DedicatedProtocolActionsTab({ wallet, disabled }: { wallet: User
           </p>
           {action === "v3Mint" ? (
             <>
-              <Label>Indexed V3 pool</Label>
+              <Label>Pool</Label>
               <Select value={v3Pool} onValueChange={setV3Pool}>
                 <SelectTrigger><SelectValue placeholder="Select V3 pool" /></SelectTrigger>
                 <SelectContent>
@@ -688,23 +731,23 @@ export function DedicatedProtocolActionsTab({ wallet, disabled }: { wallet: User
           )}
           {action === "v3Mint" || action === "v3Increase" ? (
             <>
-              {amountField("Token 0 desired", amount, setAmount)}
-              {amountField("Token 1 desired", amount2, setAmount2)}
-              {amountField("Token 0 minimum", amount3, setAmount3)}
-              {amountField("Token 1 minimum", amount4, setAmount4)}
+              {amountField(`${selectedV3Pool?.token0._symbol ?? "First token"} desired`, amount, setAmount)}
+              {amountField(`${selectedV3Pool?.token1._symbol ?? "Second token"} desired`, amount2, setAmount2)}
+              {amountField(`Minimum ${selectedV3Pool?.token0._symbol ?? "first token"}`, amount3, setAmount3)}
+              {amountField(`Minimum ${selectedV3Pool?.token1._symbol ?? "second token"}`, amount4, setAmount4)}
             </>
           ) : null}
           {action === "v3Decrease" ? (
             <>
               {amountField("Liquidity units", liquidity, setLiquidity)}
-              {amountField("Token 0 minimum", amount, setAmount)}
-              {amountField("Token 1 minimum", amount2, setAmount2)}
+              {amountField(`Minimum ${selectedV3Pool?.token0._symbol ?? "first token"}`, amount, setAmount)}
+              {amountField(`Minimum ${selectedV3Pool?.token1._symbol ?? "second token"}`, amount2, setAmount2)}
             </>
           ) : null}
           {action === "v3Collect" ? (
             <>
-              {amountField("Token 0 maximum", amount, setAmount)}
-              {amountField("Token 1 maximum", amount2, setAmount2)}
+              {amountField(`Maximum ${selectedV3Pool?.token0._symbol ?? "first token"}`, amount, setAmount)}
+              {amountField(`Maximum ${selectedV3Pool?.token1._symbol ?? "second token"}`, amount2, setAmount2)}
             </>
           ) : null}
         </>
@@ -713,46 +756,77 @@ export function DedicatedProtocolActionsTab({ wallet, disabled }: { wallet: User
       {approvalSpecs.length ? (
         <div className="rounded-md border p-3 text-sm">
           <div className="flex justify-between gap-2">
-            <span>Prerequisite allowances</span>
+            <span>Token permissions needed</span>
             <Badge variant={missingApprovals.length ? "outline" : "secondary"}>
               {allowances.isSuccess ? `${missingApprovals.length} required` : "Checking…"}
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            Missing approval issues are created before the protocol action.
+            This also creates {missingApprovals.length} permission proposal{missingApprovals.length === 1 ? "" : "s"}.
           </p>
         </div>
       ) : null}
       {(staking.isError || cdp.isError || pools.isError || (v3Action && v3.isError)) ? (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>Required protocol metadata could not be loaded. No issue will be created.</AlertDescription>
+          <AlertDescription>Could not load protocol data. Nothing was proposed.</AlertDescription>
         </Alert>
       ) : null}
       <Button className="w-full" disabled={disabled || !action || busy} onClick={() => void propose()}>
-        {busy ? "Creating workflow…" : action ? `Create ${ACTION_LABELS[action]} workflow` : "Select an operation"}
+        {busy ? "Creating proposal…" : action ? `Propose ${ACTION_LABELS[action]}` : "Select an action"}
       </Button>
     </div>
   );
 }
 
-export function DedicatedHistoryTab({ wallet }: { wallet: UserWallet }) {
+export function DedicatedHistoryTab({
+  wallet,
+  tokens,
+  metadata,
+}: {
+  wallet: MultisigWalletSummary;
+  tokens: TokenMetadata[];
+  metadata: ProposalMetadata;
+}) {
   const { data: history = [], isLoading } = useDedicatedHistory(wallet.address, 30);
+  const { data: historyTokens = [] } = useTokenMetadata(
+    history.flatMap((item) => [item.target, ...item.arguments])
+  );
+  const allTokens = [
+    ...tokens,
+    ...historyTokens.filter((indexed) =>
+      !tokens.some((token) => strip0x(token.address) === strip0x(indexed.address))
+    ),
+  ];
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading history…</p>;
   return (
     <div className="space-y-2">
-      {history.map((item) => (
-        <div key={`${item.transactionHash}:${item.issueId}`} className="rounded-md border p-3 text-sm">
+      {history.map((item) => {
+        const description = describeProposal(item, allTokens, { ...metadata, historical: true });
+        return (
+          <div key={`${item.transactionHash}:${item.issueId}`} className="rounded-md border p-3 text-sm">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-medium">{item.functionName}</span>
+            <span className="font-medium">{description.headline}</span>
             <span className="text-xs text-muted-foreground">{item.timestamp ? new Date(item.timestamp).toLocaleString() : ""}</span>
           </div>
-          <div className="font-mono text-xs break-all">Target: {item.target}</div>
-          <div className="font-mono text-xs break-all">Arguments: {JSON.stringify(item.arguments)}</div>
-          <div className="text-xs text-muted-foreground">Issue {item.issueId}</div>
+          {description.addresses.map((entry) => (
+            <div key={`${entry.label}:${entry.value}`} className="font-mono text-xs break-all">
+              {entry.label}: {entry.value}
+            </div>
+          ))}
+          <details className="mt-2 text-xs">
+            <summary className="cursor-pointer text-muted-foreground">Technical details</summary>
+            <div className="mt-2 space-y-1 font-mono break-all">
+              <div>Target: {item.target}</div>
+              <div>Function: {item.functionName}</div>
+              <div>Arguments: {JSON.stringify(item.arguments)}</div>
+              <div>Proposal ID: {item.issueId}</div>
+            </div>
+          </details>
         </div>
-      ))}
-      {!history.length ? <p className="text-sm text-muted-foreground">No executed issues.</p> : null}
+        );
+      })}
+      {!history.length ? <p className="text-sm text-muted-foreground">No completed proposals.</p> : null}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   normalizeDedicatedArguments,
   parseDedicatedTypedArguments,
 } from "./dedicatedMultisig";
+import { describeProposal } from "./dedicatedProposal";
 import { loadBackendConfig } from "@/lib/env";
 
 const wallet = "efa890674cad5e3a7640bb720c2a70bf3ae76709";
@@ -80,6 +81,113 @@ test("pool withdrawal encodes token B minimum before token A minimum", () => {
   assert.deepEqual(
     call.arguments.map((argument: any) => argument.value),
     [100, 6000001, "18000000000000000001", 6_049_000]
+  );
+});
+
+test("proposal descriptions use borrowed USDST units and show withdrawal receivers", () => {
+  const collateral = "1111111111111111111111111111111111111111";
+  const pool = "2222222222222222222222222222222222222222";
+  const receiver = "3333333333333333333333333333333333333333";
+  const metadata = {
+    walletAddress: wallet,
+    pools: [{ address: pool, poolName: "Stable pool" }] as any[],
+    cdp: {
+      registryAddress: "",
+      engineAddress: spender,
+      vaultAddress: "",
+      usdstAddress: "",
+      assets: [{ asset: collateral, symbol: "WBTC", decimals: 8, isPaused: false, isSupported: true }],
+    },
+  };
+  assert.equal(
+    describeProposal(
+      { target: spender, functionName: "mint", arguments: [collateral, "100000000000000000000"] },
+      [],
+      metadata
+    ).headline,
+    "Borrow 100 USDST against WBTC"
+  );
+  assert.deepEqual(
+    describeProposal(
+      { target: pool, functionName: "removeliquidityOneCoin", arguments: ["1", "0", "1", receiver] },
+      [],
+      metadata
+    ).addresses,
+    [{ label: "Receiver", value: receiver }]
+  );
+});
+
+test("proposal descriptions expose stable liquidity and governance destinations", () => {
+  const pool = "2222222222222222222222222222222222222222";
+  const receiver = "3333333333333333333333333333333333333333";
+  assert.deepEqual(
+    describeProposal(
+      { target: pool, functionName: "addLiquidityGeneral", arguments: ["[]", "1", receiver] },
+      [],
+      { walletAddress: wallet, pools: [{ address: pool, poolName: "Stable pool" }] as any[] }
+    ).addresses,
+    [{ label: "Receiver", value: receiver }]
+  );
+  assert.equal(
+    describeProposal(
+      {
+        target: wallet,
+        functionName: "applyConfiguration",
+        arguments: [JSON.stringify([wallet, signer]), "2"],
+      },
+      [],
+      { walletAddress: wallet, signers: [wallet, signer, receiver], requiredApprovals: 3, pools: [] }
+    ).headline,
+    "Remove signer 0x333333…3333 and change approvals needed to 2"
+  );
+  assert.equal(
+    describeProposal(
+      {
+        target: wallet,
+        functionName: "applyConfiguration",
+        arguments: ["unreadable", "2"],
+      },
+      [],
+      { walletAddress: wallet, signers: [wallet, signer, receiver], requiredApprovals: 3, pools: [] }
+    ).headline,
+    "Set signers and approvals needed to 2"
+  );
+  assert.equal(
+    describeProposal(
+      {
+        target: wallet,
+        functionName: "applyConfiguration",
+        arguments: [JSON.stringify([wallet, signer]), "2"],
+      },
+      [],
+      {
+        walletAddress: wallet,
+        signers: [wallet, signer, receiver],
+        requiredApprovals: 3,
+        historical: true,
+        pools: [],
+      }
+    ).headline,
+    "Set 2 signers and approvals needed to 2"
+  );
+  assert.equal(
+    describeProposal(
+      { target: wallet, functionName: "cancelIssue", arguments: ["proposal-7"] },
+      [],
+      { walletAddress: wallet, pools: [] }
+    ).headline,
+    "Cancel proposal proposal-7"
+  );
+});
+
+test("proposal descriptions decode tokens not held by the multisig wallet", () => {
+  assert.equal(
+    describeProposal(
+      { target: spender, functionName: "transfer", arguments: [signer, "123000000"] },
+      [{ address: spender, symbol: "USDC", decimals: 6 }],
+      { walletAddress: wallet, pools: [] }
+    ).headline,
+    "Send 123 USDC to 0xfdb36b…e032"
   );
 });
 

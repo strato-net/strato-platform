@@ -4,7 +4,12 @@ import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { api } from "@/lib/api";
 import { formatVariadicArg, parseJsonExact, typedVariadicArg, variadicArgValue } from "@/lib/args";
 import { env, runtime } from "@/lib/env";
-import { ADMIN_REGISTRY_ADDRESS, ZERO_ADDRESS, strip0x } from "@/services/userWallets";
+import {
+  ADMIN_REGISTRY_ADDRESS,
+  ZERO_ADDRESS,
+  strip0x,
+  useMyUserWallets,
+} from "@/services/userWallets";
 
 export const buildDedicatedCallPayload = (
   contractName: string,
@@ -130,6 +135,7 @@ export interface DedicatedIssue {
 
 export interface DedicatedSetupState {
   setupHash: string;
+  label: string;
   creator: string;
   expectedWallet: string;
   signers: string[];
@@ -180,7 +186,7 @@ const fetchDedicatedFactoryState = async (): Promise<DedicatedFactoryState> => {
     }))
     .filter((version) => version.version && version.logic && version.approved && !version.revoked)
     .map(({ version, logic: versionLogic }) => ({ version, logic: versionLogic }))
-    .sort((left, right) => left.version.localeCompare(right.version));
+    .sort((left, right) => left.version.localeCompare(right.version, undefined, { numeric: true }));
   const verificationErrors = [
     ...(!logic ? ["Factory proxy has no implementation"] : []),
     ...(![ADMIN_REGISTRY_ADDRESS, ZERO_ADDRESS].includes(owner)
@@ -207,6 +213,257 @@ export function useDedicatedFactoryState() {
     refetchInterval: 15_000,
     queryFn: fetchDedicatedFactoryState,
   });
+}
+
+export interface MultisigWalletSummary {
+  address: string;
+  label: string;
+  requiredApprovals: number;
+  signerCount: number;
+  signerAddress: string;
+  signerUsername: string;
+  pendingSigner: boolean;
+  nomineeAddress?: string;
+  nomineeUsername?: string;
+  active: boolean;
+}
+
+export interface PendingMultisigSetupSummary {
+  setupHash: string;
+  label: string;
+  creator: string;
+  creatorUsername: string;
+  expectedWallet: string;
+  signerAddress: string;
+  signerUsername: string;
+  confirmedCount: number;
+  signerConfirmed: boolean;
+  canConfirm: boolean;
+  requiredApprovals: number;
+  signerCount: number;
+  expiresAt: number;
+}
+
+const storageData = (row: any): any => {
+  const storage = row?.storage;
+  const entry = Array.isArray(storage) ? storage[0] : storage;
+  return entry?.data ?? entry ?? {};
+};
+
+export function useMyMultisigWallets(ownerAddress?: string | null) {
+  const { data: userWallets = [], isLoading: userWalletsLoading } = useMyUserWallets(ownerAddress);
+  const controlled = [
+    strip0x(ownerAddress ?? ""),
+    ...userWallets.map((wallet) => strip0x(wallet.address)),
+  ].filter(Boolean);
+  const usernames = new Map(userWallets.map((wallet) => [strip0x(wallet.address), wallet.username]));
+  const factory = runtime.multisigFactoryAddress();
+  const query = useQuery({
+    queryKey: ["my-multisig-wallets", ownerAddress, controlled],
+    enabled: !!ownerAddress && !userWalletsLoading && !!factory,
+    refetchInterval: 15_000,
+    queryFn: async (): Promise<MultisigWalletSummary[]> => {
+      const dedicatedSelect =
+        "select=address,key,value,storage(data-%3E%3EmultisigFactory,data-%3E%3EmultisigSetupHash,data-%3E%3EmultisigActive,data-%3E%3EmultisigEpoch,data-%3E%3ErequiredApprovals)";
+      const [signerRows, nominationRows] = await Promise.all([
+        pagedRows(
+          "mapping",
+          `collection_name=eq.signerMap&key-%3E%3Ekey=in.(${controlled.join(",")})` +
+            `&value=gt.0&${dedicatedSelect}`
+        ),
+        pagedRows(
+          "mapping",
+          `collection_name=eq.nominations&key-%3E%3Ekey=in.(${controlled.join(",")})&${dedicatedSelect}`
+        ),
+      ]);
+      const allRows = [...signerRows, ...nominationRows];
+      const addresses = [...new Set(
+        allRows.map((row) => strip0x(String(row?.address ?? ""))).filter(Boolean)
+      )];
+      if (!addresses.length) return [];
+      const setupHashes = [...new Set(
+        allRows.map((row) => String(storageData(row)?.multisigSetupHash ?? "")).filter(Boolean)
+      )];
+      const [registeredRows, setupRows, allSignerRows] = await Promise.all([
+        inBatches(addresses, (batch) => pagedRows(
+          "mapping",
+          `address=eq.${factory}&collection_name=eq.factoryWallets` +
+            `&key-%3E%3Ekey=in.(${batch.join(",")})&value=eq.true&select=key`
+        )),
+        inBatches(setupHashes, (batch) => pagedRows(
+          "mapping",
+          `address=eq.${factory}&collection_name=eq.pendingSetups` +
+            `&key-%3E%3Ekey=in.(${batch.join(",")})&select=key,value`
+        )),
+        inBatches(addresses, (batch) => pagedRows(
+          "mapping",
+          `address=in.(${batch.join(",")})&collection_name=eq.signerMap&value=gt.0&select=address`
+        )),
+      ]);
+      const registered = new Set(
+        registeredRows.map((row) => strip0x(String(row?.key?.key ?? "")))
+      );
+      const labels = new Map(
+        setupRows.map((row) => [String(row?.key?.key ?? ""), String(row?.value?.label ?? "")])
+      );
+      const signerCounts = new Map<string, number>();
+      for (const row of allSignerRows) {
+        const address = strip0x(String(row?.address ?? ""));
+        signerCounts.set(address, (signerCounts.get(address) ?? 0) + 1);
+      }
+
+      const summaries = new Map<string, MultisigWalletSummary>();
+      for (const row of signerRows) {
+        const address = strip0x(String(row?.address ?? ""));
+        const signerAddress = strip0x(String(row?.key?.key ?? ""));
+        const data = storageData(row);
+        if (!registered.has(address) || strip0x(String(data.multisigFactory ?? "")) !== factory) continue;
+        const existing = summaries.get(address);
+        if (existing && existing.signerAddress === controlled[0]) continue;
+        if (existing && signerAddress !== controlled[0]) continue;
+        summaries.set(address, {
+          address,
+          label: labels.get(String(data.multisigSetupHash ?? "")) ?? "",
+          requiredApprovals: Number(data.requiredApprovals ?? 0),
+          signerCount: signerCounts.get(address) ?? 0,
+          signerAddress,
+          signerUsername: usernames.get(signerAddress) ?? "",
+          pendingSigner: false,
+          active: data.multisigActive === true || data.multisigActive === "true",
+        });
+      }
+      for (const row of nominationRows) {
+        const address = strip0x(String(row?.address ?? ""));
+        const nomineeAddress = strip0x(String(row?.key?.key ?? ""));
+        const data = storageData(row);
+        const value = row?.value ?? {};
+        const live = (value.exists === true || value.exists === "true") &&
+          Number(value.epoch ?? 0) === Number(data.multisigEpoch ?? 0) &&
+          Number(value.expiresAt ?? 0) >= Date.now() / 1000;
+        if (!live || !registered.has(address) ||
+            strip0x(String(data.multisigFactory ?? "")) !== factory) continue;
+        const current = summaries.get(address);
+        if (current) {
+          current.pendingSigner = true;
+          current.nomineeAddress = nomineeAddress;
+          current.nomineeUsername = usernames.get(nomineeAddress) ?? "";
+        } else {
+          summaries.set(address, {
+            address,
+            label: labels.get(String(data.multisigSetupHash ?? "")) ?? "",
+            requiredApprovals: Number(data.requiredApprovals ?? 0),
+            signerCount: signerCounts.get(address) ?? 0,
+            signerAddress: "",
+            signerUsername: "",
+            pendingSigner: true,
+            nomineeAddress,
+            nomineeUsername: usernames.get(nomineeAddress) ?? "",
+            active: data.multisigActive === true || data.multisigActive === "true",
+          });
+        }
+      }
+      return [...summaries.values()];
+    },
+  });
+  return { ...query, isLoading: userWalletsLoading || query.isLoading };
+}
+
+export function useMyPendingMultisigSetups(ownerAddress?: string | null) {
+  const { data: userWallets = [], isLoading: userWalletsLoading } = useMyUserWallets(ownerAddress);
+  const controlled = [
+    strip0x(ownerAddress ?? ""),
+    ...userWallets.map((wallet) => strip0x(wallet.address)),
+  ].filter(Boolean);
+  const usernames = new Map(userWallets.map((wallet) => [strip0x(wallet.address), wallet.username]));
+  const factory = runtime.multisigFactoryAddress();
+  const query = useQuery({
+    queryKey: ["my-pending-multisig-setups", ownerAddress, controlled],
+    enabled: !!ownerAddress && !userWalletsLoading && !!factory,
+    refetchInterval: 15_000,
+    queryFn: async (): Promise<PendingMultisigSetupSummary[]> => {
+      const [signerRowGroups, creatorRows] = await Promise.all([
+        Promise.all(controlled.map((signer) => pagedRows(
+          "mapping",
+          `address=eq.${factory}&collection_name=eq.setupSigners` +
+            `&value=eq.%22${signer}%22&select=key,value`
+        ))),
+        pagedRows(
+          "mapping",
+          `address=eq.${factory}&collection_name=eq.pendingSetups` +
+            `&value-%3E%3Ecreator=in.(${controlled.join(",")})&select=key,value`
+        ),
+      ]);
+      const signerRows = signerRowGroups.flat();
+      const setupHashes = [...new Set(
+        [...signerRows, ...creatorRows].map((row) => String(row?.key?.key ?? "")).filter(Boolean)
+      )];
+      if (!setupHashes.length) return [];
+      const [setupRows, confirmationRows, allSetupSignerRows] = await Promise.all([
+        inBatches(setupHashes, (batch) => pagedRows(
+          "mapping",
+          `address=eq.${factory}&collection_name=eq.pendingSetups` +
+            `&key-%3E%3Ekey=in.(${batch.join(",")})&select=key,value`
+        )),
+        inBatches(setupHashes, (batch) => pagedRows(
+          "mapping",
+          `address=eq.${factory}&collection_name=eq.setupConfirmations` +
+            `&key-%3E%3Ekey=in.(${batch.join(",")})&value=eq.true&select=key`
+        )),
+        inBatches(setupHashes, (batch) => pagedRows(
+          "mapping",
+          `address=eq.${factory}&collection_name=eq.setupSigners` +
+            `&key-%3E%3Ekey=in.(${batch.join(",")})&select=key,value`
+        )),
+      ]);
+      const confirmed = new Set(confirmationRows.map((row) =>
+        `${String(row?.key?.key ?? "")}:${strip0x(String(row?.key?.key2 ?? ""))}`
+      ));
+      const signerCounts = new Map<string, number>();
+      const confirmedCounts = new Map<string, number>();
+      for (const row of allSetupSignerRows) {
+        const hash = String(row?.key?.key ?? "");
+        signerCounts.set(hash, (signerCounts.get(hash) ?? 0) + 1);
+      }
+      for (const row of confirmationRows) {
+        const hash = String(row?.key?.key ?? "");
+        confirmedCounts.set(hash, (confirmedCounts.get(hash) ?? 0) + 1);
+      }
+      return setupRows.flatMap((row) => {
+        const setupHash = String(row?.key?.key ?? "");
+        const value = row?.value ?? {};
+        const pending = (value.exists === true || value.exists === "true") &&
+          value.deployed !== true && value.deployed !== "true" &&
+          value.cancelled !== true && value.cancelled !== "true" &&
+          Number(value.expiresAt ?? 0) >= Date.now() / 1000;
+        if (!pending) return [];
+        const signerAddress = controlled.find((candidate) =>
+          signerRows.some((signerRow) =>
+            String(signerRow?.key?.key ?? "") === setupHash &&
+            strip0x(String(signerRow?.value ?? "")) === candidate
+          )
+        ) ?? "";
+        const creator = strip0x(String(value.creator ?? ""));
+        if (!signerAddress && !controlled.includes(creator)) return [];
+        const signerConfirmed = !!signerAddress && confirmed.has(`${setupHash}:${signerAddress}`);
+        return [{
+          setupHash,
+          label: String(value.label ?? ""),
+          creator,
+          creatorUsername: usernames.get(creator) ?? "",
+          expectedWallet: strip0x(String(value.expectedWallet ?? "")),
+          signerAddress,
+          signerUsername: usernames.get(signerAddress) ?? "",
+          confirmedCount: confirmedCounts.get(setupHash) ?? 0,
+          signerConfirmed,
+          canConfirm: !!signerAddress && !signerConfirmed,
+          requiredApprovals: Number(value.requiredApprovals ?? 0),
+          signerCount: signerCounts.get(setupHash) ?? 0,
+          expiresAt: Number(value.expiresAt ?? 0),
+        }];
+      });
+    },
+  });
+  return { ...query, isLoading: userWalletsLoading || query.isLoading };
 }
 
 export function useDedicatedSetup(setupHash?: string | null) {
@@ -242,6 +499,7 @@ export function useDedicatedSetup(setupHash?: string | null) {
         .filter((signer) => signer.length === 40);
       return {
         setupHash: hash,
+        label: String(value.label ?? ""),
         creator: strip0x(String(value.creator ?? "")),
         expectedWallet: strip0x(String(value.expectedWallet ?? "")),
         signers,
@@ -468,11 +726,11 @@ export function useDedicatedHistory(walletAddress?: string | null, limit = 10) {
 }
 
 export interface RegisterDedicatedSetup {
+  label: string;
   signers: string[];
   requiredApprovals: number;
   transactionTimelock: number;
   initialVersion: string;
-  salt: string;
 }
 
 export const canonicalizeSetupSigners = (signers: string[]): string[] =>
@@ -647,7 +905,7 @@ export function useDedicatedMultisigActions(walletAddress?: string) {
 
   const factoryCall = useCallback(
     (method: string, args: Record<string, unknown>, username?: string) => {
-      if (!factory) throw new Error("No canonical multisig factory is configured for this network");
+      if (!factory) throw new Error("Multisig wallets are not set up on this network");
       return submit(
         "FUNCTION",
         buildDedicatedCallPayload("MultisigFactory", factory, method, args),
@@ -681,12 +939,19 @@ export function useDedicatedMultisigActions(walletAddress?: string) {
         _requiredApprovals: input.requiredApprovals,
         _transactionTimelock: input.transactionTimelock,
         _initialVersion: input.initialVersion,
-        _salt: input.salt,
-      }, username),
+        _label: input.label,
+      }, username).finally(() =>
+        queryClient.invalidateQueries({ queryKey: ["my-pending-multisig-setups"] })
+      ),
     confirmSetup: (setupHash: string, username?: string) =>
-      factoryCall("confirmSetup", { _setupHash: setupHash }, username),
+      factoryCall("confirmSetup", { _setupHash: setupHash }, username).finally(() => {
+        queryClient.invalidateQueries({ queryKey: ["my-pending-multisig-setups"] });
+        queryClient.invalidateQueries({ queryKey: ["my-multisig-wallets"] });
+      }),
     cancelSetup: (setupHash: string, username?: string) =>
-      factoryCall("cancelSetup", { _setupHash: setupHash }, username),
+      factoryCall("cancelSetup", { _setupHash: setupHash }, username).finally(() =>
+        queryClient.invalidateQueries({ queryKey: ["my-pending-multisig-setups"] })
+      ),
     proposeIssue: (target: string, functionName: string, argumentTypes: string[], args: unknown[], username?: string) =>
       walletCall(argumentTypes.length ? "proposeIssue" : "proposeIssueNoArgs", argumentTypes.length ? {
         _target: strip0x(target),
@@ -735,7 +1000,10 @@ export function useDedicatedMultisigActions(walletAddress?: string) {
       walletCall("revokeIssueApproval", { _issueId: issueId }, username),
     dismissIssue: (issueId: string, username?: string) =>
       walletCall("dismissIssue", { _issueId: issueId }, username),
-    acceptNomination: (username?: string) => walletCall("acceptNomination", {}, username),
+    acceptNomination: (username?: string) =>
+      walletCall("acceptNomination", {}, username).finally(() =>
+        queryClient.invalidateQueries({ queryKey: ["my-multisig-wallets"] })
+      ),
     executeUpgrade: () => walletCall("executeUpgrade", {}),
   };
 }

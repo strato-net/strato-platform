@@ -16,6 +16,14 @@ contract MultisigFactoryV2 is MultisigFactory {
     }
 }
 
+contract TestableMultisigFactory is MultisigFactory {
+    constructor() MultisigFactory(address(0xdeadbeef)) {}
+
+    function setupLabel(string _setupHash) external returns (string) {
+        return pendingSetups[_setupHash].label;
+    }
+}
+
 contract Describe_MultisigFactory {
     MultisigFactory factory;
     MultisigLogic logic;
@@ -25,7 +33,7 @@ contract Describe_MultisigFactory {
     FactorySigner outsider;
 
     function deployFactory() internal returns (MultisigFactory) {
-        MultisigFactory implementation = new MultisigFactory(address(0xdeadbeef));
+        TestableMultisigFactory implementation = new TestableMultisigFactory();
         MultisigFactory deployed = MultisigFactory(address(new Proxy(address(implementation), address(this))));
         deployed.initializeRegistryGovernance(address(this));
         return deployed;
@@ -127,11 +135,22 @@ contract Describe_MultisigFactory {
             ),
             "M equal to N accepted"
         );
+        require(
+            rejects(
+                outsider,
+                address(factory),
+                "registerSetup",
+                [address(a), address(b), address(c)],
+                2,
+                0,
+                "1",
+                "12345678901234567890123456789012345678901234567890123456789012345"
+            ),
+            "Oversized label accepted"
+        );
     }
 
-    function it_hashes_permuted_signer_sets_identically() {
-        MultisigFactory other = deployFactory();
-        other.publishLogicVersion("1", address(logic));
+    function it_assigns_unique_setup_hashes_and_preserves_the_label() {
         (string first,) = factory.registerSetup(
             [address(a), address(b), address(c)],
             2,
@@ -139,14 +158,15 @@ contract Describe_MultisigFactory {
             "1",
             "canonical"
         );
-        (string second,) = other.registerSetup(
+        (string second,) = factory.registerSetup(
             [address(c), address(a), address(b)],
             2,
             0,
             "1",
             "canonical"
         );
-        require(first == second, "Signer permutation changed setup hash");
+        require(first != second, "Factory nonce did not produce a unique setup hash");
+        require(TestableMultisigFactory(address(factory)).setupLabel(first) == "canonical", "Setup label was not preserved");
     }
 
     function it_allows_only_creator_or_signer_to_cancel() {
