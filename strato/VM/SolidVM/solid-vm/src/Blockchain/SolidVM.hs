@@ -38,11 +38,11 @@ import Blockchain.Data.VmTrace
 import Blockchain.Data.ExecResults
 import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Forks (isEmitArgForkActive)
-import BlockApps.Solidity.ABI.Bridge (encodeEventToLogValues)
 import Blockchain.SolidVM.Builtins.ABI.Values.Metered (abiDecode)
 import qualified Blockchain.SolidVM.Builtins as Builtins
 import qualified Blockchain.SolidVM.Builtins.Casts as Casts
 import qualified Blockchain.SolidVM.Builtins.Crypto.Metered as CryptoBuiltin
+import qualified Blockchain.SolidVM.Builtins.Events.Metered as MeteredEvents
 import qualified Blockchain.SolidVM.Builtins.Functions.Metered as Builtin
 import qualified Blockchain.SolidVM.Builtins.Operators.Metered as Operators
 import Blockchain.SolidVM.Execution
@@ -52,7 +52,7 @@ import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.GasInfo
 import Blockchain.SolidVM.Metrics
 import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Metered
-import Blockchain.SolidVM.Builtins.Size.Values (ValueArguments (..), valueSize)
+import Blockchain.SolidVM.Builtins.Size.Values (ValueArguments (..), chargeInnerAggregates, chargeNested, valueSize)
 import Blockchain.SolidVM.Builtins.Size (GasSize)
 import qualified Blockchain.SolidVM.Builtins.Casts.Metered as MeteredCasts
 import qualified Blockchain.SolidVM.Builtins.Hashing as PureHashing
@@ -816,7 +816,7 @@ runStatement s@(CC.SimpleStatement (CC.VariableDefinition entries maybeExpressio
     case maybeExpression of
       Nothing -> do
         ctract <- getCurrentContract
-        createDefaultValue cc ctract singleType
+        createDefaultValueWith (decrementGas 1) cc ctract singleType
       Just e -> do
         rhs <- weakGetVar =<< expToVar e
         case (maybeLoc, rhs) of
@@ -1002,45 +1002,9 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
       then mapM (forceValue <=< getVar) exps
       else mapM (forceLoadVar . Constant <=< getVar) exps
 
-  -- checks that the event is declared and that the number of args match
-  --   DOES NOT check consistency of arg types
-  curInfo <- getCurrentCallInfo
   curCnct <- getCurrentContract
-  let evs = CC._events curCnct
-      mEv = M.lookup eventName evs
-  case mEv of
-    Nothing ->
-      throw (MissingType "no corresponding event has been declared for the following emit statement: " (unparseStatement st))
-    Just ev -> do
-      if (length exptups) /= (length $ CC._eventLogs ev)
-        then throw (InvalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st))
-        else do
-          let address = currentAddress curInfo
-          -- pair up field names with values one-by-one (no type checking tho, lol)
-          -- let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
-
-          -- An arg that was never written (unset storage slot, or SNULL) has no
-          -- shape of its own; give it the declared type's default so it leaves
-          -- the VM as a real value ([] / "" / 0 ...) like every other arg.
-          cc <- snd <$> getCurrentCodeCollection
-          evArgs <- forM (zip (CC._eventLogs ev) expVals) $
-            \(CC.EventLog name _ (CC.IndexedType _ idxType _), value) ->
-              (name,) <$> case value of
-                SReference _ | emitArgFork -> forceValue =<< createDefaultValue cc curCnct idxType
-                SNULL | emitArgFork -> forceValue =<< createDefaultValue cc curCnct idxType
-                _ -> pure value
-
-          tHash <- Env.txHash <$> getEnv
-          txSender <- Env.origin <$> getEnv
-          let contractName' = labelToText $ CC._contractName curCnct
-          -- Derive the Ethereum log topics (topic0 + indexed args) from the event
-          -- ABI now, while the CodeCollection is in hand, so the block producer can
-          -- build a real logsBloom without re-deriving them. Encodes straight from
-          -- the Values; gives the same bytes as the text-based encodeEventToLog the
-          -- JSON-RPC layer applies to Cirrus rows, so producer and RPC blooms agree.
-          let (evTopicBytes, _) = encodeEventToLogValues eventName ev evArgs
-          addEvent $ Event tHash txSender contractName' address eventName evArgs evTopicBytes
-          return Nothing
+  MeteredEvents.emit forceValue emitArgFork curCnct (unparseStatement st) eventName expVals
+  return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos
   withUncheckedCallInfo $ runStatementBlock code
@@ -1125,9 +1089,10 @@ expToPath x = throw (TypeError "expression is not a storage location" (unparseEx
 expToVar :: MonadSM m => CC.Expression -> m Variable
 expToVar x = do
   -- liftIO $ putStrLn $ C.cyan $ "expToVar: " ++ show x
-  v <- expToVar' x
+  -- charged before evaluating, so an expression that never finishes (constants
+  -- defined in terms of each other) runs out of gas
   decrementGas 1
-  return v
+  expToVar' x
 
 decrementGas :: MonadSM m => Gas -> m ()
 decrementGas = chargeBuiltinGas
@@ -1334,7 +1299,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       Constant r -> pure . Constant $ SPush r Nothing
       _ -> pure . Constant $ SPush (SArray V.empty) (Just var)
     (SArray theVector, "length") -> return $ Constant $ SInteger $ fromIntegral $ V.length theVector
-    (SString s, "length") -> return . Constant . SInteger . fromIntegral $ length s
+    (SString s, "length") -> Constant . SInteger . fromIntegral <$> Metered.stringLength (T.pack s)
     (SBytes bs, "length") -> return . Constant . SInteger . fromIntegral $ B.length bs
     (SNULL, "length") -> return . Constant $ SInteger 0
     (SReference p, itemName) -> return . Constant . SReference $ MS.snoc p $ MS.Field $ BC.pack $ labelToString itemName
@@ -1414,6 +1379,7 @@ expToVar' (CC.Binary _ "!=" expr1 expr2) = do
   ctract <- getCurrentContract
   (_, cc) <- getCurrentCodeCollection
   onTraced $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
+  Operators.comparison (valueSize val1) (valueSize val2)
   return . Constant . SBool . not $ valEquals ctract cc val1 val2
 expToVar' (CC.Binary _ "==" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
@@ -1421,11 +1387,13 @@ expToVar' (CC.Binary _ "==" expr1 expr2) = do
   ctract <- getCurrentContract
   (_, cc) <- getCurrentCodeCollection
   logVals val1 val2
+  Operators.comparison (valueSize val1) (valueSize val2)
   return . Constant . SBool $ valEquals ctract cc val1 val2
 expToVar' (CC.Binary _ "<" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
   logVals val1 val2
+  Operators.comparison (valueSize val1) (valueSize val2)
   case (defaultToInt val1, defaultToInt val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 < i2
     (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 < v2
@@ -1434,6 +1402,7 @@ expToVar' (CC.Binary _ ">" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
   logVals val1 val2
+  Operators.comparison (valueSize val1) (valueSize val2)
   case (defaultToInt val1, defaultToInt val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 > i2
     (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 > v2
@@ -1442,6 +1411,7 @@ expToVar' (CC.Binary _ ">=" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
   logVals val1 val2
+  Operators.comparison (valueSize val1) (valueSize val2)
   case (defaultToInt val1, defaultToInt val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 >= i2
     (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 >= v2
@@ -1450,6 +1420,7 @@ expToVar' (CC.Binary _ "<=" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
   logVals val1 val2
+  Operators.comparison (valueSize val1) (valueSize val2)
   case (defaultToInt val1, defaultToInt val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 <= i2
     (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 <= v2
@@ -1489,17 +1460,20 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ SVMType.Bytes {} _) args) = do
   case args of
     [a] -> do
       len <- getInt =<< expToVar a
-      Metered.allocate ((max 0 len + 31) `div` 32)
+      Metered.allocateBytes len
       return . Constant . SBytes $ B.replicate (fromIntegral len) 0
     _ -> throw (ArityMismatch "newBytes" 1 (length args))
 expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array {SVMType.entry = t}) _) args) = do
   case args of
     [a] -> do
       len <- getInt =<< expToVar a
-      Metered.allocate len
       ctract <- getCurrentContract
       cc <- snd <$> getCurrentCodeCollection
-      v <- createDefaultValue cc ctract t
+      -- each element is charged for every field of its default value
+      before <- _gasUsed <$> getGasInfo
+      v <- createDefaultValueWith (decrementGas 1) cc ctract t
+      Gas fields <- subtract before . _gasUsed <$> getGasInfo
+      Metered.allocate (len * max 1 fields)
       Constant . SArray . V.fromList <$> traverse (const $ createVar v) [1..len]
     _ -> throw (ArityMismatch "new array" 1 (length args))
 expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractName') Nothing) args) = do
@@ -2502,7 +2476,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
         SVMType.Mapping _ _ _ _ _ -> return ()
         SVMType.Array _ _ -> return ()
         t -> do
-          defVal <- createDefaultValue cc contract' t
+          defVal <- createDefaultValueWith (decrementGas 1) cc contract' t
           currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
           for_ (toBasic currentBlockNum defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n])
     -- SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
@@ -2589,7 +2563,7 @@ resolveArgRef src contract cc argType arg = case arg of
                 pure (field, var)
               pure . SStruct s $ M.fromList fieldPairs
             Nothing -> pure arg
-        _ -> createDefaultValue cc contract argType
+        _ -> createDefaultValueWith (decrementGas 1) cc contract argType
       v' -> pure v'
   SArray vs ->
     let t' = case argType of
@@ -2616,7 +2590,7 @@ resolveArgRefs src contract cc argDefs args =
   let go ts'@[(_, CC.IndexedType _ t@SVMType.Variadic _)] (v : vs') = (:) <$> resolveArgRef src contract cc t v <*> go ts' vs'
       go ((_, CC.IndexedType _ t _) : ts') (v : vs') = (:) <$> resolveArgRef src contract cc t v <*> go ts' vs'
       go _ vs' = pure vs'
-   in go argDefs args
+   in mapM_ chargeNested args >> go argDefs args
 
 -- Note: this is intentionally nonstrict in `theType`
 addLocalVariable :: MonadSM m => SolidString -> Value -> m ()
@@ -2755,7 +2729,7 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
   Metered.functionEntry (ValueArguments argVals')
   let !returnNamesAndTypes = [(n, t) | (Just n, CC.IndexedType _ t _) <- CC._funcVals theFunction]
       !theModifierNames = map fst $ (CC._funcModifiers theFunction)
-  !returns <- traverse (\(n, t) -> (n,) <$> createDefaultValue cc contract' t) returnNamesAndTypes
+  !returns <- traverse (\(n, t) -> (n,) <$> createDefaultValueWith (decrementGas 1) cc contract' t) returnNamesAndTypes
 
   theModifiers' <- forM theModifierNames $ \name -> do
     case M.lookup name (contract' ^. CC.modifiers) of
@@ -3025,9 +2999,7 @@ solidityExceptionHandler catchBlockMap ex =
     MalformedData{} -> do
       res <- solidityExceptionHandlerHelper catchBlockMap 17 ex
       return res
-    TooMuchGas{} -> do
-      res <- solidityExceptionHandlerHelper catchBlockMap 18 ex
-      return res
+    TooMuchGas{} -> throwIO ex
     PaymentError{} -> do
       res <- solidityExceptionHandlerHelper catchBlockMap 19 ex
       return res
@@ -3201,12 +3173,7 @@ solidVMExceptionHandler catchBlockMap ex =
         Just (_, block) -> do
           res <- runStatementBlock block
           return res
-    (TooMuchGas s1 s2) ->
-      case M.lookup "TooMuchGas" catchBlockMap of
-        Nothing -> solidVMExceptionHelper catchBlockMap $ throw (TooMuchGas s1 s2)
-        Just (_, block) -> do
-          res <- runStatementBlock block
-          return res
+    TooMuchGas{} -> throwIO ex
     (PaymentError s1 s2) ->
       case M.lookup "PaymentError" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ throw (PaymentError s1 s2)
@@ -3344,7 +3311,7 @@ solidVMExceptionHandler catchBlockMap ex =
 
 -- checks if an argument list is valid for a given function signature
 validateFunctionArguments:: MonadSM m => CC.CodeCollection -> CC.Contract -> CC.Func -> ValList -> m (Maybe (CC.Func, ValList))
-validateFunctionArguments cc contract' func argVals = checkFunc $ func : CC._funcOverload func
+validateFunctionArguments cc contract' func argVals = mapM_ chargeInnerAggregates argVals >> checkFunc (func : CC._funcOverload func)
   where
     checkFunc [] = pure Nothing
     checkFunc (x:xs) = testMatch x >>= \case
@@ -3399,7 +3366,7 @@ validateFunctionArguments cc contract' func argVals = checkFunc $ func : CC._fun
             then fmap (SArray . V.fromList . map Constant) . sequence <$> traverse (marshalValue . (y,)) vs
             else pure Nothing
         (r@(SReference _), _) -> pure $ Just r
-        (SNULL, t') -> Just <$> createDefaultValue cc contract' t'
+        (SNULL, t') -> Just <$> createDefaultValueWith (decrementGas 1) cc contract' t'
         _ -> pure Nothing
     mapArgValues :: MonadSM m => CC.FuncF a -> m (Maybe [(SVMType.Type, Value)])
     mapArgValues theFunc =

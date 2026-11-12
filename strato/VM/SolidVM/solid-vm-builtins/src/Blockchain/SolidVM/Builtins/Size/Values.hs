@@ -1,8 +1,10 @@
 {-# LANGUAGE LambdaCase #-}
-module Blockchain.SolidVM.Builtins.Size.Values (ValueArguments (..), valueSize, basicSize) where
+module Blockchain.SolidVM.Builtins.Size.Values (ValueArguments (..), valueSize, basicSize, chargeNested, chargeInnerAggregates) where
 
 import Blockchain.SolidVM.Builtins.Gas (byteWidth)
 import Blockchain.SolidVM.Builtins.Size (FunctionArguments (..), gasSize, wordsFor)
+import Blockchain.SolidVM.GasInfo (MonadBuiltinGas (..))
+import Blockchain.Strato.Model.Gas (Gas (..))
 import qualified Data.ByteString as B
 import qualified Data.Map as M
 import qualified Data.Text as T
@@ -30,6 +32,53 @@ valueSize = \case
   SUserDefined _ _ value -> valueSize value
   SNULL -> 0
   _ -> 32
+
+-- | Charge for everything reachable inside an aggregate, each element before
+-- it is visited. 'valueSize' counts an aggregate's own slots only, but its
+-- elements are references: many slots can share one large value, or lead
+-- back to the aggregate itself, so whatever walks the whole value (encoding,
+-- events, logging, call arguments) must pay for all of it first.
+chargeNested :: MonadBuiltinGas m => Value -> m ()
+chargeNested = \case
+  SStruct _ fields -> mapM_ element fields
+  SArray values -> mapM_ element values
+  STuple values -> mapM_ element values
+  SMap entries -> mapM_ element entries
+  SVariadic values -> mapM_ chargeNested values
+  SUserDefined _ _ value -> chargeNested value
+  _ -> pure ()
+  where
+    element variable = do
+      value <- weakGetVar variable
+      chargeBuiltinGas $ Gas (max 1 (wordsFor (leafSize value)))
+      chargeNested value
+    leafSize value = case value of
+      SStruct {} -> 0
+      SArray {} -> 0
+      STuple {} -> 0
+      SMap {} -> 0
+      _ -> valueSize value
+
+-- | For an argument, which is handed over by reference: its own elements are
+-- free, but an aggregate held in one of them is charged in full, since
+-- checking the argument walks it and shared inner values multiply.
+chargeInnerAggregates :: MonadBuiltinGas m => Value -> m ()
+chargeInnerAggregates = \case
+  SStruct _ fields -> mapM_ element fields
+  SArray values -> mapM_ element values
+  STuple values -> mapM_ element values
+  SMap entries -> mapM_ element entries
+  _ -> pure ()
+  where
+    element variable = do
+      value <- weakGetVar variable
+      case value of
+        SStruct {} -> inner value
+        SArray {} -> inner value
+        STuple {} -> inner value
+        SMap {} -> inner value
+        _ -> pure ()
+    inner value = chargeBuiltinGas 1 >> chargeNested value
 
 basicSize :: BasicValue -> Integer
 basicSize = \case

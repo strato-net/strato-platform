@@ -11,7 +11,7 @@ import SolidVM.Model.Storable (StoragePath)
 import qualified Data.ByteString as B
 import qualified Control.Monad.Change.Modify as Mod
 import {-# SOURCE #-} qualified SolidVM.Blockchain as Blockchain
-import SolidVM.Events (emitEventValuesForContract)
+import qualified Blockchain.SolidVM.Builtins.Events.Metered as Events
 import Blockchain.SolidVM.CodeCollectionDB (ParseOptions (..))
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
@@ -32,7 +32,8 @@ import SolidVM.Model.Value
 import System.IO.Unsafe (unsafePerformIO)
 import UnliftIO (bracket, catch, liftIO, throwIO)
 import SolidVM.Values
-import SolidVM.Storage (getVar, setVar)
+import SolidVM.Storage (forceValue, getVar, setVar)
+import SolidVM.Solidity.Parse.UnParser (unparseStatement)
 import qualified Blockchain.SolidVM.Builtins.ABI.Values as ABI
 import Blockchain.Data.ProposalFacts
 
@@ -201,7 +202,8 @@ emitContractEvent contractName event fields = do
   let annotation = maybe (CC._contractContext contract) CC._funcContext $
         M.lookup (currentFunctionName info) (currentContract info ^. CC.functions)
   values <- traverse (toValue . snd) fields
-  void $ emitEventValuesForContract contract (CC.EmitStatement event [] annotation) event values
+  values' <- traverse forceValue values
+  Events.emit forceValue True contract (unparseStatement (CC.EmitStatement event [] annotation)) event values'
 
 previousBlock :: SM (Address, Address, Integer)
 previousBlock = do

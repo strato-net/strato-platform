@@ -1,6 +1,6 @@
 cabal-version: 1.22
 
--- This file has been generated from package.yaml by hpack version 0.38.1.
+-- This file has been generated from package.yaml by hpack version 0.39.6.
 --
 -- see: https://github.com/sol/hpack
 
@@ -24,7 +24,6 @@ library
       SolidVM.SourceCode
       SolidVM.Gas
       SolidVM.Values
-      SolidVM.Events
       SolidVM.Storage
       SolidVM.Builtins
       SolidVM.Blockchain

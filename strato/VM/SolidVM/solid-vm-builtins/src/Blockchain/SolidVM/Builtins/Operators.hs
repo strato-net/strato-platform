@@ -47,13 +47,23 @@ integerXor :: Integer -> Integer -> Integer
 integerXor a b = a `xor` b
 
 integerShiftLeft :: Integer -> Integer -> Integer
-integerShiftLeft a b = shift a (fromInteger b)
+-- A negative count has always meant a right shift here; keep that.
+integerShiftLeft a b = shift a (fromInteger (max (negate limit) (min b limit)))
+  where limit = toInteger (maxBound :: Int)
 
 integerShiftRight :: Integer -> Integer -> Integer
-integerShiftRight a b = shiftR a (fromInteger b)
+integerShiftRight a b = shiftR a (shiftCount b)
 
 integerUnsignedShiftRight :: Integer -> Integer -> Integer
-integerUnsignedShiftRight a b = shiftR (fromInteger (toInteger (fromInteger a :: Word256))) (fromInteger b)
+integerUnsignedShiftRight a b = shiftR (fromInteger (toInteger (fromInteger a :: Word256))) (shiftCount b)
+
+-- | A shift count as a host Int. Negative counts are a contract error, and
+-- counts beyond Int are clamped (a left shift that large is rejected by its
+-- gas charge first; a right shift that large has already shifted everything out).
+shiftCount :: Integer -> Int
+shiftCount b
+  | b < 0 = throw (Exception.ArithmeticException "negative shift count" (show b))
+  | otherwise = fromInteger (min b (toInteger (maxBound :: Int)))
 
 decimalAdd :: Decimal -> Decimal -> Decimal
 decimalAdd a b = a + b
@@ -115,7 +125,7 @@ bytesAdd :: B.ByteString -> B.ByteString -> B.ByteString
 bytesAdd = (<>)
 
 integerShiftLeftAssign :: Integer -> Integer -> Integer
-integerShiftLeftAssign a b = shiftL a (fromInteger b)
+integerShiftLeftAssign a b = shiftL a (shiftCount b)
 
 checkDivisor :: (Eq a, Num a, Show a) => a -> ()
 checkDivisor value

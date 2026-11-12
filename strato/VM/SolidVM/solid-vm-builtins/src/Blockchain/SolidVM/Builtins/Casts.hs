@@ -11,9 +11,9 @@ module Blockchain.SolidVM.Builtins.Casts
     bytes,
     bytes32,
     SolidInt,
-    SolidDecimal,
+    SolidDecimal (requestedDecimalBytes),
     SolidAddress,
-    SolidString,
+    SolidString (requestedStringBytes),
     SolidBool,
     SolidBytes,
   ) where
@@ -26,6 +26,8 @@ import Blockchain.VM.SolidException (SolidException (InvalidArguments))
 import Control.Exception (throwIO)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Bits ((.&.))
+import Data.Char (digitToInt, isSpace)
+import Data.List (foldl')
 import qualified Data.Bool as Bool
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
@@ -35,13 +37,12 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as DT
 import qualified Numeric (showHex)
-import Text.Printf (printf)
-import Text.Read (readEither, readMaybe)
+import Text.Read (readMaybe)
 
 parseBaseInt :: String -> Integer -> Either String Integer
 parseBaseInt s n =
   case n of
-    10 -> readEither s
+    10 -> maybe (Left "Prelude.read: no parse") Right (readInteger s)
     16 ->
       let s' = case s of
                  '0':'x':rest -> rest
@@ -92,7 +93,9 @@ class SolidBytes a where
   castBytes :: a -> CastResult B.ByteString
 
 instance SolidBytes Integer where
-  castBytes = Right . bytesFromInteger
+  castBytes value
+    | value < 0 = Left ("bytes cast of a negative integer", [shown value])
+    | otherwise = Right (bytesFromInteger value)
 
 instance SolidBytes T.Text where
   castBytes = Right . DT.encodeUtf8
@@ -155,6 +158,9 @@ instance SolidInt () where
 
 class SolidDecimal a where
   castDecimal :: a -> CastResult Decimal
+  -- | Bytes of the power of ten the cast is asked to produce, as in @"1e9"@.
+  requestedDecimalBytes :: a -> Integer
+  requestedDecimalBytes _ = 0
 
 instance SolidDecimal Integer where
   castDecimal = Right . decimalFromInteger
@@ -164,9 +170,11 @@ instance SolidDecimal Decimal where
 
 instance SolidDecimal T.Text where
   castDecimal value = decimalFromText value
+  requestedDecimalBytes = exponentBytes . T.unpack
 
 instance SolidDecimal String where
   castDecimal value = either (\message -> Left (message, [shown value])) Right $ decimalFromString value
+  requestedDecimalBytes = exponentBytes
 
 instance SolidDecimal () where
   castDecimal = const $ Right 0
@@ -194,6 +202,9 @@ instance SolidAddress () where
 
 class SolidString a where
   castString :: a -> CastResult T.Text
+  -- | Bytes of output the cast is asked to produce beyond its input size.
+  requestedStringBytes :: a -> Integer
+  requestedStringBytes _ = 0
 
 instance SolidString T.Text where
   castString = Right
@@ -221,6 +232,7 @@ instance SolidString (Integer, Integer) where
 
 instance SolidString (Integer, Integer, Integer) where
   castString (value, base, width) = stringFromIntegerChecked value base (Just width)
+  requestedStringBytes (_, _, width) = 2 * abs width
 
 instance SolidString (B.ByteString, T.Text) where
   castString (value, encoding) = stringFromEncodedBytes value encoding
@@ -233,7 +245,7 @@ castResult = either (\(message, details) -> liftIO $ throwIO $ InvalidArguments 
 
 integerFromText :: T.Text -> Integer -> CastResult Integer
 integerFromText s base = case base of
-  10 -> either (const $ Left ("invalid decimal integer", [shown s])) Right (readEither $ T.unpack s)
+  10 -> either (const $ Left ("invalid decimal integer", [shown s])) Right (maybe (Left ()) Right . readInteger $ T.unpack s)
   16 ->
     let hex = fromMaybe s (T.stripPrefix (T.pack "0x") s)
         padded = if odd (T.length hex) then T.cons '0' hex else hex
@@ -243,7 +255,7 @@ integerFromText s base = case base of
   _ -> Left ("unsupported integer base", [shown s, shown base])
 
 decimalFromText :: T.Text -> CastResult Decimal
-decimalFromText s = maybe (Left ("decimal cast", [shown s])) Right (readMaybe $ T.unpack s)
+decimalFromText s = maybe (Left ("decimal cast", [shown s])) Right (readDecimal $ T.unpack s)
 
 addressFromText :: T.Text -> CastResult Address
 addressFromText s = maybe (Left ("address cast", [shown s])) Right (addressFromString $ T.unpack s)
@@ -267,14 +279,69 @@ integerFromDecimal :: Decimal -> Integer
 integerFromDecimal = decimalMantissa . roundTo 0
 
 integerFromBytes :: B.ByteString -> Integer
-integerFromBytes = B.foldl' (\n w -> n * 256 + fromIntegral w) 0
+integerFromBytes = byteString2Integer
 
 decimalFromString :: String -> Either String Decimal
-decimalFromString = readEither
+decimalFromString = maybe (Left "Prelude.read: no parse") Right . readDecimal
+
+-- | About half a byte for each power of ten in the exponent of @"1e9"@.
+exponentBytes :: String -> Integer
+exponentBytes s = case break (`elem` "eE") s of
+  (_, _ : rest) | digits@(_ : _) <- takeWhile isAsciiDigit (dropWhile (`elem` "+-") rest) -> digitsToInteger digits `div` 2
+  _ -> 0
+  where isAsciiDigit c = c >= '0' && c <= '9'
+
+-- | A plain number: optional surrounding whitespace, optional minus sign,
+-- digits, and optionally a point followed by digits.
+plainNumber :: String -> Maybe (Bool, String, String)
+plainNumber s =
+  let trimmed = dropWhile isSpace s
+      (negative, unsigned) = case trimmed of '-' : rest -> (True, rest); _ -> (False, trimmed)
+      (whole, afterWhole) = span isAsciiDigit unsigned
+      (fraction, end) = case afterWhole of
+        '.' : rest | (digits@(_ : _), rest') <- span isAsciiDigit rest -> (digits, rest')
+        _ -> ("", afterWhole)
+   in if not (null whole) && all isSpace end then Just (negative, whole, fraction) else Nothing
+  where isAsciiDigit c = c >= '0' && c <= '9'
+
+-- | Splits the digits in halves: 'read' takes time quadratic in their count.
+digitsToInteger :: String -> Integer
+digitsToInteger digits = go (length digits) digits
+  where
+    go :: Int -> String -> Integer
+    go n ds
+      | n <= 18 = toInteger (foldl' (\a c -> a * 10 + digitToInt c) 0 ds)
+      | otherwise = let h = n `div` 2; (a, b) = splitAt (n - h) ds in go (n - h) a * 10 ^ h + go h b
+
+-- | 'readMaybe', with plain numbers parsed in near-linear time. The other
+-- forms 'read' accepts are limited to 1024 characters.
+readInteger :: String -> Maybe Integer
+readInteger s = case plainNumber s of
+  Just (negative, whole, "") -> Just ((if negative then negate else id) (digitsToInteger whole))
+  _ | null (drop 1024 s) -> readMaybe s
+    | otherwise -> Nothing
+
+readDecimal :: String -> Maybe Decimal
+readDecimal s = case plainNumber s of
+  Just (negative, whole, fraction) | length fraction <= 255 ->
+    Just (Decimal (fromIntegral (length fraction)) ((if negative then negate else id) (digitsToInteger (whole ++ fraction))))
+  _ | null (drop 1024 s) -> readMaybe s
+    | otherwise -> Nothing
+
+-- | 'Numeric.showHex', taking linear time on large values.
+hexDigits :: Integer -> String
+hexDigits i
+  | i <= 0 = Numeric.showHex i ""
+  | otherwise = dropWhile (== '0') (BC.unpack (B16.encode (integer2Bytes i)))
 
 stringFromInteger :: Integer -> Integer -> Maybe Integer -> String
-stringFromInteger i 16 (Just width) = printf ("0x%0" ++ show (2*width) ++ "x") i
-stringFromInteger i 16 Nothing = "0x" ++ Numeric.showHex i ""
+stringFromInteger i 16 (Just width)
+  | width < 0 = "0x" ++ digits ++ padding ' '
+  | otherwise = "0x" ++ padding '0' ++ digits
+  where
+    digits = hexDigits i
+    padding = replicate (fromInteger (2 * abs width) - length digits)
+stringFromInteger i 16 Nothing = "0x" ++ hexDigits i
 stringFromInteger i _ _ = show i
 
 stringFromBool :: Bool -> String

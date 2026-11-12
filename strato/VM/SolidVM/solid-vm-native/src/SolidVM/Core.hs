@@ -419,13 +419,13 @@ blockTimestamp = round . utcTimeToPOSIXSeconds . BlockHeader.timestamp . Executi
 readBasic :: StoragePath -> SM BasicValue
 readBasic path = do
   address <- SM.getCurrentAddress
-  Metered.storageRead basicSize (getSolidStorageKeyVal' address path)
+  Metered.storageRead path basicSize (getSolidStorageKeyVal' address path)
 
 writeBasic :: StoragePath -> BasicValue -> SM ()
 writeBasic path value = do
   info <- SM.getCurrentCallInfo
   when (SM.readOnly info) $ U.throwIO (InvalidWrite "native write during read-only access" (format path))
-  Metered.storageWrite (basicSize value)
+  Metered.storageWrite path (basicSize value)
   let address = SM.currentAddress info
   SM.markDiffForAction address path value
   putSolidStorageKeyVal' address path value

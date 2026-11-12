@@ -42,7 +42,7 @@ import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.Util
 import Blockchain.DB.SolidStorageDB
 import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Metered
-import Blockchain.SolidVM.Builtins.Size.Values (basicSize)
+import Blockchain.SolidVM.Builtins.Size.Values (basicSize, chargeNested)
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM
@@ -147,7 +147,7 @@ setVal dst@(SReference path) src = do
   case basicSrc of
     Nothing -> throw (TypeError "non basic solidity type cannot be stored atomically" $ T.unpack (renderValueShallow src))
     Just b -> do
-      Metered.storageWrite (basicSize b)
+      Metered.storageWrite path (basicSize b)
       markDiffForAction addr path b
       putSolidStorageKeyVal' addr path b
 setVal (SInteger dst) (SInteger _) = throw (ImmutableError "Cannot assign immutable or constants after assigned ->" (show dst)) -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
@@ -156,7 +156,7 @@ setVal dst src = throw (TypeError "unknown case called in setVal (Probably tried
 
 getStorageValue :: (HasSolidStorageDB m, MonadBuiltinGas m) => Address -> MS.StoragePath -> m Value
 getStorageValue addr key = do
-  theValue <- Metered.storageRead basicSize (getSolidStorageKeyVal' addr key)
+  theValue <- Metered.storageRead key basicSize (getSolidStorageKeyVal' addr key)
   case theValue of
     MS.BDefault -> pure $ SReference key
     _ -> pure $ fromBasic theValue
@@ -211,7 +211,7 @@ getVar (Variable v) = liftIO $ readIORef v
 -- | Fully evaluate a value: every nested cell and storage reference is
 -- resolved, so the result holds only 'Constant's and can leave the VM.
 forceValue :: MonadSM m => Value -> m Value
-forceValue = forceValueWith getVar
+forceValue value = chargeNested value >> forceValueWith getVar value
 
 forceValueWith :: MonadSM m => (Variable -> m Value) -> Value -> m Value
 forceValueWith load = \case
@@ -314,7 +314,7 @@ deleteVar (Constant (SReference path)) = do
       addr = currentAddress cci
   when ro $ throw (InvalidWrite "Invalid delete during read-only access" $ "addr: " ++ format addr ++ ", path: " ++ format path)
   markDiffForAction addr path $ MS.BDefault
-  Metered.storageWrite (basicSize MS.BDefault)
+  Metered.storageWrite path (basicSize MS.BDefault)
   putSolidStorageKeyVal' addr path $ MS.BDefault
 deleteVar v = throw (UnsupportedFeature "delete of a local variable" $ format v)
 

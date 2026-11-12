@@ -3,6 +3,7 @@ module Blockchain.SolidVM.Builtins.Gas where
 import Blockchain.Strato.Model.Gas
 import Blockchain.SolidVM.GasInfo (MonadBuiltinGas (..))
 import Data.Bits (shiftR)
+import GHC.Num (integerLog2)
 
 -- Gas schedule for the cryptographic builtins.
 --
@@ -67,7 +68,5 @@ chargeOperation bytes = chargeBuiltinGas (Gas (1 + (max 0 bytes `shiftR` 5)))
 
 -- SolidVM charges by 256-bit limbs, including a full limb for small integers.
 byteWidth :: Integer -> Integer
-byteWidth = go 0 . abs
-  where
-    go width 0 = width
-    go width n = go (width + 32) (n `shiftR` 256)
+byteWidth 0 = 0
+byteWidth n = 32 * (toInteger (integerLog2 (abs n)) `div` 256 + 1)

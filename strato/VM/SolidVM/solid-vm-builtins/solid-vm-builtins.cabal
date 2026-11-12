@@ -34,6 +34,8 @@ library
       Blockchain.SolidVM.Builtins.Encoding.Metered
       Blockchain.SolidVM.Builtins.Environment
       Blockchain.SolidVM.Builtins.Environment.Metered
+      Blockchain.SolidVM.Builtins.Events
+      Blockchain.SolidVM.Builtins.Events.Metered
       Blockchain.SolidVM.Builtins.Functions
       Blockchain.SolidVM.Builtins.Functions.Metered
       Blockchain.SolidVM.Builtins.Gas
@@ -68,6 +70,7 @@ library
     , crypton
     , elliptic-curve
     , ethereum-rlp
+    , evm-solidity
     , format
     , memory
     , monad-alter

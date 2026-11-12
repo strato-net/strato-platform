@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -84,15 +85,13 @@ import GHC.Exts (IsList(fromList))
 modExp :: Integer -> Integer -> Integer -> Integer
 modExp _ _ 0 = 0 -- EIP-198: a zero modulus yields zero
 modExp _ e _ | e < 0 = throw (InvalidArguments "modExp" ("negative exponent" :: String))
-modExp b e m =
-  case (b, e, even e) of
-    (_, 0, _) -> 1 -- 0^0 == 1, per EIP-198
-    (0, _, _) -> 0
-    (_, _, True) ->
-      let y = modExp b (e `div` 2) m
-        in (y * y) `mod` m
-    (_, _, False) ->
-      b * (modExp b (e - 1) m) `mod` m
+modExp _ 0 _ = 1 -- 0^0 == 1, per EIP-198
+modExp 0 _ _ = 0
+modExp b e m = go 1 (b `mod` m) e
+  where
+    -- Square-and-multiply in constant stack; every step is reduced mod m.
+    go !acc _ 0 = acc
+    go !acc !base k = go (if odd k then (acc * base) `mod` m else acc) ((base * base) `mod` m) (k `div` 2)
 
 -- | BN254 base field modulus @p@ and subgroup order @r@, for validating raw
 -- integer inputs before they are reduced into field elements.

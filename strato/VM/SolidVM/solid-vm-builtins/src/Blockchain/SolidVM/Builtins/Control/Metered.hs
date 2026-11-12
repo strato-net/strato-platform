@@ -11,9 +11,10 @@ import SolidVM.Model.Value (ValList)
 import qualified Blockchain.SolidVM.Builtins.Control as Original
 import Blockchain.SolidVM.Builtins.Operations.Metered (invoke)
 import Blockchain.SolidVM.Builtins.Size
+import Blockchain.SolidVM.Builtins.Size.Values (chargeNested, valueSize)
 
 log :: forall engine m. (MonadBuiltinGas m, MonadValueOperations engine m) => ValList -> m ()
-log values = invoke (32 * fromIntegral (length values)) (Original.log @engine values)
+log values = mapM_ chargeNested values >> invoke (sum (map valueSize values)) (Original.log @engine values)
 require :: MonadBuiltinGas m => Bool -> Maybe String -> m ()
 require condition message = invoke (gasSize message) (Original.require condition message)
 assert :: MonadBuiltinGas m => Bool -> m ()

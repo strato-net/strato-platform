@@ -21,6 +21,7 @@ library:
     - Decimal
     - elliptic-curve
     - ethereum-rlp
+    - evm-solidity
     - format
     - memory
     - monad-alter

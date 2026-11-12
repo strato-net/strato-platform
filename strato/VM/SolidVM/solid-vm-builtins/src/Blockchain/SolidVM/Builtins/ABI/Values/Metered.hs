@@ -6,13 +6,13 @@ import qualified Blockchain.SolidVM.Builtins.ABI.Values as Original
 import Blockchain.SolidVM.Builtins.Operations.Metered (invoke, invokeSized)
 import Blockchain.SolidVM.Builtins.Size (GasSize)
 import qualified Blockchain.SolidVM.Builtins.ABI as ABI
-import Blockchain.SolidVM.Builtins.Size.Values (valueSize)
+import Blockchain.SolidVM.Builtins.Size.Values (chargeNested, valueSize)
 import qualified Data.ByteString as B
 import SolidVM.Model.Value
 
 abiEncode, abiEncodePacked :: MonadBuiltinGas m => [Value] -> m B.ByteString
-abiEncode values = invoke (sum (map valueSize values)) (Original.abiEncode values)
-abiEncodePacked values = invoke (sum (map valueSize values)) (Original.abiEncodePacked values)
+abiEncode values = mapM_ chargeNested values >> invoke (sum (map valueSize values)) (Original.abiEncode values)
+abiEncodePacked values = mapM_ chargeNested values >> invoke (sum (map valueSize values)) (Original.abiEncodePacked values)
 
 abiDecode :: MonadBuiltinGas m => B.ByteString -> [Value] -> m Value
 abiDecode bytes types = invoke (fromIntegral (B.length bytes)) (pure (Original.abiDecode bytes types))

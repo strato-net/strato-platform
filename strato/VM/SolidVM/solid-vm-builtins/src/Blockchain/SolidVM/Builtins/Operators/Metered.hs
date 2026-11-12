@@ -9,6 +9,10 @@ import Data.Decimal
 import qualified Data.ByteString as B
 import qualified Data.Text as T
 
+-- | A comparison reads both operands; charged by the size of the smaller.
+comparison :: MonadBuiltinGas m => Integer -> Integer -> m ()
+comparison a b = chargeOperation (min a b)
+
 integerAdd :: MonadBuiltinGas m => Integer -> Integer -> m Integer
 integerAdd a b = chargeOperation (1 + max (byteWidth a) (byteWidth b)) >> pure (Operators.integerAdd a b)
 
@@ -22,7 +26,7 @@ integerDivide :: MonadBuiltinGas m => Integer -> Integer -> m Integer
 integerDivide a b = chargeOperation (byteWidth a) >> liftIO (evaluate (Operators.integerDivide a b))
 
 integerRemainder :: MonadBuiltinGas m => Integer -> Integer -> m Integer
-integerRemainder a b = chargeOperation (byteWidth b) >> liftIO (evaluate (Operators.integerRemainder a b))
+integerRemainder a b = chargeOperation (max (byteWidth a) (byteWidth b)) >> liftIO (evaluate (Operators.integerRemainder a b))
 
 integerPower :: MonadBuiltinGas m => Integer -> Integer -> m Integer
 integerPower a b = chargeOperation (byteWidth a * b) >> liftIO (evaluate (Operators.integerPower a b))
@@ -94,13 +98,13 @@ integerDecimalDivideAssign :: MonadBuiltinGas m => Integer -> Decimal -> m Decim
 integerDecimalDivideAssign a b = chargeOperation (fromIntegral (decimalPlaces b) + max (byteWidth (a)) (byteWidth (decimalMantissa b))) >> liftIO (evaluate (Operators.integerDecimalDivide a b))
 
 decimalRemainder :: MonadBuiltinGas m => Decimal -> Decimal -> m Decimal
-decimalRemainder a b = chargeOperation (fromIntegral (max (decimalPlaces a) (decimalPlaces b)) + byteWidth (decimalMantissa b)) >> liftIO (evaluate (Operators.decimalRemainder a b))
+decimalRemainder a b = chargeOperation (fromIntegral (max (decimalPlaces a) (decimalPlaces b)) + max (byteWidth (decimalMantissa a)) (byteWidth (decimalMantissa b))) >> liftIO (evaluate (Operators.decimalRemainder a b))
 
 decimalIntegerRemainder :: MonadBuiltinGas m => Decimal -> Integer -> m Decimal
-decimalIntegerRemainder a b = chargeOperation (fromIntegral (decimalPlaces a) + byteWidth (b)) >> liftIO (evaluate (Operators.decimalIntegerRemainder a b))
+decimalIntegerRemainder a b = chargeOperation (fromIntegral (decimalPlaces a) + max (byteWidth (decimalMantissa a)) (byteWidth (b))) >> liftIO (evaluate (Operators.decimalIntegerRemainder a b))
 
 integerDecimalRemainder :: MonadBuiltinGas m => Integer -> Decimal -> m Decimal
-integerDecimalRemainder a b = chargeOperation (fromIntegral (decimalPlaces b) + byteWidth (decimalMantissa b)) >> liftIO (evaluate (Operators.integerDecimalRemainder a b))
+integerDecimalRemainder a b = chargeOperation (fromIntegral (decimalPlaces b) + max (byteWidth a) (byteWidth (decimalMantissa b))) >> liftIO (evaluate (Operators.integerDecimalRemainder a b))
 
 stringAdd :: MonadBuiltinGas m => String -> String -> m String
 stringAdd a b = chargeOperation (fromIntegral (length a + length b)) >> pure (Operators.stringAdd a b)

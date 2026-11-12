@@ -20,7 +20,6 @@ library:
     - SolidVM.SourceCode
     - SolidVM.Gas
     - SolidVM.Values
-    - SolidVM.Events
     - SolidVM.Storage
     - SolidVM.Builtins
     - SolidVM.Blockchain

@@ -306,7 +306,7 @@ compileExpressionBody sc chargeDestination e = case e of
   S.FunctionCall _ (S.NewExpression _ Ty.Bytes{} Nothing) [n] -> do
     lf <- compileAs sc TInt n
     pure $ CE TBytes (CAPTURE lf $ \compiled_0 ->
-      EMIT_BEGIN (\env_1 -> (\k_2 -> B.replicate (fromIntegral k_2) 0) <$> compiled_0 env_1)
+      EMIT_BEGIN (\env_1 -> do {k_2 <- compiled_0 env_1; Operations.allocateBytes k_2; pure (B.replicate (fromIntegral k_2) 0)})
       EMIT_END)
   S.FunctionCall _ (S.NewExpression _ ty Nothing) [n] | isArrayTy ty -> do
     SomeTy t <- resolveTy c ty
@@ -430,7 +430,7 @@ compileExpressionBody sc chargeDestination e = case e of
   S.MemberAccess _ x "length" | Right (CE t f) <- compileE sc x, isSeqLike t -> case t of
     TArr _ -> pure $ CE TInt (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap (fromIntegral . Seq.length) . compiled_0)
       EMIT_END)
-    TStr -> pure $ CE TInt (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap (fromIntegral . T.length) . compiled_0)
+    TStr -> pure $ CE TInt (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (\env_1 -> compiled_0 env_1 >>= (\s_2 -> fromIntegral <$> Operations.stringLength s_2))
       EMIT_END)
     TBytes -> pure $ CE TInt (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap (fromIntegral . B.length) . compiled_0)
       EMIT_END)
@@ -639,9 +639,11 @@ compileExpressionBody sc chargeDestination e = case e of
           rf <- compileAs sc lt r
           eq <- eqOn lt
           let k = if op == "==" then (identityFunction) else (primitiveCode NotPrimitive)
+          Dict <- pure (gasSizeDict lt)
           pure $ CE TBool (CAPTURE4 lf rf k eq $ \compiled_0 compiled_1 compiled_2 compiled_3 ->
             EMIT_BEGIN (\env_4 -> do {a_5 <- compiled_0 env_4;
             b_6 <- compiled_1 env_4;
+            Operators.comparison (SharedSize.gasSize a_5) (SharedSize.gasSize b_6);
             pure (compiled_2 (compiled_3 a_5 b_6))})
             EMIT_END)
       | op `elem` ["<", ">", "<=", ">="] = do
@@ -650,14 +652,20 @@ compileExpressionBody sc chargeDestination e = case e of
             rf <- compileAs sc TDecimal r
             let comparison = comparisonOp op
             pure $ CE TBool (CAPTURE3 comparison lf rf $ \compiled_0 compiled_1 compiled_2 ->
-              EMIT_BEGIN (\env_3 -> (compiled_0 <$> compiled_1 env_3) <*> compiled_2 env_3)
+              EMIT_BEGIN (\env_3 -> do {a_4 <- compiled_1 env_3;
+              b_5 <- compiled_2 env_3;
+              Operators.comparison (SharedSize.gasSize a_4) (SharedSize.gasSize b_5);
+              pure (compiled_0 a_4 b_5)})
               EMIT_END)
           else do
             lf <- compileAs sc TInt l
             rf <- compileAs sc TInt r
             let comparison = comparisonOp op
             pure $ CE TBool (CAPTURE3 comparison lf rf $ \compiled_0 compiled_1 compiled_2 ->
-              EMIT_BEGIN (\env_3 -> (compiled_0 <$> compiled_1 env_3) <*> compiled_2 env_3)
+              EMIT_BEGIN (\env_3 -> do {a_4 <- compiled_1 env_3;
+              b_5 <- compiled_2 env_3;
+              Operators.comparison (SharedSize.gasSize a_4) (SharedSize.gasSize b_5);
+              pure (compiled_0 a_4 b_5)})
               EMIT_END)
       | op == "&&" = do
           lf <- compileAs sc TBool l; rf <- compileAs sc TBool r
@@ -1445,8 +1453,8 @@ compileCall sc callee args = case callee of
           pure $ CE TInt $ (CAPTURE3 vf get set $ \compiled_0 compiled_1 compiled_2 ->
             EMIT_BEGIN (\env_3 -> do {v_4 <- compiled_0 env_3;
             chargeGas 1;
-            Operations.invoke 0 (pure ());
             xs_5 <- chargeAfter 1 (compiled_1 env_3);
+            Operations.memoryPush (Seq.length xs_5);
             compiled_2 env_3 (xs_5 Seq.|> v_4);
             pure (fromIntegral (Seq.length xs_5 + 1))})
             EMIT_END)

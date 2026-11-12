@@ -15,7 +15,8 @@ module Blockchain.SolidVM.Builtins.Crypto.Metered
 import Blockchain.SolidVM.GasInfo (MonadBuiltinGas (..))
 import qualified Blockchain.SolidVM.Builtins.Crypto as Crypto
 import Blockchain.SolidVM.Builtins.Gas
-import Blockchain.Strato.Model.Gas (Gas)
+import Blockchain.SolidVM.Builtins.Size (wordsFor)
+import Blockchain.Strato.Model.Gas (Gas (..))
 import Blockchain.VM.SolidException (SolidException (InvalidArguments, TypeError))
 import Control.Exception (evaluate, throw)
 import Text.Format (Format, format)
@@ -48,7 +49,12 @@ bytesResult name input = either (\message -> throw (InvalidArguments (name ++ ":
 
 modExp :: MonadBuiltinGas m => Integer -> Integer -> Integer -> m Integer
 modExp b e m = do
-  chargeBuiltinGas gasModExp
+  -- One modular multiplication per exponent bit, each quadratic in the
+  -- modulus size. Measured at roughly 200 word^2-bits per microsecond.
+  let modulusWords = wordsFor (byteWidth m)
+      baseWords = wordsFor (byteWidth b)
+      exponentBits = 8 * byteWidth e
+  chargeBuiltinGas $ gasModExp + Gas ((max baseWords modulusWords * modulusWords * exponentBits) `div` 200)
   _ <- traverse force [b, e, m]
   force $ Crypto.modExp b e m
 

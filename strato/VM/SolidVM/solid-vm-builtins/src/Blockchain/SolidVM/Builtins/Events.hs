@@ -1,27 +1,25 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
-module SolidVM.Events (emitEventValuesForContract) where
+module Blockchain.SolidVM.Builtins.Events (emit) where
 
-import Control.Exception (throw)
 import BlockApps.Solidity.ABI.Bridge (encodeEventToLogValues)
-import SolidVM.Model.Event (Event (Event))
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
-import SolidVM.Storage
+import Blockchain.SolidVM.GasInfo (MonadBuiltinGas (..))
 import Blockchain.SolidVM.SM
+import Control.Exception (throw)
 import Control.Monad
 import qualified Data.Map.Strict as M
 import qualified SolidVM.Model.CodeCollection as CC
+import SolidVM.Model.Event (Event (Event))
 import SolidVM.Model.SolidString
 import SolidVM.Model.Value
-import SolidVM.Solidity.Parse.UnParser (unparseStatement)
 
-emitEventValuesForContract :: CC.Contract -> CC.Statement -> SolidString -> [Value] -> SM (Maybe Value)
-emitEventValuesForContract curCnct st eventName values = do
-  expVals <- mapM forceValue values
-
+-- | Record an event of the current contract. 'force' is the engine's value
+-- forcing; 'statement' is the emit statement's source, used in errors.
+emit :: (Value -> SM Value) -> Bool -> CC.Contract -> String -> SolidString -> [Value] -> SM ()
+emit force defaultUnwritten curCnct statement eventName expVals = do
   -- checks that the event is declared and that the number of args match
   --   DOES NOT check consistency of arg types
   curInfo <- getCurrentCallInfo
@@ -29,14 +27,12 @@ emitEventValuesForContract curCnct st eventName values = do
       mEv = M.lookup eventName evs
   case mEv of
     Nothing ->
-      throw (MissingType "no corresponding event has been declared for the following emit statement: " (unparseStatement st))
+      throw (MissingType "no corresponding event has been declared for the following emit statement: " statement)
     Just ev -> do
       if (length expVals) /= (length $ CC._eventLogs ev)
-        then throw (InvalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st))
+        then throw (InvalidArguments "arguments to statement are inconsistent with those declared" statement)
         else do
           let address = currentAddress curInfo
-          -- pair up field names with values one-by-one (no type checking tho, lol)
-          -- let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
 
           -- An arg that was never written (unset storage slot, or SNULL) has no
           -- shape of its own; give it the declared type's default so it leaves
@@ -45,8 +41,8 @@ emitEventValuesForContract curCnct st eventName values = do
           evArgs <- forM (zip (CC._eventLogs ev) expVals) $
             \(CC.EventLog name _ (CC.IndexedType _ idxType _), value) ->
               (name,) <$> case value of
-                SReference _ -> forceValue =<< createDefaultValue cc curCnct idxType
-                SNULL -> forceValue =<< createDefaultValue cc curCnct idxType
+                SReference _ | defaultUnwritten -> force =<< createDefaultValueWith (chargeBuiltinGas 1) cc curCnct idxType
+                SNULL | defaultUnwritten -> force =<< createDefaultValueWith (chargeBuiltinGas 1) cc curCnct idxType
                 _ -> pure value
 
           tHash <- Env.txHash <$> getEnv
@@ -59,4 +55,3 @@ emitEventValuesForContract curCnct st eventName values = do
           -- JSON-RPC layer applies to Cirrus rows, so producer and RPC blooms agree.
           let (evTopicBytes, _) = encodeEventToLogValues eventName ev evArgs
           addEvent $ Event tHash txSender contractName' address eventName evArgs evTopicBytes
-          return Nothing

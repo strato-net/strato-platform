@@ -5,7 +5,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 module Blockchain.SolidVM.Builtins.Size
-  ( GasSize (gasSize), FunctionArguments (argumentWords), TupleSize (tupleSize), ArraySlots (..), slotSize, variadicSize, wordsFor ) where
+  ( GasSize (gasSize), FunctionArguments (argumentWords), TupleSize (tupleSize), ArraySlots (..), slotSize, variadicSize, wordsFor, pathSize ) where
 
 import Blockchain.SolidVM.Builtins.Gas (byteWidth)
 import Blockchain.Strato.Model.Address (Address)
@@ -15,7 +15,7 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Sequence as Seq
 import Data.Kind (Type)
 import Data.Proxy (Proxy (..))
-import SolidVM.Model.Storable (StoragePath)
+import SolidVM.Model.Storable (StoragePath (..), StoragePathPiece (..))
 import Data.Decimal (Decimal, decimalMantissa)
 
 class GasSize a where
@@ -36,6 +36,13 @@ instance (GasSize a, GasSize b, GasSize c) => GasSize (a,b,c) where gasSize (a,b
 
 wordsFor :: Integer -> Integer
 wordsFor bytes = (max 0 bytes + 31) `div` 32
+
+-- | Bytes of field names and mapping keys in a storage path.
+pathSize :: StoragePath -> Integer
+pathSize (StoragePath pieces) = sum (map pieceSize pieces)
+  where
+    pieceSize (Field name) = fromIntegral (B.length name)
+    pieceSize (Index key) = fromIntegral (B.length key)
 
 slotSize :: a -> Integer
 slotSize = const 32
