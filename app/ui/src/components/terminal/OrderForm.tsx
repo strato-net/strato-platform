@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDerivedTradeInfo } from "@/hooks/trade/useDerivedTradeInfo";
 import { useTradeSwap } from "@/hooks/trade/useTradeSwap";
 import { useMarketBalances } from "@/hooks/terminal/useMarketData";
+import { axios } from "@/lib/axios";
 import { DECIMAL_PATTERN, SWAP_CALLS } from "@/lib/constants";
 import { formatAmount, formatUnits } from "@/utils/numberUtils";
 import { computeMaxTransferable } from "@/utils/transferValidation";
@@ -88,15 +89,18 @@ export const OrderForm = ({ market }: { market: Market }) => {
   }, [tokenIn.balance, tokenIn.address, feeQuote]);
 
   const {
-    activeQuote, quoteLoading, hasQuoteResponse, typedValueWei, exactOut,
+    activeQuote, quoteResponse, quoteLoading, hasQuoteResponse, typedValueWei, exactOut,
     inputAmount, outputAmount, inputAmountWei, outputAmountWei,
     exchangeRate, invertedExchangeRate, priceImpact, slippagePercent, minAmountOutWei,
     insufficientBalance,
   } = useDerivedTradeInfo(formState, maxSpendableWei);
 
   const hasAmount = typedValueWei > 0n;
+  // the quote hook keeps the previous amount's quote on screen while a new amount is
+  // debounced; only a quote for the amount now typed may be traded on
+  const quoteIsCurrent = quoteResponse?.amount === typedValueWei.toString();
   const [baseWei, quoteWei] = isBuy ? [outputAmountWei, inputAmountWei] : [inputAmountWei, outputAmountWei];
-  const averagePrice = activeQuote && baseWei > 0n ? Number(quoteWei) / Number(baseWei) : null;
+  const averagePrice = activeQuote && quoteIsCurrent && baseWei > 0n ? Number(quoteWei) / Number(baseWei) : null;
   const impactTooHigh = (priceImpact ?? 0) >= MAX_IMPACT_PERCENT;
   const cannotFill = hasAmount && hasQuoteResponse && !quoteLoading && (!activeQuote || (exactOut && !!activeQuote.partialFill));
 
@@ -126,7 +130,7 @@ export const OrderForm = ({ market }: { market: Market }) => {
   };
 
   const handleSwap = async () => {
-    if (!activeQuote) return;
+    if (!activeQuote || !quoteIsCurrent) return;
     try {
       await tradeSwap.mutateAsync({
         poolAddress: market.poolAddress,
@@ -141,6 +145,16 @@ export const OrderForm = ({ market }: { market: Market }) => {
         variant: "success",
       });
       setTypedValue("");
+    } catch (error) {
+      // HTTP failures are toasted by the api client; a wallet rejection or the on-chain
+      // revert of a wallet-signed trade only surfaces here
+      if (!axios.isAxiosError(error)) {
+        toast({
+          title: "Trade failed",
+          description: error instanceof Error ? error.message.split("\n")[0] : "Transaction failed",
+          variant: "destructive",
+        });
+      }
     } finally {
       setConfirmOpen(false);
       await Promise.all([fetchUsdstBalance(), fetchTokens()]);
@@ -238,7 +252,7 @@ export const OrderForm = ({ market }: { market: Market }) => {
       {isLoggedIn && <FeeNotices calls={SWAP_CALLS} spendingWei={inputAmountWei} tokenAddress={tokenIn.address} />}
 
       <Button
-        disabled={!!blocker || quoteLoading || !activeQuote}
+        disabled={!!blocker || quoteLoading || !activeQuote || !quoteIsCurrent}
         onClick={() => setConfirmOpen(true)}
         className={`w-full text-background ${isBuy ? "bg-up hover:bg-up/90" : "bg-down hover:bg-down/90"}`}
       >
