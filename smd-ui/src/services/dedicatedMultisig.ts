@@ -422,6 +422,7 @@ export function useMyPendingMultisigSetups(ownerAddress?: string | null) {
       const confirmedCounts = new Map<string, number>();
       for (const row of allSetupSignerRows) {
         const hash = String(row?.key?.key ?? "");
+        if (strip0x(String(row?.value ?? "")).length !== 40) continue;
         signerCounts.set(hash, (signerCounts.get(hash) ?? 0) + 1);
       }
       for (const row of confirmationRows) {

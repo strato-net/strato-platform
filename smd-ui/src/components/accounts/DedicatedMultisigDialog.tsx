@@ -954,7 +954,6 @@ function CreateDedicatedMultisig() {
               {setupPending ? "Waiting for signers" : setupLifecycle === "deployed" ? "Created" : "Invitation unavailable"}
             </Badge>
             <div className="font-mono text-xs break-all">Invitation code: {setupHash}</div>
-            <div>{setup.requiredApprovals} of {setup.signers.length} approvals</div>
             <div>Signer confirmation: {setup.confirmedSigners.length} of {setup.signers.length}</div>
             <div className="font-mono text-xs break-all">Created by: {setup.creator}</div>
             <div className="font-mono text-xs break-all">Multisig wallet address: {setup.expectedWallet}</div>

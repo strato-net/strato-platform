@@ -114,7 +114,6 @@ export function SetupInvitationDialog({ setup: summary }: { setup: PendingMultis
           <div className="font-mono break-all">{summary.expectedWallet}</div>
           <div>Created by</div>
           <div className="font-mono break-all">{setup?.creator ?? summary.creator}</div>
-          <div>Approvals needed: {summary.requiredApprovals} of {summary.signerCount}</div>
           {setup ? (
             <>
               <div>Waiting period: {setup.transactionTimelock / 3600} hours</div>
