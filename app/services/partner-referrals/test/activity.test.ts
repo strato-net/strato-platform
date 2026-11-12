@@ -15,6 +15,8 @@ const metalForge = "f0".repeat(20);
 const usdst = "aa".repeat(20);
 const eth = "bb".repeat(20);
 const unpriced = "cc".repeat(20);
+const sixDecimals = "c6".repeat(20);
+const notAToken = "c0".repeat(20);
 const pool = "d1".repeat(20);
 const poolV3 = "d3".repeat(20);
 const alice = "11".repeat(20);
@@ -24,7 +26,7 @@ let id = 0;
 const ev = (name: string, address: string, args: Record<string, unknown>, txSender = alice): ChainEvent => ({
   id: ++id, address, name, blockTs: new Date("2026-11-11T12:00:00Z"), txSender, args,
 });
-const state: State = { prices: new Map(), pools: new Map(), dirtyPrices: new Set(), dirtyPools: new Set() };
+const state: State = { prices: new Map(), decimals: new Map([[usdst, 18], [eth, 18], [sixDecimals, 6], [notAToken, null]]), pools: new Map(), dirtyPrices: new Set(), dirtyPools: new Set() };
 const usd = (e: ChainEvent) => activityOf(e, state)?.usdWad.toString() ?? null;
 
 // A Cirrus row as served: uint256 as bare numbers, arrays as JSON text.
@@ -65,5 +67,12 @@ assert.strictEqual(usd(ev("SuppliedCollateral", lendingPool, { user: alice, ...d
 assert.strictEqual(usd(ev("Deposited", cdpEngine, { owner: alice, ...deposit })), expected);
 assert.strictEqual(usd(ev("Deposited", "ee".repeat(20), { user: alice, ...deposit })), null);
 assert.strictEqual(usd(ev("Deposited", lendingPool, { user: alice, asset: unpriced, amount: "1" })), null, "unpriced asset");
+
+// An amount is in its token's own decimals: 1,000 of a six-decimal token at $5 is $5,000
+learn(ev("PriceUpdated", oracle, { asset: sixDecimals, price: "5000000000000000000" }), state);
+assert.strictEqual(usd(ev("Deposited", cdpEngine, { owner: alice, asset: sixDecimals, amount: "1000000000" })), (5000n * 10n ** 18n).toString());
+// A priced asset without a token record values nothing
+learn(ev("PriceUpdated", oracle, { asset: notAToken, price: "5000000000000000000" }), state);
+assert.strictEqual(usd(ev("Deposited", cdpEngine, { owner: alice, asset: notAToken, amount: "1000000000" })), null);
 
 console.log("activity.test: OK");

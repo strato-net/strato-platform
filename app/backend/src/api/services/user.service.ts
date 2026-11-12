@@ -25,17 +25,40 @@ type AbiType = {
 };
 
 /**
- * Records the partner referral code a new account signed up with. Best
- * effort and not awaited: a signup never waits on, or fails with, the
- * partner referrals service.
+ * Records the partner referral code a new account signed up with. Not
+ * awaited: a signup never waits on, or fails with, the partner referrals
+ * service. While the service cannot be reached the call is tried again, for
+ * up to a day. The first failure and a final one are logged with the code
+ * and account, which is what it takes to replay the signup by hand.
  */
-export const recordPartnerReferral = (code: string, account: string, username?: string): void => {
+export const recordPartnerReferral = async (code: string, account: string, email?: string): Promise<void> => {
   if (!partnerReferralsUrl || !partnerReferralsKey) return;
-  fetch(`${partnerReferralsUrl}/partner-api/referrals/signups`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${partnerReferralsKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ code, account, username }),
-  }).catch((error) => console.error("Failed to record partner referral:", error));
+  const giveUpAt = Date.now() + DAY_MS;
+  for (let attempt = 1; ; attempt++) {
+    let failure: unknown;
+    let refused = false;
+    try {
+      const res = await fetch(`${partnerReferralsUrl}/partner-api/referrals/signups`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${partnerReferralsKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ code, account, email }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) {
+        if (attempt > 1) console.info(`Partner referral recorded on attempt ${attempt} (code ${code}, account ${account})`);
+        return;
+      }
+      failure = `HTTP ${res.status}`;
+      // Refused, not unavailable: trying again would be refused the same way
+      refused = res.status < 500 && res.status !== 429;
+    } catch (error) {
+      failure = error;
+    }
+    const final = refused || Date.now() >= giveUpAt;
+    if (attempt === 1 || final) console.error(`Partner referral not recorded${final ? "" : " yet"} (code ${code}, account ${account}):`, failure);
+    if (final) return;
+    await new Promise((resolve) => setTimeout(resolve, Math.min(4 ** attempt * 1000, 5 * 60 * 1000)));
+  }
 };
 
 export const isUserAdmin = async (

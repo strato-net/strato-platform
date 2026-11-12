@@ -53,9 +53,10 @@ CREATE TABLE pools (
   token1  TEXT NOT NULL
 );
 
--- One row per counted event of a referred account, valued in USD (1e18)
--- at the oracle price when it happened. Keyed by Cirrus event id, so a
--- replayed page counts nothing twice.
+-- One row per counted event, valued in USD (1e18) at the oracle price when
+-- it happened. Kept for good for referred accounts, and for the poller's
+-- grace period for everyone else. Keyed by Cirrus event id, so a replayed
+-- page counts nothing twice.
 CREATE TABLE activity (
   event_id BIGINT PRIMARY KEY,
   account  TEXT NOT NULL,

@@ -13,11 +13,14 @@ export interface ChainEvent {
 
 /**
  * What the poller knows at its position in the chain: the latest oracle
- * price per asset (USD, 1e18) and the pools the trusted factories created.
- * The dirty sets are what the next commit has to write.
+ * price per asset (USD per whole token, 1e18) and the pools the trusted
+ * factories created. The dirty sets are what the next commit has to write.
+ * decimals is each priced token's decimals, which turn an amount into whole
+ * tokens; null for a priced asset that is not a token and so values nothing.
  */
 export interface State {
   prices: Map<string, bigint>;
+  decimals: Map<string, number | null>;
   pools: Map<string, [string, string]>;
   dirtyPrices: Set<string>;
   dirtyPools: Set<string>;
@@ -29,8 +32,6 @@ export interface Activity {
   blockTs: Date;
   usdWad: bigint;
 }
-
-const WAD = 10n ** 18n;
 
 // Array-typed attributes arrive as JSON text inside the jsonb.
 const toArray = (v: unknown): unknown[] => {
@@ -74,7 +75,7 @@ export const learn = (e: ChainEvent, state: State): void => {
 /**
  * The account an event moved money for and its USD value at the current
  * oracle price, or null when the event is not counted: emitted by a contract
- * outside the trusted sources, or none of its tokens is priced.
+ * outside the trusted sources, or none of its tokens is a priced token.
  */
 export const activityOf = (e: ChainEvent, state: State): Activity | null => {
   const { sources } = config;
@@ -112,9 +113,11 @@ export const activityOf = (e: ChainEvent, state: State): Activity | null => {
   if (!who) return null;
   for (const [token, amount] of legs) {
     const price = state.prices.get(toAddress(token) ?? "");
+    const decimals = state.decimals.get(toAddress(token) ?? "");
     const n = toBigInt(amount);
-    if (price === undefined || n === null) continue;
-    return { eventId: e.id, account: who, blockTs: e.blockTs, usdWad: ((n < 0n ? -n : n) * price) / WAD };
+    if (price === undefined || decimals == null || n === null) continue;
+    // Amounts are in the token's smallest unit, prices per whole token
+    return { eventId: e.id, account: who, blockTs: e.blockTs, usdWad: ((n < 0n ? -n : n) * price) / 10n ** BigInt(decimals) };
   }
   return null;
 };

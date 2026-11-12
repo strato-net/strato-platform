@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import fs from "fs";
 
 const DB_NAME_RE = /^[a-z_][a-z0-9_]*$/;
@@ -42,27 +41,34 @@ const addresses = (name: string, fallback: string): string[] => {
   return list;
 };
 
-export const sha256 = (s: string): string => crypto.createHash("sha256").update(s).digest("hex");
+// A bearer key is the only thing between a caller and a partner's data, so
+// it has to be too long to guess: 32+ characters of a random generator.
+const MIN_KEY_LENGTH = 32;
 
 // PARTNER_API_KEYS is "partner:key,partner:key" (a staging and a production
-// key are two entries under two partner names). Keys are held hashed, and a
-// request is matched by the hash of the bearer it presents.
+// key are two entries under two partner names), held as key -> partner.
 const apiKeys = new Map<string, string>();
 for (const entry of (process.env.PARTNER_API_KEYS || "").split(",").map((e) => e.trim()).filter((e) => e)) {
   const sep = entry.indexOf(":");
   const [partner, key] = [entry.slice(0, sep), entry.slice(sep + 1)];
-  if (sep < 1 || !key) {
-    console.error('Invalid PARTNER_API_KEYS - expected "partner:key,partner:key"');
+  if (sep < 1 || key.length < MIN_KEY_LENGTH || apiKeys.has(key)) {
+    console.error(`Invalid PARTNER_API_KEYS - expected "partner:key,partner:key" with distinct keys of ${MIN_KEY_LENGTH}+ characters`);
     process.exit(2);
   }
-  apiKeys.set(sha256(key), partner);
+  apiKeys.set(key, partner);
+}
+
+const internalKey = process.env.PARTNER_INTERNAL_KEY || "";
+if (internalKey && (internalKey.length < MIN_KEY_LENGTH || apiKeys.has(internalKey))) {
+  console.error(`Invalid PARTNER_INTERNAL_KEY - ${MIN_KEY_LENGTH}+ characters, and not one of the partner keys`);
+  process.exit(2);
 }
 
 export const config = {
   port: Number(process.env.PORT || 3040),
   apiKeys,
   // Bearer the app backend presents to record a referred signup.
-  internalKeyHash: process.env.PARTNER_INTERNAL_KEY ? sha256(process.env.PARTNER_INTERNAL_KEY) : "",
+  internalKey,
   // The app's public URL; a code's ref_link is `${refLinkBase}?ref=<code>`.
   // Left unset, no ref_link is returned and the partner builds the link.
   refLinkBase: process.env.PARTNER_REF_LINK_BASE || "",
@@ -102,4 +108,7 @@ if (!config.cirrus.nodeUrl) {
 }
 if (apiKeys.size === 0) {
   console.warn("[Config] PARTNER_API_KEYS is not set: every partner request is refused");
+}
+if (!internalKey) {
+  console.warn("[Config] PARTNER_INTERNAL_KEY is not set: no signup is recorded");
 }

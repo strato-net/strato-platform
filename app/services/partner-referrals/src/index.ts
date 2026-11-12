@@ -9,9 +9,8 @@ import { runCirrusPoller } from "./indexer/cirrus";
 import { logError, logInfo } from "./utils/logger";
 
 const app = express();
-app.set("trust proxy", true);
 app.disable("x-powered-by");
-app.use("/partner-api", router);
+app.use(router);
 
 app.use((error: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logError("PartnerReferrals", error, { operation: "request", method: req.method, path: req.path });

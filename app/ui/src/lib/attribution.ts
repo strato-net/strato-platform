@@ -6,6 +6,11 @@
 const STORAGE_KEY = 'attribution';
 const TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
 
+// The partner ref cookie. Secure, so it only travels over https, except in
+// local development over http.
+const refCookie = (value: string, maxAge: number): string =>
+  `ref=${value}; path=/; max-age=${maxAge}; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
+
 export interface AttributionData {
   utm_source?: string;
   utm_medium?: string;
@@ -27,7 +32,7 @@ export function captureAttribution(): void {
     // on the /api/user/me call that creates the account. First-touch wins.
     const ref = params.get('ref');
     if (ref && /^[A-Za-z0-9]{1,32}$/.test(ref) && !/(?:^|;\s*)ref=/.test(document.cookie)) {
-      document.cookie = `ref=${ref}; path=/; max-age=${TTL_MS / 1000}; SameSite=Lax`;
+      document.cookie = refCookie(ref, TTL_MS / 1000);
     }
 
     const utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'via'] as const;
@@ -75,7 +80,12 @@ export function readAttribution(): AttributionData | null {
 export function clearAttribution(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
-    document.cookie = 'ref=; path=/; max-age=0';
+  } catch {
+    // ignore
+  }
+  // On its own: storage that throws must not leave the cookie behind
+  try {
+    document.cookie = refCookie('', 0);
   } catch {
     // ignore
   }

@@ -1,8 +1,10 @@
 import crypto from "crypto";
 import express from "express";
-import { config, sha256 } from "../config";
+import { config } from "../config";
 import { query } from "../db/pool";
 import { toAddress } from "../utils/num";
+
+const UNIQUE_VIOLATION = "23505";
 
 class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) {
@@ -17,24 +19,32 @@ const asyncHandler =
   (req: express.Request, res: express.Response, next: express.NextFunction) =>
     fn(req, res).catch(next);
 
-const bearerHash = (req: express.Request): string => {
+const bearer = (req: express.Request): string => {
   const [scheme, token] = (req.headers.authorization || "").split(" ");
   if (scheme !== "Bearer" || !token) throw new ApiError(401, "UNAUTHORIZED", "Missing bearer key");
-  return sha256(token);
+  return token;
+};
+
+/** Compares a presented key with a configured one in constant time. */
+const sameKey = (presented: string, key: string): boolean => {
+  const [a, b] = [Buffer.from(presented), Buffer.from(key)];
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 };
 
 /** The partner a request's key belongs to; each key reads only the codes issued through it. */
 const partnerOf = (req: express.Request): string => {
-  const partner = config.apiKeys.get(bearerHash(req));
-  if (!partner) throw new ApiError(401, "UNAUTHORIZED", "Unknown key");
-  return partner;
+  const token = bearer(req);
+  for (const [key, partner] of config.apiKeys) {
+    if (sameKey(token, key)) return partner;
+  }
+  throw new ApiError(401, "UNAUTHORIZED", "Unknown key");
 };
 
 /** An optional string field: absent and null are both "not shared". */
 const optional = (body: any, field: string): string | null => {
   const v = body[field];
   if (v === undefined || v === null) return null;
-  if (typeof v !== "string" || !v.trim() || v.length > 320) throw badRequest(`${field} must be a non-empty string`);
+  if (typeof v !== "string" || !v.trim() || v.length > 320 || v.includes("\0")) throw badRequest(`${field} must be a non-empty string`);
   return v.trim();
 };
 
@@ -49,17 +59,38 @@ const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const newCode = (): string =>
   Array.from({ length: 10 }, () => CODE_ALPHABET[crypto.randomInt(CODE_ALPHABET.length)]).join("");
 
-export const router = express.Router();
+/** Issues a code to a user who has none; null when the user already has one. */
+const drawCode = async (owner: (string | null)[]): Promise<string | null> => {
+  for (let draw = 1; ; draw++) {
+    try {
+      const { rows } = await query<{ code: string }>(
+        `INSERT INTO codes (code, partner, external_user_id, x_user_id, email, wallet) VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (partner, external_user_id) DO NOTHING
+         RETURNING code`,
+        [newCode(), ...owner]
+      );
+      return rows[0]?.code ?? null;
+    } catch (error: any) {
+      // The drawn code is already another user's: draw again.
+      if (error?.code !== UNIQUE_VIOLATION || draw === 5) throw error;
+    }
+  }
+};
+
+// Full paths on a strict, case-sensitive router: each endpoint has exactly
+// one spelling, so a path rule in front of the service (nginx, a load
+// balancer) cannot be sidestepped with another case or an extra slash.
+export const router = express.Router({ caseSensitive: true, strict: true });
 router.use(express.json());
 
-router.get("/health", (_req, res) => {
+router.get("/partner-api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
 // Issue a user's referral code. One code per (partner, external_user_id):
 // calling again returns the same code and takes in any identifier newly shared.
 router.post(
-  "/referrals/codes",
+  "/partner-api/referrals/codes",
   asyncHandler(async (req, res) => {
     const partner = partnerOf(req);
     const body = req.body ?? {};
@@ -67,17 +98,23 @@ router.post(
     if (!externalUserId) throw badRequest("external_user_id is required");
     const wallet = optional(body, "wallet");
     if (wallet && !toAddress(wallet)) throw badRequest("wallet must be a 20-byte hex address");
-    // Two users drawing the same code is a primary-key error: a 5xx the caller retries.
-    const { rows } = await query<{ code: string; created: boolean }>(
-      `INSERT INTO codes (code, partner, external_user_id, x_user_id, email, wallet) VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (partner, external_user_id) DO UPDATE SET
-         x_user_id = COALESCE(EXCLUDED.x_user_id, codes.x_user_id),
-         email = COALESCE(EXCLUDED.email, codes.email),
-         wallet = COALESCE(EXCLUDED.wallet, codes.wallet)
-       RETURNING code, (xmax = 0) AS created`,
-      [newCode(), partner, externalUserId, optional(body, "x_user_id"), optional(body, "email")?.toLowerCase() ?? null, toAddress(wallet)]
-    );
-    const { code, created } = rows[0];
+    const owner = [partner, externalUserId, optional(body, "x_user_id"), optional(body, "email")?.toLowerCase() ?? null, toAddress(wallet)];
+    let code = await drawCode(owner);
+    const created = code !== null;
+    if (!code) {
+      // The user has a code: any identifier newly shared is taken in, and
+      // the row is only written when that changes it.
+      const { rows } = await query<{ code: string }>(
+        `WITH shared AS (
+           UPDATE codes SET x_user_id = COALESCE($3, x_user_id), email = COALESCE($4, email), wallet = COALESCE($5, wallet)
+           WHERE partner = $1 AND external_user_id = $2
+             AND (COALESCE($3, x_user_id), COALESCE($4, email), COALESCE($5, wallet)) IS DISTINCT FROM (x_user_id, email, wallet)
+         )
+         SELECT code FROM codes WHERE partner = $1 AND external_user_id = $2`,
+        owner
+      );
+      code = rows[0].code;
+    }
     res.json({
       code,
       ...(config.refLinkBase ? { ref_link: `${config.refLinkBase}?ref=${code}` } : {}),
@@ -88,7 +125,7 @@ router.post(
 
 // Referrals, traders and volume per code of the calling key, for [from, to).
 router.get(
-  "/referrals/metrics",
+  "/partner-api/referrals/metrics",
   asyncHandler(async (req, res) => {
     const partner = partnerOf(req);
     const from = time(req.query.from, "from");
@@ -96,7 +133,8 @@ router.get(
     if (from >= to) throw badRequest("from must be before to");
     const limit = req.query.limit === undefined ? 100 : Number(req.query.limit);
     if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw badRequest("limit must be an integer from 1 to 1000");
-    const cursor = typeof req.query.cursor === "string" ? req.query.cursor : "";
+    const cursor = req.query.cursor === undefined ? "" : req.query.cursor;
+    if (typeof cursor !== "string" || !/^[A-Z0-9]*$/.test(cursor)) throw badRequest("cursor must be a next_cursor of this endpoint");
     const [codes, progress] = await Promise.all([
       query<{ code: string; external_user_id: string; referrals: string; traders: string; volume_usd: string }>(
         `SELECT c.code, c.external_user_id,
@@ -133,9 +171,9 @@ router.get(
 // a ref link. First code wins, and an owner's own account (by the wallet or
 // email they shared) is not their referral.
 router.post(
-  "/referrals/signups",
+  "/partner-api/referrals/signups",
   asyncHandler(async (req, res) => {
-    if (!config.internalKeyHash || bearerHash(req) !== config.internalKeyHash) throw new ApiError(401, "UNAUTHORIZED", "Unknown key");
+    if (!config.internalKey || !sameKey(bearer(req), config.internalKey)) throw new ApiError(401, "UNAUTHORIZED", "Unknown key");
     const body = req.body ?? {};
     const account = toAddress(body.account);
     const code = optional(body, "code");
@@ -145,15 +183,15 @@ router.post(
        SELECT $1, code FROM codes
        WHERE code = $2 AND wallet IS DISTINCT FROM $1 AND ($3::text IS NULL OR email IS DISTINCT FROM $3)
        ON CONFLICT (account) DO NOTHING`,
-      [account, code.toUpperCase(), optional(body, "username")?.toLowerCase() ?? null]
+      [account, code.toUpperCase(), optional(body, "email")?.toLowerCase() ?? null]
     );
     res.json({ recorded: rowCount === 1 });
   })
 );
 
 router.use((error: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
-  // express.json() rejects a malformed body with a 4xx of its own
-  const apiError = error instanceof ApiError ? error : error?.type === "entity.parse.failed" ? badRequest("Malformed JSON body") : null;
+  // express.json() rejects a body it cannot take (malformed, too large) with a 4xx of its own
+  const apiError = error instanceof ApiError ? error : error?.status < 500 ? badRequest("Malformed or oversized JSON body") : null;
   if (!apiError) return next(error);
   res.status(apiError.status).json({ error: { code: apiError.code, message: apiError.message } });
 });
