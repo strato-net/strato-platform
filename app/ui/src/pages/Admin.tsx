@@ -119,10 +119,10 @@ const Admin = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <TabsTrigger value="cdp" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
-                <Database className="h-3 w-3 md:h-4 md:w-4" />
-                <span className="hidden sm:inline">CDP Config</span>
-                <span className="sm:hidden">CDP</span>
+              <TabsTrigger value="staking" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
+                <Layers className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Staking</span>
+                <span className="sm:hidden">Stake</span>
               </TabsTrigger>
               <TabsTrigger value="vote" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
                 <Vote className="h-3 w-3 md:h-4 md:w-4" />
@@ -137,15 +137,15 @@ const Admin = () => {
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${['vault', 'staking'].includes(activeTab)
+                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${['vault', 'cdp'].includes(activeTab)
                       ? 'bg-background text-foreground shadow-sm dark:bg-muted dark:text-primary-foreground'
                       : 'hover:bg-muted hover:text-accent-foreground dark:hover:bg-muted/50 dark:hover:text-primary-foreground'
                       }`}
                   >
                     {activeTab === 'vault' && <Vault className="h-3 w-3 md:h-4 md:w-4" />}
-                    {activeTab === 'staking' && <Layers className="h-3 w-3 md:h-4 md:w-4" />}
-                    <span className="hidden sm:inline">{activeTab === 'vault' ? 'Vault' : activeTab === 'staking' ? 'Staking' : 'More'}</span>
-                    <span className="sm:hidden">{activeTab === 'vault' ? 'Vault' : activeTab === 'staking' ? 'Stake' : 'More'}</span>
+                    {activeTab === 'cdp' && <Database className="h-3 w-3 md:h-4 md:w-4" />}
+                    <span className="hidden sm:inline">{activeTab === 'vault' ? 'Vault' : activeTab === 'cdp' ? 'CDP Config' : 'More'}</span>
+                    <span className="sm:hidden">{activeTab === 'vault' ? 'Vault' : activeTab === 'cdp' ? 'CDP' : 'More'}</span>
                     <ChevronDown className="h-3 w-3" />
                   </button>
                 </DropdownMenuTrigger>
@@ -154,9 +154,9 @@ const Admin = () => {
                     <Vault className="h-4 w-4 mr-2" />
                     Vault
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('staking')}>
-                    <Layers className="h-4 w-4 mr-2" />
-                    Staking
+                  <DropdownMenuItem onClick={() => setActiveTab('cdp')}>
+                    <Database className="h-4 w-4 mr-2" />
+                    CDP Config
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
