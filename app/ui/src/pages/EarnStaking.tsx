@@ -63,6 +63,10 @@ type StakingValidator = ValidatorLifecycle & {
   selfBond: string;
   delegatedStake: string;
   totalStake: string;
+  // V2: the stake this validator's seat is held to, and whether delegated stake counts toward
+  // it (only a seat from before the self-bond rule, until its grace ends).
+  requiredStake?: string;
+  requiredStakeCountsDelegations?: boolean;
   estimatedApy: string;
   userStake: string;
   pendingRewards: string;
@@ -134,6 +138,8 @@ type StakingInfo = {
   rewardPeriodDescription: string;
   estimatedApy: string;
   minStake: string;
+  // V2: the operator's own bond a new seat needs (StratoStaking selfBondMinimum, 10,000 until set).
+  minSelfBond: string;
   proposerFeeBps: string;
   joinsPaused: boolean;
   validatorCount: string;
@@ -273,8 +279,13 @@ const formatUptime = (proposed: string, missed: string): string => {
   return `${pct >= 99.995 ? "100" : pct.toFixed(2)}%`;
 };
 
-// V2: minStake is a self-bond requirement.
-const selfBondRequirementText = (minStakeLabel: string): string => `Validators need ${minStakeLabel} of self-bond.`;
+// V2: the stake a validator's seat is held to. A seat from before the self-bond rule still
+// counts delegated stake, until the grace deadline when one is set.
+const stakeRequirementText = (minimumLabel: string, countsDelegations: boolean, graceUntil?: string): string => {
+  if (!countsDelegations) return `This validator needs ${minimumLabel} of self-bond.`;
+  const deadline = Number(graceUntil || "0") > 0 ? ` until ${formatReleaseTime(graceUntil || "0")}, then of self-bond alone` : "";
+  return `This validator needs ${minimumLabel} of self-bond plus delegated stake${deadline}.`;
+};
 
 const TipLabel = ({ label, tooltip, className }: { label: string; tooltip: string; className?: string }) => (
   <TooltipProvider>
@@ -333,8 +344,7 @@ type OperatorPanelProps = {
   minStake: string;
   decimals: number;
   symbol: string;
-  selfBondNote?: string;
-  selfBondRuleActive: boolean;
+  selfBondGraceUntil?: string;
   validatorSetDeployed: boolean;
   canManage: boolean;
   joinsPaused: boolean;
@@ -368,8 +378,7 @@ const OperatorPanel = ({
   minStake,
   decimals,
   symbol,
-  selfBondNote,
-  selfBondRuleActive,
+  selfBondGraceUntil,
   validatorSetDeployed,
   canManage,
   joinsPaused,
@@ -408,9 +417,15 @@ const OperatorPanel = ({
   const commissionReady = canManage && active && commissionBps !== null && commissionBps <= BigInt(maxCommissionBps || "0");
   const selfBondReady = canManage && active && selfBondParsed > 0n && selfBondParsed <= wallet;
   const selfUnbondReady = canManage && selfUnbondParsed > 0n && selfUnbondParsed <= selfBond;
-  const belowSelfBond = isV2 && !!validator && selfBond < BigInt(minStake || "0");
+  // V2: the stake this seat is held to (StratoStaking._meetsMinStake). minStake, the new-seat
+  // bond, stands in for a backend that does not report it.
+  const requiredStake = validator?.requiredStake ?? minStake;
+  const countsDelegations = Boolean(validator?.requiredStakeCountsDelegations);
+  const heldStake = countsDelegations ? BigInt(validator?.totalStake || "0") : selfBond;
+  const belowRequiredStake = heldStake < BigInt(requiredStake || "0");
   const validatorLabel = validator ? validator.name || truncateAddress(validator.address, 8, 6) : "";
-  const activationStake = isV2 && selfBondRuleActive ? "self-bond" : "total stake";
+  // V2: a seat is only ever taken on self-bond (StratoStaking._meetsMinStake).
+  const activationStake = isV2 ? "self-bond" : "total stake";
 
   const buttonLabel = (action: ProcessingAction, label: string, pendingLabel: string) => (
     processing === action ? (
@@ -487,10 +502,10 @@ const OperatorPanel = ({
                 {inSet || !active ? null : <span>· needs {formatToken(minStake, decimals, 0)} {symbol} {activationStake} to activate</span>}
               </p>
             )}
-            {selfBondNote && (
-              <p className={`mt-1 text-xs ${belowSelfBond ? "text-yellow-600" : "text-muted-foreground"}`}>
-                {selfBondNote}
-                {belowSelfBond ? ` This validator's self-bond is ${formatToken(validator?.selfBond, decimals)} ${symbol}.` : ""}
+            {isV2 && validator && (
+              <p className={`mt-1 text-xs ${belowRequiredStake ? "text-yellow-600" : "text-muted-foreground"}`}>
+                {stakeRequirementText(`${formatToken(requiredStake, decimals, 0)} ${symbol}`, countsDelegations, selfBondGraceUntil)}
+                {belowRequiredStake ? ` This validator's ${countsDelegations ? "total stake" : "self-bond"} is ${formatToken(heldStake.toString(), decimals)} ${symbol}.` : ""}
               </p>
             )}
           </div>
@@ -1249,10 +1264,6 @@ const EarnStaking = () => {
     setMoveAmount(formatAmountInput(actionValidatorStake, decimals));
   };
 
-  const selfBondNote = isV2 && info
-    ? selfBondRequirementText(`${formatToken(info.minStake, decimals, 0)} ${symbol}`)
-    : undefined;
-
   const renderOperatorPanel = (
     key: string,
     validator: StakingValidator | undefined,
@@ -1265,11 +1276,10 @@ const EarnStaking = () => {
       {...earnings}
       maxCommissionBps={info?.maxCommissionBps || "0"}
       walletBalance={info?.walletBalance || "0"}
-      minStake={info?.minStake || "0"}
+      minStake={(isV2 ? info?.minSelfBond : info?.minStake) || "0"}
       decimals={decimals}
       symbol={symbol}
-      selfBondNote={selfBondNote}
-      selfBondRuleActive={Boolean(info?.selfBondRuleActive)}
+      selfBondGraceUntil={info?.selfBondGraceUntil}
       validatorSetDeployed={validatorSetDeployed}
       canManage={isLoggedIn && (isV2 || !!info?.isOperator)}
       joinsPaused={Boolean(info?.joinsPaused)}
@@ -1442,7 +1452,7 @@ const EarnStaking = () => {
             isV2={isV2}
             connectedAddress={userAddress}
             operatedValidator={operatedValidators[0] ?? null}
-            minStake={formatToken(info.minStake, decimals, 0)}
+            minStake={formatToken(isV2 ? info.minSelfBond : info.minStake, decimals, 0)}
             maxCommissionBps={info.maxCommissionBps}
             symbol={symbol}
             disabled={!canCoverActionFee}
@@ -1450,7 +1460,7 @@ const EarnStaking = () => {
             onRegister={handleRegister}
             onChangeOperator={isV2 ? handleChangeOperator : undefined}
             validators={validators}
-            minStakeRaw={info.minStake}
+            minStakeRaw={isV2 ? info.minSelfBond : info.minStake}
             joinsPaused={Boolean(info.joinsPaused)}
             errorMessage={bindingError}
             {...deepLinkProps}

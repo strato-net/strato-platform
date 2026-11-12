@@ -79,6 +79,22 @@ contract record MercataGovernance is Ownable {
         return validators.length;
     }
 
+    // V2 headers discard stake events before the staking fork. Re-emit the full
+    // current set after the fork so a V3 header can publish the weights for the
+    // following block, even when governance's stored weights have not changed.
+    // Anyone may retry this; normal setValidatorStake suppresses unchanged events.
+    function publishValidatorStakeSnapshot() external {
+        uint count = validators.length;
+        require(count > 0, "No validators to publish");
+        for (uint i = 0; i < count; i++) {
+            require(validatorStake[validators[i]] > 0, "Validator has no stake weight");
+        }
+        for (uint i = 0; i < count; i++) {
+            address validator = validators[i];
+            emit ValidatorStakeUpdated(validator, validatorStake[validator]);
+        }
+    }
+
     // Adds the validator if it is not one yet, marks it as staking-managed and
     // records its stake weight.
     function addValidatorFromStaking(address validator, uint stake) external onlyStaking {

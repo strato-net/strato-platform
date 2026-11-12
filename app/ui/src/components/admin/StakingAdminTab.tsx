@@ -50,7 +50,9 @@ type AdminInfo = {
   exitNoticeSeconds: string;
   unkickCooldown: string;
   maxOperatorStakeBps: string;
+  // v2: true until the agreed opening block is reached; there is no admin pause.
   joinsPaused: boolean;
+  joinsOpenFromBlock?: string;
   governanceSyncEnabled: boolean;
   validatorCount: string;
   unattributedFees: string;
@@ -95,12 +97,12 @@ const StakingAdminTab = () => {
   const [busy, setBusy] = useState<string | null>(null);
   const [validatorParams, setValidatorParams] = useState<Record<string, string>>({});
   const [setParams, setSetParams] = useState<Record<string, string>>({});
-  const [joinsPaused, setJoinsPaused] = useState(true);
   const [governanceSync, setGovernanceSync] = useState(false);
   const [newOperator, setNewOperator] = useState({ operator: "", validatorAddress: "", commissionPercent: "", name: "" });
   // v1: bind a validator address to an operator. v2: move a validator to a new operator.
   const [validatorAddressEdit, setValidatorAddressEdit] = useState({ operator: "", validatorAddress: "" });
   const [selfBondGrace, setSelfBondGrace] = useState("");
+  const [selfBondMinimum, setSelfBondMinimum] = useState("");
   const [hardCap, setHardCap] = useState("");
   const [emergencyKicker, setEmergencyKicker] = useState("");
   const [recovery, setRecovery] = useState({ to: "", amount: "" });
@@ -126,7 +128,6 @@ const StakingAdminTab = () => {
         unkickCooldown: data.unkickCooldown,
         maxOperatorStakeBps: data.maxOperatorStakeBps,
       });
-      setJoinsPaused(Boolean(data.joinsPaused));
       setGovernanceSync(Boolean(data.governanceSyncEnabled));
       setSelfBondGrace(toDateTimeLocal(data.selfBondGraceUntil));
     } finally {
@@ -210,9 +211,10 @@ const StakingAdminTab = () => {
         <CardContent className="space-y-3">
           {paramGrid([
             isV2
-              ? { key: "minStake", label: "Min stake (STRATO, self-bond requirement)", wad: true }
+              ? { key: "minStake", label: "Incumbent min stake (STRATO)", wad: true }
               : { key: "minStake", label: "Min stake (STRATO, self-bond + delegated)", wad: true },
-            // The validator-keyed contract has no separate min self-bond; minStake is the self-bond bar.
+            // The validator-keyed contract's new-seat minimum is voted on its own
+            // (setSelfBondMinimum); minStake is the bar for seats held from before it.
             ...(isV2 ? [] : [{ key: "minSelfBond", label: "Min self-bond (STRATO)", wad: true }]),
             { key: "proposerFeeBps", label: "Proposer fee share (bps)" },
             { key: "maxConsecutiveMisses", label: "Jail after consecutive misses" },
@@ -233,8 +235,32 @@ const StakingAdminTab = () => {
       {isV2 && (
         <Card>
           <CardHeader>
+            <CardTitle>Self-bond minimum</CardTitle>
+            <CardDescription>The operator's own bond a candidate, or a seat taken under the self-bond rule, needs. Delegations never count toward it. 10,000 STRATO until set.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">Current minimum: {fromWad(info.minSelfBond)} STRATO</p>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="space-y-1 text-xs">
+                <span className="text-muted-foreground">New minimum (STRATO)</span>
+                <Input value={selfBondMinimum} onChange={(event) => setSelfBondMinimum(event.target.value)} className="w-48" />
+              </label>
+              <Button size="sm" disabled={blocked || !/^[0-9]+(\.[0-9]+)?$/.test(selfBondMinimum.trim()) || toWad(selfBondMinimum) === "0"} onClick={() => run("self-bond-minimum", () => api.patch("/staking/admin/self-bond-minimum", {
+                selfBondMinimum: toWad(selfBondMinimum),
+              }), "Self-bond minimum vote")}>
+                {label("self-bond-minimum", "Set minimum")}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">A higher minimum applies at once: seats taken under the rule whose operator holds less leave the set. Seats held from before the rule stay on min stake.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {isV2 && (
+        <Card>
+          <CardHeader>
             <CardTitle>Self-bond grace deadline</CardTitle>
-            <CardDescription>Min stake is a self-bond requirement. Until this deadline delegated stake still counts toward it; after it only self-bond does.</CardDescription>
+            <CardDescription>For seats held from before the self-bond rule: until this deadline their delegated stake still counts toward min stake; after it only self-bond does. New seats always need their operator's own bond at the self-bond minimum.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
@@ -264,7 +290,7 @@ const StakingAdminTab = () => {
       <Card>
         <CardHeader>
           <CardTitle>Validator set</CardTitle>
-          <CardDescription>Set size and admission rules. Joins stay paused until stake-weighted votes are live on every node.</CardDescription>
+          <CardDescription>Set size and admission rules. Permissionless joins open for everyone at the agreed block (setJoinsOpenFromBlock).</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {paramGrid([
@@ -276,12 +302,11 @@ const StakingAdminTab = () => {
             { key: "unkickCooldown", label: "Unkick cooldown (seconds)" },
             { key: "maxOperatorStakeBps", label: "Max operator stake (bps, 0 = off)" },
           ], setParams, setSetParams, (
-            <label className="flex items-center gap-2 text-xs">
-              <Switch checked={!joinsPaused} onCheckedChange={(checked) => setJoinsPaused(!checked)} />
-              <span>Permissionless joins {joinsPaused ? "paused" : "open"}</span>
-            </label>
+            <span className="text-xs text-muted-foreground">
+              Permissionless joins {info.joinsPaused ? "not open" : "open"} · opening block {info.joinsOpenFromBlock && info.joinsOpenFromBlock !== "0" ? info.joinsOpenFromBlock : "not agreed"}
+            </span>
           ))}
-          <Button size="sm" disabled={blocked} onClick={() => run("set-params", () => api.patch("/staking/admin/set-params", { ...setParams, joinsPaused }), "Validator set vote")}>
+          <Button size="sm" disabled={blocked} onClick={() => run("set-params", () => api.patch("/staking/admin/set-params", setParams), "Validator set vote")}>
             {label("set-params", "Save set parameters")}
           </Button>
         </CardContent>

@@ -10,9 +10,34 @@ import "../Util.sol";
 
 // Reproduces state that only a proxy upgraded in place on helium can hold: fields the
 // current initialize() always writes, records without an operator field, a consensus set
-// that predates its index, and the retired reward schedule's leftovers.
+// that predates its index, seats that predate the self-bond rule, and the retired reward
+// schedule's leftovers. It also prices the self-bond minimum at minStake, so amounts stay
+// small, unless a test switches the real one on.
 contract UpgradedInPlaceStaking is StratoStaking {
+    bool public realSelfBondMinimum;
+
     constructor(address initialOwner) StratoStaking(initialOwner) { }
+
+    function useRealSelfBondMinimum() public {
+        realSelfBondMinimum = true;
+    }
+
+    function _minSelfBond() internal view override returns (uint256) {
+        return realSelfBondMinimum ? super._minSelfBond() : minStake;
+    }
+
+    function forgetSelfBondRule(address validator) public {
+        seatedUnderSelfBondRule[validator] = false;
+    }
+
+    function forgetJoinsOpenFromBlock() public {
+        joinsOpenFromBlock = 0;
+    }
+
+    // The last processed block carried this timestamp; the test clock only moves forward.
+    function stampLastBlockTime(uint256 timestamp) public {
+        lastBlockTime = timestamp;
+    }
 
     function forgetUsdst() public {
         usdstToken = IERC20(address(0));
@@ -45,6 +70,15 @@ contract UpgradedInPlaceStaking is StratoStaking {
         operators[validator].baseRewardPerOperatorPaid = basePaid;
         operators[validator].stakeRewardPerTokenPaid = stakePaid;
         operators[validator].pendingBaseRewards = pendingBase;
+    }
+}
+
+// Lists validators the way genesis and admin votes do: in the set, not staking-managed.
+contract GenesisGovernance is MercataGovernance {
+    constructor(address initialOwner) MercataGovernance(initialOwner) { }
+
+    function seedValidator(address validator) public {
+        addValidator(validator);
     }
 }
 
@@ -98,8 +132,10 @@ contract Describe_StratoStaking {
         staking.setGovernance(address(gov), true);
         // minStake 1000 of self-bond, 50% proposer fee share; the jail knobs (3 misses, 100s) are stored but inert
         staking.setValidatorParams(1000e18, 5000, 3, 100);
-        // set of 50, generous mutation budget, 100s exit notice / unkick cooldown, no stake cap, joins paused
-        staking.setSetParams(50, 50, 500, 10, 100, 100, 0, true);
+        // set of 50, generous mutation budget, 100s exit notice / unkick cooldown, no stake cap
+        staking.setSetParams(50, 50, 500, 10, 100, 100, 0);
+        // joins open from the next block, which the fastForward below reaches
+        staking.setJoinsOpenFromBlock(block.number + 1);
 
         address[] memory validators = new address[](2);
         validators[0] = VALIDATOR_A;
@@ -168,7 +204,7 @@ contract Describe_StratoStaking {
     }
 
     function _reward(address validator, uint256 amount) internal {
-        funder.doSuccessfully(address(staking), "creditBlockReward(address,uint256)", validator, amount);
+        funder.doSuccessfully(address(staking), "distributeRewardsTo", _list(address(strato)), _amount(amount), _list(validator));
     }
 
     function _commissionOf(address validator) internal returns (uint256) {
@@ -234,15 +270,63 @@ contract Describe_StratoStaking {
         require(staking.eligible(VALIDATOR_A), "self-bond meets minStake");
     }
 
-    // Helium's validators were admitted on delegated stake. An upgraded proxy has no
-    // deadline written, keeps that rule, and only leaves it when the admins pick a deadline.
+    // The real rule: 10,000 STRATO of the operator's own bond, however much is delegated.
+    function it_needs_ten_thousand_strato_of_own_bond_for_a_new_seat() public {
+        staking.useRealSelfBondMinimum();
+        _stake(user1, VALIDATOR_A, 10000e18);
+        _selfBond(operatorA, VALIDATOR_A, 9999e18);
+        require(!staking.eligible(VALIDATOR_A), "delegations never make up the minimum");
+        _selfBond(operatorA, VALIDATOR_A, 1e18);
+        require(staking.eligible(VALIDATOR_A), "10,000 of its own");
+        _activate(VALIDATOR_A);
+        require(staking.seatedUnderSelfBondRule(VALIDATOR_A), "seated under the rule");
+    }
+
+    // Admins can move the new-seat bar. Unset reads as 10,000; a higher bar removes the seats
+    // taken under the rule that fall short, and leaves incumbents on minStake.
+    function it_lets_admins_set_the_self_bond_minimum() public {
+        staking.useRealSelfBondMinimum();
+        require(staking.selfBondMinimum() == 0, "never set");
+        _selfBond(operatorA, VALIDATOR_A, 5000e18);
+        _selfBond(operatorB, VALIDATOR_B, 2000e18);
+        require(!staking.eligible(VALIDATOR_A), "unset reads as 10,000");
+
+        staking.setSelfBondMinimum(2000e18);
+        require(staking.eligible(VALIDATOR_A) && staking.eligible(VALIDATOR_B), "a lower bar admits both");
+        _activate(VALIDATOR_A);
+        _activate(VALIDATOR_B);
+        staking.forgetSelfBondRule(VALIDATOR_B);
+
+        fastForward(1, 1);
+        staking.setSelfBondMinimum(5001e18);
+        require(!gov.isValidator(VALIDATOR_A), "a seat under the rule that falls short leaves at once");
+        require(gov.isValidator(VALIDATOR_B), "an incumbent stays on minStake");
+
+        bool rejected = false;
+        try staking.setSelfBondMinimum(0) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "zero is refused");
+        rejected = false;
+        try user1.do(address(staking), "setSelfBondMinimum", 1e18) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "non-owner rejected");
+        require(staking.selfBondMinimum() == 5001e18, "unchanged");
+    }
+
+    // Helium's validators were admitted on delegated stake. A seat from before the self-bond
+    // rule keeps that rule while no deadline is written, and leaves it when the admins pick one.
     function it_phases_in_the_self_bond_rule_after_the_grace_deadline() public {
         staking.forgetSelfBondGrace();
-        _selfBond(operatorA, VALIDATOR_A, 1000e18);
-        _activate(VALIDATOR_A);
+        _bondBoth();
         _stake(user1, VALIDATOR_B, 1000e18);
-        require(staking.eligible(VALIDATOR_B), "no deadline set: delegated stake still qualifies");
-        _activate(VALIDATOR_B);
+        staking.forgetSelfBondRule(VALIDATOR_B);
+        operatorB.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_B, 2000e18);
+        require(staking.eligible(VALIDATOR_B), "no deadline set: delegated stake still qualifies an incumbent");
+        require(gov.isValidator(VALIDATOR_B), "and keeps its seat");
 
         staking.setSelfBondGraceUntil(block.timestamp + 100);
         require(gov.isValidator(VALIDATOR_B), "setting a future deadline removes nobody");
@@ -252,6 +336,37 @@ contract Describe_StratoStaking {
         staking.syncValidator(VALIDATOR_B);
         require(!gov.isValidator(VALIDATOR_B), "left the set on the next sync");
         require(gov.isValidator(VALIDATOR_A), "a self-bonded validator is unaffected");
+    }
+
+    // A candidate never gets the incumbent rule, and an incumbent loses it by leaving the set
+    // or changing operator: from then on it is a new entrant.
+    function it_applies_the_self_bond_rule_to_new_and_returning_seats() public {
+        staking.forgetSelfBondGrace();
+        _bondBoth();
+        _stake(user1, VALIDATOR_A, 1000e18);
+        _stake(user1, VALIDATOR_B, 1000e18);
+        staking.forgetSelfBondRule(VALIDATOR_A);
+        staking.forgetSelfBondRule(VALIDATOR_B);
+
+        _registerSelf(validatorC);
+        _stake(user2, address(validatorC), 5000e18);
+        require(!staking.eligible(address(validatorC)), "a candidate needs its own bond, grace or not");
+
+        operatorA.doSuccessfully(address(staking), "requestExit(address)", VALIDATOR_A);
+        fastForward(101, 1);
+        staking.syncValidator(VALIDATOR_A);
+        require(!gov.isValidator(VALIDATOR_A), "left after its notice");
+        operatorA.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 1000e18);
+        require(!staking.eligible(VALIDATOR_A), "returning: delegations no longer qualify it");
+        _selfBond(operatorA, VALIDATOR_A, 1000e18);
+        fastForward(1, 1);
+        _activate(VALIDATOR_A);
+        require(staking.seatedUnderSelfBondRule(VALIDATOR_A), "back under the rule");
+
+        User incoming = new User();
+        registry.adminSetOperator(VALIDATOR_B, address(incoming));
+        require(staking.seatedUnderSelfBondRule(VALIDATOR_B), "a change of operator ends the exemption");
+        require(!gov.isValidator(VALIDATOR_B), "the new operator has no bond, and delegations no longer count");
     }
 
     // The pre-upgrade contract maintained lastSyncedWeight without ever calling
@@ -380,7 +495,6 @@ contract Describe_StratoStaking {
 
         _reward(VALIDATOR_A, 100e18);
         require(staking.allocatedRewardLiability() == 100e18, "credited rewards are a liability");
-        require(staking.totalRewardsCredited() == 100e18, "counted");
         // weight 2000: self-bond 1000 -> 50, delegators 50 gross, 5% commission -> 2.5 + 47.5
         require(_pendingOperatorRewards(VALIDATOR_A) == 525e17, "operator self-bond share + commission");
 
@@ -394,24 +508,18 @@ contract Describe_StratoStaking {
         require(staking.allocatedRewardLiability() == 0, "all paid out");
     }
 
-    function it_only_credits_what_it_is_paid_and_only_to_listed_validators() public {
+    function it_refuses_the_flat_block_reward() public {
+        _bondBoth();
         uint256 held = strato.balanceOf(address(staking));
-        funder.doExpectingFailure(address(staking), "creditBlockReward(address,uint256)", "SS: validator not listed", address(0xdead), 1e18);
-        require(strato.balanceOf(address(staking)) == held, "nothing pulled for an unlisted proposer");
-
-        User broke = new User();
-        bool rejected = false;
-        try broke.do(address(staking), "creditBlockReward(address,uint256)", VALIDATOR_A, 1e18) {
-        } catch {
-            rejected = true;
-        }
-        require(rejected, "a credit must be paid for");
+        funder.doExpectingFailure(address(staking), "creditBlockReward(address,uint256)", "SS: block reward disabled", VALIDATOR_A, 1e18);
+        require(strato.balanceOf(address(staking)) == held, "nothing pulled");
         require(_pendingOperatorRewards(VALIDATOR_A) == 0, "nothing credited");
+        require(staking.totalRewardsCredited() == 0, "nothing counted");
     }
 
-    // The funded reward schedule is gone: no way in, and a listed validator with no stake
-    // that proposes nothing earns nothing.
-    function it_has_no_funded_reward_schedule() public {
+    // The retired funded reward schedule is gone: no way in, and a listed validator with no
+    // stake that proposes nothing earns nothing.
+    function it_has_no_retired_reward_schedule() public {
         _registerSelf(validatorC);
         _bondBoth();
         _reward(VALIDATOR_A, 10e18);
@@ -511,6 +619,208 @@ contract Describe_StratoStaking {
         staking.seedRetiredCheckpoints(VALIDATOR_A, 0, 0, 5e18);
         operatorA.doExpectingFailure(address(staking), "claimOperatorRewards(address)", "SS: rewards unavailable", VALIDATOR_A);
         require(strato.balanceOf(address(staking)) == 2000e18, "principal intact");
+    }
+
+    // ---- emission schedule ---------------------------------------------------------------
+
+    // processBlock in a new block `gap` seconds after the last one, with `producer` as the
+    // parent block's producer. It pays `producer` for the interval between the two blocks
+    // processed before it, so the first payment comes on the third processed block.
+    function _processBlockAfter(uint256 gap, address producer) internal {
+        fastForward(gap, 1);
+        setBlockContext(producer, producer, producer, 0);
+        staking.processBlock();
+    }
+
+    function _fundReserve(uint256 amount) internal {
+        funder.doSuccessfully(address(staking), "fundEmissionReserve(uint256)", amount);
+    }
+
+    function _commitRejected(uint256 e0, uint256 s0, uint256 r0) internal returns (bool) {
+        bool rejected = false;
+        try staking.commitEmissionSchedule(e0, s0, r0, 0) {
+        } catch {
+            rejected = true;
+        }
+        return rejected;
+    }
+
+    function it_commits_the_emission_schedule_once_and_only_when_funded() public {
+        require(_commitRejected(500e18, 1000e18, 1000e18), "an unfunded schedule cannot be committed");
+
+        _fundReserve(1000e18);
+        require(staking.emissionReserve() == 1000e18, "anyone funds the reserve");
+        require(_commitRejected(500e18, 1000e18, 1001e18), "the reserve must hold r0");
+        require(_commitRejected(0, 1000e18, 1000e18), "a zero rate is no schedule");
+        require(_commitRejected(500e18, 0, 1000e18), "nor a zero reference stake");
+        require(_commitRejected(500e18, 1000e18, 0), "nor a zero reference reserve");
+        bool rejected = false;
+        try user1.do(address(staking), "commitEmissionSchedule(uint256,uint256,uint256,uint256)", 500e18, 1000e18, 1000e18, 0) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "only the owner commits");
+
+        staking.commitEmissionSchedule(500e18, 1000e18, 1000e18, 0);
+        require(staking.emissionStartTime() == block.timestamp, "a start in the past means now");
+        require(_commitRejected(1000e18, 1000e18, 1000e18), "committed once: no re-calibration");
+        require(staking.emissionRateE0() == 500e18, "the committed rate stands");
+    }
+
+    // E = E0 * sqrt(S / S0) * (R / R0) a year.
+    function it_scales_the_rate_with_the_root_of_stake_and_with_the_reserve() public {
+        _bondBoth();
+        _stake(user1, VALIDATOR_A, 1000e18); // consensus weight 4000
+        _fundReserve(10000e18);
+        require(staking.emissionAnnualRate() == 0, "nothing before the commitment");
+        staking.commitEmissionSchedule(500e18, 1000e18, 10000e18, 0);
+        require(staking.emissionAnnualRate() == 1000e18, "4x the reference stake: 2x the rate");
+
+        _fundReserve(10000e18);
+        require(staking.emissionAnnualRate() == 2000e18, "twice the reference reserve: twice again");
+
+        _stake(user2, VALIDATOR_B, 5000e18); // consensus weight 9000
+        require(staking.emissionAnnualRate() == 3000e18, "9x the reference stake: 3x");
+        require(staking.emissionStakeS0() == 1000e18 && staking.emissionReserveR0() == 10000e18, "the reference values stay committed");
+    }
+
+    function it_pays_each_producer_the_formula_split_like_the_block_reward() public {
+        _bondBoth();
+        _stake(user1, VALIDATOR_A, 1000e18); // A: 2000, half of it self-bond; B: 2000
+        // 31,536 STRATO a year at the current 4,000 of weight and a full reserve: 1e15 a second
+        _fundReserve(10000e18);
+        staking.commitEmissionSchedule(31536e18, 4000e18, 10000e18, 0);
+        require(staking.emissionAnnualRate() == 31536e18, "S = S0 and R = R0: the reference rate");
+
+        _processBlockAfter(1, VALIDATOR_A);
+        _processBlockAfter(60, VALIDATOR_A); // A's block closes 60 seconds
+        require(staking.totalEmitted() == 0, "paid in the block after, once the interval is known");
+        _processBlockAfter(1, VALIDATOR_A);
+        require(staking.totalEmitted() == 6e16, "60 seconds at 1e15 a second");
+        require(staking.emissionReserve() == 10000e18 - 6e16, "out of the reserve");
+        require(staking.allocatedRewardLiability() == 6e16, "owed like any reward");
+        // self-bond 1000 of 2000 -> 3e16, delegators 3e16 gross, 5% commission -> 1.5e15 + 2.85e16
+        require(_pendingOperatorRewards(VALIDATOR_A) == 315e14, "operator self-bond share + commission");
+        require(_pendingOperatorRewards(VALIDATOR_B) == 0, "only the producer is paid");
+
+        uint256 before = strato.balanceOf(address(user1));
+        user1.doSuccessfully(address(staking), "claimRewards", _list(VALIDATOR_A));
+        require(strato.balanceOf(address(user1)) - before == 285e14, "delegator share");
+        operatorA.doSuccessfully(address(staking), "claimOperatorRewards(address)", VALIDATOR_A);
+        require(strato.balanceOf(address(staking)) == staking.principalBalance() + staking.emissionReserve(), "claims never touch the reserve");
+    }
+
+    function it_pays_nothing_before_the_start_and_caps_a_long_gap() public {
+        _bondBoth();
+        _fundReserve(10000e18);
+        uint256 start = block.timestamp + 100;
+        staking.commitEmissionSchedule(31536e18, 3000e18, 10000e18, start);
+        require(staking.emissionStartTime() == start, "a future start is kept");
+
+        _processBlockAfter(1, VALIDATOR_A);   // start - 99
+        _processBlockAfter(10, VALIDATOR_A);  // start - 89
+        _processBlockAfter(60, VALIDATOR_A);  // start - 29: pays for start - 99 .. start - 89
+        _processBlockAfter(50, VALIDATOR_A);  // start + 21: pays for start - 89 .. start - 29
+        require(staking.totalEmitted() == 0, "nothing before the start");
+
+        uint256 rate = staking.emissionAnnualRate();
+        _processBlockAfter(1, VALIDATOR_A);   // pays for start - 29 .. start + 21: only the part after the start
+        require(staking.totalEmitted() == (rate * 21) / 31536000, "21 seconds after the start");
+
+        _processBlockAfter(7200, VALIDATOR_A); // two hours later; pays for the second before
+        uint256 emitted = staking.totalEmitted();
+        rate = staking.emissionAnnualRate();
+        _processBlockAfter(1, VALIDATOR_A);    // pays for the two hours
+        require(staking.totalEmitted() - emitted == (rate * 3600) / 31536000, "a gap is paid for one hour at most");
+    }
+
+    // A block stamped behind its parent closes no interval, and the time it stepped back over
+    // is not paid a second time to the block after it.
+    function it_never_pays_time_twice_when_a_stamp_goes_backwards() public {
+        _bondBoth();
+        _fundReserve(10000e18);
+        staking.commitEmissionSchedule(31536e18, 3000e18, 10000e18, 0);
+        _processBlockAfter(1, VALIDATOR_A);
+        _processBlockAfter(100, VALIDATOR_A);
+        _processBlockAfter(10, VALIDATOR_A);  // pays the 100 seconds
+        uint256 paid = staking.totalEmitted();
+        require(paid > 0, "the interval is paid");
+
+        // the block just processed was stamped 50 seconds behind its parent
+        uint256 parent = staking.previousBlockTime();
+        staking.stampLastBlockTime(parent - 50);
+        _processBlockAfter(1, VALIDATOR_A);   // its interval: nothing
+        require(staking.totalEmitted() == paid, "a stamp behind its parent pays nothing");
+        require(staking.previousBlockTime() == parent, "the start does not move back");
+
+        uint256 rate = staking.emissionAnnualRate();
+        _processBlockAfter(1, VALIDATOR_A);   // pays from the parent's stamp, not from the stamp behind it
+        require(staking.totalEmitted() - paid == (rate * 11) / 31536000, "only the 11 seconds not yet paid");
+    }
+
+    // Only a seated, listed, eligible producer is paid; anything else stays in the reserve.
+    function it_pays_only_seated_eligible_producers() public {
+        _bondBoth();
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1000e18); // listed and eligible, not seated
+        _fundReserve(10000e18);
+        staking.commitEmissionSchedule(31536e18, 3000e18, 10000e18, 0);
+
+        _processBlockAfter(1, address(validatorC));
+        _processBlockAfter(60, address(validatorC));
+        _processBlockAfter(60, address(validatorC));
+        _processBlockAfter(60, address(0xdead));
+        _processBlockAfter(60, address(0xdead));
+        require(staking.totalEmitted() == 0 && staking.emissionReserve() == 10000e18, "a validator outside the set, or an unknown key, earns nothing");
+
+        operatorA.doSuccessfully(address(staking), "requestExit(address)", VALIDATOR_A);
+        _processBlockAfter(101, VALIDATOR_A); // its exit notice is up; nothing has synced it out yet
+        require(staking.isValidator(VALIDATOR_A) && !staking.eligible(VALIDATOR_A), "seated, no longer eligible");
+        _processBlockAfter(60, VALIDATOR_A);
+        require(staking.totalEmitted() == 0, "nor does a seat that is due to leave");
+
+        _processBlockAfter(60, VALIDATOR_B);
+        _processBlockAfter(60, VALIDATOR_B);
+        require(staking.totalEmitted() > 0 && _pendingOperatorRewards(VALIDATOR_B) == staking.totalEmitted(), "a seated producer is");
+    }
+
+    function it_keeps_the_emission_reserve_out_of_payouts_and_recovery() public {
+        _selfBond(operatorA, VALIDATOR_A, 1000e18);
+        _fundReserve(500e18);
+        require(staking.recoverableUntrackedStrato() == 0, "the reserve is not untracked STRATO");
+        bool rejected = false;
+        try staking.recoverUntrackedStrato(address(user2), 1) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "the owner cannot take the reserve back");
+
+        strato.mint(address(staking), 5e18); // sent directly, owed to nobody
+        require(staking.recoverableUntrackedStrato() == 5e18, "only what is owed to nobody");
+        staking.recoverUntrackedStrato(address(user2), 5e18);
+
+        // 5 owed on the books, nothing held beyond principal and the reserve
+        staking.seedRetiredCheckpoints(VALIDATOR_A, 0, 0, 5e18);
+        operatorA.doExpectingFailure(address(staking), "claimOperatorRewards(address)", "SS: rewards unavailable", VALIDATOR_A);
+        require(staking.emissionReserve() == 500e18 && strato.balanceOf(address(staking)) == 1500e18, "reserve intact");
+    }
+
+    function it_never_releases_more_than_the_reserve() public {
+        _bondBoth();
+        // a year at this rate is a million STRATO; the reserve holds one
+        _fundReserve(1e18);
+        staking.commitEmissionSchedule(1000000e18, 3000e18, 1e18, 0);
+        _processBlockAfter(1, VALIDATOR_A);
+        _processBlockAfter(3600, VALIDATOR_A);
+        _processBlockAfter(1, VALIDATOR_A);
+        require(staking.emissionReserve() == 0 && staking.totalEmitted() == 1e18, "capped at what is left");
+
+        _processBlockAfter(60, VALIDATOR_A);
+        _processBlockAfter(60, VALIDATOR_A);
+        require(staking.totalEmitted() == 1e18, "nothing once the reserve is spent");
+        uint256 before = strato.balanceOf(address(operatorA));
+        operatorA.doSuccessfully(address(staking), "claimOperatorRewards(address)", VALIDATOR_A);
+        require(strato.balanceOf(address(operatorA)) - before == 1e18, "all of it claimable");
     }
 
     // ---- discretionary rewards -----------------------------------------------------------
@@ -725,17 +1035,75 @@ contract Describe_StratoStaking {
         staking.forgetSetIndex();
         require(staking.activeValidatorCount() == 0 && staking.validatorCount() == 2, "helium's shape: counted, not indexed");
 
-        address[] memory claimed = new address[](3);
-        claimed[0] = VALIDATOR_A;
-        claimed[1] = VALIDATOR_B;
-        claimed[2] = address(0xdead);
-        user2.doSuccessfully(address(staking), "indexValidatorSet", claimed);
-        require(staking.activeValidatorCount() == 2, "only real members indexed");
-        user2.doSuccessfully(address(staking), "indexValidatorSet", claimed);
+        user2.doSuccessfully(address(staking), "indexValidatorSet");
+        require(staking.activeValidatorCount() == 2, "the set governance lists is indexed");
+        user2.doSuccessfully(address(staking), "indexValidatorSet");
         require(staking.activeValidatorCount() == 2, "idempotent");
 
         staking.forgetOperatorField(VALIDATOR_A);
         require(staking.operatorOf(VALIDATOR_A) == VALIDATOR_A, "a record without an operator field is operated by its key");
+    }
+
+    // Helium's governance held no stakes after the upgrade, so the first weight published
+    // would have been the only weight in the set: one weighted validator among unweighted
+    // peers is the first-round proposer and a one-validator quorum, and anyone can trigger a
+    // validator's publication with a wei of stake. A seat the index does not hold is never
+    // published on its own; indexing reads the set from governance and publishes it whole.
+    function it_publishes_a_set_that_predates_the_index_whole_or_not_at_all() public {
+        _bondBoth();
+        staking.forgetSetIndex();
+
+        MercataGovernance fresh = new MercataGovernance(address(this));
+        fresh.setStakingContract(address(this));
+        fresh.addValidatorFromStaking(VALIDATOR_A, 0);
+        fresh.addValidatorFromStaking(VALIDATOR_B, 0);
+        fresh.setStakingContract(address(staking));
+        staking.setGovernance(address(fresh), true);
+        require(fresh.validatorStake(VALIDATOR_A) == 0 && fresh.validatorStake(VALIDATOR_B) == 0, "nothing published while unindexed");
+
+        _stake(user1, VALIDATOR_A, 1);
+        user2.doSuccessfully(address(staking), "syncValidator", VALIDATOR_B);
+        require(fresh.validatorStake(VALIDATOR_A) == 0 && fresh.validatorStake(VALIDATOR_B) == 0, "a lone seat is not published");
+
+        fresh.setStakingContract(address(this));
+        fresh.addValidatorFromStaking(address(0xdead), 0);
+        fresh.setStakingContract(address(staking));
+        user2.doExpectingFailure(address(staking), "indexValidatorSet", "SS: validator not seated here");
+        require(staking.activeValidatorCount() == 0, "a refused backfill indexes nobody");
+        user2.doSuccessfully(address(staking), "syncValidator", VALIDATOR_A);
+        require(fresh.validatorStake(VALIDATOR_A) == 0, "so no seat can be published alone after it");
+        fresh.setStakingContract(address(this));
+        require(fresh.removeValidatorFromStaking(address(0xdead)), "test setup: stranger removed");
+        fresh.setStakingContract(address(staking));
+
+        user2.doSuccessfully(address(staking), "indexValidatorSet");
+        require(staking.activeValidatorCount() == 2, "the set governance lists is indexed");
+        require(fresh.validatorStake(VALIDATOR_A) == 1000e18 + 1 && fresh.validatorStake(VALIDATOR_B) == 2000e18, "the whole set is published in one transaction");
+    }
+
+    // Governance refuses to drop a validator staking never managed, which is every seat a
+    // proxy upgraded in place inherited. One that no longer qualifies would stay in the set
+    // without a weight while its peers were published, so the backfill reverts instead.
+    function it_does_not_publish_around_a_seat_governance_refuses_to_drop() public {
+        _bondBoth();
+        staking.forgetSetIndex();
+
+        GenesisGovernance genesis = new GenesisGovernance(address(this));
+        genesis.seedValidator(VALIDATOR_A);
+        genesis.seedValidator(VALIDATOR_B);
+        genesis.setStakingContract(address(staking));
+        staking.setGovernance(address(genesis), true);
+
+        operatorA.do(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 1e18);
+        require(genesis.isValidator(VALIDATOR_A) && !staking.eligible(VALIDATOR_A), "below minStake, kept by governance");
+
+        user2.doExpectingFailure(address(staking), "indexValidatorSet", "SS: validator without weight");
+        require(staking.activeValidatorCount() == 0, "nobody indexed");
+        require(genesis.validatorStake(VALIDATOR_B) == 0, "the eligible peer is not published alone");
+
+        _selfBond(operatorA, VALIDATOR_A, 1e18);
+        user2.doSuccessfully(address(staking), "indexValidatorSet");
+        require(genesis.validatorStake(VALIDATOR_A) == 1000e18 && genesis.validatorStake(VALIDATOR_B) == 2000e18, "published whole once every seat qualifies");
     }
 
     // ---- operators ---------------------------------------------------------------------
@@ -765,7 +1133,10 @@ contract Describe_StratoStaking {
         attacker.doExpectingFailure(address(registry), "register", "VR: already registered", VALIDATOR_A, uint256(0), "x", "", "", uint8(27), uint256(1), uint256(1));
     }
 
-    function it_register_needs_the_key_but_activation_is_gated() public {
+    // Admission opens at the agreed block for everyone at once: nobody seats anyone before it,
+    // the owner included, and the block is fixed once reached.
+    function it_register_needs_the_key_and_activation_waits_for_the_agreed_block() public {
+        staking.forgetJoinsOpenFromBlock();
         _registerSelf(validatorC);
         require(staking.status(address(validatorC)) == 1, "Registered");
         require(staking.operatorOf(address(validatorC)) == address(validatorC), "self-operated");
@@ -774,13 +1145,37 @@ contract Describe_StratoStaking {
         _selfBond(validatorC, address(validatorC), 1000e18);
         require(staking.isWaiter(address(validatorC)), "waiter");
 
-        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: joins paused", address(validatorC));
-        staking.tryActivate(address(validatorC));
-        require(staking.status(address(validatorC)) == 2, "owner may activate while paused");
+        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: joins not open", address(validatorC));
+        bool rejected = false;
+        try staking.tryActivate(address(validatorC)) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "no agreed block: the owner cannot seat anyone either");
+
+        rejected = false;
+        try staking.setJoinsOpenFromBlock(block.number) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "only a future block can be agreed");
+        staking.setJoinsOpenFromBlock(block.number + 2);
+        fastForward(1, 1);
+        user2.doExpectingFailure(address(staking), "reconcileSet", "SS: joins not open", _list(address(validatorC)));
+        fastForward(1, 1);
+        user2.doSuccessfully(address(staking), "reconcileSet", _list(address(validatorC)));
+        require(staking.status(address(validatorC)) == 2, "anyone seats it from the agreed block");
+
+        rejected = false;
+        try staking.setJoinsOpenFromBlock(block.number + 10) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "once reached, the block cannot be moved");
     }
 
     function it_fills_the_set_then_evicts_the_lowest_with_margin() public {
-        staking.setSetParams(2, 50, 500, 10, 100, 100, 0, false);
+        staking.setSetParams(2, 50, 500, 10, 100, 100, 0);
         _bondBoth();
         require(staking.validatorCount() == 2, "set full");
 
@@ -797,7 +1192,7 @@ contract Describe_StratoStaking {
         require(staking.validatorCount() == 2, "set size unchanged");
 
         bool rejected = false;
-        try staking.setSetParams(3, 51, 500, 10, 100, 100, 0, false) {
+        try staking.setSetParams(3, 51, 500, 10, 100, 100, 0) {
         } catch {
             rejected = true;
         }
@@ -805,7 +1200,7 @@ contract Describe_StratoStaking {
     }
 
     function it_reconciles_named_waiters_by_stake_within_the_mutation_budget() public {
-        staking.setSetParams(3, 50, 500, 2, 100, 100, 0, false);
+        staking.setSetParams(3, 50, 500, 2, 100, 100, 0);
         _registerSelf(validatorC);
         _selfBond(operatorA, VALIDATOR_A, 1000e18);
         _selfBond(operatorB, VALIDATOR_B, 3000e18);
@@ -829,7 +1224,7 @@ contract Describe_StratoStaking {
     }
 
     function it_mutation_cap_fails_closed_but_kicks_bypass_it() public {
-        staking.setSetParams(50, 50, 500, 1, 100, 100, 0, true);
+        staking.setSetParams(50, 50, 500, 1, 100, 100, 0);
         _selfBond(operatorA, VALIDATOR_A, 1000e18);
         _selfBond(operatorB, VALIDATOR_B, 2000e18);
         _activate(VALIDATOR_A);
@@ -890,7 +1285,7 @@ contract Describe_StratoStaking {
         _activate(VALIDATOR_B);
         _activate(address(validatorC));
         // the cap is switched on once the set is bootstrapped (a lone first staker is always 100%)
-        staking.setSetParams(50, 50, 500, 10, 100, 100, 3300, true);
+        staking.setSetParams(50, 50, 500, 10, 100, 100, 3300);
 
         _stake(user1, VALIDATOR_A, 1500e18); // 2500 / 9500 = 26%
         _stake(user1, VALIDATOR_B, 1000e18); // 2000 / 10500 = 19%
@@ -911,7 +1306,7 @@ contract Describe_StratoStaking {
         require(staking.consensusWeight() == 4000e18, "A 2000 + B 2000; C is not in the set");
         require(staking.exceedsOneThird(VALIDATOR_A), "half of the vote, whatever C holds");
 
-        staking.setSetParams(50, 50, 500, 10, 100, 100, 6000, true);
+        staking.setSetParams(50, 50, 500, 10, 100, 100, 6000);
         user1.doExpectingFailure(address(staking), "stake(address,uint256)", "SS: above operator stake cap", VALIDATOR_A, 2000e18); // 4000 / 6000
         _stake(user1, VALIDATOR_B, 500e18); // 2500 / 4500
         // a validator outside the set is measured as if it had joined: 7000 / 11500
@@ -926,7 +1321,7 @@ contract Describe_StratoStaking {
         _selfBond(validatorC, address(validatorC), 1000e18);
         _activate(address(validatorC));
         fastForward(1, 1);
-        staking.setSetParams(50, 50, 500, 1, 100, 100, 0, true);
+        staking.setSetParams(50, 50, 500, 1, 100, 100, 0);
 
         // A and C (1000 each) both fall under the new minStake; one mutation is allowed
         staking.setValidatorParams(1500e18, 5000, 3, 100);

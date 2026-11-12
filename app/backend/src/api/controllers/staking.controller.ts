@@ -24,6 +24,7 @@ import {
   setStratoEmergencyKicker,
   setStratoGovernance,
   setStratoSelfBondGrace,
+  setStratoSelfBondMinimum,
   setStratoSetParams,
   setStratoStakingParams,
   setStratoOperator,
@@ -650,16 +651,30 @@ class StakingController {
     }
   }
 
+  static async setSelfBondMinimum(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { selfBondMinimum } = req.body || {};
+      if (!isPositiveAmount(selfBondMinimum)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid selfBondMinimum" });
+        return;
+      }
+
+      const result = await setStratoSelfBondMinimum(req.accessToken, req.address as string, String(selfBondMinimum));
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async setSetParams(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const {
         maxActiveValidators, hardCapActiveValidators, evictionMarginBps, maxSetMutationsPerBlock,
-        exitNoticeSeconds, unkickCooldown, maxOperatorStakeBps, joinsPaused,
+        exitNoticeSeconds, unkickCooldown, maxOperatorStakeBps,
       } = req.body || {};
-      const paused = parseOptionalBoolean(joinsPaused);
       if (
         [maxActiveValidators, hardCapActiveValidators, evictionMarginBps, maxSetMutationsPerBlock, exitNoticeSeconds, unkickCooldown, maxOperatorStakeBps]
-          .some((value) => !isNonNegativeAmount(value)) || paused === null || joinsPaused === undefined
+          .some((value) => !isNonNegativeAmount(value))
       ) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid set params" });
         return;
@@ -673,7 +688,6 @@ class StakingController {
         exitNoticeSeconds: String(exitNoticeSeconds),
         unkickCooldown: String(unkickCooldown),
         maxOperatorStakeBps: String(maxOperatorStakeBps),
-        joinsPaused: paused,
       });
       res.status(RestStatus.OK).json(result);
     } catch (error) {

@@ -19,6 +19,6 @@ export const describeValidatorNextStep = (
   if (BigInt(validator.selfBond || "0") < BigInt(minStake || "0")) {
     return `Self-bond at least ${minStakeLabel} ${symbol} to become eligible.`;
   }
-  if (validator.isWaiter) return joinsPaused ? "Eligible. Joins are paused right now." : "Eligible. Activate to join the validator set.";
+  if (validator.isWaiter) return joinsPaused ? "Eligible. Joins are not open yet." : "Eligible. Activate to join the validator set.";
   return null;
 };
