@@ -137,7 +137,6 @@ export interface DedicatedSetupState {
   setupHash: string;
   label: string;
   creator: string;
-  expectedWallet: string;
   signers: string[];
   confirmedSigners: string[];
   requiredApprovals: number;
@@ -233,7 +232,6 @@ export interface PendingMultisigSetupSummary {
   label: string;
   creator: string;
   creatorUsername: string;
-  expectedWallet: string;
   signerAddress: string;
   signerUsername: string;
   confirmedCount: number;
@@ -451,7 +449,6 @@ export function useMyPendingMultisigSetups(ownerAddress?: string | null) {
           label: String(value.label ?? ""),
           creator,
           creatorUsername: usernames.get(creator) ?? "",
-          expectedWallet: strip0x(String(value.expectedWallet ?? "")),
           signerAddress,
           signerUsername: usernames.get(signerAddress) ?? "",
           confirmedCount: confirmedCounts.get(setupHash) ?? 0,
@@ -502,7 +499,6 @@ export function useDedicatedSetup(setupHash?: string | null) {
         setupHash: hash,
         label: String(value.label ?? ""),
         creator: strip0x(String(value.creator ?? "")),
-        expectedWallet: strip0x(String(value.expectedWallet ?? "")),
         signers,
         confirmedSigners,
         requiredApprovals: Number(value.requiredApprovals ?? 0),
@@ -535,13 +531,20 @@ export function useDedicatedSetupLifecycle(setupHash?: string | null) {
   });
 }
 
-export function extractDedicatedSetupResult(result: any): { setupHash: string; expectedWallet: string } | null {
-  const response = result?.txResult?.response ?? result?.response;
-  const typed = response?.t === "tup" ? response.v?.map((value: any) => value?.v) : null;
-  const contents = result?.data?.tag === "Call" ? result.data.contents : result?.data?.contents;
-  const values = Array.isArray(contents) ? contents : typed;
-  if (!Array.isArray(values) || typeof values[0] !== "string" || typeof values[1] !== "string") return null;
-  return { setupHash: values[0], expectedWallet: strip0x(values[1]) };
+export function useDedicatedCreatedWallet(setupHash?: string | null, deployed = false) {
+  return useQuery({
+    queryKey: ["dedicated-multisig-created-wallet", setupHash],
+    enabled: deployed && !!setupHash && !!runtime.multisigFactoryAddress(),
+    queryFn: async (): Promise<string> => {
+      const events = await rows(
+        "event",
+        `address=eq.${runtime.multisigFactoryAddress()}&event_name=eq.MultisigCreated` +
+          `&attributes-%3E%3EsetupHash=eq.${String(setupHash)}` +
+          `&order=block_number.desc,event_index.desc&limit=1&select=attributes`
+      );
+      return strip0x(String(events[0]?.attributes?.wallet ?? ""));
+    },
+  });
 }
 
 export function useDedicatedWalletState(walletAddress?: string | null) {

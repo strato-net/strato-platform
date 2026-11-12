@@ -45,7 +45,7 @@ contract Describe_MultisigGovernance {
     }
 
     function deploy(uint _timelock) internal returns (address) {
-        (string setupHash, address wallet) = factory.registerSetup(
+        string setupHash = factory.registerSetup(
             [address(a), address(b), address(c)],
             2,
             _timelock,
@@ -54,12 +54,11 @@ contract Describe_MultisigGovernance {
         );
         a.invoke(address(factory), "confirmSetup", setupHash);
         b.invoke(address(factory), "confirmSetup", setupHash);
-        c.invoke(address(factory), "confirmSetup", setupHash);
-        return wallet;
+        return c.invoke(address(factory), "confirmSetup", setupHash);
     }
 
     function deployThreeOfFour(uint _timelock) internal returns (address) {
-        (string setupHash, address wallet) = factory.registerSetup(
+        string setupHash = factory.registerSetup(
             [address(a), address(b), address(c), address(d)],
             3,
             _timelock,
@@ -69,8 +68,7 @@ contract Describe_MultisigGovernance {
         a.invoke(address(factory), "confirmSetup", setupHash);
         b.invoke(address(factory), "confirmSetup", setupHash);
         c.invoke(address(factory), "confirmSetup", setupHash);
-        d.invoke(address(factory), "confirmSetup", setupHash);
-        return wallet;
+        return d.invoke(address(factory), "confirmSetup", setupHash);
     }
 
     function rejects(GovernanceSigner _caller, address _target, string _function, variadic _arguments) internal returns (bool) {

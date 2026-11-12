@@ -99,13 +99,12 @@ The factory:
 
 - Assigns a unique internal setup nonce.
 - Sorts signer addresses canonically.
-- Rejects duplicates, zero addresses, and the future wallet address.
+- Rejects duplicate and zero addresses.
 - Requires `2 <= M < N`.
 - Requires the transaction timelock to be at most `MAX_TRANSACTION_TIMELOCK`.
 - Requires the initial logic version to be approved and not revoked.
 - Computes the setup hash from the factory address and setup nonce.
 - Stores the label with the pending setup and includes it in the registration and creation events.
-- Derives the salted deployment address from the setup hash.
 
 The creator receives no ownership or special authority.
 
@@ -119,9 +118,11 @@ Every initial signer confirms the setup hash before deployment:
 
 Pending setups expire. Before deployment, a pending setup may be cancelled by the creator or by any signer named in it.
 
-Once every signer confirms, the factory rechecks that the initial logic version is still approved and not revoked. If the check passes, it deploys an already-active wallet, with initialization atomic with deployment, and emits a canonical creation event. If the check fails, deployment is refused and the setup must be recreated with a current version.
+Once every signer confirms, the factory rechecks that the initial logic version is still approved and not revoked. If the check passes, it deploys an already-active wallet at a salted address, with initialization atomic with deployment, and emits the wallet address in the canonical creation event. If the check fails, deployment is refused and the setup must be recreated with a current version.
 
-SMD must not present the expected address as a deposit destination before deployment.
+SMD does not show the wallet address before deployment. The salted address remains
+computable from public factory state, so funds sent to it before deployment can still
+be stranded if the invitation is cancelled or expires.
 
 ## Governance
 

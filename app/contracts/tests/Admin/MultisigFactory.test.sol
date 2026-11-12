@@ -57,7 +57,7 @@ contract Describe_MultisigFactory {
         }
     }
 
-    function register() internal returns (string, address) {
+    function register() internal returns (string) {
         return factory.registerSetup(
             [address(c), address(a), address(b)],
             2,
@@ -68,18 +68,16 @@ contract Describe_MultisigFactory {
     }
 
     function it_requires_every_signer_before_deployment() {
-        (string setupHash, address expectedWallet) = register();
-        require(expectedWallet != address(0), "Expected wallet was not derived");
+        string setupHash = register();
         address first = a.invoke(address(factory), "confirmSetup", setupHash);
         address second = b.invoke(address(factory), "confirmSetup", setupHash);
         require(first == address(0), "First signer deployed wallet");
         require(second == address(0), "Second signer deployed wallet");
-        require(!factory.factoryWallets(expectedWallet), "Wallet registered before every confirmation");
         address deployed = c.invoke(address(factory), "confirmSetup", setupHash);
-        require(deployed == expectedWallet, "Unexpected deployed address");
-        require(factory.factoryWallets(expectedWallet), "Wallet was not registered");
-        require(MultisigLogic(expectedWallet).requiredApprovals() == 2, "Threshold was not initialized");
-        require(MultisigLogic(expectedWallet).signerMap(address(a)) > 0, "Signer was not initialized");
+        require(deployed != address(0), "Wallet was not deployed");
+        require(factory.factoryWallets(deployed), "Wallet was not registered");
+        require(MultisigLogic(deployed).requiredApprovals() == 2, "Threshold was not initialized");
+        require(MultisigLogic(deployed).signerMap(address(a)) > 0, "Signer was not initialized");
     }
 
     function it_rejects_duplicate_zero_and_unsafe_thresholds() {
@@ -151,14 +149,14 @@ contract Describe_MultisigFactory {
     }
 
     function it_assigns_unique_setup_hashes_and_preserves_the_label() {
-        (string first,) = factory.registerSetup(
+        string first = factory.registerSetup(
             [address(a), address(b), address(c)],
             2,
             0,
             "1",
             "canonical"
         );
-        (string second,) = factory.registerSetup(
+        string second = factory.registerSetup(
             [address(c), address(a), address(b)],
             2,
             0,
@@ -170,14 +168,14 @@ contract Describe_MultisigFactory {
     }
 
     function it_allows_only_creator_or_signer_to_cancel() {
-        (string setupHash,) = register();
+        string setupHash = register();
         require(rejects(outsider, address(factory), "cancelSetup", setupHash), "Outsider cancelled setup");
         a.invoke(address(factory), "cancelSetup", setupHash);
         require(rejects(b, address(factory), "confirmSetup", setupHash), "Cancelled setup accepted confirmation");
     }
 
     function it_refuses_deployment_after_initial_version_revocation() {
-        (string setupHash,) = register();
+        string setupHash = register();
         a.invoke(address(factory), "confirmSetup", setupHash);
         b.invoke(address(factory), "confirmSetup", setupHash);
         factory.revokeLogicVersion("1");
@@ -185,7 +183,7 @@ contract Describe_MultisigFactory {
     }
 
     function it_rejects_expired_setups() {
-        (string setupHash,) = register();
+        string setupHash = register();
         fastForward(2592001);
         require(rejects(a, address(factory), "confirmSetup", setupHash), "Expired setup accepted confirmation");
     }
@@ -210,7 +208,7 @@ contract Describe_MultisigFactory {
     }
 
     function it_upgrades_the_factory_implementation_without_losing_registry_state() {
-        (string setupHash, address expectedWallet) = register();
+        string setupHash = register();
         MultisigFactoryV2 next = new MultisigFactoryV2();
         require(
             rejects(outsider, address(factory), "setLogicContract", address(next)),
@@ -221,8 +219,8 @@ contract Describe_MultisigFactory {
         a.invoke(address(factory), "confirmSetup", setupHash);
         b.invoke(address(factory), "confirmSetup", setupHash);
         address deployed = c.invoke(address(factory), "confirmSetup", setupHash);
-        require(deployed == expectedWallet, "Factory state was lost during upgrade");
-        require(factory.factoryWallets(expectedWallet), "Upgraded factory did not register wallet");
+        require(deployed != address(0), "Factory state was lost during upgrade");
+        require(factory.factoryWallets(deployed), "Upgraded factory did not register wallet");
     }
 
     function it_freezes_factory_upgrades_without_freezing_the_version_registry() {
@@ -235,10 +233,10 @@ contract Describe_MultisigFactory {
     }
 
     function it_has_no_legacy_or_creator_authority_surface() {
-        (string setupHash, address wallet) = register();
+        string setupHash = register();
         a.invoke(address(factory), "confirmSetup", setupHash);
         b.invoke(address(factory), "confirmSetup", setupHash);
-        c.invoke(address(factory), "confirmSetup", setupHash);
+        address wallet = c.invoke(address(factory), "confirmSetup", setupHash);
 
         require(rejects(outsider, wallet, "addUserAddress", address(outsider)), "Hidden User authority exists");
         require(rejects(outsider, wallet, "_addAdmin", address(outsider)), "Hidden admin authority exists");

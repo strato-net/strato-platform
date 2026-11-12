@@ -234,7 +234,7 @@ export const defaultExecutedIssuesLookbackDaysFor: Record<string, number> = {
 };
 
 export const defaultMultisigFactoryFor: Record<string, string> = {
-  "114784819836269": "3aa566e02cf9e9f95df58f703a63a99884a4e405", // Helium testnet
+  "114784819836269": "fbdabeb2595749164521478d3466960cf37c37e9", // Helium testnet
   "33056204878082667": "", // Upquark mainnet
 };
 

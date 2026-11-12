@@ -71,6 +71,10 @@ The contracts use the regular proxy and upgrade tooling with
 
 Deploy the canonical factory proxy once:
 
+> This version removes the pre-deployment wallet address from pending setup
+> storage. Redeploy the testnet factory proxy instead of upgrading a factory
+> created from the earlier storage layout.
+
 ```bash
 cd app/contracts
 npm run deployProxy -- \
@@ -116,7 +120,7 @@ Then:
 3. Configure the factory proxy address in the backend.
 4. Create a test wallet and confirm the setup from every initial signer.
 5. Verify Bloc resolves `MultisigLogic` methods at the permanent wallet address and SMD
-   reports the wallet as `Factory-created and active` before enabling production deposits.
+   reports a `Verified multisig wallet` before enabling production deposits.
 
 Future factory implementations use the same proxy upgrade command without deploying a
 new proxy. Future wallet logic versions use `--deploy-only`, are published in the factory

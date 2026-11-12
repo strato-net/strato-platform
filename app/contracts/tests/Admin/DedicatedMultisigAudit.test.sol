@@ -81,7 +81,7 @@ contract Describe_DedicatedMultisigAudit {
     }
 
     function deploy(uint _timelock) internal returns (address) {
-        (string setupHash, address wallet) = factory.registerSetup(
+        string setupHash = factory.registerSetup(
             [address(a), address(b), address(c)],
             2,
             _timelock,
@@ -90,8 +90,7 @@ contract Describe_DedicatedMultisigAudit {
         );
         a.invoke(address(factory), "confirmSetup", setupHash);
         b.invoke(address(factory), "confirmSetup", setupHash);
-        c.invoke(address(factory), "confirmSetup", setupHash);
-        return wallet;
+        return c.invoke(address(factory), "confirmSetup", setupHash);
     }
 
     function rejects(AuditSigner _caller, address _target, string _function, variadic _arguments) internal returns (bool) {

@@ -17,7 +17,6 @@ contract record MultisigFactory is Ownable {
 
     struct PendingSetup {
         address creator;
-        address expectedWallet;
         address initialLogic;
         string initialVersion;
         uint requiredApprovals;
@@ -45,7 +44,7 @@ contract record MultisigFactory is Ownable {
     event LogicVersionPublished(string version, address logic);
     event LogicVersionRevoked(string version, address logic);
     event UpgradePathSet(string fromVersion, string toVersion, bool approved);
-    event MultisigSetupRegistered(string setupHash, address creator, address expectedWallet, address[] signers, uint requiredApprovals, uint transactionTimelock, string initialVersion, uint expiresAt, string label);
+    event MultisigSetupRegistered(string setupHash, address creator, address[] signers, uint requiredApprovals, uint transactionTimelock, string initialVersion, uint expiresAt, string label);
     event InitialSignerConfirmed(string setupHash, address signer, uint confirmations, uint totalSigners);
     event MultisigSetupCancelled(string setupHash, address sender);
     event MultisigCreated(address wallet, address creator, address[] signers, uint requiredApprovals, uint transactionTimelock, string initialVersion, string setupHash, string label);
@@ -110,7 +109,7 @@ contract record MultisigFactory is Ownable {
         uint _transactionTimelock,
         string _initialVersion,
         string _label
-    ) external returns (string, address) {
+    ) external returns (string) {
         address[] canonicalSigners = _canonicalSigners(_signers);
         _validateConfiguration(canonicalSigners, _requiredApprovals);
         require(_transactionTimelock <= MAX_TRANSACTION_TIMELOCK, "Timelock exceeds maximum");
@@ -122,21 +121,13 @@ contract record MultisigFactory is Ownable {
         string setupHash = keccak256(address(this), setupNonce);
         setupNonce++;
 
-        address expectedWallet = this.derive(
-            setupHash,
-            "MultisigWallet",
-            address(this),
-            setupHash
-        );
         for (uint i = 0; i < canonicalSigners.length; i++) {
-            require(canonicalSigners[i] != expectedWallet, "Future wallet cannot be a signer");
             setupSigners[setupHash].push(canonicalSigners[i]);
         }
 
         uint expiresAt = block.timestamp + SETUP_LIFETIME;
         pendingSetups[setupHash] = PendingSetup(
             msg.sender,
-            expectedWallet,
             version.logic,
             _initialVersion,
             _requiredApprovals,
@@ -151,7 +142,6 @@ contract record MultisigFactory is Ownable {
         emit MultisigSetupRegistered(
             setupHash,
             msg.sender,
-            expectedWallet,
             canonicalSigners,
             _requiredApprovals,
             _transactionTimelock,
@@ -159,7 +149,7 @@ contract record MultisigFactory is Ownable {
             expiresAt,
             _label
         );
-        return (setupHash, expectedWallet);
+        return setupHash;
     }
 
     function confirmSetup(string _setupHash) external returns (address) {
@@ -204,7 +194,6 @@ contract record MultisigFactory is Ownable {
             _setup.requiredApprovals,
             _setup.transactionTimelock
         );
-        require(address(wallet) == _setup.expectedWallet, "Derived address mismatch");
         _setup.deployed = true;
         factoryWallets[address(wallet)] = true;
         emit MultisigCreated(

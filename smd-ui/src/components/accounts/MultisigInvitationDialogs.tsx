@@ -110,8 +110,6 @@ export function SetupInvitationDialog({ setup: summary }: { setup: PendingMultis
         <div className="space-y-2 text-sm">
           <div>Invitation code</div>
           <div className="font-mono break-all">{summary.setupHash}</div>
-          <div>Multisig wallet address</div>
-          <div className="font-mono break-all">{summary.expectedWallet}</div>
           <div>Created by</div>
           <div className="font-mono break-all">{setup?.creator ?? summary.creator}</div>
           {setup ? (
@@ -135,9 +133,7 @@ export function SetupInvitationDialog({ setup: summary }: { setup: PendingMultis
           <div>Sign as</div>
           <div>{summary.signerUsername || (summary.signerAddress ? "Connected account" : "Not a signer")}</div>
           <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
-            This multisig wallet does not exist until every signer confirms. Do not send funds to
-            its address yet; funds sent before it exists may be stranded if the invitation is
-            cancelled or expires.
+            The multisig wallet address will be available after every signer confirms.
           </div>
         </div>
         <DialogFooter>

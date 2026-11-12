@@ -30,10 +30,10 @@ import { shortenHex } from "@/lib/utils";
 import {
   useDedicatedIssues,
   useDedicatedMultisigActions,
+  useDedicatedCreatedWallet,
   useDedicatedSetup,
   useDedicatedSetupLifecycle,
   useDedicatedWalletState,
-  extractDedicatedSetupResult,
   isUnlimitedTokenApproval,
   parseDedicatedTypedArguments,
   type DedicatedIssue,
@@ -764,6 +764,10 @@ function CreateDedicatedMultisig() {
     factoryState?.approvedVersions[factoryState.approvedVersions.length - 1]?.version || "";
   const { data: setup } = useDedicatedSetup(setupHash);
   const { data: setupLifecycle = "unknown" } = useDedicatedSetupLifecycle(setupHash);
+  const { data: createdWallet = "" } = useDedicatedCreatedWallet(
+    setupHash,
+    setupLifecycle === "deployed"
+  );
   const setupPending = setupLifecycle === "pending" && !!setup && setup.expiresAt >= Date.now() / 1000;
   const controlledSigners = [
     { address: strip0x(userAddress ?? ""), username: "" },
@@ -789,19 +793,17 @@ function CreateDedicatedMultisig() {
       if (!validLabel) throw new Error("Multisig wallet name is too long");
       if (!validRequired) throw new Error("Approvals needed must be at least 2 and fewer than the number of signers");
       if (!validTimelock) throw new Error("Waiting period must be a whole number from 0 to 720 hours");
-      const result = await actions.registerSetup({
+      await actions.registerSetup({
         signers,
         requiredApprovals: required,
         transactionTimelock: Math.round(timelockHours * 3600),
         initialVersion: selectedInitialVersion,
         label,
       });
-      const registered = extractDedicatedSetupResult(result);
-      if (!registered) throw new Error("Created, but the invitation code could not be read");
-      setSetupHash(registered.setupHash);
+      setSetupHash("");
       setRegisteredHere(true);
       setTab("confirm");
-      toast.success("Multisig wallet created. Waiting for signer confirmations.");
+      toast.success("Invitation created");
     } catch (error: any) {
       toast.error(error?.message || "Could not create multisig wallet");
     } finally {
@@ -916,9 +918,6 @@ function CreateDedicatedMultisig() {
             </Select>
           </div>
         </details>
-        <div className="rounded-md bg-muted p-3 text-sm">
-          {label || "Unnamed multisig wallet"} · {required} of {signers.length} approvals · {timelockHours}h waiting period
-        </div>
         <Button
           disabled={busy || !configured || invalidSigners.length > 0 || duplicateSigners ||
             !validLabel || signers.length < 3 || !validRequired || !validTimelock || !selectedInitialVersion}
@@ -943,8 +942,10 @@ function CreateDedicatedMultisig() {
         ) : null}
         {!setup && registeredHere ? (
           <div className="rounded-md border p-3 text-sm">
-            <div className="font-medium">Loading invitation…</div>
-            <div className="mt-1 font-mono text-xs break-all">{setupHash}</div>
+            <div className="font-medium">Invitation created</div>
+            <div className="mt-1 text-muted-foreground">
+              Review it under Pending invitations to confirm or share it with the other signers.
+            </div>
           </div>
         ) : null}
         {setup ? (
@@ -953,17 +954,19 @@ function CreateDedicatedMultisig() {
             <Badge variant="outline">
               {setupPending ? "Waiting for signers" : setupLifecycle === "deployed" ? "Created" : "Invitation unavailable"}
             </Badge>
+            {createdWallet ? (
+              <div className="font-mono text-xs break-all">
+                Multisig wallet address: {createdWallet}
+              </div>
+            ) : null}
             <div className="font-mono text-xs break-all">Invitation code: {setupHash}</div>
             <div>Signer confirmation: {setup.confirmedSigners.length} of {setup.signers.length}</div>
             <div className="font-mono text-xs break-all">Created by: {setup.creator}</div>
-            <div className="font-mono text-xs break-all">Multisig wallet address: {setup.expectedWallet}</div>
             {setupLifecycle !== "deployed" ? (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Do not fund this address yet</AlertTitle>
+              <Alert>
+                <AlertTitle>Waiting for signer confirmations</AlertTitle>
                 <AlertDescription>
-                  This multisig wallet does not exist until every signer confirms. Funds sent before
-                  it exists may be permanently stranded if the invitation is cancelled or expires.
+                  The multisig wallet address will be available after every signer confirms.
                 </AlertDescription>
               </Alert>
             ) : null}

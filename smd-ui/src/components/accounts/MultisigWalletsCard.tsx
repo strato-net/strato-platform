@@ -110,7 +110,6 @@ export function MultisigWalletsCard({ ownerAddress }: { ownerAddress?: string | 
               <div key={`setup:${setup.setupHash}`} className="flex items-center justify-between gap-3 text-sm">
                 <div>
                   <div>Invitation to create multisig wallet {setup.label || "Unnamed multisig wallet"}</div>
-                  <div className="font-mono text-xs text-muted-foreground">{setup.expectedWallet}</div>
                   <div className="text-xs text-muted-foreground">
                     {setup.confirmedCount} of {setup.signerCount} signers confirmed
                   </div>
