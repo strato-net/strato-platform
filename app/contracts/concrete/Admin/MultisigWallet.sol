@@ -24,7 +24,7 @@ contract record MultisigWallet {
 
     address public immutable multisigFactory;
     string public immutable multisigSetupHash;
-    address public multisigCurrentLogic;
+    address public logicContract;
     string public multisigCurrentVersion;
     uint public multisigEpoch;
     bool public multisigActive;
@@ -59,7 +59,7 @@ contract record MultisigWallet {
         require(msg.sender == multisigFactory, "Only the factory may initialize");
         require(!multisigActive, "Wallet already initialized");
         require(_initialLogic != address(0), "Invalid logic");
-        multisigCurrentLogic = _initialLogic;
+        logicContract = _initialLogic;
         multisigCurrentVersion = _initialVersion;
         multisigEpoch = 1;
         _initialLogic.delegatecall("initialize", _signers, _requiredApprovals, _transactionTimelock);
@@ -137,13 +137,13 @@ contract record MultisigWallet {
             "Upgrade path is not approved"
         );
 
-        address previousLogic = multisigCurrentLogic;
+        address previousLogic = logicContract;
         address targetLogic = pending.targetLogic;
         string fromVersion = multisigCurrentVersion;
         string targetVersion = pending.targetVersion;
         string migrationFunction = pending.migrationFunction;
 
-        multisigCurrentLogic = targetLogic;
+        logicContract = targetLogic;
         multisigCurrentVersion = targetVersion;
         _clearPendingUpgrade();
         multisigEpoch++;
@@ -196,6 +196,6 @@ contract record MultisigWallet {
     fallback(variadic args) external returns (variadic) {
         require(multisigActive, "Wallet is not active");
         require(!_isMigrationName(msg.sig), "Migration functions run only during an upgrade");
-        return multisigCurrentLogic.delegatecall(msg.sig, args);
+        return logicContract.delegatecall(msg.sig, args);
     }
 }

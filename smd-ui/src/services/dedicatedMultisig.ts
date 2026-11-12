@@ -578,7 +578,7 @@ export function useDedicatedWalletState(walletAddress?: string | null) {
       ]);
       const data = storageRows[0]?.data ?? {};
       const factory = strip0x(String(data.multisigFactory ?? ""));
-      const logic = strip0x(String(data.multisigCurrentLogic ?? ""));
+      const logic = strip0x(String(data.logicContract ?? ""));
       const version = String(data.multisigCurrentVersion ?? "");
       const registered = factoryRows.some((row) => row?.value === true || row?.value === "true");
       const registeredVersion = versionRows.find((row) => {

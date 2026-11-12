@@ -104,7 +104,7 @@ contract Describe_MultisigUpgrade {
         );
         fastForward(604800);
         outsider.invoke(wallet, "executeUpgrade");
-        require(MultisigWallet(wallet).multisigCurrentLogic() == address(v2), "Logic did not upgrade");
+        require(MultisigWallet(wallet).logicContract() == address(v2), "Logic did not upgrade");
         require(MultisigWallet(wallet).multisigCurrentVersion() == "2", "Version did not upgrade");
         require(MultisigLogicV2(wallet).migrationMarker() == 7, "Migration did not run");
         require(rejects(outsider, wallet, "migrate"), "Migration function remained externally callable");
@@ -179,7 +179,7 @@ contract Describe_MultisigUpgrade {
         schedule(wallet, "migrateFail");
         fastForward(604800);
         require(rejects(outsider, wallet, "executeUpgrade"), "Failing migration succeeded");
-        require(MultisigWallet(wallet).multisigCurrentLogic() == address(v1), "Failed migration changed logic");
+        require(MultisigWallet(wallet).logicContract() == address(v1), "Failed migration changed logic");
         require(MultisigWallet(wallet).multisigEpoch() == 1, "Failed migration changed epoch");
         (,,,,,,, bool exists) = MultisigWallet(wallet).multisigPendingUpgrade();
         require(exists, "Failed migration cleared pending upgrade");
@@ -230,7 +230,7 @@ contract Describe_MultisigUpgrade {
         schedule(wallet, "");
         fastForward(604800);
         outsider.invoke(wallet, "executeUpgrade");
-        require(MultisigWallet(wallet).multisigCurrentLogic() == address(v2), "No-migration upgrade failed");
+        require(MultisigWallet(wallet).logicContract() == address(v2), "No-migration upgrade failed");
     }
 
     function it_rechecks_the_upgrade_edge_at_execution() {

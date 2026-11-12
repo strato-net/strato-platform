@@ -101,7 +101,7 @@ instance {-# OVERLAPPING #-}
 
 {-# NOINLINE proxyContractNames #-}
 proxyContractNames :: [String]
-proxyContractNames = ["Proxy", "UserRegistry", "User"]
+proxyContractNames = ["Proxy", "UserRegistry", "User", "MultisigWallet"]
 
 {-# NOINLINE funcSet #-}
 funcSet :: S.Set (String, Text)
@@ -110,7 +110,8 @@ funcSet = S.fromList . concat $ zipWith (map . (,)) proxyContractNames allFuncti
     proxyFunctionNames = ["setLogicContract", "transferOwnership", "renounceOwnership"]
     userRegistryFunctionNames = ["createUser", "createUserFor", "deriveUserAddress", "canCreateUser", "initializeUser"]
     userFunctionNames = ["addUserAddress", "revokeUserAddress", "revokeAllUserAddresses", "createContract", "createSaltedContract", "callContract"]
-    allFunctionNames = [proxyFunctionNames, proxyFunctionNames ++ userRegistryFunctionNames, proxyFunctionNames ++ userFunctionNames]
+    multisigWalletFunctionNames = ["initializeDeployment", "scheduleUpgrade", "cancelUpgrade", "executeUpgrade", "freezeUpgrades", "advanceConfiguration", "argumentAt"]
+    allFunctionNames = [proxyFunctionNames, proxyFunctionNames ++ userRegistryFunctionNames, proxyFunctionNames ++ userFunctionNames, multisigWalletFunctionNames]
 
 getLogicCodePtr ::
   ( MonadIO m,

@@ -44,7 +44,7 @@ The wallet is the permanent treasury address and proxy shell.
 It stores:
 
 - Factory address, set at deployment and immutable.
-- Current logic address and version.
+- Current logic address in the `logicContract` pointer, and current version.
 - Upgrade state.
 - Upgrade freeze status.
 - Configuration epoch.
@@ -211,6 +211,9 @@ Revoking a version:
 - Does not remove approved outbound paths needed by wallets already using it.
 
 ### Logic version publication review
+
+Bloc recognises `MultisigWallet` as a proxy and resolves non-shell functions through
+the `logicContract` storage pointer. Shell functions remain resolved against the shell.
 
 The wallet shell forwards every call it does not define to the current logic, and it
 cannot tell a harmless function from a state-changing one. An externally callable logic

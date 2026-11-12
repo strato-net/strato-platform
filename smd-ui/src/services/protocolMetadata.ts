@@ -222,8 +222,8 @@ export function useV3AllowanceMetadata(
       ]);
       const token = (raw: any): PoolTokenMetadata => ({
         address: strip0x(String(raw?.address ?? "")),
-        _symbol: String(raw?._symbol ?? "TOKEN"),
-        customDecimals: Number(raw?.customDecimals ?? 18),
+        _symbol: String(raw?.symbol ?? "TOKEN"),
+        customDecimals: Number(raw?.decimals ?? 18),
       });
       return {
         positionManagerAddress: strip0x(String(metadataResult.data?.positionManagerAddress ?? "")),
