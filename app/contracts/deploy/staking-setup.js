@@ -9,6 +9,8 @@
 //   node staking-setup.js selfbondmin <amountWei>          own bond a new seat needs (10,000 until set)
 //   node staking-setup.js fundreserve <amountWei>          (direct) fund the emission reserve
 //   node staking-setup.js emission <e0Wei> <s0Wei> <r0Wei> <startUnix>   commit the emission schedule, once
+//   node staking-setup.js vote <target> <func> '<json array>'         any other owner call, as a registry vote
+//   node staking-setup.js call <address> <Contract> <func> '<json object>'   (direct) any call from the logged-in account
 // Addresses default to helium; set STAKING_PROXY, VALIDATOR_REGISTRY_PROXY and STRATO_TOKEN
 // for another network.
 require('dotenv').config();
@@ -119,6 +121,8 @@ const STEPS = {
     }
     return { target: STAKING, func: 'commitEmissionSchedule', args: [e0, s0, r0, start] };
   },
+  vote:      ([target, func, args]) => ({ target, func, args: JSON.parse(args || '[]') }),
+  call:      ([target, name, func, args]) => ({ direct: true, target, name, func, args: JSON.parse(args || '{}') }),
   mint:      { target: TOKEN, func: 'mint', args: [FUNDER, FORTY_K] },
   // Fund the fee router so it can pay the flat per-block reward. It pays 0.01
   // STRATO per block (~230/day at the current rate) and silently pays nothing
