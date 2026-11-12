@@ -245,6 +245,15 @@ else
 fi
 
 if [[ "$FROM_SNAPSHOT" == "true" ]]; then
+    # Pull the node's images before the restore: a failed pull (the restore
+    # loads the databases with the postgres image) stops the run here, not
+    # after the snapshot is downloaded and extracted. Images that are already
+    # present, the locally built ones among them, are left alone.
+    echo "Pulling the docker images of $NODE_DIR/docker-compose.yml..."
+    if ! (cd "$NODE_DIR" && docker compose -p strato pull --policy missing); then
+        echo "Error: could not pull the node's docker images; not restoring the snapshot." >&2
+        exit 1
+    fi
     if [[ -n "$SNAPSHOT_SOURCE" ]]; then
         SNAPSHOT_ARG=(--source "$SNAPSHOT_SOURCE")
         echo "Restoring node from $NETWORK snapshot source ($SNAPSHOT_SOURCE)..."

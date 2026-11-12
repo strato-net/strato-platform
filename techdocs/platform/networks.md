@@ -134,5 +134,5 @@ Staking activation is set per network in `ethconf.yaml` (`networkConfig`), with 
 Shared services still run on `blockapps.net`:
 
 - **`keycloak.blockapps.net`:** the OIDC provider, realm `mercata`.
-- **`vault.blockapps.net:8093`:** the shared Vault and the node default. The public testnet app's metadata reports its own Vault, `vault-test.blockapps.net:8093`.
+- **`vault.blockapps.net:8093`:** the shared Vault and the node default.
 - **`support.blockapps.net`:** where you request OAuth client credentials.

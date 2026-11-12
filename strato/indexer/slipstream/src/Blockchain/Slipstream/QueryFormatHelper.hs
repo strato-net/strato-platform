@@ -3,6 +3,7 @@
 
 module Blockchain.Slipstream.QueryFormatHelper where
 
+import Data.Char (isAlphaNum, isAscii)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Map as Map
@@ -85,8 +86,13 @@ wrapAndEscape = wrapParens . csv
 wrapEscapeSingle :: T.Text -> T.Text
 wrapEscapeSingle = wrapSingleQuotes . escapeSingleQuotes
 
+-- Persistent treats question marks as placeholders even inside SQL literals.
+-- Escape them at the leaf so nested SQL bodies are not escaped twice.
+wrapEscapeSingleQ :: T.Text -> T.Text
+wrapEscapeSingleQ = wrapSingleQuotes . escapeQuestionMarks . escapeSingleQuotes
+
 wrapEscapeDouble :: T.Text -> T.Text
-wrapEscapeDouble = wrapDoubleQuotes . escapeDoubleQuotes
+wrapEscapeDouble = wrapDoubleQuotes . escapeQuestionMarks . escapeIdentifierQuotes
 
 wrapAndEscapeSingle :: [T.Text] -> T.Text
 wrapAndEscapeSingle = wrapParens . csv . map wrapEscapeSingle
@@ -103,11 +109,21 @@ escapeSingleQuotes = T.replace "\'" "\'\'"
 escapeDoubleQuotes :: T.Text -> T.Text
 escapeDoubleQuotes = T.replace "\"" "\\\""
 
+-- PostgreSQL quoted identifiers use doubled quotes, not backslash escapes.
+escapeIdentifierQuotes :: T.Text -> T.Text
+escapeIdentifierQuotes = T.replace "\"" "\"\""
+
 escapeQuotes :: T.Text -> T.Text
 escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
 
 escapeQuestionMarks :: T.Text -> T.Text
 escapeQuestionMarks = T.replace "?" "??"
+
+-- | A code collection's creator is chosen by whoever deploys it and ends up in
+-- table names, view definitions and SQL literals. Keep it to the characters
+-- legitimate creators use, so it can never break out of the quoting around it.
+sanitizeCreator :: T.Text -> T.Text
+sanitizeCreator = T.map (\c -> if isAscii c && (isAlphaNum c || c `elem` ("._@-" :: String)) then c else '_')
 
 escapeUnderscores :: T.Text -> T.Text
 escapeUnderscores = T.replace "_" "\\_"
@@ -222,13 +238,24 @@ tableNameToTextPostgres :: TableName -> T.Text
 tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char
 
 tableNameToSingleQuoteText :: TableName -> T.Text
-tableNameToSingleQuoteText = wrapSingleQuotes . escapeQuotes . tableNameToTextPostgres
+tableNameToSingleQuoteText = wrapEscapeSingleQ . tableNameToTextPostgres
 
 tableNameToDoubleQuoteText :: TableName -> T.Text
-tableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . tableNameToText
+tableNameToDoubleQuoteText = wrapEscapeDouble . tableNameToText
 
 textToDoubleQuoteText :: T.Text -> T.Text
-textToDoubleQuoteText =  wrapDoubleQuotes . escapeQuotes
+textToDoubleQuoteText = wrapEscapeDouble
+
+-- A generated SQL body may itself contain a dollar-quote delimiter.
+-- Pick one absent from the body rather than relying on a fixed $$ tag.
+dollarQuote :: T.Text -> T.Text
+dollarQuote body = go (0 :: Int)
+  where
+    go n =
+      let delimiter = "$slipstream_" <> tshow n <> "$"
+       in if delimiter `T.isInfixOf` body
+            then go (n + 1)
+            else delimiter <> body <> delimiter
 
 aesonHelper :: Map.Map T.Text T.Text -> Map.Map Aeson.Key Aeson.Value
 aesonHelper m = Map.fromList $ map (\(x, y) -> (AesonKey.fromText x, Aeson.toJSON y)) (Map.toList m)

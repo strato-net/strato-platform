@@ -14,6 +14,20 @@ function isValidPrice(price: number): boolean {
     return price > 0 && isFinite(price);
 }
 
+// Alchemy Prices API by contract address. symbolMapping holds "<alchemy network>:<token address>".
+// by-symbol resolves a bare symbol to whichever token Alchemy picks for it (WSTETH came back at
+// $133,085,818 on 2026-11-10); by-address pins the token.
+const ALCHEMY_BY_ADDRESS = 'alchemyByAddress';
+
+function alchemyNetworkAddress(sourceConfig: SourceConfig, symbol: string): { network: string; address: string } {
+    const mapped = sourceConfig.symbolMapping?.[symbol] || '';
+    const sep = mapped.indexOf(':');
+    if (sep <= 0 || sep === mapped.length - 1) {
+        throw new Error(`${symbol}: ${ALCHEMY_BY_ADDRESS} needs symbolMapping "<network>:<address>", got "${mapped}"`);
+    }
+    return { network: mapped.slice(0, sep), address: mapped.slice(sep + 1) };
+}
+
 // Generate constant prices for asset keys
 export function generateConstantPrices(assetKeys: string[], assets: Record<string, Asset>): BatchPriceResult {
     const result: BatchPriceResult = {};
@@ -119,6 +133,11 @@ function buildRequestOptions(sourceConfig: SourceConfig, url: string): any {
 
     const requestOptions: any = { method: sourceConfig.method || 'GET', url, headers };
 
+    // Alchemy by-address: POST { addresses: [{ network, address }] }, one entry per asset
+    if (sourceConfig.parse === ALCHEMY_BY_ADDRESS) {
+        requestOptions.data = { addresses: sourceConfig.assets.map(s => alchemyNetworkAddress(sourceConfig, s)) };
+    }
+
     // Add POST body if needed
     if (sourceConfig.body && sourceConfig.method === 'POST') {
         requestOptions.data = {
@@ -147,6 +166,19 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
         
+    // Alchemy by-address: data[].{network,address,prices[0].value}; an unpriced token has empty prices and an error object
+    } else if (parsePattern === ALCHEMY_BY_ADDRESS && Array.isArray(data?.data)) {
+        symbols.forEach(symbol => {
+            const { network, address } = alchemyNetworkAddress(sourceConfig, symbol);
+            const item = data.data.find((d: any) =>
+                d.network === network && typeof d.address === 'string' && d.address.toLowerCase() === address.toLowerCase()
+            );
+            if (item?.prices?.[0]?.value) {
+                const price = Math.floor(parseFloat(item.prices[0].value) * 1e18);
+                if (isValidPrice(price)) result[symbol] = { price, feedTimestamp: item.prices[0].lastUpdatedAt || new Date().toISOString() };
+            }
+        });
+
     // CoinMarketCap: data.{symbol}[0].quote.USD.price
     } else if (parsePattern.includes('data.{symbol}[0].quote.USD.price') && data.data) {
         symbols.forEach(symbol => {
@@ -250,18 +282,24 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
 
-    // TwelveData: {symbol}.price where symbol is mapped (e.g., XAU/USD)
-    // Single symbol returns {"price": "..."}, multiple returns {"XAU/USD": {"price": "..."}}
-    } else if (parsePattern === '{symbol}.price') {
+    // TwelveData /quote?prepost=true: extended_price (pre/post-market) when newer than the regular-session close
+    // Single symbol returns the quote directly, multiple returns {"XAU/USD": {...}}
+    // `timestamp` is the OPEN of the daily bar (e.g. 09:30 ET), not the quote time; `last_quote_at` is when
+    // `close` was last updated. Using `timestamp` would make every regular-session quote look hours old
+    // and fail a maxAgeSec gate. Non-equities report extended_price "0" / extended_timestamp 0.
+    } else if (parsePattern === 'twelveDataQuote') {
         symbols.forEach(symbol => {
             const mapped = sourceConfig.symbolMapping?.[symbol] || symbol;
-            // Handle single symbol response (direct price) vs batch response (keyed by symbol)
-            const symbolData = data[mapped] || (symbols.length === 1 ? data : null);
-            if (symbolData?.price) {
-                const price = Math.floor(parseFloat(symbolData.price) * 1e18);
-                if (isValidPrice(price)) {
-                    result[symbol] = { price, feedTimestamp: new Date().toISOString() };
-                }
+            const quote = data[mapped] || (symbols.length === 1 ? data : null);
+            if (!quote) return;
+            const closeAt = Number(quote.last_quote_at || quote.timestamp || 0);
+            const extendedAt = Number(quote.extended_timestamp || 0);
+            const useExtended = parseFloat(quote.extended_price) > 0 && extendedAt > closeAt;
+            const priceUSD = parseFloat(useExtended ? quote.extended_price : quote.close);
+            const tsSec = useExtended ? extendedAt : closeAt;
+            const price = Math.floor(priceUSD * 1e18);
+            if (isValidPrice(price) && tsSec > 0) {
+                result[symbol] = { price, feedTimestamp: new Date(tsSec * 1000).toISOString() };
             }
         });
 
