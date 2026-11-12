@@ -45,7 +45,7 @@ export const recordPartnerReferral = async (code: string, account: string, email
         signal: AbortSignal.timeout(5000),
       });
       if (res.ok) {
-        if (attempt > 1) console.info(`Partner referral recorded on attempt ${attempt} (code ${code}, account ${account})`);
+        if (attempt > 1) console.info("Partner referral recorded on attempt %d (code %s, account %s)", attempt, code, account);
         return;
       }
       failure = `HTTP ${res.status}`;
@@ -55,7 +55,7 @@ export const recordPartnerReferral = async (code: string, account: string, email
       failure = error;
     }
     const final = refused || Date.now() >= giveUpAt;
-    if (attempt === 1 || final) console.error(`Partner referral not recorded${final ? "" : " yet"} (code ${code}, account ${account}):`, failure);
+    if (attempt === 1 || final) console.error("Partner referral not recorded%s (code %s, account %s):", final ? "" : " yet", code, account, failure);
     if (final) return;
     await new Promise((resolve) => setTimeout(resolve, Math.min(4 ** attempt * 1000, 5 * 60 * 1000)));
   }
