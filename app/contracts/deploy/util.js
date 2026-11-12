@@ -361,8 +361,19 @@ async function pollForCreateIssueExecution(tokenObj, issueId, creationReceipt, f
     throw new Error('IssueExecuted found but no transaction hash was available: ' + JSON.stringify(executed));
   }
 
-  const finalResults = await rest.getBlocResults(tokenObj, [txHash], { config, isAsync: true });
+  const finalResults = await util.until(
+    (results) => Array.isArray(results) && results.length > 0 &&
+      results.every((result) => result && result.status && result.status !== 'Pending'),
+    (options) => rest.getBlocResults(tokenObj, [txHash], options),
+    { config, isAsync: true },
+    CREATE_ISSUE_TIMEOUT_MS
+  );
   const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;
+  if (!final || final.status !== 'Success') {
+    throw new Error(
+      'Create-contract issue execution failed: ' + JSON.stringify(final || finalResults)
+    );
+  }
   const address = getCreatedAddress(final);
   if (address) return address;
 
