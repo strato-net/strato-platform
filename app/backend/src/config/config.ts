@@ -233,7 +233,10 @@ export const defaultExecutedIssuesLookbackDaysFor: Record<string, number> = {
   "33056204878082667": 30, // Upquark mainnet
 };
 
-export const defaultMultisigFactoryFor: Record<string, string> = {};
+export const defaultMultisigFactoryFor: Record<string, string> = {
+  "114784819836269": "3aa566e02cf9e9f95df58f703a63a99884a4e405", // Helium testnet
+  "33056204878082667": "", // Upquark mainnet
+};
 
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
