@@ -52,7 +52,7 @@ spec = describe "transaction replay protection" $ do
     replayProtectionForkBlock 114784819836269 `shouldBe` forkNotScheduled
     replayProtectionForkBlock 33056204878082667 `shouldBe` forkNotScheduled
     replayProtectionForkBlock 42 `shouldBe` 0
-    replayProtectionForkBlock 7381244120123405172 `shouldBe` 10000
+    replayProtectionForkBlock 7381244120123405172 `shouldBe` 1150
   where
     legacyTransaction recoveryId =
       rlpDecode $ rlpDeserialize $ rlpSerialize $ rlpEncode eip155Transaction {chainId = Nothing, v = recoveryId}

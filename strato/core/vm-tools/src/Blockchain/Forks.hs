@@ -49,7 +49,7 @@ forktestNetworkID :: Integer
 forktestNetworkID = 7381244120123405172
 
 forktestForkBlock :: Integer
-forktestForkBlock = 10000
+forktestForkBlock = 1150
 
 heliumReceiptsRootForkBlock :: Integer
 heliumReceiptsRootForkBlock = 250000
@@ -107,7 +107,7 @@ heliumFeeConsensusDeltaForkBlock :: Integer
 heliumFeeConsensusDeltaForkBlock = 1000000
 
 forktestFeeConsensusDeltaForkBlock :: Integer
-forktestFeeConsensusDeltaForkBlock = forkNotScheduled
+forktestFeeConsensusDeltaForkBlock = forktestForkBlock
 
 isFeeConsensusDeltaForkActive :: Integer -> Bool
 isFeeConsensusDeltaForkActive blockNum =
