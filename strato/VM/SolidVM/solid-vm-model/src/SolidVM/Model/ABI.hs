@@ -96,13 +96,18 @@ parseTypeDescriptor s
 abiEncode :: [(Bool, B.ByteString)] -> B.ByteString
 abiEncode vals =
   let headSize = length vals * 32
-      go [] _ headAcc tailAcc = headAcc <> tailAcc
-      go ((dynamic, encoded):vs) tailOffset headAcc tailAcc
+      -- the pieces of the head and of the tail, joined once at the end:
+      -- appending to an accumulator copies it for every value
+      go [] _ = ([], [])
+      go ((dynamic, encoded):vs) tailOffset
         | dynamic =
-            let offsetWord = encodeUint256 (fromIntegral tailOffset)
-            in go vs (tailOffset + B.length encoded) (headAcc <> offsetWord) (tailAcc <> encoded)
-        | otherwise = go vs tailOffset (headAcc <> encoded) tailAcc
-  in go vals headSize B.empty B.empty
+            let (heads, tails) = go vs (tailOffset + B.length encoded)
+            in (encodeUint256 (fromIntegral tailOffset) : heads, encoded : tails)
+        | otherwise =
+            let (heads, tails) = go vs tailOffset
+            in (encoded : heads, tails)
+      (headPieces, tailPieces) = go vals headSize
+  in mconcat headPieces <> mconcat tailPieces
 
 abiEncodePacked :: [B.ByteString] -> B.ByteString
 abiEncodePacked = mconcat

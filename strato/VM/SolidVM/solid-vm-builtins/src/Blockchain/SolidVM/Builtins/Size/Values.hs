@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Blockchain.SolidVM.Builtins.Size.Values (ValueArguments (..), valueSize, basicSize, chargeNested, chargeInnerAggregates) where
+module Blockchain.SolidVM.Builtins.Size.Values (ValueArguments (..), valueSize, basicSize, chargeNested, chargeInnerAggregates, chargeCopy) where
 
 import Blockchain.SolidVM.Builtins.Gas (byteWidth)
 import Blockchain.SolidVM.Builtins.Size (FunctionArguments (..), gasSize, wordsFor)
@@ -79,6 +79,15 @@ chargeInnerAggregates = \case
         SMap {} -> inner value
         _ -> pure ()
     inner value = chargeBuiltinGas 1 >> chargeNested value
+
+-- | Placing an aggregate in a new cell copies its slots.
+chargeCopy :: MonadBuiltinGas m => Value -> m ()
+chargeCopy value = case value of
+  SStruct {} -> slots
+  SArray {} -> slots
+  STuple {} -> slots
+  _ -> pure ()
+  where slots = chargeBuiltinGas $ Gas (wordsFor (valueSize value))
 
 basicSize :: BasicValue -> Integer
 basicSize = \case
