@@ -13,6 +13,8 @@ import "./NFTs/NFTFactory.sol";
 
 //Admin Registry
 import "Admin/AdminRegistry.sol";
+import "Admin/MultisigFactory.sol";
+import "Admin/MultisigLogic.sol";
 
 //Swap
 import "./Pools/Pool.sol";

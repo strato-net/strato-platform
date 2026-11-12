@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import {
-  decodeCastVoteOutcome,
   simulationChain,
   type SimulatedEvent,
   type SimulationResult,
@@ -13,11 +12,7 @@ interface SimulationResultPanelProps {
   error?: string;
   /** Optional heading, e.g. "Proposal tx" vs "Effect if executed". */
   title?: string;
-  /**
-   * Headings for the nested `effect` chain, outermost first (a vote wrapped
-   * through nested multisigs simulates as one panel per hop). Falls back to
-   * "Effect if executed" when absent or exhausted.
-   */
+  /** Headings for nested simulated effects, outermost first. */
   effectTitles?: string[];
   /** Internal: suppress the chain summary on nested panels. */
   isNested?: boolean;
@@ -40,13 +35,6 @@ export function SimulationResultPanel({
 
   const failed = !!error || result?.status !== "Success";
   const message = error || result?.error || "";
-  // A castVoteOnIssue hop reports whether this vote itself crossed the
-  // threshold; the server only attaches an effect to castVoteOnIssue sims, so
-  // gate on that to avoid misreading unrelated boolean returns.
-  const voteOutcome =
-    result?.effect != null && result.status === "Success"
-      ? decodeCastVoteOutcome(result.response)
-      : null;
   const returned = result?.data?.contents ?? result?.response;
   const traceRoots: TraceFrame[] = !result?.trace
     ? []
@@ -66,14 +54,6 @@ export function SimulationResultPanel({
         {title ? `${title}: ` : "Simulation: "}
         {failed ? "transaction would fail" : "transaction would succeed"}
       </div>
-
-      {voteOutcome != null ? (
-        <div className="mt-1 text-xs text-muted-foreground">
-          {voteOutcome
-            ? "Threshold met — this vote executes the next step immediately."
-            : "Vote recorded — the next step waits for more votes here."}
-        </div>
-      ) : null}
 
       {message ? (
         <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap break-all text-xs text-destructive">
@@ -121,9 +101,7 @@ export function SimulationResultPanel({
     </div>
   );
 
-  // A castVoteOnIssue simulation carries the issue's effect (recursively, for
-  // votes wrapped through nested multisigs); show one panel per hop so the
-  // voter sees the vote tx and every step it would set in motion.
+  // Show backend-supplied nested effects without interpreting protocol-specific returns.
   if (!result?.effect) return panel;
   return (
     <div className="space-y-2">

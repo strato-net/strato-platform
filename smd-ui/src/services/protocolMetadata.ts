@@ -66,6 +66,7 @@ export interface PositionV3Metadata {
 }
 
 export interface V3AllowanceMetadata {
+  positionManagerAddress: string;
   pools: PoolV3Metadata[];
   positions: PositionV3Metadata[];
 }
@@ -211,7 +212,8 @@ export function useV3AllowanceMetadata(
     enabled: enabled && owners.length > 0,
     staleTime: 30_000,
     queryFn: async (): Promise<V3AllowanceMetadata> => {
-      const [poolsResult, ...positionResults] = await Promise.all([
+      const [metadataResult, poolsResult, ...positionResults] = await Promise.all([
+        api.get("/api/poolv3/metadata", { skipErrorToast: true }),
         api.get("/api/poolv3/pools", { skipErrorToast: true }),
         ...owners.map((owner) => api.get("/api/poolv3/positions", {
           skipErrorToast: true,
@@ -224,6 +226,7 @@ export function useV3AllowanceMetadata(
         customDecimals: Number(raw?.customDecimals ?? 18),
       });
       return {
+        positionManagerAddress: strip0x(String(metadataResult.data?.positionManagerAddress ?? "")),
         pools: (Array.isArray(poolsResult.data) ? poolsResult.data : []).map((pool: any) => ({
           address: strip0x(String(pool?.address ?? "")),
           token0: token(pool?.token0),

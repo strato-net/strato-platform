@@ -21,9 +21,9 @@ const raw = {
 await mkdir("node_modules/.cache", { recursive: true });
 const directory = await mkdtemp("node_modules/.cache/smd-tests-");
 try {
-  const outfile = path.resolve(directory, "multisig.test.mjs");
+  const outfile = path.resolve(directory, "dedicatedMultisig.test.mjs");
   await build({
-    entryPoints: ["src/services/multisig.test.ts"],
+    entryPoints: ["src/services/dedicatedMultisig.test.ts"],
     outfile,
     bundle: true,
     platform: "node",

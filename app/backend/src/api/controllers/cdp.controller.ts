@@ -67,11 +67,12 @@ class CDPController {
     try {
       const { accessToken, address: userAddress } = req;
       const requestedAddress = req.query?.address;
+      const normalizedAddress = typeof requestedAddress === "string" ? requestedAddress.trim() : requestedAddress;
       if (requestedAddress !== undefined) {
-        const { error } = validateAddressField("address").validate(requestedAddress);
+        const { error } = validateAddressField("address").validate(normalizedAddress);
         if (error) throw error;
       }
-      const ownerAddress = String(requestedAddress ?? userAddress).replace(/^0x/i, "");
+      const ownerAddress = String(normalizedAddress ?? userAddress).trim().replace(/^0x/i, "");
       const vaults = await getVaults(accessToken, ownerAddress);
       res.status(RestStatus.OK).json(vaults);
     } catch (error) {

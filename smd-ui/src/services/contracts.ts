@@ -319,10 +319,14 @@ export async function submitStratoTx(
     }
   );
   const result = Array.isArray(data) ? data[0] : data;
-  if (result?.status === "Pending" && result?.hash) {
+  if (!result) {
+    throw new Error("Transaction returned no result");
+  }
+  if (result.status === "Pending") {
+    if (!result.hash) throw new Error("Pending transaction returned no hash");
     return pollTransactionResult(result.hash);
   }
-  if (result?.status === "Failure") {
+  if (result.status === "Failure") {
     throw new Error(result.txResult?.message || "Transaction failed");
   }
   return result;

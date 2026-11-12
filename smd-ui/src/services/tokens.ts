@@ -41,7 +41,7 @@ export function useMyTokens(ownerAddress?: string | null) {
       const { data } = await api.get(
         `${env.CIRRUS_URL}/mapping?collection_name=eq._balances` +
           `&storage.data-%3E%3Estatus=eq.2&key-%3E%3Ekey=eq.${key}&value=gt.0` +
-          `&select=address,value,storage!inner(data-%3E%3E_symbol,data-%3E%3EcustomDecimals)`
+          `&select=address,value::text,storage!inner(data-%3E%3E_symbol,data-%3E%3EcustomDecimals)`
       );
       if (!Array.isArray(data)) return [];
       return data
