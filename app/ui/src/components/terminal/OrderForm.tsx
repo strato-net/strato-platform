@@ -309,6 +309,7 @@ export const OrderForm = ({ market, settlement }: OrderFormProps) => {
         <Row label="Minimum received">
           {quoted(() => `${formatTokens(minAmountOutWei)} ${tokenOut._symbol}`)}
         </Row>
+        <Row label="Pool fee">{market.feeBps / 100}%</Row>
       </div>
 
       <SlippageControl

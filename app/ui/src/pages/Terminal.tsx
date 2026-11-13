@@ -23,11 +23,11 @@ const subscribeToDesktop = (onChange: () => void) => {
   return () => query.removeEventListener("change", onChange);
 };
 
-/** Depth and trades share one panel, a tab each */
+/** The order book and the trades share one panel, a tab each */
 const book = (market: Market) => (
   <Tabs
     tabs={[
-      { name: "Depth", content: <DepthLadder market={market} /> },
+      { name: "Order book", content: <DepthLadder market={market} /> },
       { name: "Trades", content: <TradesTape market={market} /> },
     ]}
   />

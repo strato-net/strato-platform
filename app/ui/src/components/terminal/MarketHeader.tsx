@@ -68,7 +68,6 @@ export const MarketHeader = ({ market, markets, stats }: MarketHeaderProps) => {
         )}
       </Stat>
       <Stat label="Total liquidity">{formatUsd(market.totalLiquidityUSD)}</Stat>
-      <Stat label="Fee">{market.feeBps / 100}%</Stat>
     </div>
   );
 };
