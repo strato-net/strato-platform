@@ -38,6 +38,8 @@ export default {
 					DEFAULT: 'hsl(var(--destructive))',
 					foreground: 'hsl(var(--destructive-foreground))'
 				},
+				up: 'hsl(var(--up))',
+				down: 'hsl(var(--down))',
 				muted: {
 					DEFAULT: 'hsl(var(--muted))',
 					foreground: 'hsl(var(--muted-foreground))'
@@ -92,6 +94,14 @@ export default {
 					'0%, 100%': { backgroundPosition: '0% 50%' },
 					'50%': { backgroundPosition: '100% 50%' },
 				},
+				'flash-up': {
+					'0%, 35%': { backgroundColor: 'hsl(var(--up) / 0.3)' },
+					'100%': { backgroundColor: 'transparent' },
+				},
+				'flash-down': {
+					'0%, 35%': { backgroundColor: 'hsl(var(--down) / 0.3)' },
+					'100%': { backgroundColor: 'transparent' },
+				},
 				'pulse-slow': {
 					'0%, 100%': { opacity: '1' },
 					'50%': { opacity: '0.8' },
@@ -105,6 +115,8 @@ export default {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'gradient-flow': 'gradient-flow 8s ease infinite',
+				'flash-up': 'flash-up 2s ease-out',
+				'flash-down': 'flash-down 2s ease-out',
 				'pulse-slow': 'pulse-slow 3s ease-in-out infinite',
 				'float': 'float 6s ease-in-out infinite',
 			},

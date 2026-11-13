@@ -12,9 +12,17 @@ interface SlippageControlProps {
   effectivePercent: number;
   onChange: (slippage: SlippageSetting) => void;
   disabled?: boolean;
+  /** false leaves the derived tolerance out while in auto mode */
+  showAutoPercent?: boolean;
 }
 
-export const SlippageControl = ({ slippage, effectivePercent, onChange, disabled = false }: SlippageControlProps) => {
+export const SlippageControl = ({
+  slippage,
+  effectivePercent,
+  onChange,
+  disabled = false,
+  showAutoPercent = true,
+}: SlippageControlProps) => {
   const isAuto = slippage.mode === "auto";
   const isHighSlippage = effectivePercent > 5;
   const isLowSlippage = !isAuto && effectivePercent < 0.5;
@@ -45,9 +53,11 @@ export const SlippageControl = ({ slippage, effectivePercent, onChange, disabled
           >
             Manual
           </button>
-          <span className={`ml-1 md:ml-2 px-2 md:px-3 py-1 rounded-full border text-xs font-semibold ${slippageClass}`}>
-            {isAuto ? `Auto · ${effectivePercent.toFixed(2)}%` : `${effectivePercent}%`}
-          </span>
+          {(!isAuto || showAutoPercent) && (
+            <span className={`ml-1 md:ml-2 px-2 md:px-3 py-1 rounded-full border text-xs font-semibold ${slippageClass}`}>
+              {isAuto ? `Auto · ${effectivePercent.toFixed(2)}%` : `${effectivePercent}%`}
+            </span>
+          )}
         </div>
       </div>
       {!isAuto && (

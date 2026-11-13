@@ -809,6 +809,7 @@ export const getLiquidityDistribution = async (
   }
 
   return {
+    sqrtPriceX96: pool.sqrtPriceX96,
     currentTick: Number(pool.currentTick),
     tickSpacing: Number(pool.tickSpacing),
     liquidity: pool.liquidity,

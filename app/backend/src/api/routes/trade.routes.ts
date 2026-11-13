@@ -199,4 +199,87 @@ router.get("/token-history/:tokenAddress", authHandler.authorizeRequest(true), T
  */
 router.get("/history/:tokenAddress1/:tokenAddress2", authHandler.authorizeRequest(true), TradeController.history);
 
+/**
+ * @openapi
+ * /trade/markets:
+ *   get:
+ *     summary: Trading-terminal markets (V3 pools presented as BASE/QUOTE)
+ *     tags: [Trade]
+ *     responses:
+ *       200:
+ *         description: Markets with tokens, pool balances, TVL and whether trading is open
+ */
+router.get("/markets", authHandler.authorizeRequest(true), TradeController.markets);
+
+/**
+ * @openapi
+ * /trade/markets/{poolAddress}/candles:
+ *   get:
+ *     summary: OHLC candles for a market, from the pool's swap events
+ *     tags: [Trade]
+ *     parameters:
+ *       - name: poolAddress
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - name: resolution
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [1m, 5m, 15m, 1h, 4h, 1d]
+ *       - name: from
+ *         in: query
+ *         required: false
+ *         description: Only candles whose bucket starts at or after this unix time (seconds)
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Candles as [time, open, high, low, close, quoteVolume, count], oldest first; buckets without swaps are flat at the previous close
+ */
+router.get("/markets/:poolAddress/candles", authHandler.authorizeRequest(true), TradeController.marketCandles);
+
+/**
+ * @openapi
+ * /trade/markets/{poolAddress}/trades:
+ *   get:
+ *     summary: Most recent swaps in a market, newest first
+ *     tags: [Trade]
+ *     parameters:
+ *       - name: poolAddress
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Recent trades with side, execution price and amounts
+ */
+router.get("/markets/:poolAddress/trades", authHandler.authorizeRequest(true), TradeController.marketTrades);
+
+/**
+ * @openapi
+ * /trade/markets/{poolAddress}/stats:
+ *   get:
+ *     summary: Pool price and trailing-24h stats for a market
+ *     tags: [Trade]
+ *     parameters:
+ *       - name: poolAddress
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Price, 24h open/high/low/change, volumes and trade count
+ */
+router.get("/markets/:poolAddress/stats", authHandler.authorizeRequest(true), TradeController.marketStats);
+
 export default router;
