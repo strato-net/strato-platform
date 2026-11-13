@@ -150,6 +150,7 @@ export function DedicatedTreasuryTab({
   const { data: sourceTokens = [] } = useMyTokens(userAddress);
   const { data: treasury = [] } = useMyTokens(wallet.address);
   const { data: deployed, isLoading: positionsLoading } = useDeployedPositions(wallet.address);
+  const { data: v3, isLoading: v3PositionsLoading } = useV3AllowanceMetadata(wallet.address);
   const [depositToken, setDepositToken] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
   const [transferToken, setTransferToken] = useState("");
@@ -251,7 +252,7 @@ export function DedicatedTreasuryTab({
 
       <div className="space-y-2">
         <Label>Staked and supplied</Label>
-        {positionsLoading ? <p className="text-sm text-muted-foreground">Loading positions…</p> : (
+        {positionsLoading || v3PositionsLoading ? <p className="text-sm text-muted-foreground">Loading positions…</p> : (
           <>
             {hasStaking ? (
               <div className="rounded-md border px-3 py-2 text-sm">
@@ -268,8 +269,24 @@ export function DedicatedTreasuryTab({
                 <span className="font-mono text-xs">{formatUnits(BigInt(position.amount), position.decimals)}</span>
               </div>
             ))}
-            {!hasStaking && !deployed?.collateral.length ? (
-              <p className="text-sm text-muted-foreground">No staked tokens or supplied collateral.</p>
+            {v3?.positions.map((position) => {
+              const pool = v3.pools.find((item) => item.address === position.poolAddress);
+              return (
+                <div key={position.tokenId} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                  <div>
+                    <div className="font-medium">
+                      {pool ? `${pool.token0._symbol}/${pool.token1._symbol}` : "V3"} position
+                    </div>
+                    <div className="font-mono text-xs text-muted-foreground">
+                      {shortenHex(position.poolAddress, 6, 4)}
+                    </div>
+                  </div>
+                  <span className="font-mono text-xs">NFT #{position.tokenId}</span>
+                </div>
+              );
+            })}
+            {!hasStaking && !deployed?.collateral.length && !v3?.positions.length ? (
+              <p className="text-sm text-muted-foreground">No staked, supplied, or liquidity positions.</p>
             ) : null}
           </>
         )}
@@ -550,7 +567,7 @@ export function DedicatedProtocolActionsTab({
       for (const call of workflow) await actions.proposeCall(call, wallet.signerUsername || undefined);
       toast.success("Proposal created", {
         description: missingApprovals.length
-          ? `${missingApprovals.length} permission proposals were created before the protocol action.`
+          ? `${missingApprovals.length} permission proposal${missingApprovals.length === 1 ? " was" : "s were"} created before the protocol action.`
           : "The protocol action is ready for signer review.",
       });
       onProposalCreated?.();

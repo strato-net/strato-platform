@@ -145,8 +145,10 @@ function ChainSummary({
       }
     >
       {ok
-        ? `All ${chain.length} steps would succeed.`
-        : `${failures.length} of ${chain.length} steps would fail: ${failures.join("; ")}`}
+        ? chain.length === 1 ? "The step would succeed." : `All ${chain.length} steps would succeed.`
+        : chain.length === 1
+          ? `The step would fail: ${failures.join("; ")}`
+          : `${failures.length} of ${chain.length} steps would fail: ${failures.join("; ")}`}
     </div>
   );
 }

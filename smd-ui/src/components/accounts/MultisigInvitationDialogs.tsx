@@ -114,7 +114,10 @@ export function SetupInvitationDialog({ setup: summary }: { setup: PendingMultis
           <div className="font-mono break-all">{setup?.creator ?? summary.creator}</div>
           {setup ? (
             <>
-              <div>Waiting period: {setup.transactionTimelock / 3600} hours</div>
+              <div>
+                Waiting period: {setup.transactionTimelock / 3600}{" "}
+                {setup.transactionTimelock === 3600 ? "hour" : "hours"}
+              </div>
               <div>Multisig wallet version: {setup.initialVersion}</div>
               <div className="space-y-1">
                 {setup.signers.map((signer) => (

@@ -208,7 +208,9 @@ export function describeProposal(
   if (targetIsWallet && proposal.functionName === "setTransactionTimelock") {
     const seconds = Number(proposal.arguments[0] ?? 0);
     return {
-      headline: `Change waiting period to ${seconds === 0 ? "none" : `${seconds / 3600} hours`}`,
+      headline: `Change waiting period to ${
+        seconds === 0 ? "none" : `${seconds / 3600} ${seconds === 3600 ? "hour" : "hours"}`
+      }`,
       addresses: [],
     };
   }

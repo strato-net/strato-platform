@@ -548,7 +548,10 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
         </TabsContent>
         <TabsContent value="settings" className="mt-4 space-y-4">
           <div className="grid gap-1 text-sm">
-            <div>Waiting period: {state.transactionTimelock / 3600} hours</div>
+            <div>
+              Waiting period: {state.transactionTimelock / 3600}{" "}
+              {state.transactionTimelock === 3600 ? "hour" : "hours"}
+            </div>
             <div>Upgrades: {state.upgradesFrozen ? "permanently frozen" : "enabled"}</div>
             <div>
               Signers: {state.signers.map((signer) =>
@@ -970,7 +973,10 @@ function CreateDedicatedMultisig() {
                 </AlertDescription>
               </Alert>
             ) : null}
-            <div>Waiting period: {setup.transactionTimelock / 3600} hours</div>
+            <div>
+              Waiting period: {setup.transactionTimelock / 3600}{" "}
+              {setup.transactionTimelock === 3600 ? "hour" : "hours"}
+            </div>
             <div>Invitation expires: {new Date(setup.expiresAt * 1000).toLocaleString()}</div>
             <div className="space-y-1 text-xs text-muted-foreground">
               {setup.signers.map((signer) => {
