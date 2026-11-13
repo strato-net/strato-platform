@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, CheckCircle2, Plus, ShieldCheck } from "lucide-react";
 import { AddressInput } from "@/components/AddressInput";
+import { CopyButton } from "@/components/CopyButton";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -452,6 +453,13 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
   if (isLoading || !state) return <div className="text-sm text-muted-foreground">Loading multisig wallet…</div>;
   return (
     <div className="space-y-4">
+      <div className="space-y-1">
+        <div className="text-xl font-semibold">{wallet.label || "Unnamed multisig wallet"}</div>
+        <div className="flex items-start gap-2 text-sm text-muted-foreground">
+          <span className="break-all font-mono">{wallet.address}</span>
+          <CopyButton value={wallet.address} className="mt-0.5 shrink-0" />
+        </div>
+      </div>
       {state.verified ? (
         <Alert>
           <CheckCircle2 className="h-4 w-4" />
@@ -1042,7 +1050,7 @@ export function DedicatedMultisigDialog({
           {wallet ? "Manage" : "Create multisig wallet"}
         </Button>
       </DialogTrigger>
-      <DialogContent className="h-[100dvh] max-h-[100dvh] w-screen max-w-none overflow-y-auto rounded-none border-0 p-4 md:p-8">
+      <DialogContent className="h-[100dvh] max-h-[100dvh] w-screen max-w-none content-start overflow-y-auto rounded-none border-0 p-4 md:p-8">
         <DialogHeader>
           <DialogTitle>{wallet ? "Multisig wallet" : "Create multisig wallet"}</DialogTitle>
           <DialogDescription>
