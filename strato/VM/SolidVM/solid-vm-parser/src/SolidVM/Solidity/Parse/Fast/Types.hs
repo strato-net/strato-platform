@@ -105,7 +105,8 @@ mappingType = do
 
 -- | An array dimension: @+ - * / % **@ and parentheses over number literals.
 -- Division by zero and a negative exponent are rejected here rather than
--- left in the tree.
+-- left in the tree. Every value is kept below 2^256, and a power is checked
+-- before it is computed, so a short dimension cannot build a huge number.
 intExpr :: P Word
 intExpr = fromInteger <$> sums
   where
@@ -114,15 +115,15 @@ intExpr = fromInteger <$> sums
         more x = do
           t <- peek
           if
-            | isSym "+" t -> skip *> products >>= more . (x +)
-            | isSym "-" t -> skip *> products >>= more . (x -)
+            | isSym "+" t -> skip *> products >>= inRange . (x +) >>= more
+            | isSym "-" t -> skip *> products >>= inRange . (x -) >>= more
             | otherwise -> pure x
     products = powers >>= more
       where
         more x = do
           t <- peek
           if
-            | isSym "*" t -> skip *> powers >>= more . (x *)
+            | isSym "*" t -> skip *> powers >>= inRange . (x *) >>= more
             | isSym "/" t -> skip *> (powers >>= nonZero) >>= more . div x
             | isSym "%" t -> skip *> (powers >>= nonZero) >>= more . mod x
             | otherwise -> pure x
@@ -135,7 +136,10 @@ intExpr = fromInteger <$> sums
         then do
           skip
           y <- powers
-          if y < 0 then failWith "negative exponent in an array size" else pure (x ^ y)
+          if
+            | y < 0 -> failWith "negative exponent in an array size"
+            | abs x > 1, y > 256 -> failWith outOfRange
+            | otherwise -> inRange (x ^ y)
         else pure x
     signed = do
       t <- peek
@@ -145,7 +149,12 @@ intExpr = fromInteger <$> sums
         | otherwise -> atom
     atom = do
       t <- peek
-      if isSym "(" t then parens sums else integer
+      if isSym "(" t then parens sums else integer >>= inRange
+    inRange :: Integer -> P Integer
+    inRange v
+      | abs v < 2 ^ (256 :: Int) = pure v
+      | otherwise = failWith outOfRange
+    outOfRange = "array size out of range"
 
 userTypeHelper' :: Maybe String -> SVMType.Type
 userTypeHelper' (Just "bool") = SVMType.Bool

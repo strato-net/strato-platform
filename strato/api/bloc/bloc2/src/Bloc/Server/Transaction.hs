@@ -1180,13 +1180,13 @@ postUsersContractMethod' cacheNonce token FunctionParameters {..} = do
   $logInfoLS "postUsersContractMethod'/hash" txHash
   getResultAndRespond [txHash] resolve
 
-prepareUnsignedTx :: Integer -> TransactionHeader -> Transaction
-prepareUnsignedTx gasLimit TransactionHeader {..} =
+prepareUnsignedTx :: TransactionHeader -> Transaction
+prepareUnsignedTx TransactionHeader {..} =
   case transactionheaderToAddr of
     Nothing ->
       TX.ContractCreationTX
       { TX.nonce = fromIntegral $ fromMaybe 0 (txparamsNonce transactionheaderTxParams),
-        TX.gasLimit = fromIntegral $ fromMaybe (Gas gasLimit) (txparamsGasLimit transactionheaderTxParams),
+        TX.gasLimit = fromIntegral $ fromMaybe transactionGas (txparamsGasLimit transactionheaderTxParams),
         TX.contractName = fromMaybe (error "prepareUnsignedTx: contractName missing in ContractCreationTX") transactionheaderContractName,
         TX.args = transactionheaderArgs,
         TX.network = transactionheaderNetwork,
@@ -1200,7 +1200,7 @@ prepareUnsignedTx gasLimit TransactionHeader {..} =
     Just _ ->
       TX.MessageTX
       { TX.nonce = fromIntegral $ fromMaybe 0 (txparamsNonce transactionheaderTxParams),
-        TX.gasLimit = fromIntegral $ fromMaybe (Gas gasLimit) (txparamsGasLimit transactionheaderTxParams),
+        TX.gasLimit = fromIntegral $ fromMaybe transactionGas (txparamsGasLimit transactionheaderTxParams),
         TX.to = fromMaybe (error "prepareUnsignedTx: to missing in MessageTX") transactionheaderToAddr,
         TX.funcName = fromMaybe (error "prepareUnsignedTx: funcName missing in MessageTX") transactionheaderFuncName,
         TX.args = transactionheaderArgs,
@@ -1273,26 +1273,24 @@ preparePostUnsignedRawTx time tx contractName' args =
       Nothing
 
 signAndPrepare ::
-  (MonadIO m, MonadLogger m, HasBlocEnv m) =>
+  (MonadIO m, MonadLogger m) =>
   Text ->
   Address ->
   TransactionHeader ->
   m RawTransaction'
 signAndPrepare token from th = do
-  BlocEnv {gasLimit = envGasLimit} <- getBlocEnv
   time <- liftIO getCurrentTime
-  fmap (preparePostTx time from) . callSignature token $ prepareUnsignedTx envGasLimit th
+  fmap (preparePostTx time from) . callSignature token $ prepareUnsignedTx th
 
 prepareUnsignedRawTx ::
-  (MonadIO m, HasBlocEnv m) =>
+  MonadIO m =>
   Text ->
   [Text] ->
   TransactionHeader ->
   m BlocTransactionUnsignedResult
 prepareUnsignedRawTx contractName' args th = do
-  BlocEnv {gasLimit = envGasLimit} <- getBlocEnv
   time <- liftIO getCurrentTime
-  let unsigned = prepareUnsignedTx envGasLimit th
+  let unsigned = prepareUnsignedTx th
       msgHash = unsafeCreateKeccak256FromByteString $ keccak256ToByteString $ partialTransactionHash unsigned
       unsignedRawTx = preparePostUnsignedRawTx time unsigned contractName' args
   pure $ BlocTransactionUnsignedResult msgHash (Just unsignedRawTx)

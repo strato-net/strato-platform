@@ -2,7 +2,8 @@
 -- Compiler facts are discarded when the final executable action is extracted.
 module SolidVM.Code where
 
-import SolidVM.Core (M, Action, runAction, contextAction, liftAction, chargeAction, storeAction, Ty, HL(..), Env(..), Ix(..), localValue, chargeGas, chargeAfter, writeVal, replaceValue)
+import Blockchain.SolidVM.SM (SM)
+import SolidVM.Core (Action, runAction, contextAction, liftAction, chargeAction, storeAction, Ty, HL(..), Env(..), Ix(..), localValue, chargeGas, chargeAfter, writeVal, replaceValue)
 import qualified SolidVM.Core as Core
 import Data.IORef (IORef)
 import Data.Decimal (Decimal)
@@ -68,49 +69,49 @@ actionProgram = id
 actionReturn :: Monad m => Code a -> Code (Action env m a)
 actionReturn code = withCode code $ \value -> Code (pure value) (PureComputation code)
 
-actionCharge :: Integer -> Code (Action env M ())
+actionCharge :: Integer -> Code (Action env SM ())
 actionCharge = plainCode . chargeAction
 
-actionStore :: Ty a -> Code StoragePath -> Code a -> Code (Action env M ())
+actionStore :: Ty a -> Code StoragePath -> Code a -> Code (Action env SM ())
 actionStore ty path value = withCode path $ \p -> withCode value $ \v -> plainCode (storeAction ty p v)
 
-referenceAction :: Ix ls (IORef a) -> Code (Action (Env ls) M a)
+referenceAction :: Ix ls (IORef a) -> Code (Action (Env ls) SM a)
 referenceAction = plainCode . Core.readReference
 
-valueAction :: Ix ls a -> Code (Action (Env ls) M a)
+valueAction :: Ix ls a -> Code (Action (Env ls) SM a)
 valueAction = plainCode . Core.valueAt
 
-actionAfter :: Integer -> Code (Action env M a) -> Code (Action env M a)
+actionAfter :: Integer -> Code (Action env SM a) -> Code (Action env SM a)
 actionAfter gas code = withCode code $ \action -> action `seq` plainCode (Core.chargeActionAfter gas action)
 
-actionThenResidual :: Code (Action env M a) -> Code (Action env M b) -> Code (Action env M b)
+actionThenResidual :: Code (Action env SM a) -> Code (Action env SM b) -> Code (Action env SM b)
 actionThenResidual first second = withCode first $ \a -> withCode second $ \b -> a `seq` b `seq` plainCode (a >> b)
 
-actionPureResidual :: Code (env -> a) -> Code (Action env M a)
+actionPureResidual :: Code (env -> a) -> Code (Action env SM a)
 actionPureResidual code = withCode code $ \f -> f `seq` plainCode (fmap f Core.askEnvironment)
 
-actionWritePath :: Ty a -> Code StoragePath -> Code (env -> a) -> Code (Action env M ())
+actionWritePath :: Ty a -> Code StoragePath -> Code (env -> a) -> Code (Action env SM ())
 actionWritePath ty path value = withCode path $ \p -> withCode value $ \v ->
   v `seq` plainCode (contextAction (\env -> writeVal ty p (v env)))
 
-actionWriteValue :: Ty a -> Code (env -> StoragePath) -> Code a -> Code (Action env M ())
+actionWriteValue :: Ty a -> Code (env -> StoragePath) -> Code a -> Code (Action env SM ())
 actionWriteValue ty path value = withCode path $ \p -> withCode value $ \v ->
   p `seq` plainCode (contextAction (\env -> writeVal ty (p env) v))
 
-actionWriteResidual :: Ty a -> Code (env -> StoragePath) -> Code (env -> a) -> Code (Action env M ())
+actionWriteResidual :: Ty a -> Code (env -> StoragePath) -> Code (env -> a) -> Code (Action env SM ())
 actionWriteResidual ty path value = withCode path $ \p -> withCode value $ \v ->
   p `seq` v `seq` plainCode (contextAction (\env -> writeVal ty (p env) (v env)))
 
 applyResidual :: Code (a -> b) -> Code a -> Code b
 applyResidual function argument = withCode function $ \f -> withCode argument $ \value -> plainCode (f value)
 
-bindResidual :: Code (M a) -> Code (a -> M b) -> Code (M b)
+bindResidual :: Code (SM a) -> Code (a -> SM b) -> Code (SM b)
 bindResidual first continuation = withCode first $ \action -> withCode continuation $ \next -> plainCode (action >>= next)
 
-mapResidual :: Code (a -> b) -> Code (M a) -> Code (M b)
+mapResidual :: Code (a -> b) -> Code (SM a) -> Code (SM b)
 mapResidual function action = withCode function $ \f -> withCode action $ \a -> plainCode (fmap f a)
 
-applyActionResidual :: Code (M (a -> b)) -> Code (M a) -> Code (M b)
+applyActionResidual :: Code (SM (a -> b)) -> Code (SM a) -> Code (SM b)
 applyActionResidual function action = withCode function $ \f -> withCode action $ \a -> plainCode (f <*> a)
 
 integerCode :: Integer -> Code Integer
@@ -119,26 +120,26 @@ integerCode value = Code value (IntegerValue value)
 listCode :: [Code a] -> Code [a]
 listCode codes = withCodes codes plainCode
 
-sequenceResidual :: [Code (M a)] -> Code (M [a])
+sequenceResidual :: [Code (SM a)] -> Code (SM [a])
 sequenceResidual codes = withCodes codes (plainCode . sequence)
 
 unitCode :: Code ()
 unitCode = Code () UnitValue
 
-emitUnitSteps :: [ActionStep] -> Code (M ())
+emitUnitSteps :: [ActionStep] -> Code (SM ())
 emitUnitSteps steps = let action = lowerUnitSteps steps in action `seq` plainCode action
 
-emitResultSteps :: [ActionStep] -> Code a -> Code (M a)
+emitResultSteps :: [ActionStep] -> Code a -> Code (SM a)
 emitResultSteps steps value = withCode value $ \result ->
   let action = lowerSteps steps (pure result)
    in action `seq` plainCode action
 
-emitResidualSteps :: [ActionStep] -> Code (M a) -> Code (M a)
+emitResidualSteps :: [ActionStep] -> Code (SM a) -> Code (SM a)
 emitResidualSteps steps final = withCode final $ \tailAction ->
   let action = lowerSteps steps tailAction
    in action `seq` plainCode action
 
-lowerSteps :: [ActionStep] -> M a -> M a
+lowerSteps :: [ActionStep] -> SM a -> SM a
 lowerSteps [] final = final
 lowerSteps (step : steps) final =
   let rest = lowerSteps steps final
@@ -147,7 +148,7 @@ lowerSteps (step : steps) final =
         EffectStep code -> withCode code $ \action -> action >> rest
         WriteStep ty path value -> withCode path $ \p -> withCode value $ \v -> writeVal ty p v >> rest
 
-lowerUnitSteps :: [ActionStep] -> M ()
+lowerUnitSteps :: [ActionStep] -> SM ()
 lowerUnitSteps [] = pure ()
 lowerUnitSteps [GasStep gas] = chargeGas gas
 lowerUnitSteps [EffectStep code] = withCode code void
@@ -171,14 +172,14 @@ valueEnvironment value rest = withCode value $ \v -> withCode rest $ \env ->
 localResidual :: Ix ls a -> Code (Env ls) -> Code a
 localResidual index code = withCode code $ \env -> plainCode (localValue index env)
 
-afterResidual :: Integer -> Code (M a) -> Code (M a)
+afterResidual :: Integer -> Code (SM a) -> Code (SM a)
 afterResidual gas code = withCode code $ \action -> plainCode (chargeAfter gas action)
 
 optionalCode :: Maybe (Code a) -> Code (Maybe a)
 optionalCode Nothing = plainCode Nothing
 optionalCode (Just code) = withCode code (plainCode . Just)
 
-emitFunction :: [FunctionStep env] -> FunctionEnd env a -> Code (env -> M a)
+emitFunction :: [FunctionStep env] -> FunctionEnd env a -> Code (env -> SM a)
 emitFunction [] (ResidualFunction code) = code
 emitFunction steps end =
   withCode (functionAction steps end) $ \action ->
@@ -191,16 +192,16 @@ hlistCode a b = withCode a $ \x -> withCode b $ \y -> Code (x :* y) (HListValue 
 hlistConstructor :: Code (a -> HL ls -> HL (a ': ls))
 hlistConstructor = plainCode (:*)
 
-writePrimitiveResidual :: Ty a -> Code (StoragePath -> a -> M ())
+writePrimitiveResidual :: Ty a -> Code (StoragePath -> a -> SM ())
 writePrimitiveResidual = plainCode . writeVal
 
-writeFunctionResidual :: Ty a -> Code StoragePath -> Code (a -> M ())
+writeFunctionResidual :: Ty a -> Code StoragePath -> Code (a -> SM ())
 writeFunctionResidual ty code = withCode code $ \path -> plainCode (writeVal ty path)
 
 replaceResidual :: Ix ls a -> Code a -> Code (Env ls) -> Code (Env ls)
 replaceResidual index value code = withCode value $ \v -> withCode code $ \env -> plainCode (replaceValue index v env)
 
-bindChainResidual :: T.Text -> Code (M a) -> [Code (a -> M a)] -> Code (a -> M b) -> Code (M b)
+bindChainResidual :: T.Text -> Code (SM a) -> [Code (a -> SM a)] -> Code (a -> SM b) -> Code (SM b)
 bindChainResidual _ initial commands final = withCode initial $ \start -> withCodes commands $ \steps ->
   withCode final $ \finish -> plainCode (Core.bindActionChain start steps finish)
 
@@ -226,15 +227,15 @@ primitiveCode primitive = plainCode $ case primitive of
   RetDynPrimitive ty -> Core.retDyn ty
   ApplyLastPrimitive -> Core.applyLast
 
-mapComputation :: Code (a -> b) -> Code (Action env M a) -> Code (Action env M b)
+mapComputation :: Code (a -> b) -> Code (Action env SM a) -> Code (Action env SM b)
 mapComputation function action = withCode function $ \f -> withCode action $ \a ->
   a `seq` plainCode (fmap f a)
 
-applyComputation :: Code (Action env M (a -> b)) -> Code (Action env M a) -> Code (Action env M b)
+applyComputation :: Code (Action env SM (a -> b)) -> Code (Action env SM a) -> Code (Action env SM b)
 applyComputation function action = withCode function $ \f -> withCode action $ \a ->
   f `seq` a `seq` plainCode (f <*> a)
 
-traverseFunctionResidual :: [Code (env -> M a)] -> Code (env -> M [a])
+traverseFunctionResidual :: [Code (env -> SM a)] -> Code (env -> SM [a])
 traverseFunctionResidual functions = withCodes functions $ \actions ->
   plainCode (\environment -> mapM ($ environment) actions)
 
@@ -246,11 +247,11 @@ dropEnvironmentResidual :: Code (Env ls -> b) -> Code (Env (a ': ls) -> b)
 dropEnvironmentResidual function = withCode function $ \f ->
   plainCode (\(_ :& environment) -> f environment)
 
-bindEnvironmentResidual :: Code (Env ls -> M a) -> Code (Env (a ': ls) -> M b) -> Code (Env ls -> M b)
+bindEnvironmentResidual :: Code (Env ls -> SM a) -> Code (Env (a ': ls) -> SM b) -> Code (Env ls -> SM b)
 bindEnvironmentResidual initial next = withCode initial $ \start -> withCode next $ \finish ->
   plainCode (\environment -> do value <- start environment; finish (value :& environment))
 
-functionBindResidual :: Code (env -> M a) -> Code (env -> a -> M b) -> Code (env -> M b)
+functionBindResidual :: Code (env -> SM a) -> Code (env -> a -> SM b) -> Code (env -> SM b)
 functionBindResidual first next = withCode first $ \start -> withCode next $ \finish ->
   plainCode (\environment -> start environment >>= finish environment)
 
@@ -258,7 +259,7 @@ extendValueAt :: Code (Env ls) -> Code (Env (a ': ls) -> b) -> Code (a -> b)
 extendValueAt environment function = withCode environment $ \env -> withCode function $ \f ->
   plainCode (\value -> f (value :& env))
 
-emitGasResult :: Integer -> Code a -> Code (M a)
+emitGasResult :: Integer -> Code a -> Code (SM a)
 emitGasResult gas value = withCode value $ \result ->
   let action = do chargeGas gas; pure result
    in action `seq` plainCode action

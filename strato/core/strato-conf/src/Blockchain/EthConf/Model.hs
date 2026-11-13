@@ -273,7 +273,6 @@ data NetworkConf = NetworkConf
   , chainId :: Integer
   , httpPort :: Int
   , txSizeLimit :: Int
-  , gasLimit :: Integer
   , blockPeriodMs :: Int
   , roundPeriodS :: Int
   -- | Seconds a proposed block's header timestamp may run ahead of this node's
@@ -312,7 +311,6 @@ instance FromJSON NetworkConf where
       <*> v .:? "chainId" .!= computeChainId net
       <*> v .:? "httpPort" .!= 8081
       <*> v .:? "txSizeLimit" .!= 2097152
-      <*> v .:? "gasLimit" .!= 1000000
       <*> v .:? "blockPeriodMs" .!= 1000
       <*> v .:? "roundPeriodS" .!= 3600
       <*> v .:? "maxTimestampDriftS" .!= defaultMaxTimestampDriftS
@@ -561,7 +559,6 @@ instance Default NetworkConf where
     , chainId = computeChainId "upquark"
     , httpPort = 8081
     , txSizeLimit = 2097152  -- 2 MiB
-    , gasLimit = 1000000
     , blockPeriodMs = 1000   -- minimum delay between blocks
     , roundPeriodS = 3600    -- backstop: seconds without progress before a forced round change
     , maxTimestampDriftS = defaultMaxTimestampDriftS

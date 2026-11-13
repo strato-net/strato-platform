@@ -44,7 +44,7 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs
 import Blockchain.Sequencer.CallSpec (CallSpec (..), TxCreateObject (..), TxFuncCallObject (..))
 import Blockchain.Strato.Model.Address (Address, fromPublicKey, stringAddress)
-import Blockchain.Strato.Model.Gas (Gas (..))
+import Blockchain.Strato.Model.Gas (Gas (..), getGasValue, transactionGas)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Model.SyncState (BestBlock, WorldBestBlock)
 import Blockchain.SyncDB (SyncStatus)
@@ -149,10 +149,9 @@ postBlocTransactionSimulate mToken mUsername mChainId trace (PostBlocTransaction
     _ -> pure addr
   env <- getBlocEnv
   let url = Bloc.Monad.vmJsonRpcUrl env
-      envGasLimit = Bloc.Monad.gasLimit env
       hexGas mp = Text.pack $ case txparamsGasLimit =<< mp of
         Just (Gas g) -> "0x" ++ showHex g ""
-        Nothing -> "0x" ++ showHex envGasLimit ""
+        Nothing -> "0x" ++ showHex (getGasValue transactionGas) ""
       mkFuncCall to' fn args gasTxt =
         SpecFuncCall
           TxFuncCallObject
