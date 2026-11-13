@@ -14,7 +14,7 @@ import { safeParseUnits } from "@/utils/numberUtils";
 import { computeMaxTransferable } from "@/utils/transferValidation";
 import { SlippageSetting, TradeFormState, initialTradeFormState } from "@/components/swap/swapFormReducer";
 import { SlippageControl } from "@/components/swap/SlippageControl";
-import NetworkFee, { FeeNotices } from "@/components/NetworkFee";
+import { FeeNotices } from "@/components/NetworkFee";
 import { amountText, formatPrice, formatTokens } from "@/components/terminal/format";
 
 const HIGH_IMPACT_PERCENT = 5;
@@ -318,11 +318,6 @@ export const OrderForm = ({ market, settlement }: OrderFormProps) => {
           {quoted(() => `${formatTokens(minAmountOutWei)} ${tokenOut._symbol}`)}
         </Row>
         <Row label="Pool fee">{market.feeBps / 100}%</Row>
-        {isLoggedIn && (
-          <Row label="Network fee">
-            <NetworkFee calls={SWAP_CALLS} />
-          </Row>
-        )}
       </div>
 
       <SlippageControl
