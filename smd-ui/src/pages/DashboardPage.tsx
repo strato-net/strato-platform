@@ -159,7 +159,7 @@ export default function DashboardPage() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Last block" value={Number(lastBlock).toLocaleString()} icon={Box} />
-        <StatCard label="Users" value={Number(usersCount).toLocaleString()} icon={Users} to="/accounts" />
+        <StatCard label="Users" value={Number(usersCount).toLocaleString()} icon={Users} to="/accounts/users" />
         <StatCard label="Contracts" value={Number(contractsCount).toLocaleString()} icon={FileText} to="/contracts" />
         <StatCard label="Peers" value={Number(peerCount).toLocaleString()} icon={Network} />
       </div>

@@ -175,6 +175,29 @@ export function functionArgs(info: any, fnName: string): FuncArg[] {
     .map((entry: any) => ({ name: entry?.[0] ?? "", type: argType(entry?.[1]) }));
 }
 
+/** Resolve a deployed contract by address and return one function's declared arguments. */
+export async function fetchFunctionArgs(address: string, fnName: string): Promise<FuncArg[]> {
+  const normalized = address.replace(/^0x/i, "").toLowerCase();
+  const { data: groups } = await api.get(`${env.BLOC_URL}/contracts`, {
+    params: { name: normalized, limit: 20, ...chainParam() },
+  });
+  if (!groups || typeof groups !== "object") return [];
+
+  for (const [name, rawInstances] of Object.entries(groups as Record<string, any>)) {
+    const instances = Array.isArray(rawInstances) ? rawInstances : rawInstances?.instances ?? [];
+    const found = instances.some((instance: any) => {
+      const candidate = typeof instance === "string" ? instance : instance?.address;
+      return String(candidate ?? "").replace(/^0x/i, "").toLowerCase() === normalized;
+    });
+    if (!found) continue;
+    const { data: info } = await api.get(`${env.BLOC_URL}/contracts/${name}/${normalized}`, {
+      params: chainParam(),
+    });
+    return functionArgs(info, fnName);
+  }
+  return [];
+}
+
 /** Whether a function is payable (accepts value), from its state mutability. */
 export function isPayable(info: any, fnName: string): boolean {
   return info?._functions?.[fnName]?._funcStateMutability === "payable";
@@ -296,10 +319,14 @@ export async function submitStratoTx(
     }
   );
   const result = Array.isArray(data) ? data[0] : data;
-  if (result?.status === "Pending" && result?.hash) {
+  if (!result) {
+    throw new Error("Transaction returned no result");
+  }
+  if (result.status === "Pending") {
+    if (!result.hash) throw new Error("Pending transaction returned no hash");
     return pollTransactionResult(result.hash);
   }
-  if (result?.status === "Failure") {
+  if (result.status === "Failure") {
     throw new Error(result.txResult?.message || "Transaction failed");
   }
   return result;

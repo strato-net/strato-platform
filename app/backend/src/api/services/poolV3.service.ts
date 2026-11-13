@@ -1316,6 +1316,10 @@ const requirePositionManager = (): string => {
   return config.positionManagerV3;
 };
 
+export const getPositionManagerMetadata = () => ({
+  positionManagerAddress: normalizeAddress(requirePositionManager()),
+});
+
 /** The position NFT for a tokenId, resolved against the network's singleton manager —
  *  lets the UI address a position as /v3-liquidity/:tokenId with no manager in the URL */
 export const getPositionNFTItem = async (accessToken: string, tokenId: string) => {
