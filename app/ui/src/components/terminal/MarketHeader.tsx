@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { Market, MarketStats } from "@/interface";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { TokenLogo } from "@/components/poolv3/TokenPairIcons";
 import { usdstAddress } from "@/lib/constants";
 import { formatPrice, formatQuantity, formatUsd } from "@/components/terminal/format";
 
@@ -28,7 +29,8 @@ export const MarketHeader = ({ market, markets, stats }: MarketHeaderProps) => {
   return (
     <div className="flex items-start gap-5 px-3 py-2 border-b border-border overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center gap-1 self-center whitespace-nowrap rounded bg-muted px-2 py-1 text-sm font-semibold">
+        <DropdownMenuTrigger className="flex items-center gap-1.5 self-center whitespace-nowrap rounded bg-muted px-2 py-1 text-sm font-semibold">
+          <TokenLogo token={market.base} size="xs" />
           {market.base.symbol}/{market.quote.symbol}
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
         </DropdownMenuTrigger>
@@ -39,8 +41,11 @@ export const MarketHeader = ({ market, markets, stats }: MarketHeaderProps) => {
               onSelect={() => navigate(`/dashboard/terminal/${m.id}`)}
               className={`grid grid-cols-[9rem_3rem_6rem_5rem] gap-3 text-xs tabular-nums ${m.id === market.id ? "bg-muted" : ""}`}
             >
-              <span className="truncate font-semibold">
-                {m.base.symbol}/{m.quote.symbol}
+              <span className="flex min-w-0 items-center gap-1.5 font-semibold">
+                <TokenLogo token={m.base} size="xs" />
+                <span className="truncate">
+                  {m.base.symbol}/{m.quote.symbol}
+                </span>
               </span>
               <span className="text-muted-foreground">{m.feeBps / 100}%</span>
               <span className="text-right">{formatPrice(m.price)}</span>
