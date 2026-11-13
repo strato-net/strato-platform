@@ -6,7 +6,7 @@ import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Market } from "@/interface";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useMarkets, useMarketStats } from "@/hooks/terminal/useMarketData";
+import { useMarkets, useMarketStats, useTradeSettling } from "@/hooks/terminal/useMarketData";
 import { MarketHeader } from "@/components/terminal/MarketHeader";
 import { PriceChart } from "@/components/terminal/PriceChart";
 import { DepthLadder } from "@/components/terminal/DepthLadder";
@@ -40,6 +40,7 @@ const Terminal = () => {
   const { data: markets, isLoading } = useMarkets();
   const market = markets?.find((m) => m.id.toLowerCase() === pair?.toLowerCase()) ?? markets?.[0];
   const { data: stats } = useMarketStats(market?.poolAddress);
+  const settlement = useTradeSettling(market?.poolAddress);
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
@@ -67,7 +68,7 @@ const Terminal = () => {
                   </ResizablePanel>
                   <ResizableHandle />
                   <ResizablePanel defaultSize={28} minSize={18}>
-                    <OrderForm key={market.id} market={market} />
+                    <OrderForm key={market.id} market={market} settlement={settlement} />
                   </ResizablePanel>
                 </ResizablePanelGroup>
               </ResizablePanel>
@@ -83,7 +84,7 @@ const Terminal = () => {
             <div className="h-72">
               <PriceChart poolAddress={market.poolAddress} />
             </div>
-            <OrderForm key={market.id} market={market} />
+            <OrderForm key={market.id} market={market} settlement={settlement} />
             <div className="h-[28rem]">{book(market)}</div>
             <div className="h-64">
               <BottomPanel market={market} price={stats?.price} />

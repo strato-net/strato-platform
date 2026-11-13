@@ -1,5 +1,7 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
+import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import {
@@ -13,6 +15,9 @@ import {
 
 const FAST_POLL_MS = 3_000;
 const SLOW_POLL_MS = 15_000;
+/** After a trade: how often the tape is checked for it, and the longest balances wait for it */
+const SETTLING_POLL_MS = 1_000;
+const SETTLING_TIMEOUT_MS = 15_000;
 
 /** Terminal markets (tokens, pool balances, whether trading is open). */
 export function useMarkets() {
@@ -40,7 +45,7 @@ export function useMarketStats(poolAddress?: string) {
   });
 }
 
-export function useMarketTrades(poolAddress?: string) {
+export function useMarketTrades(poolAddress?: string, pollMs = FAST_POLL_MS) {
   return useQuery({
     queryKey: ["trade", "market", poolAddress, "trades"],
     queryFn: async ({ signal }) => {
@@ -51,20 +56,20 @@ export function useMarketTrades(poolAddress?: string) {
       return data ?? [];
     },
     enabled: !!poolAddress,
-    refetchInterval: FAST_POLL_MS,
+    refetchInterval: pollMs,
     retry: 1,
   });
 }
 
 /**
- * Id of the signed-in user's newest swap on the market's tape: it changes once a trade of
- * theirs has been indexed. The tape is already polled, so this costs no request.
+ * The signed-in user's own swaps on the market's tape, newest first. A new one appears once
+ * a trade of theirs has been indexed. The tape is already polled, so this costs no request.
  */
-export function useOwnLatestTradeId(poolAddress?: string): number | undefined {
+export function useOwnTrades(poolAddress?: string, pollMs?: number): MarketTrade[] {
   const { userAddress } = useUser();
-  const { data: trades = [] } = useMarketTrades(poolAddress);
+  const { data: trades = [] } = useMarketTrades(poolAddress, pollMs);
   const ownAddress = userAddress?.toLowerCase().replace(/^0x/, "");
-  return trades.find((trade) => trade.sender === ownAddress)?.id;
+  return trades.filter((trade) => trade.sender === ownAddress);
 }
 
 /**
@@ -112,4 +117,65 @@ export function useMarketBalances(market: Market): { base: string; quote: string
   const balanceOf = (address: string): string =>
     [...activeTokens, ...inactiveTokens].find((t) => t.address === address)?.balance || "0";
   return { base: balanceOf(market.base.address), quote: balanceOf(market.quote.address) };
+}
+
+/** A trade just made, kept until it shows on its market's tape */
+interface SettlingTrade {
+  poolAddress: string;
+  /** the user's newest swap on that tape when the trade was sent */
+  since?: number;
+  side: MarketTrade["side"];
+  /** whole tokens spent */
+  spent: number;
+}
+
+const landed = (trade: SettlingTrade, ownTrades: MarketTrade[]): boolean =>
+  ownTrades.some(
+    (own) =>
+      own.id > (trade.since ?? 0) &&
+      own.side === trade.side &&
+      Math.abs((own.side === "buy" ? own.amountQuote : own.amountBase) - trade.spent) <= trade.spent * 1e-9
+  );
+
+/**
+ * Wallet balances around a trade. The read made right after a trade can land before the
+ * indexer has the swap, and nothing else reads balances again, so they count as `settling`
+ * until the trade shows on its market's tape (or a time limit passes) and are read once
+ * more then. Kept above the order form so it survives a switch of market.
+ */
+export function useTradeSettling(poolAddress?: string) {
+  const { fetchUsdstBalance } = useTokenContext();
+  const { fetchTokens } = useUserTokens();
+  const [settling, setSettling] = useState<SettlingTrade>();
+  const ownTrades = useOwnTrades(settling?.poolAddress ?? poolAddress, settling ? SETTLING_POLL_MS : undefined);
+  const ownTradesRef = useRef(ownTrades);
+  ownTradesRef.current = ownTrades;
+  const refreshBalances = useCallback(
+    () => Promise.all([fetchUsdstBalance(), fetchTokens()]),
+    [fetchUsdstBalance, fetchTokens]
+  );
+
+  const ownLatestTradeId = ownTrades[0]?.id;
+  useEffect(() => {
+    if (!ownLatestTradeId) return;
+    void refreshBalances().finally(() =>
+      setSettling((current) => (current && landed(current, ownTradesRef.current) ? undefined : current))
+    );
+  }, [ownLatestTradeId, refreshBalances]);
+
+  /** Call when a trade is sent on `poolAddress`; call what it returns once the trade has succeeded */
+  const begin = (side: MarketTrade["side"], spent: number) => {
+    const trade: SettlingTrade = { poolAddress: poolAddress!, since: ownLatestTradeId, side, spent };
+    const releaseIf = (done: () => boolean) =>
+      void refreshBalances().finally(() => setSettling((current) => (current === trade && done() ? undefined : current)));
+    return () => {
+      setSettling(trade);
+      // it may have reached the tape while it was confirming: this read is then already final
+      releaseIf(() => landed(trade, ownTradesRef.current));
+      // and a trade that never shows on the tape must not hold the form forever
+      window.setTimeout(() => releaseIf(() => true), SETTLING_TIMEOUT_MS);
+    };
+  };
+
+  return { settling: !!settling, begin, refreshBalances };
 }

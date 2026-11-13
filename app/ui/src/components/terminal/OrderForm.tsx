@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Market, PoolV3Token, SwapToken } from "@/interface";
 import { useUser } from "@/context/UserContext";
@@ -7,20 +7,21 @@ import { useUserTokens } from "@/context/UserTokensContext";
 import { useToast } from "@/hooks/use-toast";
 import { useDerivedTradeInfo } from "@/hooks/trade/useDerivedTradeInfo";
 import { useTradeSwap } from "@/hooks/trade/useTradeSwap";
-import { useMarketBalances, useOwnLatestTradeId } from "@/hooks/terminal/useMarketData";
+import { useMarketBalances, useTradeSettling } from "@/hooks/terminal/useMarketData";
 import { axios } from "@/lib/axios";
 import { DECIMAL_PATTERN, SWAP_CALLS } from "@/lib/constants";
-import { formatAmount, formatUnits } from "@/utils/numberUtils";
+import { safeParseUnits } from "@/utils/numberUtils";
 import { computeMaxTransferable } from "@/utils/transferValidation";
 import { SlippageSetting, TradeFormState, initialTradeFormState } from "@/components/swap/swapFormReducer";
 import { SlippageControl } from "@/components/swap/SlippageControl";
 import { SwapConfirmDialog } from "@/components/swap/SwapConfirmDialog";
 import NetworkFee, { FeeNotices } from "@/components/NetworkFee";
-import { formatPrice } from "@/components/terminal/format";
+import { amountText, formatPrice, formatTokens } from "@/components/terminal/format";
 
 const HIGH_IMPACT_PERCENT = 5;
 const MAX_IMPACT_PERCENT = 15;
 const SIZE_PRESETS = [25, 50, 75, 100];
+const WAD = 10n ** 18n;
 
 type Side = "buy" | "sell";
 type Unit = "base" | "quote";
@@ -37,6 +38,11 @@ const toSwapToken = (token: PoolV3Token, balance: string): SwapToken => ({
   images: token.image ? [{ value: token.image }] : [],
 });
 
+interface OrderFormProps {
+  market: Market;
+  settlement: ReturnType<typeof useTradeSettling>;
+}
+
 const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div className="flex items-center justify-between gap-2">
     <span className="text-muted-foreground">{label}</span>
@@ -48,27 +54,28 @@ const Row = ({ label, children }: { label: string; children: React.ReactNode }) 
  * Market orders against the terminal's pool. Buying spends the quote token, selling
  * spends the base token; the amount can be typed in either. Quotes and execution go
  * through the unified /trade endpoints with the pool pinned.
+ *
+ * Nothing here is shown or traded on unless it belongs to what is on screen now: a quote
+ * counts only if it was made for the amount typed, and after a trade the balances are
+ * held back (`settlement`) until a read that includes it.
  */
-export const OrderForm = ({ market }: { market: Market }) => {
+export const OrderForm = ({ market, settlement }: OrderFormProps) => {
   const { isLoggedIn } = useUser();
-  const { feeQuote, fetchUsdstBalance } = useTokenContext();
-  const { fetchTokens } = useUserTokens();
+  const { feeQuote } = useTokenContext();
+  const { loading: tokensLoading, activeTokens, inactiveTokens } = useUserTokens();
+  const { settling } = settlement;
   const { toast } = useToast();
   const balances = useMarketBalances(market);
   const tradeSwap = useTradeSwap();
 
-  // the balance read right after a trade can land before the indexer has the swap, and
-  // nothing else reads balances again: read them once more when the trade shows on the tape
-  const ownLatestTradeId = useOwnLatestTradeId(market.poolAddress);
-  useEffect(() => {
-    if (ownLatestTradeId) void Promise.all([fetchUsdstBalance(), fetchTokens()]);
-  }, [ownLatestTradeId, fetchUsdstBalance, fetchTokens]);
-
   const [side, setSide] = useState<Side>("buy");
   const [unit, setUnit] = useState<Unit>("quote");
   const [typedValue, setTypedValue] = useState("");
+  /** what the amount read in the other unit before the last unit switch: switching back restores it */
+  const [otherUnitValue, setOtherUnitValue] = useState<string>();
   const [slippage, setSlippage] = useState<SlippageSetting>(initialTradeFormState.slippage);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const balancesLoading = tokensLoading && activeTokens.length + inactiveTokens.length === 0;
 
   const isBuy = side === "buy";
   const spendUnit: Unit = isBuy ? "quote" : "base";
@@ -96,20 +103,30 @@ export const OrderForm = ({ market }: { market: Market }) => {
   }, [tokenIn.balance, tokenIn.address, feeQuote]);
 
   const {
-    activeQuote, quoteResponse, quoteLoading, hasQuoteResponse, typedValueWei, exactOut,
-    inputAmount, outputAmount, inputAmountWei, outputAmountWei,
+    activeQuote, quoteResponse, typedValueWei, exactOut,
+    inputAmountWei, outputAmountWei,
     exchangeRate, invertedExchangeRate, priceImpact, slippagePercent, minAmountOutWei,
     insufficientBalance,
   } = useDerivedTradeInfo(formState, maxSpendableWei);
 
   const hasAmount = typedValueWei > 0n;
-  // the quote hook keeps the previous amount's quote on screen while a new amount is
-  // debounced; only a quote for the amount now typed may be traded on
+  // the quote hook keeps the last response on screen while the amount now typed is being
+  // quoted (and, right after a unit switch, briefly asks for the old amount in the new
+  // unit): only a response made for exactly this amount is used
   const quoteIsCurrent = quoteResponse?.amount === typedValueWei.toString();
+  const quoting = hasAmount && !quoteIsCurrent;
+  // a pool that cannot take the whole order answers with a partial fill (an exact-input
+  // quote then reports a smaller input): that is no quote for this order
+  const fillable =
+    quoteIsCurrent && !!activeQuote && !activeQuote.partialFill && (exactOut || BigInt(activeQuote.amountIn) >= typedValueWei);
+  const quote = fillable ? activeQuote : undefined;
+  const cannotFill = hasAmount && quoteIsCurrent && !quote;
   const [baseWei, quoteWei] = isBuy ? [outputAmountWei, inputAmountWei] : [inputAmountWei, outputAmountWei];
-  const averagePrice = activeQuote && quoteIsCurrent && baseWei > 0n ? Number(quoteWei) / Number(baseWei) : null;
-  const impactTooHigh = (priceImpact ?? 0) >= MAX_IMPACT_PERCENT;
-  const cannotFill = hasAmount && hasQuoteResponse && !quoteLoading && (!activeQuote || (exactOut && !!activeQuote.partialFill));
+  const averagePrice = quote && baseWei > 0n ? Number(quoteWei) / Number(baseWei) : null;
+  const impact = quote ? priceImpact : null;
+  // spending an exact amount is checked against the balance at once; an exact amount to
+  // receive only once its quote says what it costs
+  const insufficient = insufficientBalance && (!exactOut || !!quote);
 
   const blocker = !isLoggedIn
     ? "Sign in to trade"
@@ -117,41 +134,74 @@ export const OrderForm = ({ market }: { market: Market }) => {
       ? "Trading opens soon"
       : !hasAmount
         ? "Enter an amount"
-        : insufficientBalance
-          ? `Insufficient ${tokenIn._symbol} balance`
-          : cannotFill
-            ? "Not enough liquidity"
-            : impactTooHigh
-              ? "Price impact too high"
-              : feeError || null;
+        : balancesLoading
+          ? "Loading balances…"
+          : settling
+            ? "Updating balances…"
+            : insufficient
+              ? `Insufficient ${tokenIn._symbol} balance`
+              : cannotFill
+                ? "Not enough liquidity"
+                : (impact ?? 0) >= MAX_IMPACT_PERCENT
+                  ? "Price impact too high"
+                  : feeError || null;
+
+  const typeAmount = (value: string) => {
+    setTypedValue(value);
+    setOtherUnitValue(undefined);
+  };
 
   const selectSide = (next: Side) => {
     setSide(next);
     setUnit(next === "buy" ? "quote" : "base");
-    setTypedValue("");
+    typeAmount("");
+  };
+
+  /** The typed amount in the other token: what its quote says, else at the pool price */
+  const inOtherUnit = (): bigint => {
+    if (quote) return exactOut ? inputAmountWei : outputAmountWei;
+    const priceWad = safeParseUnits(market.price.toFixed(18));
+    if (priceWad === 0n) return 0n;
+    return unit === "base" ? (typedValueWei * priceWad) / WAD : (typedValueWei * WAD) / priceWad;
+  };
+
+  const switchUnit = (next: Unit) => {
+    if (next === unit) return;
+    setUnit(next);
+    setTypedValue(otherUnitValue ?? (hasAmount ? amountText(inOtherUnit()) : typedValue));
+    setOtherUnitValue(typedValue);
   };
 
   const applyPreset = (percent: number) => {
     setUnit(spendUnit);
-    setTypedValue(formatUnits(((maxSpendableWei * BigInt(percent)) / 100n).toString()));
+    // all of it is exact; a share is rounded down to a readable amount
+    typeAmount(
+      percent === 100 ? amountText(maxSpendableWei, Infinity) : amountText((maxSpendableWei * BigInt(percent)) / 100n)
+    );
   };
 
   const handleSwap = async () => {
-    if (!activeQuote || !quoteIsCurrent) return;
+    if (!quote) return;
+    const succeeded = settlement.begin(side, Number(inputAmountWei) / 1e18);
     try {
-      await tradeSwap.mutateAsync({
+      const result = await tradeSwap.mutateAsync({
         poolAddress: market.poolAddress,
         tokenIn: tokenIn.address,
         tokenOut: tokenOut.address,
         amountIn: inputAmountWei.toString(),
         minAmountOut: minAmountOutWei.toString(),
       });
-      toast({
-        title: "Success",
-        description: `Traded ${formatAmount(inputAmount)} ${tokenIn._symbol} for ${formatAmount(outputAmount)} ${tokenOut._symbol}`,
-        variant: "success",
-      });
-      setTypedValue("");
+      if (result?.status === "Pending") {
+        toast({ title: "Order submitted", description: "It is still confirming; balances update once it lands." });
+      } else {
+        toast({
+          title: "Success",
+          description: `Traded ${formatTokens(inputAmountWei)} ${tokenIn._symbol} for ${formatTokens(outputAmountWei)} ${tokenOut._symbol}`,
+          variant: "success",
+        });
+      }
+      typeAmount("");
+      succeeded();
     } catch (error) {
       // HTTP failures are toasted by the api client; a wallet rejection or the on-chain
       // revert of a wallet-signed trade only surfaces here
@@ -162,13 +212,16 @@ export const OrderForm = ({ market }: { market: Market }) => {
           variant: "destructive",
         });
       }
+      // a failed order can still have cost network fees
+      void settlement.refreshBalances();
     } finally {
       setConfirmOpen(false);
-      await Promise.all([fetchUsdstBalance(), fetchTokens()]);
     }
   };
 
   const unitSymbol = unit === "base" ? market.base.symbol : market.quote.symbol;
+  /** a figure from the quote, a placeholder while the amount now typed is being quoted */
+  const quoted = (value: () => string) => (quote ? value() : quoting ? "…" : "—");
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-y-auto p-3 text-xs [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -191,7 +244,13 @@ export const OrderForm = ({ market }: { market: Market }) => {
       </div>
 
       <Row label="Available">
-        {isLoggedIn ? `${formatAmount(formatUnits(tokenIn.balance))} ${tokenIn._symbol}` : "—"}
+        {!isLoggedIn
+          ? "—"
+          : balancesLoading
+            ? "Loading…"
+            : settling
+              ? "Updating…"
+              : `${formatTokens(BigInt(tokenIn.balance))} ${tokenIn._symbol}`}
       </Row>
 
       <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 focus-within:ring-1 focus-within:ring-ring">
@@ -201,7 +260,7 @@ export const OrderForm = ({ market }: { market: Market }) => {
           aria-label={`Amount in ${unitSymbol}`}
           value={typedValue}
           onChange={(e) => {
-            if (DECIMAL_PATTERN.test(e.target.value)) setTypedValue(e.target.value);
+            if (DECIMAL_PATTERN.test(e.target.value)) typeAmount(e.target.value);
           }}
           className="min-w-0 flex-1 bg-transparent text-base tabular-nums outline-none"
         />
@@ -209,7 +268,7 @@ export const OrderForm = ({ market }: { market: Market }) => {
           {(["base", "quote"] as const).map((option) => (
             <button
               key={option}
-              onClick={() => setUnit(option)}
+              onClick={() => switchUnit(option)}
               className={`rounded px-2 py-0.5 ${
                 option === unit ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
               }`}
@@ -224,7 +283,7 @@ export const OrderForm = ({ market }: { market: Market }) => {
         {SIZE_PRESETS.map((percent) => (
           <button
             key={percent}
-            disabled={maxSpendableWei <= 0n}
+            disabled={balancesLoading || settling || maxSpendableWei <= 0n}
             onClick={() => applyPreset(percent)}
             className="rounded border border-border py-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
@@ -235,18 +294,20 @@ export const OrderForm = ({ market }: { market: Market }) => {
 
       <div className="flex flex-col gap-1.5 rounded-md bg-muted/50 p-3">
         <Row label={exactOut ? "You pay ≈" : "You receive ≈"}>
-          {activeQuote
-            ? `${formatAmount(exactOut ? inputAmount : outputAmount)} ${exactOut ? tokenIn._symbol : tokenOut._symbol}`
-            : "—"}
+          {quoted(() =>
+            exactOut ? `${formatTokens(inputAmountWei)} ${tokenIn._symbol}` : `${formatTokens(outputAmountWei)} ${tokenOut._symbol}`
+          )}
         </Row>
-        <Row label="Average price">{averagePrice ? `${formatPrice(averagePrice)} ${market.quote.symbol}` : "—"}</Row>
+        <Row label="Average price">
+          {quoted(() => (averagePrice ? `${formatPrice(averagePrice)} ${market.quote.symbol}` : "—"))}
+        </Row>
         <Row label="Price impact">
-          <span className={(priceImpact ?? 0) >= HIGH_IMPACT_PERCENT ? "text-down" : undefined}>
-            {priceImpact === null ? "—" : `${priceImpact.toFixed(2)}%`}
+          <span className={(impact ?? 0) >= HIGH_IMPACT_PERCENT ? "text-down" : undefined}>
+            {quoted(() => `${(impact ?? 0).toFixed(2)}%`)}
           </span>
         </Row>
         <Row label="Minimum received">
-          {activeQuote ? `${formatAmount(formatUnits(minAmountOutWei.toString()))} ${tokenOut._symbol}` : "—"}
+          {quoted(() => `${formatTokens(minAmountOutWei)} ${tokenOut._symbol}`)}
         </Row>
         <Row label="Pool fee">{market.feeBps / 100}%</Row>
         <Row label="Network fee">
@@ -256,10 +317,16 @@ export const OrderForm = ({ market }: { market: Market }) => {
 
       <SlippageControl slippage={slippage} effectivePercent={slippagePercent} onChange={setSlippage} />
 
-      {isLoggedIn && <FeeNotices calls={SWAP_CALLS} spendingWei={inputAmountWei} tokenAddress={tokenIn.address} />}
+      {isLoggedIn && (
+        <FeeNotices
+          calls={SWAP_CALLS}
+          spendingWei={exactOut && !quote ? 0n : inputAmountWei}
+          tokenAddress={tokenIn.address}
+        />
+      )}
 
       <Button
-        disabled={!!blocker || quoteLoading || !activeQuote || !quoteIsCurrent}
+        disabled={!!blocker || !quote}
         onClick={() => setConfirmOpen(true)}
         className={`w-full text-background ${isBuy ? "bg-up hover:bg-up/90" : "bg-down hover:bg-down/90"}`}
       >
@@ -269,16 +336,16 @@ export const OrderForm = ({ market }: { market: Market }) => {
       <SwapConfirmDialog
         isOpen={confirmOpen}
         onOpenChange={setConfirmOpen}
-        fromAmount={formatAmount(inputAmount)}
-        toAmount={formatAmount(outputAmount)}
+        fromAmount={formatTokens(inputAmountWei)}
+        toAmount={formatTokens(outputAmountWei)}
         fromAsset={tokenIn}
         toAsset={tokenOut}
         exchangeRate={exchangeRate}
         invertedExchangeRate={invertedExchangeRate}
-        isHighPriceImpact={(priceImpact ?? 0) >= HIGH_IMPACT_PERCENT}
-        toAmountMin={formatAmount(formatUnits(minAmountOutWei.toString()))}
+        isHighPriceImpact={(impact ?? 0) >= HIGH_IMPACT_PERCENT}
+        toAmountMin={formatTokens(minAmountOutWei)}
         onConfirm={handleSwap}
-        isLoading={tradeSwap.isPending}
+        isLoading={tradeSwap.isPending || !quote}
       />
     </div>
   );

@@ -16,3 +16,23 @@ export const formatQuantity = (quantity: number): string =>
     : quantity > 0 && quantity < 0.000001
       ? "<0.000001"
       : quantity.toLocaleString(undefined, { maximumFractionDigits: quantity >= 100 ? 2 : quantity >= 1 ? 4 : 6 });
+
+/**
+ * A token amount (18-decimal base units) as text for the amount box, rounded down: six
+ * significant digits by default, every digit when `significant` is Infinity.
+ */
+export const amountText = (units: bigint, significant = 6): string => {
+  const digits = units.toString().padStart(19, "0");
+  const whole = digits.slice(0, -18);
+  const fraction = digits.slice(-18);
+  const decimals = whole === "0" ? fraction.search(/[1-9]/) + significant : significant - whole.length;
+  const kept = fraction.slice(0, Math.max(0, decimals)).replace(/0+$/, "");
+  return kept ? `${whole}.${kept}` : whole;
+};
+
+/** A token amount (18-decimal base units) for display: six significant digits, rounded down */
+export const formatTokens = (units: bigint): string => {
+  const [whole, fraction] = amountText(units).split(".");
+  const grouped = BigInt(whole).toLocaleString("en-US");
+  return fraction ? `${grouped}.${fraction}` : grouped;
+};

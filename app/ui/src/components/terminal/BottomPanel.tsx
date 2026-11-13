@@ -1,7 +1,7 @@
 import { Market } from "@/interface";
 import { useUser } from "@/context/UserContext";
 import { useTradeHistory } from "@/hooks/trade/useTradeHistory";
-import { useMarketBalances, useOwnLatestTradeId } from "@/hooks/terminal/useMarketData";
+import { useMarketBalances, useOwnTrades } from "@/hooks/terminal/useMarketData";
 import { formatAmount, formatUnits } from "@/utils/numberUtils";
 import { formatPrice } from "@/components/terminal/format";
 import { Tabs } from "@/components/terminal/Tabs";
@@ -18,7 +18,7 @@ const MyTrades = ({ market }: { market: Market }) => {
   const { userAddress } = useUser();
   // one refetch at confirmation can land before the indexer has the swap: refetch again
   // when the user's trade shows on the tape
-  const revision = useOwnLatestTradeId(market.poolAddress);
+  const revision = useOwnTrades(market.poolAddress)[0]?.id;
   const { data, isLoading } = useTradeHistory({
     tokenIn: market.base.address,
     tokenOut: market.quote.address,
