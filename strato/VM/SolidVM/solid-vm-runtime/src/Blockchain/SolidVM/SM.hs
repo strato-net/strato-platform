@@ -496,14 +496,12 @@ runSM maybeCode envBefore gi f = do
   contextState <- Mod.get (Mod.Proxy @ContextState)
   let initialDebugSettings = _debugSettings contextState
       initialVmTracer = _vmTracer contextState
-  GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
-  $logDebugS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
   let !startingState =
         SState
           { env = envBefore,
             callStack = [],
             _action = startingAction envBefore,
-            _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap}, -- capping the transaction gas limit
+            _gasInfo = gi,
             ssDebugSettingsValue = initialDebugSettings,
             ssVmTracerValue = initialVmTracer,
             ssDbgHot = isJust initialDebugSettings || isJust initialVmTracer

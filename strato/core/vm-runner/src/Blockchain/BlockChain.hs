@@ -448,7 +448,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
         | txSize >= sizeLimit = Left $ TFTXSizeLimitExceeded txSize sizeLimit t
         | otherwise = Right ()
 
-  let availableGas = 600_000
+  let availableGas = transactionGas
 
   case precheck of
     Left failure -> pure (Left failure)

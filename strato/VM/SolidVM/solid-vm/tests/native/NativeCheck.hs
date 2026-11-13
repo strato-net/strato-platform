@@ -8,7 +8,7 @@ module Main where
 import BlockApps.Logging (runLogging)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.SolidVM.Simple hiding (name)
-import Blockchain.VMContext (runMemContextM, GasCap (..), ContextState)
+import Blockchain.VMContext (runMemContextM, ContextState)
 import qualified Control.Monad.Change.Modify as Mod
 import Blockchain.VMOptions ()
 import Blockchain.Strato.Model.Options ()
@@ -265,19 +265,16 @@ main = do
     emptyContext <- Mod.get (Mod.Proxy :: Mod.Proxy ContextState)
     forM_ [0..1100] $ \limit -> do
       Mod.put (Mod.Proxy :: Mod.Proxy ContextState) emptyContext
-      Mod.put (Mod.Proxy :: Mod.Proxy GasCap) (GasCap (Gas limit))
-      result <- create $ def & createNewAddress .~ 0x2100 & createContractName .~ "GasProbe" & createCode .~ Code gasSource
+      result <- create $ def & createArgs . argsGas .~ Gas limit & createNewAddress .~ 0x2100 & createContractName .~ "GasProbe" & createCode .~ Code gasSource
       liftIO $ putStrLn $ "GAS constructor " ++ show limit ++ " " ++ show (erException result, erReturnVal result)
     Mod.put (Mod.Proxy :: Mod.Proxy ContextState) emptyContext
-    Mod.put (Mod.Proxy :: Mod.Proxy GasCap) (GasCap (Gas 100000000))
     deployment <- create $ def & createNewAddress .~ 0x2100 & createContractName .~ "GasProbe" & createCode .~ Code gasSource
     liftIO $ check deployment
     savedContext <- Mod.get (Mod.Proxy :: Mod.Proxy ContextState)
     forM_ ["aliasIndex", "aliasIndexWrite", "aliasIncrement", "storageIncrement", "guardedArgs", "libraryConstant", "qualifiedCall", "usingCall", "superCall", "decimalCompound", "tupleAssign", "aliasRebind", "message", "blockNumber", "constantRead", "enumRead", "externalCall", "scalarWrite", "memberWrite", "indexWrite", "mappingWrite", "copyStorage", "push", "memoryIndexWrite", "aliasWrite", "stringAdd", "bytesAdd", "abiEncode", "shifts", "bigMultiply", "decimalDivide", "compare", "literal", "local", "valueChain", "literalFirst", "valueSelfAdd", "valueMultiply", "valueUnderflow", "valueFromStorage", "localBytesRead", "localBytesWrite", "storageRead", "member", "index", "mappingRead", "callInternal", "castContract", "arithmetic", "divide", "modulo", "compound", "decimalMath", "loop", "breakLoop", "whileLoop", "doLoop", "tuple", "arrayLiteral", "guarded", "explicitStorageArrayLength", "aliasArrayLength", "reboundArrayLength", "memoryArrayLength", "memoryStructArrayLength", "abiBoolsPacked", "abiString", "abiArray", "abiPackedArray", "payableCast", "memberCompound", "indexCompound", "memoryCompound", "memoryIncrement", "localFieldWrite", "parameterSizes", "hashCost", "castText", "emptyLoop", "hugeArray", "catchGas", "catchGasBody"] $ \fn ->
       forM_ [0..1100] $ \limit -> do
         Mod.put (Mod.Proxy :: Mod.Proxy ContextState) savedContext
-        Mod.put (Mod.Proxy :: Mod.Proxy GasCap) (GasCap (Gas limit))
-        result <- call $ def & callCodeAddress .~ 0x2100 & callFuncName .~ fn
+        result <- call $ def & callArgs . argsGas .~ Gas limit & callCodeAddress .~ 0x2100 & callFuncName .~ fn
         liftIO $ putStrLn $ "GAS " ++ T.unpack fn ++ " " ++ show limit ++ " " ++ show (erException result, erReturnVal result)
     Mod.put (Mod.Proxy :: Mod.Proxy ContextState) savedContext
   oracleSource <- traverse T.readFile =<< lookupEnv "SOLIDVM_ORACLE_SOURCE"
