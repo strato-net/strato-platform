@@ -33,6 +33,7 @@ import SyncingPage from "./pages/SyncingPage";
 import StratoStats from "./pages/StratoStats";
 import Explore from "./pages/Explore";
 import Rewards from "./pages/Rewards";
+import Vesting from "./pages/Vesting";
 import Claim from "./pages/Claim";
 import ProductLanding from "./pages/ProductLanding";
 import CommunityRewardsOnePager from "./pages/CommunityRewardsOnePager";
@@ -468,6 +469,14 @@ const App = () => {
                                                   element={
                                                     <GuestAccessibleRoute>
                                                       <Rewards />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/vesting"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <Vesting />
                                                     </GuestAccessibleRoute>
                                                   }
                                                 />
