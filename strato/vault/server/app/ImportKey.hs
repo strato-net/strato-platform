@@ -25,7 +25,7 @@ main = do
   privateKey <- decodePrivateKey privateKeyHex
   vaultPassword <- readVaultPassword
 
-  conn <- connect dbConnectInfo
+  conn <- connect =<< connectInfo
   (mMsgLst :: [(B.ByteString, SB.Nonce, B.ByteString)]) <- runSelect conn VQ.getMessageQuery
   case mMsgLst of
     [] -> die "message table is empty, so the vault password must not be set. Aborting..."
@@ -40,16 +40,6 @@ main = do
             else die $ "User key already exists for " ++ flags_username ++ " (" ++ flags_oauthProvider ++ ")"
         _ -> die "couldn't decrypt the secret message, probably you entered the wrong vault password"
     _ -> die "multiple rows in message table, something is not right"
-
-dbConnectInfo :: ConnectInfo
-dbConnectInfo =
-  ConnectInfo
-    { connectHost = flags_pghost,
-      connectPort = read flags_pgport,
-      connectUser = flags_pguser,
-      connectPassword = flags_password,
-      connectDatabase = flags_database
-    }
 
 readVaultPassword :: IO String
 readVaultPassword
