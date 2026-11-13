@@ -109,6 +109,10 @@ data Value
   | -- | The value of an integer written with an exponent, @1e3@, which only
     -- expressions accept.
     Scientific !Integer
+  | -- | The mantissa and exponent of an integer written with an exponent too
+    -- large to work out while parsing: the power is left to run time, where
+    -- its size is charged before it is computed.
+    Power !Integer !Integer
   | -- | A decimal's integer part and fraction digits.
     Decimal !Integer String
   | -- | A string literal's decoded value, or why a 'TError' could not be read.
@@ -373,7 +377,11 @@ tokenize (Text arr start len) = runST $ do
                     | n == 0 = err (i + 1) (unexpected (chr (fromIntegral b)))
                     | Just op <- IntMap.lookup (packAt i n) operatorValues = flat TOp (i + n) n op
                     | otherwise = match (n - 1)
-               in match (min longestOperator (spanClass opChar i - i))
+                  -- the run of operator bytes at i, no further than an operator can reach
+                  run n
+                    | n < longestOperator, i + n < end, c <- byteAt (i + n), c < 0x80, is opChar c = run (n + 1)
+                    | otherwise = n
+               in match (run 0)
           | is punctChar b -> flat TPunct (i + 1) 1 None
           | otherwise -> err (i + 1) (unexpected (chr (fromIntegral b)))
 
@@ -398,7 +406,8 @@ tokenize (Text arr start len) = runST $ do
                   | j < end, byteAt j == 0x2e, k <- spanClass digitChar (j + 1), k > j + 1 ->
                       Right (TDecimal, k, Decimal ds [chr (fromIntegral (byteAt m)) | m <- [j + 1 .. k - 1]])
                   | j < end, byteAt j == 0x65 || byteAt j == 0x45, k <- spanClass digitChar (j + 1), k > j + 1 ->
-                      Right (TNumber, k, Scientific (ds * 10 ^ value 10 (j + 1) k))
+                      let e = value 10 (j + 1) k
+                       in Right (TNumber, k, if e > 1000 then Power ds e else Scientific (ds * 10 ^ e))
                   | otherwise -> Right (TNumber, j, Number ds)
       spanHex :: Int -> Int
       spanHex !i
@@ -406,7 +415,11 @@ tokenize (Text arr start len) = runST $ do
         | otherwise = i
       -- the value of the digits in bytes [i, j)
       value :: Integer -> Int -> Int -> Integer
-      value base i j = foldl' (\acc m -> acc * base + fromIntegral (digitValue (byteAt m))) 0 [i .. j - 1]
+      -- Long runs are split in halves: adding a digit at a time to the whole
+      -- number takes time quadratic in its length.
+      value base i j
+        | j - i <= 32 = foldl' (\acc m -> acc * base + fromIntegral (digitValue (byteAt m))) 0 [i .. j - 1]
+        | otherwise = let m = (i + j) `div` 2 in value base i m * base ^ (j - m) + value base m j
 
       -- the body of the string opened by the quote byte q, from byte i:
       -- the decoded value and the byte index after the closing quote

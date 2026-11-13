@@ -82,6 +82,8 @@ ENTRYPOINT ["/highway/doit.sh"]
 
 
 FROM base as vault-wrapper
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 COPY usr/local/bin/blockapps-vault-wrapper-server /usr/local/bin/
 COPY ./vault-wrapper /vault-wrapper
 EXPOSE 8000

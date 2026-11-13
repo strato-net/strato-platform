@@ -25,27 +25,29 @@ module SolidVM.Blockchain
     create,
     callReturnEnv,
     createReturnEnv,
+    call', createContractValues, createCode, selfdestruct, derive, getPrevBlockFacts,
   )
 where
 
 import Control.Exception (throw)
-import Blockchain.DB.ModifyStateDB (pay)
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.ExecResults
 import qualified Control.Monad.Composable.StateDB as MP
+import Blockchain.SolidVM.Execution
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.GasInfo
 import Blockchain.SolidVM.Metrics (recordCall)
+import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Metered
+import Blockchain.SolidVM.Builtins.Size.Values (ValueArguments (..))
+import qualified Blockchain.SolidVM.Builtins.Contracts.Metered as ContractBuiltins
 import Blockchain.SolidVM.SM hiding (action)
 import SolidVM.Storage
 import SolidVM.Values
-import SolidVM.Events
 import SolidVM.Gas
-import qualified SolidVM.Core as N
 import qualified SolidVM.Runtime as Runtime
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
@@ -168,7 +170,7 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
   fmap (fmap $ either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
 
     opts <- parseOptionsForCurrentBlock
-    (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 initCode
+    (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests False $ DT.encodeUtf8 initCode
     addNewCodeCollection hsh cc
     let eArgExps = traverse (Fast.parseArg initialParserState "") argsStrings
         !argExps = either ((throw . ParseError "create arguments") . show) id eArgExps
@@ -370,7 +372,7 @@ call' from to' fnCalltype functionName valList = do
         else pure to'
   let shouldPushSender = bool False (fnCalltype /= CC.DelegateCall) isExternal
       currentReadOnly = maybe False readOnly currentCall
-  (contract, hsh, cc) <- getCodeAndCollection codeAddress
+  (contract, hsh, cc) <- Runtime.getCodeAndCollection codeAddress
 
   unless (maybe False ((storageAddress ==) . currentAddress) currentCall) $
     initializeAction storageAddress
@@ -566,11 +568,13 @@ runTheConstructors from to hsh cc contractName' argVals' = do
       Just (_, vals) -> pure vals
       Nothing -> throw (InvalidArguments "constructor arguments don't match" (format (contractName', map renderValueShallow argVals')))
 
+  Metered.functionEntry (ValueArguments argVals)
+
   nativeArgs <- liftIO $ newIORef $ maybe [] (const argVals) (contract' ^. CC.constructor)
   let runStage stage = do
         fun <- Runtime.constructorStage hsh cc contract' stage
         values <- liftIO $ readIORef nativeArgs
-        result <- runAction cc contract' "constructor" (CC._contractContext contract') fun values
+        result <- Runtime.runAction cc contract' "constructor" fun values
         if stage == "<constructor>" then pure result else case result of
           Just (STuple outputs) -> case V.toList outputs of
             [updatedVar, valueVar] -> do
@@ -674,47 +678,32 @@ runTheCallValidated validation address codeAddress contract name hsh cc original
       Just pair -> pure pair
       Nothing -> throw (TypeError "function arguments do not match" (labelToString name))
   fun <- Runtime.compiledFunction hsh cc contract name selected
-  decrementGas 5
+  Metered.functionEntry (ValueArguments values)
   result <- withCallInfo address codeAddress contract name hsh cc M.empty ro ff $
-    runAction cc contract name (CC._funcContext selected) fun values
+    Runtime.runAction cc contract name fun values
   pure (selected ^. CC.funcVals, result)
-
-runAction :: CC.CodeCollection -> CC.Contract -> T.Text -> SourceAnnotation () -> N.Fun -> ValList -> SM (Maybe Value)
-runAction cc contract name annotation = Runtime.runAction (decrementGas . Gas) call' createContractValues host emit cc contract name
-  where
-    host = Runtime.Host createCode selfdestruct getPrevBlockFacts derive
-    emit eventContractName event values = do
-      eventContract <- maybe (throw (MissingType "event contract" (labelToString eventContractName))) pure $ M.lookup eventContractName (cc ^. CC.contracts)
-      void $ emitEventValuesForContract eventContract (CC.EmitStatement event [] annotation) event values
 
 createCode :: Maybe Value -> T.Text -> T.Text -> ValList -> SM Address
 createCode salt name source args = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ throw (InvalidWrite "contract creation during read-only access" (T.unpack name))
-  creator <- getCurrentAddress
-  isRunningTests <- Env.runningTests <$> getEnv
-  opts <- parseOptionsForCurrentBlock
-  (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True (DT.encodeUtf8 source)
-  addNewCodeCollection hsh cc
-  address <- case salt of
-    Nothing -> getNewAddress creator
-    Just s -> getNewAddressWithSalt creator s hsh (SString (T.unpack name) : args)
-  result <- create' creator address hsh cc name args
-  pure $ fromMaybe (throw (InternalError ("create did not produce an address: " ++ (maybe "no VM exception" (either displayException displayException) $ erException result)))) (erNewContractAddress result)
+  let name' = T.unpack name
+      source' = T.unpack source
+  case salt of
+    Nothing -> ContractBuiltins.create @Native name' source' args
+    Just value -> ContractBuiltins.create2 @Native value name' source' args
+
+instance MonadContractCreation Native SM where
+  prepareContractSource = compileSourceForCreation False
+  runContractConstructor = create'
 
 selfdestruct :: Address -> SM Bool
 selfdestruct target = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ throw (InvalidWrite "selfdestruct during read-only access" (format target))
-  address <- getCurrentAddress
-  balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) address
-  A.adjustWithDefault_ (A.Proxy @AddressState) address $ \addressState ->
-    pure addressState {addressStateCodeHash = SolidVMCode "Code_0" (unsafeCreateKeccak256FromWord256 0)}
-  sent <- pay "selfdestruct function" address target balance
-  purgeStorageMap address
-  pure sent
+  ContractBuiltins.selfdestruct target
 
 derive :: Address -> T.Text -> T.Text -> ValList -> SM Address
 derive address salt name args = do
-  (_, hsh, _) <- getCodeAndCollection address
+  (_, hsh, _) <- Runtime.getCodeAndCollection address
   pure $ getNewAddressWithSalt_unsafe address (T.unpack salt) (keccak256ToByteString hsh) (SString (T.unpack name) : args)

@@ -196,7 +196,7 @@ export const getUserVaults = async (
 
     return userVaults || [];
   } catch (error) {
-    console.warn(`❌ [CDP] Failed to fetch user vaults for ${userAddress}:`, error);
+    console.warn("❌ [CDP] Failed to fetch user vaults for %s:", userAddress, error);
     return [];
   }
 };

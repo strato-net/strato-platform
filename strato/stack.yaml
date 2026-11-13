@@ -101,11 +101,13 @@ packages:
 - VM/evm-solidity
 - VM/SolidVM/debugger
 - VM/SolidVM/solid-vm
+- VM/SolidVM/solid-vm-builtins
 - VM/SolidVM/solid-vm-compiler
 - VM/SolidVM/solid-vm-fuzzer
 - VM/SolidVM/solid-vm-model
 - VM/SolidVM/solid-vm-native
 - VM/SolidVM/solid-vm-parser
+- VM/SolidVM/solid-vm-runtime
 - VM/SolidVM/solid-vm-static-analysis
 - VM/SolidVM/source-tools
 

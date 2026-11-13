@@ -173,7 +173,7 @@ These builtins run natively and are charged gas before they run, based on input 
 
 The BLS12-381 functions take EIP-2537-encoded `bytes`. The addition, MSM and pairing functions also accept flat integer coordinates.
 
-A Groth16 verification is one four-pair `ecPairing` check (113,000 gas), which fits in a transaction's 400,000 budget. `app/contracts/tests/General/main.groth16.sol` is a Groth16 verifier built on these builtins, and `app/contracts/tests/General/cryptoGas.test.sol` checks the gas ceilings.
+A Groth16 verification is one four-pair `ecPairing` check (113,000 gas), which fits in a transaction's 600,000 budget. `app/contracts/tests/General/main.groth16.sol` is a Groth16 verifier built on these builtins, and `app/contracts/tests/General/cryptoGas.test.sol` checks the gas ceilings.
 
 ### Other builtins
 

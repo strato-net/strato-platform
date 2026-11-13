@@ -504,21 +504,28 @@ contract Describe_Adv_Amm_PriceImpact {
     /// Total value extractable in ONE transaction by recycling chunks. Scans chunk sizes: the
     /// limit of infinitely-fine chunking is the whole area between the AMM curve and oracle
     /// parity, so this is a tight upper bound on single-transaction liquidation MEV.
-    function it_d4_total_single_tx_extraction() public {
+    /// One chunk size per test: the three scans together do not fit in one test's gas.
+    function it_d4a_greedy_chunk_7000() public {
         (uint pr1, uint it1, uint tr1) = _greedy("GF1", 7000e18, 60);
-        (uint pr2, uint it2, uint tr2) = _greedy("GF2", 2000e18, 60);
-        (uint pr3, uint it3, uint tr3) = _greedy("GF3", 500e18, 80);
-
         greedyProfit = pr1; greedyIters = it1; greedyTotalRepaid = tr1;
-        if (pr2 > greedyProfit) { greedyProfit = pr2; greedyIters = it2; greedyTotalRepaid = tr2; }
-        if (pr3 > greedyProfit) { greedyProfit = pr3; greedyIters = it3; greedyTotalRepaid = tr3; }
+        greedyBest7000 = pr1; greedyIt7000 = it1;
+    }
 
-        greedyBest7000 = pr1; greedyBest2000 = pr2; greedyBest500 = pr3;
-        greedyIt7000 = it1; greedyIt2000 = it2; greedyIt500 = it3;
+    function it_d4b_greedy_chunk_2000() public {
+        (uint pr2, uint it2, uint tr2) = _greedy("GF2", 2000e18, 60);
+        if (pr2 > greedyProfit) { greedyProfit = pr2; greedyIters = it2; greedyTotalRepaid = tr2; }
+        greedyBest2000 = pr2; greedyIt2000 = it2;
+    }
+
+    function it_d4c_total_single_tx_extraction() public {
+        // 15 cycles is what fits in one transaction's gas.
+        (uint pr3, uint it3, uint tr3) = _greedy("GF3", 500e18, 15);
+        if (pr3 > greedyProfit) { greedyProfit = pr3; greedyIters = it3; greedyTotalRepaid = tr3; }
+        greedyBest500 = pr3; greedyIt500 = it3;
 
         require(greedyProfit > 0, "greedy recycling nets something");
         require(greedyProfit < 1000e18, "total single-tx extraction is under $1,000");
-        require(it3 > it1, "finer chunking runs more cycles");
+        require(it3 > greedyIt7000, "finer chunking runs more cycles");
     }
 
     // ─────────────────────────────────────────────────────────────────────

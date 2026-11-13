@@ -557,24 +557,21 @@ contract Describe_Adv_Credit_RealDepth {
         }
     }
 
-    function it_cc_h4_scan_peak_region() public {
-        _h4Try(4000e18);
-        _h4Try(9000e18);
+    // One size per test: each try is a whole transaction's worth of gas.
+    function it_cc1_h4_scan_peak_region() public { _h4Try(4000e18); }
+    function it_cc2_h4_scan_peak_region() public { _h4Try(9000e18); }
+    function it_cc3_h4_scan_peak_region() public {
         _h4Try(11000e18);
         require(h4LargestOk > 0, "small self-liquidations do close");
     }
 
-    function it_cd_h4_scan_upper_region() public {
-        _h4Try(13000e18);
-        _h4Try(16000e18);
-        _h4Try(19000e18);
-    }
+    function it_cd1_h4_scan_upper_region() public { _h4Try(13000e18); }
+    function it_cd2_h4_scan_upper_region() public { _h4Try(16000e18); }
+    function it_cd3_h4_scan_upper_region() public { _h4Try(19000e18); }
 
-    function it_ce_h4_scan_boundary() public {
-        _h4Try(21000e18);
-        _h4Try(23000e18);
-        _h4Try(26000e18);
-    }
+    function it_ce1_h4_scan_boundary() public { _h4Try(21000e18); }
+    function it_ce2_h4_scan_boundary() public { _h4Try(23000e18); }
+    function it_ce3_h4_scan_boundary() public { _h4Try(26000e18); }
 
     function it_cf_h4_scan_verdict() public {
         log("H4 VERDICT largest atomic zero-capital self-liquidation : " + string(h4LargestOk));

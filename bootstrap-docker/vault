@@ -30,42 +30,55 @@ The entrypoints are mutually exclusive.
 --help|-h       - this help.
 --set-password  - set or re-enter the STRATO Vault's in-memory password; use PASSWORD env var to skip interactive input.
 --down          - remove strato containers and leave all volumes intact.
---wipe          - stop and remove STRATO containers and wipe out volumes.
+--wipe          - same as --down; prints the command that wipes the volumes.
 --pull          - pull images used in docker-compose.vault.yml.
 
 ${Yellow}Environment variables:${NC}
 PASSWORD           - STRATO Vault's in-memory password. To be requested interactively if skipped.
 HTTP_PORT          - (default: 8090) Port for HTTP traffic listener.
 HTTPS_PORT         - (default: 8093) Port for HTTPS traffic listener; only used with ssl=true.
+VAULT_NGINX_PORT   - Override the nginx host-to-container port mapping, including an optional bind address.
 ssl                - (default: false) [true|false] to run the node with SSL/TLS.
 sslCertFileType    - (default: pem) [pem|crt] the SSL certificate type and file extension (should be accessible at ./ssl/certs/server.<sslCertFileType> at deploy time.)
 INITIAL_OAUTH_DISCOVERY_URL       - (required) OpenID Connect discovery URL for initial OAuth2 provider. Additional ones can be added at run time.
 INITIAL_OAUTH_ISSUER              - (required) Issuer value for initial OAuth2 provider.
-INITIAL_OAUTH_JWT_USERNAME_CLAIM  - (default: sub) The claim (payload property) of JWT token to use as unique user id within STRATO Vault."
+INITIAL_OAUTH_JWT_USER_ID_CLAIM   - (default: sub) The claim (payload property) of JWT token to use as unique user id within STRATO Vault.
+
+${Yellow}Database environment variables:${NC}
+COMPOSE_PROFILES   - Set to local-postgres to run the bundled PostgreSQL container. Leave unset to use an external database.
+VAULT_PGPASS_FILE  - (default: /etc/vault/postgres.pgpass) File with the database login's password, one host:port:database:user:password line, mode 0600.
+postgres_host      - (default: postgres) Database host. The default is the bundled PostgreSQL container.
+postgres_user      - (default: strato) Database login. The default is the bundled PostgreSQL's login, which is not a superuser.
+postgres_vault_wrapper_db - (default: oauth) Database name.
+postgres_password  - (default: api) Password the bundled PostgreSQL is created with on its first start. VAULT_PGPASS_FILE must hold the same one.
+VAULT_CREATE_DB    - (default: false) [true|false] Create the database when it is missing. Set to true with the bundled PostgreSQL.
+PGSSLMODE          - (default: verify-full) TLS mode of the database connection. Set to disable with the bundled PostgreSQL.
+PGSSLROOTCERT      - (default: system) CA certificates the database's certificate is verified against. With PGSSLMODE=disable set it to /etc/ssl/certs/ca-certificates.crt."
 }
 
 function wipe {
-  echo -e "${Yellow}Removing Vault containers and wiping out volumes${NC}"
-  ${docker_compose} down -vt 0 --remove-orphans
+  down
+  echo -e "${BYellow}The volumes are kept. To wipe them, run the command below. ALL USER KEYS STORED IN THIS VAULT WILL BE LOST:
+  docker volume rm vault_vaultpgdata vault_idpconfig${NC}"
 }
 
 function down {
   echo -e "${Yellow}Removing Vault containers${NC}"
-  ${docker_compose} down --remove-orphans
+  ${docker_compose} -f docker-compose.vault.yml --profile local-postgres down --remove-orphans
 }
 
 function stop {
   echo -e "${Yellow}Gently stopping Vault containers${NC}"
-  ${docker_compose} stop
+  ${docker_compose} -f docker-compose.vault.yml --profile local-postgres stop
 }
 
 function start {
   echo -e "${Yellow}Starting the earlier stopped Vault containers${NC}"
-  ${docker_compose} start
+  ${docker_compose} -f docker-compose.vault.yml --profile local-postgres start
 }
 
 function pullImages {
-  ${docker_compose} pull
+  ${docker_compose} -f docker-compose.vault.yml pull
 }
 
 function setPassword {
@@ -115,10 +128,10 @@ then
 else
   if ! docker compose version &> /dev/null
   then
-    docker_compose="docker-compose -p vault -f docker-compose.vault.yml --log-level ERROR"
+    docker_compose="docker-compose -p vault --log-level ERROR"
     CNAME_SEP="_"
   else
-    docker_compose="docker -l error compose -p vault -f docker-compose.vault.yml"
+    docker_compose="docker -l error compose -p vault"
     CNAME_SEP="-"
   fi
 fi
@@ -166,10 +179,10 @@ outputLogo
 
 if [ "$ssl" = true ] ; then
   http_protocol=https
-  main_port=${HTTPS_PORT}
+  container_port=443
 else
   http_protocol=http
-  main_port=${HTTP_PORT}
+  container_port=80
 fi
 export sslCertFileType=${sslCertFileType:-pem}
 
@@ -185,14 +198,9 @@ echo "ssl: $ssl"
 echo "sslCertFileType: $sslCertFileType"
 echo "INITIAL_OAUTH_DISCOVERY_URL: ${INITIAL_OAUTH_DISCOVERY_URL}"
 echo "INITIAL_OAUTH_ISSUER: ${INITIAL_OAUTH_ISSUER}"
-echo "INITIAL_OAUTH_JWT_USERNAME_CLAIM: ${INITIAL_OAUTH_ISSUER:-'using default'}"
+echo "INITIAL_OAUTH_JWT_USER_ID_CLAIM: ${INITIAL_OAUTH_JWT_USER_ID_CLAIM:-'using default'}"
 echo "PASSWORD: $(if [ -z ${PASSWORD} ]; then echo "not provided (to be set in stdin)"; else echo "provided in env var"; fi)"
 
-
-if [[ ${HTTP_PORT} == ${HTTPS_PORT} ]]; then
-  echo -e "${Red}Can not bind HTTP and HTTPS listeners to same port (${HTTP_PORT})${NC}"
-  exit 7
-fi
 
 if [ ! -f docker-compose.vault.yml ]
 then
@@ -209,25 +217,44 @@ function cleanup {
 trap cleanup EXIT
 
 if [ "$ssl" != true ]; then
-  sed -n '/#TAG_REMOVE_WHEN_NO_SSL/!p' docker-compose.vault.yml > docker-compose-vault-temp.yml
+  port_mapping='${VAULT_NGINX_PORT:-${HTTP_PORT:-8090}:80}'
 else
-  if [ ${HTTPS_PORT} != "8093" ]; then
-    sed -n '/#TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT/!p' docker-compose.vault.yml > docker-compose-vault-temp.yml
-  else
-    cp docker-compose.vault.yml docker-compose-vault-temp.yml
-  fi
+  port_mapping='${VAULT_NGINX_PORT:-${HTTPS_PORT:-8093}:443}'
 fi
+sed -e '/#TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT/d' \
+    -e "s|^[[:space:]]*- .*#TAG_REMOVE_WHEN_NO_SSL$|    - ${port_mapping}|" \
+    docker-compose.vault.yml > docker-compose-vault-temp.yml
 # END OF COMPOSE FILE PRE-PROCESSING
 
 ${docker_compose} -f docker-compose-vault-temp.yml up -d --remove-orphans
+published=$(${docker_compose} -f docker-compose-vault-temp.yml port nginx "$container_port")
+while IFS= read -r binding; do
+  if [[ $binding != '[::]:'* && $binding != ':::'* ]]; then
+    published=$binding
+    break
+  fi
+done <<< "$published"
+published=${published%%$'\n'*}
+if [ -z "$published" ]; then
+  echo -e "${Red}No published nginx port found for container port ${container_port}${NC}"
+  exit 7
+fi
+main_host=${published%:*}
+main_port=${published##*:}
+case "$main_host" in
+  0.0.0.0) main_host=127.0.0.1 ;;
+  '[::]'|'::') main_host='[::1]' ;;
+  *:*) [[ $main_host == \[*\] ]] || main_host="[$main_host]" ;;
+esac
 # Wait until the vault is reachable. /_ping returns 200 when the password is
 # already set (e.g. via vaultPasswordFile) and 503 when it is awaiting password
 # initialization — either response means the container is up and ready for
 # setPassword to proceed. Any other condition (connection refused, timeout,
 # transient 5xx from a fronting proxy) keeps the loop waiting.
-until status=$(curl --silent --output /dev/null --insecure --location \
+# nginx exposes the wrapper's /_ping response at /ping.
+until status=$(curl --silent --output /dev/null --insecure --location --noproxy '*' \
                     --write-out '%{http_code}' --max-time 2 \
-                    "${http_protocol}://localhost:${main_port}/_ping") \
+                    "${http_protocol}://${main_host}:${main_port}/ping") \
        && { [ "$status" = "200" ] || [ "$status" = "503" ]; }
 do
   sleep 0.5

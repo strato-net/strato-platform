@@ -6,13 +6,13 @@
   "scripts": {
     "start": "ts-node src/index.ts",
     "dev": "nodemon src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "node --test --require ts-node/register test/*.test.cjs"
   },
   "engines": {
     "node": ">=22.12 <23.0"
   },
   "dependencies": {
-    "@sendgrid/mail": "^8.1.5",
     "@types/jsonwebtoken": "^9.0.10",
     "axios": "^1.13.6",
     "body-parser": "^1.20.2",
@@ -22,7 +22,6 @@
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.2.0",
-    "jwt-decode": "^4.0.0",
     "simple-oauth2": "^5.1.0"
   },
   "devDependencies": {
@@ -35,7 +34,6 @@
     "@types/node-fetch": "^2.6.12",
     "@types/pbkdf2": "^3.1.2",
     "@types/secp256k1": "^4.0.6",
-    "@types/sendgrid": "^2.0.31",
     "@types/simple-oauth2": "^5.0.7",
     "@types/ws": "^8.5.10",
     "nodemon": "^3.0.1",

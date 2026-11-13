@@ -23,6 +23,7 @@ export interface Asset {
     targetAssetAddress: string;
     constantPrice?: number;
     minSources?: number; // Overrides ORACLE_CONFIG.MIN_VALID_SOURCES for this asset
+    maxAgeSec?: number; // Drop a source's answer when now - feedTimestamp exceeds this
     weekendProxy?: string; // Proxy symbol for weekend/market-closed pricing (e.g., "PAXG" for XAU)
     equivalentAssets?: string[]; // Assets with equivalent prices (e.g., ["XAUT"] for XAU)
     submit?: boolean; // Whether to submit this asset to blockchain (default: true)
@@ -50,6 +51,15 @@ export interface SourceConfig {
     accountId?: string; // Resolved account ID (populated at load time)
     symbolMapping?: Record<string, string>; // Mapping from asset symbols to API-specific keys
     assets: string[]; // Which assets this source supports
+    twapSeconds?: number; // On-chain pool sources: TWAP window passed to observe()
+    pools?: Record<string, PoolConfig>; // On-chain pool sources: asset symbol -> Uniswap V3-style pool
+}
+
+export interface PoolConfig {
+    address: string;
+    baseIsToken0: boolean; // Whether the priced asset is the pool's token0 (quote token is ~USD)
+    decimals0: number;
+    decimals1: number;
 }
 
 export interface TransactionResult {
