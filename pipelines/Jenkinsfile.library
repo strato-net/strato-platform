@@ -305,6 +305,15 @@ def waitLocalNodeIsSynced(String nodeDir = '') {
         sudo docker exec strato-nginx-1 curl -fsS 172.17.0.1:3000/eth/v1.2/metadata 2>/dev/null
       }
 
+      # /metadata only reports isSynced; the block numbers are in the eth
+      # database's node_status table (Blockchain.Data.NodeStatus).
+      sync_progress() {
+        sudo docker exec strato-postgres-1 psql -U strato -d eth -tAc "
+          select 'nodeBestBlock=' || coalesce(max(value::json->>'number') filter (where name = 'best_block'), '?')
+              || ' worldBestBlock=' || coalesce(max(value::json->>'number') filter (where name = 'world_best_block'), '?')
+          from node_status;" 2>/dev/null || echo 'nodeBestBlock=? worldBestBlock=?'
+      }
+
       # strato-ps shells out to docker compose and strato-barometer, so it costs
       # far more than the metadata poll: callers invoke it every ~30s, not every
       # poll. Two attempts: strato-ps talks to the docker daemon, which can
@@ -333,11 +342,11 @@ def waitLocalNodeIsSynced(String nodeDir = '') {
       for (( i = 0; i < SYNC_MAX_POLLS; i++ )); do
         meta=$(metadata)
         if grep -q '"isSynced":true' <<<"$meta"; then
-          echo "Node is in-sync (nodeBestBlock=$(jq -r '.nodeBestBlock // "?"' <<<"$meta" 2>/dev/null)) after ${SECONDS}s"
+          echo "Node is in-sync ($(sync_progress)) after ${SECONDS}s"
           break
         fi
         if (( SECONDS - last_progress >= PROGRESS_EVERY_SECS )); then
-          echo "[$(date -u +%H:%M:%S)] still syncing: nodeBestBlock=$(jq -r '.nodeBestBlock // "?"' <<<"$meta" 2>/dev/null) worldBestBlock=$(jq -r '.worldBestBlock // "?"' <<<"$meta" 2>/dev/null)"
+          echo "[$(date -u +%H:%M:%S)] still syncing: $(sync_progress)"
           last_progress=$SECONDS
         fi
         # Skipping i=0 gives convoke a grace period to write .strato.pid, since

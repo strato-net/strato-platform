@@ -315,7 +315,7 @@ oracle:
 
 build_formatter:
 	@echo building code formatter...
-	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-formatter:${STACK_RESOLVER} - < Dockerfile.formatter
+	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-formatter:${STACK_RESOLVER} - < strato/extraFiles/Dockerfile.formatter
 
 build_common: generate-version-file
 	@echo building haskell libraries and creating directories

@@ -28,7 +28,6 @@
   },
   "dependencies": {
     "@noble/curves": "1.9.7",
-    "@sendgrid/mail": "^8.1.6",
     "@strato/shared-types": "file:../packages/shared-types",
     "@types/json-bigint": "^1.0.4",
     "axios": "^1.13.6",
