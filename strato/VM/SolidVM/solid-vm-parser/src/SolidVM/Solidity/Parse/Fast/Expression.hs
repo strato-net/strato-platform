@@ -274,9 +274,15 @@ newExpression = do
 expressionNumber :: P Expression
 expressionNumber = do
   (a, (n, u)) <- withPosition ((,) <$> number <*> optionalNext numberUnit)
-  pure (NumberLiteral a n u)
+  pure $ case n of
+    Left value -> NumberLiteral a value u
+    Right (mantissa, e) -> Binary a "*" (NumberLiteral a mantissa u) (Binary a "**" (NumberLiteral a 10 Nothing) (NumberLiteral a e Nothing))
   where
-    number = next (\t -> case tValue' t of Number n -> Just n; Scientific n -> Just n; _ -> Nothing)
+    number = next $ \t -> case tValue' t of
+      Number n -> Just (Left n)
+      Scientific n -> Just (Left n)
+      Power mantissa e -> Just (Right (mantissa, e))
+      _ -> Nothing
 
 -- | A number, with an optional unit, or a decimal, after the optional sign
 -- parsec's @integer@ accepts.

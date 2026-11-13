@@ -24,7 +24,9 @@ module Blockchain.Forks
     isReplayProtectionForkActive,
     replayProtectionForkBlock,
     isStratoGasForkActive,
-    forkNotScheduled
+    forkNotScheduled,
+    heliumNetworkID,
+    upquarkNetworkID
   )
 where
 

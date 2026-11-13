@@ -48,6 +48,7 @@ import qualified Data.Map.Strict as M
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Set (Set)
 import qualified Data.Set as S
+import qualified Data.Text as T
 import Text.Printf
 import Text.Format
 
@@ -98,9 +99,8 @@ replayHistoricBlock realValidators realStakes activation chainId' lastRound' seq
       blockNo = fromIntegral . number $ hdr
       stakingActive = maybe True (number hdr >=) activation
 
-  signers <- sequence $ map (verifyCommitmentSeal (blockHash blk)) _commitment
-
-  let signerRes = S.fromList $ map Validator signers
+  let recovered = S.fromList [Validator s | Right s <- map (verifyCommitmentSeal (blockHash blk)) _commitment]
+      signerRes = recovered `S.intersection` realValidators
 
   unless (seqNo + 1 == blockNo) $
     throwError $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
@@ -122,13 +122,11 @@ replayHistoricBlock realValidators realStakes activation chainId' lastRound' seq
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
       ++ "\nblock validator list: " ++ show (map format $ S.toList expectedValidatorList)
 
-  unless (signerRes `S.isSubsetOf` realValidators) $ do
-        let unexplained = intercalate "," . map format . S.toList $ signerRes S.\\ realValidators
-        blockstanbulError $
-               "unknown signers in block #" ++ show blockNo ++ ": " ++ unexplained
-               ++ "\nsignerRes: " ++ show (map format $ S.toList signerRes)
-               ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
-               ++ "\nblock validator list: " ++ show (map format $ S.toList expectedValidatorList)
+  when (S.size signerRes /= length _commitment) $
+    logWarnNS "blockstanbul" . T.pack $
+      printf "block #%d: ignoring %d of %d commit seals not from distinct validators; outside signers: %s"
+        blockNo (length _commitment - S.size signerRes) (length _commitment)
+        (intercalate "," . map format . S.toList $ recovered S.\\ realValidators)
 
   -- Stake-weighted once staking is active (the stakes in force for this block are
   -- the ones we hold and the header must carry, checked below), headcount before.

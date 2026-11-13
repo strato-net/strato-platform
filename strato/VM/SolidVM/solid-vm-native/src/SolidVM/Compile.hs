@@ -6,6 +6,7 @@
 -- Contract-to-address is a selected compatibility exception (see README.md).
 module SolidVM.Compile where
 
+import Blockchain.SolidVM.SM (SM)
 import Control.Exception (throwIO)
 import Control.Lens ((^.), (&), (.~))
 import Control.Monad
@@ -24,16 +25,21 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Type.Equality ((:~:) (Refl))
 import Blockchain.Strato.Model.Address (Address (..))
-import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import qualified Data.Source.Annotation as SA
 import qualified Data.Source.Position as SP
 import SolidVM.Model.CodeCollection hiding (DelegateCall, RawCall, Internal)
 import qualified SolidVM.Model.CodeCollection.Statement as S
 import SolidVM.Model.Storable (BasicValue (BDefault), StoragePath (..), StoragePathPiece (..))
 import qualified SolidVM.Model.Type as Ty
+import {-# SOURCE #-} qualified SolidVM.Runtime as Runtime
 import SolidVM.Core
 import SolidVM.Code
 import qualified SolidVM.Builtins as Builtins
+import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Operations
+import qualified Blockchain.SolidVM.Builtins.Size as SharedSize
+import qualified Blockchain.SolidVM.Builtins.Casts.Metered as MeteredCasts
+import qualified Blockchain.SolidVM.Builtins.Functions.Metered as Metered
+import qualified Blockchain.SolidVM.Builtins.Operators.Metered as Operators
 
 makeFun :: T.Text -> Sig args r -> Code (Fn args r) -> Fun
 makeFun name sig action = withCode action (Fun name sig)
@@ -42,7 +48,7 @@ linkedAction :: a -> a
 linkedAction = id
 {-# INLINE linkedAction #-}
 
-constantCode :: Ty a -> a -> Code (b -> M a)
+constantCode :: Ty a -> a -> Code (b -> SM a)
 constantCode _ v = constantFunction (pureAction (plainCode v))
 {-# INLINE constantCode #-}
 valueCode :: Ty a -> a -> Code a
@@ -54,9 +60,9 @@ namedCode _ a = a
 namedFunction :: T.Text -> Func -> a -> a
 namedFunction _ _ a = a
 {-# INLINE namedFunction #-}
-builtinCode :: T.Text -> a -> Code a
-builtinCode _ a = plainCode a
-{-# INLINE builtinCode #-}
+builtinBinding :: Code a -> Code a
+builtinBinding code = withCode code $ \function -> function `seq` code
+{-# INLINE builtinBinding #-}
 
 typedCode :: [EnvTy] -> Ty r -> a -> a
 typedCode _ _ a = a
@@ -64,6 +70,9 @@ typedCode _ _ a = a
 typedBody :: [EnvTy] -> Ty r -> a -> a
 typedBody _ _ a = a
 {-# INLINE typedBody #-}
+typedUnary :: Ty a -> Ty b -> Code (a -> SM b) -> Code (a -> SM b)
+typedUnary _ _ = id
+{-# INLINE typedUnary #-}
 typedSetter :: [EnvTy] -> Ty r -> a -> a
 typedSetter _ _ a = a
 {-# INLINE typedSetter #-}

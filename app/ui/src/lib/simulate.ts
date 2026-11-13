@@ -44,17 +44,20 @@ export interface SimulationResult {
 /**
  * Simulate casting a vote on an admin issue. Returns the vote tx result with the
  * issue's "effect if executed" nested under `.effect`. The voting admin (the
- * vote's msg.sender) is the authenticated session user, resolved server-side.
+ * vote's msg.sender) is the session user, or the connected wallet when there is no
+ * session, resolved server-side.
  */
 export async function simulateAdminVote(issue: {
   target: string;
   func: string;
   args: unknown[];
 }): Promise<SimulationResult> {
+  // Parsed issue args carry large integers as BigInts, which JSON cannot encode: send
+  // them as decimal strings, which the backend reads at full precision
+  const args = JSON.parse(JSON.stringify(issue.args, (_k, v) => (typeof v === "bigint" ? v.toString() : v)));
   const { data } = await api.post(
     "/user/admin/vote/simulate",
-    { target: issue.target, func: issue.func, args: issue.args },
-    { walletAuth: false } as never
+    { target: issue.target, func: issue.func, args }
   );
   if (!data) throw new Error("Empty simulation response");
   return data as SimulationResult;

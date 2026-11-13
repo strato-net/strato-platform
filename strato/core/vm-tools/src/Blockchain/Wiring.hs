@@ -27,7 +27,6 @@ module Blockchain.Wiring
 where
 
 import BlockApps.Init ()
-import BlockApps.Logging
 import Blockchain.Bagger.BaggerState (BaggerState)
 import qualified Blockchain.DB.AddressStateDB as DB
 import Blockchain.DB.BlockSummaryDB
@@ -60,7 +59,6 @@ import Data.Default (def)
 import Data.Maybe (fromMaybe)
 import Control.Monad.IO.Class
 import qualified Data.NibbleString as N
-import qualified Data.Text as T
 import Blockchain.Data.VmTrace (VmTracer)
 import Debugger
 import Text.Format (format)
@@ -201,10 +199,3 @@ instance (Keccak256 `A.Alters` BlockSummary) ContextM where
   lookup _ k = readStore memBlockSummaryDB (\d -> genericLookupBlockSummaryDB (pure $ _blockSummaryDB d) k) mirrorBlockSummary k
   insert _ k v = writeStore memBlockSummaryDB (\d -> genericInsertBlockSummaryDB (pure $ _blockSummaryDB d) k v) k (Just v)
   delete _ k = writeStore memBlockSummaryDB (\d -> genericDeleteBlockSummaryDB (pure $ _blockSummaryDB d) k) k Nothing
-
-instance Mod.Modifiable GasCap ContextM where
-  get _ = contextGets (GasCap . _vmGasCap)
-
-  put _ (GasCap g) = do
-    contextModify (vmGasCap .~ g)
-    $logDebugS "#### Mod.put @vmGasCap" . T.pack $ "VM Gas Cap updated to: " ++ show g

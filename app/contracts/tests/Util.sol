@@ -1,4 +1,3 @@
-import "../../abstract/ERC20/access/Authorizable.sol";
 // This is the import path needed for:
 // find app/contracts/tests -name '*.test.sol' -print0   | xargs -0 -I {} sh -c 'echo "{}" && cd "$(dirname "{}")" && solid-vm-cli test "$(basename "{}")"'
 // It doesn't work to compile this contract alone; see https://github.com/strato-net/strato-platform/issues/4905
@@ -23,13 +22,6 @@ contract User {
         } catch Error(string e) {
             require(e == expectedError, "Expected " + f + " to fail with error: " + expectedError + " but got: " + e);
         }
-    }
-}
-
-// Authorizable admin to enable callback-style ownership checks
-contract Admin is User, Authorizable {
-    constructor() {
-        bypassAuthorizations = true;
     }
 }
 

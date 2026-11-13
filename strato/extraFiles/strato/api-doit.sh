@@ -1,5 +1,5 @@
 #!/bin/bash
-# Entrypoint for the API tier (docker-compose.api.yml): strato-api and
+# Entrypoint for the API tier: strato-api and
 # ethereum-jsonrpc from the strato image, with nginx as a sidecar container.
 #
 # Config: a node's ethconf.yaml mounted at /config/ethconf.yaml supplies the
@@ -16,6 +16,8 @@
 #   VM_QUERY (default true), VM_QUERY_URLS        this copy's vm-query, and other
 #                                                 copies' to try when it is down
 #   /run/secrets/postgres_password                optional database password file
+#   postgres_reader_host                          replica endpoint for reads, when
+#                                                 the node config names none
 #   VAULT_URL                                     vault-wrapper base URL
 #   OAUTH_CREDENTIALS_YAML | /run/secrets/oauth_credentials.yaml
 #     | OAUTH_DISCOVERY_URL + OAUTH_CLIENT_ID + OAUTH_CLIENT_SECRET
@@ -73,6 +75,14 @@ if [[ -z "${INGRESS_URLS:-}" ]]; then
   exit 8
 fi
 INGRESS_LIST="$INGRESS_URLS" yq -i '.ingressUrls = (strenv(INGRESS_LIST) | split(",") | map(trim) | map(select(. != "")))' "$CONF"
+# A core cell's config names only the writer. General eth and Cirrus reads go
+# to the replica endpoint; writes and the resolve poll stay on the writer (see
+# Blockchain.DB.SQLDB). User, password and port are the config's own.
+if [[ -n "${postgres_reader_host:-}" ]]; then
+  yq -i '.sqlReaderConfig = .sqlConfig' "$CONF"
+  override   '.sqlReaderConfig.host'           "$postgres_reader_host"
+  override   '.cirrusConfig.host'              "$postgres_reader_host"
+fi
 override     '.apiConfig.apiListenAddress'     "$API_LISTEN_ADDRESS"
 # ethereum-jsonrpc binds apiListenAddress as well, and bloc reaches it in this
 # same container on loopback for simulations (strato-api derives the URL).

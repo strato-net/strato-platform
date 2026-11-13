@@ -9,6 +9,7 @@
 -- Contract-to-address is a selected compatibility exception (see README.md).
 module SolidVM.Source where
 
+import Blockchain.SolidVM.SM (SM)
 import Control.Exception (throwIO)
 import Control.Lens ((^.), (&), (.~))
 import Control.Monad
@@ -28,17 +29,22 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Type.Equality ((:~:) (Refl))
 import Blockchain.Strato.Model.Address (Address (..))
-import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import qualified Data.Source.Annotation as SA
 import qualified Data.Source.Position as SP
 import SolidVM.Model.CodeCollection hiding (DelegateCall, RawCall, Internal)
 import qualified SolidVM.Model.CodeCollection.Statement as S
 import SolidVM.Model.Storable (BasicValue (BDefault), StoragePath (..), StoragePathPiece (..))
 import qualified SolidVM.Model.Type as Ty
+import qualified SolidVM.Runtime as Runtime
 import SolidVM.Core hiding (Fun(..))
 import SolidVM.SourceCode
 import qualified SolidVM.SourceTemplate as SourceTemplate
 import qualified SolidVM.Builtins as Builtins
+import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Operations
+import qualified Blockchain.SolidVM.Builtins.Size as SharedSize
+import qualified Blockchain.SolidVM.Builtins.Casts.Metered as MeteredCasts
+import qualified Blockchain.SolidVM.Builtins.Functions.Metered as Metered
+import qualified Blockchain.SolidVM.Builtins.Operators.Metered as Operators
 import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.Exts as Haskell
 import qualified Language.Haskell.TH.Syntax as TH (NameSpace(..))
@@ -279,6 +285,7 @@ publicModule modul name = case modul of
   "Data.Text.Internal" -> "Data.Text"
   "Data.Sequence.Internal" -> "Data.Sequence"
   "GHC.IORef" -> "Data.IORef"
+  "GHC.Prim" | name == "seq" -> "Prelude"
   "GHC.IO" | name /= "IO" -> "Control.Exception"
   "GHC.Base" | name `elem` ["when", "unless", "join", "ap", "liftM"] -> "Control.Monad"
   _ | modul `elem` ["GHC.Base", "GHC.Classes", "GHC.Types", "GHC.Maybe", "GHC.Num", "GHC.Num.Integer", "GHC.Real", "GHC.Show", "GHC.List", "GHC.IO"] -> "Prelude"

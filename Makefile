@@ -69,6 +69,7 @@ HASH_SMD := $(call dir_hash,smd-ui)
 HASH_BRIDGE := $(call dir_hash,app/services/bridge)
 HASH_BRIDGE_NGINX := $(call dir_hash,app/services/bridge/nginx)
 HASH_HISTORY := $(call dir_hash,app/services/history)
+HASH_PARTNER_REFERRALS := $(call dir_hash,app/services/partner-referrals)
 HASH_LOCAL_AUTH := $(call dir_hash,local-auth)
 
 # Check if image exists in Docker — rebuild if missing (hash in tag handles source changes)
@@ -105,7 +106,7 @@ HASH_SUBS = -e 's|<HASH_STRATO>|$(HASH_STRATO)|g' \
             -e 's|<HASH_BRIDGE>|$(HASH_BRIDGE)|g' \
             -e 's|<HASH_BRIDGE_NGINX>|$(HASH_BRIDGE_NGINX)|g'
 
-.PHONY: postgrest nginx apex app-backend app-ui app-nginx prometheus smd bridge bridge-nginx history local-auth
+.PHONY: postgrest nginx apex app-backend app-ui app-nginx prometheus smd bridge bridge-nginx history partner-referrals push-partner-referrals local-auth
 
 .PHONY: postgres
 postgres:
@@ -225,6 +226,21 @@ history:
 		docker tag $(REPO_GHCR_URL)history:$(VERSION)-$(HASH_HISTORY) history:$(VERSION)-$(HASH_HISTORY); \
 	fi
 
+# The partner referrals service (app/services/partner-referrals): BlockApps
+# runs it itself, next to a Postgres of its own, so its image goes to the
+# private ECR like the bridge's.
+partner-referrals:
+	@if $(call image_missing,$(REPO_AWS_ECR_URL)partner-referrals:$(VERSION)-$(HASH_PARTNER_REFERRALS)); then \
+		echo "Building partner-referrals ($(VERSION)-$(HASH_PARTNER_REFERRALS))..."; \
+		docker build -t $(REPO_AWS_ECR_URL)partner-referrals:$(VERSION)-$(HASH_PARTNER_REFERRALS) ./app/services/partner-referrals; \
+	else \
+		echo "partner-referrals up to date"; \
+	fi
+
+# It has no compose file to be pushed from, so it is pushed by name.
+push-partner-referrals:
+	./scripts/docker-push-ecr.sh $(REPO_AWS_ECR_URL)partner-referrals:$(VERSION)-$(HASH_PARTNER_REFERRALS)
+
 all: local
 
 local: build_common apex nginx postgres postgrest prometheus smd app-backend app-ui bridge bridge-nginx oracle local-auth
@@ -315,7 +331,7 @@ oracle:
 
 build_formatter:
 	@echo building code formatter...
-	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-formatter:${STACK_RESOLVER} - < Dockerfile.formatter
+	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-formatter:${STACK_RESOLVER} - < strato/extraFiles/Dockerfile.formatter
 
 build_common: generate-version-file
 	@echo building haskell libraries and creating directories
@@ -474,18 +490,14 @@ vault-nginx:
 	DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
 docker-compose:
-	@echo Generating vault, highway, bridge, api, app compose files...
-	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
+	@echo Generating vault, highway, bridge compose files...
+	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' -e 's|<POSTGRES_IMAGE>|$(REPO_GHCR_URL)postgres:$(VERSION)-$(HASH_POSTGRES)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.yml
-	sed -e 's|<REPO_URL>|$(REPO_GHCR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.api.tpl.yml > docker-compose.api.push.yml
-	sed -e 's|<REPO_URL>|$(REPO_GHCR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.app.tpl.yml > docker-compose.app.push.yml
 
 	awk '/build: ./{getline} 1' docker-compose.vault.push.yml > docker-compose.vault.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.yml > docker-compose.highway.yml
 	awk '/build: ./{getline} 1' docker-compose.bridge.push.yml > docker-compose.bridge.yml
-	awk '/build: ./{getline} 1' docker-compose.api.push.yml > docker-compose.api.yml
-	awk '/build: ./{getline} 1' docker-compose.app.push.yml > docker-compose.app.yml
 
 # The node images of this build, by their GitHub registry name. CI pushes them
 # with push-node-images; images a build did not make are skipped. The strato

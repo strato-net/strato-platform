@@ -15,7 +15,7 @@ services:
     - keyStoreCacheTimeout=${keyStoreCacheTimeout:-60}
     - postgres_host=${postgres_host:-postgres}
     - postgres_port=5432
-    - postgres_user=${postgres_user:-postgres}
+    - postgres_user=${postgres_user:-strato}
     - postgres_vault_wrapper_db=${postgres_vault_wrapper_db:-oauth}
     - PGPASSFILE=/run/secrets/vault_pgpass
     - PGSSLMODE=${PGSSLMODE:-verify-full}
@@ -37,11 +37,13 @@ services:
     - local-postgres
     environment:
       - POSTGRES_PASSWORD=${postgres_password:-api}
-    image: postgres:9.6
+    image: <POSTGRES_IMAGE>
     volumes:
       - vaultpgdata:/var/lib/postgresql/data
     command:
       - "postgres"
+      - "-c"
+      - "hba_file=/etc/postgresql/pg_hba.conf"
       - "-c"
       - "max_connections=300"
       - "-c"
