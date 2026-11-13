@@ -1,33 +1,18 @@
 import { Market } from "@/interface";
 import { useUser } from "@/context/UserContext";
-import { useTradeHistory } from "@/hooks/trade/useTradeHistory";
-import { useMarketBalances, useOwnTrades } from "@/hooks/terminal/useMarketData";
+import { MyTrades as MyTradesData, useMarketBalances } from "@/hooks/terminal/useMarketData";
 import { formatAmount, formatUnits } from "@/utils/numberUtils";
 import { formatPrice } from "@/components/terminal/format";
 import { Tabs } from "@/components/terminal/Tabs";
-
-const MY_TRADES_LIMIT = 25;
 
 interface BottomPanelProps {
   market: Market;
   /** pool price, quote per base — values the base balance */
   price?: number;
+  myTrades: MyTradesData;
 }
 
-const MyTrades = ({ market }: { market: Market }) => {
-  const { userAddress } = useUser();
-  // one refetch at confirmation can land before the indexer has the swap: refetch again
-  // when the user's trade shows on the tape
-  const revision = useOwnTrades(market.poolAddress)[0]?.id;
-  const { data, isLoading } = useTradeHistory({
-    tokenIn: market.base.address,
-    tokenOut: market.quote.address,
-    page: 1,
-    limit: MY_TRADES_LIMIT,
-    sender: userAddress ?? undefined,
-    revision,
-  });
-  const entries = data?.entries ?? [];
+const MyTrades = ({ market, myTrades: { entries, isLoading } }: Pick<BottomPanelProps, "market" | "myTrades">) => {
 
   if (entries.length === 0) {
     return <p className="px-3 py-6 text-center text-muted-foreground">{isLoading ? "Loading…" : "No trades yet"}</p>;
@@ -62,7 +47,7 @@ const MyTrades = ({ market }: { market: Market }) => {
   );
 };
 
-const Balances = ({ market, price }: BottomPanelProps) => {
+const Balances = ({ market, price }: Pick<BottomPanelProps, "market" | "price">) => {
   const balances = useMarketBalances(market);
   const base = Number(formatUnits(balances.base));
   const rows = [
@@ -91,7 +76,7 @@ const Balances = ({ market, price }: BottomPanelProps) => {
   );
 };
 
-export const BottomPanel = ({ market, price }: BottomPanelProps) => {
+export const BottomPanel = ({ market, price, myTrades }: BottomPanelProps) => {
   const { isLoggedIn } = useUser();
   const signIn = (
     <p className="px-3 py-6 text-center text-muted-foreground">Sign in to see your trades and balances</p>
@@ -101,7 +86,7 @@ export const BottomPanel = ({ market, price }: BottomPanelProps) => {
     <div className="h-full text-xs">
       <Tabs
         tabs={[
-          { name: "My trades", content: isLoggedIn ? <MyTrades market={market} /> : signIn },
+          { name: "My trades", content: isLoggedIn ? <MyTrades market={market} myTrades={myTrades} /> : signIn },
           { name: "Balances", content: isLoggedIn ? <Balances market={market} price={price} /> : signIn },
         ]}
       />

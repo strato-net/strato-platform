@@ -4,6 +4,7 @@ import { api } from "@/lib/axios";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useTradeHistory } from "@/hooks/trade/useTradeHistory";
 import {
   CandleResolution,
   Market,
@@ -18,6 +19,9 @@ const SLOW_POLL_MS = 15_000;
 /** After a trade: how often the tape is checked for it, and the longest balances wait for it */
 const SETTLING_POLL_MS = 1_000;
 const SETTLING_TIMEOUT_MS = 15_000;
+const MY_TRADES_LIMIT = 25;
+/** one array for "none", so nothing downstream sees a change where there is none */
+const NO_TRADES: never[] = [];
 
 /** Terminal markets (tokens, pool balances, whether trading is open). */
 export function useMarkets() {
@@ -71,6 +75,27 @@ export function useOwnTrades(poolAddress?: string, pollMs?: number): MarketTrade
   const ownAddress = userAddress?.toLowerCase().replace(/^0x/, "");
   return trades.filter((trade) => trade.sender === ownAddress);
 }
+
+/**
+ * The signed-in user's latest trades in the market's pair, newest first; none for a guest.
+ * Held by the page: the trades list and the chart's fill markers read the same load.
+ */
+export function useMyTrades(market?: Market) {
+  const { userAddress } = useUser();
+  // one refetch at confirmation can land before the indexer has the swap: refetch again
+  // when the user's trade shows on the tape
+  const revision = useOwnTrades(market?.poolAddress)[0]?.id;
+  const { data, isLoading } = useTradeHistory({
+    tokenIn: userAddress ? market?.base.address : undefined,
+    tokenOut: market?.quote.address,
+    page: 1,
+    limit: MY_TRADES_LIMIT,
+    sender: userAddress ?? undefined,
+    revision,
+  });
+  return { entries: (userAddress && data?.entries) || NO_TRADES, isLoading };
+}
+export type MyTrades = ReturnType<typeof useMyTrades>;
 
 /**
  * Candles for one resolution. The first fetch loads the history; each poll then asks

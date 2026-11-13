@@ -6,7 +6,7 @@ import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Market } from "@/interface";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useMarkets, useMarketStats, useTradeSettling } from "@/hooks/terminal/useMarketData";
+import { useMarkets, useMarketStats, useMyTrades, useTradeSettling } from "@/hooks/terminal/useMarketData";
 import { MarketHeader } from "@/components/terminal/MarketHeader";
 import { PriceChart } from "@/components/terminal/PriceChart";
 import { DepthLadder } from "@/components/terminal/DepthLadder";
@@ -41,6 +41,7 @@ const Terminal = () => {
   const market = markets?.find((m) => m.id.toLowerCase() === pair?.toLowerCase()) ?? markets?.[0];
   const { data: stats } = useMarketStats(market?.poolAddress);
   const settlement = useTradeSettling(market?.poolAddress);
+  const myTrades = useMyTrades(market);
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
@@ -60,7 +61,7 @@ const Terminal = () => {
               <ResizablePanel defaultSize={72} minSize={40}>
                 <ResizablePanelGroup direction="horizontal" autoSaveId="terminal-columns">
                   <ResizablePanel defaultSize={50} minSize={30}>
-                    <PriceChart poolAddress={market.poolAddress} />
+                    <PriceChart market={market} myTrades={myTrades.entries} />
                   </ResizablePanel>
                   <ResizableHandle />
                   <ResizablePanel defaultSize={22} minSize={16}>
@@ -74,7 +75,7 @@ const Terminal = () => {
               </ResizablePanel>
               <ResizableHandle />
               <ResizablePanel defaultSize={28} minSize={10}>
-                <BottomPanel market={market} price={stats?.price} />
+                <BottomPanel market={market} price={stats?.price} myTrades={myTrades} />
               </ResizablePanel>
             </ResizablePanelGroup>
           </main>
@@ -82,12 +83,12 @@ const Terminal = () => {
           <main className="flex flex-col divide-y divide-border">
             <MarketHeader market={market} markets={markets!} stats={stats} />
             <div className="h-96">
-              <PriceChart poolAddress={market.poolAddress} />
+              <PriceChart market={market} myTrades={myTrades.entries} />
             </div>
             <OrderForm key={market.id} market={market} settlement={settlement} />
             <div className="h-[28rem]">{book(market)}</div>
             <div className="h-64">
-              <BottomPanel market={market} price={stats?.price} />
+              <BottomPanel market={market} price={stats?.price} myTrades={myTrades} />
             </div>
           </main>
         )}

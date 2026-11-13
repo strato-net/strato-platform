@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
+  CalendarDays,
+  Camera,
   CandlestickChart,
   ChevronDown,
   LineChart,
   Maximize2,
   Minimize2,
+  RotateCcw,
   SlidersHorizontal,
   Trash2,
   Undo2,
@@ -23,8 +26,9 @@ import {
   UTCTimestamp,
   createChart,
 } from "lightweight-charts";
-import { CandleResolution, MarketCandle } from "@/interface";
-import { useMarketCandles } from "@/hooks/terminal/useMarketData";
+import { CandleResolution, Market, MarketCandle } from "@/interface";
+import { useToast } from "@/hooks/use-toast";
+import { MyTrades, useMarketCandles } from "@/hooks/terminal/useMarketData";
 import { priceDecimals } from "@/components/terminal/format";
 import { INDICATORS, Indicator, IndicatorPlot } from "@/components/terminal/indicators";
 import { DrawingLayer, DrawingStore } from "@/components/terminal/DrawingLayer";
@@ -49,6 +53,8 @@ type ChartType = (typeof CHART_TYPES)[number]["type"];
 const CHART_TYPE_KEY = "terminal-chart-type";
 const INDICATORS_KEY = "terminal-indicators";
 const INITIAL_VISIBLE_BARS = 120;
+/** Candles on screen around a date gone to */
+const DATE_VISIBLE_BARS = 80;
 /** Heights of the volume pane and of an indicator's pane, as stretch factors (the price pane's is 2) */
 const VOLUME_PANE_STRETCH = 0.25;
 const INDICATOR_PANE_STRETCH = 0.5;
@@ -165,6 +171,15 @@ interface ChartHandles {
 const showLatest = (chart: IChartApi, candles: number, bars: number) =>
   chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, candles - bars), to: candles + 2 });
 
+/** Center the view on the candle that holds `time` (unix s); false when that is before the first candle */
+const showDate = (chart: IChartApi, rows: MarketCandle[], time: number): boolean => {
+  if (time < rows[0][0]) return false;
+  const index = Math.min(rows.length - 1, Math.floor((time - rows[0][0]) / ((rows[1]?.[0] ?? Infinity) - rows[0][0])));
+  const from = Math.max(0, Math.min(rows.length - DATE_VISIBLE_BARS, index - DATE_VISIBLE_BARS / 2));
+  chart.timeScale().setVisibleLogicalRange({ from, to: from + DATE_VISIBLE_BARS });
+  return true;
+};
+
 /** A histogram bar's color: above zero or below it */
 const signColor = ({ volumeColors }: ChartHandles, value: number) => (value >= 0 ? volumeColors.up : volumeColors.down);
 
@@ -215,7 +230,9 @@ const drawIndicator = (current: ChartHandles, { overlay, range, levels = [], lab
   return drawn;
 };
 
-export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
+export const PriceChart = ({ market, myTrades }: { market: Market; myTrades: MyTrades["entries"] }) => {
+  const { poolAddress } = market;
+  const { toast } = useToast();
   const [resolution, setResolution] = useState<CandleResolution>("15m");
   const [chartType, setChartType] = useState<ChartType>(() =>
     localStorage.getItem(CHART_TYPE_KEY) === "line" ? "line" : "candles"
@@ -223,6 +240,8 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
   const [enabledIndicators, setEnabledIndicators] = useState(storedIndicators);
   const [expanded, setExpanded] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
+  const [date, setDate] = useState("");
   /** index of the candle under the crosshair */
   const [hovered, setHovered] = useState<number>();
   const [drawings] = useState(() => new DrawingStore());
@@ -230,8 +249,8 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
   const { data: candles, isLoading } = useMarketCandles(poolAddress, resolution);
   const containerRef = useRef<HTMLDivElement>(null);
   const handles = useRef<ChartHandles>();
-  /** how many candles to open on once the resolution a range switched to has loaded */
-  const rangeBars = useRef<number>();
+  /** the view to open on once the candles of a resolution just switched to have loaded */
+  const pendingView = useRef<(chart: IChartApi, rows: MarketCandle[]) => void>();
 
   const indicators = useMemo(() => {
     const rows = candles ?? [];
@@ -254,7 +273,8 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
     const chart = createChart(containerRef.current, {
       autoSize: true,
       layout: { background: { color: "transparent" } },
-      timeScale: { timeVisible: true, secondsVisible: false },
+      // candles may squeeze to a fifth of a pixel, so that a whole loaded history fits on screen
+      timeScale: { timeVisible: true, secondsVisible: false, minBarSpacing: 0.2 },
     });
     const candleSeries = chart.addSeries(CandlestickSeries);
     const lineSeries = chart.addSeries(LineSeries, { lineWidth: 2 });
@@ -330,6 +350,7 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
         note: themeColor("muted", 0.9),
         surface: themeColor("background"),
         font: `10px ${getComputedStyle(document.body).fontFamily}`,
+        fillFont: `8px ${getComputedStyle(document.body).fontFamily}`,
       };
     };
     applyTheme();
@@ -340,6 +361,7 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       setToolsOpen(false);
+      setDateOpen(false);
       setExpanded(false);
       drawings.arm(null);
     };
@@ -395,8 +417,9 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
       current.volume.setData(rows.map(volume));
       if (rows.length > 0 && shown.key !== key) {
         // open on the most recent bars; the rest of the history is a scroll away
-        showLatest(current.chart, rows.length, rangeBars.current ?? INITIAL_VISIBLE_BARS);
-        rangeBars.current = undefined;
+        showLatest(current.chart, rows.length, INITIAL_VISIBLE_BARS);
+        pendingView.current?.(current.chart, rows);
+        pendingView.current = undefined;
       }
       // new data fits at once; only later refits ease
       current.eases.forEach((ease) => ease.reset());
@@ -442,19 +465,79 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
     }
   }, [indicators]);
 
+  // the user's own trades in this pool, marked where they filled
+  useEffect(() => {
+    handles.current?.drawings.setFills(
+      myTrades
+        .filter((trade) => trade.poolAddress === poolAddress)
+        .map((trade) => ({
+          time: trade.timestamp.getTime() / 1000,
+          price: Number(trade.impliedPrice),
+          buy: trade.tokenOut === market.base.symbol,
+        }))
+    );
+  }, [myTrades, poolAddress, market.base.symbol]);
+
   const toggleIndicator = (id: string) => {
     const next = enabledIndicators.includes(id) ? enabledIndicators.filter((other) => other !== id) : [...enabledIndicators, id];
     localStorage.setItem(INDICATORS_KEY, JSON.stringify(next));
     setEnabledIndicators(next);
   };
 
-  const showRange = (range: (typeof RANGES)[number]) => {
-    if (range.resolution !== resolution) {
-      rangeBars.current = range.bars;
-      setResolution(range.resolution);
+  /** Put a view on screen, on `wanted` candles: at once if they are showing, else once they have loaded */
+  const show = (wanted: CandleResolution, view: (chart: IChartApi, rows: MarketCandle[]) => void) => {
+    if (wanted !== resolution) {
+      pendingView.current = view;
+      setResolution(wanted);
     } else if (handles.current && candles?.length) {
-      showLatest(handles.current.chart, candles.length, range.bars);
+      view(handles.current.chart, candles);
     }
+  };
+
+  const fit = () => {
+    show(resolution, (chart, rows) => {
+      showLatest(chart, rows.length, Infinity);
+      // a price axis dragged by hand stops fitting itself: hand that back
+      chart.panes().forEach((pane) => pane.priceScale("right").applyOptions({ autoScale: true }));
+    });
+  };
+
+  const goToDate = (event: React.FormEvent) => {
+    event.preventDefault();
+    const time = Date.parse(`${date}T00:00:00Z`) / 1000;
+    if (!Number.isFinite(time)) return;
+    // intraday candles reach back days, not months: a date is looked up on daily ones
+    show(resolution === "1w" ? "1w" : "1d", (chart, rows) => {
+      if (showDate(chart, rows, time)) return;
+      toast({ title: `Available history starts ${new Date(rows[0][0] * 1000).toLocaleDateString()}` });
+    });
+    setDateOpen(false);
+  };
+
+  const downloadPng = () => {
+    const current = handles.current;
+    if (!current) return;
+    const shot = current.chart.takeScreenshot(true);
+    // the chart is see-through over the page: the picture gets the page's color behind it,
+    // and a line under it saying what it shows
+    const scale = shot.width / containerRef.current!.clientWidth;
+    const picture = document.createElement("canvas");
+    picture.width = shot.width;
+    picture.height = shot.height + 48 * scale;
+    const context = picture.getContext("2d")!;
+    context.fillStyle = themeColor("background");
+    context.fillRect(0, 0, picture.width, picture.height);
+    context.drawImage(shot, 0, 0);
+    context.font = `${13 * scale}px ${getComputedStyle(document.body).fontFamily}`;
+    context.fillStyle = themeColor("muted-foreground");
+    context.textBaseline = "middle";
+    const shown = [`${market.base.symbol} / ${market.quote.symbol}`, resolution, ...indicators.active.map(({ indicator }) => indicator.label)];
+    context.fillText(["STRATO", ...shown].join("   ·   "), 16 * scale, shot.height + 24 * scale);
+    const link = document.createElement("a");
+    link.href = picture.toDataURL("image/png");
+    link.download = `STRATO-${market.base.symbol}-${resolution}-analysis.png`;
+    link.click();
+    toast({ title: "Chart exported as PNG" });
   };
 
   const shownIndex = hovered !== undefined && candles?.[hovered] ? hovered : (candles?.length ?? 0) - 1;
@@ -466,7 +549,7 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
           <button
             key={r}
             onClick={() => {
-              rangeBars.current = undefined;
+              pendingView.current = undefined;
               setResolution(r);
             }}
             className={`rounded px-2 py-0.5 ${
@@ -522,6 +605,14 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
             </button>
           ))}
           <button
+            onClick={downloadPng}
+            aria-label="Download Chart PNG"
+            title="Download Chart PNG"
+            className="rounded p-1 text-muted-foreground hover:text-foreground"
+          >
+            <Camera className="h-3.5 w-3.5" />
+          </button>
+          <button
             onClick={() => setExpanded(!expanded)}
             aria-label={expanded ? "Exit full screen" : "Full screen"}
             title={expanded ? "Exit full screen" : "Full screen"}
@@ -550,16 +641,55 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
         )}
         {drawings.note && <NoteEditor store={drawings} />}
       </div>
-      <div className="flex h-[37px] items-center gap-2 border-t border-border px-3 text-[10px]">
-        {RANGES.map((range) => (
-          <button
-            key={range.label}
-            onClick={() => showRange(range)}
-            className="p-[3px] text-muted-foreground hover:text-foreground"
+      <div className="relative flex h-[37px] items-center gap-2.5 border-t border-border px-3 text-[10px]">
+        <div className="flex gap-2">
+          {RANGES.map(({ label, resolution: wanted, bars }) => (
+            <button
+              key={label}
+              onClick={() => show(wanted, (chart, rows) => showLatest(chart, rows.length, bars))}
+              className="p-[3px] text-muted-foreground hover:text-foreground"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setDateOpen(!dateOpen)}
+          aria-expanded={dateOpen}
+          aria-label="Go to Date"
+          title="Go to Date"
+          className="rounded p-[5px] text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <CalendarDays className="h-3.5 w-3.5" />
+        </button>
+        {dateOpen && (
+          <form
+            onSubmit={goToDate}
+            className="absolute bottom-[calc(100%+8px)] left-2 z-30 flex max-w-[calc(100%-16px)] items-end gap-3 rounded-xl border border-border bg-popover p-4 shadow-[0_12px_40px_rgba(0,0,0,0.2)] sm:left-[100px]"
           >
-            {range.label}
-          </button>
-        ))}
+            <label className="grid gap-[7px] text-[11px] leading-[14px] text-muted-foreground">
+              Go to date
+              <input
+                type="date"
+                aria-label="Chart Date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+                className="h-[34px] rounded-md border border-border bg-background p-2 text-foreground dark:[color-scheme:dark]"
+              />
+            </label>
+            <button type="submit" className="rounded-md bg-primary px-3.5 py-2 text-xs leading-[15px] text-primary-foreground">
+              Go
+            </button>
+          </form>
+        )}
+        <button
+          onClick={fit}
+          title="Fit Chart"
+          className="ml-auto flex items-center gap-1 p-[3px] text-muted-foreground hover:text-foreground"
+        >
+          <RotateCcw className="h-3 w-3" />
+          Fit
+        </button>
       </div>
     </div>
   );
