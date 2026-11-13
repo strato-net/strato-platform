@@ -49,15 +49,7 @@ q1 mv = do
 main :: IO ()
 main = do
   _ <- $initHFlags "migrate-keys"
-  let dbConnectInfo =
-        ConnectInfo
-          { connectHost = flags_pghost,
-            connectPort = read flags_pgport,
-            connectUser = flags_pguser,
-            connectPassword = flags_password,
-            connectDatabase = flags_database
-          }
-  conn <- connect dbConnectInfo
+  conn <- connect =<< connectInfo
   withTransactionSerializable conn $ do
     void $ execute_ conn [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS enc_sec_prv_key bytea; |]
     newPassword <- Password . C8.pack <$> getEnv "SECRET_VAULT_WRAPPER_PASSWORD"

@@ -133,9 +133,9 @@ sudo docker exec -i \
   -e OLD_VAULT_PASSWORD="${OLD_PASSWORD}" \
   -e NEW_VAULT_PASSWORD="${NEW_PASSWORD}" \
   vault-vault-wrapper-1 \
-  /usr/local/bin/change-vault-password \
-    --pghost=postgres --pgport=5432 \
-    --pguser=strato --password=api --database=oauth
+  /usr/local/bin/change-vault-password
+# Connection settings come from the container environment and PGPASSFILE
+# (see "Postgres connection settings" below).
 #
 sudo docker restart -t 0 vault-vault-wrapper-1
 for i in {1..200}; do
