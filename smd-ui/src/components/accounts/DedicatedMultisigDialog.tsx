@@ -1042,7 +1042,7 @@ export function DedicatedMultisigDialog({
           {wallet ? "Manage" : "Create multisig wallet"}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+      <DialogContent className="h-[100dvh] max-h-[100dvh] w-screen max-w-none overflow-y-auto rounded-none border-0 p-4 md:p-8">
         <DialogHeader>
           <DialogTitle>{wallet ? "Multisig wallet" : "Create multisig wallet"}</DialogTitle>
           <DialogDescription>

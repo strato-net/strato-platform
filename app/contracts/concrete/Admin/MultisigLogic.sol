@@ -437,8 +437,8 @@ contract record MultisigLogic {
         }
         requiredApprovals = _requiredApprovals;
         address(this).call("advanceConfiguration");
-        _clearNominations();
         emit ConfigurationChanged(multisigEpoch, _resultingSigners, _requiredApprovals);
+        _clearNominations();
     }
 
     function _validateConfiguration(address[] _signers, uint _requiredApprovals) internal {
