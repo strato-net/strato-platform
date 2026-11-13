@@ -52,13 +52,19 @@ forktestNetworkID = 7381244120123405172
 forktestForkBlock :: Integer
 forktestForkBlock = 10000
 
+-- | Upquark's flag day for its receipts-root and emit-arg forks (the
+-- block-reward receipt fork stays with staking at upquarkStakingForkBlock).
+-- Keep it equal to stratoGasForkBlock "upquark" in strato-conf.
+upquarkForkBlock :: Integer
+upquarkForkBlock = 1000000
+
 heliumReceiptsRootForkBlock :: Integer
 heliumReceiptsRootForkBlock = 250000
 
 isReceiptsRootForkActive :: Integer -> Bool
 isReceiptsRootForkActive blockNum =
   let net = Conf.networkID $ networkConfig ethConf
-   in not $ (net == upquarkNetworkID  && blockNum < upquarkStakingForkBlock)
+   in not $ (net == upquarkNetworkID  && blockNum < upquarkForkBlock)
          || (net == heliumNetworkID   && blockNum < heliumReceiptsRootForkBlock)
          || (net == forktestNetworkID && blockNum < forktestForkBlock)
 
@@ -97,14 +103,14 @@ isBlockRewardReceiptForkActive blockNum =
 -- unwritten args as SReference/SNULL. Those have no TypedArg, so the receipt
 -- log left them out; afterwards they are real values and appear in it. That
 -- moves the receipts root, so the change needs a height on any network that
--- already checks receipts roots. Upquark switches with its staking fork.
+-- already checks receipts roots. Upquark switches with its receipts-root fork.
 heliumEmitArgForkBlock :: Integer
 heliumEmitArgForkBlock = 750000
 
 isEmitArgForkActive :: Integer -> Bool
 isEmitArgForkActive blockNum =
   let net = Conf.networkID $ networkConfig ethConf
-   in not $ (net == upquarkNetworkID  && blockNum < upquarkStakingForkBlock)
+   in not $ (net == upquarkNetworkID  && blockNum < upquarkForkBlock)
          || (net == heliumNetworkID   && blockNum < heliumEmitArgForkBlock)
          || (net == forktestNetworkID && blockNum < forktestForkBlock)
 
