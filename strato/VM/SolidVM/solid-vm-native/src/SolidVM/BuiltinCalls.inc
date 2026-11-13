@@ -18,7 +18,6 @@ lookupBuiltinCall sc abiMember name args = do
         applyCall sc signature (constantFunction chargedTarget) args
   where
     selectDynamic = \case
-      "keccak256" -> Just (dynamicCall TStr (EMIT_BEGIN Builtins.keccak EMIT_END))
       "ecrecover" -> Just (dynamicCall TAddr (EMIT_BEGIN Builtins.recover EMIT_END))
       "addmod" -> Just (dynamicCall TInt (EMIT_BEGIN (Builtins.modular Metered.addmod) EMIT_END))
       "mulmod" -> Just (dynamicCall TInt (EMIT_BEGIN (Builtins.modular Metered.mulmod) EMIT_END))
@@ -155,11 +154,6 @@ lookupBuiltinFunction sc name args = select name
           pure $ SomeFunction signature (CAPTURE operation $ \compiled_operation ->
             EMIT_BEGIN (curryArguments signature compiled_operation)
             EMIT_END)
-
-    hashCall = aggregate TStr $ \fields ->
-      EMIT_BEGIN (let encoder = Builtins.arguments Builtins.rlpArgument fields
-                  in encoder `seq` \values -> encoder values >>= Builtins.keccakValue . Builtins.rlpArguments)
-      EMIT_END
 
     abiCall packed = aggregate TBytes $ \fields ->
       EMIT_BEGIN (Builtins.abiArguments packed fields) EMIT_END

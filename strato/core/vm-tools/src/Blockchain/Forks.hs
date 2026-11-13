@@ -21,6 +21,7 @@ module Blockchain.Forks
     isBlockRewardReceiptForkActive,
     isEmitArgForkActive,
     isOperatorPrecedenceForkActive,
+    isRlpEncodeForkActive,
     isReplayProtectionForkActive,
     replayProtectionForkBlock,
     isStratoGasForkActive,
@@ -147,6 +148,27 @@ isOperatorPrecedenceForkActive blockNum =
    in not $ (net == upquarkNetworkID  && blockNum < upquarkOperatorPrecedenceForkBlock)
          || (net == heliumNetworkID   && blockNum < heliumOperatorPrecedenceForkBlock)
          || (net == forktestNetworkID && blockNum < forktestOperatorPrecedenceForkBlock)
+
+-- | Block from which SolidVM's RLP encoding of values gives every value its
+-- own encoding.
+--
+-- Before it, contracts, mappings, user-defined values, function references and
+-- the other non-data values all encoded as an empty list, so e.g. two different
+-- contracts passed to keccak256 hashed the same. The encoding feeds keccak256,
+-- sha256 and ripemd160 of non-bytes arguments and salted contract addresses, so
+-- it is consensus-visible through the state root.
+heliumRlpEncodeForkBlock :: Integer
+heliumRlpEncodeForkBlock = 1200000
+
+upquarkRlpEncodeForkBlock :: Integer
+upquarkRlpEncodeForkBlock = 1000000
+
+isRlpEncodeForkActive :: Integer -> Bool
+isRlpEncodeForkActive blockNum =
+  let net = Conf.networkID $ networkConfig ethConf
+   in not $ (net == upquarkNetworkID  && blockNum < upquarkRlpEncodeForkBlock)
+         || (net == heliumNetworkID   && blockNum < heliumRlpEncodeForkBlock)
+         || (net == forktestNetworkID && blockNum < forktestForkBlock)
 
 -- | Require signed chain binding from this height. Public networks
 -- remain unscheduled until the upgrade is coordinated.
