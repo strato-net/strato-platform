@@ -9,7 +9,8 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module Blockchain.SolidVM.GasInfo
-  ( GasInfo (..),
+  ( MonadBuiltinGas (..),
+    GasInfo (..),
     gasLeft,
     gasUsed,
     gasInitialAllotment,
@@ -20,7 +21,11 @@ where
 import Blockchain.Strato.Model.Gas
 import Control.DeepSeq
 import Control.Lens
+import Control.Monad.IO.Class (MonadIO)
 import GHC.Generics
+
+class MonadIO m => MonadBuiltinGas m where
+  chargeBuiltinGas :: Gas -> m ()
 
 data GasInfo = GasInfo
   { _gasLeft :: Gas,

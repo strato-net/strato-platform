@@ -331,4 +331,57 @@ router.get("/history", authHandler.authorizeRequest(), ReferController.getHistor
  */
 router.get("/status", authHandler.authorizeRequest(), ReferController.getStatus);
 
+/**
+ * @openapi
+ * /refer/partner-claim:
+ *   get:
+ *     summary: The message an external wallet signs to confirm a partner referral code
+ *     description: For a guest whose wallet is named by the X-Wallet-Address header. The message is null when there is nothing to confirm (no partner issued the code, the wallet is the code owner's, or it is referred already).
+ *     tags: [Refer]
+ *     parameters:
+ *       - name: code
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: The message to sign and the time it was issued, or a null message
+ *       400:
+ *         description: Missing or malformed code or wallet address
+ *       503:
+ *         description: Partner referrals are not configured or not reachable
+ *   post:
+ *     summary: Confirm a partner referral with the wallet's signature
+ *     description: The backend rebuilds the message from the code, the X-Wallet-Address header and issuedAt, and records the referral only if that wallet signed it (personal_sign) within the last ten minutes.
+ *     tags: [Refer]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [code, issuedAt, signature]
+ *             properties:
+ *               code:
+ *                 type: string
+ *               issuedAt:
+ *                 type: string
+ *                 format: date-time
+ *               signature:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Whether the referral was recorded
+ *       400:
+ *         description: Malformed request, expired message, or a signature that is not this wallet's
+ *       503:
+ *         description: Partner referrals are not configured or not reachable
+ */
+// No authorizeRequest on these two: it would make a guest's confirmation
+// depend on the OAuth provider, and the wallet header it trusts proves
+// nothing here anyway.
+router.get("/partner-claim", ReferController.getPartnerClaim);
+router.post("/partner-claim", ReferController.claimPartner);
+
 export default router;

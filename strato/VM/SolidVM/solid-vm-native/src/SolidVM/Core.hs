@@ -1,25 +1,39 @@
 {-# LANGUAGE DataKinds, GADTs, KindSignatures, TypeOperators, TypeFamilies, RankNTypes,
-             ScopedTypeVariables, LambdaCase, OverloadedStrings, ExistentialQuantification, CPP #-}
+             ScopedTypeVariables, LambdaCase, OverloadedStrings, ExistentialQuantification, FlexibleInstances, ConstraintKinds, CPP #-}
 -- Typed core for the SolidVM -> Haskell-action compiler.
 -- No `Value` sum type at runtime: every compiled closure has an exact Haskell type.
 module SolidVM.Core where
 
 import Text.Format (format)
 import Control.Exception
-import Control.Monad.Reader
+import Control.Monad
+import Control.Monad.IO.Class
+import qualified UnliftIO as U
+import Blockchain.SolidVM.SM (SM)
+import qualified Blockchain.SolidVM.SM as SM
+import qualified Blockchain.SolidVM.Environment as ExecutionEnv
+import qualified Blockchain.Data.BlockHeader as BlockHeader
+import Blockchain.DB.SolidStorageDB
+import Blockchain.SolidVM.Exception (SolidException (InvalidWrite))
+import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Metered
+import Blockchain.SolidVM.Builtins.Size.Values (basicSize)
+import SolidVM.Gas (decrementGas)
+import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Foldable as F
 import Data.Decimal
 import Text.Read (readMaybe)
 import Data.IORef
-import Data.Kind (Type)
+import Data.Kind (Type, Constraint)
+import Data.Proxy (Proxy (..))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Type.Equality
 import Blockchain.SolidVM.Exception (SolidException (InternalError, TooMuchGas))
-import Data.Bits ((.|.), (.&.), xor, shiftL, shiftR)
+import qualified Blockchain.SolidVM.Builtins.Size as SharedSize
+import Blockchain.Strato.Model.Gas (Gas (..))
 import Blockchain.Strato.Model.Address (Address (..))
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
 
@@ -121,12 +135,15 @@ enumValue n = EnumValue n False
 data Dyn = forall t. Dyn (Ty t) t
 
 showDyn :: Dyn -> T.Text
-showDyn (Dyn t v) = case t of
+showDyn (Dyn t v) = formatValue t v
+
+formatValue :: Ty t -> t -> T.Text
+formatValue t v = case t of
   TDecimal -> T.pack (show v)
   TInt -> T.pack (show v); TBool -> T.pack (show v); TAddr -> T.pack (show v); TStr -> v
   TBytes -> T.pack (format v); TEnum n ns -> let i = enumNumber v in n <> "." <> (if i >= 0 && fromIntegral i < length ns then ns !! fromIntegral i else T.pack (show i))
   TContract n -> n <> "(" <> T.pack (show v) <> ")"; TUnit -> "()"
-  TArr et -> "[" <> T.intercalate "," (map (showDyn . Dyn et) (F.toList v)) <> "]"
+  TArr et -> "[" <> T.intercalate "," (map (formatValue et) (F.toList v)) <> "]"
   TStruct n fs -> n <> "{" <> T.intercalate "," (showFields fs v) <> "}"
   TTuple fs -> "(" <> T.intercalate "," (showFields fs v) <> ")"
   TVariadic -> "[" <> T.intercalate "," (map showDyn v) <> "]"; TMaybe _ -> "<maybe>"; TRef _ -> T.pack (format v)
@@ -137,7 +154,55 @@ showDyn (Dyn t v) = case t of
   where
     showFields :: Fields ts -> HL ts -> [T.Text]
     showFields FNil HNil = []
-    showFields (FCons n ft rest) (x :* xs) = (if T.null n then "" else n <> "=") <> showDyn (Dyn ft x) : showFields rest xs
+    showFields (FCons n ft rest) (x :* xs) = (if T.null n then "" else n <> "=") <> formatValue ft x : showFields rest xs
+
+data Dict (constraint :: Constraint) where
+  Dict :: constraint => Dict constraint
+
+instance SharedSize.GasSize EnumValue where gasSize = SharedSize.slotSize
+instance SharedSize.TupleSize ts => SharedSize.GasSize (HL ts) where
+  gasSize = const (SharedSize.tupleSize (Proxy :: Proxy ts))
+instance SharedSize.GasSize [Dyn] where gasSize = SharedSize.variadicSize
+instance SharedSize.GasSize Dyn where
+  gasSize (Dyn ty value) = withGasArgument ty $ \adapt -> SharedSize.gasSize (adapt value)
+
+-- Resolve class instances while assembling typed code.
+gasSizeDict :: Ty a -> Dict (SharedSize.GasSize a)
+gasSizeDict ty = case ty of
+  TInt -> Dict
+  TDecimal -> Dict
+  TBool -> Dict
+  TAddr -> Dict
+  TStr -> Dict
+  TBytes -> Dict
+  TEnum _ _ -> Dict
+  TContract _ -> Dict
+  TUnit -> Dict
+  TArr _ -> Dict
+  TStruct _ fields -> case tupleSizeDict fields of Dict -> Dict
+  TTuple fields -> case tupleSizeDict fields of Dict -> Dict
+  TVariadic -> Dict
+  TRaw -> Dict
+  TWireArray -> Dict
+  TWireEnum _ _ -> Dict
+  TMaybe element -> case gasSizeDict element of Dict -> Dict
+  TRef _ -> Dict
+  TAlias _ _ -> Dict
+
+tupleSizeDict :: Fields ts -> Dict (SharedSize.TupleSize ts)
+tupleSizeDict FNil = Dict
+tupleSizeDict (FCons _ _ rest) = case tupleSizeDict rest of Dict -> Dict
+
+withGasArgument :: Ty a -> (forall b. SharedSize.GasSize b => (a -> b) -> result) -> result
+withGasArgument TWireArray use = use SharedSize.ArraySlots
+withGasArgument (TWireEnum _ _) use = use (\number -> EnumValue number True)
+withGasArgument (TMaybe element) use = withGasArgument element $ \adapt -> use (fmap adapt)
+withGasArgument ty use = case gasSizeDict ty of Dict -> use id
+
+withArgumentTuple :: Fields ts -> (forall args. SharedSize.GasSize args => (HL ts -> args) -> result) -> result
+withArgumentTuple FNil use = use (const ())
+withArgumentTuple (FCons _ ty rest) use = withGasArgument ty $ \adapt ->
+  withArgumentTuple rest $ \remaining -> use (\(value :* values) -> (adapt value, remaining values))
 
 defaultOf :: Ty t -> t
 defaultOf = \case
@@ -243,16 +308,6 @@ replaceValue (IS i) v (x :& env) = x :& replaceValue i v env
 
 data CallKind = Call | RawCall | DelegateCall deriving (Eq, Show)
 
-data Frame = Frame
-  { fThis :: Address      -- storage/identity context
-  , fCode :: Address      -- where the running code lives (differs from fThis under delegatecall)
-  , fSender :: Address
-  , fOrigin :: Address
-  , fSig :: T.Text        -- SolidVM msg.sig = function name
-  , fArgs :: [Dyn]        -- SolidVM msg.data = the call's arguments
-  , fValue :: Integer
-  }
-
 -- A revert carries a message; it unwinds to the nearest try/catch or external call boundary.
 newtype Revert = Revert T.Text deriving Show
 instance Exception Revert where
@@ -268,28 +323,6 @@ instance Exception Divergence where
 newtype NativeUnavailable = NativeUnavailable T.Text deriving Show
 instance Exception NativeUnavailable where
   displayException (NativeUnavailable message) = "native execution unavailable: " ++ T.unpack message
-
-data RT = RT
-  { rtChargeGas :: Integer -> IO ()
-  , rtGet  :: Address -> StoragePath -> IO BasicValue
-  , rtPut  :: Address -> StoragePath -> BasicValue -> IO ()
-  , rtEmit :: Frame -> T.Text -> T.Text -> [(T.Text, Dyn)] -> IO ()   -- contract name, event name, args
-  , rtCall :: CallKind -> Frame -> Address -> T.Text -> [Dyn] -> Maybe SomeTy -> IO [Dyn]
-  , rtSender :: Frame -> IO Address
-  , rtAbiEncode :: Bool -> [Dyn] -> IO B.ByteString
-  , rtHashInput :: [Dyn] -> IO (Either B.ByteString B.ByteString) -- keccak256 input as the interpreter builds it: Left raw bytes, Right RLP
-  , rtCreateCode :: Maybe Dyn -> T.Text -> T.Text -> [Dyn] -> IO Address
-  , rtSelfdestruct :: Address -> IO Bool
-  , rtPreviousBlock :: IO (Address, Address, Integer)
-  , rtProposer :: IO Address
-  , rtCopyStorage :: StoragePath -> StoragePath -> IO ()
-  , rtDerive :: Address -> T.Text -> T.Text -> [Dyn] -> IO Address
-  , rtCreate :: Frame -> T.Text -> Maybe (IO Dyn) -> IO [Dyn] -> IO Address
-  , rtBlockNumber :: Integer
-  , rtTimestamp :: Integer
-  }
-
-type M = ReaderT (RT, Frame) IO
 
 -- An action executes in a typed local environment. Composition uses the
 -- underlying monad's ordinary sequencing.
@@ -320,100 +353,104 @@ contextAction = Action
 withEnvironment :: (outer -> inner) -> Action inner m a -> Action outer m a
 withEnvironment project (Action action) = Action (action . project)
 
-chargeAction :: Integer -> Action env M ()
+chargeAction :: Integer -> Action env SM ()
 chargeAction = liftAction . chargeGas
 
 -- Keep the reader argument explicit to avoid an intermediate action for each
 -- environment application.
-chargeActionAfter :: Integer -> Action env M a -> Action env M a
-chargeActionAfter gas (Action action) = Action $ \env -> ReaderT $ \runtime -> do
-  value <- runReaderT (action env) runtime
-  runReaderT (chargeGas gas) runtime
+chargeActionAfter :: Integer -> Action env SM a -> Action env SM a
+chargeActionAfter gas (Action action) = Action $ \env -> do
+  value <- action env
+  chargeGas gas
   pure value
 {-# INLINE chargeActionAfter #-}
 
-storeAction :: Ty a -> StoragePath -> a -> Action env M ()
+storeAction :: Ty a -> StoragePath -> a -> Action env SM ()
 storeAction ty path value = liftAction (writeVal ty path value)
 
-readReference :: Ix ls (IORef a) -> Action (Env ls) M a
+readReference :: Ix ls (IORef a) -> Action (Env ls) SM a
 readReference index = Action (\env -> liftIO (readIORef (ref index env)))
 
 valueAt :: Applicative m => Ix ls a -> Action (Env ls) m a
 valueAt index = Action (pure . localValue index)
 
-bindActionChain :: M a -> [a -> M a] -> (a -> M b) -> M b
+bindActionChain :: SM a -> [a -> SM a] -> (a -> SM b) -> SM b
 bindActionChain initial commands final = continuation `seq` (initial >>= continuation)
   where
     continuation = foldr step final commands
     step command next = next `seq` (\value -> command value >>= next)
 
-chargeGas :: Integer -> M ()
-chargeGas amount = rt >>= \runtime -> liftIO (rtChargeGas runtime amount)
+chargeGas :: Integer -> SM ()
+chargeGas = decrementGas . Gas
 
-charged :: Integer -> M a -> M a
+charged :: Integer -> SM a -> SM a
 charged amount action = chargeGas amount >> action
 
-chargeAfter :: Integer -> M a -> M a
+chargeAfter :: Integer -> SM a -> SM a
 chargeAfter amount action = do
   value <- action
   chargeGas amount
   pure value
 
-chargeOp :: Integer -> M ()
-chargeOp bytes = chargeGas (operationGas bytes)
+catchContractFailure :: SM a -> SM a -> SM a
+catchContractFailure action handler = action `U.catches`
+  [ U.Handler (\(_ :: Revert) -> handler)
+  , U.Handler (\(e :: SolidException) -> case e of
+      InternalError{} -> U.throwIO e
+      TooMuchGas{} -> U.throwIO e
+      _ -> handler)
+  ]
 
-operationGas :: Integer -> Integer
-operationGas bytes = 1 + (bytes `shiftR` 5)
+thisAddress :: SM Address
+thisAddress = SM.getCurrentAddress
 
--- SolidVM charges by 256-bit limbs, including a full limb for small integers.
-byteWidth :: Integer -> Integer
-byteWidth = go 0 . abs
-  where
-    go width 0 = width
-    go width n = go (width + 32) (n `shiftR` 256)
+senderAddress :: SM Address
+senderAddress = ExecutionEnv.sender <$> SM.getEnv
 
-catchContractFailure :: M a -> M a -> M a
-catchContractFailure action handler = do
-  state <- ask
-  liftIO $ runReaderT action state `catches`
-    [ Handler (\(_ :: Revert) -> runReaderT handler state)
-    , Handler (\(e :: SolidException) -> case e of
-        InternalError{} -> throwIO e
-        TooMuchGas{} -> throwIO e
-        _ -> runReaderT handler state)
-    ]
+originAddress :: SM Address
+originAddress = ExecutionEnv.origin <$> SM.getEnv
 
-rt :: M RT
-rt = asks fst
+blockNumber :: SM Integer
+blockNumber = BlockHeader.number . ExecutionEnv.blockHeader <$> SM.getEnv
 
-frame :: M Frame
-frame = asks snd
+blockTimestamp :: SM Integer
+blockTimestamp = round . utcTimeToPOSIXSeconds . BlockHeader.timestamp . ExecutionEnv.blockHeader <$> SM.getEnv
 
-revert :: T.Text -> M a
+readBasic :: StoragePath -> SM BasicValue
+readBasic path = do
+  address <- SM.getCurrentAddress
+  Metered.storageRead path basicSize (getSolidStorageKeyVal' address path)
+
+writeBasic :: StoragePath -> BasicValue -> SM ()
+writeBasic path value = do
+  info <- SM.getCurrentCallInfo
+  when (SM.readOnly info) $ U.throwIO (InvalidWrite "native write during read-only access" (format path))
+  Metered.storageWrite path (basicSize value)
+  let address = SM.currentAddress info
+  SM.markDiffForAction address path value
+  putSolidStorageKeyVal' address path value
+
+revert :: T.Text -> SM a
 revert = liftIO . throwIO . Revert
 
-diverge :: T.Text -> M a
+diverge :: T.Text -> SM a
 diverge = liftIO . throwIO . Divergence
 
-readSlot :: Ty t -> StoragePath -> M t
+readSlot :: Ty t -> StoragePath -> SM t
 readSlot t p = do
-  (r, f) <- ask
-  v <- liftIO $ rtGet r (fThis f) p
+  v <- readBasic p
   either diverge pure (fromBasic t v)
 
-writeSlot :: Ty t -> StoragePath -> t -> M ()
+writeSlot :: Ty t -> StoragePath -> t -> SM ()
 writeSlot t p v = do
-  (r, f) <- ask
-  liftIO $ rtPut r (fThis f) p (toBasic t v)
+  writeBasic p (toBasic t v)
 
 snocP :: StoragePath -> StoragePathPiece -> StoragePath
 snocP (StoragePath ps) p = StoragePath (ps ++ [p])
 
 -- Whole values in storage: scalars are one slot; arrays are `length` + indexed slots; structs are fields.
-readVal :: Ty t -> StoragePath -> M t
-readVal t p = do
-  (r, f) <- ask
-  readValWith (liftIO . rtGet r (fThis f)) t p
+readVal :: Ty t -> StoragePath -> SM t
+readVal = readValWith readBasic
 
 readValWith :: forall m t. MonadIO m => (StoragePath -> m BasicValue) -> Ty t -> StoragePath -> m t
 readValWith getSlot t p = case t of
@@ -430,7 +467,7 @@ readValWith getSlot t p = case t of
     readFields FNil = pure HNil
     readFields (FCons n ft rest) = (:*) <$> readValWith getSlot ft (snocP p (Field (TE.encodeUtf8 n))) <*> readFields rest
 
-writeVal :: Ty t -> StoragePath -> t -> M ()
+writeVal :: Ty t -> StoragePath -> t -> SM ()
 writeVal t p v = case t of
   TArr et -> do
     writeSlot TInt (snocP p (Field "length")) (fromIntegral (Seq.length v))
@@ -439,7 +476,7 @@ writeVal t p v = case t of
   TTuple fs -> writeFields fs v
   _ -> writeSlot t p v
   where
-    writeFields :: Fields ts -> HL ts -> M ()
+    writeFields :: Fields ts -> HL ts -> SM ()
     writeFields FNil HNil = pure ()
     writeFields (FCons n ft rest) (x :* xs) = writeVal ft (snocP p (Field (TE.encodeUtf8 n))) x >> writeFields rest xs
 
@@ -450,16 +487,23 @@ data Sig (args :: [Type]) r where
   SigCons :: Ty a -> Sig as r -> Sig (a ': as) r
 
 type family Fn (args :: [Type]) r where
-  Fn '[] r = M r
+  Fn '[] r = SM r
   Fn (a ': as) r = a -> Fn as r
 
 -- A checked call is assembled from these typed applications at compilation.
 -- Execution applies argument values without walking a signature.
-applyLast :: M r -> HL '[] -> M r
+applyLast :: SM r -> HL '[] -> SM r
 applyLast action HNil = action
 
-applyNext :: (Fn args r -> HL args -> M r) -> (a -> Fn args r) -> HL (a ': args) -> M r
+applyNext :: (Fn args r -> HL args -> SM r) -> (a -> Fn args r) -> HL (a ': args) -> SM r
 applyNext next f (value :* values) = next (f value) values
+
+-- Prepare currying once; execution applies values without traversing the signature.
+curryArguments :: Sig args r -> (HL args -> SM r) -> Fn args r
+curryArguments (SigNil _) = \body -> body HNil
+curryArguments (SigCons _ rest) =
+  let next = curryArguments rest
+  in next `seq` \body -> body `seq` \value -> next (\values -> body (value :* values))
 
 -- A compiled function: its exact signature and the Haskell action of exactly that type.
 data Fun = forall args r. Fun T.Text (Sig args r) (Fn args r)
@@ -481,21 +525,20 @@ sigArity (SigNil _) = 0
 sigArity (SigCons _ s) = 1 + sigArity s
 
 showSig :: Sig args r -> T.Text
-showSig (SigNil r) = "M " <> showTy r
+showSig (SigNil r) = "SM " <> showTy r
 showSig (SigCons a s) = showTy a <> " -> " <> showSig s
 
 -- Build the typed action from a body that sees its arguments as typed mutable locals.
 -- First argument is at index IZ.
-mkFn :: Sig args r -> (Env (RefTypes args) -> M r) -> Fn args r
+mkFn :: Sig args r -> (Env (RefTypes args) -> SM r) -> Fn args r
 mkFn (SigNil _) body = body ENil
 mkFn (SigCons _ rest) body = \a -> mkFn rest (\env -> do r <- liftIO (newIORef a); body (r :& env))
 
 -- The dynamic boundary (tx args, .call results): check each arg once, then run the typed action.
-callDyn :: Sig args r -> Fn args r -> [Dyn] -> M [Dyn]
-callDyn (SigNil r) f [] = do
-  st <- ask
-  liftIO $ runReaderT (retDyn r <$> f) st
-    `catch` (\(ForwardReturn ds) -> pure $ case ds of
+callDyn :: Sig args r -> Fn args r -> [Dyn] -> SM [Dyn]
+callDyn (SigNil r) f [] =
+  (retDyn r <$> f)
+    `U.catch` (\(ForwardReturn ds) -> pure $ case ds of
       [Dyn TUnit ()] -> []
       _ -> ds)
 callDyn (SigCons t rest) f (d : ds) = do v <- fromDyn t d; callDyn rest (f v) ds
@@ -510,9 +553,7 @@ instance Exception ForwardReturn
 
 typedReturns :: Sig args r -> Fn args r -> Fn args r
 typedReturns (SigCons _ rest) f = \a -> typedReturns rest (f a)
-typedReturns (SigNil r) f = do
-  st <- ask
-  liftIO $ runReaderT f st `catch` (\(ForwardReturn ds) -> runReaderT (decode ds) st)
+typedReturns (SigNil r) f = f `U.catch` (\(ForwardReturn ds) -> decode ds)
   where
     decode returned = case r of
       TUnit -> pure ()
@@ -525,17 +566,8 @@ typedReturns (SigNil r) f = do
       where
         ds = case returned of [Dyn TVariadic values] -> values; _ -> returned
 
-internalFrame :: T.Text -> Sig args r -> Fn args r -> Fn args r
-internalFrame name sig f = go sig f []
-  where
-    callName = maybe name id (T.stripPrefix "super." name)
-    go :: Sig as result -> Fn as result -> [Dyn] -> Fn as result
-    go (SigCons t rest) action args = \a -> go rest (action a) (Dyn t a : args)
-    go (SigNil _) action args = local (\(runtime, caller) ->
-      (runtime, caller {fSig = callName, fArgs = reverse args})) action
-
 -- address <-> contract and int <-> enum share a wire value; the typed side decides.
-fromDyn :: Ty t -> Dyn -> M t
+fromDyn :: Ty t -> Dyn -> SM t
 fromDyn t (Dyn t' v) = case tyEq t t' of
   Just Refl -> pure v
   Nothing -> case (t, t') of
@@ -562,7 +594,7 @@ fromDyn t (Dyn t' v) = case tyEq t t' of
     (_, TVariadic) | [d] <- v -> fromDyn t d
     _ -> diverge ("value of type " <> showTy t' <> " where " <> showTy t <> " was declared")
 
-fromDyns :: Fields ts -> [Dyn] -> M (HL ts)
+fromDyns :: Fields ts -> [Dyn] -> SM (HL ts)
 fromDyns FNil [] = pure HNil
 fromDyns (FCons _ t rest) (d : ds) = (:*) <$> fromDyn t d <*> fromDyns rest ds
 fromDyns _ _ = diverge "tuple arity mismatch at call boundary"
@@ -601,5 +633,3 @@ dynFromText t s = case t of
 -- ---------------------------------------------------------------- control flow
 
 data Flow r = Next | Brk | Cnt | Ret r | RetDynamic [Dyn]
-
-#include "IntegerActions.inc"

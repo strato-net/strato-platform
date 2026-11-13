@@ -43,7 +43,6 @@ module Blockchain.VMContext
     getDBs,
     readStore,
     writeStore,
-    GasCap (..),
     hashDB,
     codeDB,
     blockSummaryDB,
@@ -52,7 +51,6 @@ module Blockchain.VMContext
     memBlockSummaryDB,
     baggerState,
     bestBlockInfo,
-    vmGasCap,
     selfAddress,
     isProposer,
     runningTests,
@@ -107,7 +105,6 @@ import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff (StateDiff)
 import qualified Blockchain.TxRunResultCache as TRC
@@ -158,9 +155,6 @@ knownExpensiveTxs =
   S.fromList
     [
     ]
-
-newtype GasCap = GasCap {unVmGasCap :: Gas}
-  deriving (Generic, NFData, Show, Eq)
 
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockHeader !Int
   deriving (Eq, Show, Generic, NFData)
@@ -223,7 +217,6 @@ data Backend
 data ContextState = ContextState
   { _baggerState :: !BaggerState,
     _bestBlockInfo :: !ContextBestBlockInfo,
-    _vmGasCap :: !Gas,
     _runningTests :: !Bool,
     _txRunResultsCache :: TRC.Cache,
     _debugSettings :: !(Maybe DebugSettings),
@@ -240,7 +233,6 @@ instance Default ContextState where
     ContextState
       { _baggerState = defaultBaggerState,
         _bestBlockInfo = Unspecified,
-        _vmGasCap = Gas (Conf.gasLimit $ networkConfig ethConf),
         _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
         _debugSettings = Nothing,
@@ -464,7 +456,6 @@ runTestContextM f =
             cstate <-
               newIORef $
                 def
-                  & vmGasCap .~ 100000
                   & runningTests .~ True
                   & txRunResultsCache .~ cache
             que <- newTQueueIO

@@ -63,6 +63,7 @@ module Blockchain.SolidVM.SM
     addNewCodeCollection,
     getContractNameAndHash,
     getCodeAndCollection,
+    getCodeAndCollectionWithTypeCheck,
     getContractsForParents,
     getAbstractParentsFromContract,
     getMapNamesFromContract,
@@ -91,7 +92,7 @@ import Blockchain.Forks (isOperatorPrecedenceForkActive, isRlpEncodeForkActive)
 import Blockchain.SolidVM.Exception
 import Blockchain.Data.VmTrace
 import Blockchain.SolidVM.GasInfo
-import Blockchain.Strato.Model.Gas (Gas (..))
+import Blockchain.Strato.Model.Gas (Gas (..), getGasValue)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
@@ -142,6 +143,7 @@ import qualified Prelude as Ordering (Ordering (..))
 
 data CallInfo = CallInfo
   { currentFunctionName :: SolidString,
+    currentArguments :: ValList,
     currentAddress :: Address,
     currentCodeAddress :: Address,
     currentContract :: CC.Contract,
@@ -439,6 +441,14 @@ instance MonadGas SM where
     pure gi'
   {-# INLINE chargeGasState #-}
 
+instance MonadBuiltinGas SM where
+  chargeBuiltinGas !gas = do
+    gi' <- chargeGasState gas
+    when (gi' ^. gasLeft < Gas 0) $ do
+      let msg = "out of gas: " ++ show (gi' ^. gasLeft) ++ " < " ++ show gas
+      liftIO $ putStrLn $ CL.red msg
+      throw (TooMuchGas (getGasValue $ _gasInitialAllotment gi') (getGasValue $ gi' ^. gasUsed))
+
 instance Mod.Modifiable Action SM where
   get _ = gets _action
   put _ a = modify $ action .~ a
@@ -487,14 +497,12 @@ runSM maybeCode envBefore gi f = do
   contextState <- Mod.get (Mod.Proxy @ContextState)
   let initialDebugSettings = _debugSettings contextState
       initialVmTracer = _vmTracer contextState
-  GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
-  $logDebugS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
   let !startingState =
         SState
           { env = envBefore,
             callStack = [],
             _action = startingAction envBefore,
-            _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap}, -- capping the transaction gas limit
+            _gasInfo = gi,
             ssDebugSettingsValue = initialDebugSettings,
             ssVmTracerValue = initialVmTracer,
             ssDbgHot = isJust initialDebugSettings || isJust initialVmTracer
@@ -822,6 +830,7 @@ addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
   let newCallInfo =
         CallInfo
           { currentFunctionName = fn,
+            currentArguments = [],
             currentAddress = a,
             currentCodeAddress = codeAddr,
             currentContract = c,
@@ -920,7 +929,7 @@ getCurrentContract = do
     (currentCallInfo : _) -> return $ currentContract currentCallInfo
     _ -> throw (InternalError "getCurrentContract called with an empty stack")
 
-getCurrentAddress :: MonadSM m => m Address
+getCurrentAddress :: Mod.Modifiable [CallInfo] m => m Address
 getCurrentAddress = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
@@ -1079,7 +1088,7 @@ addNewCodeCollection ch cc = do
       Mod.modify_ (Mod.Proxy @(OMap.OMap (Text, Keccak256) CodeCollection)) $ pure . (OMap.|> ((username, ch), cc))
     Nothing -> pure ()
 
-getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
+getBlockHashWithNumber :: (MonadLogger m, (Keccak256 `A.Alters` BlockSummary) m) => Integer -> Keccak256 -> m (Maybe Keccak256)
 getBlockHashWithNumber num h = do
   $logInfoS "getBlockHashWithNumber" . T.pack $ "calling getBSum with " ++ format h
   bSum <- getBSum h
@@ -1110,17 +1119,20 @@ parseOptionsForCurrentBlock = do
 
 -- | Values as 'rlpEncodeValue' should see them at the current block: before
 -- 'isRlpEncodeForkActive', every non-data value encoded as an empty list.
-rlpForkValues :: MonadSM m => [Value] -> m [Value]
+rlpForkValues :: (Monad m, Mod.Accessible Env.Environment m) => [Value] -> m [Value]
 rlpForkValues vs = do
-  forked <- isRlpEncodeForkActive . blockHeaderBlockNumber . Env.blockHeader <$> getEnv
+  forked <- isRlpEncodeForkActive . blockHeaderBlockNumber . Env.blockHeader <$> Mod.access (Mod.Proxy @Env.Environment)
   pure $ if forked then vs else rlpLegacyValue <$> vs
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
-getCodeAndCollection address' = do
+getCodeAndCollection = getCodeAndCollectionWithTypeCheck True
+
+getCodeAndCollectionWithTypeCheck :: MonadSM m => Bool -> Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
+getCodeAndCollectionWithTypeCheck typeCheck address' = do
   (contractName', ch) <- getContractNameAndHash address'
   isRunningTests <- Env.runningTests <$> getEnv
   opts <- parseOptionsForCurrentBlock
-  cc <- codeCollectionFromHashWith opts isRunningTests True ch
+  cc <- codeCollectionFromHashWith opts isRunningTests typeCheck ch
   let !contract' = fromMaybe (throw (MissingType "getCodeAndCollection" (labelToString contractName'))) $ M.lookup contractName' $ cc ^. CC.contracts
   return (contract', ch, cc)
 

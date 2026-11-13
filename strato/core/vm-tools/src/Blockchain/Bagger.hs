@@ -598,11 +598,9 @@ isValidForPool :: MonadBagger m => OutputTx -> m (Either TxRejection ())
 isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = do
   -- todo: is this everything that can be checked? be more pedantic and check for neg. balance, etc?
   state <- getBaggerState
-  let intrinsicGas = B.calculateIntrinsicGasAtNextBlock state t
-      txn = TD.nonce bt
+  let txn = TD.nonce bt
       txFee = B.calculateIntrinsicTxFee state t
       txSize = toInteger $ BS.length $ BL.toStrict $ Bin.encode bt
-      gLimit = Conf.gasLimit (networkConfig ethConf)
       sizeLimit = toInteger (Conf.txSizeLimit (networkConfig ethConf))
       nextBlock = number (B.bestBlockHeader $ B.miningCache state) + 1
       expectedChainId = Conf.chainId $ networkConfig ethConf
@@ -615,7 +613,6 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = do
       | chainIdRequired (isReplayProtectionForkActive nextBlock) bt && not (transactionChainIdValid expectedChainId bt) -> Left $ ChainIdMismatch Validation Incoming expectedChainId t
       | Just why <- envelopeRejection (isStratoGasForkActive nextBlock) bt -> Left $ InvalidEnvelope Validation Incoming why t
       | Just (q, bound) <- feeBoundRejection quote bt -> Left $ FeeBoundExceeded Validation Incoming q bound t
-      | intrinsicGas >= gLimit -> Left $ GasLimitTooLow Validation Incoming intrinsicGas gLimit t
       | addressNonce > txn -> Left $ NonceTooLow Validation Incoming addressNonce t
       | addressBalance < txFee -> Left $ BalanceTooLow Validation Incoming txFee addressBalance t
       | txSize >= sizeLimit -> Left $ TXSizeLimitExceeded Validation Incoming txSize sizeLimit t

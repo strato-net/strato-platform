@@ -19,6 +19,7 @@ module SolidVM.Model.Value
     coerceType,
     defaultValue,
     createDefaultValue,
+    createDefaultValueWith,
     valEquals,
     valueTypeName,
     getConst,
@@ -371,23 +372,36 @@ createDefaultValue ::
   CC.Contract ->
   SVMType.Type ->
   m Value
-createDefaultValue _ _ (SVMType.Array _ _) = return $ SArray V.empty
-createDefaultValue _ _ (SVMType.Mapping _ _ _ _ _) = return $ SMap M.empty
-createDefaultValue _ _ (SVMType.Int _ _) = return $ SInteger 0
-createDefaultValue _ _ SVMType.Bool = return $ SBool False
-createDefaultValue _ _ (SVMType.Address _) = return $ (SAddress 0) False
-createDefaultValue _ _ (SVMType.String _) = return $ SString ""
-createDefaultValue _ _ (SVMType.Bytes _ mSize) = return $ SBytes $ case mSize of
+createDefaultValue = createDefaultValueWith (pure ())
+
+-- | 'createDefaultValue', running the given action before each struct field
+-- is created, so the caller can charge for a struct by its size as it is
+-- built: nested structs can make a short declaration very large.
+createDefaultValueWith ::
+  MonadIO m =>
+  m () ->
+  CC.CodeCollection ->
+  CC.Contract ->
+  SVMType.Type ->
+  m Value
+createDefaultValueWith _ _ _ (SVMType.Array _ _) = return $ SArray V.empty
+createDefaultValueWith _ _ _ (SVMType.Mapping _ _ _ _ _) = return $ SMap M.empty
+createDefaultValueWith _ _ _ (SVMType.Int _ _) = return $ SInteger 0
+createDefaultValueWith _ _ _ SVMType.Bool = return $ SBool False
+createDefaultValueWith _ _ _ (SVMType.Address _) = return $ (SAddress 0) False
+createDefaultValueWith _ _ _ (SVMType.String _) = return $ SString ""
+createDefaultValueWith _ _ _ (SVMType.Bytes _ mSize) = return $ SBytes $ case mSize of
   Just n -> BC.replicate (fromIntegral n) '\0'  -- Fixed-size bytes (e.g., bytes32)
   Nothing -> BC.empty  -- Dynamic bytes
-createDefaultValue _ _ SVMType.Decimal = return $ SDecimal 0
-createDefaultValue cc ctract (SVMType.UnknownLabel name) =
+createDefaultValueWith _ _ _ SVMType.Decimal = return $ SDecimal 0
+createDefaultValueWith perField cc ctract (SVMType.UnknownLabel name) =
   case (M.lookup name $ CC._enums ctract, M.lookup name $ CC._structs ctract) of
     (Just ((val : _), _), _) -> return $ SEnumVal name val 0x0
     (Nothing, Just sdef) -> do
       items <-
         forM sdef $ \(n, itemType, _) -> do
-          itemVal <- createDefaultValue cc ctract $ CC.fieldTypeType itemType
+          perField
+          itemVal <- createDefaultValueWith perField cc ctract $ CC.fieldTypeType itemType
           itemVar <- createVar itemVal
           return (n, itemVar)
       return $ SStruct name $ M.fromList items
@@ -397,7 +411,8 @@ createDefaultValue cc ctract (SVMType.UnknownLabel name) =
         (Nothing, Just sdef) -> do
           items <-
             forM sdef $ \(n, itemType, _) -> do
-              itemVal <- createDefaultValue cc ctract $ CC.fieldTypeType itemType
+              perField
+              itemVal <- createDefaultValueWith perField cc ctract $ CC.fieldTypeType itemType
               itemVar <- createVar itemVal
               return (n, itemVar)
           return $ SStruct name $ M.fromList items
@@ -405,9 +420,9 @@ createDefaultValue cc ctract (SVMType.UnknownLabel name) =
           [_] -> return $ SContract name 0x0
           (n:ns) -> case M.lookup (textToLabel n) $ cc ^. CC.contracts of
             Nothing -> return $ SContract name 0x0
-            Just c -> createDefaultValue cc c (SVMType.UnknownLabel . textToLabel $ T.intercalate "." ns)
+            Just c -> createDefaultValueWith perField cc c (SVMType.UnknownLabel . textToLabel $ T.intercalate "." ns)
           _ -> return $ SContract name 0x0
-createDefaultValue _ _ _ = pure SNULL
+createDefaultValueWith _ _ _ _ = pure SNULL
 
 {-
 byteStringToValue :: B.ByteString -> Maybe Value
