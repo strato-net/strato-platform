@@ -30,7 +30,7 @@ The entrypoints are mutually exclusive.
 --help|-h       - this help.
 --set-password  - set or re-enter the STRATO Vault's in-memory password; use PASSWORD env var to skip interactive input.
 --down          - remove strato containers and leave all volumes intact.
---wipe          - stop and remove STRATO containers and wipe out volumes.
+--wipe          - same as --down; prints the command that wipes the volumes.
 --pull          - pull images used in docker-compose.vault.yml.
 
 ${Yellow}Environment variables:${NC}
@@ -42,27 +42,39 @@ ssl                - (default: false) [true|false] to run the node with SSL/TLS.
 sslCertFileType    - (default: pem) [pem|crt] the SSL certificate type and file extension (should be accessible at ./ssl/certs/server.<sslCertFileType> at deploy time.)
 INITIAL_OAUTH_DISCOVERY_URL       - (required) OpenID Connect discovery URL for initial OAuth2 provider. Additional ones can be added at run time.
 INITIAL_OAUTH_ISSUER              - (required) Issuer value for initial OAuth2 provider.
-INITIAL_OAUTH_JWT_USER_ID_CLAIM   - (default: sub) The claim (payload property) of JWT token to use as unique user id within STRATO Vault."
+INITIAL_OAUTH_JWT_USER_ID_CLAIM   - (default: sub) The claim (payload property) of JWT token to use as unique user id within STRATO Vault.
+
+${Yellow}Database environment variables:${NC}
+COMPOSE_PROFILES   - Set to local-postgres to run the bundled PostgreSQL container. Leave unset to use an external database.
+VAULT_PGPASS_FILE  - (default: /etc/vault/postgres.pgpass) File with the database login's password, one host:port:database:user:password line, mode 0600.
+postgres_host      - (default: postgres) Database host. The default is the bundled PostgreSQL container.
+postgres_user      - (default: strato) Database login. The default is the bundled PostgreSQL's login, which is not a superuser.
+postgres_vault_wrapper_db - (default: oauth) Database name.
+postgres_password  - (default: api) Password the bundled PostgreSQL is created with on its first start. VAULT_PGPASS_FILE must hold the same one.
+VAULT_CREATE_DB    - (default: false) [true|false] Create the database when it is missing. Set to true with the bundled PostgreSQL.
+PGSSLMODE          - (default: verify-full) TLS mode of the database connection. Set to disable with the bundled PostgreSQL.
+PGSSLROOTCERT      - (default: system) CA certificates the database's certificate is verified against. With PGSSLMODE=disable set it to /etc/ssl/certs/ca-certificates.crt."
 }
 
 function wipe {
-  echo -e "${Yellow}Removing Vault containers and wiping out volumes${NC}"
-  ${docker_compose} -f docker-compose.vault.yml down -vt 0 --remove-orphans
+  down
+  echo -e "${BYellow}The volumes are kept. To wipe them, run the command below. ALL USER KEYS STORED IN THIS VAULT WILL BE LOST:
+  docker volume rm vault_vaultpgdata vault_idpconfig${NC}"
 }
 
 function down {
   echo -e "${Yellow}Removing Vault containers${NC}"
-  ${docker_compose} -f docker-compose.vault.yml down --remove-orphans
+  ${docker_compose} -f docker-compose.vault.yml --profile local-postgres down --remove-orphans
 }
 
 function stop {
   echo -e "${Yellow}Gently stopping Vault containers${NC}"
-  ${docker_compose} -f docker-compose.vault.yml stop
+  ${docker_compose} -f docker-compose.vault.yml --profile local-postgres stop
 }
 
 function start {
   echo -e "${Yellow}Starting the earlier stopped Vault containers${NC}"
-  ${docker_compose} -f docker-compose.vault.yml start
+  ${docker_compose} -f docker-compose.vault.yml --profile local-postgres start
 }
 
 function pullImages {
