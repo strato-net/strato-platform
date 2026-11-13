@@ -38,6 +38,12 @@ export const clientSecret = process.env.OAUTH_CLIENT_SECRET;
 export const hasClientCredentials = Boolean(clientId && clientSecret);
 export const nodeUrl = process.env.NODE_URL;
 
+// Partner referrals service (app/services/partner-referrals): where a new
+// account that arrived through a partner ref link is recorded. Unset, ref
+// links are not recorded.
+export const partnerReferralsUrl = process.env.PARTNER_REFERRALS_URL?.replace(/\/$/, "");
+export const partnerReferralsKey = process.env.PARTNER_INTERNAL_KEY;
+
 // Direct Postgres access to cirrus DB (used instead of Cirrus/PostgREST for heavy queries)
 export const cirrusDbName = "cirrus";
 
