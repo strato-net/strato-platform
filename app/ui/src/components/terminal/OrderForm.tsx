@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Market, PoolV3Token, SwapToken } from "@/interface";
 import { useUser } from "@/context/UserContext";
@@ -14,7 +14,6 @@ import { safeParseUnits } from "@/utils/numberUtils";
 import { computeMaxTransferable } from "@/utils/transferValidation";
 import { SlippageSetting, TradeFormState, initialTradeFormState } from "@/components/swap/swapFormReducer";
 import { SlippageControl } from "@/components/swap/SlippageControl";
-import { SwapConfirmDialog } from "@/components/swap/SwapConfirmDialog";
 import { FeeNotices } from "@/components/NetworkFee";
 import { amountText, formatPrice, formatTokens } from "@/components/terminal/format";
 
@@ -58,6 +57,9 @@ const Row = ({ label, children }: { label: string; children: React.ReactNode }) 
  * Nothing here is shown or traded on unless it belongs to what is on screen now: a quote
  * counts only if it was made for the amount typed, and after a trade the balances are
  * held back (`settlement`) until a read that includes it.
+ *
+ * The button sends the order at once, with no confirmation step: the form is frozen while
+ * the order is on its way so that what was sent is what stays on screen.
  */
 export const OrderForm = ({ market, settlement }: OrderFormProps) => {
   const { isLoggedIn } = useUser();
@@ -74,7 +76,9 @@ export const OrderForm = ({ market, settlement }: OrderFormProps) => {
   /** what the amount read in the other unit before the last unit switch: switching back restores it */
   const [otherUnitValue, setOtherUnitValue] = useState<string>();
   const [slippage, setSlippage] = useState<SlippageSetting>(initialTradeFormState.slippage);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  // set synchronously on a click: a second click in the same frame must not send again
+  const sending = useRef(false);
+  const submitting = tradeSwap.isPending;
   const balancesLoading = tokensLoading && activeTokens.length + inactiveTokens.length === 0;
 
   const isBuy = side === "buy";
@@ -105,7 +109,7 @@ export const OrderForm = ({ market, settlement }: OrderFormProps) => {
   const {
     activeQuote, quoteResponse, typedValueWei, exactOut,
     inputAmountWei, outputAmountWei,
-    exchangeRate, invertedExchangeRate, priceImpact, slippagePercent, minAmountOutWei,
+    priceImpact, slippagePercent, minAmountOutWei,
     insufficientBalance,
   } = useDerivedTradeInfo(formState, maxSpendableWei);
 
@@ -181,7 +185,8 @@ export const OrderForm = ({ market, settlement }: OrderFormProps) => {
   };
 
   const handleSwap = async () => {
-    if (!quote) return;
+    if (!quote || sending.current) return;
+    sending.current = true;
     const succeeded = settlement.begin(side, Number(inputAmountWei) / 1e18);
     try {
       const result = await tradeSwap.mutateAsync({
@@ -215,7 +220,7 @@ export const OrderForm = ({ market, settlement }: OrderFormProps) => {
       // a failed order can still have cost network fees
       void settlement.refreshBalances();
     } finally {
-      setConfirmOpen(false);
+      sending.current = false;
     }
   };
 
@@ -229,6 +234,7 @@ export const OrderForm = ({ market, settlement }: OrderFormProps) => {
         {(["buy", "sell"] as const).map((option) => (
           <button
             key={option}
+            disabled={submitting}
             onClick={() => selectSide(option)}
             className={`rounded py-1.5 capitalize ${
               option !== side
@@ -259,6 +265,7 @@ export const OrderForm = ({ market, settlement }: OrderFormProps) => {
           placeholder="0.00"
           aria-label={`Amount in ${unitSymbol}`}
           value={typedValue}
+          disabled={submitting}
           onChange={(e) => {
             if (DECIMAL_PATTERN.test(e.target.value)) typeAmount(e.target.value);
           }}
@@ -268,6 +275,7 @@ export const OrderForm = ({ market, settlement }: OrderFormProps) => {
           {(["base", "quote"] as const).map((option) => (
             <button
               key={option}
+              disabled={submitting}
               onClick={() => switchUnit(option)}
               className={`rounded px-2 py-0.5 ${
                 option === unit ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
@@ -283,7 +291,7 @@ export const OrderForm = ({ market, settlement }: OrderFormProps) => {
         {SIZE_PRESETS.map((percent) => (
           <button
             key={percent}
-            disabled={balancesLoading || settling || maxSpendableWei <= 0n}
+            disabled={submitting || balancesLoading || settling || maxSpendableWei <= 0n}
             onClick={() => applyPreset(percent)}
             className="rounded border border-border py-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
@@ -316,6 +324,7 @@ export const OrderForm = ({ market, settlement }: OrderFormProps) => {
         slippage={slippage}
         effectivePercent={slippagePercent}
         onChange={setSlippage}
+        disabled={submitting}
         showAutoPercent={false}
       />
 
@@ -328,28 +337,14 @@ export const OrderForm = ({ market, settlement }: OrderFormProps) => {
       )}
 
       <Button
-        disabled={!!blocker || !quote}
-        onClick={() => setConfirmOpen(true)}
+        disabled={!!blocker || !quote || submitting}
+        onClick={handleSwap}
         className={`w-full text-background ${isBuy ? "bg-up hover:bg-up/90" : "bg-down hover:bg-down/90"}`}
       >
-        {blocker ?? `${isBuy ? "Buy" : "Sell"} ${market.base.symbol}`}
+        {submitting
+          ? `${isBuy ? "Buying" : "Selling"} ${market.base.symbol}…`
+          : (blocker ?? `${isBuy ? "Buy" : "Sell"} ${market.base.symbol}`)}
       </Button>
-
-      <SwapConfirmDialog
-        isOpen={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        fromAmount={formatTokens(inputAmountWei)}
-        toAmount={formatTokens(outputAmountWei)}
-        fromAsset={tokenIn}
-        toAsset={tokenOut}
-        exchangeRate={exchangeRate}
-        invertedExchangeRate={invertedExchangeRate}
-        isHighPriceImpact={(impact ?? 0) >= HIGH_IMPACT_PERCENT}
-        toAmountMin={formatTokens(minAmountOutWei)}
-        networkFeeCalls={SWAP_CALLS}
-        onConfirm={handleSwap}
-        isLoading={tradeSwap.isPending || !quote}
-      />
     </div>
   );
 };

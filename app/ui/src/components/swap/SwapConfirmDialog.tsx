@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dialog";
 import { SwapToken } from "@/interface";
 import { LoadingSpinner } from "@/components/swap/TokenInputPanel";
-import NetworkFee from "@/components/NetworkFee";
 
 // ============================================================================
 // CONFIRM TRADE DIALOG
@@ -25,8 +24,6 @@ interface SwapConfirmDialogProps {
   invertedExchangeRate?: string;
   isHighPriceImpact: boolean;
   toAmountMin: string;
-  /** contract calls the trade makes: shows the network fee for them */
-  networkFeeCalls?: number;
   onConfirm: () => void;
   isLoading: boolean;
 }
@@ -42,7 +39,6 @@ export const SwapConfirmDialog = ({
   invertedExchangeRate,
   isHighPriceImpact,
   toAmountMin,
-  networkFeeCalls,
   onConfirm,
   isLoading
 }: SwapConfirmDialogProps) => (
@@ -82,14 +78,6 @@ export const SwapConfirmDialog = ({
             )}
           </span>
         </div>
-        {networkFeeCalls !== undefined && (
-          <div className="flex justify-between items-center gap-2">
-            <span className="text-sm md:text-base text-muted-foreground flex-shrink-0">Network fee:</span>
-            <span className="font-semibold text-sm md:text-base text-right break-words">
-              <NetworkFee calls={networkFeeCalls} />
-            </span>
-          </div>
-        )}
         {isHighPriceImpact && (
           <div className="text-yellow-600 text-xs md:text-sm mt-2">
             ⚠️ High price impact — you may receive fewer tokens than expected.
