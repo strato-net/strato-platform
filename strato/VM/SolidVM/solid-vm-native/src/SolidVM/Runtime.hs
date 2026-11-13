@@ -8,6 +8,7 @@
 module SolidVM.Runtime (compiledContract, compiledFunction, constructorStage, runAction, Host (..)) where
 
 import Text.Format (format)
+import Blockchain.Data.RLP (rlpSerialize)
 import Blockchain.DB.SolidStorageDB
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.SolidVM.CodeCollectionDB (ParseOptions (..))
@@ -162,6 +163,11 @@ runAction charge callFunction createContract host emit cc contract name (N.Fun _
           , N.rtAbiEncode = \packed ds -> run $ do
               vals <- traverse toValue ds
               (if packed then ABI.abiEncodePacked else ABI.abiEncode) vals
+          , N.rtHashInput = \ds -> run $ do
+              vals <- traverse (getVar . Constant <=< toValue) ds
+              case vals of
+                [SBytes bs] -> pure $ Left bs
+                _ -> Right . rlpSerialize . rlpEncodeValues <$> rlpForkValues vals
           , N.rtCreateCode = \salt contractName source ds -> run $ unwind $ do
               saltValue <- traverse toValue salt
               vals <- traverse toValue ds
@@ -174,7 +180,7 @@ runAction charge callFunction createContract host emit cc contract name (N.Fun _
           , N.rtCopyStorage = \destination source -> run $
               setVar (Constant $ SReference destination) =<< getVar (Constant $ SReference source)
           , N.rtDerive = \creator salt contractName ds -> run $
-              hostDerive host creator salt contractName =<< traverse toValue ds
+              hostDerive host creator salt contractName =<< traverse (getVar . Constant <=< toValue) ds
           , N.rtSender = \_ -> run $ Env.sender <$> getEnv
           , N.rtCreate = \_ contractName getSalt getArgs -> run $ do
               depth <- getCallStackDepth

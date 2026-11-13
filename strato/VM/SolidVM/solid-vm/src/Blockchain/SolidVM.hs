@@ -1532,7 +1532,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   (hsh, cc) <- getCurrentCodeCollection
   salt <- getVar =<< expToVar saltExpression
   argVals <- argsToVals args
-  newAddress <- getNewAddressWithSalt creator salt hsh (SString (labelToString contractName') : argVals)
+  newAddress <- getNewAddressWithSalt creator salt hsh =<< rlpForkValues (SString (labelToString contractName') : argVals)
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
   execResults <- create' creator newAddress hsh cc contractName' argVals
   onTraced $ do
@@ -1595,12 +1595,13 @@ expToVar' (CC.FunctionCall _ e args) = do
                       SVariadic v : rest -> reverse rest ++ v
                       _ -> vs
                     _ -> throw (TypeError "derive: first two arguments must be contract name and salt " $ intercalate ", " (map unparseExpression args))
-                  newAddress =
+              encodedArgs <- rlpForkValues args''
+              let newAddress =
                     getNewAddressWithSalt_unsafe
                       addr
                       salt
                       (keccak256ToByteString hsh)
-                      args''
+                      encodedArgs
               onTraced $ do
                 liftIO $
                   putStrLn $
@@ -2603,7 +2604,7 @@ callBuiltin "__solidvm_normalizeHex" [SString input] =
 callBuiltin "__solidvm_normalizeHex" args = throw (TypeError "normalizeHex" $ format (map renderValueShallow args))
 callBuiltin "log" args = SNULL <$ traverse (liftIO . putStrLn <=< showSM) args
 callBuiltin "keccak256" [SBytes bs] = pure . SBytes . keccak256ToByteString $ hash bs
-callBuiltin "keccak256" args = pure . SString . keccak256ToHex . hash . rlpSerialize $ rlpEncodeValues args
+callBuiltin "keccak256" args = SString . keccak256ToHex . hash . rlpSerialize . rlpEncodeValues <$> rlpForkValues args
 callBuiltin "ecrecover" [h', v', r', s'] = do
     bytestringHash <- getBytesVal h'
     v <- int v'
@@ -2652,9 +2653,9 @@ callBuiltin "verifyP256" (h' : r' : s' : p') = getBytesVal h' >>= \h -> case dig
     let !isValidSig = verifyDigest (Mod.Proxy @Curve_P256R1) pub sig digest
     pure $ SBool isValidSig
 callBuiltin "sha256" [SBytes bs] = pure . SBytes $ SHA256.hash bs
-callBuiltin "sha256" args = pure . SString . BC.unpack . B16.encode . SHA256.hash . rlpSerialize $ rlpEncodeValues args
+callBuiltin "sha256" args = SString . BC.unpack . B16.encode . SHA256.hash . rlpSerialize . rlpEncodeValues <$> rlpForkValues args
 callBuiltin "ripemd160" [SBytes bs] = pure . SBytes $ RIPEMD160.hash bs
-callBuiltin "ripemd160" args = pure . SString . BC.unpack . B16.encode . RIPEMD160.hash . rlpSerialize $ rlpEncodeValues args
+callBuiltin "ripemd160" args = SString . BC.unpack . B16.encode . RIPEMD160.hash . rlpSerialize . rlpEncodeValues <$> rlpForkValues args
 callBuiltin "base64encode" [SBytes bs] = pure . SBytes $ B64.encode bs
 callBuiltin "base64encode" [SString s] = pure . SString . BC.unpack . B64.encode . DT.encodeUtf8 $ T.pack s
 callBuiltin "base64urlencode" [SBytes bs] = pure . SBytes . BC.takeWhile (/= '=') $ B64URL.encode bs
@@ -2841,7 +2842,7 @@ callBuiltin "create2" args@(salt : n : src : argVals) = do
   opts <- parseOptionsForCurrentBlock
   (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 $ T.pack contractSrc
   addNewCodeCollection hsh cc
-  newAddress <- getNewAddressWithSalt creator salt hsh $ n:argVals
+  newAddress <- getNewAddressWithSalt creator salt hsh =<< rlpForkValues (n:argVals)
   execResults <- create' creator newAddress hsh cc (stringToLabel contractName') argVals
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAddress) False) nca

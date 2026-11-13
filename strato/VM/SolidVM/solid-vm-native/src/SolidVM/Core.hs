@@ -277,6 +277,7 @@ data RT = RT
   , rtCall :: CallKind -> Frame -> Address -> T.Text -> [Dyn] -> Maybe SomeTy -> IO [Dyn]
   , rtSender :: Frame -> IO Address
   , rtAbiEncode :: Bool -> [Dyn] -> IO B.ByteString
+  , rtHashInput :: [Dyn] -> IO (Either B.ByteString B.ByteString) -- keccak256 input as the interpreter builds it: Left raw bytes, Right RLP
   , rtCreateCode :: Maybe Dyn -> T.Text -> T.Text -> [Dyn] -> IO Address
   , rtSelfdestruct :: Address -> IO Bool
   , rtPreviousBlock :: IO (Address, Address, Integer)

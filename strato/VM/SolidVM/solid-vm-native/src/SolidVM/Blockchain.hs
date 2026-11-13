@@ -190,7 +190,7 @@ createContractValues contractName' mSalt getArgs = do
     Just getSalt -> do
       salt <- getSalt
       values <- getArgs
-      address <- getNewAddressWithSalt creator salt hsh (SString (labelToString contractName') : values)
+      address <- getNewAddressWithSalt creator salt hsh =<< rlpForkValues (SString (labelToString contractName') : values)
       pure (address, values)
   execResults <- create' creator newAddress hsh cc contractName' argVals
   pure $ fromMaybe (throw (InternalError ("a call to create did not create an address: " ++ (maybe "no VM exception" (either displayException displayException) $ erException execResults)))) $ erNewContractAddress execResults
@@ -698,7 +698,7 @@ createCode salt name source args = do
   addNewCodeCollection hsh cc
   address <- case salt of
     Nothing -> getNewAddress creator
-    Just s -> getNewAddressWithSalt creator s hsh (SString (T.unpack name) : args)
+    Just s -> getNewAddressWithSalt creator s hsh =<< rlpForkValues (SString (T.unpack name) : args)
   result <- create' creator address hsh cc name args
   pure $ fromMaybe (throw (InternalError ("create did not produce an address: " ++ (maybe "no VM exception" (either displayException displayException) $ erException result)))) (erNewContractAddress result)
 
@@ -717,4 +717,4 @@ selfdestruct target = do
 derive :: Address -> T.Text -> T.Text -> ValList -> SM Address
 derive address salt name args = do
   (_, hsh, _) <- getCodeAndCollection address
-  pure $ getNewAddressWithSalt_unsafe address (T.unpack salt) (keccak256ToByteString hsh) (SString (T.unpack name) : args)
+  getNewAddressWithSalt_unsafe address (T.unpack salt) (keccak256ToByteString hsh) <$> rlpForkValues (SString (T.unpack name) : args)

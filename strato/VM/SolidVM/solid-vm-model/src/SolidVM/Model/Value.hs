@@ -14,6 +14,7 @@ module SolidVM.Model.Value
     rlpEncodeVariable,
     rlpEncodeValue,
     rlpEncodeValues,
+    rlpLegacyValue,
     createVar,
     coerceType,
     defaultValue,
@@ -227,7 +228,53 @@ rlpEncodeValue (SStruct _ m) = RLPArray $ rlpEncodeVariable . snd <$> M.toList m
 rlpEncodeValue (STuple v) = RLPArray $ rlpEncodeVariable <$> V.toList v
 rlpEncodeValue (SArray v) = RLPArray $ rlpEncodeVariable <$> V.toList v
 rlpEncodeValue (SVariadic vs) = rlpEncodeValues vs
-rlpEncodeValue _ = RLPArray []
+rlpEncodeValue (SContract _ a) = rlpEncode a
+rlpEncodeValue (SUserDefined _ _ v) = rlpEncodeValue v
+rlpEncodeValue (SMap m) = RLPArray [RLPArray [rlpEncodeValue k, rlpEncodeVariable v] | (k, v) <- M.toList m]
+rlpEncodeValue (SContractFunction a f) = RLPArray [rlpEncode a, rlpEncode f]
+rlpEncodeValue (SEnum n) = rlpEncodeTagged "enum" [rlpEncode n]
+rlpEncodeValue (SStructDef n) = rlpEncodeTagged "structDef" [rlpEncode n]
+rlpEncodeValue (SContractDef n) = rlpEncodeTagged "contractDef" [rlpEncode n]
+rlpEncodeValue (SFunction n c) = rlpEncodeTagged "function" [rlpEncode n, rlpEncode $ CC._contractName <$> c]
+rlpEncodeValue (SBuiltinVariable n) = rlpEncodeTagged "builtinVariable" [rlpEncode n]
+rlpEncodeValue (SSetterGetter n v) = rlpEncodeTagged "setterGetter" [rlpEncode n, rlpEncode v]
+rlpEncodeValue (SContractItem a n) = rlpEncodeTagged "contractItem" [rlpEncode a, rlpEncode n]
+rlpEncodeValue (SPush v _) = rlpEncodeTagged "push" [rlpEncodeValue v]
+rlpEncodeValue SHexDecodeAndTrim = rlpEncodeTagged "hexDecodeAndTrim" []
+rlpEncodeValue SStringConcat = rlpEncodeTagged "stringConcat" []
+rlpEncodeValue (SDeferredConstant n) = rlpEncodeTagged "deferredConstant" [rlpEncode n]
+rlpEncodeValue SAddressToAscii = rlpEncodeTagged "addressToAscii" []
+rlpEncodeValue SBreak = rlpEncodeTagged "break" []
+rlpEncodeValue SContinue = rlpEncodeTagged "continue" []
+
+-- | Values that are not data (type names, builtins, bound members, control
+-- flow) are encoded as their constructor tag followed by their fields, so no
+-- two of them share an encoding.
+rlpEncodeTagged :: String -> [RLPObject] -> RLPObject
+rlpEncodeTagged tag fields = RLPArray $ rlpEncode tag : fields
+
+-- | Rewrites a value so 'rlpEncodeValue' gives its encoding from before the RLP
+-- encode fork, when every value without a data case of its own encoded as
+-- @RLPArray []@, the same as an empty tuple.
+rlpLegacyValue :: Value -> Value
+rlpLegacyValue = \case
+  SStruct n m -> SStruct n $ legacyVar <$> m
+  STuple v -> STuple $ legacyVar <$> v
+  SArray v -> SArray $ legacyVar <$> v
+  SVariadic vs -> SVariadic $ rlpLegacyValue <$> vs
+  v@SNULL -> v
+  v@SReference{} -> v
+  v@SInteger{} -> v
+  v@SString{} -> v
+  v@SBytes{} -> v
+  v@SDecimal{} -> v
+  v@SBool{} -> v
+  v@SAddress{} -> v
+  v@SEnumVal{} -> v
+  _ -> STuple V.empty
+  where
+    legacyVar (Constant v) = Constant $ rlpLegacyValue v
+    legacyVar var = var
 
 rlpEncodeValues :: [Value] -> RLPObject
 rlpEncodeValues [x] = rlpEncodeValue x

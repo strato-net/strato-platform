@@ -23,6 +23,7 @@
 
 module Blockchain.SolidVM.SM
   ( parseOptionsForCurrentBlock,
+    rlpForkValues,
     CallInfo (..),
     SState (..),
     SM,
@@ -86,7 +87,7 @@ import Blockchain.EthConf (ethConf)
 import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
-import Blockchain.Forks (isOperatorPrecedenceForkActive)
+import Blockchain.Forks (isOperatorPrecedenceForkActive, isRlpEncodeForkActive)
 import Blockchain.SolidVM.Exception
 import Blockchain.Data.VmTrace
 import Blockchain.SolidVM.GasInfo
@@ -1106,6 +1107,13 @@ parseOptionsForCurrentBlock :: MonadSM m => m ParseOptions
 parseOptionsForCurrentBlock = do
   blockNum <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
   pure defaultParseOptions {parseLegacyOperatorPrecedence = not (isOperatorPrecedenceForkActive blockNum)}
+
+-- | Values as 'rlpEncodeValue' should see them at the current block: before
+-- 'isRlpEncodeForkActive', every non-data value encoded as an empty list.
+rlpForkValues :: MonadSM m => [Value] -> m [Value]
+rlpForkValues vs = do
+  forked <- isRlpEncodeForkActive . blockHeaderBlockNumber . Env.blockHeader <$> getEnv
+  pure $ if forked then vs else rlpLegacyValue <$> vs
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection address' = do

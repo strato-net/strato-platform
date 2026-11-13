@@ -68,6 +68,16 @@ gasSource = T.unlines
   , " function bigMultiply() returns (uint) { uint x = 1; x = x << 260; return x * x; }"
   , " function decimalDivide() returns (decimal) { decimal x = decimal(\"1.25\"); return x / decimal(\"2.00\"); }"
   , " function compare() returns (bool) { uint x = 1; return x > 0 && x < 2; }"
+  , " bool flag; address owner0; GasProbe self0;"
+  , " function hashScalars() returns (string) { return keccak256(value, flag, owner0); }"
+  , " function hashStorageValues() returns (string) { return keccak256(array, holder, pair); }"
+  , " function hashStoragePaths() returns (string) { return keccak256(array[0], pair.a, pair.b, map[1], map[2], array.length); }"
+  , " function hashAliases() returns (string) { Pair p = pair; Holder h = holder; return keccak256(p, p.a, h); }"
+  , " function hashContracts() returns (string) { return keccak256(GasProbe(address(this)), self0); }"
+  , " function hashMemory() returns (string) { uint[] memory a = [uint(1), uint(2)]; return keccak256(a, \"x\", 5); }"
+  , " function zeroBoolHashesAsZero() returns (bool) { return keccak256(flag) == keccak256(uint(0)); }"
+  , " function contractHashesAsAddress() returns (bool) { return keccak256(GasProbe(address(this))) == keccak256(address(this)); }"
+  , " function deriveWithStorage() returns (address) { return this.derive(\"s\", \"GasBase\", flag, value, array); }"
   , " function leaf() returns (uint) { return 4; }"
   , " function literal() returns (uint) { return 3; }"
   , " function local() returns (uint) { uint x = 1; x = 2; return x; }"
@@ -252,7 +262,7 @@ main = do
     deployment <- create $ def & createNewAddress .~ 0x2100 & createContractName .~ "GasProbe" & createCode .~ Code gasSource
     liftIO $ check deployment
     savedContext <- Mod.get (Mod.Proxy :: Mod.Proxy ContextState)
-    forM_ ["aliasIndex", "aliasIndexWrite", "aliasIncrement", "storageIncrement", "guardedArgs", "libraryConstant", "qualifiedCall", "usingCall", "superCall", "decimalCompound", "tupleAssign", "aliasRebind", "message", "blockNumber", "constantRead", "enumRead", "externalCall", "scalarWrite", "memberWrite", "indexWrite", "mappingWrite", "copyStorage", "push", "memoryIndexWrite", "aliasWrite", "stringAdd", "bytesAdd", "abiEncode", "shifts", "bigMultiply", "decimalDivide", "compare", "literal", "local", "valueChain", "literalFirst", "valueSelfAdd", "valueMultiply", "valueUnderflow", "valueFromStorage", "localBytesRead", "localBytesWrite", "storageRead", "member", "index", "mappingRead", "callInternal", "castContract", "arithmetic", "divide", "modulo", "compound", "decimalMath", "loop", "breakLoop", "whileLoop", "doLoop", "tuple", "arrayLiteral", "guarded", "catchGas", "catchGasBody"] $ \fn ->
+    forM_ ["aliasIndex", "aliasIndexWrite", "aliasIncrement", "storageIncrement", "guardedArgs", "libraryConstant", "qualifiedCall", "usingCall", "superCall", "decimalCompound", "tupleAssign", "aliasRebind", "message", "blockNumber", "constantRead", "enumRead", "externalCall", "scalarWrite", "memberWrite", "indexWrite", "mappingWrite", "copyStorage", "push", "memoryIndexWrite", "aliasWrite", "stringAdd", "bytesAdd", "abiEncode", "shifts", "bigMultiply", "decimalDivide", "compare", "literal", "local", "valueChain", "literalFirst", "valueSelfAdd", "valueMultiply", "valueUnderflow", "valueFromStorage", "localBytesRead", "localBytesWrite", "storageRead", "member", "index", "mappingRead", "callInternal", "castContract", "arithmetic", "divide", "modulo", "compound", "decimalMath", "loop", "breakLoop", "whileLoop", "doLoop", "tuple", "arrayLiteral", "guarded", "catchGas", "catchGasBody", "hashScalars", "hashStorageValues", "hashStoragePaths", "hashAliases", "hashContracts", "hashMemory", "zeroBoolHashesAsZero", "contractHashesAsAddress", "deriveWithStorage"] $ \fn ->
       forM_ [0..1100] $ \limit -> do
         Mod.put (Mod.Proxy :: Mod.Proxy ContextState) savedContext
         Mod.put (Mod.Proxy :: Mod.Proxy GasCap) (GasCap (Gas limit))

@@ -3,7 +3,6 @@
 module SolidVM.Builtins where
 
 import Text.Format (format)
-import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import Blockchain.Data.Util (integer2Bytes)
 import qualified Blockchain.SolidVM.Exception as E
@@ -16,8 +15,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.Decimal
-import Data.Foldable (toList)
-import Data.List (sortOn)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -159,37 +156,12 @@ recover ds = case flatten ds of
     hashBytes d = bad "ecrecover hash" [d]
 
 keccak :: [Dyn] -> M Dyn
-keccak ds = case flatten ds of
-  [Dyn TBytes bs] -> pure (Dyn TBytes (keccak256ToByteString (hash bs)))
-  xs -> pure (Dyn TStr (T.pack (keccak256ToHex (hash (rlpSerialize (encodeValues xs))))))
-
-encodeValues :: [Dyn] -> RLPObject
-encodeValues [d] = encodeValue d
-encodeValues ds = RLPArray (map encodeValue ds)
-
-encodeValue :: Dyn -> RLPObject
-encodeValue (Dyn ty v) = case ty of
-  TInt -> rlpEncode v
-  TDecimal -> rlpEncode (show v)
-  TBool -> rlpEncode v
-  TAddr -> rlpEncode v
-  TStr -> rlpEncode (T.unpack v)
-  TBytes -> rlpEncode v
-  TEnum _ _ -> rlpEncode (enumNumber v)
-  TWireEnum _ _ -> rlpEncode v
-  TStruct _ fs -> RLPArray (map (encodeValue . snd) (sortOn fst (fields fs v)))
-  TTuple fs -> RLPArray (map encodeValue (toDyns fs v))
-  TArr et -> RLPArray (map (encodeValue . Dyn et) (toList v))
-  TWireArray -> RLPArray (map encodeValue v)
-  TVariadic -> encodeValues v
-  TRaw -> case v of [] -> rlpEncode (0 :: Integer); _ -> encodeValues v
-  TUnit -> rlpEncode (0 :: Integer)
-  TRef _ -> rlpEncode (0 :: Integer)
-  _ -> RLPArray []
-  where
-    fields :: Fields ts -> HL ts -> [(T.Text, Dyn)]
-    fields FNil HNil = []
-    fields (FCons n t rest) (x :* xs) = (n, Dyn t x) : fields rest xs
+keccak ds = do
+  runtime <- rt
+  input <- liftIO (rtHashInput runtime (flatten ds))
+  pure $ case input of
+    Left bs -> Dyn TBytes (keccak256ToByteString (hash bs))
+    Right rlp -> Dyn TStr (T.pack (keccak256ToHex (hash rlp)))
 
 lookupAction :: T.Text -> Maybe ([Dyn] -> M Dyn)
 lookupAction =
