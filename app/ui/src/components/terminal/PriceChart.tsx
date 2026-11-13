@@ -1,5 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, CandlestickChart, LineChart, Maximize2, Minimize2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  CandlestickChart,
+  ChevronDown,
+  LineChart,
+  Maximize2,
+  Minimize2,
+  SlidersHorizontal,
+  Trash2,
+  Undo2,
+} from "lucide-react";
 import {
   AutoscaleInfoProvider,
   CandlestickData,
@@ -16,16 +25,10 @@ import {
 } from "lightweight-charts";
 import { CandleResolution, MarketCandle } from "@/interface";
 import { useMarketCandles } from "@/hooks/terminal/useMarketData";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { priceDecimals } from "@/components/terminal/format";
 import { INDICATORS, Indicator, IndicatorPlot } from "@/components/terminal/indicators";
 import { DrawingLayer, DrawingStore } from "@/components/terminal/DrawingLayer";
-import { DrawingTools } from "@/components/terminal/DrawingTools";
+import { ChartTools, NoteEditor } from "@/components/terminal/ChartTools";
 import { ChartLegend } from "@/components/terminal/ChartLegend";
 
 const RESOLUTIONS: CandleResolution[] = ["1m", "5m", "15m", "1h", "4h", "1d"];
@@ -171,8 +174,7 @@ const drawIndicator = (current: ChartHandles, { overlay, range, levels = [], lab
           {
             ...options,
             color: themeColor(plot.color!),
-            lineWidth: plot.thin ? 1 : 2,
-            lineStyle: plot.dashed ? LineStyle.Dashed : LineStyle.Solid,
+            lineWidth: 1,
             crosshairMarkerVisible: false,
             ...(range && {
               autoscaleInfoProvider: () => ({ priceRange: { minValue: range[0], maxValue: range[1] } }),
@@ -208,9 +210,11 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
   );
   const [enabledIndicators, setEnabledIndicators] = useState(storedIndicators);
   const [expanded, setExpanded] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
   /** index of the candle under the crosshair */
   const [hovered, setHovered] = useState<number>();
   const [drawings] = useState(() => new DrawingStore());
+  useSyncExternalStore(drawings.subscribe, () => drawings.version);
   const { data: candles, isLoading } = useMarketCandles(poolAddress, resolution);
   const containerRef = useRef<HTMLDivElement>(null);
   const handles = useRef<ChartHandles>();
@@ -301,25 +305,33 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
         levels.forEach((level) => level.applyOptions({ color: themeColor("muted-foreground", 0.5) }));
       }
       layer.ink = {
-        line: themeColor("foreground"),
-        surface: themeColor("background", 0.85),
+        line: themeColor("drawing"),
+        label: themeColor("drawing-label"),
+        fill: themeColor("drawing", 0.09),
+        up,
+        down,
         upFill: themeColor("up", 0.15),
         downFill: themeColor("down", 0.15),
-        font: `11px ${getComputedStyle(document.body).fontFamily}`,
+        muted: themeColor("muted-foreground"),
+        note: themeColor("muted", 0.9),
+        surface: themeColor("background"),
+        font: `10px ${getComputedStyle(document.body).fontFamily}`,
       };
     };
     applyTheme();
     const themeObserver = new MutationObserver(applyTheme);
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
     chart.subscribeCrosshairMove((param) => setHovered(param.point ? param.logical : undefined));
-    // the browser leaves full screen on Escape: the chart goes back to its panel with it
-    const onFullscreenChange = () => {
-      if (!document.fullscreenElement) setExpanded(false);
+    // Escape steps back from everything at once: the tools, the tool in hand, the full window
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setToolsOpen(false);
+      setExpanded(false);
+      drawings.arm(null);
     };
-    document.addEventListener("fullscreenchange", onFullscreenChange);
+    window.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener("fullscreenchange", onFullscreenChange);
-      if (document.fullscreenElement) void document.exitFullscreen();
+      window.removeEventListener("keydown", onKeyDown);
       themeObserver.disconnect();
       eases.forEach((ease) => ease.stop());
       layer.destroy();
@@ -423,23 +435,11 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
     setEnabledIndicators(next);
   };
 
-  // the chart fills the window, and the window the screen where the browser allows it
-  const toggleExpanded = () => {
-    if (!expanded) {
-      setExpanded(true);
-      void document.documentElement.requestFullscreen?.().catch(() => undefined);
-    } else if (document.fullscreenElement) {
-      void document.exitFullscreen();
-    } else {
-      setExpanded(false);
-    }
-  };
-
   const shownIndex = hovered !== undefined && candles?.[hovered] ? hovered : (candles?.length ?? 0) - 1;
 
   return (
     <div className={`flex flex-col ${expanded ? "fixed inset-0 z-[60] bg-background" : "h-full"}`}>
-      <div className="flex items-center gap-1 px-3 py-2 text-xs">
+      <div className="flex flex-wrap items-center gap-1 px-3 py-2 text-xs">
         {RESOLUTIONS.map((r) => (
           <button
             key={r}
@@ -451,27 +451,34 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
             {r}
           </button>
         ))}
+        <button
+          onClick={() => setToolsOpen(!toolsOpen)}
+          aria-expanded={toolsOpen}
+          aria-label="Tools & Indicators"
+          className={`ml-2 flex items-center gap-[7px] whitespace-nowrap rounded border bg-muted/50 px-2 py-1.5 ${
+            toolsOpen ? "border-drawing/60 text-drawing" : "border-border text-foreground/70"
+          }`}
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Tools &amp; Indicators</span>
+          <ChevronDown className="h-[11px] w-[11px]" />
+        </button>
         <div className="ml-auto flex items-center gap-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-1 rounded px-2 py-0.5 text-muted-foreground hover:text-foreground">
-              <Activity className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Indicators</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="z-[70]">
-              {INDICATORS.map(({ id, label }) => (
-                <DropdownMenuCheckboxItem
-                  key={id}
-                  checked={enabledIndicators.includes(id)}
-                  onCheckedChange={() => toggleIndicator(id)}
-                  // stays open: several are usually switched in one go
-                  onSelect={(event) => event.preventDefault()}
-                  className="text-xs"
-                >
-                  {label}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {[
+            { label: "Undo Drawing", Icon: Undo2, run: () => drawings.undo() },
+            { label: "Clear Drawings", Icon: Trash2, run: () => drawings.clear() },
+          ].map(({ label, Icon, run }) => (
+            <button
+              key={label}
+              onClick={run}
+              disabled={drawings.drawings.length === 0}
+              aria-label={label}
+              title={label}
+              className="rounded p-1 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:hover:text-muted-foreground"
+            >
+              <Icon className="h-3.5 w-3.5" />
+            </button>
+          ))}
           {CHART_TYPES.map(({ type, label, Icon }) => (
             <button
               key={type}
@@ -490,7 +497,7 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
             </button>
           ))}
           <button
-            onClick={toggleExpanded}
+            onClick={() => setExpanded(!expanded)}
             aria-label={expanded ? "Exit full screen" : "Full screen"}
             title={expanded ? "Exit full screen" : "Full screen"}
             className="rounded p-1 text-muted-foreground hover:text-foreground"
@@ -499,17 +506,23 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
           </button>
         </div>
       </div>
-      <div className="flex min-h-0 flex-1">
-        <DrawingTools store={drawings} />
-        <div className="relative min-h-0 flex-1">
-          <div ref={containerRef} tabIndex={-1} className="absolute inset-0 outline-none" />
-          <ChartLegend candle={candles?.[shownIndex]} index={shownIndex} indicators={indicators.active} />
-          {(isLoading || candles?.length === 0) && (
-            <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-              {isLoading ? "Loading chart…" : "No trades yet"}
-            </div>
-          )}
-        </div>
+      <div className="relative min-h-0 flex-1">
+        <div ref={containerRef} tabIndex={-1} className="absolute inset-0 outline-none" />
+        <ChartLegend candle={candles?.[shownIndex]} index={shownIndex} indicators={indicators.active} />
+        {(isLoading || candles?.length === 0) && (
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+            {isLoading ? "Loading chart…" : "No trades yet"}
+          </div>
+        )}
+        {toolsOpen && (
+          <ChartTools
+            store={drawings}
+            indicators={enabledIndicators}
+            onIndicator={toggleIndicator}
+            onClose={() => setToolsOpen(false)}
+          />
+        )}
+        {drawings.note && <NoteEditor store={drawings} />}
       </div>
     </div>
   );

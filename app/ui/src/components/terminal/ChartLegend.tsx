@@ -41,10 +41,7 @@ export const ChartLegend = ({ candle, index, indicators }: ChartLegendProps) => 
         const [marked] = lines;
         return (
           <span key={indicator.id} className="flex items-center gap-1">
-            <span
-              className={`w-4 border-t-2 ${marked.dashed ? "border-dashed" : ""}`}
-              style={{ borderColor: `hsl(var(--${marked.color}))` }}
-            />
+            <span className="w-4 border-t-2" style={{ borderColor: `hsl(var(--${marked.color}))` }} />
             {indicator.label}
             <span className="text-foreground">
               {[...lines, ...plots.filter((plot) => plot.histogram)]

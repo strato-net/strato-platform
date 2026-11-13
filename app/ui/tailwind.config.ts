@@ -40,6 +40,7 @@ export default {
 				},
 				up: 'hsl(var(--up))',
 				down: 'hsl(var(--down))',
+				drawing: 'hsl(var(--drawing))',
 				muted: {
 					DEFAULT: 'hsl(var(--muted))',
 					foreground: 'hsl(var(--muted-foreground))'

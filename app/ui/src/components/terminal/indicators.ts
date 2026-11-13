@@ -80,8 +80,6 @@ export const macd = (values: number[], fast = 12, slow = 26, signalPeriod = 9) =
 export interface IndicatorPlot {
   /** theme token of the plot's color; a histogram is colored by its sign instead */
   color?: string;
-  dashed?: boolean;
-  thin?: boolean;
   histogram?: boolean;
   values: IndicatorValues;
 }
@@ -97,21 +95,20 @@ export interface Indicator {
   plots: (closes: number[]) => IndicatorPlot[];
 }
 
-// Color is the average's speed (fast, medium, slow), the dash is its kind (simple, exponential):
-// only three hues stay apart on one pane for every kind of color vision.
 export const INDICATORS: Indicator[] = [
-  { id: "ma20", label: "MA 20", overlay: true, plots: (c) => [{ color: "series-1", values: sma(c, 20) }] },
-  { id: "ma50", label: "MA 50", overlay: true, plots: (c) => [{ color: "series-2", values: sma(c, 50) }] },
-  { id: "ma200", label: "MA 200", overlay: true, plots: (c) => [{ color: "series-3", values: sma(c, 200) }] },
-  { id: "ema12", label: "EMA 12", overlay: true, plots: (c) => [{ color: "series-1", dashed: true, values: ema(c, 12) }] },
-  { id: "ema26", label: "EMA 26", overlay: true, plots: (c) => [{ color: "series-2", dashed: true, values: ema(c, 26) }] },
+  { id: "sma20", label: "SMA 20", overlay: true, plots: (c) => [{ color: "series-1", values: sma(c, 20) }] },
+  { id: "ema20", label: "EMA 20", overlay: true, plots: (c) => [{ color: "series-2", values: ema(c, 20) }] },
   {
     id: "bb",
-    label: "Bollinger 20, 2",
+    label: "Bollinger Bands",
     overlay: true,
     plots: (c) => {
       const { upper, middle, lower } = bollinger(c);
-      return [upper, middle, lower].map((values) => ({ color: "muted-foreground", thin: true, values }));
+      return [
+        { color: "series-3", values: upper },
+        { color: "muted-foreground", values: middle },
+        { color: "series-3", values: lower },
+      ];
     },
   },
   {
@@ -124,11 +121,11 @@ export const INDICATORS: Indicator[] = [
   },
   {
     id: "macd",
-    label: "MACD 12, 26, 9",
+    label: "MACD",
     overlay: false,
     plots: (c) => {
       const { line, signal, histogram } = macd(c);
-      return [{ histogram: true, values: histogram }, { color: "series-1", values: line }, { color: "series-2", values: signal }];
+      return [{ histogram: true, values: histogram }, { color: "series-5", values: line }, { color: "series-1", values: signal }];
     },
   },
 ];
