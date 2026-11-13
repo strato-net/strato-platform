@@ -94,6 +94,10 @@ export default {
 					'0%, 100%': { backgroundPosition: '0% 50%' },
 					'50%': { backgroundPosition: '100% 50%' },
 				},
+				'trade-flash': {
+					'0%, 35%': { backgroundColor: 'var(--trade-flash)' },
+					'100%': { backgroundColor: 'transparent' },
+				},
 				'pulse-slow': {
 					'0%, 100%': { opacity: '1' },
 					'50%': { opacity: '0.8' },
@@ -107,6 +111,7 @@ export default {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'gradient-flow': 'gradient-flow 8s ease infinite',
+				'trade-flash': 'trade-flash 2s ease-out',
 				'pulse-slow': 'pulse-slow 3s ease-in-out infinite',
 				'float': 'float 6s ease-in-out infinite',
 			},

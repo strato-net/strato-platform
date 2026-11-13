@@ -10,8 +10,16 @@ const formatTime = (ms: number): string =>
     : new Date(ms).toLocaleDateString([], { month: "short", day: "numeric" });
 
 export const TradesTape = ({ market }: { market: Market }) => {
-  const { data: trades = [], isLoading } = useMarketTrades(market.poolAddress);
+  const { data, isLoading, isFetchedAfterMount } = useMarketTrades(market.poolAddress);
+  const trades = data ?? [];
   const [hideGas, setHideGas] = useState(false);
+  // the newest trade of the market's first fresh load: anything newer arrived while watching
+  // and flashes in. Cached trades shown before that load, and a switch of market, do not.
+  const [loaded, setLoaded] = useState<{ pool: string; newestId: number }>();
+  if (data && isFetchedAfterMount && loaded?.pool !== market.poolAddress) {
+    setLoaded({ pool: market.poolAddress, newestId: data[0]?.id ?? 0 });
+  }
+  const arrived = (id: number) => loaded?.pool === market.poolAddress && id > loaded.newestId;
   const hasGas = trades.some((t) => t.kind === "gas");
   const rows = hideGas ? trades.filter((t) => t.kind !== "gas") : trades;
 
@@ -30,7 +38,16 @@ export const TradesTape = ({ market }: { market: Market }) => {
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {rows.map((trade) => (
-          <div key={trade.id} className="grid grid-cols-3 px-3 py-1 tabular-nums">
+          <div
+            key={trade.id}
+            className={`grid grid-cols-3 px-3 py-1 tabular-nums ${
+              !arrived(trade.id)
+                ? ""
+                : `animate-trade-flash motion-reduce:animate-none ${
+                    trade.side === "buy" ? "[--trade-flash:hsl(var(--up)/0.3)]" : "[--trade-flash:hsl(var(--down)/0.3)]"
+                  }`
+            }`}
+          >
             <span className={trade.side === "buy" ? "text-up" : "text-down"}>{formatPrice(trade.price)}</span>
             <span className="text-right">
               {trade.kind === "gas" && <span className="mr-1 text-muted-foreground">fee</span>}
