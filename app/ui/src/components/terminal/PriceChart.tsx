@@ -1,20 +1,32 @@
-import { useEffect, useRef, useState } from "react";
-import { CandlestickChart, LineChart } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Activity, CandlestickChart, LineChart, Maximize2, Minimize2 } from "lucide-react";
 import {
   AutoscaleInfoProvider,
   CandlestickData,
   CandlestickSeries,
   HistogramSeries,
   IChartApi,
+  IPriceLine,
   ISeriesApi,
   LineSeries,
+  LineStyle,
   SeriesType,
   UTCTimestamp,
   createChart,
 } from "lightweight-charts";
 import { CandleResolution, MarketCandle } from "@/interface";
 import { useMarketCandles } from "@/hooks/terminal/useMarketData";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { priceDecimals } from "@/components/terminal/format";
+import { INDICATORS, Indicator, IndicatorPlot } from "@/components/terminal/indicators";
+import { DrawingLayer, DrawingStore } from "@/components/terminal/DrawingLayer";
+import { DrawingTools } from "@/components/terminal/DrawingTools";
+import { ChartLegend } from "@/components/terminal/ChartLegend";
 
 const RESOLUTIONS: CandleResolution[] = ["1m", "5m", "15m", "1h", "4h", "1d"];
 /** The price as candles, or as a line through the closes */
@@ -24,7 +36,20 @@ const CHART_TYPES = [
 ] as const;
 type ChartType = (typeof CHART_TYPES)[number]["type"];
 const CHART_TYPE_KEY = "terminal-chart-type";
+const INDICATORS_KEY = "terminal-indicators";
 const INITIAL_VISIBLE_BARS = 120;
+/** Heights of the volume pane and of an indicator's pane, as stretch factors (the price pane's is 2) */
+const VOLUME_PANE_STRETCH = 0.25;
+const INDICATOR_PANE_STRETCH = 0.5;
+
+const storedIndicators = (): string[] => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(INDICATORS_KEY) ?? "[]");
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+};
 
 /** A theme token resolved to an rgb()/rgba() string the canvas can use */
 const themeColor = (token: string, alpha = 1): string => {
@@ -103,25 +128,105 @@ const easeAutoscale = (series: ISeriesApi<SeriesType>) => {
   };
 };
 
+/** One plot of an indicator on the chart */
+interface DrawnPlot {
+  series: ISeriesApi<SeriesType>;
+  plot: IndicatorPlot;
+  ease?: ReturnType<typeof easeAutoscale>;
+  levels: IPriceLine[];
+}
+
 interface ChartHandles {
   chart: IChartApi;
   candles: ISeriesApi<"Candlestick">;
   line: ISeriesApi<"Line">;
   volume: ISeriesApi<"Histogram">;
+  /** by indicator id */
+  indicators: Map<string, DrawnPlot[]>;
+  drawings: DrawingLayer;
   eases: ReturnType<typeof easeAutoscale>[];
   volumeColors: { up: string; down: string };
   /** what the series currently hold: a poll that only extends it is applied in place */
   shown: { key: string; length: number; first?: number };
 }
 
+/** A histogram bar's color: above zero or below it */
+const signColor = ({ volumeColors }: ChartHandles, value: number) => (value >= 0 ? volumeColors.up : volumeColors.down);
+
+/** Adds an indicator's plots to the chart: over the price, or in a new pane below the others */
+const drawIndicator = (current: ChartHandles, { overlay, range, levels = [], label }: Indicator, plots: IndicatorPlot[]) => {
+  const { chart } = current;
+  const pane = overlay ? 0 : chart.panes().length;
+  const drawn = plots.map((plot, i): DrawnPlot => {
+    const options = {
+      priceLineVisible: false,
+      // the legend names an overlay; a pane is named by the tag on its axis
+      lastValueVisible: !overlay && !plot.histogram,
+      title: !overlay && i === plots.findIndex((p) => !p.histogram) ? label : "",
+    };
+    const series = plot.histogram
+      ? chart.addSeries(HistogramSeries, options, pane)
+      : chart.addSeries(
+          LineSeries,
+          {
+            ...options,
+            color: themeColor(plot.color!),
+            lineWidth: plot.thin ? 1 : 2,
+            lineStyle: plot.dashed ? LineStyle.Dashed : LineStyle.Solid,
+            crosshairMarkerVisible: false,
+            ...(range && {
+              autoscaleInfoProvider: () => ({ priceRange: { minValue: range[0], maxValue: range[1] } }),
+            }),
+          },
+          pane
+        );
+    // a pane with a fixed range has nothing to refit
+    const ease = range ? undefined : easeAutoscale(series);
+    if (ease) current.eases.push(ease);
+    const guides =
+      i === 0
+        ? levels.map((price) =>
+            series.createPriceLine({
+              price,
+              color: themeColor("muted-foreground", 0.5),
+              lineWidth: 1,
+              lineStyle: LineStyle.Dashed,
+              axisLabelVisible: false,
+            })
+          )
+        : [];
+    return { series, plot, ease, levels: guides };
+  });
+  if (!overlay) chart.panes()[pane].setStretchFactor(INDICATOR_PANE_STRETCH);
+  return drawn;
+};
+
 export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
   const [resolution, setResolution] = useState<CandleResolution>("15m");
   const [chartType, setChartType] = useState<ChartType>(() =>
     localStorage.getItem(CHART_TYPE_KEY) === "line" ? "line" : "candles"
   );
+  const [enabledIndicators, setEnabledIndicators] = useState(storedIndicators);
+  const [expanded, setExpanded] = useState(false);
+  /** index of the candle under the crosshair */
+  const [hovered, setHovered] = useState<number>();
+  const [drawings] = useState(() => new DrawingStore());
   const { data: candles, isLoading } = useMarketCandles(poolAddress, resolution);
   const containerRef = useRef<HTMLDivElement>(null);
   const handles = useRef<ChartHandles>();
+
+  const indicators = useMemo(() => {
+    const rows = candles ?? [];
+    const closes = rows.map((row) => row[4]);
+    return {
+      times: rows.map((row) => chartTime(row[0])),
+      precision: priceDecimals(closes.at(-1) ?? 1),
+      active: INDICATORS.filter(({ id }) => enabledIndicators.includes(id)).map((indicator) => ({
+        indicator,
+        plots: indicator.plots(closes),
+      })),
+    };
+  }, [candles, enabledIndicators]);
 
   // the chart's colors come from the theme tokens. The theme is a class on <html>, set after
   // this component's effects have run, so the tokens are re-read when that class changes
@@ -140,13 +245,16 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
       { priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false },
       1
     );
-    chart.panes()[1].setStretchFactor(0.25);
+    chart.panes()[1].setStretchFactor(VOLUME_PANE_STRETCH);
     const eases = [easeAutoscale(candleSeries), easeAutoscale(lineSeries), easeAutoscale(volumeSeries)];
+    const layer = new DrawingLayer(chart, candleSeries, containerRef.current, drawings);
     const current: ChartHandles = {
       chart,
       candles: candleSeries,
       line: lineSeries,
       volume: volumeSeries,
+      indicators: new Map(),
+      drawings: layer,
       eases,
       volumeColors: { up: "", down: "" },
       shown: { key: "", length: 0 },
@@ -182,17 +290,43 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
           color: bars[index].close >= bars[index].open ? current.volumeColors.up : current.volumeColors.down,
         }))
       );
+      for (const { series, plot, levels } of [...current.indicators.values()].flat()) {
+        if (plot.histogram) {
+          series.setData(
+            series.data().map((bar) => ("value" in bar ? { ...bar, color: signColor(current, bar.value) } : bar))
+          );
+        } else {
+          series.applyOptions({ color: themeColor(plot.color!) });
+        }
+        levels.forEach((level) => level.applyOptions({ color: themeColor("muted-foreground", 0.5) }));
+      }
+      layer.ink = {
+        line: themeColor("foreground"),
+        surface: themeColor("background", 0.85),
+        upFill: themeColor("up", 0.15),
+        downFill: themeColor("down", 0.15),
+        font: `11px ${getComputedStyle(document.body).fontFamily}`,
+      };
     };
     applyTheme();
     const themeObserver = new MutationObserver(applyTheme);
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    chart.subscribeCrosshairMove((param) => setHovered(param.point ? param.logical : undefined));
+    // the browser leaves full screen on Escape: the chart goes back to its panel with it
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) setExpanded(false);
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => {
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      if (document.fullscreenElement) void document.exitFullscreen();
       themeObserver.disconnect();
       eases.forEach((ease) => ease.stop());
+      layer.destroy();
       chart.remove();
       handles.current = undefined;
     };
-  }, []);
+  }, [drawings]);
 
   // both series hold the data; the chart type decides which one is drawn
   useEffect(() => {
@@ -243,10 +377,68 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
       current.eases.forEach((ease) => ease.reset());
     }
     current.shown = { key: rows.length > 0 ? key : shown.key, length: rows.length, first: rows[0]?.[0] };
-  }, [candles, poolAddress, resolution]);
+    drawings.open(poolAddress);
+    current.drawings.setTimeline(rows[0]?.[0], rows.length > 1 ? rows[1][0] - rows[0][0] : 0);
+  }, [candles, poolAddress, resolution, drawings]);
+
+  // indicators are recomputed from the candles on every poll and redrawn whole
+  useEffect(() => {
+    const current = handles.current;
+    if (!current) return;
+    const { chart, indicators: drawn } = current;
+    const { times, precision, active } = indicators;
+    for (const [id, plots] of drawn) {
+      if (active.some(({ indicator }) => indicator.id === id)) continue;
+      for (const { series, ease } of plots) {
+        if (ease) {
+          ease.stop();
+          current.eases.splice(current.eases.indexOf(ease), 1);
+        }
+        chart.removeSeries(series);
+      }
+      drawn.delete(id);
+    }
+    for (const { indicator, plots } of active) {
+      if (!drawn.has(indicator.id)) drawn.set(indicator.id, drawIndicator(current, indicator, plots));
+      // an indicator in its own pane is a difference of prices: finer than the prices themselves
+      const decimals = indicator.overlay ? precision : precision + 2;
+      drawn.get(indicator.id)!.forEach(({ series }, i) => {
+        if (!indicator.range) {
+          series.applyOptions({ priceFormat: { type: "price", precision: decimals, minMove: 10 ** -decimals } });
+        }
+        series.setData(
+          times.map((time, j) => {
+            const value = plots[i].values[j];
+            if (value === null) return { time };
+            return plots[i].histogram ? { time, value, color: signColor(current, value) } : { time, value };
+          })
+        );
+      });
+    }
+  }, [indicators]);
+
+  const toggleIndicator = (id: string) => {
+    const next = enabledIndicators.includes(id) ? enabledIndicators.filter((other) => other !== id) : [...enabledIndicators, id];
+    localStorage.setItem(INDICATORS_KEY, JSON.stringify(next));
+    setEnabledIndicators(next);
+  };
+
+  // the chart fills the window, and the window the screen where the browser allows it
+  const toggleExpanded = () => {
+    if (!expanded) {
+      setExpanded(true);
+      void document.documentElement.requestFullscreen?.().catch(() => undefined);
+    } else if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    } else {
+      setExpanded(false);
+    }
+  };
+
+  const shownIndex = hovered !== undefined && candles?.[hovered] ? hovered : (candles?.length ?? 0) - 1;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className={`flex flex-col ${expanded ? "fixed inset-0 z-[60] bg-background" : "h-full"}`}>
       <div className="flex items-center gap-1 px-3 py-2 text-xs">
         {RESOLUTIONS.map((r) => (
           <button
@@ -260,6 +452,26 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
           </button>
         ))}
         <div className="ml-auto flex items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex items-center gap-1 rounded px-2 py-0.5 text-muted-foreground hover:text-foreground">
+              <Activity className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Indicators</span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="z-[70]">
+              {INDICATORS.map(({ id, label }) => (
+                <DropdownMenuCheckboxItem
+                  key={id}
+                  checked={enabledIndicators.includes(id)}
+                  onCheckedChange={() => toggleIndicator(id)}
+                  // stays open: several are usually switched in one go
+                  onSelect={(event) => event.preventDefault()}
+                  className="text-xs"
+                >
+                  {label}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {CHART_TYPES.map(({ type, label, Icon }) => (
             <button
               key={type}
@@ -277,15 +489,27 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
               <Icon className="h-3.5 w-3.5" />
             </button>
           ))}
+          <button
+            onClick={toggleExpanded}
+            aria-label={expanded ? "Exit full screen" : "Full screen"}
+            title={expanded ? "Exit full screen" : "Full screen"}
+            className="rounded p-1 text-muted-foreground hover:text-foreground"
+          >
+            {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          </button>
         </div>
       </div>
-      <div className="relative min-h-0 flex-1">
-        <div ref={containerRef} className="absolute inset-0" />
-        {(isLoading || candles?.length === 0) && (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-            {isLoading ? "Loading chart…" : "No trades yet"}
-          </div>
-        )}
+      <div className="flex min-h-0 flex-1">
+        <DrawingTools store={drawings} />
+        <div className="relative min-h-0 flex-1">
+          <div ref={containerRef} tabIndex={-1} className="absolute inset-0 outline-none" />
+          <ChartLegend candle={candles?.[shownIndex]} index={shownIndex} indicators={indicators.active} />
+          {(isLoading || candles?.length === 0) && (
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+              {isLoading ? "Loading chart…" : "No trades yet"}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
