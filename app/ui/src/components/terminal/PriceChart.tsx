@@ -31,7 +31,15 @@ import { DrawingLayer, DrawingStore } from "@/components/terminal/DrawingLayer";
 import { ChartTools, NoteEditor } from "@/components/terminal/ChartTools";
 import { ChartLegend } from "@/components/terminal/ChartLegend";
 
-const RESOLUTIONS: CandleResolution[] = ["1m", "5m", "15m", "1h", "4h", "1d"];
+const RESOLUTIONS: CandleResolution[] = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"];
+/** Stretches of history to jump to: the candles each is read in, and how many of them fill the chart */
+const RANGES: { label: string; resolution: CandleResolution; bars: number }[] = [
+  { label: "1D", resolution: "5m", bars: 288 },
+  { label: "1W", resolution: "1h", bars: 168 },
+  { label: "1M", resolution: "1d", bars: 32 },
+  { label: "1Y", resolution: "1w", bars: 52 },
+  { label: "All", resolution: "1w", bars: Infinity },
+];
 /** The price as candles, or as a line through the closes */
 const CHART_TYPES = [
   { type: "candles", label: "Candles", Icon: CandlestickChart },
@@ -153,6 +161,10 @@ interface ChartHandles {
   shown: { key: string; length: number; first?: number };
 }
 
+/** Put the newest `bars` of the chart's `candles` on screen */
+const showLatest = (chart: IChartApi, candles: number, bars: number) =>
+  chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, candles - bars), to: candles + 2 });
+
 /** A histogram bar's color: above zero or below it */
 const signColor = ({ volumeColors }: ChartHandles, value: number) => (value >= 0 ? volumeColors.up : volumeColors.down);
 
@@ -218,6 +230,8 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
   const { data: candles, isLoading } = useMarketCandles(poolAddress, resolution);
   const containerRef = useRef<HTMLDivElement>(null);
   const handles = useRef<ChartHandles>();
+  /** how many candles to open on once the resolution a range switched to has loaded */
+  const rangeBars = useRef<number>();
 
   const indicators = useMemo(() => {
     const rows = candles ?? [];
@@ -381,9 +395,8 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
       current.volume.setData(rows.map(volume));
       if (rows.length > 0 && shown.key !== key) {
         // open on the most recent bars; the rest of the history is a scroll away
-        current.chart
-          .timeScale()
-          .setVisibleLogicalRange({ from: Math.max(0, rows.length - INITIAL_VISIBLE_BARS), to: rows.length + 2 });
+        showLatest(current.chart, rows.length, rangeBars.current ?? INITIAL_VISIBLE_BARS);
+        rangeBars.current = undefined;
       }
       // new data fits at once; only later refits ease
       current.eases.forEach((ease) => ease.reset());
@@ -435,6 +448,15 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
     setEnabledIndicators(next);
   };
 
+  const showRange = (range: (typeof RANGES)[number]) => {
+    if (range.resolution !== resolution) {
+      rangeBars.current = range.bars;
+      setResolution(range.resolution);
+    } else if (handles.current && candles?.length) {
+      showLatest(handles.current.chart, candles.length, range.bars);
+    }
+  };
+
   const shownIndex = hovered !== undefined && candles?.[hovered] ? hovered : (candles?.length ?? 0) - 1;
 
   return (
@@ -443,7 +465,10 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
         {RESOLUTIONS.map((r) => (
           <button
             key={r}
-            onClick={() => setResolution(r)}
+            onClick={() => {
+              rangeBars.current = undefined;
+              setResolution(r);
+            }}
             className={`rounded px-2 py-0.5 ${
               r === resolution ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
             }`}
@@ -507,7 +532,8 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
         </div>
       </div>
       <div className="relative min-h-0 flex-1">
-        <div ref={containerRef} tabIndex={-1} className="absolute inset-0 outline-none" />
+        {/* isolated: the chart library layers its pane dividers high enough to show through what is laid over the chart */}
+        <div ref={containerRef} tabIndex={-1} className="absolute inset-0 isolate outline-none" />
         <ChartLegend candle={candles?.[shownIndex]} index={shownIndex} indicators={indicators.active} />
         {(isLoading || candles?.length === 0) && (
           <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
@@ -523,6 +549,17 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
           />
         )}
         {drawings.note && <NoteEditor store={drawings} />}
+      </div>
+      <div className="flex h-[37px] items-center gap-2 border-t border-border px-3 text-[10px]">
+        {RANGES.map((range) => (
+          <button
+            key={range.label}
+            onClick={() => showRange(range)}
+            className="p-[3px] text-muted-foreground hover:text-foreground"
+          >
+            {range.label}
+          </button>
+        ))}
       </div>
     </div>
   );

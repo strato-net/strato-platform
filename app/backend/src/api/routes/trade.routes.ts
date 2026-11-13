@@ -228,7 +228,7 @@ router.get("/markets", authHandler.authorizeRequest(true), TradeController.marke
  *         required: true
  *         schema:
  *           type: string
- *           enum: [1m, 5m, 15m, 1h, 4h, 1d]
+ *           enum: [1m, 5m, 15m, 1h, 4h, 1d, 1w]
  *       - name: from
  *         in: query
  *         required: false

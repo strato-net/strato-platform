@@ -113,7 +113,7 @@ export interface Market {
   tradable: boolean;
 }
 
-export type CandleResolution = "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+export type CandleResolution = "1m" | "5m" | "15m" | "1h" | "4h" | "1d" | "1w";
 
 /** [bucket start (unix s), open, high, low, close, quote volume, swap count] */
 export type MarketCandle = [number, number, number, number, number, number, number];

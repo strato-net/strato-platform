@@ -106,6 +106,30 @@ test("candlesFrom fills buckets without swaps flat at the previous close", () =>
   assert.deepEqual(candlesFrom(emptyMarketState(), "1m", now), []);
 });
 
+test("weekly candles open on Monday 00:00 UTC", () => {
+  const state = emptyMarketState();
+  // 2026-11-08 is a Sunday, 2026-11-09 a Monday
+  foldSwap(state, swap(1, "2026-11-08 23:59:59 UTC", -1n * WAD, 4n * WAD, 2n), base0, FEE_ADDRESS);
+  foldSwap(state, swap(2, "2026-11-09 00:00:00 UTC", -1n * WAD, 9n * WAD, 3n), base0, FEE_ADDRESS);
+  foldSwap(state, swap(3, "2026-11-15 23:59:59 UTC", 2n * WAD, -8n * WAD, 2n), base0, FEE_ADDRESS);
+
+  const monday = Date.parse("2026-11-09T00:00:00Z") / 1000;
+  const week = 7 * 86400;
+  const now = Date.parse("2026-11-25T12:00:00Z");
+  assert.deepEqual(candlesFrom(state, "1w", now), [
+    [monday - week, 4, 4, 4, 4, 4, 1],
+    [monday, 4, 9, 4, 4, 17, 2],
+    // weeks without swaps, through the one that holds `now`
+    [monday + week, 4, 4, 4, 4, 0, 0],
+    [monday + 2 * week, 4, 4, 4, 4, 0, 0],
+  ]);
+  // a poll from the newest candle on returns it alone; one from mid-week starts at the next Monday
+  assert.deepEqual(candlesFrom(state, "1w", now, monday + 2 * week), [[monday + 2 * week, 4, 4, 4, 4, 0, 0]]);
+  assert.equal(candlesFrom(state, "1w", now, monday + 1)[0][0], monday + week);
+  // the other resolutions keep their epoch-aligned buckets
+  assert.equal(candlesFrom(state, "1d", now)[0][0], Date.parse("2026-11-08T00:00:00Z") / 1000);
+});
+
 test("a swap that strands the pool at the tick bound is priced at its execution", () => {
   const state = emptyMarketState();
   const drained = { ...swap(1, "2026-11-11 10:00:00 UTC", -1n * WAD, 5n * WAD, 2n), sqrtPriceX96: (MAX_SQRT_RATIO - 1n).toString() };

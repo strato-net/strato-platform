@@ -12,6 +12,7 @@ export const RESOLUTION_SECONDS: Record<CandleResolution, number> = {
   "1h": 3600,
   "4h": 14400,
   "1d": 86400,
+  "1w": 604800,
 };
 export const CANDLE_RESOLUTIONS = Object.keys(RESOLUTION_SECONDS) as CandleResolution[];
 
@@ -21,6 +22,14 @@ const TAPE_SIZE = 200;
 /** Below this many base units on either side, rounding swamps the ratio (bots probe with 2 wei) */
 const MIN_PRICED_AMOUNT = 1_000_000n;
 const DAY_SECONDS = 86400;
+/** A week opens on Monday 00:00 UTC; the unix epoch fell on a Thursday */
+const WEEK_OFFSET = 4 * DAY_SECONDS;
+
+/** When the bucket `seconds` long that holds `time` (unix s) opens */
+const bucketStart = (time: number, seconds: number): number => {
+  const offset = seconds === RESOLUTION_SECONDS["1w"] ? WEEK_OFFSET : 0;
+  return Math.floor((time - offset) / seconds) * seconds + offset;
+};
 
 /** How a pool maps onto a BASE/QUOTE market */
 export interface MarketOrientation {
@@ -62,7 +71,7 @@ export interface MarketState {
 }
 
 export const emptyMarketState = (): MarketState => ({
-  candles: { "1m": [], "5m": [], "15m": [], "1h": [], "4h": [], "1d": [] },
+  candles: { "1m": [], "5m": [], "15m": [], "1h": [], "4h": [], "1d": [], "1w": [] },
   tape: [],
   lastId: 0,
   price: 0,
@@ -96,7 +105,7 @@ export const foldSwap = (state: MarketState, row: RawSwapRow, o: MarketOrientati
   for (const resolution of CANDLE_RESOLUTIONS) {
     const candles = state.candles[resolution];
     const seconds = RESOLUTION_SECONDS[resolution];
-    const bucket = Math.floor(time / 1000 / seconds) * seconds;
+    const bucket = bucketStart(time / 1000, seconds);
     let candle = candles[candles.length - 1];
     // block timestamps are not guaranteed monotonic: a swap stamped before the newest
     // bucket folds into that bucket rather than rewriting history
@@ -147,8 +156,9 @@ export const candlesFrom = (
   const candles = state.candles[resolution];
   if (candles.length === 0) return [];
   const seconds = RESOLUTION_SECONDS[resolution];
-  const end = Math.max(candles[candles.length - 1].t, Math.floor(nowMs / 1000 / seconds) * seconds);
-  const start = Math.max(candles[0].t, Math.ceil(from / seconds) * seconds, end - (limit - 1) * seconds);
+  const end = Math.max(candles[candles.length - 1].t, bucketStart(nowMs / 1000, seconds));
+  // `from` counts from the first bucket that opens at or after it
+  const start = Math.max(candles[0].t, bucketStart(from + seconds - 1, seconds), end - (limit - 1) * seconds);
   // the newest swap-bearing candle at or before `start`
   let i = candles.length - 1;
   while (candles[i].t > start) i--;

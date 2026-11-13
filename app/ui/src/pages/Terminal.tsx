@@ -81,7 +81,7 @@ const Terminal = () => {
         ) : (
           <main className="flex flex-col divide-y divide-border">
             <MarketHeader market={market} markets={markets!} stats={stats} />
-            <div className="h-72">
+            <div className="h-96">
               <PriceChart poolAddress={market.poolAddress} />
             </div>
             <OrderForm key={market.id} market={market} settlement={settlement} />
