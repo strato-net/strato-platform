@@ -24,9 +24,9 @@ export const MarketHeader = ({ market, markets, stats }: MarketHeaderProps) => {
   const quote = market.quote.symbol;
 
   return (
-    <div className="flex items-center gap-5 px-3 py-2 border-b border-border overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="flex items-start gap-5 px-3 py-2 border-b border-border overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center gap-1 whitespace-nowrap rounded bg-muted px-2 py-1 text-sm font-semibold">
+        <DropdownMenuTrigger className="flex items-center gap-1 self-center whitespace-nowrap rounded bg-muted px-2 py-1 text-sm font-semibold">
           {market.base.symbol}/{market.quote.symbol}
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
         </DropdownMenuTrigger>
@@ -50,10 +50,10 @@ export const MarketHeader = ({ market, markets, stats }: MarketHeaderProps) => {
         </DropdownMenuContent>
       </DropdownMenu>
       <div className="flex flex-col whitespace-nowrap" aria-live="polite">
-        <span className={`text-lg font-semibold leading-tight tabular-nums ${changeClass}`}>
+        <span className="text-[11px] text-muted-foreground">Pool price</span>
+        <span className={`text-lg font-semibold leading-tight tabular-nums ${change > 0 ? "text-up" : ""}`}>
           {stats ? formatPrice(stats.price) : "—"}
         </span>
-        <span className="text-[11px] text-muted-foreground">Pool price</span>
       </div>
       <Stat label="24h change">
         <span className={changeClass}>{stats ? `${change > 0 ? "+" : ""}${change.toFixed(2)}%` : "—"}</span>
