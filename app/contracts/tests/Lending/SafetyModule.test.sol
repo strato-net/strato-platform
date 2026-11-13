@@ -1,6 +1,5 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 
 contract User {
@@ -10,7 +9,7 @@ contract User {
     }
 }
 
-contract Describe_SafetyModule_Attacks is Authorizable {
+contract Describe_SafetyModule_Attacks {
 
     uint public INFINITY = 2 ** 256 - 1;
 
@@ -21,7 +20,6 @@ contract Describe_SafetyModule_Attacks is Authorizable {
     SafetyModule freshSM;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
     }
@@ -31,25 +29,29 @@ contract Describe_SafetyModule_Attacks is Authorizable {
         freshSM = new SafetyModule(address(this));
         freshSM.initialize(address(m.lendingRegistry()), address(m.tokenFactory()));
 
+        AdminRegistry reg = m.adminRegistry();
+
         // Create test tokens
-        address USDST = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        address sUSDST = m.tokenFactory().createToken("sUSDST", "sUSDST Token", [], [], [], "sUSDST", 0, 18);
+        (bool executed, variadic ret) = reg.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        address USDST = address(ret);
+        (executed, ret) = reg.castVoteOnIssue(address(m.tokenFactory()), "createToken", "sUSDST", "sUSDST Token", [], [], [], "sUSDST", 0, 18);
+        address sUSDST = address(ret);
 
         // Activate tokens
-        Token(USDST).setStatus(2);
-        Token(sUSDST).setStatus(2);
+        reg.castVoteOnIssue(USDST, "setStatus", 2);
+        reg.castVoteOnIssue(sUSDST, "setStatus", 2);
 
         // Configure lending pool
-        m.poolConfigurator().setBorrowableAsset(USDST);
-        m.poolConfigurator().setMToken(sUSDST);
+        reg.castVoteOnIssue(address(m.poolConfigurator()), "setBorrowableAsset", USDST);
+        reg.castVoteOnIssue(address(m.poolConfigurator()), "setMToken", sUSDST);
 
         // Configure fresh SafetyModule
         freshSM.syncFromRegistry();
         freshSM.setTokens(sUSDST, USDST);
 
         // Whitelist tokens for SafetyModule
-        m.adminRegistry().addWhitelist(address(sUSDST), "mint", address(freshSM));
-        m.adminRegistry().addWhitelist(address(sUSDST), "burn", address(freshSM));
+        reg.castVoteOnIssue(address(reg), "addWhitelist", address(sUSDST), "mint", address(freshSM));
+        reg.castVoteOnIssue(address(reg), "addWhitelist", address(sUSDST), "burn", address(freshSM));
     }
 
     function it_prevents_share_dilution_via_donation() public {
@@ -61,7 +63,7 @@ contract Describe_SafetyModule_Attacks is Authorizable {
         User victim = new User();
 
         // Attacker stakes 1 wei
-        Token(asset).mint(address(attacker), 1);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(attacker), 1);
         attacker.do(asset, "approve", address(sm), INFINITY);
         attacker.do(address(sm), "stake(uint256,uint256)", 1, 1);
 
@@ -70,7 +72,7 @@ contract Describe_SafetyModule_Attacks is Authorizable {
 
         // Attacker attempts to donate 10,000 USDST directly to contract
         uint donationAmount = 10000e18;
-        Token(asset).mint(address(attacker), donationAmount);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(attacker), donationAmount);
         attacker.do(asset, "transfer", address(sm), donationAmount);
 
         // Internal tracking prevents donation from affecting totalAssets
@@ -78,7 +80,7 @@ contract Describe_SafetyModule_Attacks is Authorizable {
         require(sm.totalShares() == 1, "Only 1 share exists");
 
         // Victim can now stake 9,999 USDST successfully (no dilution)
-        Token(asset).mint(address(victim), 9999e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(victim), 9999e18);
         victim.do(asset, "approve", address(sm), INFINITY);
         victim.do(address(sm), "stake(uint256,uint256)", 9999e18, 9999e18);
 
@@ -105,7 +107,7 @@ contract Describe_SafetyModule_Attacks is Authorizable {
         User attacker = new User();
 
         // Attacker stakes 1 wei and attempts to donate 10,000 USDST
-        Token(asset).mint(address(attacker), 10000e18 + 1);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(attacker), 10000e18 + 1);
         attacker.do(asset, "approve", address(sm), INFINITY);
         attacker.do(address(sm), "stake(uint256,uint256)", 1, 1);
         attacker.do(asset, "transfer", address(sm), 10000e18);
@@ -119,7 +121,7 @@ contract Describe_SafetyModule_Attacks is Authorizable {
 
         for (uint i = 0; i < amounts.length; i++) {
             User victim = new User();
-            Token(asset).mint(address(victim), amounts[i]);
+            m.adminRegistry().castVoteOnIssue(asset, "mint", address(victim), amounts[i]);
             victim.do(asset, "approve", address(sm), INFINITY);
 
             // All deposits should succeed with fair share calculation
@@ -142,13 +144,13 @@ contract Describe_SafetyModule_Attacks is Authorizable {
         User victim = new User();
 
         // Attacker stakes 1 wei
-        Token(asset).mint(address(attacker), 1);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(attacker), 1);
         attacker.do(asset, "approve", address(sm), INFINITY);
         attacker.do(address(sm), "stake(uint256,uint256)", 1, 1);
 
         // Attacker donates 10,000 USDST directly to contract
         uint donationAmount = 10000e18;
-        Token(asset).mint(address(attacker), donationAmount);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(attacker), donationAmount);
         attacker.do(asset, "transfer", address(sm), donationAmount);
 
         // Internal tracking is unaffected
@@ -163,7 +165,7 @@ contract Describe_SafetyModule_Attacks is Authorizable {
         require(sm.totalAssets() == 1, "Internal tracking still unaffected");
 
         // Victim can still stake normally
-        Token(asset).mint(address(victim), 1000e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(victim), 1000e18);
         victim.do(asset, "approve", address(sm), INFINITY);
         victim.do(address(sm), "stake(uint256,uint256)", 1000e18, 1000e18);
 

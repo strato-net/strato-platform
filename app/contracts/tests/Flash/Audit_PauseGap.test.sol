@@ -1,6 +1,5 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 
 contract User {
@@ -38,7 +37,7 @@ contract PauseLiquidator {
 }
 
 /// Does the USDST emergency pause actually stop the flash-mint facility and its downstream effects?
-contract Describe_FlashMintPauseGap is Authorizable {
+contract Describe_FlashMintPauseGap {
 
     Mercata m;
     FlashMint fm;
@@ -51,29 +50,30 @@ contract Describe_FlashMintPauseGap is Authorizable {
     Token usdstT; Token collT;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata();
         fm = new FlashMint(address(m.adminRegistry())); cdp = m.cdpEngine(); cdpVault = m.cdpVault();
         reg = m.cdpRegistry(); oracle = m.priceOracle(); admin = m.adminRegistry();
 
-        USDST = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
-        usdstT = Token(USDST); usdstT.setStatus(2);
-        reg.setUSDST(USDST);
-        oracle.setAssetPrice(USDST, 1e18);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",[],[],[],"USDST",0,18);
+        USDST = address(ret);
+        usdstT = Token(USDST); admin.castVoteOnIssue(USDST, "setStatus", 2);
+        admin.castVoteOnIssue(address(reg), "setUSDST", USDST);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", USDST, 1e18);
 
-        COLL = m.tokenFactory().createToken("GOLDST","Gold",[],[],[],"GOLDST",0,18);
-        collT = Token(COLL); collT.setStatus(2);
-        oracle.setAssetPrice(COLL, 4595e18);
+        (executed, ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "GOLDST","Gold",[],[],[],"GOLDST",0,18);
+        COLL = address(ret);
+        collT = Token(COLL); admin.castVoteOnIssue(COLL, "setStatus", 2);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", COLL, 4595e18);
         // mainnet params: LR 1.50, minCR 1.55, penalty 10%, closeFactor 50%
-        cdp.setCollateralAssetParams(COLL, 150e16, 155e16, 1000, 5000, 1e27, 1e18, 1e30, false);
+        admin.castVoteOnIssue(address(cdp), "setCollateralAssetParams", COLL, 150e16, 155e16, 1000, 5000, 1e27, 1e18, 1e30, false);
 
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(cdp));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(cdp));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(fm));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(fm));
 
-        fm.initialize(USDST, address(m.feeCollector()), 2000000e18);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), 2000000e18);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
     }
 
     /// Pausing USDST must close the facility: views advertise 0 and flashLoan reverts.
@@ -81,27 +81,27 @@ contract Describe_FlashMintPauseGap is Authorizable {
     function it_p1_pausing_usdst_stops_flashmint_and_liquidation() public {
         // Victim opens a vault: 100 GOLDST @ $4595 = $459,500 collateral, $250,000 debt (CR 1.838)
         User victim = new User();
-        collT.mint(address(victim), 100e18);
+        admin.castVoteOnIssue(COLL, "mint", address(victim), 100e18);
         victim.callFunction(COLL, "approve", address(cdpVault), 100e18);
         victim.callFunction(address(cdp), "deposit", COLL, 100e18);
         victim.callFunction(address(cdp), "mint", COLL, 250000e18);
 
         // Gold falls 25% to $3,446 -> collateral $344,600 vs $250,000 debt -> CR 1.378 < 1.50
-        oracle.setAssetPrice(COLL, 3446e18);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", COLL, 3446e18);
         require(cdp.collateralizationRatio(address(victim), COLL) < 150e16, "victim must be liquidatable");
 
         PauseLiquidator liq = new PauseLiquidator();
         liq.init(address(fm), address(cdp), USDST);
 
         // === EMERGENCY: governance pauses USDST ===
-        usdstT.pause();
+        admin.castVoteOnIssue(USDST, "pause");
         require(usdstT.paused(), "USDST paused");
         require(!fm.paused(), "FlashMint.paused is not auto-tripped by the token pause");
         require(fm.maxFlashLoan() == 0, "token pause advertises 0 capacity");
         require(!fm.canBorrow(address(liq)), "token pause closes canBorrow");
 
         uint repay = 125000e18;                       // 50% close factor
-        usdstT.mint(address(liq), repay);
+        admin.castVoteOnIssue(USDST, "mint", address(liq), repay);
         uint supplyBefore = usdstT.totalSupply();
         uint collBefore = collT.balanceOf(address(liq));
         uint servedBefore = fm.loansServed();
@@ -116,13 +116,13 @@ contract Describe_FlashMintPauseGap is Authorizable {
         require(usdstT.totalSupply() == supplyBefore, "no debt burned");
         require(fm.loansServed() == servedBefore, "no flash loan served");
 
-        usdstT.unpause();
-        oracle.setAssetPrice(COLL, 4595e18);
+        admin.castVoteOnIssue(USDST, "unpause");
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", COLL, 4595e18);
     }
 
     /// FlashMint's own switch also stops it. Token pause is a separate brake (see it_p1).
     function it_p2_flashmint_own_pause_does_stop_it() public {
-        fm.setPaused(true);
+        admin.castVoteOnIssue(address(fm), "setPaused", true);
         PauseLiquidator liq = new PauseLiquidator();
         liq.init(address(fm), address(cdp), USDST);
         try {
@@ -130,6 +130,6 @@ contract Describe_FlashMintPauseGap is Authorizable {
             require(false, "FlashMint.paused must stop the facility");
         } catch { }
         require(fm.maxFlashLoan() == 0, "paused facility advertises 0");
-        fm.setPaused(false);
+        admin.castVoteOnIssue(address(fm), "setPaused", false);
     }
 }

@@ -8,7 +8,9 @@ pipeline {
   stages {
     stage('Prepare') {
       steps {
-        sh 'git fetch --tags'
+        // --force: a tag re-pointed on GitHub would otherwise fail every build on an agent
+        // that fetched the old one ("would clobber existing tag")
+        sh 'git fetch --tags --force'
         sh 'git fetch origin develop --quiet'
         script {
           // A tag build (the job's "Discover tags" behaviour: release and rc tags)

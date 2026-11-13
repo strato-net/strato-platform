@@ -18,6 +18,7 @@ module Bloc.Database.Queries
   ( sourceToContractDetails,
     getContractByAddress,
     getContractWithCodeCollectionByAddress,
+    getGovernanceOwner,
     getContractByAccountsFilterParams,
     getContractDetailsForContract,
     getContractDetailsByCodeHash,
@@ -39,6 +40,7 @@ import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import Control.Lens ((^.), (&), (?~))
+import Control.Monad (guard)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except
@@ -99,7 +101,7 @@ instance {-# OVERLAPPING #-}
 
 {-# NOINLINE proxyContractNames #-}
 proxyContractNames :: [String]
-proxyContractNames = ["Proxy", "UserRegistry", "User"]
+proxyContractNames = ["Proxy", "UserRegistry", "User", "MultisigWallet"]
 
 {-# NOINLINE funcSet #-}
 funcSet :: S.Set (String, Text)
@@ -108,7 +110,8 @@ funcSet = S.fromList . concat $ zipWith (map . (,)) proxyContractNames allFuncti
     proxyFunctionNames = ["setLogicContract", "transferOwnership", "renounceOwnership"]
     userRegistryFunctionNames = ["createUser", "createUserFor", "deriveUserAddress", "canCreateUser", "initializeUser"]
     userFunctionNames = ["addUserAddress", "revokeUserAddress", "revokeAllUserAddresses", "createContract", "createSaltedContract", "callContract"]
-    allFunctionNames = [proxyFunctionNames, proxyFunctionNames ++ userRegistryFunctionNames, proxyFunctionNames ++ userFunctionNames]
+    multisigWalletFunctionNames = ["initializeDeployment", "scheduleUpgrade", "cancelUpgrade", "executeUpgrade", "freezeUpgrades", "advanceConfiguration", "argumentAt"]
+    allFunctionNames = [proxyFunctionNames, proxyFunctionNames ++ userRegistryFunctionNames, proxyFunctionNames ++ userFunctionNames, multisigWalletFunctionNames]
 
 getLogicCodePtr ::
   ( MonadIO m,
@@ -133,6 +136,31 @@ getLogicCodePtr a = runMaybeT $ do
     . getAccount'
     $ accountsFilterParams & qaAddress ?~ logicAddr
   MaybeT . pure $ addressStateRefCodePtr l
+
+-- | A contract's owner, when that owner is a governance registry (it exposes
+-- castVoteOnIssue): owner-only calls on the contract must be voted through it.
+getGovernanceOwner ::
+  ( MonadIO m,
+    (Keccak256 `A.Selectable` CodeCollection) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m
+  ) =>
+  Address ->
+  m (Maybe Address)
+getGovernanceOwner a = runMaybeT $ do
+  (StorageAddress _ v _) <- MaybeT
+    . fmap listToMaybe
+    . getStorage'
+    $ storageFilterParams
+        { qsAddress = Just a
+        , qsKey = Just "_owner"
+        }
+  owner <- MaybeT . pure $ case v of
+    BAddress address' -> Just address'
+    _ -> Nothing
+  registry <- MaybeT $ getContractByAddress owner (Just "castVoteOnIssue")
+  guard . Map.member "castVoteOnIssue" $ registry ^. functions
+  pure owner
 
 withCodeCollectionCache :: MonadIO m => ReaderT (IORef (Map.Map Keccak256 CodeCollection)) m a -> m a
 withCodeCollectionCache action = do

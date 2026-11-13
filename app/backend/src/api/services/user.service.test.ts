@@ -3,7 +3,15 @@ import test from "node:test";
 import JSONBig from "json-bigint";
 import { bloc, cirrus, eth, strato } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
-import { castVoteOnIssueById, createIssue, getContractDetails, simulateCastVoteOnIssue } from "./user.service";
+import { requestContext } from "../../utils/requestContext";
+import {
+  castVoteOnIssueById,
+  createIssue,
+  getContractDetails,
+  governedInput,
+  ownerInput,
+  simulateCastVoteOnIssue,
+} from "./user.service";
 
 const JSONBigString = JSONBig({ storeAsString: true });
 
@@ -127,23 +135,20 @@ test("traces create-issue argument transformations through the STRATO request", 
     exit: result,
   }, (_key, value) => typeof value === "bigint" ? value.toString() : value, 2));
 
-  assert.equal(sentArgs.recipient.type, "address");
+  assert.equal(sent.txs[0].payload.method, "castVoteOnIssue");
+  assert.equal(sentArgs._target, target);
+  assert.equal(sentArgs._func, "captureArguments");
+  const [recipient, amount, enabled, label, labels] = sentArgs._args;
+  assert.equal(recipient.type, "address");
+  assert.equal(recipient.value, "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
+  assert.equal(amount.type, "uint256");
   assert.equal(
-    sentArgs.recipient.value,
-    "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-  );
-  assert.equal(sentArgs.amount.type, "uint256");
-  assert.equal(
-    sentArgs.amount.value,
+    amount.value,
     submittedArgs[1],
     "the backend must preserve every large integer digit before STRATO",
   );
   assert.deepEqual(
-    JSON.parse(JSON.stringify({
-      enabled: sentArgs.enabled,
-      label: sentArgs.label,
-      labels: sentArgs.labels,
-    })),
+    JSON.parse(JSON.stringify({ enabled, label, labels })),
     {
       enabled: { type: "bool", value: true },
       label: { type: "string", value: "preserve surrounding spaces" },
@@ -155,6 +160,51 @@ test("traces create-issue argument transformations through the STRATO request", 
     hash: "0xsemantictrace",
     issueId: "semantic-trace-issue",
     governed: true,
+  });
+});
+
+test("governedInput turns a direct call's named args into a typed castVoteOnIssue call", async (t) => {
+  const target = "0x0000000000000000000000000000000000001008";
+  t.mock.method(bloc, "get", (async (_token: string, path: string) => ({
+    status: path === `/contracts/contract/${target}/details` ? 200 : 404,
+    data: {
+      _contractName: "MercataBridge",
+      _functions: {
+        setAssetRoute: {
+          _funcArgs: [
+            ["enabled", { index: 3, type: { tag: "Bool" } }],
+            ["externalToken", { index: 0, type: { tag: "Address" } }],
+            ["externalChainId", { index: 1, type: { tag: "Int", signed: false, bytes: 32 } }],
+            ["targetStratoToken", { index: 2, type: { tag: "Address" } }],
+          ],
+        },
+      },
+    },
+  })) as typeof bloc.get);
+
+  const input = await governedInput("access-token", {
+    contractName: "MercataBridge",
+    contractAddress: target,
+    method: "setAssetRoute",
+    args: {
+      externalToken: "0000000000000000000000000000000000001234",
+      externalChainId: "900719925474099312345678901234567890",
+      targetStratoToken: "0x0000000000000000000000000000000000005555",
+      enabled: true,
+    },
+  });
+
+  assert.equal(input.contractAddress, constants.adminRegistry);
+  assert.equal(input.method, "castVoteOnIssue");
+  assert.deepEqual(JSON.parse(JSON.stringify(input.args)), {
+    _func: "setAssetRoute",
+    _target: target,
+    _args: [
+      { type: "address", value: "0x0000000000000000000000000000000000001234" },
+      { type: "uint256", value: "900719925474099312345678901234567890" },
+      { type: "address", value: "0x0000000000000000000000000000000000005555" },
+      { type: "bool", value: true },
+    ],
   });
 });
 
@@ -180,18 +230,32 @@ type VoteScenario = {
   votes?: any[];
   unreadableIndex?: boolean;
   landedIssueId?: string;
+  // Results of the node's simulate endpoint, one per simulation in order
+  simulations?: any[];
+  // The target's function, when not Rewards.addPositionActivity
+  func?: { contractName: string; name: string; funcArgs: any[] };
 };
 
 const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
   const posted: any[] = [];
+  const simulations = [...(scenario.simulations ?? [])];
+  const simulated: any[] = [];
+  const txLookups: string[] = [];
+
+  t.mock.method(bloc, "post", (async (_token: string, _path: string, body: any, config: any) => {
+    // Encoded as axios would send it: a replayed call's BigInts must survive
+    (config?.transformRequest?.[0] ?? JSON.stringify)(body);
+    simulated.push(body);
+    return { status: 200, data: [simulations.shift()] };
+  }) as typeof bloc.post);
 
   t.mock.method(bloc, "get", (async (_token: string, _path: string) => ({
     status: 200,
     data: {
-      _contractName: "Rewards",
+      _contractName: scenario.func?.contractName ?? "Rewards",
       _functions: {
-        addPositionActivity: {
-          _funcArgs: [
+        [scenario.func?.name ?? "addPositionActivity"]: {
+          _funcArgs: scenario.func?.funcArgs ?? [
             ["name", { index: 0, type: { tag: "String" } }],
             ["emissionRate", { index: 1, type: { tag: "Int", signed: false, bytes: 32 } }],
             ["sourceContract", { index: 2, type: { tag: "Address" } }],
@@ -209,13 +273,14 @@ const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
     status: 200,
     data: [{
       to: REWARDS,
-      funcName: "addPositionActivity",
+      funcName: scenario.func?.name ?? "addPositionActivity",
       args: scenario.txArgs ?? ["\"UI Arg Probe\"", "0", "\"0xdead0001\"", RENDERED_EVENTS],
     }],
   })) as typeof eth.get);
 
   t.mock.method(cirrus, "get", (async (_token: string, path: string, config: any) => {
     const params = config?.params ?? {};
+    if (params.transaction_hash) txLookups.push(params.transaction_hash);
     if (path.endsWith("-IssueCreated") && params.issueId?.startsWith("eq.")) {
       return {
         status: 200,
@@ -244,6 +309,10 @@ const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
 
   t.mock.method(strato, "post", (async (_token: string, _path: string, body: any) => {
     posted.push(body.txs[0].payload);
+    // Signing in a wallet: the node returns the transaction unsigned
+    if (requestContext.getStore()?.externalSigning) {
+      return { status: 200, data: [{ hash: "0xunsigned", data: { nonce: 7 } }] };
+    }
     if (posted.length === 1 && scenario.replayFailure === "node") {
       return {
         status: 200,
@@ -262,8 +331,50 @@ const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
     return { status: 200, data: [{ status: "Success", hash: `0xvote${posted.length}` }] };
   }) as typeof strato.post);
 
-  return posted;
+  return Object.assign(posted, { simulated, txLookups });
 };
+
+// The node's simulate result for a vote: the registry's events for it
+const registryEvent = (name: string, issueId: string = ISSUE_ID) =>
+  ({ address: constants.adminRegistry, name, args: { issueId } });
+
+const simulatedSuccess = (...events: any[]) => ({ status: "Success", events });
+
+// A registry fallback is chosen on simulations: this one counts as a vote on the issue
+const votesOnIssue = simulatedSuccess(registryEvent("IssueVoted"));
+
+test("ownerInput calls an account-owned target directly and votes through a registry owner", async (t) => {
+  const token = "0x3333333333333333333333333333333333333333";
+  const account = "4444444444444444444444444444444444444444";
+  const registry = "5555555555555555555555555555555555555555";
+  t.mock.method(bloc, "get", (async (_token: string, path: string) => {
+    if (path === `/contracts/contract/${token}/details`) {
+      return {
+        status: 200,
+        data: {
+          _contractName: "Token",
+          _functions: { setStatus: { _funcArgs: [["newStatus", { index: 0, type: { tag: "Int", signed: false, bytes: 32 } }]] } },
+        },
+      };
+    }
+    if (path === `/contracts/contract/${registry}/details`) {
+      return { status: 200, data: { _contractName: "AdminRegistry", _functions: { castVoteOnIssue: { _funcArgs: [] } } } };
+    }
+    return { status: 400, data: {} };
+  }) as typeof bloc.get);
+  const direct = { contractName: "Token", contractAddress: token, method: "setStatus", args: { newStatus: 2 } };
+
+  assert.deepEqual(await ownerInput("access-token", direct, account), direct);
+
+  const voted = await ownerInput("access-token", direct, registry);
+  assert.equal(voted.contractAddress, registry);
+  assert.equal(voted.method, "castVoteOnIssue");
+  assert.deepEqual(JSON.parse(JSON.stringify(voted.args)), {
+    _func: "setStatus",
+    _target: token,
+    _args: [{ type: "uint256", value: 2 }],
+  });
+});
 
 test("votes by replaying the original transaction when it decodes", async (t) => {
   const posted = mockVoteScenario(t, {
@@ -278,7 +389,7 @@ test("votes by replaying the original transaction when it decodes", async (t) =>
 });
 
 test("falls back to the registry when the recorded arguments cannot be decoded", async (t) => {
-  const posted = mockVoteScenario(t);
+  const posted = mockVoteScenario(t, { simulations: [votesOnIssue] });
 
   const result = await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
 
@@ -305,6 +416,7 @@ test("falls back to the registry when the node rejects the replayed transaction"
   const posted = mockVoteScenario(t, {
     txArgs: ["\"UI Arg Probe\"", "0", "\"0xdead0001\"", '[{"eventName":"d","actionType":0}]'],
     replayFailure: "node",
+    simulations: [votesOnIssue],
   });
 
   const result = await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
@@ -312,6 +424,54 @@ test("falls back to the registry when the node rejects the replayed transaction"
   assert.equal(result.votedVia, "registry");
   assert.equal(posted.length, 2, "the replay was submitted and failed, then the fallback was sent");
   assert.equal(posted[1].method, "castVoteOnIssue");
+  // The original transaction's arguments (the event records two other actionable events)
+  assert.equal(posted[1].args._args[3].value[0].eventName, "d");
+});
+
+test("an OAuth vote on a forwarded issue goes through the registry with its variadic tail flat", async (t) => {
+  // A User contract's createContract forwarded the issue: the replay is rejected, and the
+  // event renders the variadic tail nested where the issueId covers it flat
+  const posted = mockVoteScenario(t, {
+    func: {
+      contractName: "User",
+      name: "createContract",
+      funcArgs: [
+        ["contractName", { index: 0, type: { tag: "String" } }],
+        ["contractSrc", { index: 1, type: { tag: "String" } }],
+        ["args", { index: 2, type: { tag: "Variadic" } }],
+      ],
+    },
+    txArgs: ["\"CDPEngine\"", "\"contract CDPEngine {}\"", "\"00000000000000000000000000000000deadbeef\""],
+    replayFailure: "node",
+    simulations: [votesOnIssue],
+  });
+
+  const result = await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
+
+  assert.equal(result.votedVia, "registry");
+  assert.equal(posted.length, 2);
+  assert.deepEqual(posted[1].args._args, [
+    { type: "string", value: "CDPEngine" },
+    { type: "string", value: "contract CDPEngine {}" },
+    "\"00000000000000000000000000000000deadbeef\"",
+  ]);
+});
+
+test("an OAuth fallback that no registry vote reaches submits nothing more", async (t) => {
+  // Submitting a vote that misses the issue would open another one
+  const elsewhere = simulatedSuccess(registryEvent("IssueVoted", "aaaa000000000000000000000000000000000000000000000000000000000000"));
+  const posted = mockVoteScenario(t, {
+    txArgs: ["\"UI Arg Probe\"", "0", "\"0xdead0001\"", '[{"eventName":"d","actionType":0}]'],
+    replayFailure: "node",
+    simulations: [elsewhere, elsewhere],
+  });
+
+  await assert.rejects(
+    () => castVoteOnIssueById("access-token", VOTER, ISSUE_ID),
+    (error: any) => error.status === 409 && /No vote reaches this issue/.test(error.message)
+      && /after replaying the original transaction failed/.test(error.message),
+  );
+  assert.equal(posted.length, 1, "only the failed replay was submitted");
 });
 
 test("refuses the fallback once this admin's vote is already recorded", async (t) => {
@@ -333,7 +493,7 @@ test("refuses the fallback once the issue has been executed", async (t) => {
 });
 
 test("allows the fallback when the only execution predates this issue", async (t) => {
-  const posted = mockVoteScenario(t, { executed: [{ issueId: ISSUE_ID, block_number: "99" }] });
+  const posted = mockVoteScenario(t, { executed: [{ issueId: ISSUE_ID, block_number: "99" }], simulations: [votesOnIssue] });
 
   const result = await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
 
@@ -370,6 +530,164 @@ test("reports a vote that hashed to a different issue instead of claiming succes
     () => castVoteOnIssueById("access-token", VOTER, ISSUE_ID),
     /landed on issue aaaa0000/,
   );
+});
+
+// ── castVoteOnIssueById: signing in a wallet ─────────────────────────────────
+// A wallet signs the vote after the request returns, so the replay and its fallback
+// are chosen on simulations of them, and the wallet is never handed a call that would
+// open an issue rather than vote on this one.
+
+const asWallet = <T>(fn: () => Promise<T>): Promise<T> =>
+  requestContext.run({ externalSigning: true, userAddress: VOTER.replace(/^0x/, "") }, fn);
+
+// An 18-decimal amount: past Number.MAX_SAFE_INTEGER, so the replayed call carries a BigInt
+const DECODABLE_TX_ARGS = ["\"UI Arg Probe\"", "1000000000000000000000", "\"0xdead0001\"", '[{"eventName":"d","actionType":"Deposit"}]'];
+
+test("a wallet vote replays the original transaction when it simulates as a vote on the issue", async (t) => {
+  const posted = mockVoteScenario(t, {
+    txArgs: DECODABLE_TX_ARGS,
+    simulations: [simulatedSuccess(registryEvent("IssueVoted"))],
+  });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.deepEqual(result, { status: "unsigned", hash: "0xunsigned", votedVia: "replay" });
+  assert.equal(posted.simulated.length, 1);
+  assert.equal(posted.simulated[0].address, VOTER.replace(/^0x/, ""), "simulated as the wallet");
+  assert.equal(posted.length, 1);
+  assert.equal(posted[0].method, "addPositionActivity");
+  assert.deepEqual(posted.txLookups, [], "an unsigned transaction has no events to wait for");
+});
+
+const failedOnChain = { status: "Failure", error: "Only an admin or a whitelisted account can call castVoteOnIssue", events: [] };
+
+test("a wallet vote sends the original transaction's arguments through the registry when the replay would fail on chain", async (t) => {
+  const posted = mockVoteScenario(t, {
+    txArgs: DECODABLE_TX_ARGS,
+    simulations: [failedOnChain, simulatedSuccess(registryEvent("IssueVoted"))],
+  });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.equal(result.votedVia, "registry");
+  assert.equal(posted.length, 1, "only the call that simulated as a vote is handed to the wallet");
+  assert.equal(posted[0].method, "castVoteOnIssue");
+  assert.equal(posted[0].contractAddress, constants.adminRegistry);
+  assert.equal(posted[0].args._func, "addPositionActivity");
+  // Decoded from the transaction (the event records this argument as 0)
+  assert.equal(String(posted[0].args._args[1].value), "1000000000000000000000");
+});
+
+test("a wallet vote lays a forwarded call's variadic tail flat in the registry vote", async (t) => {
+  // An issue a User contract's createContract forwarded to the registry: the event renders
+  // the variadic tail as a nested list, but the issueId covers it flat
+  const posted = mockVoteScenario(t, {
+    func: {
+      contractName: "User",
+      name: "createContract",
+      funcArgs: [
+        ["contractName", { index: 0, type: { tag: "String" } }],
+        ["contractSrc", { index: 1, type: { tag: "String" } }],
+        ["args", { index: 2, type: { tag: "Variadic" } }],
+      ],
+    },
+    txArgs: ["\"CDPEngine\"", "\"contract CDPEngine {}\"", "\"00000000000000000000000000000000deadbeef\""],
+    simulations: [failedOnChain, simulatedSuccess(registryEvent("IssueVoted"))],
+  });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.equal(result.votedVia, "registry");
+  assert.deepEqual(posted[0].args._args, [
+    { type: "string", value: "CDPEngine" },
+    { type: "string", value: "contract CDPEngine {}" },
+    "\"00000000000000000000000000000000deadbeef\"",
+  ]);
+});
+
+test("a wallet vote falls back to the issue's recorded arguments when neither transaction-based vote counts", async (t) => {
+  const posted = mockVoteScenario(t, {
+    txArgs: DECODABLE_TX_ARGS,
+    simulations: [failedOnChain, failedOnChain, simulatedSuccess(registryEvent("IssueVoted"))],
+  });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.equal(result.votedVia, "registry");
+  assert.equal(posted.simulated.length, 3);
+  // Rebuilt from the event, which records this argument as 0
+  assert.equal(String(posted[0].args._args[1].value), "0");
+});
+
+test("a wallet vote goes through the registry when the recorded arguments cannot be decoded", async (t) => {
+  const posted = mockVoteScenario(t, { simulations: [simulatedSuccess(registryEvent("IssueVoted"))] });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.equal(result.votedVia, "registry");
+  assert.equal(posted.simulated.length, 1, "an undecodable replay is never simulated");
+  assert.equal(posted[0].method, "castVoteOnIssue");
+});
+
+// The issue has no current votes, so the vote opens it anew
+const reopened = simulatedSuccess(registryEvent("IssueCreated"), registryEvent("IssueVoted"));
+
+test("a wallet vote restarts an issue whose votes a registry config change cleared", async (t) => {
+  const posted = mockVoteScenario(t, { txArgs: DECODABLE_TX_ARGS, simulations: [reopened] });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.equal(result.votedVia, "replay");
+  assert.equal(posted.length, 1, "a vote OAuth would cast must not be refused for a wallet");
+});
+
+test("a wallet vote is refused when it would reopen an executed issue", async (t) => {
+  const posted = mockVoteScenario(t, {
+    txArgs: DECODABLE_TX_ARGS,
+    executed: [{ issueId: ISSUE_ID, block_number: "101" }],
+    simulations: [reopened, reopened, reopened],
+  });
+
+  await assert.rejects(
+    () => asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID)),
+    /would open the issue anew/,
+  );
+  assert.equal(posted.length, 0, "re-voting an executed issue would resurrect it");
+});
+
+test("a wallet vote is refused when it would vote on a different issue", async (t) => {
+  const elsewhere = simulatedSuccess(registryEvent("IssueVoted", "aaaa000000000000000000000000000000000000000000000000000000000000"));
+  const posted = mockVoteScenario(t, { txArgs: DECODABLE_TX_ARGS, simulations: [elsewhere, elsewhere, elsewhere] });
+
+  await assert.rejects(
+    () => asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID)),
+    // A 4xx, so the admin sees why rather than a generic server error
+    (error: any) => error.status === 409 && /would vote on issue aaaa0000/.test(error.message),
+  );
+  assert.equal(posted.length, 0);
+});
+
+test("a wallet vote counts only the registry's events", async (t) => {
+  // A nested multisig the issue executes emits its own IssueVoted, which is not this vote
+  const nested = simulatedSuccess({ address: REWARDS, name: "IssueVoted", args: { issueId: ISSUE_ID } });
+  const posted = mockVoteScenario(t, { txArgs: DECODABLE_TX_ARGS, simulations: [nested, nested, nested] });
+
+  await assert.rejects(
+    () => asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID)),
+    /would record no vote/,
+  );
+  assert.equal(posted.length, 0);
+});
+
+test("a wallet-signed issue is handed back without waiting for its events", async (t) => {
+  const posted = mockVoteScenario(t);
+
+  const result = await asWallet(() => createIssue("access-token", VOTER, REWARDS, "addPositionActivity",
+    ["UI Arg Probe", 0, "0xdead0001", [{ eventName: "d", actionType: 0 }]]));
+
+  assert.deepEqual(result, { status: "unsigned", hash: "0xunsigned", issueId: null, governed: false });
+  assert.equal(posted[0].method, "castVoteOnIssue");
+  assert.deepEqual(posted.txLookups, [], "an unsigned transaction has no events to look up");
 });
 
 // ── castVoteOnIssueById: replaying a registry-created issue ──────────────────
@@ -442,6 +760,16 @@ test("replays a registry-created issue's variadic tail as the values it rendered
   assert.equal(posted.length, 1);
   assert.equal(posted[0].method, "castVoteOnIssue");
   assert.deepEqual(posted[0].args._args, [false, true]);
+});
+
+test("replays a bytes value rendered as hex\"…\" as bytes, not as text", async (t) => {
+  // Re-sent verbatim, hex"…" arrives as a string and the vote opens a different issue
+  const value = "50056542149a3c5dd91db8d25b5f9e9d147e2d0fc5b59d1e2b46cf4ebf589177";
+  const posted = mockRegistryReplay(t, [`"${TOKEN}"`, "\"cancelVesting\"", `hex"${value}"`]);
+
+  await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(posted[0].args._args)), [{ type: "bytes", value }]);
 });
 
 test("keeps quoted variadic renderings verbatim so the node strips exactly one quote level", async (t) => {

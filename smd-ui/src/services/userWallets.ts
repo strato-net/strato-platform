@@ -4,39 +4,28 @@ import { env } from "@/lib/env";
 
 /** UserRegistry is deployed at 0x720 in genesis; createUser() lives here. */
 export const USER_REGISTRY_ADDRESS = "0000000000000000000000000000000000000720";
+export const ADMIN_REGISTRY_ADDRESS = "000000000000000000000000000000000000100c";
 export const ZERO_ADDRESS = "0000000000000000000000000000000000000000";
 
 export const strip0x = (s: string): string => (s || "").replace(/^0x/, "").toLowerCase();
 
 export interface UserWallet {
-  /** The User wallet contract address. */
+  /** User-wallet contract address. */
   address: string;
   username: string;
-  /**
-   * True when the connected account controls this wallet as a multisig **signer**
-   * (it's in the wallet's `adminMap`) rather than as a direct owner/authorized
-   * account. Multisig wallets are self-owned, so signers aren't in `userAddressMap`.
-   */
-  multisig?: boolean;
+}
+
+function extractStorageData(row: any): any {
+  const storage = row?.storage;
+  const entry = Array.isArray(storage) ? storage[0] : storage;
+  return entry?.data ?? entry ?? {};
 }
 
 function extractUsername(row: any): string {
-  const s = row?.storage;
-  const data = Array.isArray(s) ? s[0] : s;
-  return data?.username ?? "";
+  return extractStorageData(row)?.username ?? "";
 }
 
-/**
- * User wallets the connected account can act on. Two sources, merged and deduped:
- *  - `userAddressMap` (address => uint): wallets it owns / is an authorized account on.
- *  - `adminMap` (address => uint, value = index+1): wallets it's a multisig **signer**
- *    on. Once a wallet is converted to a self-owned multisig, `transferOwnership`
- *    clears its owner out of `userAddressMap`, so signers only appear here.
- * Both cirrus queries key on the connected account and join `storage` for the username;
- * the global AdminRegistry/Governance also have an `adminMap` but no username, so
- * requiring a username naturally excludes them. Removed accounts are zeroed out in the
- * mappings rather than deleted, so both queries require value > 0.
- */
+/** User wallets controlled by the connected account. */
 export function useMyUserWallets(ownerAddress?: string | null) {
   return useQuery({
     queryKey: ["my-user-wallets", ownerAddress],
@@ -44,26 +33,16 @@ export function useMyUserWallets(ownerAddress?: string | null) {
     queryFn: async (): Promise<UserWallet[]> => {
       const key = strip0x(ownerAddress!);
       const select = "select=address,storage(data-%3E%3Eusername)";
-      const [ownedRes, signerRes] = await Promise.all([
-        api.get(`${env.CIRRUS_URL}/mapping?collection_name=eq.userAddressMap&key-%3E%3Ekey=eq.${key}&value=gt.0&${select}`),
-        api.get(`${env.CIRRUS_URL}/mapping?collection_name=eq.adminMap&key-%3E%3Ekey=eq.${key}&value=gt.0&${select}`),
-      ]);
-
-      const byAddr = new Map<string, UserWallet>();
-      for (const row of Array.isArray(ownedRes.data) ? ownedRes.data : []) {
-        const address = row?.address ?? "";
-        if (!address) continue;
-        byAddr.set(address, { address, username: extractUsername(row), multisig: false });
-      }
-      for (const row of Array.isArray(signerRes.data) ? signerRes.data : []) {
-        const address = row?.address ?? "";
-        const username = extractUsername(row);
-        if (!address || !username) continue; // no username => a global registry, skip
-        const existing = byAddr.get(address);
-        if (existing) existing.multisig = true;
-        else byAddr.set(address, { address, username, multisig: true });
-      }
-      return [...byAddr.values()];
+      const ownedRes = await api.get(
+        `${env.CIRRUS_URL}/mapping?collection_name=eq.userAddressMap&key-%3E%3Ekey=eq.${key}&value=gt.0&${select}`
+      );
+      const ownedRows = Array.isArray(ownedRes.data) ? ownedRes.data : [];
+      return ownedRows
+        .map((row: any) => ({
+          address: strip0x(String(row?.address ?? "")),
+          username: String(extractUsername(row)),
+        }))
+        .filter((wallet: UserWallet) => wallet.address && wallet.username);
     },
     refetchInterval: 15000,
   });
