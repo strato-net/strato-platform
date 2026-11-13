@@ -5,6 +5,7 @@ module Blockchain.Data.ExecResults
   ( calculateReturned,
     evmErrorResults,
     solidvmErrorResults,
+    prependConsensusDeltas,
     ExecResults (..),
   )
 where
@@ -48,6 +49,18 @@ calculateReturned :: Transaction -> ExecResults -> Integer
 calculateReturned t er =
   let realRefund = min (erRefund er) ((gasLimit t - erRemainingTxGas er) `div` 2)
    in realRefund + erRemainingTxGas er
+
+-- | Carry the validator-set and stake changes of a call that ran ahead of @er@
+-- (the fee payment precedes its transaction) into @er@, in execution order: the
+-- earlier call's validators come first, and a stake weight published by @er@
+-- replaces the earlier call's for the same validator.
+prependConsensusDeltas :: ExecResults -> ExecResults -> ExecResults
+prependConsensusDeltas earlier er =
+  er
+    { erNewValidators = erNewValidators earlier ++ erNewValidators er,
+      erRemovedValidators = erRemovedValidators earlier ++ erRemovedValidators er,
+      erStakeUpdates = M.union (erStakeUpdates er) (erStakeUpdates earlier)
+    }
 
 evmErrorResults :: Integer -> VMException -> ExecResults
 evmErrorResults remainingGas e = errorResults remainingGas (Right e)

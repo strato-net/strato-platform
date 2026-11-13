@@ -30,6 +30,7 @@ import           BlockApps.Init
 import           BlockApps.Logging as BL
 import           Data.IORef
 import           Data.String (fromString)
+import           Data.Unique (newUnique)
 import           Data.Set.Ordered (empty)
 import           Instrumentation
 import           Blockchain.Sequencer.Kafka (seqP2pEventsTopicName, unseqEventsTopicName)
@@ -70,7 +71,8 @@ initP2P = labelTheThread "initP2P" $ do
         -- read-modify-write safe within a single connection.
         env <- createStreamEnv "strato-p2p" streamAddr
         envVar <- liftIO $ newMVar env
-        let cfg' = cfg { configContext = ctx, configStreamEnv = envVar }
+        connId <- liftIO newUnique
+        let cfg' = cfg { configContext = ctx, configStreamEnv = envVar, configConnectionId = connId }
         -- Sequencer events are consumed once per process by
         -- runSeqEventBroadcaster below and fanned out in memory. Each
         -- connection subscribes here, at its start, and sees the events

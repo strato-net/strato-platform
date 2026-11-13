@@ -63,7 +63,7 @@ commitmentSeal sha =
 
 signMessage :: (StateMachineM m) => TrustedMessage -> m (OutEvent)
 signMessage tm = do
-  let mesg = getHash tm
+  mesg <- uses chainId (`getHash` tm)
   addr <- use selfAddr
   sig <- sign mesg
   return $ OMsg (MsgAuth (fromJust addr) sig) $ tm
@@ -71,13 +71,13 @@ signMessage tm = do
 blockstanbulError :: (MonadError String m) => String -> m a
 blockstanbulError = if flags_strictBlockstanbul then error else throwError
 
-authenticate :: (Monad m) => InEvent -> m Bool
-authenticate (IMsg (MsgAuth cm sig) tm) = do
-  let msgHash = getHash tm
+authenticate :: (Monad m) => Integer -> InEvent -> m Bool
+authenticate chainId' (IMsg (MsgAuth cm sig) tm) = do
+  let msgHash = getHash chainId' tm
       mKey = recoverPub sig msgHash --recover pub key
       mAddress = fromPublicKey <$> mKey --getting the address of sender
   return (mAddress == Just cm)
-authenticate _ = return True
+authenticate _ _ = return True
 
 -- | Do the block's transactions and uncles belong to its header? Signatures and
 -- seals cover the header alone, so without this a relay could change the body
