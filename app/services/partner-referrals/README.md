@@ -24,15 +24,17 @@ timestamps in ISO 8601 UTC, USD amounts as decimal strings. Errors are
   `{data_as_of, codes: [{code, external_user_id, referrals, traders, volume_usd}], next_cursor}`
   for every code of the calling key. `from` is inclusive, `to` exclusive;
   `limit` is 1 to 1000 (default 100).
-- `POST /referrals/signups` `{code, account, email?}`: internal, called by
-  the app backend with `PARTNER_INTERNAL_KEY`. The app nginx answers 404 for
-  it. Where the service has a load balancer of its own, the path is
-  reachable there and the key is what guards it.
+- `POST /referrals/signups` `{code, account, email?, since?}` and
+  `GET /referrals/signups?code=&account=` (`{claimable}`: whether that
+  signup would be recorded): internal, called by the app backend with
+  `PARTNER_INTERNAL_KEY`. The app nginx answers 404 for the path. Where the
+  service has a load balancer of its own, the path is reachable there and
+  the key is what guards it.
 - `GET /health`
 
 | Field | Meaning |
 |---|---|
-| `referrals` | Accounts that signed up with the code inside the window |
+| `referrals` | Accounts that signed up with the code inside the window, and external wallets that confirmed it inside the window and have had counted activity since |
 | `traders` | Unique accounts referred by the code at any time, with counted activity inside the window |
 | `volume_usd` | USD value of that activity at the oracle price when it happened, each event counted once |
 
@@ -40,6 +42,12 @@ The window applies to the signup for `referrals` and to the activity for
 `traders` and `volume_usd`. A code whose referrals all signed up before the
 window therefore reports `referrals: 0` next to their `traders` and
 `volume_usd` inside it.
+
+A wallet's activity counts from the moment it confirmed, not before. A
+wallet that confirmed and has done nothing since is recorded but is not yet
+a referral: confirming costs nothing, so counting it would let a script
+inflate the number. A wallet that becomes active later is then counted in
+the period in which it confirmed, so a past period's `referrals` can grow.
 
 ## How a referral is recorded
 
@@ -56,9 +64,19 @@ backend restart ends the retries). The first failure and a final one are
 logged with the code and account (`Partner referral not recorded`), which is
 what it takes to replay the signup against `/referrals/signups`.
 
-Only accounts the backend creates at a first login are recorded. A guest who
-connects an external wallet without logging in has no signup and is not
-attributed.
+A guest who connects an external wallet (MetaMask and the like) without
+logging in has no signup. Their wallet confirms the referral instead: right
+after it connects, the app has it sign a short message naming the code
+(`personal_sign`: free, no transaction), and the backend records the wallet
+only when the signature is that wallet's. The signature is the proof of
+ownership; the wallet address a guest's requests carry is not. The wallet is
+asked once: not again in the same browser session after a decline, and not
+at all when there is nothing to confirm (the `ref` is no partner's code, the
+wallet is the code owner's, or it is referred already). Any wallet can
+confirm, including one that has traded before. The `ref` cookie is kept, so
+an account the same visitor creates later by logging in is recorded as well.
+A contract wallet cannot confirm: its signature is not one the backend can
+check, and it cannot sign STRATO transactions either.
 
 ## What counts as volume
 

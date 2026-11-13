@@ -151,6 +151,31 @@ const carol = "44".repeat(20);
   await prune();
   assert.deepStrictEqual(await stored(), [1, 2, 4]);
 
+  // --- An external wallet confirms a referral ---
+  const dave = "55".repeat(20);
+  const walletCode = (await call("POST", "/referrals/codes", keyA, { external_user_id: "u5" })).body.code;
+  // Asked first: only a known code, for a wallet that is neither its owner's nor referred already
+  const claimable = (account: string, c: string) => call("GET", `/referrals/signups?code=${c}&account=${account}`, keyInternal).then((r) => r.body.claimable);
+  assert.strictEqual((await call("GET", `/referrals/signups?code=${walletCode}&account=${dave}`, keyA)).status, 401);
+  assert.deepStrictEqual(
+    [await claimable(dave, walletCode.toLowerCase()), await claimable(dave, "NOSUCHCODE"), await claimable(owner, code), await claimable(alice, walletCode)],
+    [true, false, false, false]
+  );
+  assert.strictEqual((await call("POST", "/referrals/signups", keyInternal, { code: walletCode, account: dave, since: "soon" })).status, 400);
+  const confirmed = await call("POST", "/referrals/signups", keyInternal, { code: walletCode, account: dave, since: ago(0.5).toISOString() });
+  assert.strictEqual(confirmed.body.recorded, true);
+  assert.strictEqual(await claimable(dave, walletCode), false);
+  const walletMetrics = async () => {
+    const { codes } = (await call("GET", `/referrals/metrics?from=${ago(2).toISOString()}&to=${ago(-1).toISOString()}`, keyA)).body;
+    const c = codes.find((x: any) => x.code === walletCode);
+    return [c.referrals, c.traders, c.volume_usd];
+  };
+  // What the wallet did before it confirmed does not count, and until it does something after, it is not a referral
+  await commit(state, [{ eventId: 6, account: dave, blockTs: ago(1), usdWad: 50n * 10n ** 18n }], 5, 6, asOf);
+  assert.deepStrictEqual(await walletMetrics(), [0, 0, "0.00"]);
+  await commit(state, [{ eventId: 7, account: dave, blockTs: ago(0.25), usdWad: 9n * 10n ** 18n }], 6, 7, asOf);
+  assert.deepStrictEqual(await walletMetrics(), [1, 1, "9.00"]);
+
   server.close();
   await pool.end();
   console.log("db.test: OK");

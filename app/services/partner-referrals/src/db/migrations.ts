@@ -66,4 +66,13 @@ CREATE TABLE activity (
 CREATE INDEX activity_account_ts ON activity (account, block_ts);
 `,
   },
+  {
+    name: "002_referral_counted_from",
+    sql: `
+-- From when a referred account's activity counts. NULL for an account a
+-- signup created, which has no earlier activity. For an external wallet,
+-- which can have traded before, the time it confirmed the referral.
+ALTER TABLE referrals ADD COLUMN counted_from TIMESTAMPTZ;
+`,
+  },
 ];

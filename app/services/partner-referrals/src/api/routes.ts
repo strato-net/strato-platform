@@ -40,6 +40,11 @@ const partnerOf = (req: express.Request): string => {
   throw new ApiError(401, "UNAUTHORIZED", "Unknown key");
 };
 
+/** Only the app backend, which holds the internal key, gets past this. */
+const internalOnly = (req: express.Request): void => {
+  if (!config.internalKey || !sameKey(bearer(req), config.internalKey)) throw new ApiError(401, "UNAUTHORIZED", "Unknown key");
+};
+
 /** An optional string field: absent and null are both "not shared". */
 const optional = (body: any, field: string): string | null => {
   const v = body[field];
@@ -138,12 +143,19 @@ router.get(
     const [codes, progress] = await Promise.all([
       query<{ code: string; external_user_id: string; referrals: string; traders: string; volume_usd: string }>(
         `SELECT c.code, c.external_user_id,
-                COUNT(DISTINCT r.account) FILTER (WHERE r.created_at >= $2 AND r.created_at < $3) AS referrals,
+                COUNT(DISTINCT r.account) FILTER (WHERE r.created_at >= $2 AND r.created_at < $3 AND s.active) AS referrals,
                 COUNT(DISTINCT a.account) AS traders,
                 ROUND(COALESCE(SUM(a.usd_wad), 0) / 1e18, 2)::text AS volume_usd
          FROM codes c
          LEFT JOIN referrals r ON r.code = c.code
+         -- A wallet (counted_from set) is a referral once it has activity
+         -- from then on; without that test, confirming would cost nothing.
+         LEFT JOIN LATERAL (
+           SELECT r.counted_from IS NULL
+               OR EXISTS (SELECT 1 FROM activity x WHERE x.account = r.account AND x.block_ts >= r.counted_from) AS active
+         ) s ON true
          LEFT JOIN activity a ON a.account = r.account AND a.block_ts >= $2 AND a.block_ts < $3
+                             AND (r.counted_from IS NULL OR a.block_ts >= r.counted_from)
          WHERE c.partner = $1 AND c.code > $4
          GROUP BY c.code
          ORDER BY c.code
@@ -168,24 +180,44 @@ router.get(
 );
 
 // Internal, called by the app backend when a new account signed up through
-// a ref link. First code wins, and an owner's own account (by the wallet or
-// email they shared) is not their referral.
+// a ref link, or when an external wallet confirmed one (then with since: the
+// wallet's activity counts from that time). First code wins, and an owner's
+// own account (by the wallet or email they shared) is not their referral.
 router.post(
   "/partner-api/referrals/signups",
   asyncHandler(async (req, res) => {
-    if (!config.internalKey || !sameKey(bearer(req), config.internalKey)) throw new ApiError(401, "UNAUTHORIZED", "Unknown key");
+    internalOnly(req);
     const body = req.body ?? {};
     const account = toAddress(body.account);
     const code = optional(body, "code");
     if (!account || !code) throw badRequest("code and account are required");
+    const since = body.since === undefined || body.since === null ? null : time(body.since, "since");
     const { rowCount } = await query(
-      `INSERT INTO referrals (account, code)
-       SELECT $1, code FROM codes
+      `INSERT INTO referrals (account, code, counted_from)
+       SELECT $1, code, $4::timestamptz FROM codes
        WHERE code = $2 AND wallet IS DISTINCT FROM $1 AND ($3::text IS NULL OR email IS DISTINCT FROM $3)
        ON CONFLICT (account) DO NOTHING`,
-      [account, code.toUpperCase(), optional(body, "email")?.toLowerCase() ?? null]
+      [account, code.toUpperCase(), optional(body, "email")?.toLowerCase() ?? null, since]
     );
     res.json({ recorded: rowCount === 1 });
+  })
+);
+
+// Internal: whether a signup of this account with this code would be
+// recorded. The backend asks before it has a wallet sign anything.
+router.get(
+  "/partner-api/referrals/signups",
+  asyncHandler(async (req, res) => {
+    internalOnly(req);
+    const account = toAddress(req.query.account);
+    const code = optional(req.query, "code");
+    if (!account || !code) throw badRequest("code and account are required");
+    const { rows } = await query<{ claimable: boolean }>(
+      `SELECT EXISTS (SELECT 1 FROM codes WHERE code = $2 AND wallet IS DISTINCT FROM $1)
+          AND NOT EXISTS (SELECT 1 FROM referrals WHERE account = $1) AS claimable`,
+      [account, code.toUpperCase()]
+    );
+    res.json({ claimable: rows[0].claimable });
   })
 );
 

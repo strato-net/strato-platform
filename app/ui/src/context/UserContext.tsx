@@ -3,11 +3,11 @@
 // context/UserContext.tsx
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { useAccount, useDisconnect, useWalletClient } from "wagmi";
+import { useAccount, useDisconnect, useSignMessage, useWalletClient } from "wagmi";
 import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
 import { isAuthenticated, logout as authLogout, redirectToSignedOutLanding, WALLET_CONNECT_REQUEST_EVENT } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE } from "@/lib/constants";
-import { readAttribution, clearAttribution } from "@/lib/attribution";
+import { readAttribution, clearAttribution, claimWalletReferral } from "@/lib/attribution";
 import { trackWalletConnected } from "@/lib/tracking";
 import { capture, identifyUser, resetUser } from "@/lib/analytics";
 import { ensureStratoChainInWallet } from "@/lib/stratoChain";
@@ -65,6 +65,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const { openConnectModal } = useConnectModal();
   const { disconnect } = useDisconnect();
   const { data: walletClient } = useWalletClient();
+  const { signMessageAsync } = useSignMessage();
   const [stratoAddress, setStratoAddress] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
@@ -381,6 +382,17 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     externalEvmConnectedRef.current = isExternalEvmWalletConnected;
   }, [isExternalEvmWalletConnected]);
+
+  // A guest's external wallet confirms the partner ref link it arrived
+  // through, once (claimWalletReferral keeps track). Signed through wagmi's
+  // own action rather than walletClient, which is undefined while the wallet
+  // is on a chain the app does not list.
+  const referralWallet = shouldUseExternalWallet ? externalEvmWalletAddress : null;
+  useEffect(() => {
+    if (referralWallet) {
+      claimWalletReferral(referralWallet, (message) => signMessageAsync({ message, account: referralWallet as `0x${string}` }));
+    }
+  }, [referralWallet, signMessageAsync]);
 
   useLayoutEffect(() => {
     setAppAuthenticated(isLoggedIn);

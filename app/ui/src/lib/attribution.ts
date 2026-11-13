@@ -6,10 +6,12 @@
 const STORAGE_KEY = 'attribution';
 const TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
 
-// The partner ref cookie. Secure, so it only travels over https, except in
+// The cookies set here are Secure, so they only travel over https, except in
 // local development over http.
-const refCookie = (value: string, maxAge: number): string =>
-  `ref=${value}; path=/; max-age=${maxAge}; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
+const cookieAttributes = (): string => `path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
+
+// The partner ref cookie.
+const refCookie = (value: string, maxAge: number): string => `ref=${value}; max-age=${maxAge}; ${cookieAttributes()}`;
 
 export interface AttributionData {
   utm_source?: string;
@@ -74,6 +76,79 @@ export function readAttribution(): AttributionData | null {
     return parsed;
   } catch {
     return null;
+  }
+}
+
+// --- A guest's external wallet confirms the partner ref link it came through ---
+//
+// A wallet-only visitor never signs up, so the backend has no new account to
+// record. The wallet signs a short message instead (free, no transaction):
+// proof that the address is the visitor's, which the wallet header on a
+// request is not.
+
+const CLAIM_URL = '/api/refer/partner-claim';
+// localStorage: the "<CODE>:<address>" pairs that are settled (confirmed, or
+// with nothing to confirm) and are never asked about again.
+const CLAIMED_KEY = 'ref_claimed';
+// Session cookie (every tab, until the browser closes): the addresses whose
+// wallet was already prompted, so a decline is not followed by another prompt.
+const ASKED_COOKIE = 'ref_asked';
+
+const claimedPairs = (): string[] => {
+  try {
+    return JSON.parse(localStorage.getItem(CLAIMED_KEY) ?? '[]');
+  } catch {
+    return [];
+  }
+};
+const markClaimed = (pair: string): void => {
+  try {
+    localStorage.setItem(CLAIMED_KEY, JSON.stringify([...claimedPairs(), pair]));
+  } catch {
+    // storage unavailable: the wallet may be asked again another day
+  }
+};
+const askedAddresses = (): string[] => new RegExp(`(?:^|;\\s*)${ASKED_COOKIE}=([0-9a-f.]*)`).exec(document.cookie)?.[1].split('.') ?? [];
+
+let claiming = false;
+
+// Asks the wallet at `walletAddress` to confirm the ref code in the cookie,
+// once: `sign` is the wallet's personal_sign. Never throws and never blocks
+// anything; a visitor who declines simply is not attributed.
+export async function claimWalletReferral(walletAddress: string, sign: (message: string) => Promise<string>): Promise<void> {
+  if (claiming) return;
+  claiming = true;
+  try {
+    const code = /(?:^|;\s*)ref=([A-Za-z0-9]{1,32})(?:;|$)/.exec(document.cookie)?.[1].toUpperCase();
+    if (!code) return;
+    const address = walletAddress.toLowerCase().replace(/^0x/, '');
+    const pair = `${code}:${address}`;
+    if (claimedPairs().includes(pair) || askedAddresses().includes(address)) return;
+
+    // Plain fetch: the shared axios client sends a guest to the login page on a 401
+    const headers = { 'X-Wallet-Address': address };
+    const offered = await fetch(`${CLAIM_URL}?code=${code}`, { headers });
+    // Referrals not set up or not reachable: asked again in a later session
+    if (!offered.ok) return;
+    const { message, issuedAt } = await offered.json();
+    // Not a partner's code, the code owner's own wallet, or referred already
+    if (!message) return markClaimed(pair);
+
+    document.cookie = `${ASKED_COOKIE}=${[...askedAddresses(), address].slice(-20).join('.')}; ${cookieAttributes()}`;
+    const signature = await sign(message);
+    // A contract wallet's signature is not the 65 bytes the backend can
+    // check (and such a wallet cannot sign STRATO transactions): settled.
+    if (!/^0x[0-9a-fA-F]{130}$/.test(signature)) return markClaimed(pair);
+    const claimed = await fetch(CLAIM_URL, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, issuedAt, signature }),
+    });
+    if (claimed.ok) markClaimed(pair);
+  } catch {
+    // declined, unsupported by the wallet, offline: never in the visitor's way
+  } finally {
+    claiming = false;
   }
 }
 
