@@ -38,17 +38,20 @@ const partnerSignups = (query: string, signup?: object): Promise<Response> =>
  * Records the partner referral code a new account signed up with. Not
  * awaited: a signup never waits on, or fails with, the partner referrals
  * service. While the service cannot be reached the call is tried again, for
- * up to a day. The first failure and a final one are logged with the code
- * and account, which is what it takes to replay the signup by hand.
+ * up to a day. The first failure and a final one are logged with the code,
+ * account and signup time, which is what it takes to replay the signup by
+ * hand. The signup time is sent along, so a signup that arrives late still
+ * counts in the period it happened in.
  */
 export const recordPartnerReferral = async (code: string, account: string, email?: string): Promise<void> => {
   if (!partnerReferralsUrl || !partnerReferralsKey) return;
+  const signedUpAt = new Date().toISOString();
   const giveUpAt = Date.now() + DAY_MS;
   for (let attempt = 1; ; attempt++) {
     let failure: unknown;
     let refused = false;
     try {
-      const res = await partnerSignups("", { code, account, email });
+      const res = await partnerSignups("", { code, account, email, signed_up_at: signedUpAt });
       if (res.ok) {
         if (attempt > 1) console.info("Partner referral recorded on attempt %d (code %s, account %s)", attempt, code, account);
         return;
@@ -60,7 +63,7 @@ export const recordPartnerReferral = async (code: string, account: string, email
       failure = error;
     }
     const final = refused || Date.now() >= giveUpAt;
-    if (attempt === 1 || final) console.error("Partner referral not recorded%s (code %s, account %s):", final ? "" : " yet", code, account, failure);
+    if (attempt === 1 || final) console.error("Partner referral not recorded%s (code %s, account %s, signed up %s):", final ? "" : " yet", code, account, signedUpAt, failure);
     if (final) return;
     await new Promise((resolve) => setTimeout(resolve, Math.min(4 ** attempt * 1000, 5 * 60 * 1000)));
   }

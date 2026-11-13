@@ -110,18 +110,20 @@ const markClaimed = (pair: string): void => {
 };
 const askedAddresses = (): string[] => new RegExp(`(?:^|;\\s*)${ASKED_COOKIE}=([0-9a-f.]*)`).exec(document.cookie)?.[1].split('.') ?? [];
 
-let claiming = false;
+// The wallets with a confirmation under way: a wallet is not asked twice at
+// once, and one wallet's open prompt does not hold back another wallet's.
+const claiming = new Set<string>();
 
 // Asks the wallet at `walletAddress` to confirm the ref code in the cookie,
 // once: `sign` is the wallet's personal_sign. Never throws and never blocks
 // anything; a visitor who declines simply is not attributed.
 export async function claimWalletReferral(walletAddress: string, sign: (message: string) => Promise<string>): Promise<void> {
-  if (claiming) return;
-  claiming = true;
+  const address = walletAddress.toLowerCase().replace(/^0x/, '');
+  if (claiming.has(address)) return;
+  claiming.add(address);
   try {
     const code = /(?:^|;\s*)ref=([A-Za-z0-9]{1,32})(?:;|$)/.exec(document.cookie)?.[1].toUpperCase();
     if (!code) return;
-    const address = walletAddress.toLowerCase().replace(/^0x/, '');
     const pair = `${code}:${address}`;
     if (claimedPairs().includes(pair) || askedAddresses().includes(address)) return;
 
@@ -133,6 +135,8 @@ export async function claimWalletReferral(walletAddress: string, sign: (message:
     const { message, issuedAt } = await offered.json();
     // Not a partner's code, the code owner's own wallet, or referred already
     if (!message) return markClaimed(pair);
+    // Another tab may have prompted this wallet while the offer was fetched
+    if (askedAddresses().includes(address)) return;
 
     document.cookie = `${ASKED_COOKIE}=${[...askedAddresses(), address].slice(-20).join('.')}; ${cookieAttributes()}`;
     const signature = await sign(message);
@@ -148,7 +152,7 @@ export async function claimWalletReferral(walletAddress: string, sign: (message:
   } catch {
     // declined, unsupported by the wallet, offline: never in the visitor's way
   } finally {
-    claiming = false;
+    claiming.delete(address);
   }
 }
 

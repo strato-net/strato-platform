@@ -120,3 +120,27 @@ test('two calls at once prompt once', async () => {
   await Promise.all([claimWalletReferral(WALLET, sign), claimWalletReferral(WALLET, sign)]);
   assert.deepEqual([asked.length, calls.length], [1, 2]);
 });
+
+test('a wallet another tab prompted while the offer was fetched is not prompted again', async () => {
+  const { calls } = browser('ref=ABCDEFGHJK', { message: 'sign me' });
+  const answer = globalThis.fetch;
+  globalThis.fetch = ((...request: Parameters<typeof fetch>) => {
+    document.cookie = `ref_asked=${ADDRESS}`;
+    return answer(...request);
+  }) as typeof fetch;
+  const { asked, sign } = signer();
+  await claimWalletReferral(WALLET, sign);
+  assert.deepEqual([asked, calls.map((c) => c.method)], [[], ['GET']]);
+});
+
+test("one wallet's open prompt does not hold back another wallet", async () => {
+  browser('ref=ABCDEFGHJK', { message: 'sign me' });
+  let prompts = 0;
+  void claimWalletReferral(`0x${'34'.repeat(20)}`, () => {
+    prompts++;
+    return new Promise<string>(() => {});
+  });
+  const other = signer();
+  await claimWalletReferral(`0x${'12'.repeat(20)}`, other.sign);
+  assert.deepEqual([prompts, other.asked.length], [1, 1]);
+});

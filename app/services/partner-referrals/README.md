@@ -24,7 +24,7 @@ timestamps in ISO 8601 UTC, USD amounts as decimal strings. Errors are
   `{data_as_of, codes: [{code, external_user_id, referrals, traders, volume_usd}], next_cursor}`
   for every code of the calling key. `from` is inclusive, `to` exclusive;
   `limit` is 1 to 1000 (default 100).
-- `POST /referrals/signups` `{code, account, email?, since?}` and
+- `POST /referrals/signups` `{code, account, email?, since?, signed_up_at?}` and
   `GET /referrals/signups?code=&account=` (`{claimable}`: whether that
   signup would be recorded): internal, called by the app backend with
   `PARTNER_INTERNAL_KEY`. The app nginx answers 404 for the path. Where the
@@ -61,8 +61,10 @@ account is referred once, by the first code, and an owner's own account
 The backend's call is not part of the signup. While this service cannot be
 reached it is tried again, for up to a day, from the backend's memory (a
 backend restart ends the retries). The first failure and a final one are
-logged with the code and account (`Partner referral not recorded`), which is
-what it takes to replay the signup against `/referrals/signups`.
+logged with the code, account and signup time (`Partner referral not
+recorded`), which is what it takes to replay the signup against
+`/referrals/signups`. The backend sends the signup time as `signed_up_at`,
+so a signup that arrives late still counts in the period it happened in.
 
 A guest who connects an external wallet (MetaMask and the like) without
 logging in has no signup. Their wallet confirms the referral instead: right
@@ -96,7 +98,7 @@ Prices come from `PriceUpdated` / `BatchPricesUpdated` of `PRICE_ORACLE`;
 rows arrive in chain order, so an event is valued at the price in force when
 it executed. Amounts are in the token's own decimals, read from the token's
 Cirrus record (`customDecimals`). Events on unpriced tokens, and on priced
-assets that have no token record, are not counted.
+assets that have no token record or no decimals on it, are not counted.
 
 Activity is kept for good for referred accounts, and for seven days for
 everyone else, so a signup that is recorded late (a retry, a replay) still

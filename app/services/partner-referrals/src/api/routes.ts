@@ -183,6 +183,8 @@ router.get(
 // a ref link, or when an external wallet confirmed one (then with since: the
 // wallet's activity counts from that time). First code wins, and an owner's
 // own account (by the wallet or email they shared) is not their referral.
+// signed_up_at is when the account signed up, for a signup that arrives
+// later (a retry, a replay); a time ahead of the clock is not taken.
 router.post(
   "/partner-api/referrals/signups",
   asyncHandler(async (req, res) => {
@@ -192,12 +194,13 @@ router.post(
     const code = optional(body, "code");
     if (!account || !code) throw badRequest("code and account are required");
     const since = body.since === undefined || body.since === null ? null : time(body.since, "since");
+    const signedUpAt = body.signed_up_at === undefined || body.signed_up_at === null ? null : time(body.signed_up_at, "signed_up_at");
     const { rowCount } = await query(
-      `INSERT INTO referrals (account, code, counted_from)
-       SELECT $1, code, $4::timestamptz FROM codes
+      `INSERT INTO referrals (account, code, counted_from, created_at)
+       SELECT $1, code, $4::timestamptz, LEAST($5::timestamptz, now()) FROM codes
        WHERE code = $2 AND wallet IS DISTINCT FROM $1 AND ($3::text IS NULL OR email IS DISTINCT FROM $3)
        ON CONFLICT (account) DO NOTHING`,
-      [account, code.toUpperCase(), optional(body, "email")?.toLowerCase() ?? null, since]
+      [account, code.toUpperCase(), optional(body, "email")?.toLowerCase() ?? null, since, signedUpAt]
     );
     res.json({ recorded: rowCount === 1 });
   })

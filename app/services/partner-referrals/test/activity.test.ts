@@ -2,8 +2,9 @@
 // USD value. Run with `npm test`.
 process.env.METAL_FORGE = "f0".repeat(20);
 import assert from "assert";
+import axios from "axios";
 import { activityOf, ChainEvent, learn, State } from "../src/indexer/activity";
-import { fromCirrusRow } from "../src/indexer/cirrus";
+import { fromCirrusRow, learnDecimals } from "../src/indexer/cirrus";
 import { parseJsonPreservingBigInts } from "../src/utils/num";
 
 const oracle = "0000000000000000000000000000000000001002";
@@ -75,4 +76,10 @@ assert.strictEqual(usd(ev("Deposited", cdpEngine, { owner: alice, asset: sixDeci
 learn(ev("PriceUpdated", oracle, { asset: notAToken, price: "5000000000000000000" }), state);
 assert.strictEqual(usd(ev("Deposited", cdpEngine, { owner: alice, asset: notAToken, amount: "1000000000" })), null);
 
-console.log("activity.test: OK");
+// Decimals as Cirrus serves them: a record with none on it is not a zero-decimal token, and stays uncounted
+(axios as any).get = async () => ({ data: [{ address: usdst, customDecimals: 18 }, { address: eth, customDecimals: 0 }, { address: unpriced, customDecimals: null }] });
+const served: State = { ...state, decimals: new Map() };
+learnDecimals(served, [usdst, eth, unpriced, notAToken]).then(() => {
+  assert.deepStrictEqual([...served.decimals], [[usdst, 18], [eth, 0], [unpriced, null], [notAToken, null]]);
+  console.log("activity.test: OK");
+});

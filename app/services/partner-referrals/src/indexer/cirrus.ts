@@ -56,7 +56,7 @@ export const fromCirrusRow = (row: CirrusEventRow): ChainEvent | null => {
  * them for. A token's decimals are set once, at its creation, so each asset
  * is looked up once per run; one without a token record gets null.
  */
-const learnDecimals = async (state: State, assets: Iterable<string>): Promise<void> => {
+export const learnDecimals = async (state: State, assets: Iterable<string>): Promise<void> => {
   const unknown = [...assets].filter((a) => !state.decimals.has(a));
   for (let i = 0; i < unknown.length; i += 100) {
     const batch = unknown.slice(i, i + 100);
@@ -68,7 +68,8 @@ const learnDecimals = async (state: State, assets: Iterable<string>): Promise<vo
     batch.forEach((a) => state.decimals.set(a, null));
     for (const token of data) {
       const address = toAddress(token.address);
-      const decimals = Number(token.customDecimals);
+      // A record with no decimals on it is not a zero-decimal token: it stays null
+      const decimals = token.customDecimals == null ? NaN : Number(token.customDecimals);
       if (address && Number.isInteger(decimals) && decimals >= 0 && decimals <= 36) state.decimals.set(address, decimals);
     }
   }

@@ -85,14 +85,16 @@ const carol = "44".repeat(20);
     const res = await fetch(base + path, { method: "POST", headers: { Authorization: `Bearer ${keyInternal}`, "Content-Type": "application/json" }, body: JSON.stringify({ code, account: alice }) });
     assert.strictEqual(res.status, 404, path);
   }
-  const signup = (account: string, c: string, email?: string) =>
-    call("POST", "/referrals/signups", keyInternal, { code: c, account, email }).then((r) => r.body.recorded);
+  const signup = (account: string, c: string, email?: string, signed_up_at?: string) =>
+    call("POST", "/referrals/signups", keyInternal, { code: c, account, email, signed_up_at }).then((r) => r.body.recorded);
   assert.strictEqual(await signup(owner, code), false, "the owner's wallet is not their referral");
   assert.strictEqual(await signup(bob, code, "OWNER@example.com"), false, "nor is the owner's email");
   assert.strictEqual(await signup(alice, "NOSUCHCODE"), false);
-  assert.strictEqual(await signup(alice, code.toLowerCase(), "alice@example.com"), true);
+  assert.strictEqual((await call("POST", "/referrals/signups", keyInternal, { code, account: alice, signed_up_at: "earlier" })).status, 400);
+  // A signup that arrives late is stored with the time the account signed up
+  assert.strictEqual(await signup(alice, code.toLowerCase(), "alice@example.com", "2026-11-05T00:00:00Z"), true);
   assert.strictEqual(await signup(alice, other.body.code), false, "first code wins");
-  await query("UPDATE referrals SET created_at = '2026-11-05T00:00:00Z'");
+  assert.deepStrictEqual((await query("SELECT created_at FROM referrals")).rows, [{ created_at: new Date("2026-11-05T00:00:00Z") }]);
 
   // --- Commit: activity of referred accounts, and of anyone inside the grace period, once ---
   const ago = (days: number) => new Date(Date.now() - days * 86_400_000);
@@ -142,7 +144,8 @@ const carol = "44".repeat(20);
   assert.notStrictEqual(page2.codes[0].code, page1.codes[0].code);
 
   // --- A signup recorded after the account's first events still counts them ---
-  assert.strictEqual(await signup(carol, quiet), true);
+  // (a signup time ahead of the clock is not taken: it would count in a later period)
+  assert.strictEqual(await signup(carol, quiet, undefined, new Date(Date.now() + 2 * 86_400_000).toISOString()), true);
   const late = (await call("GET", `/referrals/metrics?from=${ago(1).toISOString()}&to=${ago(-1).toISOString()}`, keyA)).body;
   const lateCode = late.codes.find((c: any) => c.code === quiet);
   assert.deepStrictEqual([lateCode.referrals, lateCode.traders, lateCode.volume_usd], [1, 1, "5.00"]);
