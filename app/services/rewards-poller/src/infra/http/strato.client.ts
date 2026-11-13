@@ -77,8 +77,10 @@ export const execute = async (
   timeout?: number,
 ): Promise<TxResponse> => {
   const inputArray = Array.isArray(inputs) ? inputs : [inputs];
-  const { method = "unknown", contractName = "unknown" } = inputArray[0] || {};
-  const context = `${method} on ${contractName}`;
+  const { method = "unknown", contractName = "unknown", args } = inputArray[0] || {};
+  const context = method === "castVoteOnIssue"
+    ? `${args?._func} via ${contractName}`
+    : `${method} on ${contractName}`;
 
   logInfo("StratoHelper", `Executing ${context} (${inputArray.length} tx)`);
 

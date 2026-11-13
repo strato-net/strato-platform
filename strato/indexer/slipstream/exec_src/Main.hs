@@ -55,7 +55,7 @@ main = do
 
       -- Create cirrus database if it doesn't exist
       let cirrusConf = EC.cirrusConfig ethConf
-          rawConn = EC.postgreSQLConnectionString cirrusConf {EC.database = ""}
+          rawConn = EC.postgreSQLConnectionString cirrusConf {EC.database = "postgres"}
           cirrusDb = EC.database cirrusConf
           query = T.pack $ "CREATE DATABASE " ++ show cirrusDb ++ ";"
       $logInfoS "main" $ T.pack $ "Ensuring cirrus database exists: " ++ cirrusDb

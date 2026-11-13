@@ -41,7 +41,7 @@ export function AddressInput({
 
   const isAddr = isAddressLike(value);
   const searchTerm = isAddr ? "" : value.trim();
-  const { data: matches } = useUserSearch(searchTerm);
+  const { data: matches, isFetching, isSuccess } = useUserSearch(searchTerm);
   const suggestions = useMemo(() => (matches ?? []).slice(0, 6), [matches]);
 
   // An exact (unique) username match resolves without a click.
@@ -100,6 +100,10 @@ export function AddressInput({
       ) : null}
       {resolved && !isAddr ? (
         <p className="font-mono text-xs text-muted-foreground">→ {resolved}</p>
+      ) : searchTerm.length >= 2 && isFetching ? (
+        <p className="text-xs text-muted-foreground">Resolving username…</p>
+      ) : searchTerm.length >= 2 && isSuccess ? (
+        <p className="text-xs text-muted-foreground">Select a matching username to continue.</p>
       ) : null}
     </div>
   );

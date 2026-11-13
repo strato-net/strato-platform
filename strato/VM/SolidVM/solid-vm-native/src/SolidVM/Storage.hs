@@ -35,11 +35,14 @@ module SolidVM.Storage
   )
 where
 
+import Blockchain.SolidVM.GasInfo (MonadBuiltinGas (..))
 import Control.Exception (throw)
 import Text.Format (format)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.Util
 import Blockchain.DB.SolidStorageDB
+import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Metered
+import Blockchain.SolidVM.Builtins.Size.Values (basicSize, chargeNested)
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM
@@ -95,7 +98,7 @@ toBasic currentBlockNum = \case
 
 setVar :: MonadSM m => Variable -> Value -> m ()
 setVar (Constant dst) src = setVal dst src
-setVar (Variable var) val = liftIO $ writeIORef var val
+setVar (Variable var) val = Metered.localWrite >> liftIO (writeIORef var val)
 
 setVal :: MonadSM m => Value -> Value -> m ()
 -- If val is a simple value, assign it. If it
@@ -144,15 +147,16 @@ setVal dst@(SReference path) src = do
   case basicSrc of
     Nothing -> throw (TypeError "non basic solidity type cannot be stored atomically" $ T.unpack (renderValueShallow src))
     Just b -> do
+      Metered.storageWrite path (basicSize b)
       markDiffForAction addr path b
       putSolidStorageKeyVal' addr path b
 setVal (SInteger dst) (SInteger _) = throw (ImmutableError "Cannot assign immutable or constants after assigned ->" (show dst)) -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
 setVal (SNULL) _ = return ()
 setVal dst src = throw (TypeError "unknown case called in setVal (Probably tried to change the value of a constant):" ("src = " ++ T.unpack (renderValueShallow src) ++ ", dst = " ++ T.unpack (renderValueShallow dst)))
 
-getStorageValue :: HasSolidStorageDB m => Address -> MS.StoragePath -> m Value
+getStorageValue :: (HasSolidStorageDB m, MonadBuiltinGas m) => Address -> MS.StoragePath -> m Value
 getStorageValue addr key = do
-  theValue <- getSolidStorageKeyVal' addr key
+  theValue <- Metered.storageRead key basicSize (getSolidStorageKeyVal' addr key)
   case theValue of
     MS.BDefault -> pure $ SReference key
     _ -> pure $ fromBasic theValue
@@ -207,19 +211,22 @@ getVar (Variable v) = liftIO $ readIORef v
 -- | Fully evaluate a value: every nested cell and storage reference is
 -- resolved, so the result holds only 'Constant's and can leave the VM.
 forceValue :: MonadSM m => Value -> m Value
-forceValue = \case
+forceValue value = chargeNested value >> forceValueWith getVar value
+
+forceValueWith :: MonadSM m => (Variable -> m Value) -> Value -> m Value
+forceValueWith load = \case
   v@(SReference _) -> do
-    v' <- getVar (Constant v)
+    v' <- load (Constant v)
     case v' of
       SReference _ -> pure v' -- unset storage slot resolves to itself
-      _ -> forceValue v'
+      _ -> forceValueWith load v'
   SStruct n m -> SStruct n <$> traverse forceVar m
   STuple vs -> STuple <$> traverse forceVar vs
   SArray vs -> SArray <$> traverse forceVar vs
   SMap m -> SMap <$> traverse forceVar m
   v -> pure v
   where
-    forceVar var = Constant <$> (getVar var >>= forceValue)
+    forceVar var = Constant <$> (load var >>= forceValueWith load)
 
 getIntEither :: MonadSM m => Variable -> m (Either Value Integer)
 getIntEither p = getIntValEither <$> getVar p
@@ -307,9 +314,18 @@ deleteVar (Constant (SReference path)) = do
       addr = currentAddress cci
   when ro $ throw (InvalidWrite "Invalid delete during read-only access" $ "addr: " ++ format addr ++ ", path: " ++ format path)
   markDiffForAction addr path $ MS.BDefault
+  Metered.storageWrite path (basicSize MS.BDefault)
   putSolidStorageKeyVal' addr path $ MS.BDefault
 deleteVar v = throw (UnsupportedFeature "delete of a local variable" $ format v)
 
 -- | Trace/debug text for a value: force it, then use the one renderer.
 showSM :: MonadSM m => Value -> m String
-showSM = fmap (T.unpack . renderValue) . forceValue
+showSM = fmap (T.unpack . renderValue) . forceValueWith displayValue
+  where
+    displayValue (Constant (SReference key)) = do
+      address <- getCurrentAddress
+      basic <- getSolidStorageKeyVal' address key
+      pure $ case basic of
+        MS.BDefault -> SReference key
+        _ -> fromBasic basic
+    displayValue variable = weakGetVar variable

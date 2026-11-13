@@ -90,6 +90,10 @@ require("dotenv").config();
     },
     type: "FUNCTION",
   });
+  // onlyOwner calls on AdminRegistry-owned contracts go through castVoteOnIssue with positional {type, value} args
+  const ADMIN_REGISTRY = (process.env.ADMIN_REGISTRY_ADDRESS || "000000000000000000000000000000000000100c").toLowerCase();
+  const governedCall = (addr, method, args) =>
+    buildCall("AdminRegistry", ADMIN_REGISTRY, "castVoteOnIssue", { _target: addr, _func: method, _args: args });
 
   // --- Cirrus read helpers (pure read, no transactions) ---
   const CIRRUS_BASE = ROOT.includes("/strato") ? ROOT.split("/strato")[0] : ROOT;
@@ -229,9 +233,9 @@ require("dotenv").config();
     console.log("   ✓ collateral supplied\n");
 
     console.log("2b) Set initial GOLD price to $2000");
-    await sendTx(ADMIN_TOKEN, buildCall("PriceOracle", cfg.PRICE_ORACLE, "setAssetPrice", { asset: cfg.GOLDST, price: "2000000000000000000000" }));
+    await sendTx(ADMIN_TOKEN, governedCall(cfg.PRICE_ORACLE, "setAssetPrice", [{ type: "address", value: cfg.GOLDST }, { type: "uint256", value: "2000000000000000000000" }]));
     // Ensure USDST oracle price is $1
-    await sendTx(ADMIN_TOKEN, buildCall("PriceOracle", cfg.PRICE_ORACLE, "setAssetPrice", { asset: cfg.USDST, price: "1000000000000000000" }));
+    await sendTx(ADMIN_TOKEN, governedCall(cfg.PRICE_ORACLE, "setAssetPrice", [{ type: "address", value: cfg.USDST }, { type: "uint256", value: "1000000000000000000" }]));
     console.log("   ✓ price initialized\n");
 
     // 2c) Ensure GOLD asset configuration (incl. liquidation bonus) is set
@@ -253,14 +257,14 @@ require("dotenv").config();
     }
     if (currBonus < 10000n) {
       console.log("2c) Configure GOLD collateral parameters");
-      await sendTx(ADMIN_TOKEN, buildCall("PoolConfigurator", cfg.POOL_CONFIGURATOR, "configureAsset", {
-        asset: cfg.GOLDST,
-        ltv: "7500",
-        liquidationThreshold: "8000",
-        liquidationBonus: "10500",
-        interestRate: "500",
-        reserveFactor: "1000",
-      }));
+      await sendTx(ADMIN_TOKEN, governedCall(cfg.POOL_CONFIGURATOR, "configureAsset", [
+        { type: "address", value: cfg.GOLDST },
+        { type: "uint", value: "7500" }, // ltv
+        { type: "uint", value: "8000" }, // liquidationThreshold
+        { type: "uint", value: "10500" }, // liquidationBonus
+        { type: "uint", value: "500" }, // interestRate
+        { type: "uint", value: "1000" }, // reserveFactor
+      ]));
       console.log("   ✓ asset configured\n");
     }
 
@@ -279,7 +283,7 @@ require("dotenv").config();
     console.log("   ✓ borrow executed\n");
 
     console.log("4) Crash GOLD price to $1000");
-    await sendTx(ADMIN_TOKEN, buildCall("PriceOracle", cfg.PRICE_ORACLE, "setAssetPrice", { asset: cfg.GOLDST, price: "1000000000000000000000" }));
+    await sendTx(ADMIN_TOKEN, governedCall(cfg.PRICE_ORACLE, "setAssetPrice", [{ type: "address", value: cfg.GOLDST }, { type: "uint256", value: "1000000000000000000000" }]));
     console.log("   ✓ price updated\n");
 
     console.log("5) Liquidate position (dynamic repay considering bonus)");

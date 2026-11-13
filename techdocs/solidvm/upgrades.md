@@ -50,7 +50,7 @@ Deploy the new implementation, then call `setLogicContract` on the proxy:
 Proxy(address(logic)).setLogicContract(address(new MyLogicV2()));
 ```
 
-`setLogicContract` is `onlyOwner`. When the caller isn't the owner, the `onlyOwner` modifier in `Ownable` doesn't simply revert. It forwards the call to the owner address as `AdminRegistry.castVoteOnIssue(...)`, so a proxy owned by the platform's `AdminRegistry` is upgraded through that contract's vote.
+`setLogicContract` is `onlyOwner`, and `onlyOwner` reverts for any caller other than the owner. A proxy owned by the platform's `AdminRegistry` is upgraded through that contract's vote: admins call `castVoteOnIssue(proxy, "setLogicContract", newLogic)`, and the upgrade runs once the vote passes.
 
 ## Storage rules
 

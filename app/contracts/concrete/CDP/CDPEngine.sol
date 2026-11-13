@@ -12,6 +12,7 @@ import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Lending/PriceOracle.sol";
 import "./CDPRegistry.sol";
+import "../Admin/AdminRegistry.sol";
 import "../Admin/FeeCollector.sol";
 import "./CDPReserve.sol";
 
@@ -136,6 +137,14 @@ contract record CDPEngine is Ownable {
     function _tokenFactory() internal view returns (TokenFactory) { return TokenFactory(address(registry.tokenFactory())); }
     function _feeCollector() internal view returns (FeeCollector) { return FeeCollector(address(registry.feeCollector())); }
     function _cdpReserve() internal view returns (CDPReserve) { return registry.cdpReserve(); }
+    function _mintUSDST(address to, uint amount) internal {
+        Token usdst = _usdst();
+        AdminRegistry(usdst.owner()).castVoteOnIssue(address(usdst), "mint", to, amount);
+    }
+    function _burnUSDST(address from, uint amount) internal {
+        Token usdst = _usdst();
+        AdminRegistry(usdst.owner()).castVoteOnIssue(address(usdst), "burn", from, amount);
+    }
 
     // ─────────────────────────── Access Modifiers ───────────────────────────
     modifier whenNotPaused(address asset) {
@@ -203,8 +212,8 @@ contract record CDPEngine is Ownable {
             uint256 toReserve   = (feeUSD * feeToReserveBps) / 10000;
             uint256 toCollector = feeUSD - toReserve;
 
-            if (toReserve > 0) Token(_usdst()).mint(address(_cdpReserve()), toReserve);
-            if (toCollector > 0) Token(_usdst()).mint(address(_feeCollector()), toCollector);
+            if (toReserve > 0) _mintUSDST(address(_cdpReserve()), toReserve);
+            if (toCollector > 0) _mintUSDST(address(_feeCollector()), toCollector);
 
             emit FeesRouted(asset, toReserve, toCollector);
         }
@@ -320,7 +329,7 @@ contract record CDPEngine is Ownable {
             require(totalDebtAfter >= assetConfig.debtFloor, "CDPEngine: below debt floor");
         }
         // Mint USDST to the user; fees are realized in _accrue
-        Token(_usdst()).mint(msg.sender, amountUSD);
+        _mintUSDST(msg.sender, amountUSD);
         emit USDSTMinted(msg.sender, asset, amountUSD, assetState.totalScaledDebt, assetState.rateAccumulator);
         emit VaultUpdated(msg.sender, asset, userVault.collateral, userVault.scaledDebt);
     }
@@ -363,7 +372,7 @@ contract record CDPEngine is Ownable {
             require(totalDebtAfter >= config.debtFloor, "CDPEngine: below debt floor");
         }
         // Mint funds to the user
-        Token(_usdst()).mint(msg.sender, amountMinted);
+        _mintUSDST(msg.sender, amountMinted);
         emit USDSTMinted(msg.sender, asset, amountMinted, assetState.totalScaledDebt, assetState.rateAccumulator);
         emit VaultUpdated(msg.sender, asset, userVault.collateral, userVault.scaledDebt);
     }
@@ -394,7 +403,7 @@ contract record CDPEngine is Ownable {
         // Exact extinguished USD at current index
         uint owedForDelta = (scaledDelta * assetState.rateAccumulator) / RAY;
 
-        Token(_usdst()).burn(msg.sender, owedForDelta);
+        _burnUSDST(msg.sender, owedForDelta);
 
         userVault.scaledDebt = newScaledDebt;
         assetState.totalScaledDebt -= scaledDelta;
@@ -425,7 +434,7 @@ contract record CDPEngine is Ownable {
         uint owed = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
         uint scaledDebtToRemove = userVault.scaledDebt;
         // Burn user's USDST equal to owed
-        Token(_usdst()).burn(msg.sender, owed);
+        _burnUSDST(msg.sender, owed);
         userVault.scaledDebt = 0;
         assetState.totalScaledDebt -= scaledDebtToRemove;
 
@@ -496,7 +505,7 @@ contract record CDPEngine is Ownable {
         uint owedForDelta = (scaledDebtToLiquidate * assetState.rateAccumulator) / RAY;
 
         // Burn exact extinguished debt
-        Token(_usdst()).burn(msg.sender, owedForDelta);
+        _burnUSDST(msg.sender, owedForDelta);
 
         borrowerVault.scaledDebt   -= scaledDebtToLiquidate;
         assetState.totalScaledDebt -= scaledDebtToLiquidate;
@@ -911,7 +920,7 @@ contract record CDPEngine is Ownable {
 
         // Burn and reduce bad debt
         burnedUSDST = amountUSDST > bad ? bad : amountUSDST;
-        Token(_usdst()).burn(msg.sender, burnedUSDST);
+        _burnUSDST(msg.sender, burnedUSDST);
         badDebtUSDST[asset] = bad - burnedUSDST;
         emit BadDebtRepaid(asset, burnedUSDST, badDebtUSDST[asset]);
 

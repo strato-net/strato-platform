@@ -10,6 +10,7 @@ declare global {
       RPC_URL?: string;
       EXPLORER_URL?: string;
       WAGMI_PROJECT_ID?: string;
+      MULTISIG_FACTORY_ADDRESS?: string;
     };
   }
 }
@@ -33,4 +34,27 @@ export const runtime = {
   rpcUrl: () => window.ENV?.RPC_URL || env.RPC_URL,
   explorerUrl: () => window.ENV?.EXPLORER_URL ?? "",
   wagmiProjectId: () => window.ENV?.WAGMI_PROJECT_ID ?? "",
+  multisigFactoryAddress: () =>
+    (window.ENV?.MULTISIG_FACTORY_ADDRESS ?? "").replace(/^0x/, "").toLowerCase(),
 };
+
+export async function loadBackendConfig(timeoutMs = 5_000): Promise<void> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch("/api/config", {
+      credentials: "include",
+      signal: controller.signal,
+    });
+    if (!response.ok) return;
+    const config = (await response.json())?.data;
+    window.ENV = {
+      ...window.ENV,
+      MULTISIG_FACTORY_ADDRESS: typeof config?.multisigFactory === "string" ? config.multisigFactory : "",
+    };
+  } catch {
+    // The rest of SMD remains available; dedicated multisig actions stay disabled.
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}

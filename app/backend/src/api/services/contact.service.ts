@@ -1,9 +1,6 @@
-import sgMail, { MailDataRequired } from "@sendgrid/mail";
+import axios from "axios";
 
 const apiKey = process.env.SENDGRID_API_KEY;
-if (apiKey) {
-  sgMail.setApiKey(apiKey);
-}
 
 const METALS_INQUIRY_TO = "metals@strato.nexus";
 const METALS_INQUIRY_FROM = "no-reply@strato.nexus";
@@ -20,28 +17,35 @@ export async function sendMetalsInquiry(data: MetalsInquiryPayload): Promise<voi
     throw new Error("SENDGRID_API_KEY is not configured");
   }
 
-  const msg: MailDataRequired = {
-    to: METALS_INQUIRY_TO,
-    from: METALS_INQUIRY_FROM,
-    replyTo: data.email,
-    subject: `New Metals Inquiry from ${data.name}`,
-    text: [
-      `Name: ${data.name}`,
-      `Email: ${data.email}`,
-      "",
-      "Message:",
-      data.message,
-    ].join("\n"),
-    html: [
-      `<h2>New Metals Inquiry</h2>`,
-      `<p><strong>Name:</strong> ${escapeHtml(data.name)}</p>`,
-      `<p><strong>Email:</strong> ${escapeHtml(data.email)}</p>`,
-      `<hr/>`,
-      `<p>${escapeHtml(data.message).replace(/\n/g, "<br/>")}</p>`,
-    ].join("\n"),
-  };
+  const text = [
+    `Name: ${data.name}`,
+    `Email: ${data.email}`,
+    "",
+    "Message:",
+    data.message,
+  ].join("\n");
+  const html = [
+    `<h2>New Metals Inquiry</h2>`,
+    `<p><strong>Name:</strong> ${escapeHtml(data.name)}</p>`,
+    `<p><strong>Email:</strong> ${escapeHtml(data.email)}</p>`,
+    `<hr/>`,
+    `<p>${escapeHtml(data.message).replace(/\n/g, "<br/>")}</p>`,
+  ].join("\n");
 
-  await sgMail.send(msg);
+  await axios.post(
+    "https://api.sendgrid.com/v3/mail/send",
+    {
+      personalizations: [{ to: [{ email: METALS_INQUIRY_TO }] }],
+      from: { email: METALS_INQUIRY_FROM },
+      reply_to: { email: data.email },
+      subject: `New Metals Inquiry from ${data.name}`,
+      content: [
+        { type: "text/plain", value: text },
+        { type: "text/html", value: html },
+      ],
+    },
+    { headers: { Authorization: `Bearer ${apiKey}` } },
+  );
 }
 
 function escapeHtml(str: string): string {

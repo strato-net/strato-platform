@@ -24,7 +24,6 @@ pragma solidity ^0.8.0;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Tokens/Token.sol";
@@ -71,7 +70,7 @@ contract FlashHolder {
     }
 }
 
-contract Describe_Adv_Credit_Rewards is Authorizable {
+contract Describe_Adv_Credit_Rewards {
 
     Mercata m;
     FlashMint fm;
@@ -94,7 +93,6 @@ contract Describe_Adv_Credit_Rewards is Authorizable {
     address SRC;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         CAP = 2000000e18;
         SRC = address(0xBEEF);
 
@@ -102,30 +100,33 @@ contract Describe_Adv_Credit_Rewards is Authorizable {
         admin = m.adminRegistry();
         fm    = new FlashMint(address(admin));
 
-        USDST  = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",[],[],[],"USDST",0,18);
+        USDST  = address(ret);
         usdstT = Token(USDST);
-        usdstT.setStatus(2);
-        m.cdpRegistry().setUSDST(USDST);
+        admin.castVoteOnIssue(USDST, "setStatus", 2);
+        admin.castVoteOnIssue(address(m.cdpRegistry()), "setUSDST", USDST);
 
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(fm));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(fm));
-        fm.initialize(USDST, address(m.feeCollector()), CAP);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), CAP);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
 
         // ── Rewards, owned by this suite so we can drive it directly.
-        CATA  = m.tokenFactory().createToken("CATA","CATA reward token",[],[],[],"CATA",0,18);
+        (executed, ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "CATA","CATA reward token",[],[],[],"CATA",0,18);
+        CATA  = address(ret);
         cataT = Token(CATA);
-        cataT.setStatus(2);
+        admin.castVoteOnIssue(CATA, "setStatus", 2);
         rewards = new Rewards(address(this));
         rewards.initialize(CATA);
-        cataT.mint(address(rewards), 1000000e18);
+        admin.castVoteOnIssue(CATA, "mint", address(rewards), 1000000e18);
         activityId = rewards.addOneTimeDirectPayoutActivity("BonusReward", SRC, "BonusApplied");
 
         // ── StratoStaking + ValidatorRegistry (validator-keyed; opA is a validator
         //    listed as its own operator)
-        address st = m.tokenFactory().createTokenWithInitialOwner(
+        (executed, ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createTokenWithInitialOwner",
             "STRATO","STRATO Token",[],[],[],"STRATO",0,18,address(this)
         );
+        address st = address(ret);
         strato = Token(st);
         strato.setStatus(2);
 
@@ -228,7 +229,7 @@ contract Describe_Adv_Credit_Rewards is Authorizable {
         h.init(address(fm), USDST, address(rewards), address(staking));
 
         // Give the holder plenty of USDST-denominated "wealth" — none of it is STRATO.
-        usdstT.mint(address(h), 1000000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(h), 1000000e18);
 
         uint stake0 = staking.delegatedStake(address(h), address(opA));
         uint rewardable0 = staking.totalRewardableStake();
@@ -278,7 +279,7 @@ contract Describe_Adv_Credit_Rewards is Authorizable {
 
         FlashHolder h = new FlashHolder();
         h.init(address(fm), USDST, address(rewards), address(staking));
-        usdstT.mint(address(h), 1e18);
+        admin.castVoteOnIssue(USDST, "mint", address(h), 1e18);
         uint c0 = vreg.validatorCount();
         h.probe(CAP, address(opA));
         log("4g validatorCount after 2m flash mint: " + string(vreg.validatorCount()));

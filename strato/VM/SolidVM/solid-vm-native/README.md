@@ -61,10 +61,9 @@ The typed runtime foundation:
 - `SType` describes storage layouts, including mappings, arrays, and structs.
 - `fromBasic` and `toBasic` bridge typed values to the existing
   `BasicValue` storage format.
-- `RT` is the small runtime interface for storage, events, calls, block
-  context, and timestamps.
-- `Frame` contains `this`, code address, sender, origin, call name, arguments,
-  and value.
+- Compiled actions execute directly in the shared SolidVM `SM` monad.
+- Call identity, arguments, sender, origin, and block context come from
+  `SM`'s call information and environment.
 - `Dyn` is restricted to genuinely dynamic boundaries such as transaction
   arguments, `variadic`, `msg.data`, and low-level call results.
 
@@ -200,7 +199,7 @@ Examples of compiled representations:
 
 ```haskell
 transfer(address,uint256) returns (bool)
-  -> Address -> Integer -> M Bool
+  -> Address -> Integer -> SM Bool
 ```
 
 Local variables are typed `IORef`s. Function arguments and return values have
@@ -224,14 +223,10 @@ Storage remains compatible with the existing layout:
 - Mapping keys use the same encoding as the interpreter's `expToPath`.
 - Storage pointers carry an `SType` layout and are checked when compiled.
 
-The current execution monad is:
+Compiled actions use `SM` directly.
 
-```haskell
-type M = ReaderT (RT, Frame) IO
-```
-
-The uncommitted adapter uses `SM`'s existing `withRunInIO` bridge for these
-callbacks, so storage, events, and nested calls use the existing VM state.
+Storage, gas, events, creation, and nested calls use the existing VM state
+directly, without an IO callback record or a separate reader environment.
 
 ## Current language coverage
 
@@ -317,7 +312,7 @@ The following decisions remain provisional:
 - `super` executes in the selected parent context, matching STRATO dispatch.
 - Catch handles ordinary contract failures. Gas exhaustion aborts the
   transaction and cannot be caught; engine failures also remain uncaught.
-- STRATO supplies the canonical gas meter through `RT.rtChargeGas`.
+- Compiled actions use the shared `SM` gas meter.
 - Events use the contract context containing the executing body, including
   inherited `super` calls (`ERC20` versus `Token` in the fee path).
 
@@ -334,21 +329,13 @@ the interpreter until the package dependency is substituted explicitly.
 
 ### 1. Adapt the execution monad
 
-Replace or parameterize `M = ReaderT (RT, Frame) IO` so compiled actions can
-run inside the existing SolidVM `SM`/`ContextM` stack.
+Completed: compiled actions run directly in `SM`. Storage reads and writes,
+gas, and block context use the shared runtime. Events, contract creation, and
+external calls invoke native execution functions in the same monad. The
+`RT` callback record, separate `Frame`, and `withRunInIO` adapter are removed.
 
-The production adapter should map:
-
-- `rtGet` to the existing typed/storage lookup path, based on
-  `getSolidStorageKeyVal'`
-- `rtPut` to `putSolidStorageKeyVal'`
-- `rtEmit` to the existing event/action machinery
-- `rtCall` to the existing SolidVM call boundary
-- `Frame` fields to the existing call environment
-- block number and timestamp to the current VM environment
-
-Avoid duplicating storage, rollback, gas, or call-frame state in a parallel
-runtime.
+Call arguments are snapshotted in the shared call information for `msg.data`;
+internal calls restore the caller's name and arguments on success or failure.
 
 ### 2. Add a compiled collection cache
 

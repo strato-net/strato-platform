@@ -31,6 +31,7 @@ import Bloc.Server.Transaction
     mergeTxParams,
     resolveUserWalletAddress,
     vaultGetPub,
+    walletCall,
     walletWrapCall,
     walletWrapCreate,
   )
@@ -43,7 +44,7 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs
 import Blockchain.Sequencer.CallSpec (CallSpec (..), TxCreateObject (..), TxFuncCallObject (..))
 import Blockchain.Strato.Model.Address (Address, fromPublicKey, stringAddress)
-import Blockchain.Strato.Model.Gas (Gas (..))
+import Blockchain.Strato.Model.Gas (Gas (..), getGasValue, transactionGas)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Model.SyncState (BestBlock, WorldBestBlock)
 import Blockchain.SyncDB (SyncStatus)
@@ -148,10 +149,9 @@ postBlocTransactionSimulate mToken mUsername mChainId trace (PostBlocTransaction
     _ -> pure addr
   env <- getBlocEnv
   let url = Bloc.Monad.vmJsonRpcUrl env
-      envGasLimit = Bloc.Monad.gasLimit env
       hexGas mp = Text.pack $ case txparamsGasLimit =<< mp of
         Just (Gas g) -> "0x" ++ showHex g ""
-        Nothing -> "0x" ++ showHex envGasLimit ""
+        Nothing -> "0x" ++ showHex (getGasValue transactionGas) ""
       mkFuncCall to' fn args gasTxt =
         SpecFuncCall
           TxFuncCallObject
@@ -162,6 +162,11 @@ postBlocTransactionSimulate mToken mUsername mChainId trace (PostBlocTransaction
               funcCallFunctionName = fn,
               funcCallArgs = args
             }
+      -- A wallet-routed call; when voted through the wallet's registry, the
+      -- plan also simulates the vote's effect on the wallet.
+      walletPlan to' fn args gasTxt = do
+        outer <- marshalOuterCall to' fn args
+        pure $ SimPlan (mkFuncCall to' fn outer gasTxt) (SimCall to' fn) (castVoteEffectPlan to' gasTxt fn args outer)
 
   -- Bound the number of concurrent simulations so they cannot starve
   -- block processing on the shared VM; excess requests are shed (503).
@@ -175,14 +180,8 @@ postBlocTransactionSimulate mToken mUsername mChainId trace (PostBlocTransaction
       BlocContract p
         | useWallet -> do
             (cn, contractSrc, _, ctorLits) <- marshalCreatePayload msrcs p
-            outer <-
-              marshalOuterCall userContractAddr "createContract" $
-                walletWrapCreate cn contractSrc ctorLits
-            pure $
-              SimPlan
-                (mkFuncCall userContractAddr "createContract" outer (hexGas $ mergeTxParams (contractpayloadTxParams p) txParams))
-                (SimCall userContractAddr "createContract")
-                Nothing
+            (to', fn, args) <- walletCall addr userContractAddr "createContract" $ walletWrapCreate cn contractSrc ctorLits
+            walletPlan to' fn args . hexGas $ mergeTxParams (contractpayloadTxParams p) txParams
         | otherwise -> do
             (cn, contractSrc, _, ctorLits) <- marshalCreatePayload msrcs p
             pure $
@@ -202,23 +201,19 @@ postBlocTransactionSimulate mToken mUsername mChainId trace (PostBlocTransaction
       BlocFunction p
         | useWallet && userContractAddr /= functionpayloadContractAddress p -> do
             inner <- marshalInnerCallArgs (functionpayloadContractAddress p) (functionpayloadMethod p) (functionpayloadArgs p)
-            outer <-
-              marshalOuterCall userContractAddr "callContract" $
-                walletWrapCall (functionpayloadContractAddress p) (functionpayloadMethod p) inner
-            pure $
-              SimPlan
-                (mkFuncCall userContractAddr "callContract" outer (hexGas $ mergeTxParams (functionpayloadTxParams p) txParams))
-                (SimCall userContractAddr "callContract")
-                Nothing
+            (to', fn, args) <- walletCall addr userContractAddr "callContract" $ walletWrapCall (functionpayloadContractAddress p) (functionpayloadMethod p) inner
+            walletPlan to' fn args . hexGas $ mergeTxParams (functionpayloadTxParams p) txParams
         | otherwise -> do
             let gasTxt = hexGas $ mergeTxParams (functionpayloadTxParams p) txParams
-                target = functionpayloadContractAddress p
-                method = functionpayloadMethod p
-            args' <- marshalOuterCall target method (functionpayloadArgs p)
+            (target, method, argsMap) <-
+              if useWallet
+                then walletCall addr userContractAddr (functionpayloadMethod p) (functionpayloadArgs p)
+                else pure (functionpayloadContractAddress p, functionpayloadMethod p, functionpayloadArgs p)
+            args' <- marshalOuterCall target method argsMap
             -- Simulating castVoteOnIssue(_target,_func,_args)? Also simulate the
             -- issue's effect: target.func(args) run as the registry/wallet, using
             -- the same positional _args (which flatten to the tail of args').
-            let mEffect = castVoteEffectPlan target gasTxt method (functionpayloadArgs p) args'
+            let mEffect = castVoteEffectPlan target gasTxt method argsMap args'
             pure $
               SimPlan
                 (mkFuncCall target method args' gasTxt)

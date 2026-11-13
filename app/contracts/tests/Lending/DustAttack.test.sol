@@ -3,7 +3,6 @@ pragma solidity ^0.8.30;
 
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../Util.sol";
 
@@ -16,16 +15,12 @@ import "../Util.sol";
  *      preventing the protocol from being shortchanged even in extreme edge cases where borrowing
  *      1 wei may result in owing 2 wei due to high interest accrual.
  */
-contract Describe_DustAttack is Authorizable {
+contract Describe_DustAttack {
     using TestUtils for User;
 
     struct LoanInfo {
         uint scaledDebt;
         uint lastUpdated;
-    }
-
-    constructor() {
-        bypassAuthorizations = true;
     }
 
     // Test infrastructure (created fresh in beforeEach)
@@ -78,27 +73,30 @@ contract Describe_DustAttack is Authorizable {
         adminRegistry = m.adminRegistry();
 
         // Create tokens
-        usdst = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        musdst = m.tokenFactory().createToken("mUSDST", "mUSDST Token", [], [], [], "mUSDST", 0, 18);
-        goldst = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
+        (bool executed, variadic ret) = adminRegistry.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        usdst = address(ret);
+        (executed, ret) = adminRegistry.castVoteOnIssue(address(m.tokenFactory()), "createToken", "mUSDST", "mUSDST Token", [], [], [], "mUSDST", 0, 18);
+        musdst = address(ret);
+        (executed, ret) = adminRegistry.castVoteOnIssue(address(m.tokenFactory()), "createToken", "GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
+        goldst = address(ret);
 
         // Activate tokens
-        Token(usdst).setStatus(2);
-        Token(musdst).setStatus(2);
-        Token(goldst).setStatus(2);
+        adminRegistry.castVoteOnIssue(usdst, "setStatus", 2);
+        adminRegistry.castVoteOnIssue(musdst, "setStatus", 2);
+        adminRegistry.castVoteOnIssue(goldst, "setStatus", 2);
 
         // Whitelist mToken
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(musdst), "mint", address(liquidity));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(musdst), "burn", address(liquidity));
 
         // Configure pool
-        configurator.setBorrowableAsset(usdst);
-        configurator.setMToken(musdst);
-        configurator.setDebtCeilings(10000000e18, 10000000e18);
-        configurator.setSafetyShareBps(1000);
+        adminRegistry.castVoteOnIssue(address(configurator), "setBorrowableAsset", usdst);
+        adminRegistry.castVoteOnIssue(address(configurator), "setMToken", musdst);
+        adminRegistry.castVoteOnIssue(address(configurator), "setDebtCeilings", 10000000e18, 10000000e18);
+        adminRegistry.castVoteOnIssue(address(configurator), "setSafetyShareBps", 1000);
 
         // Configure USDST (borrowable asset) with provided interest rate
-        configurator.configureAsset(
+        adminRegistry.castVoteOnIssue(address(configurator), "configureAsset",
             usdst,
             0,      // ltv
             0,      // liquidationThreshold
@@ -109,7 +107,7 @@ contract Describe_DustAttack is Authorizable {
         );
 
         // Configure GOLDST (collateral)
-        configurator.configureAsset(
+        adminRegistry.castVoteOnIssue(address(configurator), "configureAsset",
             goldst,
             7500,   // ltv (75%)
             8000,   // liquidationThreshold (80%)
@@ -120,8 +118,8 @@ contract Describe_DustAttack is Authorizable {
         );
 
         // Set oracle prices
-        oracle.setAssetPrice(usdst, 1e18);       // $1 USD
-        oracle.setAssetPrice(goldst, 2000e18);   // $2000 Gold
+        adminRegistry.castVoteOnIssue(address(oracle), "setAssetPrice", usdst, 1e18);       // $1 USD
+        adminRegistry.castVoteOnIssue(address(oracle), "setAssetPrice", goldst, 2000e18);   // $2000 Gold
 
         // Provide initial liquidity for tests
         provideLiquidity(usdst, 1000000e18);
@@ -133,7 +131,7 @@ contract Describe_DustAttack is Authorizable {
      * @param amount Amount of token to provide
      */
     function provideLiquidity(address token, uint amount) internal {
-        Token(token).mint(address(this), amount);
+        adminRegistry.castVoteOnIssue(token, "mint", address(this), amount);
         IERC20(token).approve(address(liquidity), amount);
         pool.depositLiquidity(amount);
     }
@@ -145,7 +143,7 @@ contract Describe_DustAttack is Authorizable {
      * @param collateralAmount Amount of collateral to provide
      */
     function setupUserWithCollateral(User user, address collateralToken, uint collateralAmount) internal {
-        Token(collateralToken).mint(address(user), collateralAmount);
+        adminRegistry.castVoteOnIssue(collateralToken, "mint", address(user), collateralAmount);
         TestUtils.callAs(user, collateralToken, "approve(address,uint256)", address(vault), collateralAmount);
         TestUtils.callAs(user, address(pool), "supplyCollateral(address,uint256)", collateralToken, collateralAmount);
     }
@@ -173,8 +171,8 @@ contract Describe_DustAttack is Authorizable {
         fastForward(365 * 24 * 60 * 60);
 
         // Update oracle prices after time advancement to prevent staleness
-        oracle.setAssetPrice(goldst, 2000e18);   // $2000 Gold (preserve original price)
-        oracle.setAssetPrice(usdst, 1e18);       // $1 USD (preserve original price)
+        adminRegistry.castVoteOnIssue(address(oracle), "setAssetPrice", goldst, 2000e18);   // $2000 Gold (preserve original price)
+        adminRegistry.castVoteOnIssue(address(oracle), "setAssetPrice", usdst, 1e18);       // $1 USD (preserve original price)
 
         // given a user with collateral wants to borrow dust amount
         User dustBorrower = new User();
@@ -227,8 +225,8 @@ contract Describe_DustAttack is Authorizable {
         }
 
         // Update oracle prices after time advancement to prevent staleness
-        oracle.setAssetPrice(goldst, 2000e18);   // $2000 Gold (preserve original price)
-        oracle.setAssetPrice(usdst, 1e18);       // $1 USD (preserve original price)
+        adminRegistry.castVoteOnIssue(address(oracle), "setAssetPrice", goldst, 2000e18);   // $2000 Gold (preserve original price)
+        adminRegistry.castVoteOnIssue(address(oracle), "setAssetPrice", usdst, 1e18);       // $1 USD (preserve original price)
 
         // given a user with collateral wants to borrow dust amount
         User dustBorrower = new User();

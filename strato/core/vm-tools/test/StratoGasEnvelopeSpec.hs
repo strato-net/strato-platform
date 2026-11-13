@@ -113,9 +113,9 @@ spec = describe "STRATO-gas envelope boundary" $ do
     mapM_ (\active -> envelopeRejection active (MessageTX 0 1000000 1 "ping" ["7"] "mercata" (Just 1) 0 0 27 1 B.empty) `shouldSatisfy` isNothing) [False, True]
   it "schedules helium, upquark and the forktest rehearsal, and starts new networks at genesis" $ do
     stratoGasForkBlock "helium" `shouldBe` 900000
-    stratoGasForkBlock "upquark" `shouldBe` 2000000
+    stratoGasForkBlock "upquark" `shouldBe` 1000000
     stratoGasForkBlock "forktest" `shouldBe` 1000
     stratoGasForkBlock "beryllium" `shouldBe` 0
     -- The test config is the default, upquark-shaped network.
-    isStratoGasForkActive 1999999 `shouldBe` False
-    isStratoGasForkActive 2000000 `shouldBe` True
+    isStratoGasForkActive 999999 `shouldBe` False
+    isStratoGasForkActive 1000000 `shouldBe` True

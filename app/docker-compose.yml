@@ -22,6 +22,8 @@ services:
       - MERCATA_BRIDGE=${MERCATA_BRIDGE}
       - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID}
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - PARTNER_REFERRALS_URL=${PARTNER_REFERRALS_URL:-}
+      - PARTNER_INTERNAL_KEY=${PARTNER_INTERNAL_KEY:-}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -79,6 +81,7 @@ services:
   nginx:
     environment:
       - HISTORY_HOST=${HISTORY_HOST:-history}
+      - PARTNER_REFERRALS_HOST=${PARTNER_REFERRALS_HOST:-}
       - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
       - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}

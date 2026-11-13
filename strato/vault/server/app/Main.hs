@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -10,18 +9,11 @@ module Main where
 
 import BlockApps.Init
 import BlockApps.Logging (LogLevel (..), flags_minLogLevel)
-import Control.Exception (SomeException, try)
 import Control.Monad (forM_, void, when)
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Logger (runNoLoggingT)
-import Control.Monad.Reader (runReaderT)
 import Data.Cache
 import Data.IORef
 import Data.Pool
-import Data.String (fromString)
 import qualified GHC.Conc as Conc
-import Database.Persist.Sql (rawExecute)
-import Database.Persist.Postgresql (withPostgresqlConn)
 import Database.PostgreSQL.Simple
 import HFlags
 import Network.HTTP.Client hiding (Proxy)
@@ -64,21 +56,15 @@ main = do
     ]
   _ <- $initHFlags "Setup Vault Wrapper DBs"
 
-  -- Create database if it doesn't exist (postgres should be ready via docker --wait)
-  let adminConnStr = fromString $ "host=" <> flags_pghost <> " port=" <> flags_pgport <> " user=" <> flags_pguser <> " password=" <> flags_password <> " dbname=postgres"
-      createDbQuery = "CREATE DATABASE " <> fromString flags_database <> " WITH ENCODING 'UTF8'"
-  runNoLoggingT $ withPostgresqlConn adminConnStr $ \backend -> do
-    result <- liftIO $ try $ runReaderT (rawExecute createDbQuery []) backend
-    case result of
-      Left (_ :: SomeException) -> liftIO $ putStrLn $ "Database " <> flags_database <> " already exists or could not be created"
-      Right () -> return ()
-
+  postgresPassword <- if null flags_postgresPasswordFile
+    then pure flags_password
+    else filter (/= '\n') <$> readFile flags_postgresPasswordFile
   let dbConnectInfo =
         ConnectInfo
           { connectHost = flags_pghost,
             connectPort = read flags_pgport,
             connectUser = flags_pguser,
-            connectPassword = flags_password,
+            connectPassword = postgresPassword,
             connectDatabase = flags_database
           }
 

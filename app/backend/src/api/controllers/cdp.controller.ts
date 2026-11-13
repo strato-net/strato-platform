@@ -33,6 +33,7 @@ import {
   getCDPStats,
   getInterestAccrued,
   getVaultCandidates,
+  getCDPMetadata,
 } from "../services/cdp.service";
 import {
   validateDepositArgs,
@@ -47,8 +48,17 @@ import {
   validateTopUpJuniorNoteArgs,
   validateSetCollateralConfigArgs
 } from "../validators/cdp.validator";
+import { validateAddressField } from "../validators/common.validators";
 
 class CDPController {
+  static async getMetadata(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      res.status(RestStatus.OK).json(await getCDPMetadata(req.accessToken));
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getVaults(
     req: Request,
     res: Response,
@@ -56,7 +66,14 @@ class CDPController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress } = req;
-      const vaults = await getVaults(accessToken, userAddress as string);
+      const requestedAddress = req.query?.address;
+      const normalizedAddress = typeof requestedAddress === "string" ? requestedAddress.trim() : requestedAddress;
+      if (requestedAddress !== undefined) {
+        const { error } = validateAddressField("address").validate(normalizedAddress);
+        if (error) throw error;
+      }
+      const ownerAddress = String(normalizedAddress ?? userAddress).trim().replace(/^0x/i, "");
+      const vaults = await getVaults(accessToken, ownerAddress);
       res.status(RestStatus.OK).json(vaults);
     } catch (error) {
       next(error);

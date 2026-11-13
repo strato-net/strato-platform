@@ -14,10 +14,12 @@ module SolidVM.Model.Value
     rlpEncodeVariable,
     rlpEncodeValue,
     rlpEncodeValues,
+    rlpLegacyValue,
     createVar,
     coerceType,
     defaultValue,
     createDefaultValue,
+    createDefaultValueWith,
     valEquals,
     valueTypeName,
     getConst,
@@ -227,7 +229,53 @@ rlpEncodeValue (SStruct _ m) = RLPArray $ rlpEncodeVariable . snd <$> M.toList m
 rlpEncodeValue (STuple v) = RLPArray $ rlpEncodeVariable <$> V.toList v
 rlpEncodeValue (SArray v) = RLPArray $ rlpEncodeVariable <$> V.toList v
 rlpEncodeValue (SVariadic vs) = rlpEncodeValues vs
-rlpEncodeValue _ = RLPArray []
+rlpEncodeValue (SContract _ a) = rlpEncode a
+rlpEncodeValue (SUserDefined _ _ v) = rlpEncodeValue v
+rlpEncodeValue (SMap m) = RLPArray [RLPArray [rlpEncodeValue k, rlpEncodeVariable v] | (k, v) <- M.toList m]
+rlpEncodeValue (SContractFunction a f) = RLPArray [rlpEncode a, rlpEncode f]
+rlpEncodeValue (SEnum n) = rlpEncodeTagged "enum" [rlpEncode n]
+rlpEncodeValue (SStructDef n) = rlpEncodeTagged "structDef" [rlpEncode n]
+rlpEncodeValue (SContractDef n) = rlpEncodeTagged "contractDef" [rlpEncode n]
+rlpEncodeValue (SFunction n c) = rlpEncodeTagged "function" [rlpEncode n, rlpEncode $ CC._contractName <$> c]
+rlpEncodeValue (SBuiltinVariable n) = rlpEncodeTagged "builtinVariable" [rlpEncode n]
+rlpEncodeValue (SSetterGetter n v) = rlpEncodeTagged "setterGetter" [rlpEncode n, rlpEncode v]
+rlpEncodeValue (SContractItem a n) = rlpEncodeTagged "contractItem" [rlpEncode a, rlpEncode n]
+rlpEncodeValue (SPush v _) = rlpEncodeTagged "push" [rlpEncodeValue v]
+rlpEncodeValue SHexDecodeAndTrim = rlpEncodeTagged "hexDecodeAndTrim" []
+rlpEncodeValue SStringConcat = rlpEncodeTagged "stringConcat" []
+rlpEncodeValue (SDeferredConstant n) = rlpEncodeTagged "deferredConstant" [rlpEncode n]
+rlpEncodeValue SAddressToAscii = rlpEncodeTagged "addressToAscii" []
+rlpEncodeValue SBreak = rlpEncodeTagged "break" []
+rlpEncodeValue SContinue = rlpEncodeTagged "continue" []
+
+-- | Values that are not data (type names, builtins, bound members, control
+-- flow) are encoded as their constructor tag followed by their fields, so no
+-- two of them share an encoding.
+rlpEncodeTagged :: String -> [RLPObject] -> RLPObject
+rlpEncodeTagged tag fields = RLPArray $ rlpEncode tag : fields
+
+-- | Rewrites a value so 'rlpEncodeValue' gives its encoding from before the RLP
+-- encode fork, when every value without a data case of its own encoded as
+-- @RLPArray []@, the same as an empty tuple.
+rlpLegacyValue :: Value -> Value
+rlpLegacyValue = \case
+  SStruct n m -> SStruct n $ legacyVar <$> m
+  STuple v -> STuple $ legacyVar <$> v
+  SArray v -> SArray $ legacyVar <$> v
+  SVariadic vs -> SVariadic $ rlpLegacyValue <$> vs
+  v@SNULL -> v
+  v@SReference{} -> v
+  v@SInteger{} -> v
+  v@SString{} -> v
+  v@SBytes{} -> v
+  v@SDecimal{} -> v
+  v@SBool{} -> v
+  v@SAddress{} -> v
+  v@SEnumVal{} -> v
+  _ -> STuple V.empty
+  where
+    legacyVar (Constant v) = Constant $ rlpLegacyValue v
+    legacyVar var = var
 
 rlpEncodeValues :: [Value] -> RLPObject
 rlpEncodeValues [x] = rlpEncodeValue x
@@ -324,23 +372,36 @@ createDefaultValue ::
   CC.Contract ->
   SVMType.Type ->
   m Value
-createDefaultValue _ _ (SVMType.Array _ _) = return $ SArray V.empty
-createDefaultValue _ _ (SVMType.Mapping _ _ _ _ _) = return $ SMap M.empty
-createDefaultValue _ _ (SVMType.Int _ _) = return $ SInteger 0
-createDefaultValue _ _ SVMType.Bool = return $ SBool False
-createDefaultValue _ _ (SVMType.Address _) = return $ (SAddress 0) False
-createDefaultValue _ _ (SVMType.String _) = return $ SString ""
-createDefaultValue _ _ (SVMType.Bytes _ mSize) = return $ SBytes $ case mSize of
+createDefaultValue = createDefaultValueWith (pure ())
+
+-- | 'createDefaultValue', running the given action before each struct field
+-- is created, so the caller can charge for a struct by its size as it is
+-- built: nested structs can make a short declaration very large.
+createDefaultValueWith ::
+  MonadIO m =>
+  m () ->
+  CC.CodeCollection ->
+  CC.Contract ->
+  SVMType.Type ->
+  m Value
+createDefaultValueWith _ _ _ (SVMType.Array _ _) = return $ SArray V.empty
+createDefaultValueWith _ _ _ (SVMType.Mapping _ _ _ _ _) = return $ SMap M.empty
+createDefaultValueWith _ _ _ (SVMType.Int _ _) = return $ SInteger 0
+createDefaultValueWith _ _ _ SVMType.Bool = return $ SBool False
+createDefaultValueWith _ _ _ (SVMType.Address _) = return $ (SAddress 0) False
+createDefaultValueWith _ _ _ (SVMType.String _) = return $ SString ""
+createDefaultValueWith _ _ _ (SVMType.Bytes _ mSize) = return $ SBytes $ case mSize of
   Just n -> BC.replicate (fromIntegral n) '\0'  -- Fixed-size bytes (e.g., bytes32)
   Nothing -> BC.empty  -- Dynamic bytes
-createDefaultValue _ _ SVMType.Decimal = return $ SDecimal 0
-createDefaultValue cc ctract (SVMType.UnknownLabel name) =
+createDefaultValueWith _ _ _ SVMType.Decimal = return $ SDecimal 0
+createDefaultValueWith perField cc ctract (SVMType.UnknownLabel name) =
   case (M.lookup name $ CC._enums ctract, M.lookup name $ CC._structs ctract) of
     (Just ((val : _), _), _) -> return $ SEnumVal name val 0x0
     (Nothing, Just sdef) -> do
       items <-
         forM sdef $ \(n, itemType, _) -> do
-          itemVal <- createDefaultValue cc ctract $ CC.fieldTypeType itemType
+          perField
+          itemVal <- createDefaultValueWith perField cc ctract $ CC.fieldTypeType itemType
           itemVar <- createVar itemVal
           return (n, itemVar)
       return $ SStruct name $ M.fromList items
@@ -350,7 +411,8 @@ createDefaultValue cc ctract (SVMType.UnknownLabel name) =
         (Nothing, Just sdef) -> do
           items <-
             forM sdef $ \(n, itemType, _) -> do
-              itemVal <- createDefaultValue cc ctract $ CC.fieldTypeType itemType
+              perField
+              itemVal <- createDefaultValueWith perField cc ctract $ CC.fieldTypeType itemType
               itemVar <- createVar itemVal
               return (n, itemVar)
           return $ SStruct name $ M.fromList items
@@ -358,9 +420,9 @@ createDefaultValue cc ctract (SVMType.UnknownLabel name) =
           [_] -> return $ SContract name 0x0
           (n:ns) -> case M.lookup (textToLabel n) $ cc ^. CC.contracts of
             Nothing -> return $ SContract name 0x0
-            Just c -> createDefaultValue cc c (SVMType.UnknownLabel . textToLabel $ T.intercalate "." ns)
+            Just c -> createDefaultValueWith perField cc c (SVMType.UnknownLabel . textToLabel $ T.intercalate "." ns)
           _ -> return $ SContract name 0x0
-createDefaultValue _ _ _ = pure SNULL
+createDefaultValueWith _ _ _ _ = pure SNULL
 
 {-
 byteStringToValue :: B.ByteString -> Maybe Value

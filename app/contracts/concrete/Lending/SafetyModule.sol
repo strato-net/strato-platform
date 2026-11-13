@@ -3,6 +3,7 @@ import "./LendingRegistry.sol";
 import "./LiquidityPool.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
+import "../Admin/AdminRegistry.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 
@@ -196,7 +197,7 @@ contract record SafetyModule is Ownable {
         require(sharesOut > 0, "SM:dust");
         require(sharesOut >= minSharesOut, "SM:slippage");
 
-        Token(sToken).mint(msg.sender, sharesOut);
+        AdminRegistry(Ownable(sToken).owner()).castVoteOnIssue(sToken, "mint", msg.sender, sharesOut);
 
         // Reset cooldown on new stake
         cooldownStart[msg.sender] = 0;
@@ -230,7 +231,7 @@ contract record SafetyModule is Ownable {
         require(assetsOut >= minAssetsOut, "SM:slippage");
 
         // burn then transfer
-        Token(sToken).burn(msg.sender, sharesIn);
+        AdminRegistry(Ownable(sToken).owner()).castVoteOnIssue(sToken, "burn", msg.sender, sharesIn);
 
         uint256 bal = IERC20(asset).balanceOf(address(this));
         require(IERC20(asset).transfer(msg.sender, assetsOut), "SM: redeem transfer failed");
