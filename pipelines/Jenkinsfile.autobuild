@@ -74,7 +74,7 @@ pipeline {
         // TODO: replace vault-wrapper and highway make-targets with ones that don't rely on build_common_docker (should depend on build_common instead)
         // strato_docker, app-nginx and history are not in `make local` (a developer's
         // node runs its processes on the host and no app tier) but are published.
-        sh 'make strato_docker app-nginx history vault-wrapper vault-nginx bridge bridge-nginx oracle highway highway-nginx docker-compose'
+        sh 'make strato_docker app-nginx history partner-referrals vault-wrapper vault-nginx bridge bridge-nginx oracle highway highway-nginx docker-compose'
       }
     }
 
@@ -153,6 +153,8 @@ pipeline {
                   -f docker-compose.vault.push.yml \
                   -f docker-compose.highway.push.yml \
                   -f docker-compose.bridge.push.yml 2>&1
+                # The partner referrals service has no compose file: pushed by name
+                make push-partner-referrals 2>&1
                 rm -rf "$DOCKER_CONFIG"
               '''
             }
