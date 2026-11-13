@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import {
+  AutoscaleInfoProvider,
   CandlestickSeries,
   HistogramSeries,
   IChartApi,
   ISeriesApi,
+  SeriesType,
   UTCTimestamp,
   createChart,
 } from "lightweight-charts";
-import { CandleResolution } from "@/interface";
+import { CandleResolution, MarketCandle } from "@/interface";
 import { useMarketCandles } from "@/hooks/terminal/useMarketData";
 
 const RESOLUTIONS: CandleResolution[] = ["1m", "5m", "15m", "1h", "4h", "1d"];
@@ -26,13 +28,79 @@ const themeColor = (token: string, alpha = 1): string => {
 
 // the chart's time axis is UTC; shift bucket times so it reads in local time
 const LOCAL_OFFSET_SECONDS = new Date().getTimezoneOffset() * 60;
+const chartTime = (bucket: number) => (bucket - LOCAL_OFFSET_SECONDS) as UTCTimestamp;
+
+/** Time constant of the price-axis easing */
+const AUTOSCALE_EASE_MS = 80;
+/** After new data is loaded the library refits over a few frames: those fits are immediate */
+const AUTOSCALE_SNAP_MS = 200;
+
+/**
+ * The library refits the price axis to the visible bars in a single frame, so a tall bar
+ * scrolling into view makes the whole chart jump. This eases the fitted range toward its
+ * target instead: each frame an edge closes a fraction of its gap, counting at most half
+ * the range on screen as the gap, so a flat market meeting a tall bar zooms out steadily
+ * rather than in one step. `reset` makes the next fit immediate (new market or resolution).
+ */
+const easeAutoscale = (series: ISeriesApi<SeriesType>) => {
+  let shown: { minValue: number; maxValue: number } | undefined;
+  let target = shown;
+  let frame = 0;
+  let last = 0;
+  let snapUntil = 0;
+  const settled = () =>
+    !shown || !target || (shown.minValue === target.minValue && shown.maxValue === target.maxValue);
+  const provider: AutoscaleInfoProvider = (original) => {
+    const info = original();
+    if (!info?.priceRange) return info;
+    target = info.priceRange;
+    if (!shown || performance.now() < snapUntil) shown = target;
+    if (!frame && !settled()) {
+      last = performance.now();
+      frame = requestAnimationFrame(step);
+    }
+    return { ...info, priceRange: shown };
+  };
+  const step = (now: number) => {
+    frame = 0;
+    if (!shown || !target) return;
+    const k = 1 - Math.exp(-Math.max(0, now - last) / AUTOSCALE_EASE_MS);
+    last = now;
+    const reach = (shown.maxValue - shown.minValue) / 2 || Infinity;
+    const toward = (from: number, to: number) =>
+      from + Math.sign(to - from) * Math.min(Math.abs(to - from), reach) * k;
+    const next = {
+      minValue: toward(shown.minValue, target.minValue),
+      maxValue: toward(shown.maxValue, target.maxValue),
+    };
+    // within a couple of pixels of the target: land on it and stop
+    const gap = Math.abs(next.minValue - target.minValue) + Math.abs(next.maxValue - target.maxValue);
+    shown = gap < Math.abs(target.maxValue - target.minValue) * 0.005 ? target : next;
+    // re-applying the provider makes the library refit with the eased range; it is asked
+    // before the next step is queued so the library draws first on every frame
+    series.applyOptions({ autoscaleInfoProvider: provider });
+    if (!settled()) frame = requestAnimationFrame(step);
+  };
+  series.applyOptions({ autoscaleInfoProvider: provider });
+  return {
+    reset: () => {
+      cancelAnimationFrame(frame);
+      frame = 0;
+      shown = undefined;
+      snapUntil = performance.now() + AUTOSCALE_SNAP_MS;
+    },
+    stop: () => cancelAnimationFrame(frame),
+  };
+};
 
 interface ChartHandles {
   chart: IChartApi;
   candles: ISeriesApi<"Candlestick">;
   volume: ISeriesApi<"Histogram">;
-  /** pool + resolution the view was last fitted to */
-  fitted: string;
+  eases: ReturnType<typeof easeAutoscale>[];
+  volumeColors: { up: string; down: string };
+  /** what the series currently hold: a poll that only extends it is applied in place */
+  shown: { key: string; length: number; first?: number };
 }
 
 export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
@@ -73,8 +141,17 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
       1
     );
     chart.panes()[1].setStretchFactor(0.25);
-    handles.current = { chart, candles: candleSeries, volume: volumeSeries, fitted: "" };
+    const eases = [easeAutoscale(candleSeries), easeAutoscale(volumeSeries)];
+    handles.current = {
+      chart,
+      candles: candleSeries,
+      volume: volumeSeries,
+      eases,
+      volumeColors: { up: themeColor("up", 0.5), down: themeColor("down", 0.5) },
+      shown: { key: "", length: 0 },
+    };
     return () => {
+      eases.forEach((ease) => ease.stop());
       chart.remove();
       handles.current = undefined;
     };
@@ -84,31 +161,37 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
     const current = handles.current;
     if (!current) return;
     const rows = candles ?? [];
-    const last = rows[rows.length - 1]?.[4] ?? 1;
-    const precision = last >= 1000 ? 2 : last >= 1 ? 4 : 6;
-    current.candles.applyOptions({ priceFormat: { type: "price", precision, minMove: 10 ** -precision } });
-    current.candles.setData(
-      rows.map(([t, open, high, low, close]) => ({
-        time: (t - LOCAL_OFFSET_SECONDS) as UTCTimestamp,
-        open,
-        high,
-        low,
-        close,
-      }))
-    );
-    current.volume.setData(
-      rows.map(([t, open, , , close, volume]) => ({
-        time: (t - LOCAL_OFFSET_SECONDS) as UTCTimestamp,
-        value: volume,
-        color: themeColor(close >= open ? "up" : "down", 0.5),
-      }))
-    );
     const key = `${poolAddress}:${resolution}`;
-    if (rows.length > 0 && current.fitted !== key) {
-      // open on the most recent bars; the rest of the history is a scroll away
-      current.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, rows.length - INITIAL_VISIBLE_BARS), to: rows.length + 2 });
-      current.fitted = key;
+    const candle = ([t, open, high, low, close]: MarketCandle) => ({ time: chartTime(t), open, high, low, close });
+    const volume = ([t, open, , , close, quoteVolume]: MarketCandle) => ({
+      time: chartTime(t),
+      value: quoteVolume,
+      color: close >= open ? current.volumeColors.up : current.volumeColors.down,
+    });
+
+    const { shown } = current;
+    if (shown.key === key && shown.length > 0 && rows.length >= shown.length && rows[0][0] === shown.first) {
+      // a poll only changes the newest bars: apply those in place, the view stays put
+      for (const row of rows.slice(shown.length - 1)) {
+        current.candles.update(candle(row));
+        current.volume.update(volume(row));
+      }
+    } else {
+      const last = rows[rows.length - 1]?.[4] ?? 1;
+      const precision = last >= 1000 ? 2 : last >= 1 ? 4 : 6;
+      current.candles.applyOptions({ priceFormat: { type: "price", precision, minMove: 10 ** -precision } });
+      current.candles.setData(rows.map(candle));
+      current.volume.setData(rows.map(volume));
+      if (rows.length > 0 && shown.key !== key) {
+        // open on the most recent bars; the rest of the history is a scroll away
+        current.chart
+          .timeScale()
+          .setVisibleLogicalRange({ from: Math.max(0, rows.length - INITIAL_VISIBLE_BARS), to: rows.length + 2 });
+      }
+      // new data fits at once; only later refits ease
+      current.eases.forEach((ease) => ease.reset());
     }
+    current.shown = { key: rows.length > 0 ? key : shown.key, length: rows.length, first: rows[0]?.[0] };
   }, [candles, poolAddress, resolution, resolvedTheme]);
 
   return (
