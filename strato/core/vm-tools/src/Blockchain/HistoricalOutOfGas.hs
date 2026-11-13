@@ -15,7 +15,7 @@
 --
 -- The lists were taken from the public nodes' transaction results:
 --   upquark: complete through block 982720
---   helium:  complete through block 1167348
+--   helium:  complete through block 1168044
 -- A transaction that runs out of gas under the old schedule after those
 -- heights, before every validator runs the revised metering, must be added.
 -- Nothing mined under the revised metering ever belongs here.
@@ -59,7 +59,7 @@ upquarkOutOfGasTxs =
     , 0x658398de0d58e02740d30a42f722f68e3c6cf0baa547a62b5a3ee68fb08bf1dc -- block 947862, deliver
     ]
 
--- 2897 transactions.
+-- 2928 transactions.
 heliumOutOfGasTxs :: [Word256]
 heliumOutOfGasTxs =
     [ 0x7c49a7377d7b475619df043c5aedd59af5f1a17b74d46b2cd79a80665ac85520 -- block 319709, anchorBlockHeader
@@ -2985,4 +2985,9 @@ heliumOutOfGasTxs =
     , 0x58c6585347d51e05c242bff9c12d8fda90fd14aa7617bc77029e65b7d8f069dc -- block 1166526, advanceCommittee
     , 0x2aefa5e61f87aefb9c9fe200e38244d2c90950d1d8613cd375c3b73f241cea47 -- block 1166742, advanceCommittee
     , 0xcabad823c344d72ac6a7e2f55828badabc94e3e4fe28f9688a27a4a814649962 -- block 1167028, advanceCommittee
+    , 0xf9ceb371ffa8b97f776e0a6448a4523d708e89834b024997ac055a25c857a54f -- block 1167374, advanceCommittee
+    , 0x2983485d2d1560013e9c3a98fb1bc864a9b80a6a42d2f70865679c5753547999 -- block 1167717, advanceCommittee
+    , 0xf0ad3adcbbcc9ed16d7172d65690218009840d02399f715e9de24e5a0c8250c4 -- block 1167780, advanceCommittee
+    , 0x94883e4976b5203b236c108d18623b6a5d32c2768e51d02a9910e47766a21cb8 -- block 1167869, advanceCommittee
+    , 0x44d9a5ce694230019da91805bb211154b354f2741238fb67bee4aa9965411466 -- block 1167960, advanceCommittee
     ]
