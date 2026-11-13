@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { useTheme } from "next-themes";
 import {
   AutoscaleInfoProvider,
+  CandlestickData,
   CandlestickSeries,
   HistogramSeries,
   IChartApi,
@@ -107,35 +107,20 @@ interface ChartHandles {
 export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
   const [resolution, setResolution] = useState<CandleResolution>("15m");
   const { data: candles, isLoading } = useMarketCandles(poolAddress, resolution);
-  const { resolvedTheme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const handles = useRef<ChartHandles>();
 
-  // the chart is rebuilt on theme change: its colors are resolved from the theme tokens
+  // the chart's colors come from the theme tokens. The theme is a class on <html>, set after
+  // this component's effects have run, so the tokens are re-read when that class changes
+  // rather than when React reports a new theme
   useEffect(() => {
     if (!containerRef.current) return;
-    const up = themeColor("up");
-    const down = themeColor("down");
-    const grid = themeColor("border", 0.5);
     const chart = createChart(containerRef.current, {
       autoSize: true,
-      layout: {
-        background: { color: "transparent" },
-        textColor: themeColor("muted-foreground"),
-        panes: { separatorColor: themeColor("border") },
-      },
-      grid: { vertLines: { color: grid }, horzLines: { color: grid } },
-      rightPriceScale: { borderColor: themeColor("border") },
-      timeScale: { borderColor: themeColor("border"), timeVisible: true, secondsVisible: false },
+      layout: { background: { color: "transparent" } },
+      timeScale: { timeVisible: true, secondsVisible: false },
     });
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: up,
-      downColor: down,
-      borderUpColor: up,
-      borderDownColor: down,
-      wickUpColor: up,
-      wickDownColor: down,
-    });
+    const candleSeries = chart.addSeries(CandlestickSeries);
     const volumeSeries = chart.addSeries(
       HistogramSeries,
       { priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false },
@@ -143,20 +128,55 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
     );
     chart.panes()[1].setStretchFactor(0.25);
     const eases = [easeAutoscale(candleSeries), easeAutoscale(volumeSeries)];
-    handles.current = {
+    const current: ChartHandles = {
       chart,
       candles: candleSeries,
       volume: volumeSeries,
       eases,
-      volumeColors: { up: themeColor("up", 0.5), down: themeColor("down", 0.5) },
+      volumeColors: { up: "", down: "" },
       shown: { key: "", length: 0 },
     };
+    handles.current = current;
+
+    const applyTheme = () => {
+      const up = themeColor("up");
+      const down = themeColor("down");
+      const border = themeColor("border");
+      const grid = themeColor("border", 0.5);
+      chart.applyOptions({
+        layout: { textColor: themeColor("muted-foreground"), panes: { separatorColor: border } },
+        grid: { vertLines: { color: grid }, horzLines: { color: grid } },
+        rightPriceScale: { borderColor: border },
+        timeScale: { borderColor: border },
+      });
+      candleSeries.applyOptions({
+        upColor: up,
+        downColor: down,
+        borderUpColor: up,
+        borderDownColor: down,
+        wickUpColor: up,
+        wickDownColor: down,
+      });
+      current.volumeColors = { up: themeColor("up", 0.5), down: themeColor("down", 0.5) };
+      // volume bars carry their own color: repaint the ones already drawn
+      const bars = candleSeries.data() as CandlestickData[];
+      volumeSeries.setData(
+        volumeSeries.data().map((bar, index) => ({
+          ...bar,
+          color: bars[index].close >= bars[index].open ? current.volumeColors.up : current.volumeColors.down,
+        }))
+      );
+    };
+    applyTheme();
+    const themeObserver = new MutationObserver(applyTheme);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
     return () => {
+      themeObserver.disconnect();
       eases.forEach((ease) => ease.stop());
       chart.remove();
       handles.current = undefined;
     };
-  }, [resolvedTheme]);
+  }, []);
 
   useEffect(() => {
     const current = handles.current;
@@ -192,7 +212,7 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
       current.eases.forEach((ease) => ease.reset());
     }
     current.shown = { key: rows.length > 0 ? key : shown.key, length: rows.length, first: rows[0]?.[0] };
-  }, [candles, poolAddress, resolution, resolvedTheme]);
+  }, [candles, poolAddress, resolution]);
 
   return (
     <div className="flex h-full flex-col">
