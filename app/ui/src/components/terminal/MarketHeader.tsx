@@ -2,7 +2,8 @@ import { useNavigate } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { Market, MarketStats } from "@/interface";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { formatPrice, formatQuantity } from "@/components/terminal/format";
+import { usdstAddress } from "@/lib/constants";
+import { formatPrice, formatQuantity, formatUsd } from "@/components/terminal/format";
 
 interface MarketHeaderProps {
   market: Market;
@@ -21,7 +22,8 @@ export const MarketHeader = ({ market, markets, stats }: MarketHeaderProps) => {
   const navigate = useNavigate();
   const change = stats?.changePct24h ?? 0;
   const changeClass = change > 0 ? "text-up" : change < 0 ? "text-down" : "text-muted-foreground";
-  const quote = market.quote.symbol;
+  // volume is counted in the quote token, which is a dollar wherever USDST is the quote
+  const volume = market.quote.address === usdstAddress ? formatUsd : formatQuantity;
 
   return (
     <div className="flex items-start gap-5 px-3 py-2 border-b border-border overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -58,18 +60,13 @@ export const MarketHeader = ({ market, markets, stats }: MarketHeaderProps) => {
       <Stat label="24h change">
         <span className={changeClass}>{stats ? `${change > 0 ? "+" : ""}${change.toFixed(2)}%` : "—"}</span>
       </Stat>
-      <Stat label="24h high">{stats ? formatPrice(stats.high24h) : "—"}</Stat>
-      <Stat label="24h low">{stats ? formatPrice(stats.low24h) : "—"}</Stat>
-      <Stat label={`24h volume (${quote})`}>
-        {stats ? formatQuantity(stats.volumeQuote24h) : "—"}
+      <Stat label={volume === formatUsd ? "24h volume" : `24h volume (${market.quote.symbol})`}>
+        {stats ? volume(stats.volumeQuote24h) : "—"}
         {stats && stats.gasVolumeQuote24h > 0 && (
-          <span className="text-muted-foreground"> · {formatQuantity(stats.gasVolumeQuote24h)} network fees</span>
+          <span className="text-muted-foreground"> · {volume(stats.gasVolumeQuote24h)} network fees</span>
         )}
       </Stat>
-      <Stat label="24h trades">{stats ? stats.trades24h.toLocaleString() : "—"}</Stat>
-      <Stat label="Pool liquidity">
-        ${market.totalLiquidityUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-      </Stat>
+      <Stat label="Pool liquidity">{formatUsd(market.totalLiquidityUSD)}</Stat>
       <Stat label="Fee">{market.feeBps / 100}%</Stat>
     </div>
   );

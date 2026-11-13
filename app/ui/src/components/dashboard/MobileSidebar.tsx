@@ -60,7 +60,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
       label: 'PRO',
       items: [
         { icon: <SlidersHorizontal size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
-        { icon: <Droplets size={20} />, label: 'V3 Liquidity', path: '/dashboard/v3-liquidity', badge: 'New' },
+        { icon: <Droplets size={20} />, label: 'V3 Liquidity', path: '/dashboard/v3-liquidity' },
         { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
         { icon: <BarChart3 size={20} />, label: 'Analytics', path: '/dashboard/stats' },
         { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin', adminOnly: true },

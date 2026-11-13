@@ -12,6 +12,7 @@ import {
 } from "lightweight-charts";
 import { CandleResolution, MarketCandle } from "@/interface";
 import { useMarketCandles } from "@/hooks/terminal/useMarketData";
+import { priceDecimals } from "@/components/terminal/format";
 
 const RESOLUTIONS: CandleResolution[] = ["1m", "5m", "15m", "1h", "4h", "1d"];
 const INITIAL_VISIBLE_BARS = 120;
@@ -177,8 +178,7 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
         current.volume.update(volume(row));
       }
     } else {
-      const last = rows[rows.length - 1]?.[4] ?? 1;
-      const precision = last >= 1000 ? 2 : last >= 1 ? 4 : 6;
+      const precision = priceDecimals(rows[rows.length - 1]?.[4] ?? 1);
       current.candles.applyOptions({ priceFormat: { type: "price", precision, minMove: 10 ** -precision } });
       current.candles.setData(rows.map(candle));
       current.volume.setData(rows.map(volume));

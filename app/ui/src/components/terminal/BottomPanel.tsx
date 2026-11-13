@@ -1,12 +1,11 @@
-import { useState } from "react";
 import { Market } from "@/interface";
 import { useUser } from "@/context/UserContext";
 import { useTradeHistory } from "@/hooks/trade/useTradeHistory";
 import { useMarketBalances, useOwnLatestTradeId } from "@/hooks/terminal/useMarketData";
 import { formatAmount, formatUnits } from "@/utils/numberUtils";
 import { formatPrice } from "@/components/terminal/format";
+import { Tabs } from "@/components/terminal/Tabs";
 
-const TABS = ["My trades", "Balances"] as const;
 const MY_TRADES_LIMIT = 25;
 
 interface BottomPanelProps {
@@ -94,32 +93,18 @@ const Balances = ({ market, price }: BottomPanelProps) => {
 
 export const BottomPanel = ({ market, price }: BottomPanelProps) => {
   const { isLoggedIn } = useUser();
-  const [tab, setTab] = useState<(typeof TABS)[number]>("My trades");
+  const signIn = (
+    <p className="px-3 py-6 text-center text-muted-foreground">Sign in to see your trades and balances</p>
+  );
 
   return (
-    <div className="flex h-full flex-col text-xs">
-      <div className="flex gap-1 border-b border-border px-3 py-1.5 text-sm">
-        {TABS.map((name) => (
-          <button
-            key={name}
-            onClick={() => setTab(name)}
-            className={`rounded px-2 py-0.5 ${
-              name === tab ? "bg-muted font-semibold text-foreground" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto py-1">
-        {!isLoggedIn ? (
-          <p className="px-3 py-6 text-center text-muted-foreground">Sign in to see your trades and balances</p>
-        ) : tab === "My trades" ? (
-          <MyTrades market={market} />
-        ) : (
-          <Balances market={market} price={price} />
-        )}
-      </div>
+    <div className="h-full text-xs">
+      <Tabs
+        tabs={[
+          { name: "My trades", content: isLoggedIn ? <MyTrades market={market} /> : signIn },
+          { name: "Balances", content: isLoggedIn ? <Balances market={market} price={price} /> : signIn },
+        ]}
+      />
     </div>
   );
 };

@@ -4,6 +4,7 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { Market } from "@/interface";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useMarkets, useMarketStats } from "@/hooks/terminal/useMarketData";
 import { MarketHeader } from "@/components/terminal/MarketHeader";
@@ -12,6 +13,7 @@ import { DepthLadder } from "@/components/terminal/DepthLadder";
 import { TradesTape } from "@/components/terminal/TradesTape";
 import { OrderForm } from "@/components/terminal/OrderForm";
 import { BottomPanel } from "@/components/terminal/BottomPanel";
+import { Tabs } from "@/components/terminal/Tabs";
 
 // below this width the three columns no longer fit beside the sidebar
 const DESKTOP_QUERY = "(min-width: 1180px)";
@@ -20,6 +22,16 @@ const subscribeToDesktop = (onChange: () => void) => {
   query.addEventListener("change", onChange);
   return () => query.removeEventListener("change", onChange);
 };
+
+/** Depth and trades share one panel, a tab each */
+const book = (market: Market) => (
+  <Tabs
+    tabs={[
+      { name: "Depth", content: <DepthLadder market={market} /> },
+      { name: "Trades", content: <TradesTape market={market} /> },
+    ]}
+  />
+);
 
 const Terminal = () => {
   usePageTitle("Terminal");
@@ -51,15 +63,7 @@ const Terminal = () => {
                   </ResizablePanel>
                   <ResizableHandle />
                   <ResizablePanel defaultSize={22} minSize={16}>
-                    <ResizablePanelGroup direction="vertical" autoSaveId="terminal-book">
-                      <ResizablePanel defaultSize={62} minSize={20}>
-                        <DepthLadder market={market} />
-                      </ResizablePanel>
-                      <ResizableHandle />
-                      <ResizablePanel defaultSize={38} minSize={15}>
-                        <TradesTape market={market} />
-                      </ResizablePanel>
-                    </ResizablePanelGroup>
+                    {book(market)}
                   </ResizablePanel>
                   <ResizableHandle />
                   <ResizablePanel defaultSize={28} minSize={18}>
@@ -80,12 +84,7 @@ const Terminal = () => {
               <PriceChart poolAddress={market.poolAddress} />
             </div>
             <OrderForm key={market.id} market={market} />
-            <div className="h-96">
-              <DepthLadder market={market} />
-            </div>
-            <div className="h-64">
-              <TradesTape market={market} />
-            </div>
+            <div className="h-[28rem]">{book(market)}</div>
             <div className="h-64">
               <BottomPanel market={market} price={stats?.price} />
             </div>
