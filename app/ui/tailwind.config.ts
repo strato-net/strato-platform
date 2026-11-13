@@ -94,8 +94,12 @@ export default {
 					'0%, 100%': { backgroundPosition: '0% 50%' },
 					'50%': { backgroundPosition: '100% 50%' },
 				},
-				'trade-flash': {
-					'0%, 35%': { backgroundColor: 'var(--trade-flash)' },
+				'flash-up': {
+					'0%, 35%': { backgroundColor: 'hsl(var(--up) / 0.3)' },
+					'100%': { backgroundColor: 'transparent' },
+				},
+				'flash-down': {
+					'0%, 35%': { backgroundColor: 'hsl(var(--down) / 0.3)' },
 					'100%': { backgroundColor: 'transparent' },
 				},
 				'pulse-slow': {
@@ -111,7 +115,8 @@ export default {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'gradient-flow': 'gradient-flow 8s ease infinite',
-				'trade-flash': 'trade-flash 2s ease-out',
+				'flash-up': 'flash-up 2s ease-out',
+				'flash-down': 'flash-down 2s ease-out',
 				'pulse-slow': 'pulse-slow 3s ease-in-out infinite',
 				'float': 'float 6s ease-in-out infinite',
 			},

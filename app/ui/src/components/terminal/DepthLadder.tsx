@@ -1,20 +1,44 @@
 import { useMemo, useState } from "react";
 import { Market } from "@/interface";
 import { useMarketLiquidity } from "@/hooks/terminal/useMarketData";
-import { buildLadder, groupingDecimals, groupingOptions, poolPrice, LadderLevel } from "@/components/terminal/ladder";
+import {
+  buildLadder,
+  groupingDecimals,
+  groupingOptions,
+  poolPrice,
+  Ladder,
+  LadderLevel,
+} from "@/components/terminal/ladder";
 import { formatPrice, formatQuantity } from "@/components/terminal/format";
 
 const LEVELS_PER_SIDE = 20;
+
+/** A level's size and, once it has changed while on screen, which way and how often */
+interface LevelMemory {
+  base: number;
+  direction?: "up" | "down";
+  changes: number;
+}
 
 interface LevelRowProps {
   level: LadderLevel;
   side: "ask" | "bid";
   decimals: number;
   maxTotal: number;
+  memory?: LevelMemory;
 }
 
-const LevelRow = ({ level, side, decimals, maxTotal }: LevelRowProps) => (
+const LevelRow = ({ level, side, decimals, maxTotal, memory }: LevelRowProps) => (
   <div className="relative grid w-full grid-cols-3 px-3 py-1 tabular-nums">
+    {memory?.direction && (
+      // keyed by the change count so that every change replays the flash
+      <div
+        key={memory.changes}
+        className={`absolute inset-0 motion-reduce:animate-none ${
+          memory.direction === "up" ? "animate-flash-up" : "animate-flash-down"
+        }`}
+      />
+    )}
     <div
       className={`absolute inset-y-0 right-0 ${side === "ask" ? "bg-down/15" : "bg-up/15"}`}
       style={{ width: `${maxTotal > 0 ? (level.totalQuote / maxTotal) * 100 : 0}%` }}
@@ -46,6 +70,27 @@ export const DepthLadder = ({ market }: { market: Market }) => {
     return { ladder, options, decimals: groupingDecimals(grouping), maxTotal };
   }, [distribution, market, groupingIndex]);
 
+  // a level whose size differs from the previous ladder flashes: green when it grew, red
+  // when it shrank. Only ladders of the same market and grouping are compared, so the
+  // first load, a market switch and a regrouping stay still.
+  const [seen, setSeen] = useState<{ ladder: Ladder; scope: string; levels: Map<number, LevelMemory> }>();
+  const scope = `${market.poolAddress}:${groupingIndex}`;
+  if (view && seen?.ladder !== view.ladder) {
+    const before = seen?.scope === scope ? seen.levels : undefined;
+    const levels = new Map<number, LevelMemory>();
+    for (const level of [...view.ladder.asks, ...view.ladder.bids]) {
+      const was = before?.get(level.price);
+      const changed = !!was && Math.abs(level.base - was.base) > Math.max(level.base, was.base) * 1e-9;
+      levels.set(
+        level.price,
+        changed
+          ? { base: level.base, direction: level.base > was.base ? "up" : "down", changes: was.changes + 1 }
+          : { base: level.base, direction: was?.direction, changes: was?.changes ?? 0 }
+      );
+    }
+    setSeen({ ladder: view.ladder, scope, levels });
+  }
+
   return (
     <div className="flex h-full flex-col text-xs">
       <div className="flex h-9 items-center justify-end gap-1 px-3">
@@ -72,7 +117,14 @@ export const DepthLadder = ({ market }: { market: Market }) => {
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex min-h-0 flex-1 flex-col-reverse flex-wrap overflow-hidden">
             {view.ladder.asks.map((level) => (
-              <LevelRow key={level.price} level={level} side="ask" decimals={view.decimals} maxTotal={view.maxTotal} />
+              <LevelRow
+                key={level.price}
+                level={level}
+                side="ask"
+                decimals={view.decimals}
+                maxTotal={view.maxTotal}
+                memory={seen?.levels.get(level.price)}
+              />
             ))}
           </div>
           <div className="my-1 flex items-baseline gap-2 border-y border-border px-3 py-2.5">
@@ -81,7 +133,14 @@ export const DepthLadder = ({ market }: { market: Market }) => {
           </div>
           <div className="flex min-h-0 flex-1 flex-col flex-wrap overflow-hidden">
             {view.ladder.bids.map((level) => (
-              <LevelRow key={level.price} level={level} side="bid" decimals={view.decimals} maxTotal={view.maxTotal} />
+              <LevelRow
+                key={level.price}
+                level={level}
+                side="bid"
+                decimals={view.decimals}
+                maxTotal={view.maxTotal}
+                memory={seen?.levels.get(level.price)}
+              />
             ))}
           </div>
         </div>

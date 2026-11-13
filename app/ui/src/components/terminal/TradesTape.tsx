@@ -40,12 +40,8 @@ export const TradesTape = ({ market }: { market: Market }) => {
         {rows.map((trade) => (
           <div
             key={trade.id}
-            className={`grid grid-cols-3 px-3 py-1 tabular-nums ${
-              !arrived(trade.id)
-                ? ""
-                : `animate-trade-flash motion-reduce:animate-none ${
-                    trade.side === "buy" ? "[--trade-flash:hsl(var(--up)/0.3)]" : "[--trade-flash:hsl(var(--down)/0.3)]"
-                  }`
+            className={`grid grid-cols-3 px-3 py-1 tabular-nums motion-reduce:animate-none ${
+              !arrived(trade.id) ? "" : trade.side === "buy" ? "animate-flash-up" : "animate-flash-down"
             }`}
           >
             <span className={trade.side === "buy" ? "text-up" : "text-down"}>{formatPrice(trade.price)}</span>
