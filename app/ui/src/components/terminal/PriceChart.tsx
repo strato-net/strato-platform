@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { CandlestickChart, LineChart } from "lucide-react";
 import {
   AutoscaleInfoProvider,
   CandlestickData,
@@ -6,6 +7,7 @@ import {
   HistogramSeries,
   IChartApi,
   ISeriesApi,
+  LineSeries,
   SeriesType,
   UTCTimestamp,
   createChart,
@@ -15,6 +17,13 @@ import { useMarketCandles } from "@/hooks/terminal/useMarketData";
 import { priceDecimals } from "@/components/terminal/format";
 
 const RESOLUTIONS: CandleResolution[] = ["1m", "5m", "15m", "1h", "4h", "1d"];
+/** The price as candles, or as a line through the closes */
+const CHART_TYPES = [
+  { type: "candles", label: "Candles", Icon: CandlestickChart },
+  { type: "line", label: "Line", Icon: LineChart },
+] as const;
+type ChartType = (typeof CHART_TYPES)[number]["type"];
+const CHART_TYPE_KEY = "terminal-chart-type";
 const INITIAL_VISIBLE_BARS = 120;
 
 /** A theme token resolved to an rgb()/rgba() string the canvas can use */
@@ -97,6 +106,7 @@ const easeAutoscale = (series: ISeriesApi<SeriesType>) => {
 interface ChartHandles {
   chart: IChartApi;
   candles: ISeriesApi<"Candlestick">;
+  line: ISeriesApi<"Line">;
   volume: ISeriesApi<"Histogram">;
   eases: ReturnType<typeof easeAutoscale>[];
   volumeColors: { up: string; down: string };
@@ -106,6 +116,9 @@ interface ChartHandles {
 
 export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
   const [resolution, setResolution] = useState<CandleResolution>("15m");
+  const [chartType, setChartType] = useState<ChartType>(() =>
+    localStorage.getItem(CHART_TYPE_KEY) === "line" ? "line" : "candles"
+  );
   const { data: candles, isLoading } = useMarketCandles(poolAddress, resolution);
   const containerRef = useRef<HTMLDivElement>(null);
   const handles = useRef<ChartHandles>();
@@ -121,16 +134,18 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
       timeScale: { timeVisible: true, secondsVisible: false },
     });
     const candleSeries = chart.addSeries(CandlestickSeries);
+    const lineSeries = chart.addSeries(LineSeries, { lineWidth: 2 });
     const volumeSeries = chart.addSeries(
       HistogramSeries,
       { priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false },
       1
     );
     chart.panes()[1].setStretchFactor(0.25);
-    const eases = [easeAutoscale(candleSeries), easeAutoscale(volumeSeries)];
+    const eases = [easeAutoscale(candleSeries), easeAutoscale(lineSeries), easeAutoscale(volumeSeries)];
     const current: ChartHandles = {
       chart,
       candles: candleSeries,
+      line: lineSeries,
       volume: volumeSeries,
       eases,
       volumeColors: { up: "", down: "" },
@@ -157,6 +172,7 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
         wickUpColor: up,
         wickDownColor: down,
       });
+      lineSeries.applyOptions({ color: themeColor("foreground") });
       current.volumeColors = { up: themeColor("up", 0.5), down: themeColor("down", 0.5) };
       // volume bars carry their own color: repaint the ones already drawn
       const bars = candleSeries.data() as CandlestickData[];
@@ -178,12 +194,23 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
     };
   }, []);
 
+  // both series hold the data; the chart type decides which one is drawn
+  useEffect(() => {
+    const current = handles.current;
+    if (!current) return;
+    current.candles.applyOptions({ visible: chartType === "candles" });
+    current.line.applyOptions({ visible: chartType === "line" });
+    // a line spans only the closes, candles the highs and lows: fit the new one at once
+    current.eases.forEach((ease) => ease.reset());
+  }, [chartType]);
+
   useEffect(() => {
     const current = handles.current;
     if (!current) return;
     const rows = candles ?? [];
     const key = `${poolAddress}:${resolution}`;
     const candle = ([t, open, high, low, close]: MarketCandle) => ({ time: chartTime(t), open, high, low, close });
+    const point = (row: MarketCandle) => ({ time: chartTime(row[0]), value: row[4] });
     const volume = ([t, open, , , close, quoteVolume]: MarketCandle) => ({
       time: chartTime(t),
       value: quoteVolume,
@@ -195,12 +222,16 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
       // a poll only changes the newest bars: apply those in place, the view stays put
       for (const row of rows.slice(shown.length - 1)) {
         current.candles.update(candle(row));
+        current.line.update(point(row));
         current.volume.update(volume(row));
       }
     } else {
       const precision = priceDecimals(rows[rows.length - 1]?.[4] ?? 1);
-      current.candles.applyOptions({ priceFormat: { type: "price", precision, minMove: 10 ** -precision } });
+      const priceFormat = { type: "price" as const, precision, minMove: 10 ** -precision };
+      current.candles.applyOptions({ priceFormat });
+      current.line.applyOptions({ priceFormat });
       current.candles.setData(rows.map(candle));
+      current.line.setData(rows.map(point));
       current.volume.setData(rows.map(volume));
       if (rows.length > 0 && shown.key !== key) {
         // open on the most recent bars; the rest of the history is a scroll away
@@ -228,6 +259,25 @@ export const PriceChart = ({ poolAddress }: { poolAddress: string }) => {
             {r}
           </button>
         ))}
+        <div className="ml-auto flex items-center gap-1">
+          {CHART_TYPES.map(({ type, label, Icon }) => (
+            <button
+              key={type}
+              onClick={() => {
+                localStorage.setItem(CHART_TYPE_KEY, type);
+                setChartType(type);
+              }}
+              aria-label={label}
+              aria-pressed={type === chartType}
+              title={label}
+              className={`rounded p-1 ${
+                type === chartType ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+            </button>
+          ))}
+        </div>
       </div>
       <div className="relative min-h-0 flex-1">
         <div ref={containerRef} className="absolute inset-0" />
