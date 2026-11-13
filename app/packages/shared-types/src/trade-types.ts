@@ -103,6 +103,8 @@ export interface Market {
   feeBps: number;
   /** pool price, quote per base */
   price: number;
+  /** oracle price of the pair, quote per base; 0 when either token has no oracle price */
+  oraclePrice: number;
   /** pool balances, wei strings */
   baseBalance: string;
   quoteBalance: string;

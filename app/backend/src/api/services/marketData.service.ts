@@ -70,12 +70,16 @@ const toMarket = (pool: PoolV3, gasLocked: boolean): Market => {
     baseIsToken0,
     feeBps: pool.fee / 100,
     price: 0,
+    oraclePrice: 0,
     baseBalance: baseIsToken0 ? pool.token0Balance : pool.token1Balance,
     quoteBalance: baseIsToken0 ? pool.token1Balance : pool.token0Balance,
     totalLiquidityUSD: pool.totalLiquidityUSD,
     tradable: !pool.isPaused && !gasLocked && !config.hiddenSwapPools.has(pool.address),
   };
   market.price = marketPrice(pool.sqrtPriceX96, orientationOf(market));
+  // the pool reports its oracle price as whole token1 per whole token0
+  const oracleToken1PerToken0 = Number(pool.oraclePriceWad) / 1e18;
+  if (oracleToken1PerToken0 > 0) market.oraclePrice = baseIsToken0 ? oracleToken1PerToken0 : 1 / oracleToken1PerToken0;
   return market;
 };
 

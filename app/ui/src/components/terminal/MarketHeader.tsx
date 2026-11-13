@@ -57,6 +57,7 @@ export const MarketHeader = ({ market, markets, stats }: MarketHeaderProps) => {
           {stats ? formatPrice(stats.price) : "—"}
         </span>
       </div>
+      <Stat label="Oracle price">{market.oraclePrice > 0 ? formatPrice(market.oraclePrice) : "—"}</Stat>
       <Stat label="24h change">
         <span className={changeClass}>{stats ? `${change > 0 ? "+" : ""}${change.toFixed(2)}%` : "—"}</span>
       </Stat>
@@ -66,7 +67,7 @@ export const MarketHeader = ({ market, markets, stats }: MarketHeaderProps) => {
           <span className="text-muted-foreground"> · {volume(stats.gasVolumeQuote24h)} network fees</span>
         )}
       </Stat>
-      <Stat label="Pool liquidity">{formatUsd(market.totalLiquidityUSD)}</Stat>
+      <Stat label="Total liquidity">{formatUsd(market.totalLiquidityUSD)}</Stat>
       <Stat label="Fee">{market.feeBps / 100}%</Stat>
     </div>
   );

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildLadder, feeSpread, groupingDecimals, groupingOptions } from '../src/components/terminal/ladder.ts';
+import { buildLadder, groupingDecimals, groupingOptions } from '../src/components/terminal/ladder.ts';
 
 const Q96 = 2n ** 96n;
 const L = 1e24;
@@ -69,12 +69,4 @@ test('grouping options scale with the price', () => {
   assert.equal(groupingDecimals(0.01), 2);
   assert.equal(groupingDecimals(0.05), 2);
   assert.equal(groupingDecimals(10), 0);
-});
-
-test('the spread is the pool fee taken once each way', () => {
-  // 0.3% pool at 100: buy at 100/0.997, sell at 100*0.997
-  close(feeSpread(100, 30), 100 / 0.997 - 99.7);
-  // about twice the fee: 0.01% each way on a 0.01% pool
-  assert.ok(Math.abs(feeSpread(2000, 1) / 2000 - 0.0002) < 1e-7);
-  assert.equal(feeSpread(5, 0), 0);
 });

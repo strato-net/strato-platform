@@ -94,16 +94,6 @@ export function buildLadder(
   return { price, asks: side(1), bids: side(-1) };
 }
 
-/**
- * A pool has no bid/ask gap of its own: the cost of a round trip at the pool price is its
- * fee, taken once each way. That is the spread a trader meets: buying costs price/(1−fee)
- * and selling pays price·(1−fee).
- */
-export const feeSpread = (price: number, feeBps: number): number => {
-  const kept = 1 - feeBps / 10_000;
-  return price / kept - price * kept;
-};
-
 /** Three price groupings scaled to the price: 1, 5 and 10 hundredths of its magnitude */
 export const groupingOptions = (price: number): number[] => {
   if (!(price > 0)) return [0.01, 0.05, 0.1];

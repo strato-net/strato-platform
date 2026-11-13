@@ -1,15 +1,8 @@
 import { useMemo, useState } from "react";
 import { Market } from "@/interface";
 import { useMarketLiquidity } from "@/hooks/terminal/useMarketData";
-import {
-  buildLadder,
-  feeSpread,
-  groupingDecimals,
-  groupingOptions,
-  poolPrice,
-  LadderLevel,
-} from "@/components/terminal/ladder";
-import { formatPrice, formatQuantity, priceDecimals } from "@/components/terminal/format";
+import { buildLadder, groupingDecimals, groupingOptions, poolPrice, LadderLevel } from "@/components/terminal/ladder";
+import { formatPrice, formatQuantity } from "@/components/terminal/format";
 
 const LEVELS_PER_SIDE = 20;
 
@@ -50,8 +43,7 @@ export const DepthLadder = ({ market }: { market: Market }) => {
       ladder.asks[ladder.asks.length - 1]?.totalQuote ?? 0,
       ladder.bids[ladder.bids.length - 1]?.totalQuote ?? 0
     );
-    const spread = feeSpread(ladder.price, market.feeBps);
-    return { ladder, options, decimals: groupingDecimals(grouping), maxTotal, spread };
+    return { ladder, options, decimals: groupingDecimals(grouping), maxTotal };
   }, [distribution, market, groupingIndex]);
 
   return (
@@ -86,11 +78,6 @@ export const DepthLadder = ({ market }: { market: Market }) => {
           <div className="my-1 flex items-baseline gap-2 border-y border-border px-3 py-2.5">
             <span className="text-sm font-semibold tabular-nums">{formatPrice(view.ladder.price)}</span>
             <span className="text-[11px] text-muted-foreground">Pool price</span>
-            <span className="ml-auto text-[11px] text-muted-foreground">Spread</span>
-            <span className="tabular-nums">
-              {formatPrice(view.spread, priceDecimals(view.ladder.price))} (
-              {((view.spread / view.ladder.price) * 100).toFixed(2)}%)
-            </span>
           </div>
           <div className="flex min-h-0 flex-1 flex-col flex-wrap overflow-hidden">
             {view.ladder.bids.map((level) => (

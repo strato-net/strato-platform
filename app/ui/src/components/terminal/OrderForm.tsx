@@ -15,7 +15,7 @@ import { computeMaxTransferable } from "@/utils/transferValidation";
 import { SlippageSetting, TradeFormState, initialTradeFormState } from "@/components/swap/swapFormReducer";
 import { SlippageControl } from "@/components/swap/SlippageControl";
 import { SwapConfirmDialog } from "@/components/swap/SwapConfirmDialog";
-import NetworkFee, { FeeNotices } from "@/components/NetworkFee";
+import { FeeNotices } from "@/components/NetworkFee";
 import { amountText, formatPrice, formatTokens } from "@/components/terminal/format";
 
 const HIGH_IMPACT_PERCENT = 5;
@@ -309,13 +309,14 @@ export const OrderForm = ({ market, settlement }: OrderFormProps) => {
         <Row label="Minimum received">
           {quoted(() => `${formatTokens(minAmountOutWei)} ${tokenOut._symbol}`)}
         </Row>
-        <Row label="Pool fee">{market.feeBps / 100}%</Row>
-        <Row label="Network fee">
-          <NetworkFee calls={SWAP_CALLS} />
-        </Row>
       </div>
 
-      <SlippageControl slippage={slippage} effectivePercent={slippagePercent} onChange={setSlippage} />
+      <SlippageControl
+        slippage={slippage}
+        effectivePercent={slippagePercent}
+        onChange={setSlippage}
+        showAutoPercent={false}
+      />
 
       {isLoggedIn && (
         <FeeNotices
@@ -344,6 +345,7 @@ export const OrderForm = ({ market, settlement }: OrderFormProps) => {
         invertedExchangeRate={invertedExchangeRate}
         isHighPriceImpact={(impact ?? 0) >= HIGH_IMPACT_PERCENT}
         toAmountMin={formatTokens(minAmountOutWei)}
+        networkFeeCalls={SWAP_CALLS}
         onConfirm={handleSwap}
         isLoading={tradeSwap.isPending || !quote}
       />
