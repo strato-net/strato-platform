@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Market, PoolV3Token, SwapToken } from "@/interface";
 import { useUser } from "@/context/UserContext";
@@ -7,7 +7,7 @@ import { useUserTokens } from "@/context/UserTokensContext";
 import { useToast } from "@/hooks/use-toast";
 import { useDerivedTradeInfo } from "@/hooks/trade/useDerivedTradeInfo";
 import { useTradeSwap } from "@/hooks/trade/useTradeSwap";
-import { useMarketBalances } from "@/hooks/terminal/useMarketData";
+import { useMarketBalances, useOwnLatestTradeId } from "@/hooks/terminal/useMarketData";
 import { axios } from "@/lib/axios";
 import { DECIMAL_PATTERN, SWAP_CALLS } from "@/lib/constants";
 import { formatAmount, formatUnits } from "@/utils/numberUtils";
@@ -56,6 +56,13 @@ export const OrderForm = ({ market }: { market: Market }) => {
   const { toast } = useToast();
   const balances = useMarketBalances(market);
   const tradeSwap = useTradeSwap();
+
+  // the balance read right after a trade can land before the indexer has the swap, and
+  // nothing else reads balances again: read them once more when the trade shows on the tape
+  const ownLatestTradeId = useOwnLatestTradeId(market.poolAddress);
+  useEffect(() => {
+    if (ownLatestTradeId) void Promise.all([fetchUsdstBalance(), fetchTokens()]);
+  }, [ownLatestTradeId, fetchUsdstBalance, fetchTokens]);
 
   const [side, setSide] = useState<Side>("buy");
   const [unit, setUnit] = useState<Unit>("quote");

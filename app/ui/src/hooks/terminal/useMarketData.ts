@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
+import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import {
   CandleResolution,
@@ -53,6 +54,17 @@ export function useMarketTrades(poolAddress?: string) {
     refetchInterval: FAST_POLL_MS,
     retry: 1,
   });
+}
+
+/**
+ * Id of the signed-in user's newest swap on the market's tape: it changes once a trade of
+ * theirs has been indexed. The tape is already polled, so this costs no request.
+ */
+export function useOwnLatestTradeId(poolAddress?: string): number | undefined {
+  const { userAddress } = useUser();
+  const { data: trades = [] } = useMarketTrades(poolAddress);
+  const ownAddress = userAddress?.toLowerCase().replace(/^0x/, "");
+  return trades.find((trade) => trade.sender === ownAddress)?.id;
 }
 
 /**

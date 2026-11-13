@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Market } from "@/interface";
 import { useUser } from "@/context/UserContext";
 import { useTradeHistory } from "@/hooks/trade/useTradeHistory";
-import { useMarketBalances, useMarketTrades } from "@/hooks/terminal/useMarketData";
+import { useMarketBalances, useOwnLatestTradeId } from "@/hooks/terminal/useMarketData";
 import { formatAmount, formatUnits } from "@/utils/numberUtils";
 import { formatPrice } from "@/components/terminal/format";
 
@@ -17,17 +17,16 @@ interface BottomPanelProps {
 
 const MyTrades = ({ market }: { market: Market }) => {
   const { userAddress } = useUser();
-  // the tape is already polled: the user's newest swap on it tells the history to refetch
-  // (one refetch at confirmation can land before the indexer has the swap)
-  const { data: tape = [] } = useMarketTrades(market.poolAddress);
-  const ownAddress = userAddress?.toLowerCase().replace(/^0x/, "");
+  // one refetch at confirmation can land before the indexer has the swap: refetch again
+  // when the user's trade shows on the tape
+  const revision = useOwnLatestTradeId(market.poolAddress);
   const { data, isLoading } = useTradeHistory({
     tokenIn: market.base.address,
     tokenOut: market.quote.address,
     page: 1,
     limit: MY_TRADES_LIMIT,
     sender: userAddress ?? undefined,
-    revision: tape.find((trade) => trade.sender === ownAddress)?.id,
+    revision,
   });
   const entries = data?.entries ?? [];
 
