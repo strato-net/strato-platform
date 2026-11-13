@@ -1319,7 +1319,7 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
       val <- getVar var
       case (val, theIndex) of
         (SArray theVector, SInteger i) -> do
-          if (fromIntegral i) >= length theVector
+          if i < 0 || i >= fromIntegral (length theVector)
             then throw (IndexOutOfBounds ("index value was " ++ (format i) ++ ", but the array length was " ++ (format $ length theVector)) $ unparseExpression x)
             else return $ theVector V.! fromIntegral i
         (SBytes bs, SInteger i) -> case bs B.!? fromIntegral i of
