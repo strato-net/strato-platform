@@ -1,5 +1,6 @@
 import { cirrus, strato } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
+import { governedInput } from "./user.service";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import * as config from "../../config/config";
@@ -1960,12 +1961,12 @@ const executeYieldVaultAdminCall = async (
   if (!info.deployed) throw new Error(`Yield vault ${key} is not deployed`);
 
   const builtTx = await buildFunctionTx(
-    {
+    await governedInput(accessToken, {
       contractName: "YieldVault",
       contractAddress: info.vaultAddress,
       method,
       args,
-    },
+    }),
     userAddress,
     accessToken
   );

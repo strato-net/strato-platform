@@ -12,7 +12,6 @@
 
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/Pools/DirectMintPSM.sol";
 import "../../concrete/Savings/SaveUSDSTVault.sol";
@@ -201,7 +200,7 @@ contract PsmRaider {
     }
 }
 
-contract Describe_Adv_Peg_PSM is Authorizable {
+contract Describe_Adv_Peg_PSM {
 
     uint public INFINITY = 2 ** 256 - 1;
     uint public WAD = 1e18;
@@ -230,63 +229,65 @@ contract Describe_Adv_Peg_PSM is Authorizable {
     User whale;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata();
         areg = m.adminRegistry();
 
-        USDST = Token(m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18));
-        USDST.setStatus(2);
-        USDC = Token(m.tokenFactory().createToken("USDC","Strato USDC",[],[],[],"USDC",0,18));
-        USDC.setStatus(2);
-        USDT = Token(m.tokenFactory().createToken("USDT","Strato USDT",[],[],[],"USDT",0,18));
-        USDT.setStatus(2);
+        (bool executed, variadic ret) = areg.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",[],[],[],"USDST",0,18);
+        USDST = Token(address(ret));
+        areg.castVoteOnIssue(address(USDST), "setStatus", 2);
+        (executed, ret) = areg.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDC","Strato USDC",[],[],[],"USDC",0,18);
+        USDC = Token(address(ret));
+        areg.castVoteOnIssue(address(USDC), "setStatus", 2);
+        (executed, ret) = areg.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDT","Strato USDT",[],[],[],"USDT",0,18);
+        USDT = Token(address(ret));
+        areg.castVoteOnIssue(address(USDT), "setStatus", 2);
 
         // ── savings vault, mainnet-shaped
         vault = new SaveUSDSTVault(address(this));
         vault.initialize(address(USDST), "Save USDST", "saveUSDST");
 
         saver = new User();
-        USDST.mint(address(saver), VAULT_SHARES);
+        areg.castVoteOnIssue(address(USDST), "mint", address(saver), VAULT_SHARES);
         saver.do(address(USDST), "approve", address(vault), INFINITY);
         saver.do(address(vault), "deposit(uint256,address)", VAULT_SHARES, address(saver));
 
         // top managed up to the mainnet 1,672,886 vs 1,663,340 (rate 1.00574)
         uint topUp = VAULT_MANAGED - VAULT_SHARES;
-        USDST.mint(address(this), topUp);
+        areg.castVoteOnIssue(address(USDST), "mint", address(this), topUp);
         IERC20(address(USDST)).transfer(address(vault), topUp);
         vault.recordRewardTransfer(topUp);
 
         distributor = new User();
-        USDST.mint(address(distributor), DISTRIB_BAL);
+        areg.castVoteOnIssue(address(USDST), "mint", address(distributor), DISTRIB_BAL);
         distributor.do(address(USDST), "approve", address(vault), INFINITY);
         vault.setRewardDistributor(address(distributor));
         vault.setPerSecondSavingsRate(1000000001500000000000000000);   // mainnet 1.0000000015/s
 
         // ── PSM
         psm = new DirectMintPSM(address(this));
-        areg.addWhitelist(address(USDST), "mint", address(psm));
-        areg.addWhitelist(address(USDST), "burn", address(psm));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(USDST), "mint", address(psm));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(USDST), "burn", address(psm));
         psm.initialize(address(USDST), address(m.feeCollector()), [address(USDC), address(USDT)]);
         psm.setSavingsVault(address(vault));
 
         // seed the reserve exactly the way mainnet got it: users minted USDST against stables
         whale = new User();
-        USDC.mint(address(whale), PSM_USDC);
-        USDT.mint(address(whale), PSM_USDT);
+        areg.castVoteOnIssue(address(USDC), "mint", address(whale), PSM_USDC);
+        areg.castVoteOnIssue(address(USDT), "mint", address(whale), PSM_USDT);
         whale.do(address(USDC), "approve", address(psm), INFINITY);
         whale.do(address(USDT), "approve", address(psm), INFINITY);
         whale.do(address(psm), "mint", PSM_USDC, address(USDC));
         whale.do(address(psm), "mint", PSM_USDT, address(USDT));
 
         // rest of the float
-        USDST.mint(address(this), FLOAT_OTHER);
+        areg.castVoteOnIssue(address(USDST), "mint", address(this), FLOAT_OTHER);
 
         // ── FlashMint
         fm = new FlashMint(address(areg));
-        areg.addWhitelist(address(USDST), "mint", address(fm));
-        areg.addWhitelist(address(USDST), "burn", address(fm));
-        fm.initialize(address(USDST), address(m.feeCollector()), MAXLOAN);
-        fm.setWhitelistEnabled(false);
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(USDST), "mint", address(fm));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(USDST), "burn", address(fm));
+        areg.castVoteOnIssue(address(fm), "initialize", address(USDST), address(m.feeCollector()), MAXLOAN);
+        areg.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
 
         log("── fixture ──");
         log("USDST totalSupply      = " + string(USDST.totalSupply() / WAD));
@@ -373,7 +374,7 @@ contract Describe_Adv_Peg_PSM is Authorizable {
         uint notional = 100000e18;
 
         // give the raider its own USDST so we can measure the round trip without flash noise
-        USDST.mint(address(r), notional);
+        areg.castVoteOnIssue(address(USDST), "mint", address(r), notional);
 
         // (a) mint 0 / burn 0
         psm.setMintFeeBps(address(USDC), 0);
@@ -387,7 +388,7 @@ contract Describe_Adv_Peg_PSM is Authorizable {
 
         // (b) mint 0 / burn 30bps  (USDST -> USDC -> USDST)
         psm.setBurnFeeBps(address(USDC), 30);
-        USDST.mint(address(r), notional - USDST.balanceOf(address(r)) + notional);
+        areg.castVoteOnIssue(address(USDST), "mint", address(r), notional - USDST.balanceOf(address(r)) + notional);
         uint b0 = USDST.balanceOf(address(r));
         r.controlRoundTrip(notional);
         uint b1 = USDST.balanceOf(address(r));
@@ -398,7 +399,7 @@ contract Describe_Adv_Peg_PSM is Authorizable {
         // (c) mint 30bps / burn 0
         psm.setBurnFeeBps(address(USDC), 0);
         psm.setMintFeeBps(address(USDC), 30);
-        USDST.mint(address(r), notional);
+        areg.castVoteOnIssue(address(USDST), "mint", address(r), notional);
         uint c0 = USDST.balanceOf(address(r));
         r.controlRoundTrip(notional);
         uint c1 = USDST.balanceOf(address(r));
@@ -408,7 +409,7 @@ contract Describe_Adv_Peg_PSM is Authorizable {
 
         // (d) both
         psm.setBurnFeeBps(address(USDC), 30);
-        USDST.mint(address(r), notional);
+        areg.castVoteOnIssue(address(USDST), "mint", address(r), notional);
         uint d0 = USDST.balanceOf(address(r));
         r.controlRoundTrip(notional);
         uint d1 = USDST.balanceOf(address(r));
@@ -461,7 +462,7 @@ contract Describe_Adv_Peg_PSM is Authorizable {
         psm.setMintMaxBalance(address(USDC), bal + 1000e18);
 
         User u = new User();
-        USDC.mint(address(u), 5000e18);
+        areg.castVoteOnIssue(address(USDC), "mint", address(u), 5000e18);
         u.do(address(USDC), "approve", address(psm), INFINITY);
 
         // in-cap mint works
@@ -471,7 +472,7 @@ contract Describe_Adv_Peg_PSM is Authorizable {
 
         // anybody can shove the PSM over its own cap with a plain transfer
         User griefer = new User();
-        USDC.mint(address(griefer), 2000e18);
+        areg.castVoteOnIssue(address(USDC), "mint", address(griefer), 2000e18);
         griefer.do(address(USDC), "transfer", address(psm), 2000e18);
 
         string err = "";
@@ -511,7 +512,7 @@ contract Describe_Adv_Peg_PSM is Authorizable {
         uint fc0 = USDC.balanceOf(address(m.feeCollector()));
         uint psm0 = USDC.balanceOf(address(psm));
         User u = new User();
-        USDST.mint(address(u), 1000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(u), 1000e18);
         u.do(address(USDST), "approve", address(psm), INFINITY);
         u.do(address(psm), "redeem", 1000e18, address(USDC));
         uint psm1 = USDC.balanceOf(address(psm));
@@ -535,7 +536,7 @@ contract Describe_Adv_Peg_PSM is Authorizable {
         // Bankroll: without it the round trip cannot even repay the principal (see the
         // require below) — proof on its own that the savings leg is strictly lossy.
         uint bankroll = 1e18;
-        USDST.mint(address(r), bankroll);
+        areg.castVoteOnIssue(address(USDST), "mint", address(r), bankroll);
 
         uint rate0 = vault.exchangeRate();
         uint managed0 = vault.totalAssets();
@@ -608,7 +609,7 @@ contract Describe_Adv_Peg_PSM is Authorizable {
 
         // a real mintAndSave still works after the (reverted) donation attempts
         User u = new User();
-        USDC.mint(address(u), 10000e18);
+        areg.castVoteOnIssue(address(USDC), "mint", address(u), 10000e18);
         u.do(address(USDC), "approve", address(psm), INFINITY);
         uint sh = uint(u.do(address(psm), "mintAndSave", 10000e18, address(USDC)));
         log("live mintAndSave 10,000 -> shares = " + string(sh));
@@ -626,7 +627,7 @@ contract Describe_Adv_Peg_PSM is Authorizable {
     function it_q1g_offpeg_venue_makes_the_reserve_drain_capital_free() public {
         PegDesk desk = new PegDesk();
         desk.init(address(USDST), address(USDC), 99e16);   // USDST trading at $0.99
-        USDST.mint(address(desk), 5000000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(desk), 5000000e18);
 
         PsmRaider r = _newRaider();
         r.setDesk(address(desk));
@@ -656,7 +657,7 @@ contract Describe_Adv_Peg_PSM is Authorizable {
         // a deeper depeg scales linearly up to maxLoan / venue depth
         desk.setPrice(95e16);
         User whale2 = new User();
-        USDC.mint(address(whale2), 500000e18);
+        areg.castVoteOnIssue(address(USDC), "mint", address(whale2), 500000e18);
         whale2.do(address(USDC), "approve", address(psm), INFINITY);
         whale2.do(address(psm), "mint", 500000e18, address(USDC));   // refill the reserve
         PsmRaider r2 = _newRaider();
@@ -673,10 +674,10 @@ contract Describe_Adv_Peg_PSM is Authorizable {
     function it_q1h_on_peg_the_same_path_yields_zero() public {
         PegDesk desk = new PegDesk();
         desk.init(address(USDST), address(USDC), 1e18);
-        USDST.mint(address(desk), 5000000e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(desk), 5000000e18);
 
         User whale3 = new User();
-        USDC.mint(address(whale3), 100000e18);
+        areg.castVoteOnIssue(address(USDC), "mint", address(whale3), 100000e18);
         whale3.do(address(USDC), "approve", address(psm), INFINITY);
         whale3.do(address(psm), "mint", 100000e18, address(USDC));
 
@@ -700,7 +701,7 @@ contract Describe_Adv_Peg_PSM is Authorizable {
         // earlier tests rotated the reserve out; refill it so the mintAndSave leg has liquidity
         if (psm.availableRedemptionLiquidity(address(USDC)) < 50000e18) {
             User refill = new User();
-            USDC.mint(address(refill), 100000e18);
+            areg.castVoteOnIssue(address(USDC), "mint", address(refill), 100000e18);
             refill.do(address(USDC), "approve", address(psm), INFINITY);
             refill.do(address(psm), "mint", 100000e18, address(USDC));
         }
@@ -729,7 +730,7 @@ contract Describe_Adv_Peg_PSM is Authorizable {
         log("target for next day (wei)   = " + string(target2));
         uint mgd = vault.totalAssets();
         PsmRaider r = _newRaider();
-        USDST.mint(address(r), 1e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(r), 1e18);
         // mode 4 does a mintAndSave (deposit) then redeem in one tx; deposit calls _accrue first
         r.attack(4, MAXLOAN);
         log("managed before/after cycle  = " + string(mgd) + " / " + string(vault.totalAssets()));

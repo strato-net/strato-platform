@@ -3,6 +3,7 @@ import "PoolFactory.sol";
 import "../Lending/PriceOracle.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
+import "../Admin/AdminRegistry.sol";
 import "../Admin/FeeCollector.sol";
 import "../../abstract/ERC20/ERC20.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
@@ -519,7 +520,7 @@ contract record StablePool is Ownable {
         } else {
             // L1: the first deposit permanently locks MINIMUM_LIQUIDITY.
             require(d1 > MINIMUM_LIQUIDITY, "Initial deposit too small");
-            lpToken.mint(address(0xdead), MINIMUM_LIQUIDITY);
+            AdminRegistry(lpToken.owner()).castVoteOnIssue(address(lpToken), "mint", address(0xdead), MINIMUM_LIQUIDITY);
             totalSupply = MINIMUM_LIQUIDITY;
             mintAmount = d1 - MINIMUM_LIQUIDITY;
             lastDPacked = pack2(d1, d1);
@@ -533,7 +534,7 @@ contract record StablePool is Ownable {
         require(mintAmount >= _minMintAmount, "Slippage: fewer LP tokens minted than the minimum");
 
         totalSupply += mintAmount;
-        lpToken.mint(receiver, mintAmount);
+        AdminRegistry(lpToken.owner()).castVoteOnIssue(address(lpToken), "mint", receiver, mintAmount);
 
         uint[] xpFinal = _xpMem(rates, newBalances);
         _updateRatios(rates, xpFinal, amp, d1);
@@ -673,7 +674,7 @@ contract record StablePool is Ownable {
 
         // F1: burn the caller's LP, never the receiver's. `_receiver` chooses
         // where the withdrawn coin lands, it must not choose whose position closes.
-        lpToken.burn(msg.sender, _burnAmount);
+        AdminRegistry(lpToken.owner()).castVoteOnIssue(address(lpToken), "burn", msg.sender, _burnAmount);
 
         _transferOut(i, dy, receiver);
 
@@ -740,7 +741,7 @@ contract record StablePool is Ownable {
         require(burnAmount <= _maxBurnAmount, "Slippage screwed you");
 
         // F9: burn before the coins leave the contract.
-        lpToken.burn(msg.sender, burnAmount);
+        AdminRegistry(lpToken.owner()).castVoteOnIssue(address(lpToken), "burn", msg.sender, burnAmount);
 
         for (uint t = 0; t < coins.length; t++) {
             if (_amounts[t] > 0) {
@@ -818,7 +819,7 @@ contract record StablePool is Ownable {
 
         // F9: burn first, pay out second, so a re-entrant call can never see the
         // pool drained while totalSupply is still stale.
-        lpToken.burn(msg.sender, _burnAmount);
+        AdminRegistry(lpToken.owner()).castVoteOnIssue(address(lpToken), "burn", msg.sender, _burnAmount);
 
         for (uint t = 0; t < coins.length; t++) {
             _transferOut(t, amounts[t], receiver);
@@ -1445,7 +1446,7 @@ contract record StablePool is Ownable {
         uint mintAmount = (totalSupply * (d1 - d0)) / d0;
         require(mintAmount > 0, "Deposit too small to mint LP tokens");
 
-        lpToken.mint(_depositor, mintAmount);
+        AdminRegistry(lpToken.owner()).castVoteOnIssue(address(lpToken), "mint", _depositor, mintAmount);
 
         // Seed the new coin's oracle slot at its actual spot price (clamped the
         // way upkeepOracles clamps) rather than a flat 1e18.

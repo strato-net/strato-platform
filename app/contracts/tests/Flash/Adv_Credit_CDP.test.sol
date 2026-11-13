@@ -10,7 +10,6 @@ pragma solidity ^0.8.0;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Tokens/Token.sol";
 
@@ -168,7 +167,7 @@ contract ProxyLiquidator {
     }
 }
 
-contract Describe_Adv_Credit_CDP is Authorizable {
+contract Describe_Adv_Credit_CDP {
 
     Mercata m;
     FlashMint fm;
@@ -189,7 +188,6 @@ contract Describe_Adv_Credit_CDP is Authorizable {
     uint LR; uint MINCR; uint PEN; uint CF;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         WAD = 1e18; RAY = 1e27; CAP = 2000000e18;
         LR = 150e16; MINCR = 155e16; PEN = 1000; CF = 5000;
 
@@ -202,26 +200,28 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         admin    = m.adminRegistry();
         fm       = new FlashMint(address(admin));
 
-        USDST  = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",[],[],[],"USDST",0,18);
+        USDST  = address(ret);
         usdstT = Token(USDST);
-        usdstT.setStatus(2);
-        reg.setUSDST(USDST);
-        oracle.setAssetPrice(USDST, 1e18);
+        admin.castVoteOnIssue(USDST, "setStatus", 2);
+        admin.castVoteOnIssue(address(reg), "setUSDST", USDST);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", USDST, 1e18);
 
-        COLL  = m.tokenFactory().createToken("GOLDST","Gold",[],[],[],"GOLDST",0,18);
+        (executed, ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "GOLDST","Gold",[],[],[],"GOLDST",0,18);
+        COLL  = address(ret);
         collT = Token(COLL);
-        collT.setStatus(2);
-        oracle.setAssetPrice(COLL, 100e18);
+        admin.castVoteOnIssue(COLL, "setStatus", 2);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", COLL, 100e18);
         // mainnet-shaped: LR 1.50, minCR 1.55, 10% penalty, 50% close factor, no accrual.
-        cdp.setCollateralAssetParams(COLL, LR, MINCR, PEN, CF, RAY, 1e18, 1e30, false);
+        admin.castVoteOnIssue(address(cdp), "setCollateralAssetParams", COLL, LR, MINCR, PEN, CF, RAY, 1e18, 1e30, false);
 
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(cdp));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(cdp));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(fm));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(fm));
 
-        fm.initialize(USDST, address(m.feeCollector()), CAP);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), CAP);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
 
         desk = new Desk();
         desk.setPrice(USDST, 1e18);
@@ -231,7 +231,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
     function beforeEach() public { }
 
     function _price(uint p) internal {
-        oracle.setAssetPrice(COLL, p);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", COLL, p);
         desk.setPrice(COLL, p);
     }
 
@@ -243,7 +243,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
     function it_aa_inert_flash_mint_leaves_cdp_accounting_untouched() public {
         // Put real debt on the books first so the accumulator has something to act on.
         User u = new User();
-        collT.mint(address(u), 10000e18);
+        admin.castVoteOnIssue(COLL, "mint", address(u), 10000e18);
         u.do(COLL, "approve", address(cdpVault), 10000e18);
         u.do(address(cdp), "deposit", COLL, 10000e18);
         u.do(address(cdp), "mint", COLL, 400000e18);
@@ -274,9 +274,9 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         // Leverager with $100,000 of equity levers to the minCR limit in ONE transaction.
         Leverager lev = new Leverager();
         lev.init(address(fm), address(cdp), USDST);
-        collT.mint(address(lev), 1000e18);           // 1,000 COLL @ $100 = $100,000 equity
-        collT.mint(address(desk), 500000e18);
-        usdstT.mint(address(desk), 5000000e18);
+        admin.castVoteOnIssue(COLL, "mint", address(lev), 1000e18);           // 1,000 COLL @ $100 = $100,000 equity
+        admin.castVoteOnIssue(COLL, "mint", address(desk), 500000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(desk), 5000000e18);
         lev.seed(COLL);
         lev.lever(COLL, address(desk), 150000e18);
 
@@ -301,11 +301,11 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         (uint r, uint l, uint tsd) = cdp.collateralGlobalStates(COLL);
         uint outstanding = (tsd * r) / RAY;
         uint ceiling = outstanding + 100000e18;   // only $100,000 of headroom left
-        cdp.setCollateralAssetParams(COLL, LR, MINCR, PEN, CF, RAY, 1e18, ceiling, false);
+        admin.castVoteOnIssue(address(cdp), "setCollateralAssetParams", COLL, LR, MINCR, PEN, CF, RAY, 1e18, ceiling, false);
 
         CeilingRider cr = new CeilingRider();
         cr.init(address(fm), address(cdp), USDST);
-        collT.mint(address(cr), 100000e18);         // $10,000,000 of collateral: plenty
+        admin.castVoteOnIssue(COLL, "mint", address(cr), 100000e18);         // $10,000,000 of collateral: plenty
         cr.seed(COLL, 100000e18);
 
         // Draw the remaining headroom.
@@ -329,7 +329,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         require(after_ <= ceiling, "BLOCKED: outstanding never exceeded the ceiling");
 
         // Restore a loose ceiling for later tests.
-        cdp.setCollateralAssetParams(COLL, LR, MINCR, PEN, CF, RAY, 1e18, 1e30, false);
+        admin.castVoteOnIssue(address(cdp), "setCollateralAssetParams", COLL, LR, MINCR, PEN, CF, RAY, 1e18, 1e30, false);
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -340,7 +340,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
     function it_ba_close_factor_is_bypassed_by_looping_in_one_transaction() public {
         Vault_ v = new Vault_();
         v.init(address(cdp));
-        collT.mint(address(v), 40000e18);
+        admin.castVoteOnIssue(COLL, "mint", address(v), 40000e18);
         v.open(COLL, 40000e18, 1500000e18);     // 40,000 COLL @ $100 = $4m ; debt $1.5m
 
         // Gap the price to $39: collateral $1,560,000 vs debt $1,500,000 -> CR 1.04
@@ -356,7 +356,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         uint resBefore = usdstT.balanceOf(address(reserve));
         uint feeBefore = usdstT.balanceOf(address(m.feeCollector()));
 
-        usdstT.mint(address(desk), 5000000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(desk), 5000000e18);
 
         LoopLiquidator ll = new LoopLiquidator();
         ll.init(address(fm), address(cdp), USDST);
@@ -395,7 +395,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
     function it_ca_penalty_goes_100pct_to_the_liquidator_and_0_to_the_reserve() public {
         Vault_ v = new Vault_();
         v.init(address(cdp));
-        collT.mint(address(v), 40000e18);
+        admin.castVoteOnIssue(COLL, "mint", address(v), 40000e18);
         v.open(COLL, 40000e18, 1500000e18);
 
         _price(55e18);   // collateral $2.2m vs debt $1.5m -> CR 1.4667, liquidatable
@@ -403,7 +403,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
 
         uint resBefore  = usdstT.balanceOf(address(reserve));
         uint feeBefore  = usdstT.balanceOf(address(m.feeCollector()));
-        usdstT.mint(address(desk), 5000000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(desk), 5000000e18);
 
         LoopLiquidator ll = new LoopLiquidator();
         ll.init(address(fm), address(cdp), USDST);
@@ -447,7 +447,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
     function it_cc_proxy_self_liquidation_recycles_the_penalty_and_dodges_minCR() public {
         Vault_ v = new Vault_();
         v.init(address(cdp));
-        collT.mint(address(v), 40000e18);
+        admin.castVoteOnIssue(COLL, "mint", address(v), 40000e18);
         v.open(COLL, 40000e18, 1500000e18);
 
         _price(55e18);
@@ -459,7 +459,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         log("2c withdraw(1 COLL) while CR<minCR : '" + wErr + "'");
         require(wErr == "CDPEngine: below min CR", "withdraw is gated by minCR");
 
-        usdstT.mint(address(desk), 5000000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(desk), 5000000e18);
         uint resBefore = usdstT.balanceOf(address(reserve));
 
         ProxyLiquidator pl = new ProxyLiquidator();
@@ -494,11 +494,11 @@ contract Describe_Adv_Credit_CDP is Authorizable {
     function it_da_cannot_liquidate_a_healthy_vault() public {
         Vault_ v = new Vault_();
         v.init(address(cdp));
-        collT.mint(address(v), 40000e18);
+        admin.castVoteOnIssue(COLL, "mint", address(v), 40000e18);
         v.open(COLL, 40000e18, 1000000e18);   // CR = 4.0, very healthy
         require(cdp.collateralizationRatio(address(v), COLL) > MINCR, "healthy");
 
-        usdstT.mint(address(desk), 5000000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(desk), 5000000e18);
         LoopLiquidator ll = new LoopLiquidator();
         ll.init(address(fm), address(cdp), USDST);
 
@@ -521,10 +521,10 @@ contract Describe_Adv_Credit_CDP is Authorizable {
     function it_db_exact_guard_on_healthy_liquidation() public {
         Vault_ v = new Vault_();
         v.init(address(cdp));
-        collT.mint(address(v), 4000e18);
+        admin.castVoteOnIssue(COLL, "mint", address(v), 4000e18);
         v.open(COLL, 4000e18, 100000e18);
 
-        usdstT.mint(address(this), 200000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(this), 200000e18);
         usdstT.approve(address(cdp), 200000e18);
         string err = "NO REVERT";
         try cdp.liquidate(COLL, address(v), 50000e18) { err = "NO REVERT"; }
@@ -539,7 +539,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
     function it_ea_underwater_vault_residual_lands_on_unbacked_usdst() public {
         Vault_ v = new Vault_();
         v.init(address(cdp));
-        collT.mint(address(v), 40000e18);
+        admin.castVoteOnIssue(COLL, "mint", address(v), 40000e18);
         v.open(COLL, 40000e18, 1500000e18);
 
         // Hard gap: $100 -> $25. Collateral $1,000,000 vs debt $1,500,000. CR 0.667.
@@ -549,7 +549,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         uint badBefore   = cdp.badDebtUSDST(COLL);
         uint supplyBefore = usdstT.totalSupply();
         uint resBefore   = usdstT.balanceOf(address(reserve));
-        usdstT.mint(address(desk), 5000000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(desk), 5000000e18);
 
         LoopLiquidator ll = new LoopLiquidator();
         ll.init(address(fm), address(cdp), USDST);
@@ -584,10 +584,10 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         uint bad = cdp.badDebtUSDST(COLL);
         require(bad > 0, "precondition: bad debt exists from the previous test");
 
-        cdp.setJuniorPremium(1000);   // 10%
+        admin.castVoteOnIssue(address(cdp), "setJuniorPremium", 1000);   // 10%
 
         User j = new User();
-        usdstT.mint(address(j), 500000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(j), 500000e18);
         uint supply0 = usdstT.totalSupply();
         j.do(address(cdp), "openJuniorNote", COLL, 100000e18);
 
@@ -615,7 +615,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
 
         JuniorDonor jd = new JuniorDonor();
         jd.init(address(fm), USDST, address(reserve), address(cdp));
-        usdstT.mint(address(jd), 300000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(jd), 300000e18);
         jd.openNote(COLL, 100000e18);              // burns 100k -> cap 110k at 10% premium
 
         (address o, uint capD, uint eD) = cdp.juniorNotes(address(jd));
@@ -653,16 +653,16 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         // the accrual below is real.
         fastForward(1);
         // A second asset carrying a genuine ~5% APY stability fee.
-        address C2 = m.tokenFactory().createToken("SILVST","Silver",[],[],[],"SILVST",0,18);
-        Token c2 = Token(C2);
-        c2.setStatus(2);
-        oracle.setAssetPrice(C2, 100e18);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "SILVST","Silver",[],[],[],"SILVST",0,18);
+        address C2 = address(ret);
+        admin.castVoteOnIssue(C2, "setStatus", 2);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", C2, 100e18);
         uint SFR5 = 1000000001547125956666413085;         // ~5% APY per-second factor, RAY
-        cdp.setCollateralAssetParams(C2, LR, MINCR, PEN, CF, SFR5, 1e18, 1e30, false);
+        admin.castVoteOnIssue(address(cdp), "setCollateralAssetParams", C2, LR, MINCR, PEN, CF, SFR5, 1e18, 1e30, false);
 
         Vault_ v = new Vault_();
         v.init(address(cdp));
-        c2.mint(address(v), 40000e18);
+        admin.castVoteOnIssue(C2, "mint", address(v), 40000e18);
         v.open(C2, 40000e18, 1000000e18);                 // $4m collateral, $1m debt
 
         (uint r0, uint l0, uint tsd0) = cdp.collateralGlobalStates(C2);
@@ -671,7 +671,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
 
         fastForward(365 * 24 * 60 * 60);
         // Poke the accrual with a 1-wei repay so the index is realised on-chain.
-        usdstT.mint(address(v), 1000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(v), 1000e18);
         v.pokeRepay(C2, 1e18);
 
         (uint r1, uint l1, uint tsd1) = cdp.collateralGlobalStates(C2);
@@ -706,24 +706,24 @@ contract Describe_Adv_Credit_CDP is Authorizable {
     /// @notice And show the ONLY route by which CDPReserve can ever be funded, so the
     ///         "$ forgone per $1m of liquidatable debt" figure is unambiguous.
     function it_gb_reserve_can_only_be_funded_by_the_stability_fee_split() public {
-        cdp.setFeeToReserveBps(5000);   // 50/50 split, governance dial
+        admin.castVoteOnIssue(address(cdp), "setFeeToReserveBps", 5000);   // 50/50 split, governance dial
         log("1h feeToReserveBps set to        : " + string(cdp.feeToReserveBps()));
 
-        address C3 = m.tokenFactory().createToken("BOOE","Boo",[],[],[],"BOOE",0,18);
-        Token c3 = Token(C3);
-        c3.setStatus(2);
-        oracle.setAssetPrice(C3, 100e18);
-        cdp.setCollateralAssetParams(C3, LR, MINCR, PEN, CF, 1000000001547125956666413085, 1e18, 1e30, false);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "BOOE","Boo",[],[],[],"BOOE",0,18);
+        address C3 = address(ret);
+        admin.castVoteOnIssue(C3, "setStatus", 2);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", C3, 100e18);
+        admin.castVoteOnIssue(address(cdp), "setCollateralAssetParams", C3, LR, MINCR, PEN, CF, 1000000001547125956666413085, 1e18, 1e30, false);
 
         Vault_ v = new Vault_();
         v.init(address(cdp));
-        c3.mint(address(v), 40000e18);
+        admin.castVoteOnIssue(C3, "mint", address(v), 40000e18);
         v.open(C3, 40000e18, 1000000e18);
 
         uint res0 = usdstT.balanceOf(address(reserve));
         uint fee0 = usdstT.balanceOf(address(m.feeCollector()));
         fastForward(365 * 24 * 60 * 60);
-        usdstT.mint(address(v), 1000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(v), 1000e18);
         v.pokeRepay(C3, 1e18);
 
         uint resGain = usdstT.balanceOf(address(reserve)) - res0;
@@ -735,7 +735,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         // A liquidation on the SAME asset adds nothing to the reserve, at any bps setting.
         // Debt is now ~$1.05m after a year of fees; gap the price to $38 so CR < 1.50.
         _price3(C3, 38e18);
-        usdstT.mint(address(desk), 5000000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(desk), 5000000e18);
         desk.setPrice(C3, 38e18);
         log("1h CR before liquidation         : " + string(cdp.collateralizationRatio(address(v), C3)));
         uint resPre = usdstT.balanceOf(address(reserve));
@@ -749,10 +749,10 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         require(ll.usdstProfit() > 0, "the liquidator took a penalty");
         require(resPost == resPre,
             "DEMONSTRATED: even with feeToReserveBps=5000 the liquidation penalty routes 0 to the reserve");
-        cdp.setFeeToReserveBps(0);
+        admin.castVoteOnIssue(address(cdp), "setFeeToReserveBps", 0);
     }
 
-    function _price3(address a, uint p) internal { oracle.setAssetPrice(a, p); }
+    function _price3(address a, uint p) internal { admin.castVoteOnIssue(address(oracle), "setAssetPrice", a, p); }
 }
 
 /// @notice One-shot leverage helper.

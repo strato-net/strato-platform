@@ -65,6 +65,9 @@ const config = {
     safeProposerPrivateKey: process.env.SAFE_PROPOSER_PRIVATE_KEY,
     apiKey: process.env.SAFE_API_KEY,
   },
+  adminRegistry: {
+    address: process.env.ADMIN_REGISTRY_ADDRESS || "000000000000000000000000000000000000100c",
+  },
   voucher: {
     contractAddress:
       process.env.VOUCHER_CONTRACT_ADDRESS ||

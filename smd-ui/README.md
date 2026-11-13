@@ -50,6 +50,84 @@ Both submit transactions over the STRATO chain JSON-RPC at `/rpc`.
   WalletConnect's relay rejects the placeholder project ID with close code 3000
   "Project not found" and no QR code is shown.
 
+## Dedicated multisig deployment
+
+Dedicated multisigs are disabled until the canonical network deployment is pinned:
+
+- `defaultMultisigFactoryFor` — the canonical factory address by network ID.
+
+The map lives in `app/backend/src/config/config.ts` and is returned by `/api/config`.
+`MULTISIG_FACTORY_ADDRESS` overrides it for local and temporary deployments. SMD keeps
+wallet actions read-only when the factory or wallet provenance checks fail.
+
+This uses the same trust model as existing platform proxies: the backend pins the
+factory proxy address, AdminRegistry owns its implementation pointer (or the proxy is
+permanently frozen), and the separately stored registry governance remains
+AdminRegistry. The factory registry identifies wallets and approved wallet logic
+versions.
+
+The contracts use the regular proxy and upgrade tooling with
+`BaseCodeCollection.sol` as the source bundle.
+
+Deploy the canonical factory proxy once:
+
+> This version removes the pre-deployment wallet address from pending setup
+> storage. Redeploy the testnet factory proxy instead of upgrading a factory
+> created from the earlier storage layout.
+
+```bash
+cd app/contracts
+npm run deployProxy -- \
+  --empty \
+  --owner 000000000000000000000000000000000000100c \
+  --contract-file BaseCodeCollection.sol
+```
+
+Install or upgrade the factory implementation:
+
+```bash
+npm run upgrade -- \
+  --proxy-address <factory-proxy> \
+  --contract-name MultisigFactory \
+  --contract-file BaseCodeCollection.sol \
+  --constructor-args '{"_governance":"00000000000000000000000000000000deadbeef"}' \
+  +OVERRIDE-CHECKS
+```
+
+Then, through AdminRegistry governance, initialize the independent version-registry
+authority once:
+
+```text
+initializeRegistryGovernance(000000000000000000000000000000000000100c)
+```
+
+Deploy the concrete wallet logic without another proxy:
+
+```bash
+npm run upgrade -- \
+  --deploy-only \
+  --contract-name MultisigLogic \
+  --contract-file BaseCodeCollection.sol \
+  --constructor-args '{}'
+```
+
+Then:
+
+1. Review both implementation ABIs, including the wallet shell's reserved function
+   names, and require every state-changing setup function to use the `migrate` prefix.
+2. Confirm `registryGovernance` is AdminRegistry, then through AdminRegistry governance call
+   `publishLogicVersion("1", logic)` on the factory.
+3. Configure the factory proxy address in the backend.
+4. Create a test wallet and confirm the setup from every initial signer.
+5. Verify Bloc resolves `MultisigLogic` methods at the permanent wallet address and SMD
+   reports a `Verified multisig wallet` before enabling production deposits.
+
+Future factory implementations use the same proxy upgrade command without deploying a
+new proxy. Future wallet logic versions use `--deploy-only`, are published in the factory
+registry, and are adopted independently by each wallet quorum. Renouncing ownership of
+the factory proxy permanently freezes factory implementation upgrades without disabling
+version publication or revocation through `registryGovernance`.
+
 ## Layout
 
 - `src/lib/` — `env`, `api` (axios), `auth`, `csrf`, `wagmi`, `stratoChain`, `stratoWallet`.

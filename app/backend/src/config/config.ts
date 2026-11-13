@@ -239,6 +239,11 @@ export const defaultExecutedIssuesLookbackDaysFor: Record<string, number> = {
   "33056204878082667": 30, // Upquark mainnet
 };
 
+export const defaultMultisigFactoryFor: Record<string, string> = {
+  "114784819836269": "fbdabeb2595749164521478d3466960cf37c37e9", // Helium testnet
+  "33056204878082667": "", // Upquark mainnet
+};
+
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
@@ -265,6 +270,7 @@ export let usdcYieldVault: string = '';
 export let goldstYieldVault: string = '';
 export let silvstYieldVault: string = '';
 export let executedIssuesLookbackDays: number = UNKNOWN_NETWORK_EXECUTED_ISSUES_LOOKBACK_DAYS;
+export let multisigFactory: string = '';
 
 function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -413,6 +419,10 @@ export function setExecutedIssuesLookbackConfig(networkId: string) {
     defaultExecutedIssuesLookbackDaysFor[networkId] || UNKNOWN_NETWORK_EXECUTED_ISSUES_LOOKBACK_DAYS;
 }
 
+export function setMultisigConfig(networkId: string) {
+  multisigFactory = process.env.MULTISIG_FACTORY_ADDRESS || defaultMultisigFactoryFor[networkId] || "";
+}
+
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
   const { eth } = await import("../utils/appApiHelper");
@@ -441,6 +451,7 @@ export async function initNetworkConfig() {
   setUsdcYieldVaultConfig(networkId);
   setMetalYieldVaultConfig(networkId);
   setExecutedIssuesLookbackConfig(networkId);
+  setMultisigConfig(networkId);
 }
 
 /**

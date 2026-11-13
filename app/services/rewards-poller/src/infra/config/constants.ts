@@ -16,6 +16,7 @@ export const REQUIRED_ENV_VARS = [
 export const DEFAULTS = {
   usdstAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
   voucherAddress: "000000000000000000000000000000000000100e",
+  adminRegistryAddress: "000000000000000000000000000000000000100c",
   pollingIntervalMs: 10 * 60 * 1000,
   maxBatchSize: 50,
   bonusCronSchedule: "0 3,9,15,21 * * *",

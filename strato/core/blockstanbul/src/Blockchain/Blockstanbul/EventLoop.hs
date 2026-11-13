@@ -479,7 +479,7 @@ eventLoop ctx = execStateC ctx $
                       proposal .= Just pp
                       -- run in vm before sending prepare
                       whenM mayVote . yieldR $ RunPreprepare pp
-        IMsg auth ppp@(Prepare v' di) -> when (v <= v') $ do
+        IMsg auth ppp@(Prepare v' di) -> when (v == v') $ do
           preparers <- use prepared
           unless (M.member (Validator $ sender auth) preparers) . yieldL $ OMsg auth ppp
           ps <- prepared <%= M.insert (Validator $ sender auth) di
@@ -494,12 +494,13 @@ eventLoop ctx = execStateC ctx $
             whenM mayVote $ do
               msg <- signMessage (Commit v di seal)
               yieldR msg
-        IMsg auth ccc@(Commit v' di seal) -> when (v <= v') $ do
+        IMsg auth ccc@(Commit v' di seal) -> when (v == v') $ do
           committors <- use committed
           unless (M.member (Validator $ sender auth) committors) . yieldL $ OMsg auth ccc
           cs <- committed <%= M.insert (Validator $ sender auth) (di, seal)
           weights <- gets currentVoteWeights
-          let quorum = hasSupermajority weights . M.keysSet . M.filter ((== di) . fst) $ cs
+          let votes = M.filter ((== di) . fst) cs
+              quorum = hasSupermajority weights $ M.keysSet votes
           sameHash <- hasSameHash di
           -- TODO(tim): Is it necessary to check that we have prepared?
           hasSent <- use hasCommitted
@@ -509,7 +510,7 @@ eventLoop ctx = execStateC ctx $
             case ppl of
               Nothing -> error "TODO(tim): Decide how to handle this"
               Just blk -> do
-                let seals = map snd . M.elems $ cs
+                let seals = map snd $ M.elems votes
                 let blockNo = number . blockBlockData $ blk
                 recordMaxBlockNumber "pbft_commit" blockNo
                 commitBlock $ addCommitmentSeals seals blk

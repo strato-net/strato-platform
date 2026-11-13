@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Tokens/Token.sol";
 
@@ -219,7 +218,7 @@ contract LiquidationStateVerification {
  *   • Success (cap) paths: coverage-cap binds with CF=50% and CF=100% (+ bad debt).
  *   • Boundary: debtToCover == coverageCap → MUST NOT take cap-bound branch.
  */
-contract Describe_CDPEngine_Liquidations is Authorizable {
+contract Describe_CDPEngine_Liquidations {
     // System
     Mercata m;
     CDPEngine cdp;
@@ -255,7 +254,6 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
 
     // ───────────────────────────── Setup ─────────────────────────────
     function beforeAll() public {
-        bypassAuthorizations = true;
 
         WAD  = 1e18;
         RAY  = 1e27;
@@ -282,46 +280,48 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
         liq      = new User();
 
         // USDST + wire registry
-        USDST  = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",[],[],[],"USDST",0,18);
+        USDST  = address(ret);
         usdstT = Token(USDST);
-        usdstT.setStatus(2);
+        m.adminRegistry().castVoteOnIssue(address(usdstT), "setStatus", 2);
         m.adminRegistry().castVoteOnIssue(address(m.adminRegistry()), "addWhitelist", address(USDST), "mint", address(cdp));
         m.adminRegistry().castVoteOnIssue(address(m.adminRegistry()), "addWhitelist", address(USDST), "burn", address(cdp));
-        reg.setUSDST(USDST);
-        oracle.setAssetPrice(USDST, 1e18);
+        m.adminRegistry().castVoteOnIssue(address(reg), "setUSDST", USDST);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", USDST, 1e18);
 
         // fund liquidator heavily
-        usdstT.mint(address(liq), 1e36);
+        m.adminRegistry().castVoteOnIssue(address(usdstT), "mint", address(liq), 1e36);
     }
 
     function beforeEach() public {
         // Fresh collateral each test
-        ASSET  = m.tokenFactory().createToken("COLL","Collateral",[],[],[],"COLL",0,18);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "COLL","Collateral",[],[],[],"COLL",0,18);
+        ASSET  = address(ret);
         assetT = Token(ASSET);
-        assetT.setStatus(2);
+        m.adminRegistry().castVoteOnIssue(address(assetT), "setStatus", 2);
 
         // Default params (CF=50% here; tests may overwrite)
-        cdp.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(cdp), "setCollateralAssetParams",
             ASSET, LR, 160e16, PEN, CF, SFR, FLOOR_, CEIL_, false
         );
 
         // Open price healthy
-        oracle.setAssetPrice(ASSET, OPEN_P);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ASSET, OPEN_P);
 
         // Give borrower large balance for deposits
-        assetT.mint(address(borrower), 1000000e18);
+        m.adminRegistry().castVoteOnIssue(address(assetT), "mint", address(borrower), 1000000e18);
     }
 
     // ───────────────────────────── Helpers ─────────────────────────────
     function _open(uint depUnits, uint mintUSD, uint priceBefore) internal {
-        oracle.setAssetPrice(ASSET, priceBefore);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ASSET, priceBefore);
         borrower.callFunction(ASSET, "approve", address(vault), depUnits);
         borrower.callFunction(address(cdp), "deposit", ASSET, depUnits);
         if (mintUSD > 0) borrower.callFunction(address(cdp), "mint", ASSET, mintUSD);
     }
 
     function _liq(address borrower_, uint amountUSD, uint priceAtLiq) internal returns (uint seized, uint leftover) {
-        oracle.setAssetPrice(ASSET, priceAtLiq);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ASSET, priceAtLiq);
         liq.callFunction(USDST, "approve", address(cdp), amountUSD);
         uint beforeBal = vault.userCollaterals(borrower_, ASSET);
         liq.callFunction(address(cdp), "liquidate", ASSET, borrower_, amountUSD);
@@ -331,7 +331,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
     }
 
     function _liqWithFullVerification(address borrower_, uint amountUSD, uint priceAtLiq) internal returns (uint seized, uint leftover, bool verificationPassed, string memory error) {
-        oracle.setAssetPrice(ASSET, priceAtLiq);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ASSET, priceAtLiq);
 
         // Capture pre-liquidation state for comprehensive verification
         LiquidationStateVerification verifier = new LiquidationStateVerification();
@@ -358,7 +358,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
 
     function it_rejects_zero_debtToCover() public {
         _open(1000e18, 100e18, OPEN_P);
-        oracle.setAssetPrice(ASSET, LOW_P); // unsafe
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ASSET, LOW_P); // unsafe
         bool reverted = false;
         try cdp.liquidate(ASSET, address(borrower), 0) {
             revert("expected revert on zero amount");
@@ -394,7 +394,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
 
     function it_rejects_when_borrower_has_no_debt() public {
         _open(1000e18, 0, OPEN_P);          // no debt
-        oracle.setAssetPrice(ASSET, LOW_P); // even if unsafe, no debt → revert
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ASSET, LOW_P); // even if unsafe, no debt → revert
         bool reverted = false;
         try cdp.liquidate(ASSET, address(borrower), 1e18) {
             revert("expected revert on no debt");
@@ -405,7 +405,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
     function it_rejects_when_position_healthy() public {
         _open(1000e18, 100e18, OPEN_P); // healthy
         // keep price high enough
-        oracle.setAssetPrice(ASSET, OPEN_P);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ASSET, OPEN_P);
         bool reverted = false;
         try cdp.liquidate(ASSET, address(borrower), 1e18) {
             revert("expected revert on healthy position");
@@ -417,7 +417,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
         _open(1000e18, 100e18, OPEN_P);
         // set price to 0 → oracle will cause a revert the engine catches as require
         bool reverted = false;
-        try oracle.setAssetPrice(ASSET, 0) {
+        try m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ASSET, 0) {
             revert("expected revert on set zero price");
         } catch { reverted = true; }
         require(reverted, "should revert");
@@ -507,7 +507,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
     /// totalDebt binds (CF=100%, coverageCap >= totalDebt, unsafe CR)
     function it_liquidates_when_total_debt_binds_CF_100() public {
         // Make CF 100% for this test.
-        cdp.setCollateralAssetParams(ASSET, LR, 160e16, PEN, 10000, SFR, FLOOR_, CEIL_, false);
+        m.adminRegistry().castVoteOnIssue(address(cdp), "setCollateralAssetParams", ASSET, LR, 160e16, PEN, 10000, SFR, FLOOR_, CEIL_, false);
 
         // Choose deposit & liq price so: unsafe, and coverageCap ≥ totalDebt.
         // deposit=3000, debt=6000, liq price=$2.5 → colUSD=7500, covCap=6818 ≥ 6000, CR=1.25 < LR
@@ -590,7 +590,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
 
     /// CF=100%, same cap-bound behavior: seize all + bad debt
     function it_liquidates_cap_bound_CF_100() public {
-        cdp.setCollateralAssetParams(ASSET, LR, 160e16, PEN, 10000, SFR, FLOOR_, CEIL_, false);
+        m.adminRegistry().castVoteOnIssue(address(cdp), "setCollateralAssetParams", ASSET, LR, 160e16, PEN, 10000, SFR, FLOOR_, CEIL_, false);
 
         _open(2000e18, 6000e18, OPEN_P);
         (uint colBefore, ) = _state(address(borrower));
@@ -762,7 +762,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
 
     function it_state_consistency_total_debt_binds_CF100_updates_all() public {
         // Set CF=100% and choose price so coverageCap ≥ totalDebt, CR < LR
-        cdp.setCollateralAssetParams(ASSET, LR, 160e16, PEN, 10000, SFR, FLOOR_, CEIL_, false);
+        m.adminRegistry().castVoteOnIssue(address(cdp), "setCollateralAssetParams", ASSET, LR, 160e16, PEN, 10000, SFR, FLOOR_, CEIL_, false);
         _open(3000e18, 6000e18, OPEN_P);
 
         (uint rate0,, uint totalScaled0) = cdp.collateralGlobalStates(ASSET);
@@ -807,7 +807,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
     function it_state_invariants_after_multi_rounds_match_between_vault_and_engine() public {
         // Start unsafe at $3; CF=50% ensures non-cap rounds
         _open(3000e18, 9000e18, OPEN_P);
-        oracle.setAssetPrice(ASSET, MID_P);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ASSET, MID_P);
 
         (uint rate0,, uint totalScaled0) = cdp.collateralGlobalStates(ASSET);
         // Silence warnings by using the variables
@@ -900,7 +900,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
         _open(2000e18, 6000e18, OPEN_P);
 
         // Force cap-bound path: set price to $1 so coverageCap < totalDebt and engine seizes ALL collateral.
-        oracle.setAssetPrice(ASSET, LOW_P);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ASSET, LOW_P);
 
         // Compute the exact coverageCap the engine will use (same formula as in the engine)
         (uint colBefore, ) = _state(address(borrower));
@@ -914,7 +914,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
         fastForward(3600); // 1 hour
 
         // Update price to make it fresh again
-        oracle.setAssetPrice(ASSET, LOW_P);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ASSET, LOW_P);
 
         // Liquidate with a huge allowance so internal caps determine the repay
         liq.callFunction(USDST, "approve", address(cdp), 1e36);

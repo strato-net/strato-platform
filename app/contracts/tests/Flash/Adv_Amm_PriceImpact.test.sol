@@ -15,7 +15,6 @@
 // OUTPUT: it_zz_print_* dump measured numbers via log(). All it_d*/it_e* tests must pass.
 
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Tokens/Token.sol";
 
@@ -257,7 +256,7 @@ contract DeskLeverager {
     }
 }
 
-contract Describe_Adv_Amm_PriceImpact is Authorizable {
+contract Describe_Adv_Amm_PriceImpact {
 
     Mercata m;
     FlashMint fm;
@@ -270,7 +269,6 @@ contract Describe_Adv_Amm_PriceImpact is Authorizable {
     OTCDesk desk;
 
     address USDST;
-    Token usdstT;
 
     uint GOLD_RES;      // 53.71e18
     uint USDST_RES;     // 239,376e18
@@ -294,7 +292,6 @@ contract Describe_Adv_Amm_PriceImpact is Authorizable {
     uint goldFloatAllVenues;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
 
         WAD = 1e18;
         LR = 150e16; MINCR = 155e16; PEN = 1000; CF = 5000;
@@ -311,19 +308,19 @@ contract Describe_Adv_Amm_PriceImpact is Authorizable {
         oracle = m.priceOracle(); admin = m.adminRegistry(); pf = m.poolFactory();
         fm = new FlashMint(address(admin));
 
-        USDST = m.tokenFactory().createToken("USDST", "USD Stable", [], [], [], "USDST", 0, 18);
-        usdstT = Token(USDST);
-        usdstT.setStatus(2);
-        reg.setUSDST(USDST);
-        oracle.setAssetPrice(USDST, 1e18);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USD Stable", [], [], [], "USDST", 0, 18);
+        USDST = address(ret);
+        admin.castVoteOnIssue(USDST, "setStatus", 2);
+        admin.castVoteOnIssue(address(reg), "setUSDST", USDST);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", USDST, 1e18);
 
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(cdp));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(cdp));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(fm));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(fm));
 
-        fm.initialize(USDST, address(m.feeCollector()), 2000000e18);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), 2000000e18);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
 
         // The oracle price that makes the pool sit at EXACT parity: 239,376 / 53.71
         GOLD_PRICE = (USDST_RES * 1e18) / GOLD_RES;
@@ -334,16 +331,18 @@ contract Describe_Adv_Amm_PriceImpact is Authorizable {
 
     // ── fresh GOLDST + pool at mainnet depth, oracle pinned to pool parity ──
     function _newGold(string sym) internal returns (address, address) {
-        address gold = m.tokenFactory().createToken("GOLDST", "Gold", [], [], [], sym, 0, 18);
-        Token(gold).setStatus(2);
-        Token(gold).mint(address(this), 100000e18);
-        usdstT.mint(address(this), 20000000e18);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "GOLDST", "Gold", [], [], [], sym, 0, 18);
+        address gold = address(ret);
+        admin.castVoteOnIssue(gold, "setStatus", 2);
+        admin.castVoteOnIssue(gold, "mint", address(this), 100000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(this), 20000000e18);
 
-        oracle.setAssetPrice(gold, GOLD_PRICE);
-        cdp.setCollateralAssetParams(gold, LR, MINCR, PEN, CF, SFR, FLOOR_, CEIL_, false);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", gold, GOLD_PRICE);
+        admin.castVoteOnIssue(address(cdp), "setCollateralAssetParams", gold, LR, MINCR, PEN, CF, SFR, FLOOR_, CEIL_, false);
         desk.setPrice(gold, GOLD_PRICE);
 
-        address p = pf.createPool(gold, USDST);
+        (executed, ret) = admin.castVoteOnIssue(address(pf), "createPool", gold, USDST);
+        address p = address(ret);
         Token lp = Pool(p).lpToken();
         admin.castVoteOnIssue(address(admin), "addWhitelist", address(lp), "mint", p);
         admin.castVoteOnIssue(address(admin), "addWhitelist", address(lp), "burn", p);
@@ -359,16 +358,16 @@ contract Describe_Adv_Amm_PriceImpact is Authorizable {
     /// away from pool parity: mint under a temporarily high price, then restore parity.
     function _newLiquidatableVault(address gold, uint debt) internal returns (address) {
         uint collateral = (145 * debt) / (100 * (GOLD_PRICE / 1e18));   // CR 1.45 at GOLD_PRICE
-        Token(gold).mint(address(this), collateral);
+        admin.castVoteOnIssue(gold, "mint", address(this), collateral);
 
         User b = new User();
         Token(gold).transfer(address(b), collateral);
 
-        oracle.setAssetPrice(gold, GOLD_PRICE * 2);                 // temporarily healthy
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", gold, GOLD_PRICE * 2);                 // temporarily healthy
         b.callFunction(gold, "approve", address(cdpVault), collateral);
         b.callFunction(address(cdp), "deposit", gold, collateral);
         b.callFunction(address(cdp), "mint", gold, debt);
-        oracle.setAssetPrice(gold, GOLD_PRICE);                     // back to pool parity
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", gold, GOLD_PRICE);                     // back to pool parity
 
         require(cdp.collateralizationRatio(address(b), gold) < LR, "vault must be liquidatable");
         return address(b);
@@ -395,8 +394,8 @@ contract Describe_Adv_Amm_PriceImpact is Authorizable {
         address borrower = _newLiquidatableVault(gold, WHALE_DEBT);
 
         // What the vendor's desk says: a clean 10% bonus.
-        usdstT.mint(address(desk), 5000000e18);
-        Token(gold).mint(address(desk), 1e18);
+        admin.castVoteOnIssue(USDST, "mint", address(desk), 5000000e18);
+        admin.castVoteOnIssue(gold, "mint", address(desk), 1e18);
         DeskLiquidator dl = new DeskLiquidator();
         dl.init(address(fm), address(cdp), USDST, gold, address(desk));
         dl.run(borrower, WHALE_REPAY);
@@ -529,14 +528,14 @@ contract Describe_Adv_Amm_PriceImpact is Authorizable {
     /// The desk version reaches minCR exactly as the vendor claims.
     function it_e1_leverage_desk_reaches_mincr() public {
         (address p, address gold) = _newGold("GG");
-        Token(gold).mint(address(desk), 100000e18);
-        usdstT.mint(address(desk), 10000000e18);
+        admin.castVoteOnIssue(gold, "mint", address(desk), 100000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(desk), 10000000e18);
 
         DeskLeverager d = new DeskLeverager();
         d.init(address(fm), address(cdp), USDST, gold, address(desk));
         // $100,000 of equity, exactly the vendor's shape
         uint equity = (100000e18 * 1e18) / GOLD_PRICE;
-        Token(gold).mint(address(d), equity);
+        admin.castVoteOnIssue(gold, "mint", address(d), equity);
         d.openEquity();
         d.lever(150000e18);
 
@@ -556,7 +555,7 @@ contract Describe_Adv_Amm_PriceImpact is Authorizable {
         uint equity = (100000e18 * 1e18) / GOLD_PRICE;
         PoolLeverager l = new PoolLeverager();
         l.init(address(fm), address(cdp), p, USDST, gold);
-        Token(gold).mint(address(l), equity);
+        admin.castVoteOnIssue(gold, "mint", address(l), equity);
         l.openEquity();
 
         // pre-compute what the pool would actually sell
@@ -597,7 +596,7 @@ contract Describe_Adv_Amm_PriceImpact is Authorizable {
         // LIVE confirmation at the boundary.
         PoolLeverager l = new PoolLeverager();
         l.init(address(fm), address(cdp), p, USDST, gold);
-        Token(gold).mint(address(l), equity);
+        admin.castVoteOnIssue(gold, "mint", address(l), equity);
         l.openEquity();
         l.lever((levMaxFeasible * 99) / 100);
         require(l.mintedBack() > 0, "boundary leverage actually executes");

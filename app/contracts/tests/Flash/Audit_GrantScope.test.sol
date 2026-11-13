@@ -1,29 +1,28 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 
 /// Stands in for "whatever code holds the grant" — FlashMint today, its next
 /// implementation tomorrow. Does the grant itself constrain the holder at all?
 contract GrantHolder {
-    function mintTo(address token, address to, uint amt) public { Token(token).mint(to, amt); }
-    function burnFrom(address token, address from, uint amt) public { Token(token).burn(from, amt); }
+    function mintTo(address token, address to, uint amt) public { AdminRegistry(Ownable(token).owner()).castVoteOnIssue(token, "mint", to, amt); }
+    function burnFrom(address token, address from, uint amt) public { AdminRegistry(Ownable(token).owner()).castVoteOnIssue(token, "burn", from, amt); }
 }
 
 /*
  * The question is not what FlashMint.sol does with the grant. It is what the grant
  * PERMITS, because the grant outlives any particular implementation behind the proxy.
  */
-contract Describe_MintBurnGrantScope is Authorizable {
+contract Describe_MintBurnGrantScope {
     Mercata m; AdminRegistry admin; address USDST; Token usdstT;
     string[] empty;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         empty = new string[](0);
         m = new Mercata(); admin = m.adminRegistry();
-        USDST = m.tokenFactory().createToken("USDST","USD Stable",empty,empty,empty,"USDST",0,18);
-        usdstT = Token(USDST); usdstT.setStatus(2);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",empty,empty,empty,"USDST",0,18);
+        USDST = address(ret);
+        usdstT = Token(USDST); admin.castVoteOnIssue(USDST, "setStatus", 2);
     }
 
     /// The grant is "mint", unqualified. No cap, no recipient restriction.
@@ -48,7 +47,7 @@ contract Describe_MintBurnGrantScope is Authorizable {
 
         // An innocent third party with its own money and no relationship to the grant holder.
         address victim = address(0xCAFE);
-        usdstT.mint(victim, 250000e18);
+        admin.castVoteOnIssue(USDST, "mint", victim, 250000e18);
         require(usdstT.allowance(victim, address(g)) == 0, "victim granted NO allowance");
 
         uint supplyBefore = usdstT.totalSupply();
@@ -62,7 +61,7 @@ contract Describe_MintBurnGrantScope is Authorizable {
     /// itself to msg.sender; nothing in the grant requires that of its successor.
     function it_x3_the_grant_does_not_encode_flashmints_self_restriction() public {
         FlashMint fm = new FlashMint(address(admin));
-        fm.initialize(USDST, address(m.feeCollector()), 0);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), 0);
         // FlashMint's own guard is a line of its source, not a property of the grant.
         try {
             fm.flashLoan(address(0xD00D), 1e18, "");
