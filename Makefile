@@ -315,7 +315,7 @@ oracle:
 
 build_formatter:
 	@echo building code formatter...
-	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-formatter:${STACK_RESOLVER} - < Dockerfile.formatter
+	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-formatter:${STACK_RESOLVER} - < strato/extraFiles/Dockerfile.formatter
 
 build_common: generate-version-file
 	@echo building haskell libraries and creating directories
@@ -474,18 +474,14 @@ vault-nginx:
 	DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
 docker-compose:
-	@echo Generating vault, highway, bridge, api, app compose files...
-	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
+	@echo Generating vault, highway, bridge compose files...
+	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' -e 's|<POSTGRES_IMAGE>|$(REPO_GHCR_URL)postgres:$(VERSION)-$(HASH_POSTGRES)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.yml
-	sed -e 's|<REPO_URL>|$(REPO_GHCR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.api.tpl.yml > docker-compose.api.push.yml
-	sed -e 's|<REPO_URL>|$(REPO_GHCR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.app.tpl.yml > docker-compose.app.push.yml
 
 	awk '/build: ./{getline} 1' docker-compose.vault.push.yml > docker-compose.vault.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.yml > docker-compose.highway.yml
 	awk '/build: ./{getline} 1' docker-compose.bridge.push.yml > docker-compose.bridge.yml
-	awk '/build: ./{getline} 1' docker-compose.api.push.yml > docker-compose.api.yml
-	awk '/build: ./{getline} 1' docker-compose.app.push.yml > docker-compose.app.yml
 
 # The node images of this build, by their GitHub registry name. CI pushes them
 # with push-node-images; images a build did not make are skipped. The strato

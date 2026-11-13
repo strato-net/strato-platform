@@ -8,7 +8,7 @@ Build the images and copy the generated Compose file before running it:
 ```
 cd strato-platform
 ./install_deps.sh
-make vault-wrapper vault-nginx docker-compose
+make postgres vault-wrapper vault-nginx docker-compose
 cp docker-compose.vault.yml strato/vault/vault-runner/
 ```
 
@@ -46,6 +46,39 @@ strato-up mynode \
    - `--vaultUrl=https://example.com:8443/strato/v2.3 \`
 4. Make sure the domain and port are accessible from the STRATO node's host.
 
+### Database
+
+`run-vault.sh` runs the Vault with the bundled PostgreSQL container (Compose profile `local-postgres`), which is meant for local runs and CI. The Vault logs in as `strato`, which is not a superuser, and the container has no superuser login.
+
+A `vault_vaultpgdata` volume created by an earlier build holds PostgreSQL 9.6 data, and the bundled PostgreSQL 14 does not start on it. To keep its keys, dump the database with the old container before upgrading (`sudo docker exec vault-postgres-1 pg_dump -U postgres --no-owner -d oauth > vault-dump-file.sql`), remove the volume (`sudo docker volume rm vault_vaultpgdata`), start the Vault and follow the [steps to restore the DB dump](#steps-to-restore-the-db-dump-for-testing-or-in-case-of-disaster). The restore reports one harmless error, `must be owner of extension plpgsql`, and the restored Vault takes its old password.
+
+To use an external database instead, create a database and a login that owns it, write the login's password to a password file, and start the Vault without the profile:
+```
+sudo \
+  postgres_host=db.example.com \
+  postgres_user=vault \
+  postgres_vault_wrapper_db=vault \
+  VAULT_PGPASS_FILE=/etc/vault/postgres.pgpass \
+  VAULT_NGINX_PORT=8080:80 \
+  ssl=false \
+  INITIAL_OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration' \
+  INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/mercata' \
+  INITIAL_OAUTH_JWT_USER_ID_CLAIM='sub' \
+  docker compose -f docker-compose.vault.yml -p vault up -d
+```
+
+| Variable | Default | Description |
+|---|---|---|
+| `COMPOSE_PROFILES` | | `local-postgres` runs the bundled PostgreSQL container. Leave unset for an external database. |
+| `VAULT_PGPASS_FILE` | `/etc/vault/postgres.pgpass` | File with the database login's password: one `host:port:database:user:password` line, mode `0600`. |
+| `postgres_host` | `postgres` | Database host. The default is the bundled PostgreSQL container. |
+| `postgres_user` | `strato` | Database login. The default is the bundled PostgreSQL's login. |
+| `postgres_vault_wrapper_db` | `oauth` | Database name. |
+| `postgres_password` | `api` | Password the bundled PostgreSQL is created with on its first start. The password file must hold the same one. |
+| `VAULT_CREATE_DB` | `false` | Create the database when it is missing. Set to `true` with the bundled PostgreSQL. |
+| `PGSSLMODE` | `verify-full` | TLS mode of the database connection. Set to `disable` with the bundled PostgreSQL. |
+| `PGSSLROOTCERT` | `system` | CA certificates the database's certificate is verified against. With `PGSSLMODE=disable` set it to `/etc/ssl/certs/ca-certificates.crt`. |
+
 ### Key migration
 
 You may want to migrate a specific user's key from one Vault instance to another (for example,
@@ -56,11 +89,11 @@ from the BlockApps shared Vault to your local vault). See the
 
 - To bring down but keep database:
     ```
-    docker compose -f docker-compose.vault.yml -p vault down
+    docker compose -f docker-compose.vault.yml -p vault --profile local-postgres down
     ```
-- To wipe the vault:
+- To wipe the vault (all user keys stored in it are lost):
     ```
-    docker compose -f docker-compose.vault.yml -p vault down -vt0
+    docker compose -f docker-compose.vault.yml -p vault --profile local-postgres down -vt0
     ```
 
 
@@ -83,7 +116,7 @@ sudo docker exec vault-vault-wrapper-1 chmod 755 /usr/local/bin/change-vault-pas
 
 ### Backup DB
 ```
-sudo docker exec vault-postgres-1   pg_dump -U postgres -d oauth -F p   > ~/vault-$(date -u +%F-%H%M%S).sql
+sudo docker exec vault-postgres-1   pg_dump -U strato -d oauth -F p   > ~/vault-$(date -u +%F-%H%M%S).sql
 ```
 
 ### Execute the password change
@@ -102,7 +135,7 @@ sudo docker exec -i \
   vault-vault-wrapper-1 \
   /usr/local/bin/change-vault-password \
     --pghost=postgres --pgport=5432 \
-    --pguser=postgres --password=api --database=oauth
+    --pguser=strato --password=api --database=oauth
 #
 sudo docker restart -t 0 vault-vault-wrapper-1
 for i in {1..200}; do
@@ -136,27 +169,27 @@ rm -rf update-password.sh
     ```
 2. Terminate connections to oauth.
     ```
-    sudo docker exec vault-postgres-1 psql -U postgres -d postgres -c \
+    sudo docker exec vault-postgres-1 psql -U strato -d postgres -c \
     "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'oauth' AND pid <> pg_backend_pid();"`
     ```
 3. Drop the database.
-    ```sudo docker exec vault-postgres-1 psql -U postgres -d postgres -c \
+    ```sudo docker exec vault-postgres-1 psql -U strato -d postgres -c \
     "DROP DATABASE IF EXISTS oauth;"
    ```
 4. Recreate it.
     ```
-    sudo docker exec vault-postgres-1 psql -U postgres -d postgres -c \
-    "CREATE DATABASE oauth OWNER postgres;"
+    sudo docker exec vault-postgres-1 psql -U strato -d postgres -c \
+    "CREATE DATABASE oauth OWNER strato;"
     ```
 5. Restore the dump. Execute from the directory with `vault-dump-file.sql` file:
     ```
     sudo docker exec -i vault-postgres-1 \
-    psql -U postgres -d oauth \
+    psql -U strato -d oauth \
     < vault-dump-file.sql
     ```
 6. Sanity check.
     ```
-    sudo docker exec vault-postgres-1 psql -U postgres -d oauth -c \
+    sudo docker exec vault-postgres-1 psql -U strato -d oauth -c \
     "SELECT (SELECT count(*) FROM users) AS users, (SELECT count(*) FROM message) AS message;"
     ```
 7. Start the vault.
