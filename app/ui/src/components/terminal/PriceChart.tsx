@@ -465,18 +465,21 @@ export const PriceChart = ({ market, myTrades }: { market: Market; myTrades: MyT
     }
   }, [indicators]);
 
-  // the user's own trades in this pool, marked where they filled
+  // the user's own trades in this pool, marked where they filled. A trade's price includes the
+  // pool's fee, taken from what was paid in, and the candles do not: with the fee taken out
+  // the mark sits on the candle the trade made
   useEffect(() => {
+    const afterFee = 1 - market.feeBps / 10_000;
     handles.current?.drawings.setFills(
       myTrades
         .filter((trade) => trade.poolAddress === poolAddress)
-        .map((trade) => ({
-          time: trade.timestamp.getTime() / 1000,
-          price: Number(trade.impliedPrice),
-          buy: trade.tokenOut === market.base.symbol,
-        }))
+        .map((trade) => {
+          const buy = trade.tokenOut === market.base.symbol;
+          const paid = Number(trade.impliedPrice);
+          return { time: trade.timestamp.getTime() / 1000, price: buy ? paid * afterFee : paid / afterFee, buy };
+        })
     );
-  }, [myTrades, poolAddress, market.base.symbol]);
+  }, [myTrades, poolAddress, market.base.symbol, market.feeBps]);
 
   const toggleIndicator = (id: string) => {
     const next = enabledIndicators.includes(id) ? enabledIndicators.filter((other) => other !== id) : [...enabledIndicators, id];
