@@ -87,6 +87,20 @@ Nuances:
   pending upgrade. Signers must propose them again. This prevents approvals collected
   under the old signer set from being used under the new one.
 
+### When a signer is another multisig wallet
+
+The inner multisig must collect its own approvals and wait out its own waiting period
+before it can confirm an outer wallet's invitation, accept a nomination, approve an
+outer proposal, or execute one. Invitations, nominations, and proposal approvals each
+have a 30-day window. If the inner wallet waits `D` days, at most `30 − D` days remain
+to collect its approvals and act. A 30-day inner waiting period leaves only the
+same-second boundary and is unusable in practice.
+
+An outer proposal has a separate 7-day execution window. A nested signer that starts
+its execution proposal only after that window opens has at most `7 − D` days to act;
+preparing the inner proposal earlier may help when the outer action is already known.
+A quorum that depends on a slow nested signer may be unable to act in time.
+
 ## Upgrading a multisig wallet's rules
 
 This is what the 7-day upgrade delay is for. Publishing new rules never changes a
@@ -113,6 +127,10 @@ Nuances:
 - An upgrade may include one migration step. Its name must start with `migrate`, it
   takes no input, and it can only run as part of the upgrade. If it fails, the whole
   upgrade is undone.
+- Before new rules take effect, the multisig wallet checks that they can still read its
+  signers, approvals needed and waiting period. If the check fails, the upgrade is undone
+  and the old rules stay. This stops an upgrade to a wrong address or an incompatible
+  version; it does not catch every possible fault in new rules.
 - Signers can **freeze upgrades** permanently. A frozen multisig wallet can never
   receive fixes; the only remedy is moving funds to a new multisig wallet.
 

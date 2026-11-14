@@ -4,7 +4,7 @@
  * @dev SolidVM delegatecall storage is keyed by variable name. The multisig-prefixed
  * shell fields below intentionally match MultisigWallet and are read-only here.
  */
-contract record MultisigLogic {
+contract MultisigLogic {
     uint public constant MIN_SIGNERS = 3;
     uint public constant MAX_TRANSACTION_TIMELOCK = 2592000; // 30 days
     uint public constant ISSUE_APPROVAL_LIFETIME = 2592000; // 30 days
@@ -37,19 +37,19 @@ contract record MultisigLogic {
     address public multisigFactory;
     uint public multisigEpoch;
 
-    address[] public record signers;
-    mapping (address => uint) public record signerMap;
+    address[] public signers;
+    mapping (address => uint) public signerMap;
     uint public requiredApprovals;
     uint public transactionTimelock;
     uint public nextIssueNonce;
     bool public multisigInitialized;
     bool private multisigExecuting;
 
-    mapping (string => Issue) public record issues;
-    mapping (string => mapping (address => bool)) public record issueApprovals;
+    mapping (string => Issue) public issues;
+    mapping (string => mapping (address => bool)) public issueApprovals;
 
-    mapping (address => Nomination) public record nominations;
-    mapping (address => address[]) public record nominationSigners;
+    mapping (address => Nomination) public nominations;
+    mapping (address => address[]) public nominationSigners;
     address private openNominee;
 
     event IssueCreated(address creator, string issueId, uint nonce, uint epoch, address target, string functionName, string[] argumentTypes, uint approvalExpiresAt, variadic arguments);
@@ -98,6 +98,17 @@ contract record MultisigLogic {
             signers.push(_signers[i]);
             signerMap[_signers[i]] = signers.length;
         }
+    }
+
+    /// @dev Read-only. The shell requires this to pass before adopting a logic version.
+    function multisigHealthCheck() external returns (bool) {
+        require(multisigInitialized, "Multisig is not initialized");
+        _validateConfiguration(signers, requiredApprovals);
+        require(transactionTimelock <= MAX_TRANSACTION_TIMELOCK, "Timelock exceeds maximum");
+        for (uint i = 0; i < signers.length; i++) {
+            require(signerMap[signers[i]] == i + 1, "Signer index does not match");
+        }
+        return true;
     }
 
     function proposeIssue(address _target, string _functionName, string[] _argumentTypes, variadic _arguments) external onlySigner notExecuting returns (string) {

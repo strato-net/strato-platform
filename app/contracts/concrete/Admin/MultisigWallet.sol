@@ -7,7 +7,7 @@ interface IMultisigVersionRegistry {
  * @title MultisigWallet
  * @notice Permanent treasury address and upgrade shell for MultisigLogic.
  */
-contract record MultisigWallet {
+contract MultisigWallet {
     uint public constant UPGRADE_DELAY = 604800; // 7 days
     uint public constant UPGRADE_EXPIRY_WINDOW = 604800; // 7 days
 
@@ -63,6 +63,7 @@ contract record MultisigWallet {
         multisigCurrentVersion = _initialVersion;
         multisigEpoch = 1;
         _initialLogic.delegatecall("initialize", _signers, _requiredApprovals, _transactionTimelock);
+        _requireHealthyLogic(_initialLogic, _initialVersion, msg.sender);
         multisigActive = true;
     }
 
@@ -138,6 +139,7 @@ contract record MultisigWallet {
             "Upgrade path is not approved"
         );
 
+        address factory = multisigFactory;
         address previousLogic = logicContract;
         address targetLogic = pending.targetLogic;
         string fromVersion = multisigCurrentVersion;
@@ -152,6 +154,8 @@ contract record MultisigWallet {
         if (migrationFunction != "") {
             targetLogic.delegatecall(migrationFunction);
         }
+        _requireHealthyLogic(targetLogic, targetVersion, factory);
+        require(multisigActive, "Logic changed shell state");
         emit UpgradeExecuted(msg.sender, previousLogic, targetLogic, fromVersion, targetVersion, multisigEpoch);
     }
 
@@ -171,6 +175,16 @@ contract record MultisigWallet {
     function argumentAt(uint _index, variadic _arguments) external returns (bool) {
         variadic value = _arguments[_index];
         return true;
+    }
+
+    function _requireHealthyLogic(address _logic, string _version, address _factory) internal {
+        bool healthy = _logic.delegatecall("multisigHealthCheck");
+        require(healthy, "Logic failed its health check");
+        require(
+            logicContract == _logic && multisigCurrentVersion == _version &&
+            multisigFactory == _factory && !multisigUpgradesFrozen,
+            "Logic changed shell state"
+        );
     }
 
     function _isMigrationName(string _name) internal returns (bool) {
