@@ -253,11 +253,13 @@ the activation height; (2) deploy `StratoStaking` V2 + `ValidatorRegistry` V2 be
 `setGovernance(0x100, false)`; (3) upgrade governance logic (`setLogicContract`), vote
 `setStakingContract`; (4) list the current validators as operators with their node vault
 addresses, stake ≥ `minStake`, `setGovernance(0x100, true)`, then `tryActivate` each (or
-`reconcileSet`), `setSetParams(maxActiveValidators = live n, …, maxOperatorStakeBps = 3300,
-joinsPaused = true)`, `gov.setHardCapValidators(50)`, `registry.setEmergencyKicker(<ops key>)` — all
-before the activation height; (5) deploy `FeeRouter`
+`reconcileSet`), `setSetParams(maxActiveValidators = live n, …, maxOperatorStakeBps = 3300)`
+(joins stay closed: no opening block is agreed yet), `gov.setHardCapValidators(50)`,
+`registry.setEmergencyKicker(<ops key>)` — all before the activation height; (5) deploy `FeeRouter`
 and `DeciderState.updatePayFeeContract` (owner key); (6) migrate V1 stakers (stop schedule,
-`setParams(unbondingSeconds=0)`, users unstake/restake). Fresh networks get `FeeRouter` at
+`setParams(unbondingSeconds=0)`, users unstake/restake); (7) once weighted votes are live on every
+producer and every weight is in a header, vote `setJoinsOpenFromBlock` (Upquark: see
+`app/contracts/deploy/RUNBOOK-upquark-admission-and-emissions.md`). Fresh networks get `FeeRouter` at
 `0xDEC1DE03` from genesis.
 
 ## Known limitations (accepted for this phase)
