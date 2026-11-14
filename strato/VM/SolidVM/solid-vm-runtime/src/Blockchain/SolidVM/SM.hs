@@ -39,7 +39,6 @@ module Blockchain.SolidVM.SM
     withContractConstruction,
     getCodeHashForDerivation,
     withStaticCallInfo,
-    withUncheckedCallInfo,
     withLocalVars,
     getCurrentCallInfo,
     setCallArguments,
@@ -157,7 +156,6 @@ data CallInfo = CallInfo
     stateMap :: !(M.Map Address AddressStateModification),
     storageMap :: !(M.Map (Address, MS.StoragePath) MS.BasicValue),
     readOnly :: Bool,
-    isUncheckedSection :: Bool, -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
     currentSourcePos :: Maybe SourcePosition,
     isFreeFunction :: Bool
   }
@@ -848,17 +846,11 @@ addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
             stateMap = M.empty,
             storageMap = M.empty,
             readOnly = ro,
-            isUncheckedSection = False, -- The rationale here is that unchecked sections only apply to the current stack frame
             currentSourcePos = Nothing,
             isFreeFunction = ff
           }
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo :)
-
-uncheckedCallInfo :: MonadSM m => m ()
-uncheckedCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-  [] -> throw (InternalError "uncheckedCallInfo was called on an already empty stack")
-  (ci : rest) -> pure $ ci {isUncheckedSection = True} : ci : rest
 
 popCallInfo :: MonadSM m => Bool -> m ()
 popCallInfo reverted = do
@@ -930,15 +922,6 @@ withStaticCallInfo f = do
       case eResult of
         Left (e :: SomeException) -> throwIO e
         Right result -> pure result
-
-withUncheckedCallInfo :: MonadSM m => m a -> m a
-withUncheckedCallInfo f = do
-  uncheckedCallInfo
-  eResult <- try f
-  popCallInfo $ isLeft eResult
-  case eResult of
-    Left (e :: SomeException) -> throwIO e
-    Right result -> pure result
 
 getCurrentCallInfo :: MonadSM m => m CallInfo
 getCurrentCallInfo = do

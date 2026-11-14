@@ -1030,7 +1030,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
   return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos
-  withUncheckedCallInfo $ runStatementBlock code
+  runStatementBlock code
 
 --runs the "_;" operator in a modifier statement
 runStatement (CC.ModifierExecutor pos) = do
