@@ -111,4 +111,5 @@ tests:
       - ethereum-rlp
       - format
       - hspec
+      - network
       - strato-model

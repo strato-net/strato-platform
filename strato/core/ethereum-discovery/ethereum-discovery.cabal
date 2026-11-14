@@ -138,5 +138,6 @@ test-suite ethereum-discover-test
     , ethereum-rlp
     , format
     , hspec
+    , network
     , strato-model
   default-language: Haskell2010

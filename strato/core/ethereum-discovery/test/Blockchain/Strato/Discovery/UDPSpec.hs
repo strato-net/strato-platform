@@ -5,8 +5,10 @@
 module Blockchain.Strato.Discovery.UDPSpec where
 
 import Blockchain.Data.RLP
+import Blockchain.Strato.Discovery.Data.Peer (TCPPort (..), UDPPort (..))
 import Blockchain.Strato.Discovery.UDP
 import Data.Bits
+import Data.String (fromString)
 import Network.Socket (tupleToHostAddress, tupleToHostAddress6)
 import Test.Hspec
 import Text.Format
@@ -38,3 +40,24 @@ spec = do
     it "parses ipv6 addresses" $ do
       let addr = rlpDecode . rlpEncode $ stringToIAddr "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
       addr `shouldBe` (IPV6Addr (536939960, 2242052096, 35374, 57701172))
+
+  describe "neighborsPackets" $ do
+    let neighbor i =
+          Neighbor
+            (Endpoint (IPV4Addr $ tupleToHostAddress (10, 0, 0, i)) (UDPPort 30303) (TCPPort 30303))
+            (NodeID . fromString $ replicate 64 'n')
+        neighbors = map neighbor [1 .. 20]
+        packets = neighborsPackets 0 neighbors
+
+    it "needs more than one packet for the twenty closest peers" $ do
+      packetWireLength (Neighbors neighbors 0) `shouldSatisfy` (> maxPacketBytes)
+      length packets `shouldSatisfy` (> 1)
+
+    it "keeps every packet within the discovery size limit" $
+      map packetWireLength packets `shouldSatisfy` all (<= maxPacketBytes)
+
+    it "keeps every neighbor, in order" $
+      concat [ns | Neighbors ns _ <- packets] `shouldBe` neighbors
+
+    it "answers with one empty packet when it knows no neighbors" $
+      neighborsPackets 0 [] `shouldBe` [Neighbors [] 0]
