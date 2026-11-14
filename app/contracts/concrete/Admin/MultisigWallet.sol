@@ -86,6 +86,7 @@ contract record MultisigWallet {
             "An upgrade is already pending"
         );
         if (_migrationFunction != "") {
+            require(!_hasOpeningParenthesis(_migrationFunction), "Signature-style calls are not allowed");
             require(_isMigrationName(_migrationFunction), "Invalid migration function");
         }
 
@@ -182,6 +183,15 @@ contract record MultisigWallet {
         return true;
     }
 
+    function _hasOpeningParenthesis(string _name) internal returns (bool) {
+        bytes name = bytes(_name);
+        bytes opening = bytes("(");
+        for (uint i = 0; i < name.length; i++) {
+            if (name[i] == opening[0]) return true;
+        }
+        return false;
+    }
+
     function _clearPendingUpgrade() internal {
         multisigPendingUpgrade.targetLogic = address(0);
         multisigPendingUpgrade.fromVersion = "";
@@ -195,6 +205,7 @@ contract record MultisigWallet {
 
     fallback(variadic args) external returns (variadic) {
         require(multisigActive, "Wallet is not active");
+        require(!_hasOpeningParenthesis(msg.sig), "Signature-style calls are not allowed");
         require(!_isMigrationName(msg.sig), "Migration functions run only during an upgrade");
         return logicContract.delegatecall(msg.sig, args);
     }

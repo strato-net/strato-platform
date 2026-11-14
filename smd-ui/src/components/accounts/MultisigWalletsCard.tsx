@@ -111,6 +111,7 @@ export function MultisigWalletsCard({ ownerAddress }: { ownerAddress?: string | 
                 <div>
                   <div>Invitation to create multisig wallet {setup.label || "Unnamed multisig wallet"}</div>
                   <div className="text-xs text-muted-foreground">
+                    Approvals needed: {setup.requiredApprovals} of {setup.signerCount} ·{" "}
                     {setup.confirmedCount} of {setup.signerCount} signers confirmed
                   </div>
                 </div>

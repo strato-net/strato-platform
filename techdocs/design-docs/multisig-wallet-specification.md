@@ -149,6 +149,9 @@ The number of supplied arguments must exactly equal the number of declared argum
 types. Missing or additional variadic values are rejected before the commitment is
 created or checked.
 
+Issue function names containing `(` are rejected so SolidVM cannot normalize a
+signature-style name into a different dispatched function after approval.
+
 STRATO has no separate ETH-like asset. USDST, STRATO, and other asset movements are represented as token contract calls, so issues do not carry a separate native-value field.
 
 ### Issue lifecycle
@@ -178,13 +181,16 @@ Signer or threshold changes:
 - Clear any pending upgrade.
 - Void all other open nominations.
 
-New and replacement signers use two-phase activation:
+New signers use two-phase activation:
 
-1. The current quorum executes an issue that nominates the signer and records the complete resulting configuration—signer set and M.
+1. The current quorum executes an issue that nominates exactly one signer. The resulting configuration must contain every current signer plus the nominee, with M unchanged.
 2. The nominee proves control by confirming from the nominated address.
 3. Confirmation applies the recorded configuration immediately, after rechecking `2 <= M < N`; no second quorum vote is required.
 
 Nominations are bound to the epoch in which they were created. They expire, can be revoked by quorum, and are voided by any epoch increment.
+
+Replacing a signer requires two proposals: add and activate the replacement first, then
+remove the old signer through a separate configuration proposal.
 
 Removals that add no new signer need no nomination and apply when the issue executes.
 
@@ -266,7 +272,9 @@ Executors cannot supply a migration function or arguments. This prevents permiss
 execution from substituting values that collide under SolidVM's raw variadic hashing.
 
 Every migration function name must begin with `migrate`. The permanent wallet shell
-rejects that prefix in its fallback, so migration functions can be reached only by
+rejects signature-style fallback names containing `(` before rejecting that prefix.
+This prevents SolidVM from normalizing a whitespace-prefixed signature into a migration
+function after the guard. Migration functions can therefore be reached only by
 `executeUpgrade` during the atomic upgrade. State-changing setup or initialization
 functions outside the `migrate` prefix are rejected by the logic version publication
 review described above.

@@ -35,6 +35,8 @@ Nuances:
 - The multisig wallet address exists only after the last confirmation. SMD does not show
   an address before then. Funds sent to a predicted address are lost if the invitation
   is cancelled or expires.
+- SMD always uses the latest approved rules version. The contracts accept any approved
+  version, so someone calling them directly can still choose an older one.
 - If the chosen rules version is deprecated before the last confirmation, creation is
   refused and a new invitation is needed.
 - A multisig wallet cannot be one of its own signers.
@@ -61,6 +63,7 @@ signer changes, upgrades.
 | The action fails when executed | The whole transaction is undone; the proposal can be retried until it expires |
 
 Only signers can propose, approve, and execute.
+Proposal function names must be plain names; signature-style names containing `(` are rejected.
 
 ## Changing signers, approvals, or the waiting period
 
@@ -74,7 +77,9 @@ Nuances:
 
 - All of these wait out the **current** waiting period. Shortening the waiting period
   still takes the old one.
-- A nomination can add exactly one new signer and may remove others in the same step.
+- A nomination adds exactly one new signer, keeps every current signer, and cannot change
+  the approvals needed. To replace a signer, add and activate the replacement first, then
+  remove the old signer with a separate proposal.
 - Only one nomination is open at a time. A new one replaces it.
 - Withdrawing a nomination is a normal proposal and waits the waiting period, so the
   nominee can still accept in the meantime.

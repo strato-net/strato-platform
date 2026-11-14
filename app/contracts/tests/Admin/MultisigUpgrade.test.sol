@@ -124,6 +124,18 @@ contract Describe_MultisigUpgrade {
         require(MultisigLogicV2(wallet).migrationMarker() == 7, "Committed no-argument migration did not run");
     }
 
+    function it_rejects_signature_style_migration_names() {
+        address wallet = deploy(0);
+        schedule(wallet, "migrate");
+        fastForward(604800);
+        outsider.invoke(wallet, "executeUpgrade");
+        require(
+            rejects(outsider, wallet, " migrate()"),
+            "Signature-style migration bypassed the fallback guard"
+        );
+        require(MultisigLogicV2(wallet).ordinaryFunction() == 9, "Ordinary fallback call was blocked");
+    }
+
     function it_rechecks_revocation_at_execution() {
         address wallet = deploy(0);
         schedule(wallet, "");
@@ -211,6 +223,35 @@ contract Describe_MultisigUpgrade {
                 "ordinaryFunction"
             ),
             "Non-migration function was scheduled"
+        );
+    }
+
+    function it_rejects_a_signature_style_migration_name() {
+        address wallet = deploy(0);
+        string issueId = a.invoke(
+            wallet,
+            "proposeIssue",
+            wallet,
+            "scheduleUpgrade",
+            ["address", "string", "string"],
+            address(v2),
+            "2",
+            "migrate()"
+        );
+        require(
+            rejects(
+                b,
+                wallet,
+                "approveIssue",
+                issueId,
+                wallet,
+                "scheduleUpgrade",
+                ["address", "string", "string"],
+                address(v2),
+                "2",
+                "migrate()"
+            ),
+            "Signature-style migration function was scheduled"
         );
     }
 
