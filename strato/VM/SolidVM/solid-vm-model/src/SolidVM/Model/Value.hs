@@ -12,6 +12,7 @@ module SolidVM.Model.Value
   ( Variable (..),
     Value (.., SIntegral),
     unsignedInteger,
+    integerResult,
     coerceUnsignedValue,
     ValList,
     toNull,
@@ -151,6 +152,10 @@ unsignedInteger :: Integer -> Value
 unsignedInteger n
   | n < 0 = arithmeticException "unsigned integer underflow" n
   | otherwise = SUnsigned (fromInteger n)
+
+integerResult :: Bool -> Integer -> Value
+integerResult True = unsignedInteger
+integerResult False = SInteger
 
 -- See the note on the Store instances in SolidVM.Model.Storable.
 instance Store Value

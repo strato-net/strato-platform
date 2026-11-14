@@ -52,7 +52,7 @@ import Blockchain.SolidVM.Metrics
 import Blockchain.SolidVM.SM
 import Blockchain.SolidVM.SetGet
 import Blockchain.SolidVM.TraceTools
-import SolidVM.Solidity.StaticAnalysis.Typechecker (showType)
+import SolidVM.Solidity.StaticAnalysis.Typechecker (showType, expressionType, isIntegerLiteral)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import SolidVM.Model.Delta
@@ -1146,6 +1146,47 @@ expToVar x = do
   decrementGas 1
   return v
 
+expressionTypeFor :: MonadSM m => CC.Expression -> m (Maybe SVMType.Type)
+expressionTypeFor expression | isIntegerLiteral expression = pure $ Just $ SVMType.Int Nothing Nothing
+expressionTypeFor expression = do
+  frame <- getCurrentCallInfo
+  let types = M.mapMaybe (\case TypedVariable t _ -> Just t; _ -> Nothing) (NE.head $ localVariables frame)
+  pure $ expressionType (codeCollection frame) (currentContract frame) types expression
+
+arithmeticValue :: MonadSM m => CC.Expression -> m Value
+arithmeticValue expression = do
+  variable <- expToVar expression
+  value <- getVar variable
+  case (variable, value) of
+    (TypedVariable _ _, _) -> pure value
+    (_, SInteger _) | not (isIntegerLiteral expression) -> expressionTypeFor expression >>= \case
+      Just t@(SVMType.Int (Just False) _) -> enforceUnsignedType t value
+      _ -> pure value
+    _ -> pure value
+
+isUnsignedValue :: Value -> Bool
+isUnsignedValue SUnsigned{} = True
+isUnsignedValue _ = False
+
+checkUnsignedOperands :: MonadSM m => CC.Expression -> Value -> CC.Expression -> Value -> m Bool
+checkUnsignedOperands left a right b = do
+  unsigned <- if isUnsignedValue a || isUnsignedValue b then pure True else
+    if unset a || unset b then do
+      ta <- expressionTypeFor left
+      tb <- expressionTypeFor right
+      pure $ unsignedType ta || unsignedType tb
+    else pure False
+  when unsigned $ forM_ [a, b] $ \case
+    SIntegral n -> void $ pure $! unsignedInteger n
+    _ -> pure ()
+  pure unsigned
+  where
+    unset SNULL = True
+    unset SReference{} = True
+    unset _ = False
+    unsignedType (Just (SVMType.Int (Just False) _)) = True
+    unsignedType _ = False
+
 decrementGas :: MonadSM m => Gas -> m ()
 decrementGas !gas = do
   gi' <- chargeGasState gas
@@ -1195,35 +1236,45 @@ expToVar' (CC.Variable _ name) = do
     _ -> return var
 expToVar' (CC.Unitary _ "-" e) = do
   var <- expToVar e
+  original <- getVar var
   value <- getRealNum var
   case value of
-    Left v -> return $ Constant $ SInteger (v * (-1))
+    Left v -> pure . Constant $! integerResult (isUnsignedValue original) (negate v)
     Right v -> return $ Constant $ SDecimal $ v * (-1)
+expToVar' expression@(CC.Unitary _ "~" e) = do
+  value <- getVar =<< expToVar e
+  case value of
+    SUnsigned n -> pure . Constant $! unsignedInteger (complement $ toInteger n)
+    _ -> todo "expToVar/unhandled" expression
 expToVar' (CC.PlusPlus _ e) = do
   var <- expToVar e
-  value <- getInt var
+  original <- getVar var
+  value <- getIntVal original
 
   logAssigningVariable $ SInteger value
-  setVar var $ SInteger $ value + 1
-  return $ Constant $ SInteger value
+  setVar var $ integerResult (isUnsignedValue original) $ value + 1
+  return $ Constant $ integerResult (isUnsignedValue original) value
 expToVar' (CC.Unitary _ "++" e) = do
   var <- expToVar e
-  value <- getInt var
-  let next = SInteger $ value + 1
+  original <- getVar var
+  value <- getIntVal original
+  let next = integerResult (isUnsignedValue original) $ value + 1
   logAssigningVariable next
 
   setVar var next
   return $ Constant next
 expToVar' (CC.MinusMinus _ e) = do
   var <- expToVar e
-  value <- getInt var
+  original <- getVar var
+  value <- getIntVal original
   logAssigningVariable $ SInteger value
-  setVar var . SInteger $ value - 1
-  return $ Constant $ SInteger value
+  setVar var . integerResult (isUnsignedValue original) $ value - 1
+  return $ Constant $ integerResult (isUnsignedValue original) value
 expToVar' (CC.Unitary _ "--" e) = do
   var <- expToVar e
-  value <- getInt var
-  let next = SInteger $ value - 1
+  original <- getVar var
+  value <- getIntVal original
+  let next = integerResult (isUnsignedValue original) $ value - 1
   logAssigningVariable next
   setVar var next
   return $ Constant next
@@ -1517,9 +1568,26 @@ expToVar' (CC.ArrayExpression _ exps) = do
   vars <- for exps expToVar
   --  return $ Constant $ SArray (error "array type from array literal not known") $ V.fromList vars
   return $ Constant $ SArray $ V.fromList vars
-expToVar' (CC.Ternary _ condition expr1 expr2) = do
+expToVar' expression@(CC.Ternary _ condition expr1 expr2) = do
+  inferred <- expressionTypeFor expression
+  unsigned <- case inferred of
+    Just (SVMType.Int (Just False) _) -> pure True
+    Nothing -> do
+      ta <- expressionTypeFor expr1
+      tb <- expressionTypeFor expr2
+      pure $ case (ta, tb) of
+        (Just (SVMType.Int (Just False) _), Just (SVMType.Int Nothing _)) -> True
+        (Just (SVMType.Int Nothing _), Just (SVMType.Int (Just False) _)) -> True
+        (Just (SVMType.Int (Just False) _), Just (SVMType.Int (Just False) _)) -> True
+        _ -> False
+    _ -> pure False
   c <- getBool =<< expToVar condition
-  expToVar $ if c then expr1 else expr2
+  result <- expToVar $ if c then expr1 else expr2
+  if unsigned then do
+    let typ = SVMType.Int (Just False) Nothing
+    void $ getVar result >>= enforceUnsignedType typ
+    typedVariable typ result
+  else pure result
 expToVar' (CC.FunctionCall _ (CC.NewExpression _ SVMType.Bytes {} _) args) = do
   case args of
     [a] -> do
@@ -1949,7 +2017,7 @@ expToVar' ep@(CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src) =
       -- If it's a mapping, (expToVar dst) IS a reference, so we can set directly to it
       dstVar <- expToVar dst
       setVar dstVar srcVal
-      return $ Constant srcVal
+      assignmentValue dstVar srcVal
 expToVar' ep@(CC.Binary _ "=" (CC.IndexAccess _ _ Nothing) _) = do
   missingField "index value cannot be empty" (unparseExpression ep)
 expToVar' (CC.Binary _ "=" dst src) = do
@@ -1958,7 +2026,7 @@ expToVar' (CC.Binary _ "=" dst src) = do
 
   setVar dstVar srcVal
 
-  return $ Constant srcVal
+  assignmentValue dstVar srcVal
 expToVar' x = todo "expToVar/unhandled" x
 
 --------------
@@ -2017,13 +2085,14 @@ defaultToInt x            = x
 
 expToVarAdd :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
 expToVarAdd expr1 expr2 = do
-  i1' <- getVar =<< expToVar expr1
-  i2' <- getVar =<< expToVar expr2
+  i1' <- arithmeticValue expr1
+  i2' <- arithmeticValue expr2
   let addEm i1 i2 = case i1 of
         SIntegral a -> case defaultToInt i2 of
           SIntegral b -> do
+            unsigned <- checkUnsignedOperands expr1 i1 expr2 i2
             deductGasForOp $ 1 + (max `on` byteWidth) a b
-            return . Constant . SInteger $ a + b
+            pure . Constant $! integerResult unsigned (a + b)
           SDecimal b -> do
             deductGasForOp $ 1 + fromIntegral (decimalPlaces b) + (max `on` byteWidth) a (decimalMantissa b)
             return . Constant . SDecimal $ (Decimal 0 a) + b
@@ -2084,12 +2153,13 @@ expToVarArith :: MonadSM m =>
   (Integer -> Integer -> Integer) ->
   m Variable
 expToVarArith intOp decOp expr1 expr2 gasFormula = do
-  i1 <- getVar =<< expToVar expr1
-  i2 <- getVar =<< expToVar expr2
+  i1 <- arithmeticValue expr1
+  i2 <- arithmeticValue expr2
   case (defaultToInt i1, defaultToInt i2) of
     (SIntegral a, SIntegral b) -> do
+      unsigned <- checkUnsignedOperands expr1 i1 expr2 i2
       deductGasForOp $ gasFormula a b
-      return . Constant . SInteger $ a `intOp` b
+      pure . Constant $! integerResult unsigned (a `intOp` b)
     (SDecimal a, SDecimal b) -> do
       let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
           result = a `decOp` b
@@ -2114,12 +2184,13 @@ expToVarDivide :: MonadSM m =>
   CC.Expression ->
   m Variable
 expToVarDivide intOp decOp expr1 expr2 = do
-  i1 <- getVar =<< expToVar expr1
-  i2 <- getVar =<< expToVar expr2
+  i1 <- arithmeticValue expr1
+  i2 <- arithmeticValue expr2
   case (defaultToInt i1, defaultToInt i2) of
     (SIntegral a, SIntegral b) -> do
+      unsigned <- checkUnsignedOperands expr1 i1 expr2 i2
       deductGasForOp $ byteWidth a
-      return . Constant . SInteger $ a `intOp` b
+      pure . Constant $! integerResult unsigned (a `intOp` b)
     (SDecimal a, SDecimal b) -> do
       let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
           result = a `decOp` b
@@ -2148,10 +2219,16 @@ deductGasForOp numBytes = decrementGas . Gas $ 1 + (numBytes `shiftR` 5)
 
 expToVarInteger :: MonadSM m => CC.Expression -> (Integer -> Integer -> a) -> CC.Expression -> (a -> Value) -> (Integer -> Integer -> Integer) -> m Variable
 expToVarInteger expr1 o expr2 retType gasFormula = do
-  i1 <- getInt =<< expToVar expr1
-  i2 <- getInt =<< expToVar expr2
+  v1 <- arithmeticValue expr1
+  v2 <- arithmeticValue expr2
+  i1 <- getIntVal v1
+  i2 <- getIntVal v2
+  unsigned <- checkUnsignedOperands expr1 v1 expr2 v2
   deductGasForOp $ gasFormula i1 i2
-  return . Constant . retType $ i1 `o` i2
+  let result = case retType (i1 `o` i2) of
+        SIntegral n -> integerResult unsigned n
+        value -> value
+  pure . Constant $! result
 
 binopAssign' :: MonadSM m =>
   (Integer -> Integer -> Integer) ->
@@ -2161,12 +2238,13 @@ binopAssign' :: MonadSM m =>
   (Integer -> Integer -> Integer) ->
   m Variable
 binopAssign' intOp decOp lhs rhs gasFormula = do
-  let readVal e = getVar =<< expToVar e
+  let readVal = arithmeticValue
   delta <- readVal rhs
   curValue <- readVal lhs
   varToAssign <- expToVar lhs
   next <- case (defaultToInt curValue, defaultToInt delta) of
     (SIntegral c, SIntegral d) -> do
+      void $ checkUnsignedOperands lhs curValue rhs delta
       deductGasForOp $ gasFormula c d
       pure . SInteger $ c `intOp` d
     (SDecimal a, SDecimal b) -> do
@@ -2186,7 +2264,7 @@ binopAssign' intOp decOp lhs rhs gasFormula = do
       return $ SDecimal $ roundTo maxDecimalPlaces result
     _ -> typeError "binopAssign'" $ show (curValue, delta)
   setVar varToAssign next
-  return $ Constant next
+  assignmentValue varToAssign next
 
 binopDivide :: MonadSM m =>
   (Integer -> Integer -> Integer) ->
@@ -2195,12 +2273,13 @@ binopDivide :: MonadSM m =>
   CC.Expression ->
   m Variable
 binopDivide intOp decOp lhs rhs = do
-  let readVal e = getVar =<< expToVar e
+  let readVal = arithmeticValue
   delta <- readVal rhs
   curValue <- readVal lhs
   varToAssign <- expToVar lhs
   next <- case (defaultToInt curValue, defaultToInt delta) of
     (SIntegral c, SIntegral d) -> do
+      void $ checkUnsignedOperands lhs curValue rhs delta
       deductGasForOp $ (max `on` byteWidth) c d
       pure . SInteger $ c `intOp` d
     (SDecimal a, SDecimal b) -> do
@@ -2220,16 +2299,17 @@ binopDivide intOp decOp lhs rhs = do
       return $ SDecimal $ roundTo maxDecimalPlaces result
     _ -> typeError "binopDivide'" $ show (curValue, delta)
   setVar varToAssign next
-  return $ Constant next
+  assignmentValue varToAssign next
 
 addAndAssign :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
 addAndAssign lhs rhs = do
-  let readVal e = getVar =<< expToVar e
+  let readVal = arithmeticValue
   delta <- readVal rhs
   curValue <- readVal lhs
   varToAssign <- expToVar lhs
   next <- case (defaultToInt curValue, defaultToInt delta) of
     (SIntegral c, SIntegral d) -> do
+      void $ checkUnsignedOperands lhs curValue rhs delta
       deductGasForOp $ 1 + (max `on` byteWidth) c d
       pure . SInteger $ c + d
     (SString c, SString d) -> do
@@ -2249,18 +2329,21 @@ addAndAssign lhs rhs = do
       pure . SDecimal $ (Decimal 0 a) + b
     _ -> typeError "addAndAssign" $ show (curValue, delta)
   setVar varToAssign next
-  return $ Constant next
+  assignmentValue varToAssign next
 
 binopAssign :: MonadSM m => (Integer -> Integer -> Integer) -> CC.Expression -> CC.Expression -> (Integer -> Integer -> Integer) -> m Variable
 binopAssign oper lhs rhs gasFormula = do
-  let readInt e = getInt =<< expToVar e
-  delta <- readInt rhs
-  curValue <- readInt lhs
+  let readVal = arithmeticValue
+  delta <- readVal rhs
+  curValue <- readVal lhs
   varToAssign <- expToVar lhs
-  deductGasForOp $ gasFormula curValue delta
-  let next = SInteger $ curValue `oper` delta
+  void $ checkUnsignedOperands lhs curValue rhs delta
+  a <- getIntVal curValue
+  b <- getIntVal delta
+  deductGasForOp $ gasFormula a b
+  let next = SInteger $ a `oper` b
   setVar varToAssign next
-  return $ Constant next
+  assignmentValue varToAssign next
 
 -- | Convert a value to an integer. Signedness and bit size are currently ignored;
 -- we discourage fixed-size integer types in SolidVM but support this function for

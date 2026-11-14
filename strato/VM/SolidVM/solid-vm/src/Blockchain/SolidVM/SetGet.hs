@@ -11,6 +11,7 @@
 
 module Blockchain.SolidVM.SetGet
   ( setVar,
+    assignmentValue,
     getStorageValue,
     getVar,
     getIntEither,
@@ -103,6 +104,14 @@ setVar :: MonadSM m => Variable -> Value -> m ()
 setVar (Constant dst) src = setVal dst src
 setVar (Variable var) val = liftIO $ writeIORef var val
 setVar (TypedVariable t var) val = enforceUnsignedType t val >>= setVar var
+
+assignmentValue :: MonadSM m => Variable -> Value -> m Variable
+assignmentValue destination original = case original of
+  SIntegral _ -> Constant <$> case destination of
+    TypedVariable typ _ -> enforceUnsignedType typ original
+    Constant (SReference key) -> storageValueType key >>= maybe (pure original) (`enforceUnsignedType` original)
+    _ -> pure original
+  _ -> pure (Constant original)
 
 enforceUnsignedType :: MonadSM m => SVMType.Type -> Value -> m Value
 enforceUnsignedType t value = do

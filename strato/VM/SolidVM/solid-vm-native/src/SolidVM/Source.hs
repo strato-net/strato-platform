@@ -35,6 +35,7 @@ import SolidVM.Model.CodeCollection hiding (DelegateCall, RawCall, Internal)
 import qualified SolidVM.Model.CodeCollection.Statement as S
 import SolidVM.Model.Storable (BasicValue (BDefault), StoragePath (..), StoragePathPiece (..))
 import qualified SolidVM.Model.Type as Ty
+import SolidVM.Solidity.StaticAnalysis.Typechecker (expressionType, isIntegerLiteral)
 import SolidVM.Core hiding (Fun(..))
 import SolidVM.SourceCode
 import qualified SolidVM.SourceTemplate as SourceTemplate
