@@ -21,7 +21,7 @@ instance FunctionArguments ValueArguments where
 -- Aggregate fields are memory slots; storage references are never followed.
 valueSize :: Value -> Integer
 valueSize = \case
-  SInteger n -> max 32 (byteWidth n)
+  SIntegral n -> max 32 (byteWidth n)
   SDecimal n -> gasSize n
   SString s -> fromIntegral (B.length (T.encodeUtf8 (T.pack s)))
   SBytes b -> fromIntegral (B.length b)

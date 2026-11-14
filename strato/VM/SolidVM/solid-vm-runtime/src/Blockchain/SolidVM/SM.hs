@@ -36,10 +36,12 @@ module Blockchain.SolidVM.SM
     getCurrentAddress,
     getCurrentCodeAddress,
     withCallInfo,
+    withContractConstruction,
+    getCodeHashForDerivation,
     withStaticCallInfo,
-    withUncheckedCallInfo,
     withLocalVars,
     getCurrentCallInfo,
+    setCallArguments,
     getCallStackDepth,
     trimCallStackToDepth,
     getCurrentCallInfoIfExists,
@@ -88,7 +90,7 @@ import Blockchain.EthConf (ethConf)
 import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
-import Blockchain.Forks (isOperatorPrecedenceForkActive, isRlpEncodeForkActive)
+import Blockchain.Forks (isOperatorPrecedenceForkActive, isConstructorPublicationForkActive, isRlpEncodeForkActive)
 import Blockchain.SolidVM.Exception
 import Blockchain.Data.VmTrace
 import Blockchain.SolidVM.GasInfo
@@ -114,7 +116,7 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import qualified Data.ByteString.Char8 as BC
 import Data.Either (isLeft)
-import Data.Foldable (for_)
+import Data.Foldable (for_, find)
 import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
 import qualified Data.Map.Ordered as OMap
@@ -150,10 +152,10 @@ data CallInfo = CallInfo
     codeCollection :: CC.CodeCollection,
     collectionHash :: Keccak256,
     localVariables :: NE.NonEmpty (Map SolidString Variable),
+    callArguments :: [Variable],
     stateMap :: !(M.Map Address AddressStateModification),
     storageMap :: !(M.Map (Address, MS.StoragePath) MS.BasicValue),
     readOnly :: Bool,
-    isUncheckedSection :: Bool, -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
     currentSourcePos :: Maybe SourcePosition,
     isFreeFunction :: Bool
   }
@@ -182,6 +184,7 @@ BlockData
 data SState = SState
   { env :: Env.Environment,
     callStack :: [CallInfo],
+    constructingContracts :: !(S.Set Address),
     _action :: !Action,
     _gasInfo :: GasInfo,
     ssDebugSettingsValue :: Maybe DebugSettings,
@@ -474,7 +477,10 @@ variableSet = do
         (ci : _) -> textSet . NE.head $ localVariables ci
       locals = M.singleton "Local Variables" varNames
   acct <- getCurrentAddress
-  ~(contract, _, _) <- getCodeAndCollection acct
+  constructing <- gets constructingContracts
+  contract <- if S.member acct constructing
+    then getCurrentContract
+    else (\(c, _, _) -> c) <$> getCodeAndCollection acct
   let stateVars = S.fromList $ M.keys $ contract ^. CC.storageDefs
       globals = M.singleton "State Variables" stateVars
   pure . VariableSet $ fmap (S.map labelToText) $ locals <> globals
@@ -501,6 +507,7 @@ runSM maybeCode envBefore gi f = do
         SState
           { env = envBefore,
             callStack = [],
+            constructingContracts = S.empty,
             _action = startingAction envBefore,
             _gasInfo = gi,
             ssDebugSettingsValue = initialDebugSettings,
@@ -809,9 +816,7 @@ withCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff f = do
 -- read (readIORef); storage is never touched, which would mutate the MP trie.
 renderArgShallow :: MonadIO m => (SolidString, Variable) -> m Text
 renderArgShallow (name, var) = do
-  val <- case var of
-    Constant v -> pure v
-    Variable ref -> readIORef ref
+  val <- weakGetVar var
   pure $ labelToText name <> "=" <> renderValueShallow val
 
 addCallInfo ::
@@ -837,20 +842,15 @@ addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
             codeCollection = cc,
             collectionHash = hsh,
             localVariables = NE.singleton initialLocalVariables,
+            callArguments = [],
             stateMap = M.empty,
             storageMap = M.empty,
             readOnly = ro,
-            isUncheckedSection = False, -- The rationale here is that unchecked sections only apply to the current stack frame
             currentSourcePos = Nothing,
             isFreeFunction = ff
           }
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo :)
-
-uncheckedCallInfo :: MonadSM m => m ()
-uncheckedCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-  [] -> throw (InternalError "uncheckedCallInfo was called on an already empty stack")
-  (ci : rest) -> pure $ ci {isUncheckedSection = True} : ci : rest
 
 popCallInfo :: MonadSM m => Bool -> m ()
 popCallInfo reverted = do
@@ -883,6 +883,33 @@ popLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
     _ NE.:| v:vs -> pure $ curFrame{localVariables = v NE.:| vs} : rest
     _ -> throw (InternalError "popLocalVars was called with an empty stack")
 
+withContractConstruction :: MonadSM m => Address -> (Bool -> m a) -> m a
+withContractConstruction address f = do
+  blockNum <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
+  if not (isConstructorPublicationForkActive blockNum)
+    then f False
+    else do
+      accounts <- SM accessEnv
+      accountsBefore <- snapshotAccountDBEnv accounts
+      bracket get
+        (\previous -> modify $ \ss -> ss {constructingContracts = constructingContracts previous}) $ \previous -> do
+          modify $ \ss -> ss {constructingContracts = S.insert address (constructingContracts ss)}
+          f True `onException` do
+            restoreAccountDBEnv accounts accountsBefore
+            modify (\ss -> ss
+              { env = env previous,
+                callStack = callStack previous,
+                _action = _action previous
+              })
+
+getCodeHashForDerivation :: MonadSM m => Address -> m Keccak256
+getCodeHashForDerivation address = do
+  constructing <- gets constructingContracts
+  frames <- gets callStack
+  case find ((== address) . currentCodeAddress) frames of
+    Just ci | S.member address constructing -> pure $ collectionHash ci
+    _ -> (\(_, hsh, _) -> hsh) <$> getCodeAndCollection address
+
 withStaticCallInfo :: MonadSM m => m a -> m a
 withStaticCallInfo f = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
@@ -896,21 +923,17 @@ withStaticCallInfo f = do
         Left (e :: SomeException) -> throwIO e
         Right result -> pure result
 
-withUncheckedCallInfo :: MonadSM m => m a -> m a
-withUncheckedCallInfo f = do
-  uncheckedCallInfo
-  eResult <- try f
-  popCallInfo $ isLeft eResult
-  case eResult of
-    Left (e :: SomeException) -> throwIO e
-    Right result -> pure result
-
 getCurrentCallInfo :: MonadSM m => m CallInfo
 getCurrentCallInfo = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     [] -> throw (InternalError "getCurrentCallInfo called with an empty stack")
     (currentCallInfo : _) -> return currentCallInfo
+
+setCallArguments :: MonadSM m => [Variable] -> m ()
+setCallArguments args = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  [] -> throw (InternalError "setCallArguments called with an empty stack: ()")
+  info : rest -> pure $ info {callArguments = args} : rest
 
 getCallStackDepth :: MonadSM m => m Int
 getCallStackDepth = length <$> Mod.get (Mod.Proxy @[CallInfo])
@@ -948,7 +971,7 @@ getCurrentChainId = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo : _) -> return $ _accountChainId $ currentAddress currentCallInfo
-    _ -> internalError "getCurrentChainId called with an empty stack" ""
+    _ -> throw (InternalError "getCurrentChainId called with an empty stack")
 -}
 getCurrentFunctionName :: MonadSM m => m SolidString
 getCurrentFunctionName = do
@@ -1107,7 +1130,7 @@ getContractNameAndHash address' = do
   codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
 
   case codeHash of
-    SolidVMCode cn ch' -> return (stringToLabel cn, ch')
+    SolidVMCode cn ch' | ch' /= unsafeCreateKeccak256FromWord256 0 -> return (stringToLabel cn, ch')
     _ -> throw (MissingCodeCollection ("contract call to address 0x" ++ formatAddressWithoutColor address' ++ " failed") ("no contract deployed at this address" :: String))
 
 -- | How source must be parsed for the block being executed. Consensus-visible:

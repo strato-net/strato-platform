@@ -32,7 +32,8 @@ import Blockchain.Data.ExecResults
 import Blockchain.Data.ProposalFacts
 import Blockchain.Data.RLP
 import Blockchain.Data.VmTrace
-import Blockchain.Forks (isBlockRewardReceiptForkActive)
+import Blockchain.EthConf (ethConf, networkConfig, networkID)
+import Blockchain.Forks (isBlockRewardReceiptForkActive, constructorPublicationForkBlock, isConstructorPublicationForkActive)
 import Blockchain.Model.SyncState (BestSequencedBlock (..))
 import Blockchain.Strato.Model.Address (Address (..))
 import SolidVM.Model.Delta (getStakeDeltasFromEvents)
@@ -157,6 +158,16 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
     isBlockRewardReceiptForkActive 320000 `shouldBe` False
     isBlockRewardReceiptForkActive (upquarkActivation - 1) `shouldBe` False
     isBlockRewardReceiptForkActive upquarkActivation `shouldBe` True
+
+  it "activates constructor publication at the network fork height" $ do
+    constructorPublicationForkBlock 114784819836269 `shouldBe` 76752
+    constructorPublicationForkBlock 33056204878082667 `shouldBe` 65607
+    constructorPublicationForkBlock 7381244120123405172 `shouldBe` 10000
+    constructorPublicationForkBlock 42 `shouldBe` 0
+    let activation = constructorPublicationForkBlock (networkID $ networkConfig ethConf)
+    isConstructorPublicationForkActive (activation - 1) `shouldBe` False
+    isConstructorPublicationForkActive activation `shouldBe` True
+    isConstructorPublicationForkActive (activation + 1) `shouldBe` True
 
   it "reads ValidatorStakeUpdated once the source is governance" $ do
     let govAddr = Address 0x100
