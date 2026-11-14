@@ -1,6 +1,5 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 
 /// Minimal borrower: repays out of its own float.
@@ -20,7 +19,7 @@ contract Borrower {
 
 /// Audits the bolt-on DEPLOYMENT and GOVERNANCE wiring of FlashMint (see FLASHMINT_DEPLOYMENT.md).
 /// Mercata does not deploy the facility; tests stand up the same proxy-owned, closed-at-launch shape.
-contract Describe_FlashMintWiring is Authorizable {
+contract Describe_FlashMintWiring {
 
     Mercata m;
     FlashMint fm;
@@ -29,20 +28,20 @@ contract Describe_FlashMintWiring is Authorizable {
     Token usdstT;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m     = new Mercata();
         admin = m.adminRegistry();
 
         fm = new FlashMint(address(admin));
-        fm.initialize(
+        admin.castVoteOnIssue(address(fm), "initialize",
             address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010),
             address(m.feeCollector()),
             0
         );
 
-        USDST  = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",[],[],[],"USDST",0,18);
+        USDST  = address(ret);
         usdstT = Token(USDST);
-        usdstT.setStatus(2);
+        admin.castVoteOnIssue(USDST, "setStatus", 2);
     }
 
     // ── W1: Production initialize() pins the facility at the HARD-CODED mainnet USDST,
@@ -58,11 +57,11 @@ contract Describe_FlashMintWiring is Authorizable {
     //        facility at a different token, silently resetting every risk dial.
     function it_w2_initialize_is_re_callable_and_repoints_the_token() public {
         address before = fm.token();
-        fm.setMaxLoan(123e18);
-        fm.setWhitelistEnabled(true);
+        admin.castVoteOnIssue(address(fm), "setMaxLoan", 123e18);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", true);
         require(fm.maxLoan() == 123e18, "dial set");
 
-        fm.initialize(USDST, address(m.feeCollector()), 0);   // second call — must NOT be allowed
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), 0);   // second call — must NOT be allowed
 
         require(fm.token() == USDST && fm.token() != before, "token re-pointed by re-initialize");
         require(fm.maxLoan() == 0, "re-initialize silently reset maxLoan");
@@ -75,8 +74,8 @@ contract Describe_FlashMintWiring is Authorizable {
         require(!admin.whitelist(USDST, "mint", address(fm)), "no mint grant exists");
         require(!admin.whitelist(USDST, "burn", address(fm)), "no burn grant exists");
 
-        fm.setMaxLoan(1000e18);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "setMaxLoan", 1000e18);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
 
         Borrower b = new Borrower();
         b.init(address(fm), USDST);
@@ -94,15 +93,15 @@ contract Describe_FlashMintWiring is Authorizable {
     function it_w4_pausing_usdst_stops_the_facility() public {
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(fm));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(fm));
-        fm.setMaxLoan(1000000e18);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "setMaxLoan", 1000000e18);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
 
         Borrower b = new Borrower();
         b.init(address(fm), USDST);
         b.go(1000e18);                                  // baseline: works
         require(fm.loansServed() == 1, "baseline loan served");
 
-        usdstT.pause();
+        admin.castVoteOnIssue(USDST, "pause");
         require(usdstT.paused(), "USDST is paused");
         require(fm.maxFlashLoan() == 0, "token pause advertises 0");
 
@@ -114,7 +113,7 @@ contract Describe_FlashMintWiring is Authorizable {
             require(false, "flash mint must revert while USDST is paused");
         } catch { }
         require(fm.loansServed() == served, "no loan while USDST paused");
-        usdstT.unpause();
+        admin.castVoteOnIssue(USDST, "unpause");
 
         b2.go(1e18);
         require(fm.loansServed() == served + 1, "unpause restores flashLoan");
@@ -124,8 +123,8 @@ contract Describe_FlashMintWiring is Authorizable {
     //        2 of 3 admins can raise it past total supply in one transaction, no timelock.
     function it_w5_maxLoan_has_no_ceiling() public {
         uint supply = usdstT.totalSupply();
-        fm.setMaxLoan(supply * 1000 + 1e30);
+        admin.castVoteOnIssue(address(fm), "setMaxLoan", supply * 1000 + 1e30);
         require(fm.maxLoan() > supply, "maxLoan can exceed total USDST supply");
-        fm.setMaxLoan(0);
+        admin.castVoteOnIssue(address(fm), "setMaxLoan", 0);
     }
 }

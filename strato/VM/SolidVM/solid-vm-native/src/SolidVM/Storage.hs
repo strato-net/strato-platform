@@ -35,9 +35,14 @@ module SolidVM.Storage
   )
 where
 
+import Blockchain.SolidVM.GasInfo (MonadBuiltinGas (..))
+import Control.Exception (throw)
+import Text.Format (format)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.Util
 import Blockchain.DB.SolidStorageDB
+import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Metered
+import Blockchain.SolidVM.Builtins.Size.Values (basicSize, chargeNested)
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM
@@ -94,7 +99,7 @@ toBasic currentBlockNum = \case
 
 setVar :: MonadSM m => Variable -> Value -> m ()
 setVar (Constant dst) src = setVal dst src
-setVar (Variable var) val = liftIO $ writeIORef var val
+setVar (Variable var) val = Metered.localWrite >> liftIO (writeIORef var val)
 setVar (TypedVariable t var) val = checkTypedValue t val >>= setVar var
 
 checkTypedValue :: MonadSM m => SVMType.Type -> Value -> m Value
@@ -108,7 +113,7 @@ setVal :: MonadSM m => Value -> Value -> m ()
 -- is deeper, read the subfields and assign to their adjustment
 
 setVal (SUserDefined a _ _) (SUserDefined _ _ _) =
-  when (True) (internalError "Unimplemented feature user defined types" (a))
+  throw (UnsupportedFeature "user defined type assignment" (labelToString a))
 setVal (SReference dst) (SReference src) = do
   len <- getInt (Constant $ SReference $ src `MS.snoc` MS.Field "length")
   setVal (SReference $ dst `MS.snoc` MS.Field "length") $ SInteger len
@@ -128,7 +133,7 @@ setVal (SReference dst) (SArray fs) = do
     setVal (SReference $ dst `MS.snoc` MS.Index i') elementVal
 setVal (STuple dstVector) (STuple srcVector) =
   if V.length dstVector /= V.length srcVector
-    then typeError "you are trying to set the value of a tuple to another tuple of the wrong length:\n" (show dstVector ++ "\n" ++ show srcVector)
+    then throw (TypeError "you are trying to set the value of a tuple to another tuple of the wrong length:\n" (format (V.toList dstVector) ++ "\n" ++ format (V.toList srcVector)))
     else do
       let zipped = V.zip dstVector srcVector
       --We get the values first so in the case of (x,y) = (y,x) we can still set the variables to the correct values
@@ -141,24 +146,25 @@ setVal dst@(SReference path) src = do
   cci <- getCurrentCallInfo
   let ro = readOnly cci
       addr = currentAddress cci
-  when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
+  when ro $ throw (InvalidWrite "Invalid write during read-only access" $ "src: " ++ T.unpack (renderValueShallow src) ++ ", dst: " ++ T.unpack (renderValueShallow dst))
   basicSrc <- case src of
     SString s -> pure . Just . MS.BString . UTF8.fromString $ s
     _ -> do
       currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
       pure $ toBasic currentBlockNum src
   case basicSrc of
-    Nothing -> typeError "non basic solidity type cannot be stored atomically" $ show src
+    Nothing -> throw (TypeError "non basic solidity type cannot be stored atomically" $ T.unpack (renderValueShallow src))
     Just b -> do
+      Metered.storageWrite path (basicSize b)
       markDiffForAction addr path b
       putSolidStorageKeyVal' addr path b
-setVal (SIntegral dst) (SIntegral _) = immutableError "Cannot assign immutable or constants after assigned ->" dst -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
+setVal (SIntegral dst) (SIntegral _) = throw (ImmutableError "Cannot assign immutable or constants after assigned ->" (show dst)) -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
 setVal (SNULL) _ = return ()
-setVal dst src = typeError "unknown case called in setVal (Probably tried to change the value of a constant):" ("src = " ++ show src ++ ", dst = " ++ show dst)
+setVal dst src = throw (TypeError "unknown case called in setVal (Probably tried to change the value of a constant):" ("src = " ++ T.unpack (renderValueShallow src) ++ ", dst = " ++ T.unpack (renderValueShallow dst)))
 
-getStorageValue :: HasSolidStorageDB m => Address -> MS.StoragePath -> m Value
+getStorageValue :: (HasSolidStorageDB m, MonadBuiltinGas m) => Address -> MS.StoragePath -> m Value
 getStorageValue addr key = do
-  theValue <- getSolidStorageKeyVal' addr key
+  theValue <- Metered.storageRead key basicSize (getSolidStorageKeyVal' addr key)
   case theValue of
     MS.BDefault -> pure $ SReference key
     _ -> pure $ fromBasic theValue
@@ -214,19 +220,22 @@ getVar (TypedVariable t v) = getVar v >>= checkTypedValue t
 -- | Fully evaluate a value: every nested cell and storage reference is
 -- resolved, so the result holds only 'Constant's and can leave the VM.
 forceValue :: MonadSM m => Value -> m Value
-forceValue = \case
+forceValue value = chargeNested value >> forceValueWith getVar value
+
+forceValueWith :: MonadSM m => (Variable -> m Value) -> Value -> m Value
+forceValueWith load = \case
   v@(SReference _) -> do
-    v' <- getVar (Constant v)
+    v' <- load (Constant v)
     case v' of
       SReference _ -> pure v' -- unset storage slot resolves to itself
-      _ -> forceValue v'
+      _ -> forceValueWith load v'
   SStruct n m -> SStruct n <$> traverse forceVar m
   STuple vs -> STuple <$> traverse forceVar vs
   SArray vs -> SArray <$> traverse forceVar vs
   SMap m -> SMap <$> traverse forceVar m
   v -> pure v
   where
-    forceVar var = Constant <$> (getVar var >>= forceValue)
+    forceVar var = Constant <$> (load var >>= forceValueWith load)
 
 getIntEither :: MonadSM m => Variable -> m (Either Value Integer)
 getIntEither p = getIntValEither <$> getVar p
@@ -238,10 +247,10 @@ getIntValEither v' = case toNull v' of
   v -> Left v
 
 getInt :: MonadSM m => Variable -> m Integer
-getInt = either (typeError "getInt" . show) pure <=< getIntEither
+getInt = either ((throw . TypeError "getInt") . T.unpack . renderValueShallow) pure <=< getIntEither
 
 getIntVal :: MonadSM m => Value -> m Integer
-getIntVal = either (typeError "getIntVal" . show) pure . getIntValEither
+getIntVal = either ((throw . TypeError "getIntVal") . T.unpack . renderValueShallow) pure . getIntValEither
 
 int :: MonadSM m => Value -> m Integer
 int = getIntVal
@@ -253,7 +262,7 @@ getRealNum p = do
     SIntegral s -> return $ Left s
     SDecimal s -> return $ Right s
     SNULL -> return $ Left 0
-    _ -> typeError "getRealNum" $ show (p, v)
+    _ -> throw (TypeError "getRealNum" $ format (p, renderValueShallow v))
 
 getBool :: MonadSM m => Variable -> m Bool
 getBool = getBoolVal <=< getVar
@@ -263,7 +272,7 @@ getBoolVal v' = case toNull v' of
   SBool b -> return b
   SIntegral _ -> return True -- integer is guaranteed to not be 0
   SNULL -> return False
-  v -> typeError "getBool" $ show v
+  v -> throw (TypeError "getBool" $ T.unpack (renderValueShallow v))
 
 getAddress :: MonadSM m => Variable -> m Address
 getAddress = getAddressVal <=< getVar
@@ -274,11 +283,11 @@ getAddressVal v' = case toNull v' of
   SAddress a _ -> pure a
   SContract _ a -> pure a
   SString s -> case readMaybe s of
-    Nothing -> typeError "getAddress" $ show s
+    Nothing -> throw (TypeError "getAddress" s)
     Just a -> pure a
   SBytes b -> pure $ addressFromByteString b
   SNULL -> pure 0
-  v -> typeError "getAddress" $ show v
+  v -> throw (TypeError "getAddress" $ T.unpack (renderValueShallow v))
 
 getString :: MonadSM m => Variable -> m String
 getString = getStringVal <=< getVar
@@ -290,7 +299,7 @@ getStringVal v' = case toNull v' of
     Left _ -> pure $ BC.unpack b
     Right r -> pure $ T.unpack r
   SNULL -> pure ""
-  v -> typeError "getString" $ show v
+  v -> throw (TypeError "getString" $ T.unpack (renderValueShallow v))
 
 getBytes :: MonadSM m => Variable -> m BC.ByteString
 getBytes = getBytesVal <=< getVar
@@ -305,18 +314,27 @@ getBytesVal v' = case toNull v' of
     _ -> pure . encodeUtf8 $ T.pack s
   SBytes b -> pure b
   SNULL -> pure BC.empty
-  v -> typeError "getAddress" $ show v
+  v -> throw (TypeError "getAddress" $ T.unpack (renderValueShallow v))
 
 deleteVar :: MonadSM m => Variable -> m ()
 deleteVar (Constant (SReference path)) = do
   cci <- getCurrentCallInfo
   let ro = readOnly cci
       addr = currentAddress cci
-  when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
+  when ro $ throw (InvalidWrite "Invalid delete during read-only access" $ "addr: " ++ format addr ++ ", path: " ++ format path)
   markDiffForAction addr path $ MS.BDefault
+  Metered.storageWrite path (basicSize MS.BDefault)
   putSolidStorageKeyVal' addr path $ MS.BDefault
-deleteVar v = todo "deleteVar not yet supported for local variables" $ show v
+deleteVar v = throw (UnsupportedFeature "delete of a local variable" $ format v)
 
 -- | Trace/debug text for a value: force it, then use the one renderer.
 showSM :: MonadSM m => Value -> m String
-showSM = fmap (T.unpack . renderValue) . forceValue
+showSM = fmap (T.unpack . renderValue) . forceValueWith displayValue
+  where
+    displayValue (Constant (SReference key)) = do
+      address <- getCurrentAddress
+      basic <- getSolidStorageKeyVal' address key
+      pure $ case basic of
+        MS.BDefault -> SReference key
+        _ -> fromBasic basic
+    displayValue variable = weakGetVar variable

@@ -7,6 +7,18 @@ const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 /**
  * @openapi
+ * /poolv3/metadata:
+ *   get:
+ *     summary: Canonical V3 contract addresses for governance-aware clients
+ *     tags: [PoolV3]
+ *     responses:
+ *       200:
+ *         description: Configured PositionManagerV3 address
+ */
+router.get("/metadata", authHandler.authorizeRequest(true), PoolV3Controller.metadata);
+
+/**
+ * @openapi
  * /poolv3/pools:
  *   get:
  *     summary: List concentrated liquidity (V3) pools

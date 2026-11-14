@@ -29,6 +29,7 @@ module Bloc.Server.Transaction
     marshalInnerCallArgs,
     walletWrapCreate,
     walletWrapCall,
+    walletCall,
     mergeTxParams,
     vaultGetPub,
     checkIsSynced
@@ -38,7 +39,7 @@ where
 import Bloc.API.Transaction
 import Bloc.API.Users
 import Bloc.API.Utils
-import Bloc.Database.Queries (getContractDetailsForContract, getContractWithCodeCollectionByAddress, withCodeCollectionCache)
+import Bloc.Database.Queries (getContractDetailsForContract, getContractWithCodeCollectionByAddress, getGovernanceOwner, withCodeCollectionCache)
 import Bloc.NonceStore (reserveNonces)
 import qualified SolidVM.Model.CodeCollection as CC
 import Bloc.Monad
@@ -56,6 +57,7 @@ import BlockApps.Solidity.Type
 import BlockApps.Solidity.TypeDefs (TypeDefs(..))
 import BlockApps.Solidity.Struct (Struct(..))
 import qualified Data.Map.Ordered as OMap
+import qualified Data.Aeson.KeyMap as KM
 import BlockApps.XAbiConverter (xabiTypeToType)
 import qualified SolidVM.Model.Type as SVMType
 import qualified Data.Bimap as Bimap
@@ -236,6 +238,68 @@ walletWrapCall target method innerArgs =
       ("functionName", ArgString method),
       ("args", ArgArray $ V.fromList innerArgs)
     ]
+
+-- | The call a wallet-routed tx is sent as. A wallet owned by a governance
+-- registry only takes onlyOwner calls from it, so (unless the sender is that
+-- owner) such a call becomes @registry.castVoteOnIssue(wallet, method, ...)@ with
+-- the wallet method's args positional and hinted with their declared types,
+-- the variadic tail flattened. A wallet that governs itself (Multisig logic)
+-- can't vote on its own callContract, so it votes on the wrapped call directly.
+walletCall ::
+  ( MonadIO m,
+    (Keccak256 `A.Selectable` CC.CodeCollection) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m
+  ) =>
+  Address ->
+  Address ->
+  Text ->
+  Map Text ArgValue ->
+  m (Address, Text, Map Text ArgValue)
+walletCall sender wallet method args =
+  getGovernanceOwner wallet >>= \case
+    Just registry
+      | registry == wallet,
+        method == "callContract",
+        Just target <- M.lookup "contractToCall" args,
+        Just func <- M.lookup "functionName" args ->
+          pure
+            ( wallet,
+              "castVoteOnIssue",
+              M.fromList [("_target", target), ("_func", func), ("_args", M.findWithDefault (ArgArray mempty) "args" args)]
+            )
+    Just registry | registry /= sender ->
+      getContractWithCodeCollectionByAddress wallet method >>= \case
+        Nothing -> throwIO . UserError $ "Could not find contract " <> Text.pack (format wallet)
+        -- Methods without onlyOwner (castVoteOnIssue, addAdmin, ...) take any caller
+        Just (c, _) | not (ownerOnly c) -> pure (wallet, method, args)
+        Just (c, _) -> do
+          voteArgs <- concat <$> traverse positional (sortOn (Xabi.indexedTypeIndex . snd) . Map.toList $ functionXabiArgs c method)
+          pure
+            ( registry,
+              "castVoteOnIssue",
+              M.fromList
+                [ ("_target", ArgString . Text.pack $ show wallet),
+                  ("_func", ArgString method),
+                  ("_args", ArgArray $ V.fromList voteArgs)
+                ]
+            )
+    _ -> pure (wallet, method, args)
+  where
+    ownerOnly c = maybe False (any ((== "onlyOwner") . fst) . _funcModifiers) . Map.lookup method $ c ^. functions
+    positional (name, Xabi.IndexedType _ ty) = case (ty, M.lookup name args) of
+      (Xabi.Variadic, Nothing) -> pure []
+      (Xabi.Variadic, Just (ArgArray v)) -> pure $ V.toList v
+      (_, Nothing) -> throwIO . UserError $ "Missing argument '" <> name <> "' for " <> method
+      (_, Just v) -> pure [hinted ty v]
+    hinted ty v
+      | isJust (splitTypeHint v) = v
+      | otherwise = case xabiTypeToType ty of
+          Right (TypeContract _) -> hint "address"
+          Right t | name' <- Text.strip . Text.pack $ formatType t, isJust (parseSolidityTypeName name') -> hint name'
+          _ -> v
+      where
+        hint n = ArgObject $ KM.fromList [("type", ArgString n), ("value", v)]
 
 --------------------------------- RAW (PRE-SIGNED) TRANSACTIONS ------------------------------------
 
@@ -460,14 +524,8 @@ postBlocTransactionUnsigned mUsername (PostBlocTransactionRequest mAddr txList t
       (cn, contractSrc, _, ctorArgsAsSource) <- marshalCreatePayload msrcs p
       let srcLength = Text.length $ sourceBlob contractSrc
           metadata = Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]
-          mc =
-            MethodCall
-              userContractAddr
-              "createContract"
-              (walletWrapCreate cn contractSrc ctorArgsAsSource)
-              (mergeTxParams (contractpayloadTxParams p) txParams)
-              (Just metadata)
-      processMethodCalls [mc]
+      (to', fn, args) <- walletCall addr userContractAddr "createContract" (walletWrapCreate cn contractSrc ctorArgsAsSource)
+      processMethodCalls [MethodCall to' fn args (mergeTxParams (contractpayloadTxParams p) txParams) (Just metadata)]
     CONTRACT -> do
       ps <- fromContract tx
       let srcMap :: ContractPayload -> Maybe SourceMap
@@ -521,19 +579,24 @@ postBlocTransactionUnsigned mUsername (PostBlocTransactionRequest mAddr txList t
             -- Wrap as User.callContract(contractToCall, functionName, args) so an
             -- external wallet signs a call to its own User contract.
             args' <- marshalInnerCallArgs (functionpayloadContractAddress p) (functionpayloadMethod p) (functionpayloadArgs p)
+            (to', fn, outer) <- walletCall addr userContractAddr "callContract" (walletWrapCall (functionpayloadContractAddress p) (functionpayloadMethod p) args')
             pure $
               MethodCall
-                userContractAddr
-                "callContract"
-                (walletWrapCall (functionpayloadContractAddress p) (functionpayloadMethod p) args')
+                to'
+                fn
+                outer
                 (mergeTxParams (functionpayloadTxParams p) txParams)
                 (functionpayloadMetadata p)
-          else
+          else do
+            (to', fn, args) <-
+              if useWallet
+                then walletCall addr userContractAddr (functionpayloadMethod p) (functionpayloadArgs p)
+                else pure (functionpayloadContractAddress p, functionpayloadMethod p, functionpayloadArgs p)
             pure $
               MethodCall
-                (functionpayloadContractAddress p)
-                (functionpayloadMethod p)
-                (functionpayloadArgs p)
+                to'
+                fn
+                args
                 (mergeTxParams (functionpayloadTxParams p) txParams)
                 (functionpayloadMetadata p)
       processMethodCalls [mc]
@@ -664,12 +727,13 @@ postBlocTransaction' cacheNonce token mUsername resolve (PostBlocTransactionRequ
             (_, contractSrc, _, argsAsSource) <- marshalCreatePayload msrcs p
             let srcLength = Text.length $ sourceBlob contractSrc
                 metadata = Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]
-                bcp =
+            (to', fn, args) <- walletCall addr userContractAddr "createContract" (walletWrapCreate cn contractSrc argsAsSource)
+            let bcp =
                   FunctionParameters
                     addr
-                    userContractAddr
-                    "createContract"
-                    (walletWrapCreate cn contractSrc argsAsSource)
+                    to'
+                    fn
+                    args
                     (mergeTxParams (contractpayloadTxParams p) txParams)
                     (maybe (Just metadata) (\m -> Just $ metadata `Map.union` m) md)
                     resolve
@@ -699,10 +763,11 @@ postBlocTransaction' cacheNonce token mUsername resolve (PostBlocTransactionRequ
                               (cn, contractSrc, _, argsAsSource) <- marshalCreatePayload msrcs p
                               let srcLength = Text.length $ sourceBlob contractSrc
                                   metadata = Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]
+                              (to', fn, args) <- walletCall addr userContractAddr "createContract" (walletWrapCreate cn contractSrc argsAsSource)
                               pure $ MethodCall
-                                userContractAddr
-                                "createContract"
-                                (walletWrapCreate cn contractSrc argsAsSource)
+                                to'
+                                fn
+                                args
                                 (mergeTxParams x txParams)
                                 (maybe (Just metadata) (\m' -> Just $ metadata `Map.union` m') m)
                           ) ps
@@ -743,22 +808,28 @@ postBlocTransaction' cacheNonce token mUsername resolve (PostBlocTransactionRequ
         bfp' <- if useWallet && userContractAddr /= functionpayloadContractAddress p
           then do
             args' <- marshalInnerCallArgs (functionpayloadContractAddress p) (functionpayloadMethod p) (functionpayloadArgs p)
+            (to', fn, outer) <- walletCall addr userContractAddr "callContract" (walletWrapCall (functionpayloadContractAddress p) (functionpayloadMethod p) args')
             pure $ FunctionParameters
               addr
-              userContractAddr
-              "callContract"
-              (walletWrapCall (functionpayloadContractAddress p) (functionpayloadMethod p) args')
+              to'
+              fn
+              outer
               (mergeTxParams (functionpayloadTxParams p) txParams)
               (functionpayloadMetadata p)
               resolve
-          else pure $ FunctionParameters
-            addr
-            (functionpayloadContractAddress p)
-            (functionpayloadMethod p)
-            (functionpayloadArgs p)
-            (mergeTxParams (functionpayloadTxParams p) txParams)
-            (functionpayloadMetadata p)
-            resolve
+          else do
+            (to', fn, args) <-
+              if useWallet
+                then walletCall addr userContractAddr (functionpayloadMethod p) (functionpayloadArgs p)
+                else pure (functionpayloadContractAddress p, functionpayloadMethod p, functionpayloadArgs p)
+            pure $ FunctionParameters
+              addr
+              to'
+              fn
+              args
+              (mergeTxParams (functionpayloadTxParams p) txParams)
+              (functionpayloadMetadata p)
+              resolve
         fmap (:[]) $ postUsersContractMethod' cacheNonce token bfp'
       xs -> do
         p <- mapM fromFunction xs
@@ -766,13 +837,16 @@ postBlocTransaction' cacheNonce token mUsername resolve (PostBlocTransactionRequ
             if useWallet && a /= userContractAddr
               then do
                 args' <- marshalInnerCallArgs a m r
+                (to', fn, outer) <- walletCall addr userContractAddr "callContract" (walletWrapCall a m args')
                 pure $ MethodCall
-                  userContractAddr
-                  "callContract"
-                  (walletWrapCall a m args')
+                  to'
+                  fn
+                  outer
                   (mergeTxParams x txParams)
                   md
-              else pure $ MethodCall a m r (mergeTxParams x txParams) md
+              else do
+                (to', fn, args) <- if useWallet then walletCall addr a m r else pure (a, m, r)
+                pure $ MethodCall to' fn args (mergeTxParams x txParams) md
           ) p
         postUsersContractMethodList' cacheNonce token bflp'
   where
@@ -1106,13 +1180,13 @@ postUsersContractMethod' cacheNonce token FunctionParameters {..} = do
   $logInfoLS "postUsersContractMethod'/hash" txHash
   getResultAndRespond [txHash] resolve
 
-prepareUnsignedTx :: Integer -> TransactionHeader -> Transaction
-prepareUnsignedTx gasLimit TransactionHeader {..} =
+prepareUnsignedTx :: TransactionHeader -> Transaction
+prepareUnsignedTx TransactionHeader {..} =
   case transactionheaderToAddr of
     Nothing ->
       TX.ContractCreationTX
       { TX.nonce = fromIntegral $ fromMaybe 0 (txparamsNonce transactionheaderTxParams),
-        TX.gasLimit = fromIntegral $ fromMaybe (Gas gasLimit) (txparamsGasLimit transactionheaderTxParams),
+        TX.gasLimit = fromIntegral $ fromMaybe transactionGas (txparamsGasLimit transactionheaderTxParams),
         TX.contractName = fromMaybe (error "prepareUnsignedTx: contractName missing in ContractCreationTX") transactionheaderContractName,
         TX.args = transactionheaderArgs,
         TX.network = transactionheaderNetwork,
@@ -1126,7 +1200,7 @@ prepareUnsignedTx gasLimit TransactionHeader {..} =
     Just _ ->
       TX.MessageTX
       { TX.nonce = fromIntegral $ fromMaybe 0 (txparamsNonce transactionheaderTxParams),
-        TX.gasLimit = fromIntegral $ fromMaybe (Gas gasLimit) (txparamsGasLimit transactionheaderTxParams),
+        TX.gasLimit = fromIntegral $ fromMaybe transactionGas (txparamsGasLimit transactionheaderTxParams),
         TX.to = fromMaybe (error "prepareUnsignedTx: to missing in MessageTX") transactionheaderToAddr,
         TX.funcName = fromMaybe (error "prepareUnsignedTx: funcName missing in MessageTX") transactionheaderFuncName,
         TX.args = transactionheaderArgs,
@@ -1199,26 +1273,24 @@ preparePostUnsignedRawTx time tx contractName' args =
       Nothing
 
 signAndPrepare ::
-  (MonadIO m, MonadLogger m, HasBlocEnv m) =>
+  (MonadIO m, MonadLogger m) =>
   Text ->
   Address ->
   TransactionHeader ->
   m RawTransaction'
 signAndPrepare token from th = do
-  BlocEnv {gasLimit = envGasLimit} <- getBlocEnv
   time <- liftIO getCurrentTime
-  fmap (preparePostTx time from) . callSignature token $ prepareUnsignedTx envGasLimit th
+  fmap (preparePostTx time from) . callSignature token $ prepareUnsignedTx th
 
 prepareUnsignedRawTx ::
-  (MonadIO m, HasBlocEnv m) =>
+  MonadIO m =>
   Text ->
   [Text] ->
   TransactionHeader ->
   m BlocTransactionUnsignedResult
 prepareUnsignedRawTx contractName' args th = do
-  BlocEnv {gasLimit = envGasLimit} <- getBlocEnv
   time <- liftIO getCurrentTime
-  let unsigned = prepareUnsignedTx envGasLimit th
+  let unsigned = prepareUnsignedTx th
       msgHash = unsafeCreateKeccak256FromByteString $ keccak256ToByteString $ partialTransactionHash unsigned
       unsignedRawTx = preparePostUnsignedRawTx time unsigned contractName' args
   pure $ BlocTransactionUnsignedResult msgHash (Just unsignedRawTx)

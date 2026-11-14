@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import { getAdmin, isUserAdmin, addAdmin, removeAdmin, createIssue, castVoteOnIssueById, simulateCastVoteOnIssue, dismissIssue, getOpenIssues,
-         getExecutedIssues, contractSearch, getContractDetails,
+         getExecutedIssues, contractSearch, getContractDetails, recordPartnerReferral,
  } from "../services/user.service";
-import { validateUserAddress, validateAddressField } from "../validators/common.validators";
+import { validateUserAddress } from "../validators/common.validators";
 import { validateIssuesQuery } from "../validators/user.validator";
 
 class UserController {
@@ -13,8 +13,13 @@ class UserController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { address: userAddress, accessToken, userName, isNewUser } = req;
+      const { address: userAddress, accessToken, userName, userEmail, isNewUser } = req;
       const isAdmin = await isUserAdmin(accessToken, userAddress);
+
+      // A partner ref link's code, set as a cookie by the UI when the user landed
+      const ref = isNewUser && /(?:^|;\s*)ref=([A-Za-z0-9]{1,32})(?:;|$)/.exec(req.headers.cookie ?? "")?.[1];
+      // The email screens out a code's owner; a realm that issues none often has it as the username
+      if (ref) void recordPartnerReferral(ref, userAddress, userEmail ?? userName);
 
       res.status(RestStatus.OK).json({ userAddress, isAdmin, userName, isNewUser: !!isNewUser });
       next();
@@ -94,13 +99,12 @@ class UserController {
     try {
       const { accessToken, address: actorAddress } = req;
       const { target, func, args } = req.body;
-      validateAddressField(target);
 
       const result = await createIssue(accessToken, actorAddress as string, target, func, args);
       res.status(RestStatus.OK).json({
         message: result.governed
           ? "Issue created successfully"
-          : "Function executed directly: no issue was created and no vote was recorded",
+          : "Transaction succeeded but no issue event was found for it",
         target,
         func,
         args,
@@ -123,7 +127,6 @@ class UserController {
     try {
       const { accessToken, address: actorAddress } = req;
       const { target, func, args } = req.body;
-      validateAddressField(target);
 
       const result = await simulateCastVoteOnIssue(accessToken, actorAddress as string, target, func, args);
       res.status(RestStatus.OK).json(result);

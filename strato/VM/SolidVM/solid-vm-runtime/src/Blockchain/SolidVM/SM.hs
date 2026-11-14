@@ -1,0 +1,1201 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+
+module Blockchain.SolidVM.SM
+  ( parseOptionsForCurrentBlock,
+    rlpForkValues,
+    CallInfo (..),
+    SState (..),
+    SM,
+    MonadSM,
+    MonadGas (..),
+    MonadDebugHot (..),
+    MonadCallStack (..),
+    action,
+    runSM,
+    getCurrentAddress,
+    getCurrentCodeAddress,
+    withCallInfo,
+    withContractConstruction,
+    getCodeHashForDerivation,
+    withStaticCallInfo,
+    withUncheckedCallInfo,
+    withLocalVars,
+    getCurrentCallInfo,
+    setCallArguments,
+    getCallStackDepth,
+    trimCallStackToDepth,
+    getCurrentCallInfoIfExists,
+    getCurrentContract,
+    getCurrentFunctionName,
+    getCurrentCodeCollection,
+    addFunctionToCurrentContractInCurrentCallInfo,
+    removeFunctionFromCurrentContractInCurrentCallInfo,
+    getEnv,
+    getGasInfo,
+    getVariableOfName,
+    pushSender,
+    initializeAction,
+    markDiffForAction,
+    getBlockHashWithNumber,
+    getBSum,
+    addEvent,
+    renderValueShallow,
+    addDelegatecall,
+    getUsername,
+    addNewCodeCollection,
+    getContractNameAndHash,
+    getCodeAndCollection,
+    getCodeAndCollectionWithTypeCheck,
+    getContractsForParents,
+    getAbstractParentsFromContract,
+    getMapNamesFromContract,
+    getArrayNamesFromContract
+  )
+where
+
+--import           Data.IORef
+
+import Control.Exception (throw)
+import BlockApps.Logging
+import qualified Blockchain.DB.AddressStateDB as DB
+import Blockchain.DB.CodeDB
+import Blockchain.DB.MemAddressStateDB
+import Blockchain.DB.RawStorageDB
+import Blockchain.DB.SolidStorageDB
+import Blockchain.DB.StateDB ()
+import Blockchain.Data.AddressStateDB
+import Blockchain.Data.BlockSummary
+import qualified Control.Monad.Composable.StateDB as MP
+import Blockchain.EthConf (ethConf)
+import qualified Blockchain.EthConf.Model as Conf
+import qualified Blockchain.SolidVM.Environment as Env
+import Blockchain.SolidVM.CodeCollectionDB
+import Blockchain.Forks (isOperatorPrecedenceForkActive, isConstructorPublicationForkActive, isRlpEncodeForkActive)
+import Blockchain.SolidVM.Exception
+import Blockchain.Data.VmTrace
+import Blockchain.SolidVM.GasInfo
+import Blockchain.Strato.Model.Gas (Gas (..), getGasValue)
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.Code
+import SolidVM.Model.Event
+import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.Keccak256
+import Blockchain.Stream.Action (Action)
+import qualified Blockchain.Stream.Action as Action
+import Blockchain.VMContext
+import Control.Monad.Composable.AccountDB (snapshotAccountDBEnv, restoreAccountDBEnv)
+import Blockchain.Wiring ()
+import Blockchain.VMOptions
+import Control.Applicative ((<|>))
+import Control.Arrow ((&&&))
+import Control.Lens hiding (Context)
+import Control.Monad
+import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
+import qualified Control.Monad.Change.Alter as A
+import qualified Control.Monad.Change.Modify as Mod
+import qualified Data.ByteString.Char8 as BC
+import Data.Either (isLeft)
+import Data.Foldable (for_, find)
+import qualified Data.List.NonEmpty as NE
+import Data.Map (Map)
+import qualified Data.Map.Ordered as OMap
+import qualified Data.Map as M
+import Data.Maybe
+import qualified Data.NibbleString as N
+import qualified Data.Sequence as Q
+import qualified Data.Set as S
+import Data.Source
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as DT
+import Debugger
+import Control.Monad.Composable.Base hiding (getEnv)
+import SolidVM.Model.CodeCollection (CodeCollection)
+import qualified SolidVM.Model.CodeCollection as CC
+import SolidVM.Model.SolidString
+import qualified SolidVM.Model.Storable as MS
+import qualified SolidVM.Model.Type as SVMType
+import SolidVM.Model.Value
+import qualified Text.Colors as CL
+import Text.Format
+import UnliftIO
+import Prelude hiding (EQ, GT, LT)
+import qualified Prelude as Ordering (Ordering (..))
+
+data CallInfo = CallInfo
+  { currentFunctionName :: SolidString,
+    currentArguments :: ValList,
+    currentAddress :: Address,
+    currentCodeAddress :: Address,
+    currentContract :: CC.Contract,
+    codeCollection :: CC.CodeCollection,
+    collectionHash :: Keccak256,
+    localVariables :: NE.NonEmpty (Map SolidString Variable),
+    callArguments :: [Variable],
+    stateMap :: !(M.Map Address AddressStateModification),
+    storageMap :: !(M.Map (Address, MS.StoragePath) MS.BasicValue),
+    readOnly :: Bool,
+    isUncheckedSection :: Bool, -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
+    currentSourcePos :: Maybe SourcePosition,
+    isFreeFunction :: Bool
+  }
+  deriving (Show)
+
+{-
+BlockData
+    parentHash Keccak256
+    unclesHash Keccak256
+    coinbase Address
+    stateRoot StateRoot
+    transactionsRoot StateRoot
+    receiptsRoot StateRoot
+    logBloom BS.ByteString
+    difficulty Integer sqltype=numeric(1000,0)
+    number Integer sqltype=numeric(1000,0)
+    gasLimit Integer sqltype=numeric(1000,0)
+    gasUsed Integer sqltype=numeric(1000,0)
+    timestamp UTCTime
+    extraData BS.ByteString
+    nonce Word64
+    mixHash Keccak256
+    deriving Eq Read Show Generic
+-}
+
+data SState = SState
+  { env :: Env.Environment,
+    callStack :: [CallInfo],
+    constructingContracts :: !(S.Set Address),
+    _action :: !Action,
+    _gasInfo :: GasInfo,
+    ssDebugSettingsValue :: Maybe DebugSettings,
+    ssVmTracerValue :: Maybe VmTracer,
+    ssDbgHot :: !Bool
+  }
+
+makeLenses ''SState
+
+-- | The evaluator is a large mutually recursive group. Over a transformer
+-- stack GHC cannot eta-expand it, so every bind allocates a closure per layer.
+-- 'SM' is the node's row plus the evaluator's state cell, as one flat
+-- @Env -> IO@ layer; nothing is stacked underneath.
+newtype SM a = SM {unSM :: Eff (IORef SState ': ContextRow) a}
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadLogger, MP.StateRoot `A.Alters` MP.TrieNode, Maybe Word256 `A.Alters` MP.StateRoot, Mod.Modifiable CurrentBlockHash, HasMemAddressStateDB, HasMemRawStorageDB)
+
+-- | Run a node action from the evaluator: the same environment viewed without
+-- the evaluator-state slot.
+host :: ContextM a -> SM a
+host (ContextM m) = SM (withEnv (\(_ :& rest) -> rest) m)
+{-# INLINE host #-}
+
+instance A.Selectable FilePath (Either String String) SM where
+  select p k = host (A.select p k)
+
+stateRef :: SM (IORef SState)
+stateRef = SM accessEnv
+{-# INLINE stateRef #-}
+
+class Monad m => MonadGas m where
+  chargeGasState :: Gas -> m GasInfo
+
+class Monad m => MonadDebugHot m where
+  debugIsHot :: m Bool
+
+class Monad m => MonadCallStack m where
+  popCallInfoState :: m (Maybe CallInfo)
+
+-- | The evaluator is written against an abstract @m@ but only ever runs in
+-- 'SM'. Fixing @m ~ SM@ here makes every evaluator function compile to
+-- monomorphic code (all instances resolve statically, no dictionaries are
+-- passed) without touching its signatures.
+type MonadSM m = (m ~ SM)
+
+get :: SM SState
+get = readIORef =<< stateRef
+{-# INLINE get #-}
+
+gets :: (SState -> a) -> SM a
+gets f = f <$> get
+{-# INLINE gets #-}
+
+modify :: (SState -> SState) -> SM ()
+modify f = stateRef >>= \i -> atomicModifyIORef' i (\a -> (f a, ()))
+{-# INLINE modify #-}
+
+-- Reads fall through the call frames, then this run's block map, then
+-- whatever holds the state behind it (see 'storageMiss').
+instance (RawStorageKey `A.Alters` RawStorageValue) SM
+  where
+  lookup _ k   = do
+    cs <- gets callStack
+    case lookupStorageFrames k cs of
+      Just v -> pure $ Just v
+      Nothing -> genericLookupRawStorageDBWith storageMiss k
+  lookupWithDefault _ k   = do
+    cs <- gets callStack
+    case lookupStorageFrames k cs of
+      Just v -> pure v
+      Nothing -> fromMaybe MS.BDefault <$> genericLookupRawStorageDBWith storageMiss k
+  insert _ k v = do
+    cs <- gets callStack
+    case cs of
+      [] -> genericInsertRawStorageDB k v
+      (c:cs') -> do
+        let c' = c {
+              storageMap = M.insert k v $ storageMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+  insertMany _ kvs = do
+    cs <- gets callStack
+    case cs of
+      [] -> genericInsertManyRawStorageDB kvs
+      (c:cs') -> do
+        let c' = c {
+              storageMap = kvs `M.union` storageMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+  delete _ k   = do
+    cs <- gets callStack
+    case cs of
+      [] -> genericDeleteRawStorageDB k
+      (c:cs') -> do
+        let c' = c {
+              storageMap = M.delete k $ storageMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+
+-- Same fall-through as storage: frames, this run's block map, then the
+-- trie or the mirror (see 'accountMiss').
+instance (Address `A.Alters` AddressState) SM
+  where
+  lookup _ a = do
+    cs <- gets callStack
+    case lookupStateFrames a cs of
+      Just (ASModification s) -> pure $ Just s
+      Just ASDeleted -> pure $ Just blankAddressState
+      Nothing -> getAddressStateMaybeWith accountMiss a
+  insert _ a s = do
+    cs <- gets callStack
+    case cs of
+      [] -> putAddressState a s
+      (c:cs') -> do
+        let c' = c {
+              stateMap = M.insert a (ASModification s) $ stateMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+  insertMany _ as = do
+    let asMods = M.map ASModification as
+    cs <- gets callStack
+    case cs of
+      [] -> putAddressStates asMods
+      (c:cs') -> do
+        let c' = c {
+              stateMap = asMods `M.union` stateMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+  delete _ a = do
+    cs <- gets callStack
+    case cs of
+      [] -> deleteAddressState a
+      (c:cs') -> do
+        let c' = c {
+              stateMap = M.insert a ASDeleted $ stateMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+  deleteMany _ as = do
+    cs <- gets callStack
+    case cs of
+      [] -> deleteAddressStates as
+      (c:cs') -> do
+        let c' = c {
+              stateMap = M.difference (stateMap c) . M.fromList $ (,ASDeleted) <$> as
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+
+instance A.Selectable Address AddressState SM
+  where
+  select = A.lookup
+
+-- | What answers a storage read the block map does not: the trie, as this
+-- run sees the owning account, or the SQL state mirror when the context runs
+-- over one (vm-query). Only a block-map miss gets here, so the check costs
+-- the node nothing on its hot path.
+storageMiss :: RawStorageKey -> SM (Maybe RawStorageValue)
+storageMiss k = host stateMirror >>= \case
+  Nothing -> getRawStorageKeyValDBMaybe k
+  Just m -> liftIO $ mirrorStorage m k
+
+-- | Likewise for an account.
+accountMiss :: Address -> SM (Maybe AddressState)
+accountMiss a = host stateMirror >>= \case
+  Nothing -> DB.getAddressStateMaybe a
+  Just m -> liftIO $ mirrorAccount m a
+
+lookupStorageFrames :: RawStorageKey -> [CallInfo] -> Maybe RawStorageValue
+lookupStorageFrames _ [] = Nothing
+lookupStorageFrames key (ci : rest) = case M.lookup key (storageMap ci) of
+  Just value -> Just value
+  Nothing -> lookupStorageFrames key rest
+{-# INLINE lookupStorageFrames #-}
+
+lookupStateFrames :: Address -> [CallInfo] -> Maybe AddressStateModification
+lookupStateFrames _ [] = Nothing
+lookupStateFrames address (ci : rest) = case M.lookup address (stateMap ci) of
+  Just value -> Just value
+  Nothing -> lookupStateFrames address rest
+{-# INLINE lookupStateFrames #-}
+
+instance (Keccak256 `A.Alters` BlockSummary) SM where
+  lookup p k = host (A.lookup p k)
+  insert p k v = host (A.insert p k v)
+  delete p k = host (A.delete p k)
+
+instance (Keccak256 `A.Alters` DBCode) SM where
+  lookup p k = host (A.lookup p k)
+  insert p k v = host (A.insert p k v)
+  delete p k = host (A.delete p k)
+
+instance (N.NibbleString `A.Alters` N.NibbleString) SM where
+  lookup p k = host (A.lookup p k)
+  insert p k v = host (A.insert p k v)
+  delete p k = host (A.delete p k)
+
+instance Mod.Accessible Env.Environment SM where
+  access _ = gets env
+
+instance Mod.Modifiable Env.Environment SM where
+  get _   = gets env
+  put _ m = modify $ \ss -> ss{ env = m }
+
+instance Mod.Modifiable (Maybe DebugSettings) SM where
+  get _ = gets ssDebugSettingsValue
+  put _ d = modify $ \ss ->
+    ss {ssDebugSettingsValue = d, ssDbgHot = isJust d || isJust (ssVmTracerValue ss)}
+
+instance Mod.Modifiable (Maybe VmTracer) SM where
+  get _ = gets ssVmTracerValue
+  put _ t = modify $ \ss ->
+    ss {ssVmTracerValue = t, ssDbgHot = isJust (ssDebugSettingsValue ss) || isJust t}
+
+instance MonadDebugHot SM where
+  debugIsHot = gets ssDbgHot
+  {-# INLINE debugIsHot #-}
+
+instance MonadCallStack SM where
+  popCallInfoState = stateRef >>= \ref -> liftIO $ atomicModifyIORef' ref $ \ss ->
+    case callStack ss of
+      [] -> (ss, Nothing)
+      ci : rest -> (ss {callStack = rest}, Just ci)
+  {-# INLINE popCallInfoState #-}
+
+instance Mod.Modifiable Env.Sender SM where
+  get _ = Env.Sender . Env.sender <$> gets env
+  put _ (Env.Sender s) = modify $ \ss@SState {env = e} -> ss {env = e {Env.sender = s}}
+
+instance Mod.Modifiable [CallInfo] SM where
+  get _ = gets callStack
+  put _ cs = modify $ \ss -> ss {callStack = cs}
+
+instance Mod.Modifiable GasInfo SM where
+  get _ = gets _gasInfo
+  put _ g = modify $ gasInfo .~ g
+
+instance MonadGas SM where
+  chargeGasState !gas = stateRef >>= \ref -> liftIO $ do
+    ss <- readIORef ref
+    let gi = _gasInfo ss
+        !newLeft = _gasLeft gi - gas
+        !newUsed = _gasUsed gi + gas
+        !gi' = gi {_gasLeft = newLeft, _gasUsed = newUsed}
+    writeIORef ref $! ss {_gasInfo = gi'}
+    pure gi'
+  {-# INLINE chargeGasState #-}
+
+instance MonadBuiltinGas SM where
+  chargeBuiltinGas !gas = do
+    gi' <- chargeGasState gas
+    when (gi' ^. gasLeft < Gas 0) $ do
+      let msg = "out of gas: " ++ show (gi' ^. gasLeft) ++ " < " ++ show gas
+      liftIO $ putStrLn $ CL.red msg
+      throw (TooMuchGas (getGasValue $ _gasInitialAllotment gi') (getGasValue $ gi' ^. gasUsed))
+
+instance Mod.Modifiable Action SM where
+  get _ = gets _action
+  put _ a = modify $ action .~ a
+
+instance Mod.Modifiable (Q.Seq Event) SM where
+  get _ = gets (Action._events . _action)
+  put _ q = modify $ action . Action.events .~ q
+
+instance Mod.Modifiable (Q.Seq Action.Delegatecall) SM where
+  get _ = gets (Action._delegatecalls . _action)
+  put _ q = modify $ action . Action.delegatecalls .~ q
+
+instance Mod.Modifiable (OMap.OMap (Text, Keccak256) CodeCollection) SM where
+  get _ = gets (Action._newCodeCollections . _action)
+  put _ q = modify $ action . Action.newCodeCollections .~ q
+
+variableSet :: SM VariableSet
+variableSet = do
+  cis <- Mod.get (Mod.Proxy @[CallInfo])
+  let textSet = S.fromList . M.keys
+      varNames = case cis of
+        [] -> S.empty
+        (ci : _) -> textSet . NE.head $ localVariables ci
+      locals = M.singleton "Local Variables" varNames
+  acct <- getCurrentAddress
+  constructing <- gets constructingContracts
+  contract <- if S.member acct constructing
+    then getCurrentContract
+    else (\(c, _, _) -> c) <$> getCodeAndCollection acct
+  let stateVars = S.fromList $ M.keys $ contract ^. CC.storageDefs
+      globals = M.singleton "State Variables" stateVars
+  pure . VariableSet $ fmap (S.map labelToText) $ locals <> globals
+
+instance Mod.Accessible VariableSet SM where
+  access _ = variableSet
+
+instance Mod.Accessible [SourcePosition] SM where
+  access _ = do
+    cis <- Mod.get (Mod.Proxy @[CallInfo])
+    pure $ fromMaybe (initialPosition "") . currentSourcePos <$> cis
+
+runSM ::
+  (Maybe Code) ->
+  Env.Environment ->
+  GasInfo ->
+  SM a ->
+  ContextM (Env.Environment, Either SolidException a)
+runSM maybeCode envBefore gi f = do
+  contextState <- Mod.get (Mod.Proxy @ContextState)
+  let initialDebugSettings = _debugSettings contextState
+      initialVmTracer = _vmTracer contextState
+  let !startingState =
+        SState
+          { env = envBefore,
+            callStack = [],
+            constructingContracts = S.empty,
+            _action = startingAction envBefore,
+            _gasInfo = gi,
+            ssDebugSettingsValue = initialDebugSettings,
+            ssVmTracerValue = initialVmTracer,
+            ssDbgHot = isJust initialDebugSettings || isJust initialVmTracer
+          }
+  startingStateRef <- newIORef startingState
+  -- The transaction works on the live account caches; a failed one is rolled back.
+  accounts <- ContextM accessEnv
+  accountsBefore <- snapshotAccountDBEnv accounts
+  eVal <- try . ContextM $ provide startingStateRef (unSM f)
+  sstateAfter <- readIORef startingStateRef
+  let envAfter = env sstateAfter
+  case eVal of
+    -- Internal and unexpected host failures must stop execution, not become receipts.
+    -- Contract errors, including unsupported features, fail only the transaction.
+    Left (e :: SomeException) -> do
+      let se = case fromException e of
+            Just solidEx -> solidEx
+            Nothing -> InternalError ("Uncaught internal exception: " ++ displayException e)
+      case se of
+        Require _ -> $logDebugLS "runSM/error" se
+        _ -> $logErrorLS "runSM/error" se
+      restoreAccountDBEnv accounts accountsBefore
+      case se of
+        InternalError{} -> throwIO se
+        _ | flags_svmDev -> do
+              $logErrorLS "runSM/error_code" maybeCode
+              throwIO se
+          | otherwise -> return (envAfter, Left se)
+    Right value -> return (envAfter, Right value)
+
+-- When calling a remote contract, the new `msg.sender` is the contract
+-- that the call is initiated from.
+pushSender :: MonadSM m => Address -> m a -> m a
+pushSender newSender mv = do
+  oldSender <- Mod.get (Mod.Proxy @Env.Sender)
+  Mod.put (Mod.Proxy @Env.Sender) (Env.Sender newSender)
+  ret <- mv
+  Mod.put (Mod.Proxy @Env.Sender) oldSender
+  return $ ret
+
+startingAction :: Env.Environment -> Action
+startingAction env' =
+  Action.Action
+    { _blockHash = blockHeaderHash $ Env.blockHeader env',
+      _blockTimestamp = blockHeaderTimestamp $ Env.blockHeader env',
+      _blockNumber = blockHeaderBlockNumber $ Env.blockHeader env',
+      _transactionSender = Env.sender env',
+      _actionData = OMap.empty,
+      _newCodeCollections = OMap.empty,
+      _events = Q.empty,
+      _delegatecalls = Q.empty
+    }
+
+getGasInfo :: MonadSM m => m GasInfo
+getGasInfo = Mod.get (Mod.Proxy @GasInfo)
+
+getEnv :: MonadSM m => m Env.Environment
+getEnv = Mod.access (Mod.Proxy @Env.Environment)
+
+toMaybe :: Bool -> a -> Maybe a
+toMaybe True x = Just x
+toMaybe False _ = Nothing
+
+getVariableOfName :: MonadSM m => SolidString -> m Variable
+getVariableOfName name = do
+  cStack <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentCallInfo =
+        case cStack of
+          [] -> throw (InternalError ("getVariableValue called with an empty stack: " ++ labelToString name))
+          (x : _) ->
+            if (isFreeFunction x)
+              then
+                x
+                  { currentContract =
+                      CC.Contract
+                        { CC._contractName = currentContract x ^. CC.contractName,
+                          CC._parents = currentContract x ^. CC.parents,
+                          CC._constants = M.empty,
+                          CC._userDefined = M.empty,
+                          CC._storageDefs = M.empty,
+                          CC._enums = M.empty,
+                          CC._structs = M.empty,
+                          CC._errors = M.empty,
+                          CC._events = M.empty,
+                          CC._functions = M.empty,
+                          CC._constructor = currentContract x ^. CC.constructor,
+                          CC._modifiers = M.empty,
+                          CC._usings = [],
+                          CC._contractType = currentContract x ^. CC.contractType,
+                          CC._importedFrom = Nothing,
+                          CC._contractContext = currentContract x ^. CC.contractContext
+                        }
+                  }
+              else x
+      vars = NE.head $ localVariables currentCallInfo
+      t s v = ('x' : s, v) `seq` v
+      curContract = currentContract currentCallInfo
+
+  -- when (name == "theSixthSense") (internalError "M. Night Shyamalan presents" currentCallInfo)
+
+  let maybeLocalValue = M.lookup name vars
+
+  let maybeContractFunction :: Maybe Variable
+      maybeContractFunction =
+        (t "constant function" . Constant . SFunction name $ Just curContract)
+        <$ (M.lookup name $ curContract ^. CC.functions)
+
+      maybeFreeFunction :: Maybe Variable
+      maybeFreeFunction =
+        (\f -> t "free function" . Constant . SFunction name . Just $
+          curContract & CC.functions %~ M.insert name f)
+        <$> (M.lookup name $ codeCollection currentCallInfo ^. CC.flFuncs)
+
+      maybeBuiltinFunction :: Maybe Variable
+      maybeBuiltinFunction =
+        toMaybe
+          ( name
+              `elem` [ "address",
+                       "account",
+                       "uint",
+                       "int",
+                       "decimal",
+                       "bool",
+                       "byte",
+                       "bytes",
+                       "string",
+                       "variadic",
+                       "log",
+                       "keccak256",
+                       "ripemd160",
+                       "modExp",
+                       "ecAdd",
+                       "ecMul",
+                       "ecPairing",
+                       "bls12381G1Add",
+                       "bls12381G1Msm",
+                       "bls12381G2Add",
+                       "bls12381G2Msm",
+                       "bls12381Pairing",
+                       "bls12381MapFpToG1",
+                       "bls12381MapFp2ToG2",
+                       "bls12381HashToCurveG1",
+                       "bls12381HashToCurveG2",
+                       "bls12381DecompressG1",
+                       "bls12381DecompressG2",
+                       "poseidon",
+                       "poseidon2",
+                       "poseidon2Compress",
+                       "poseidon2Permute",
+                       "poseidon2Hash",
+                       "poseidon2HashBytes",
+                       "poseidon2gl",
+                       "poseidon2glBytes",
+                       "payable",
+                       "require",
+                       "revert",
+                       "assert",
+                       "sha3",
+                       "delegatecall",
+                       "call",
+                       "staticcall",
+                       "derive",
+                       "sha256",
+                       "ecrecover",
+                       "verifyP256",
+                       "base64encode",
+                       "base64urlencode",
+                       "blockhash",
+                       "addmod",
+                       "mulmod",
+                       "selfdestruct",
+                       "suicide",
+                       "bytes32ToString",
+                       "create",
+                       "create2",
+                       "fastForward",
+                       "setBlockContext"
+                     ]
+          )
+          $ t "builtin function" $ Constant $ SFunction name Nothing
+
+      maybeBuiltinVariable :: Maybe Variable
+      maybeBuiltinVariable =
+        toMaybe (name `elem` ["msg", "block", "tx", "super", "now", "abi"]) $
+          t "builtin variable" $ Constant $ SBuiltinVariable name
+
+      maybeEnum :: Maybe Variable
+      maybeEnum =
+        toMaybe (M.member name (currentContract currentCallInfo ^. CC.enums) || M.member name (codeCollection currentCallInfo ^. CC.flEnums)) $
+          t "enum" $ Constant $ SEnum name
+
+      maybeConstant :: Maybe Variable
+      maybeConstant = fmap (t "constant constant" . Constant) $ do
+        let ctract = currentContract currentCallInfo
+        let cc = codeCollection currentCallInfo
+        let constMap = cc ^. CC.flConstants
+        CC.ConstantDecl {..} <- M.lookup name $ (ctract ^. CC.constants) `M.union` constMap
+        return $
+          coerceType ctract cc _constType $ case _constInitialVal of
+            CC.NumberLiteral _ x _ -> SInteger x
+            CC.AddressLiteral _ a -> SAddress a False
+            _ -> SDeferredConstant name  -- Complex expression, evaluate on access
+
+      maybeStructDef :: Maybe Variable
+      maybeStructDef =
+        toMaybe (M.member name (currentContract currentCallInfo ^. CC.structs) || M.member name (codeCollection currentCallInfo ^. CC.flStructs)) $
+          t "struct def" $ Constant $ SStructDef name
+
+      maybeContract :: Maybe Variable
+      maybeContract =
+        toMaybe (M.member name (codeCollection currentCallInfo ^. CC.contracts)) $
+          t "contract" $ Constant $ SContractDef name
+
+      maybeStorageItem :: Maybe Variable
+      maybeStorageItem = Constant (SReference . MS.singleton . BC.pack $ labelToString name)
+                      <$ M.lookup name (currentContract currentCallInfo ^. CC.storageDefs)
+
+      maybeThis :: Maybe Variable
+      maybeThis = toMaybe (name == "this") . t "this" . Constant $ SAddress (currentAddress currentCallInfo) False
+
+  --        M.lookup (currentAddress currentCallInfo) (accounts sstate) >>= M.lookup name . storage
+
+  --TODO- Add the constant lookup properly
+  {-
+    maybeConstantValue <- do
+  --    M.lookup (currentAddress currentCallInfo) (accounts sstate) >>= M.lookup name . constants
+      liftIO $ putStrLn $ " @@@@@@@@@@@@@@@@@@@ available constants: " ++ show (M.keys $ currentContract currentCallInfo^.constants)
+      case M.lookup name $ currentContract currentCallInfo^.constants of
+        Nothing -> return Nothing
+        Just (CC.ConstantDecl _ _ e) -> do
+          let val = constExpToVar e
+          return $ Just $ Constant $ val
+  -}
+
+  case maybeLocalValue of
+    Just value -> pure value
+    Nothing -> case maybeStorageItem of
+      Just value -> pure value
+      Nothing ->
+        return . fromMaybe (throw (UnknownVariable "getVariableOfName" (labelToString name))) $
+          maybeContractFunction
+            <|> maybeFreeFunction
+            <|> maybeBuiltinFunction
+            <|> maybeBuiltinVariable
+            <|> maybeEnum
+            <|> maybeStructDef
+            <|> maybeContract
+            <|> maybeThis
+            <|> maybeConstant
+            <|> throw (UnknownVariable "not found" (labelToString name))
+
+withCallInfo ::
+  MonadSM m =>
+  Address ->
+  Address ->
+  CC.Contract ->
+  SolidString ->
+  Keccak256 ->
+  CC.CodeCollection ->
+  Map SolidString Variable ->
+  Bool ->
+  Bool ->
+  m a ->
+  m a
+withCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff f = do
+  dbgHot <- debugIsHot
+  if not dbgHot
+    then do
+      addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff
+      res <- f
+      popCallInfo False
+      pure res
+    else do
+      mTracer <- Mod.get (Mod.Proxy @(Maybe VmTracer))
+      withInstrumentedCallInfo mTracer
+  where
+    withInstrumentedCallInfo mTracer = do
+      for_ mTracer $ \_ -> do
+        stack <- Mod.get (Mod.Proxy @[CallInfo])
+        fromAddr <- case stack of
+          (parent : _) -> pure $ currentAddress parent
+          [] -> (\(Env.Sender sndr) -> sndr) <$> Mod.get (Mod.Proxy @Env.Sender)
+        GasInfo {_gasLeft = Gas gasBefore} <- Mod.get (Mod.Proxy @GasInfo)
+        args <- traverse renderArgShallow (M.toList initialLocalVariables)
+        let callType
+              | labelToText fn == "constructor" = CTCreate
+              | codeAddr /= a = CTDelegateCall
+              | ro = CTStaticCall
+              | otherwise = CTCall
+        traceEnterFrame mTracer callType fromAddr a (labelToText $ c ^. CC.contractName) (labelToText fn) args gasBefore
+      addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff
+      eRes <- try f
+      for_ mTracer $ \_ -> do
+        GasInfo {_gasLeft = Gas gasAfter} <- Mod.get (Mod.Proxy @GasInfo)
+        traceExitFrame mTracer gasAfter $ case eRes of
+          Left (e :: SomeException) -> Just . T.pack $ displayException e
+          Right _ -> Nothing
+      popCallInfo $ isLeft eRes
+      case eRes of
+        Left (e :: SomeException) -> throwIO e
+        Right res -> pure res
+
+-- | Render one named argument for a trace frame. Only the in-memory value is
+-- read (readIORef); storage is never touched, which would mutate the MP trie.
+renderArgShallow :: MonadIO m => (SolidString, Variable) -> m Text
+renderArgShallow (name, var) = do
+  val <- weakGetVar var
+  pure $ labelToText name <> "=" <> renderValueShallow val
+
+addCallInfo ::
+  MonadSM m =>
+  Address ->
+  Address ->
+  CC.Contract ->
+  SolidString ->
+  Keccak256 ->
+  CC.CodeCollection ->
+  Map SolidString Variable ->
+  Bool ->
+  Bool ->
+  m ()
+addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
+  let newCallInfo =
+        CallInfo
+          { currentFunctionName = fn,
+            currentArguments = [],
+            currentAddress = a,
+            currentCodeAddress = codeAddr,
+            currentContract = c,
+            codeCollection = cc,
+            collectionHash = hsh,
+            localVariables = NE.singleton initialLocalVariables,
+            callArguments = [],
+            stateMap = M.empty,
+            storageMap = M.empty,
+            readOnly = ro,
+            isUncheckedSection = False, -- The rationale here is that unchecked sections only apply to the current stack frame
+            currentSourcePos = Nothing,
+            isFreeFunction = ff
+          }
+
+  Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo :)
+
+uncheckedCallInfo :: MonadSM m => m ()
+uncheckedCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  [] -> throw (InternalError "uncheckedCallInfo was called on an already empty stack")
+  (ci : rest) -> pure $ ci {isUncheckedSection = True} : ci : rest
+
+popCallInfo :: MonadSM m => Bool -> m ()
+popCallInfo reverted = do
+  popCallInfoState >>= \case
+    Nothing -> throw (InternalError "popCallInfo was called on an already empty stack")
+    Just ci -> unless reverted $ do
+      A.insertMany (A.Proxy @RawStorageValue) $ storageMap ci
+      let fromASM ASDeleted = Left ()
+          fromASM (ASModification as) = Right as
+          (deletes, inserts) = M.mapEither fromASM $ stateMap ci
+      A.insertMany (A.Proxy @AddressState) $ inserts
+      A.deleteMany (A.Proxy @AddressState) $ M.keys deletes
+
+withLocalVars :: MonadSM m => m a -> m a
+withLocalVars = bracket_ pushLocalVars popLocalVars
+
+pushLocalVars :: MonadSM m => m ()
+pushLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  [] -> throw (InternalError "pushLocalVars was called with an empty stack")
+  (curFrame : rest) -> do
+    let lvs = case localVariables curFrame of
+                v NE.:| vs -> v NE.:| v:vs
+    pure $ curFrame{localVariables = lvs} : rest
+
+-- The inverse operation as above, called when exiting a statement block and those declared variables need to be destroyed
+popLocalVars :: MonadSM m => m ()
+popLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  [] -> throw (InternalError "popLocalVars was called with an empty stack")
+  (curFrame : rest) -> case localVariables curFrame of
+    _ NE.:| v:vs -> pure $ curFrame{localVariables = v NE.:| vs} : rest
+    _ -> throw (InternalError "popLocalVars was called with an empty stack")
+
+withContractConstruction :: MonadSM m => Address -> (Bool -> m a) -> m a
+withContractConstruction address f = do
+  blockNum <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
+  if not (isConstructorPublicationForkActive blockNum)
+    then f False
+    else do
+      accounts <- SM accessEnv
+      accountsBefore <- snapshotAccountDBEnv accounts
+      bracket get
+        (\previous -> modify $ \ss -> ss {constructingContracts = constructingContracts previous}) $ \previous -> do
+          modify $ \ss -> ss {constructingContracts = S.insert address (constructingContracts ss)}
+          f True `onException` do
+            restoreAccountDBEnv accounts accountsBefore
+            modify (\ss -> ss
+              { env = env previous,
+                callStack = callStack previous,
+                _action = _action previous
+              })
+
+getCodeHashForDerivation :: MonadSM m => Address -> m Keccak256
+getCodeHashForDerivation address = do
+  constructing <- gets constructingContracts
+  frames <- gets callStack
+  case find ((== address) . currentCodeAddress) frames of
+    Just ci | S.member address constructing -> pure $ collectionHash ci
+    _ -> (\(_, hsh, _) -> hsh) <$> getCodeAndCollection address
+
+withStaticCallInfo :: MonadSM m => m a -> m a
+withStaticCallInfo f = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    [] -> throw (InternalError "withStaticCallInfo was called with an empty stack")
+    (curFrame : rest) -> do
+      Mod.put (Mod.Proxy @[CallInfo]) $ curFrame{readOnly = True} : rest
+      eResult <- try f
+      Mod.put (Mod.Proxy @[CallInfo]) $ curFrame : rest
+      case eResult of
+        Left (e :: SomeException) -> throwIO e
+        Right result -> pure result
+
+withUncheckedCallInfo :: MonadSM m => m a -> m a
+withUncheckedCallInfo f = do
+  uncheckedCallInfo
+  eResult <- try f
+  popCallInfo $ isLeft eResult
+  case eResult of
+    Left (e :: SomeException) -> throwIO e
+    Right result -> pure result
+
+getCurrentCallInfo :: MonadSM m => m CallInfo
+getCurrentCallInfo = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    [] -> throw (InternalError "getCurrentCallInfo called with an empty stack")
+    (currentCallInfo : _) -> return currentCallInfo
+
+setCallArguments :: MonadSM m => [Variable] -> m ()
+setCallArguments args = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  [] -> throw (InternalError "setCallArguments called with an empty stack: ()")
+  info : rest -> pure $ info {callArguments = args} : rest
+
+getCallStackDepth :: MonadSM m => m Int
+getCallStackDepth = length <$> Mod.get (Mod.Proxy @[CallInfo])
+
+trimCallStackToDepth :: MonadSM m => Int -> m ()
+trimCallStackToDepth depth = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \stack ->
+  pure $ drop (max 0 $ length stack - depth) stack
+
+getCurrentCallInfoIfExists :: MonadSM m => m (Maybe CallInfo)
+getCurrentCallInfoIfExists = listToMaybe <$> Mod.get (Mod.Proxy @[CallInfo])
+
+getCurrentContract :: MonadSM m => m CC.Contract
+getCurrentContract = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    (currentCallInfo : _) -> return $ currentContract currentCallInfo
+    _ -> throw (InternalError "getCurrentContract called with an empty stack")
+
+getCurrentAddress :: Mod.Modifiable [CallInfo] m => m Address
+getCurrentAddress = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    (currentCallInfo : _) -> return $ currentAddress currentCallInfo
+    _ -> throw (InternalError "getCurrentAccount called with an empty stack")
+
+getCurrentCodeAddress :: MonadSM m => m Address
+getCurrentCodeAddress = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    (currentCallInfo : _) -> return $ currentCodeAddress currentCallInfo
+    _ -> throw (InternalError "getCurrentCodeAddress called with an empty stack")
+{-
+getCurrentChainId :: MonadSM m => m (Maybe Word256)
+getCurrentChainId = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    (currentCallInfo : _) -> return $ _accountChainId $ currentAddress currentCallInfo
+    _ -> throw (InternalError "getCurrentChainId called with an empty stack")
+-}
+getCurrentFunctionName :: MonadSM m => m SolidString
+getCurrentFunctionName = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    (currentCallInfo : _) -> return $ currentFunctionName currentCallInfo
+    _ -> throw (InternalError "getCurrentFunctionName called with an empty stack")
+
+addFunctionToCurrentContractInCurrentCallInfo :: MonadSM m => SolidString -> CC.Func -> m ()
+addFunctionToCurrentContractInCurrentCallInfo funcName funcObject = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    (currentCallInfo : _) -> do
+      let contract = currentContract currentCallInfo
+          -- _functions :: Map SolidString (FuncF a),
+          newContract = contract {CC._functions = M.insert funcName funcObject $ CC._functions contract}
+      Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+        [] -> throw (InternalError "addFunctionToCurrentContractInCurrentCallInfo called with an empty stack")
+        (ci : rest) -> pure $ ci {currentContract = newContract} : rest
+    _ -> throw (InternalError "addFunctionToCurrentContractInCurrentCallInfo called with an empty stack")
+
+removeFunctionFromCurrentContractInCurrentCallInfo :: MonadSM m => SolidString -> m ()
+removeFunctionFromCurrentContractInCurrentCallInfo funcName = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    (currentCallInfo : _) -> do
+      let contract = currentContract currentCallInfo
+          -- _functions :: Map SolidString (FuncF a),
+          newContract = contract {CC._functions = M.delete funcName $ CC._functions contract}
+      Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+        [] -> throw (InternalError "removeFunctionFromCurrentContractInCurrentCallInfo called with an empty stack")
+        (ci : rest) -> pure $ ci {currentContract = newContract} : rest
+    _ -> throw (InternalError "removeFunctionFromCurrentContractInCurrentCallInfo called with an empty stack")
+
+getCurrentCodeCollection :: MonadSM m => m (Keccak256, CC.CodeCollection)
+getCurrentCodeCollection = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    (currentCallInfo : _) -> return (collectionHash currentCallInfo, codeCollection currentCallInfo)
+    _ -> throw (InternalError "getCurrentCodeCollection called with an empty stack")
+
+initializeAction :: MonadSM m =>
+                    Address -> m ()
+initializeAction acct = do
+  act <- Mod.get (Mod.Proxy @Action)
+  unless (OMap.member acct (Action._actionData act)) $ do
+    let newData = Action.ActionData (Action.SolidVMDiff M.empty)
+    Mod.modify_ (Mod.Proxy @Action) $
+      pure . (Action.actionData %~ Action.omapInsertWith Action.mergeActionData acct newData)
+
+markDiffForAction :: Mod.Modifiable Action m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
+markDiffForAction owner key' val' = do
+  let ins (Action.SolidVMDiff m) = Action.SolidVMDiff $ M.insert key' val' m
+  Mod.modify_ (Mod.Proxy @Action) $
+    pure . (Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %~ ins)
+
+addEvent :: (MonadIO m, Mod.Modifiable (Q.Seq Event) m, Mod.Modifiable (Maybe VmTracer) m) => Event -> m ()
+addEvent newEvent = do
+  Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
+  mTracer <- Mod.get (Mod.Proxy @(Maybe VmTracer))
+  traceAddLog mTracer $
+    TraceLog
+      (evContractAddress newEvent)
+      (evName newEvent)
+      [(n, renderValue v) | (n, v) <- evArgs newEvent]
+
+addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Keccak256 -> T.Text -> m ()
+addDelegatecall s c n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c n)
+
+-- Cirrus table namespace enforcement
+--
+-- Cirrus tables are namespaced by the deployer's username, which is stored in
+-- the User contract created by the UserRegistry. Only contracts deployed through
+-- a User contract should produce Cirrus tables, since the username determines
+-- which namespace the table belongs to.
+--
+-- Previously, any contract deployed without a User in the call stack would
+-- default to the "BlockApps" namespace, allowing arbitrary accounts to write
+-- into the system namespace. getUsername now returns Nothing when no User
+-- contract is found, and addNewCodeCollection skips the announcement — so no
+-- Cirrus table is created for contracts deployed outside the User contract flow.
+--
+-- The addresses below are the legacy BlockApps operational accounts that
+-- deployed system contracts before the UserRegistry was in place. They are
+-- grandfathered in so that existing system contract tables continue to be
+-- created under the "BlockApps" namespace.
+blockappsAddresses :: S.Set Address
+blockappsAddresses = S.fromList
+  [ Address 0x7630b673862a2807583834908f10192e00c58b00
+  , Address 0x101a31a25295a5dd95187ea2b0725c91443db7b7
+  , Address 0x3287f1ad89b0ac875b58a65ceaf40bc7a6cc8041
+  , Address 0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce
+  , Address 0xac840dd68e2ab32e98c8d7ccd3b9a725139f1aa7
+  , Address 0x304f41812ce9a1db4fa9c58aff7904ea3e77d51a
+  , Address 0x292dd9591f506845ef05a9f3b8116e641cbcb4bb
+  , Address 0xf1ba16a6cfb2a17fb34ad477eaaf0c76eac64f14
+  ]
+
+-- | Resolve the deployer's username for Cirrus table namespacing.
+-- Walks the call stack looking for a User contract (which has a "username"
+-- storage field). Returns Nothing if no User contract is found and the TX
+-- origin is not a grandfathered BlockApps account.
+getUsername :: MonadSM m => m (Maybe Text)
+getUsername = do
+  let go []     = do
+        (origin, currentBlockNum) <- (Env.origin &&& (blockHeaderBlockNumber . Env.blockHeader)) <$> getEnv
+        let netID = Conf.networkID (Conf.networkConfig ethConf)
+            isPreUsernameFork = currentBlockNum < 100000 && (netID `elem` [33056204878082667, 114784819836269])
+        if isPreUsernameFork && origin `S.member` blockappsAddresses
+          then pure $ Just "BlockApps"
+          else pure Nothing
+      go (x:xs) = do
+        userNameValue <- getSolidStorageKeyVal' x $ MS.StoragePath [MS.Field "username"]
+        case userNameValue of
+          MS.BString userNameString -> do
+            let usernameText = DT.decodeUtf8 userNameString
+                u = T.unpack usernameText
+                userRegistry = Address 0x720
+            ch <- A.selectWithDefault (A.Proxy @AddressState) userRegistry >>= \s ->
+              pure . keccak256ToByteString $ case addressStateCodeHash s of
+                ExternallyOwned h -> h
+                SolidVMCode _ h   -> h
+            let addr = getNewAddressWithSalt_unsafe userRegistry u ch [SString "User", SString u]
+            if addr == x
+              then pure $ Just usernameText
+              else go xs
+          _ -> go xs
+
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  go $ currentAddress <$> cs
+
+addNewCodeCollection :: MonadSM m => Keccak256 -> CodeCollection -> m ()
+addNewCodeCollection ch cc = do
+  mUsername <- getUsername
+  case mUsername of
+    Just username ->
+      Mod.modify_ (Mod.Proxy @(OMap.OMap (Text, Keccak256) CodeCollection)) $ pure . (OMap.|> ((username, ch), cc))
+    Nothing -> pure ()
+
+getBlockHashWithNumber :: (MonadLogger m, (Keccak256 `A.Alters` BlockSummary) m) => Integer -> Keccak256 -> m (Maybe Keccak256)
+getBlockHashWithNumber num h = do
+  $logInfoS "getBlockHashWithNumber" . T.pack $ "calling getBSum with " ++ format h
+  bSum <- getBSum h
+  case num `compare` bSumNumber bSum of
+    Ordering.LT -> getBlockHashWithNumber num $ bSumParentHash bSum
+    Ordering.EQ -> return $ Just h
+    Ordering.GT -> return Nothing
+
+getBSum :: (Keccak256 `A.Alters` BlockSummary) m => Keccak256 -> m BlockSummary
+getBSum bh =
+  fromMaybe (error $ "missing value in block summary DB: " ++ format bh)
+    <$> A.lookup (A.Proxy @BlockSummary) bh
+
+getContractNameAndHash :: MonadSM m => Address -> m (SolidString, Keccak256)
+getContractNameAndHash address' = do
+  codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
+
+  case codeHash of
+    SolidVMCode cn ch' | ch' /= unsafeCreateKeccak256FromWord256 0 -> return (stringToLabel cn, ch')
+    _ -> throw (MissingCodeCollection ("contract call to address 0x" ++ formatAddressWithoutColor address' ++ " failed") ("no contract deployed at this address" :: String))
+
+-- | How source must be parsed for the block being executed. Consensus-visible:
+-- see 'isOperatorPrecedenceForkActive'.
+parseOptionsForCurrentBlock :: MonadSM m => m ParseOptions
+parseOptionsForCurrentBlock = do
+  blockNum <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
+  pure defaultParseOptions {parseLegacyOperatorPrecedence = not (isOperatorPrecedenceForkActive blockNum)}
+
+-- | Values as 'rlpEncodeValue' should see them at the current block: before
+-- 'isRlpEncodeForkActive', every non-data value encoded as an empty list.
+rlpForkValues :: (Monad m, Mod.Accessible Env.Environment m) => [Value] -> m [Value]
+rlpForkValues vs = do
+  forked <- isRlpEncodeForkActive . blockHeaderBlockNumber . Env.blockHeader <$> Mod.access (Mod.Proxy @Env.Environment)
+  pure $ if forked then vs else rlpLegacyValue <$> vs
+
+getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
+getCodeAndCollection = getCodeAndCollectionWithTypeCheck True
+
+getCodeAndCollectionWithTypeCheck :: MonadSM m => Bool -> Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
+getCodeAndCollectionWithTypeCheck typeCheck address' = do
+  (contractName', ch) <- getContractNameAndHash address'
+  isRunningTests <- Env.runningTests <$> getEnv
+  opts <- parseOptionsForCurrentBlock
+  cc <- codeCollectionFromHashWith opts isRunningTests typeCheck ch
+  let !contract' = fromMaybe (throw (MissingType "getCodeAndCollection" (labelToString contractName'))) $ M.lookup contractName' $ cc ^. CC.contracts
+  return (contract', ch, cc)
+
+getContractsForParents :: [SolidString] -> M.Map SolidString (CC.ContractF a) -> [CC.ContractF a]
+getContractsForParents parents' cc =
+  let getContractForParent parent = M.lookup parent cc
+   in mapMaybe getContractForParent parents'
+
+-- Only get top-level abstract contracts (e.g. Asset, Sale), to reduce Cirrus table bloat
+getAbstractParentsFromContract :: CC.Contract -> CC.CodeCollection -> [CC.Contract]
+getAbstractParentsFromContract c cc = M.elems $ CC.getTopLevelAbstractsForContract cc c
+
+getMapNamesFromContract :: CC.Contract -> [T.Text]
+getMapNamesFromContract c =
+  let storageDefs' = c ^. CC.storageDefs
+      storageDefsList = M.toList storageDefs'
+      listOfMappings = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Mapping _ _ _ _ _ -> True; _ -> False) storageDefsList
+   in labelToText . fst <$> listOfMappings
+
+--also needs to be changed for testnet3 to be only record
+getArrayNamesFromContract :: CC.Contract -> [T.Text]
+getArrayNamesFromContract c =
+  let storageDefs' = c ^. CC.storageDefs
+      storageDefsList = M.toList storageDefs'
+      listOfArrays = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Array _ _ -> True; _ -> False) storageDefsList
+   in labelToText . fst <$> listOfArrays

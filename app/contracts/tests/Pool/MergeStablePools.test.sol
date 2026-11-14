@@ -1,5 +1,4 @@
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 
 contract User {
     function do(address a, string f, variadic args) public returns (variadic) {
@@ -7,7 +6,7 @@ contract User {
     }
 }
 
-contract Describe_MergeStablePools is Authorizable {
+contract Describe_MergeStablePools {
 
     Mercata m;
     string[] emptyArray;
@@ -15,7 +14,6 @@ contract Describe_MergeStablePools is Authorizable {
     User user2;
 
     function beforeAll() {
-        bypassAuthorizations = true;
         m = new Mercata();
         user1 = new User();
         user2 = new User();
@@ -24,16 +22,18 @@ contract Describe_MergeStablePools is Authorizable {
     // ============ HELPERS ============
 
     function _createToken(string name, string symbol) internal returns (address) {
-        address tokenAddr = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             name, "Test Token", emptyArray, emptyArray, emptyArray, symbol, 0, 18
         );
-        Token(tokenAddr).setStatus(2); // ACTIVE
+        address tokenAddr = address(ret);
+        m.adminRegistry().castVoteOnIssue(tokenAddr, "setStatus", 2); // ACTIVE
         return tokenAddr;
     }
 
     function _createAndSetupStablePool(address tokenA, address tokenB) internal returns (address) {
         fastForward(100);
-        address poolAddr = m.poolFactory().createStablePool(tokenA, tokenB);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "createStablePool", tokenA, tokenB);
+        address poolAddr = address(ret);
         Token lpToken = StablePool(poolAddr).lpToken();
         AdminRegistry ar = m.adminRegistry();
         ar.castVoteOnIssue(address(ar), "addWhitelist", address(lpToken), "mint", poolAddr);
@@ -49,16 +49,16 @@ contract Describe_MergeStablePools is Authorizable {
     }
 
     function _addLiquidity(address poolAddr, address tokenA, address tokenB, uint256 amount) internal {
-        Token(tokenA).mint(address(this), amount);
-        Token(tokenB).mint(address(this), amount);
+        m.adminRegistry().castVoteOnIssue(tokenA, "mint", address(this), amount);
+        m.adminRegistry().castVoteOnIssue(tokenB, "mint", address(this), amount);
         ERC20(tokenA).approve(poolAddr, amount);
         ERC20(tokenB).approve(poolAddr, amount);
         StablePool(poolAddr).addLiquidityGeneral([amount, amount], 1, address(this));
     }
 
     function _addLiquidityAsUser(User user, address poolAddr, address tokenA, address tokenB, uint256 amount) internal {
-        Token(tokenA).mint(address(user), amount);
-        Token(tokenB).mint(address(user), amount);
+        m.adminRegistry().castVoteOnIssue(tokenA, "mint", address(user), amount);
+        m.adminRegistry().castVoteOnIssue(tokenB, "mint", address(user), amount);
         user.do(tokenA, "approve", poolAddr, amount);
         user.do(tokenB, "approve", poolAddr, amount);
         user.do(poolAddr, "addLiquidityGeneral", [amount, amount], 1, address(user));
@@ -81,11 +81,12 @@ contract Describe_MergeStablePools is Authorizable {
         _addLiquidity(pool2, tokenC, tokenD, amount);
 
         // Merge
-        address newPool = m.poolFactory().mergeStablePools(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "mergeStablePools",
             [pool1, pool2],
             [address(this), address(this)],
             [uint(1), uint(1)]
         );
+        address newPool = address(ret);
 
         // Old pools are drained
         require(ERC20(tokenA).balanceOf(pool1) == 0, "Pool1 tokenA should be 0");
@@ -119,11 +120,12 @@ contract Describe_MergeStablePools is Authorizable {
         _addLiquidity(pool1, tokenA, tokenB, amount);
         _addLiquidity(pool2, tokenA, tokenC, amount);
 
-        address newPool = m.poolFactory().mergeStablePools(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "mergeStablePools",
             [pool1, pool2],
             [address(this), address(this)],
             [uint(1), uint(1)]
         );
+        address newPool = address(ret);
 
         // Shared tokenA is combined
         require(ERC20(tokenA).balanceOf(newPool) == 2 * amount, "New pool should have 2x tokenA");
@@ -149,11 +151,12 @@ contract Describe_MergeStablePools is Authorizable {
         require(StablePool(pool1).lpToken().balanceOf(address(user1)) > 0, "User1 should have pool1 LP");
         require(StablePool(pool2).lpToken().balanceOf(address(user2)) > 0, "User2 should have pool2 LP");
 
-        address newPool = m.poolFactory().mergeStablePools(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "mergeStablePools",
             [pool1, pool2],
             [address(user1), address(user2)],
             [uint(1), uint(1)]
         );
+        address newPool = address(ret);
 
         Token newLP = StablePool(newPool).lpToken();
         uint256 user1NewLP = newLP.balanceOf(address(user1));
@@ -185,11 +188,12 @@ contract Describe_MergeStablePools is Authorizable {
         // This contract adds 3000 to pool2 (same total value as pool1)
         _addLiquidity(pool2, tokenC, tokenD, 3000e18);
 
-        address newPool = m.poolFactory().mergeStablePools(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "mergeStablePools",
             [pool1, pool2],
             [address(user1), address(user2), address(this)],
             [uint(2), uint(1)]
         );
+        address newPool = address(ret);
 
         Token newLP = StablePool(newPool).lpToken();
 
@@ -221,11 +225,12 @@ contract Describe_MergeStablePools is Authorizable {
         _addLiquidity(pool1, tokenA, tokenB, amount);
         _addLiquidity(pool2, tokenC, tokenD, amount);
 
-        address newPool = m.poolFactory().mergeStablePools(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "mergeStablePools",
             [pool1, pool2],
             [address(this), address(this)],
             [uint(1), uint(1)]
         );
+        address newPool = address(ret);
 
         // Whitelist new pool so it can burn LP tokens on withdrawal
         _whitelistPool(newPool);
@@ -260,11 +265,12 @@ contract Describe_MergeStablePools is Authorizable {
         _addLiquidityAsUser(user1, pool1, tokenA, tokenB, amount);
         _addLiquidityAsUser(user2, pool2, tokenC, tokenD, amount);
 
-        address newPool = m.poolFactory().mergeStablePools(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "mergeStablePools",
             [pool1, pool2],
             [address(user1), address(user2)],
             [uint(1), uint(1)]
         );
+        address newPool = address(ret);
 
         _whitelistPool(newPool);
 
@@ -321,11 +327,12 @@ contract Describe_MergeStablePools is Authorizable {
         _addLiquidity(pool1, tokenA, tokenB, amount);
         _addLiquidity(pool2, tokenC, tokenD, amount);
 
-        address newPool = m.poolFactory().mergeStablePools(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "mergeStablePools",
             [pool1, pool2],
             [address(this), address(this)],
             [uint(1), uint(1)]
         );
+        address newPool = address(ret);
 
         // Old pool entries should be replaced by new pool
         require(m.poolFactory().pools(tokenA, tokenB) == newPool, "New pool should be registered A-B");
@@ -358,11 +365,12 @@ contract Describe_MergeStablePools is Authorizable {
         _addLiquidityAsUser(user1, pool1, tokenA, tokenB, 1000e18);
         _addLiquidityAsUser(user2, pool2, tokenC, tokenD, 3000e18);
 
-        address newPool = m.poolFactory().mergeStablePools(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "mergeStablePools",
             [pool1, pool2],
             [address(user1), address(user2)],
             [uint(1), uint(1)]
         );
+        address newPool = address(ret);
 
         Token newLP = StablePool(newPool).lpToken();
         uint256 user1NewLP = newLP.balanceOf(address(user1));

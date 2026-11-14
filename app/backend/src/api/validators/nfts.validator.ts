@@ -1,4 +1,4 @@
-import Joi from "@hapi/joi";
+import Joi from "joi";
 import { StatusCodes } from "http-status-codes";
 import { validateAddressField, uintStringField } from "./common.validators";
 

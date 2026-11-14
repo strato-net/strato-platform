@@ -8,7 +8,7 @@ module Main where
 import BlockApps.Logging (runLogging)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.SolidVM.Simple hiding (name)
-import Blockchain.VMContext (runMemContextM, GasCap (..), ContextState)
+import Blockchain.VMContext (runMemContextM, ContextState)
 import Blockchain.EthConf (ethConf, networkConfig, networkID)
 import Blockchain.Forks (constructorPublicationForkBlock)
 import qualified Control.Monad.Change.Modify as Mod
@@ -19,6 +19,7 @@ import Control.Lens
 import Control.Monad
 import Control.Monad.Composable.Base (runEff)
 import Control.Monad.IO.Class
+import qualified Data.Aeson as JSON
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
@@ -70,6 +71,16 @@ gasSource = T.unlines
   , " function bigMultiply() returns (uint) { uint x = 1; x = x << 260; return x * x; }"
   , " function decimalDivide() returns (decimal) { decimal x = decimal(\"1.25\"); return x / decimal(\"2.00\"); }"
   , " function compare() returns (bool) { uint x = 1; return x > 0 && x < 2; }"
+  , " bool flag; address owner0; GasProbe self0;"
+  , " function hashScalars() returns (string) { return keccak256(value, flag, owner0); }"
+  , " function hashStorageValues() returns (string) { return keccak256(array, holder, pair); }"
+  , " function hashStoragePaths() returns (string) { return keccak256(array[0], pair.a, pair.b, map[1], map[2], array.length); }"
+  , " function hashAliases() returns (string) { Pair p = pair; Holder h = holder; return keccak256(p, p.a, h); }"
+  , " function hashContracts() returns (string) { return keccak256(GasProbe(address(this)), self0); }"
+  , " function hashMemory() returns (string) { uint[] memory a = [uint(1), uint(2)]; return keccak256(a, \"x\", 5); }"
+  , " function zeroBoolHashesAsZero() returns (bool) { return keccak256(flag) == keccak256(uint(0)); }"
+  , " function contractHashesAsAddress() returns (bool) { return keccak256(GasProbe(address(this))) == keccak256(address(this)); }"
+  , " function deriveWithStorage() returns (address) { return this.derive(\"s\", \"GasBase\", flag, value, array); }"
   , " function leaf() returns (uint) { return 4; }"
   , " function literal() returns (uint) { return 3; }"
   , " function local() returns (uint) { uint x = 1; x = 2; return x; }"
@@ -99,6 +110,27 @@ gasSource = T.unlines
   , " function tuple() returns (uint,uint) { return (1,2); }"
   , " function arrayLiteral() returns (uint[]) { uint[] x = [1,2]; return x; }"
   , " function guarded() guard returns (uint) { return 3; }"
+  , " function explicitStorageArrayLength() returns (uint) { uint[] storage xs = array; return xs.length; }"
+  , " function aliasArrayLength() returns (uint) { Holder h = holder; return h.values.length; }"
+  , " function reboundArrayLength() returns (uint) { Holder h = holder; h = Holder([1,2]); return h.values.length; }"
+  , " function memoryArrayLength() returns (uint) { uint[] a = [1,2]; return a.length; }"
+  , " function memoryStructArrayLength() returns (uint) { Holder h = Holder([1,2]); return h.values.length; }"
+  , " function abiBoolsPacked() returns (bytes) { return abi.encodePacked(true,false); }"
+  , " function abiString() returns (bytes) { return abi.encode(\"abc\"); }"
+  , " function abiArray() returns (bytes) { uint[] a = [1,2,3]; return abi.encode(a); }"
+  , " function abiPackedArray() returns (bytes) { uint[] a = [1,2,3]; return abi.encodePacked(a); }"
+  , " function payableCast() returns (address) { return payable(address(1)); }"
+  , " function memberCompound() returns (uint) { pair.a += 1; return pair.a; }"
+  , " function indexCompound() returns (uint) { array[0] += 1; return array[0]; }"
+  , " function memoryCompound() returns (uint) { uint[] a = [1,2]; a[0] += 1; return a[0]; }"
+  , " function memoryIncrement() returns (uint) { uint[] a = [1,2]; a[0]++; return a[0]; }"
+  , " function localFieldWrite() returns (uint) { Pair p = Pair(1,2); p.a = 3; return p.a; }"
+  , " function takeText(string x) internal returns (uint) { return x.length; }"
+  , " function parameterSizes() returns (uint) { return takeText(\"" <> T.replicate 65 "a" <> "\"); }"
+  , " function hashCost() returns (bytes) { return keccak256(hex\"" <> T.replicate 2048 "0" <> "\"); }"
+  , " function castText() returns (uint) { return uint(\"ff\"); }"
+  , " function emptyLoop() { while(true) {} }"
+  , " function hugeArray() { uint[] a = new uint[](1000000000); }"
   , " function catchGas() { try { while(true) {} } catch {} }"
   , " function catchGasBody() { try { while(true) {} } catch { uint x = 1; } }"
   , "}"
@@ -267,19 +299,16 @@ main = do
     emptyContext <- Mod.get (Mod.Proxy :: Mod.Proxy ContextState)
     forM_ [0..1100] $ \limit -> do
       Mod.put (Mod.Proxy :: Mod.Proxy ContextState) emptyContext
-      Mod.put (Mod.Proxy :: Mod.Proxy GasCap) (GasCap (Gas limit))
-      result <- create $ def & createNewAddress .~ 0x2100 & createContractName .~ "GasProbe" & createCode .~ Code gasSource
+      result <- create $ def & createArgs . argsGas .~ Gas limit & createNewAddress .~ 0x2100 & createContractName .~ "GasProbe" & createCode .~ Code gasSource
       liftIO $ putStrLn $ "GAS constructor " ++ show limit ++ " " ++ show (erException result, erReturnVal result)
     Mod.put (Mod.Proxy :: Mod.Proxy ContextState) emptyContext
-    Mod.put (Mod.Proxy :: Mod.Proxy GasCap) (GasCap (Gas 100000000))
     deployment <- create $ def & createNewAddress .~ 0x2100 & createContractName .~ "GasProbe" & createCode .~ Code gasSource
     liftIO $ check deployment
     savedContext <- Mod.get (Mod.Proxy :: Mod.Proxy ContextState)
-    forM_ ["aliasIndex", "aliasIndexWrite", "aliasIncrement", "storageIncrement", "guardedArgs", "libraryConstant", "qualifiedCall", "usingCall", "superCall", "decimalCompound", "tupleAssign", "aliasRebind", "message", "blockNumber", "constantRead", "enumRead", "externalCall", "scalarWrite", "memberWrite", "indexWrite", "mappingWrite", "copyStorage", "push", "memoryIndexWrite", "aliasWrite", "stringAdd", "bytesAdd", "abiEncode", "shifts", "bigMultiply", "decimalDivide", "compare", "literal", "local", "valueChain", "literalFirst", "valueSelfAdd", "valueMultiply", "valueUnderflow", "valueFromStorage", "localBytesRead", "localBytesWrite", "storageRead", "member", "index", "mappingRead", "callInternal", "castContract", "arithmetic", "divide", "modulo", "compound", "decimalMath", "loop", "breakLoop", "whileLoop", "doLoop", "tuple", "arrayLiteral", "guarded", "catchGas", "catchGasBody"] $ \fn ->
+    forM_ ["aliasIndex", "aliasIndexWrite", "aliasIncrement", "storageIncrement", "guardedArgs", "libraryConstant", "qualifiedCall", "usingCall", "superCall", "decimalCompound", "tupleAssign", "aliasRebind", "message", "blockNumber", "constantRead", "enumRead", "externalCall", "scalarWrite", "memberWrite", "indexWrite", "mappingWrite", "copyStorage", "push", "memoryIndexWrite", "aliasWrite", "stringAdd", "bytesAdd", "abiEncode", "shifts", "bigMultiply", "decimalDivide", "compare", "literal", "local", "valueChain", "literalFirst", "valueSelfAdd", "valueMultiply", "valueUnderflow", "valueFromStorage", "localBytesRead", "localBytesWrite", "storageRead", "member", "index", "mappingRead", "callInternal", "castContract", "arithmetic", "divide", "modulo", "compound", "decimalMath", "loop", "breakLoop", "whileLoop", "doLoop", "tuple", "arrayLiteral", "guarded", "explicitStorageArrayLength", "aliasArrayLength", "reboundArrayLength", "memoryArrayLength", "memoryStructArrayLength", "abiBoolsPacked", "abiString", "abiArray", "abiPackedArray", "payableCast", "memberCompound", "indexCompound", "memoryCompound", "memoryIncrement", "localFieldWrite", "parameterSizes", "hashCost", "castText", "emptyLoop", "hugeArray", "catchGas", "catchGasBody", "hashScalars", "hashStorageValues", "hashStoragePaths", "hashAliases", "hashContracts", "hashMemory", "zeroBoolHashesAsZero", "contractHashesAsAddress", "deriveWithStorage"] $ \fn ->
       forM_ [0..1100] $ \limit -> do
         Mod.put (Mod.Proxy :: Mod.Proxy ContextState) savedContext
-        Mod.put (Mod.Proxy :: Mod.Proxy GasCap) (GasCap (Gas limit))
-        result <- call $ def & callCodeAddress .~ 0x2100 & callFuncName .~ fn
+        result <- call $ def & callArgs . argsGas .~ Gas limit & callCodeAddress .~ 0x2100 & callFuncName .~ fn
         liftIO $ putStrLn $ "GAS " ++ T.unpack fn ++ " " ++ show limit ++ " " ++ show (erException result, erReturnVal result)
     Mod.put (Mod.Proxy :: Mod.Proxy ContextState) savedContext
   oracleSource <- traverse T.readFile =<< lookupEnv "SOLIDVM_ORACLE_SOURCE"
@@ -304,7 +333,7 @@ main = do
         invokeAs = invokeAt 1
         invoke = invokeAs 0
         observe name expected result = do
-          unless (show (erReturnVal result) == show (expected :: Maybe Value)) $ liftIO $ throwIO $ userError $ "unexpected return from " ++ T.unpack name ++ ": " ++ show (erReturnVal result)
+          unless (JSON.toJSON (erReturnVal result) == JSON.toJSON (expected :: Maybe Value)) $ liftIO $ throwIO $ userError $ "unexpected return from " ++ T.unpack name ++ ": " ++ show (erReturnVal result)
           liftIO $ putStrLn $ "CHECK " ++ T.unpack name ++ " " ++ show (erReturnVal result, erEvents result, erAction result)
         expect addr name args value = do
           result <- invoke addr name args

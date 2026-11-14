@@ -7,6 +7,11 @@ import { extractContractName } from "../../utils/utils";
 import { StratoError } from "../../errors";
 import JSONBig from "json-bigint";
 import { normalizeLegacyEscapes, repairStructuredJson } from "../helpers/jsonStringParsing.helper";
+import { FunctionInput } from "../../types/types";
+import { validateAddressField } from "../validators/common.validators";
+import { partnerReferralsUrl, partnerReferralsKey, networkName, networkId } from "../../config/config";
+import { recoverPersonalSigner } from "../../utils/personalSign";
+import { requestContext } from "../../utils/requestContext";
 const { AdminRegistry, adminRegistry, DAY_MS } = constants;
 const JSONBigString = JSONBig({ storeAsString: true });
 const JSONBigNumber = JSONBig({ useNativeBigInt: true });
@@ -20,6 +25,111 @@ type AbiType = {
   actual?: AbiType;
   contents?: string;
   typedef?: string;
+};
+
+/** One request to the partner referrals service's internal signups endpoint: a signup to record, or a query. */
+const partnerSignups = (query: string, signup?: object): Promise<Response> =>
+  fetch(`${partnerReferralsUrl}/partner-api/referrals/signups${query}`, {
+    method: signup ? "POST" : "GET",
+    headers: { Authorization: `Bearer ${partnerReferralsKey}`, ...(signup ? { "Content-Type": "application/json" } : {}) },
+    body: signup && JSON.stringify(signup),
+    signal: AbortSignal.timeout(5000),
+  });
+
+/**
+ * Records the partner referral code a new account signed up with. Not
+ * awaited: a signup never waits on, or fails with, the partner referrals
+ * service. While the service cannot be reached the call is tried again, for
+ * up to a day. The first failure and a final one are logged with the code,
+ * account and signup time, which is what it takes to replay the signup by
+ * hand. The signup time is sent along, so a signup that arrives late still
+ * counts in the period it happened in.
+ */
+export const recordPartnerReferral = async (code: string, account: string, email?: string): Promise<void> => {
+  if (!partnerReferralsUrl || !partnerReferralsKey) return;
+  const signedUpAt = new Date().toISOString();
+  const giveUpAt = Date.now() + DAY_MS;
+  for (let attempt = 1; ; attempt++) {
+    let failure: unknown;
+    let refused = false;
+    try {
+      const res = await partnerSignups("", { code, account, email, signed_up_at: signedUpAt });
+      if (res.ok) {
+        if (attempt > 1) console.info("Partner referral recorded on attempt %d (code %s, account %s)", attempt, code, account);
+        return;
+      }
+      failure = `HTTP ${res.status}`;
+      // Refused, not unavailable: trying again would be refused the same way
+      refused = res.status < 500 && res.status !== 429;
+    } catch (error) {
+      failure = error;
+    }
+    const final = refused || Date.now() >= giveUpAt;
+    if (attempt === 1 || final) console.error("Partner referral not recorded%s (code %s, account %s, signed up %s):", final ? "" : " yet", code, account, signedUpAt, failure);
+    if (final) return;
+    await new Promise((resolve) => setTimeout(resolve, Math.min(4 ** attempt * 1000, 5 * 60 * 1000)));
+  }
+};
+
+// A wallet confirms a referral with the message it was just given: one
+// issued up to ten minutes ago, with a minute's allowance between clocks.
+const CLAIM_MAX_AGE_MS = 10 * 60 * 1000;
+const CLAIM_MAX_AHEAD_MS = 60 * 1000;
+
+const partnerReferralsUnavailable = () => new StratoError("Partner referrals are unavailable", 503);
+
+/**
+ * The text an external wallet signs to confirm that a partner code referred
+ * it. `address` is 40 lowercase hex characters. Always built here, for the
+ * wallet to sign and again to check what it signed: never taken from a
+ * caller.
+ */
+export const partnerClaimMessage = (code: string, address: string, issuedAt: string): string =>
+  [
+    "STRATO referral",
+    "",
+    `I confirm that I was referred by code ${code}.`,
+    "Signing is free and sends no transaction.",
+    "",
+    `Wallet: 0x${address}`,
+    `Network: ${networkName ?? networkId}`,
+    `Issued: ${issuedAt}`,
+  ].join("\n");
+
+/**
+ * What the wallet at `address` signs to confirm `code`, or null when there
+ * is nothing to confirm: no partner issued the code, the wallet is the
+ * code owner's own, or it is referred already. Asked before the wallet is
+ * prompted, so that a visitor is not asked to sign for nothing.
+ */
+export const partnerClaim = async (code: string, address: string): Promise<{ message: string; issuedAt: string } | null> => {
+  if (!partnerReferralsUrl || !partnerReferralsKey) throw partnerReferralsUnavailable();
+  const res = await partnerSignups(`?code=${code}&account=${address}`).catch(() => null);
+  if (!res?.ok) throw partnerReferralsUnavailable();
+  if (!(await res.json()).claimable) return null;
+  const issuedAt = new Date().toISOString();
+  return { message: partnerClaimMessage(code, address, issuedAt), issuedAt };
+};
+
+/**
+ * Records the referral an external wallet confirmed by signing
+ * partnerClaimMessage, to count from now on. The signature is the only proof
+ * that the caller owns `address` (the wallet header on the request is not
+ * one), so the signer is recovered from the message as rebuilt here. One
+ * awaited call rather than recordPartnerReferral's retries: signing with a
+ * fresh key costs nothing, so a retry loop per claim could be piled up
+ * without limit while the service is down.
+ */
+export const claimPartnerReferral = async (code: string, address: string, issuedAt: string, signature: string): Promise<boolean> => {
+  const age = Date.now() - Date.parse(issuedAt);
+  if (!(age <= CLAIM_MAX_AGE_MS && age >= -CLAIM_MAX_AHEAD_MS)) throw new StratoError("The referral message has expired");
+  if (recoverPersonalSigner(partnerClaimMessage(code, address, issuedAt), signature) !== address) {
+    throw new StratoError("The referral message is not signed by this wallet");
+  }
+  if (!partnerReferralsUrl || !partnerReferralsKey) throw partnerReferralsUnavailable();
+  const res = await partnerSignups("", { code, account: address, since: new Date().toISOString() }).catch(() => null);
+  if (!res?.ok) throw partnerReferralsUnavailable();
+  return (await res.json()).recorded === true;
 };
 
 export const isUserAdmin = async (
@@ -245,8 +355,13 @@ const parseTxArg = (text: string): any => {
   }
 };
 
-const parseVariadicArg = (text: string): any =>
-  text.startsWith('"') ? text : parseTxArg(text);
+// A bytes value is recorded as hex"…", which is not JSON: re-sent as that text it would
+// be a string. Hinted as bytes it hashes like the original, whatever its declared width
+const parseVariadicArg = (text: string): any => {
+  const bytes = /^hex"((?:[0-9a-fA-F]{2})*)"$/.exec(text);
+  if (bytes) return { type: "bytes", value: bytes[1] };
+  return text.startsWith('"') ? text : parseTxArg(text);
+};
 
 const formatArg = (type: AbiType, value: any): any => {
   const typeName = solidityTypeName(type);
@@ -321,9 +436,7 @@ const hintedArg = (type: AbiType, value: any): any => {
     : formattedValue;
 };
 
-// Direct call to target.func(args). When the caller doesn't own the target, the
-// Ownable fallback routes msg.sig/msg.data into AdminRegistry.castVoteOnIssue, so
-// the issueId is keccak256(target, func, args) over the exact call args
+// Submit one contract call, with large integers serialized at full precision
 const callTargetFunction = async (
   accessToken: string,
   userAddress: string,
@@ -354,40 +467,63 @@ type ContractCall = {
 };
 
 // The registry call a vote resolves to, whose args it hashes into the issueId
-const castVoteCall = (target: string, func: string, typedArgs: any[]): ContractCall => ({
+const castVoteCall = (target: string, func: string, typedArgs: any[], registry: string = adminRegistry): ContractCall => ({
   contractName: extractContractName(AdminRegistry),
-  contractAddress: adminRegistry,
+  contractAddress: registry,
   method: "castVoteOnIssue",
   args: { _func: func, _target: target, _args: typedArgs },
 });
 
-// Resolve an issue into the call that creates it, plus its args coerced to the
-// target's declared Solidity types. Creating one normally calls the target function
-// directly (SMD-style): the Ownable fallback hands the registry msg.sig/msg.data,
-// which the VM has already coerced, so applying the same coercion here keeps the
-// issueId aligned across voters. The AdminRegistry is the exception: it owns itself,
-// so its onlyOwner functions can't reach the fallback and go via castVoteOnIssue
+// Positional args for the registry's variadic _args, each hinted with the target's
+// declared Solidity type: unhinted, the VM infers them instead (a digit-only address
+// becomes an int), which changes both the call and its issueId. A variadic parameter
+// takes every remaining arg, so its values go flat into _args.
+// Enum fields inside struct args must be ordinals: hints don't reach struct fields,
+// and only an ordinal hashes to the same issueId as the coerced enum
+const governedArgs = (funcArgs: [string, AbiType][], args: any[]): any[] =>
+  funcArgs.flatMap(([, type], i) =>
+    type.tag === "Variadic"
+      ? args.slice(i).map((arg) => hintedArg(type, arg))
+      : [hintedArg(type, args[i])]);
+
+// The registry call that runs target.func(args) under governance, given the same named
+// args as a direct call: a whitelisted caller executes it at once, an admin's call is
+// recorded as their vote. Integers come back JSON-safe (large ones as decimal strings,
+// which the node coerces the same way), so it posts like any other function input
+export const governedInput = async (
+  accessToken: string,
+  { contractAddress, method, args }: FunctionInput,
+  registry: string = adminRegistry,
+): Promise<FunctionInput> => {
+  const { funcArgs } = await fetchFuncArgs(accessToken, contractAddress, method);
+  const positional = funcArgs.flatMap(([name, type]) =>
+    type.tag === "Variadic" ? args[name] ?? [] : [args[name]]);
+  const typedArgs = JSONBigString.parse(JSONBigNumber.stringify(governedArgs(funcArgs, positional)));
+  return castVoteCall(contractAddress, method, typedArgs, registry);
+};
+
+// For a target an account may own: the direct call when its owner is an account, or a
+// vote through the owner when that is a registry (its ABI has castVoteOnIssue)
+export const ownerInput = async (
+  accessToken: string,
+  input: FunctionInput,
+  owner: string,
+): Promise<FunctionInput> => {
+  const details: any = await getContractDetails(accessToken, owner);
+  return details?._functions?.castVoteOnIssue ? governedInput(accessToken, input, owner) : input;
+};
+
+// Resolve an issue into the registry call that creates it, plus its args coerced to
+// the target's declared Solidity types, which keeps the issueId aligned across voters
 const resolveIssueCall = async (
   accessToken: string,
   target: string,
   func: string,
   args: any[],
 ): Promise<{ call: ContractCall; typedArgs: any[] }> => {
-  const { contractName, funcArgs } = await fetchFuncArgs(accessToken, target, func);
-  if (sameAddress(target, adminRegistry)) {
-    const typedArgs = args.map((arg, i) =>
-      hintedArg(funcArgs[i]?.[1] || {}, arg));
-    return { call: castVoteCall(target, func, typedArgs), typedArgs };
-  }
-  // A variadic parameter takes every remaining arg, so it is flat in the registry's
-  // own variadic _args but one nested argument in a direct call to the target
-  const typedArgs = funcArgs.flatMap(([, type], i) =>
-    type.tag === "Variadic"
-      ? args.slice(i).map((arg) => hintedArg(type, arg))
-      : [hintedArg(type, args[i])]);
-  const namedArgs = Object.fromEntries(funcArgs.map(([name, type], i) =>
-    [name, type.tag === "Variadic" ? typedArgs.slice(i) : typedArgs[i]]));
-  return { call: { contractName, contractAddress: target, method: func, args: namedArgs }, typedArgs };
+  const { funcArgs } = await fetchFuncArgs(accessToken, target, func);
+  const typedArgs = governedArgs(funcArgs, args);
+  return { call: castVoteCall(target, func, typedArgs), typedArgs };
 };
 
 // Cirrus indexes a block only once it is mined, so the vote's event trails its receipt
@@ -413,9 +549,8 @@ const findIssueIdForTx = async (accessToken: string, hash: string): Promise<stri
   return until((issueId) => issueId !== null, fetchIssueId, ISSUE_EVENT_TIMEOUT_MS);
 };
 
-// An issue only exists if the call reached the registry. A target function without
-// onlyOwner has no fallback to catch the call, so it just executes — report what the
-// transaction actually did rather than assuming a vote was recorded.
+// Report the issue the vote landed on, read back from the transaction's events rather
+// than assumed, since only an issue the registry recorded exists for others to vote on
 export const createIssue = async (
   accessToken: string,
   userAddress: string,
@@ -426,16 +561,38 @@ export const createIssue = async (
   const { call } = await resolveIssueCall(accessToken, target, func, args);
   const { status, hash } = await callTargetFunction(
     accessToken, userAddress, call.contractName, call.contractAddress, call.method, call.args);
-  const issueId = await findIssueIdForTx(accessToken, hash);
+  // A wallet signs and submits the transaction after this returns: nothing to look up yet
+  const issueId = status === "unsigned" ? null : await findIssueIdForTx(accessToken, hash);
 
   return { status, hash, issueId, governed: issueId !== null };
+};
+
+// Run a call in the node's VM sandbox as userAddress: nothing is signed or committed.
+// Forwarded to the node's bloc simulate endpoint, which the UI can't reach
+const simulateCall = async (
+  accessToken: string,
+  userAddress: string,
+  call: ContractCall,
+  params?: Record<string, unknown>,
+): Promise<any> => {
+  const body = {
+    txs: [{ payload: { ...call, metadata: {} }, type: "FUNCTION" }],
+    address: userAddress.replace(/^0x/, ""),
+  };
+  const response = await bloc.post(accessToken, "/transaction/simulate", body, {
+    params,
+    // A replayed call's large integers are BigInts (formatArg), which JSON.stringify rejects
+    transformRequest: [(data) => JSONBigNumber.stringify(data)],
+  });
+  const data = response.data;
+  return Array.isArray(data) ? data[0] : data;
 };
 
 // Dry-run the issue in the node's VM sandbox (nothing is signed or committed), so
 // admins can preview its real impact before voting. Always simulated as the
 // registry's castVoteOnIssue, since the node derives the issue's `effect` only for
 // that method, using the same typed args the live call sends so both agree on the
-// issueId. Forwarded to the node's bloc simulate endpoint, which the UI can't reach.
+// issueId.
 export const simulateCastVoteOnIssue = async (
   accessToken: string,
   userAddress: string,
@@ -444,15 +601,7 @@ export const simulateCastVoteOnIssue = async (
   args: any[],
 ): Promise<any> => {
   const { typedArgs } = await resolveIssueCall(accessToken, target, func, args);
-  const body = {
-    txs: [{ payload: { ...castVoteCall(target, func, typedArgs), metadata: {} }, type: "FUNCTION" }],
-    address: userAddress.replace(/^0x/, ""),
-  };
-  const response = await bloc.post(accessToken, "/transaction/simulate", body, {
-    params: { trace: true },
-  });
-  const data = response.data;
-  return Array.isArray(data) ? data[0] : data;
+  return simulateCall(accessToken, userAddress, castVoteCall(target, func, typedArgs), { trace: true });
 };
 
 // Arguments as the node rendered them into the IssueCreated event. They are not
@@ -529,18 +678,89 @@ const voteStillPending = async (
 // enum member, rendered as its ordinal — still reach the same issueId. keccak256 hashes
 // an enum as its bare ordinal (rlpEncodeValue: SEnumVal _ _ i -> rlpEncode i), so the id
 // is unchanged, and coerceFromInt restores the member on execution
-const castVoteViaRegistry = async (
-  accessToken: string,
-  userAddress: string,
-  issue: any,
-): Promise<{ status: string; hash: string }> => {
+const registryVoteCall = async (accessToken: string, issue: any): Promise<ContractCall> => {
   const { funcArgs } = await fetchFuncArgs(accessToken, issue.target, issue.func);
   const typedArgs = parseIssueEventArgs(issue.args)
     .map((arg, i) => hintedArg(funcArgs[i]?.[1] || {}, arg));
-  const call = castVoteCall(issue.target, issue.func, typedArgs);
+  return castVoteCall(issue.target, issue.func, typedArgs);
+};
 
-  return callTargetFunction(
-    accessToken, userAddress, call.contractName, call.contractAddress, call.method, call.args);
+// What a simulated call would do to this issue: count a vote on it, count a vote that
+// opens it anew (it has no current votes: it was executed or dismissed, or a registry
+// config change cleared them, since it was proposed), or the reason it is not a vote on
+// it at all. Every vote the registry counts emits IssueVoted. Events from other
+// contracts, such as a nested multisig the issue would execute, are not this vote
+const simulatedVote = (result: any, issueId: string): { reopens: boolean } | { problem: string } => {
+  if (result?.status !== "Success") return { problem: result?.error || "its simulation failed" };
+  const registryEvent = (name: string) => (result.events ?? [])
+    .find((event: any) => event.name === name && sameAddress(event.address, adminRegistry));
+  const voted = registryEvent("IssueVoted");
+  if (!voted) return { problem: "it would record no vote: this admin has already voted on the issue" };
+  if (!sameIssueId(voted.args?.issueId, issueId)) return { problem: `it would vote on issue ${voted.args?.issueId} instead` };
+  return { reopens: !!registryEvent("IssueCreated") };
+};
+
+type VoteAttempt = { what: string; via: "replay" | "registry"; call: () => Promise<ContractCall> };
+
+// The registry votes that run an issue, in order: the original transaction's decoded
+// call sent through the registry, for a transaction its target forwarded the old way
+// (which the registry now rejects), its variadic tail flat as the issueId covers it (the
+// event renders the tail nested); and the vote rebuilt from the event, for a transaction
+// record that does not decode
+const registryVoteAttempts = (accessToken: string, issue: any, replay: Promise<ContractCall>): VoteAttempt[] => [
+  {
+    what: "voting through the registry with the original transaction's arguments",
+    via: "registry",
+    call: async () => {
+      const original = await replay;
+      if (sameAddress(original.contractAddress, adminRegistry)) {
+        throw new Error("the original transaction already went through the registry");
+      }
+      // The replay's args are already typed: only its variadic tail is laid out flat
+      const { funcArgs } = await fetchFuncArgs(accessToken, original.contractAddress, original.method);
+      return castVoteCall(original.contractAddress, original.method, funcArgs.flatMap(([name, type]) =>
+        type.tag === "Variadic" ? original.args[name] ?? [] : [original.args[name]]));
+    },
+  },
+  {
+    what: "voting through the registry with the issue's recorded arguments",
+    via: "registry",
+    call: () => registryVoteCall(accessToken, issue),
+  },
+];
+
+// The first attempt whose simulation is this admin's vote on the issue, so no call that
+// would miss it (opening another issue) is ever submitted
+const chooseVoteCall = async (
+  accessToken: string,
+  userAddress: string,
+  issue: any,
+  attempts: VoteAttempt[],
+): Promise<{ call: ContractCall; votedVia: "replay" | "registry" }> => {
+  // A vote that opens the issue anew restarts it, which is this vote unless the issue
+  // was executed since it was proposed: then it would resurrect a finished action
+  const voteProblem = async (call: ContractCall): Promise<string | null> => {
+    const vote = simulatedVote(await simulateCall(accessToken, userAddress, call), issue.issueId);
+    if ("problem" in vote) return vote.problem;
+    if (vote.reopens && !(await voteStillPending(accessToken, issue, userAddress))) {
+      return "it would open the issue anew, and the chain does not show it still waiting for this admin's vote";
+    }
+    return null;
+  };
+
+  const problems: string[] = [];
+  for (const attempt of attempts) {
+    try {
+      const call = await attempt.call();
+      const problem = await voteProblem(call);
+      if (!problem) return { call, votedVia: attempt.via };
+      problems.push(`${attempt.what}: ${problem}`);
+    } catch (error: any) {
+      problems.push(`${attempt.what}: ${error?.message ?? String(error)}`);
+    }
+  }
+  // A conflict with the issue's state, not a server fault: the reason reaches the admin
+  throw new StratoError(`No vote reaches this issue (${problems.join("; ")})`, 409);
 };
 
 // Cast a vote on an existing issue by replaying the exact transaction that created
@@ -549,10 +769,10 @@ const castVoteViaRegistry = async (
 // The replay decodes the node's record of the arguments back into the target's declared
 // types, which the node cannot always accept back — a struct array does not survive as
 // strict JSON, and an enum comes back as an ordinal where only its member name parses.
-// When that happens, fall back to the registry's variadic castVoteOnIssue, which infers
-// types instead and reaches the same issueId. The fallback is gated on the chain still
-// showing the vote as pending, so a first attempt that actually succeeded is never
-// submitted twice.
+// When that happens, fall back to a vote through the registry's castVoteOnIssue, the
+// first of registryVoteAttempts that simulates as a vote on this issue. The fallback is
+// gated on the chain still showing the vote as pending, so a first attempt that actually
+// succeeded is never submitted twice.
 export const castVoteOnIssueById = async (
   accessToken: string,
   userAddress: string,
@@ -569,10 +789,10 @@ export const castVoteOnIssueById = async (
     throw new Error("Issue not found");
   }
 
-  // Whether the replay got as far as submitting. A decode that fails before this
-  // changed nothing on chain; a failure after it may or may not have
-  let replaySubmitted = false;
-  const replayOriginalTransaction = async (): Promise<{ status: string; hash: string }> => {
+  const submit = (call: ContractCall) => callTargetFunction(
+    accessToken, userAddress, call.contractName, call.contractAddress, call.method, call.args);
+
+  const replayCall = async (): Promise<ContractCall> => {
     const txResponse = await eth.get(accessToken, "/transaction", { params: { hash: issue.transaction_hash } });
     const tx = Array.isArray(txResponse.data) ? txResponse.data[0] : null;
     if (!tx?.funcName || !Array.isArray(tx.args)) {
@@ -586,8 +806,28 @@ export const castVoteOnIssueById = async (
     const namedArgs = Object.fromEntries(funcArgs.map(([name, type], i) =>
       [name, type.tag === "Variadic" ? tx.args.slice(i).map(parseVariadicArg) : hintedArg(type, parseTxArg(tx.args[i]))]));
 
+    return { contractName, contractAddress: tx.to, method: tx.funcName, args: namedArgs };
+  };
+  const replay = replayCall();
+
+  // A wallet signs and submits the vote after the request returns, so neither the check
+  // that it landed on this issue nor the fallback on a failed replay can run on the real
+  // transaction. Both run on simulations instead, the replay first
+  if (requestContext.getStore()?.externalSigning) {
+    const { call, votedVia } = await chooseVoteCall(accessToken, userAddress, issue, [
+      { what: "replaying the original transaction", via: "replay", call: () => replay },
+      ...registryVoteAttempts(accessToken, issue, replay),
+    ]);
+    return { ...(await submit(call)), votedVia };
+  }
+
+  // Whether the replay got as far as submitting. A decode that fails before this
+  // changed nothing on chain; a failure after it may or may not have
+  let replaySubmitted = false;
+  const replayOriginalTransaction = async (): Promise<{ status: string; hash: string }> => {
+    const call = await replay;
     replaySubmitted = true;
-    return callTargetFunction(accessToken, userAddress, contractName, tx.to, tx.funcName, namedArgs);
+    return submit(call);
   };
 
   let replayed: { status: string; hash: string } | null = null;
@@ -621,7 +861,8 @@ export const castVoteOnIssueById = async (
 
   let result: { status: string; hash: string };
   try {
-    result = await castVoteViaRegistry(accessToken, userAddress, issue);
+    const { call } = await chooseVoteCall(accessToken, userAddress, issue, registryVoteAttempts(accessToken, issue, replay));
+    result = await submit(call);
   } catch (error: any) {
     if (error instanceof Error) {
       error.message = `${error.message} (after replaying the original transaction failed: ${replayError?.message ?? replayError})`;
@@ -803,6 +1044,7 @@ export const getContractDetails = async (
   accessToken: string,
   address: string,
 ): Promise<object> => {
+  address = await validateAddressField("Contract address").validateAsync(address);
   try {
     const response = await bloc.get(accessToken, `/contracts/contract/${address}/details`);
 

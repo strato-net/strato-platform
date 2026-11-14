@@ -2,11 +2,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 import BlockApps.Logging (runLogging)
 import Blockchain.SolidVM.Simple hiding (name)
-import Blockchain.VMContext (runMemContextM, GasCap (..))
+import Blockchain.VMContext (runMemContextM)
 import Blockchain.Strato.Model.Options ()
 import Blockchain.VMOptions ()
 import Blockchain.Wiring ()
-import qualified Control.Monad.Change.Modify as Mod
 import Control.Lens
 import Control.Monad
 import Control.Monad.Composable.Base (runEff)
@@ -52,7 +51,6 @@ main :: IO ()
 main = do
   void $ $initHFlags "ordered arguments and mapping defaults"
   void $ runEff . runLogging . runMemContextM (const $ pure Nothing) Nothing $ do
-    Mod.put (Mod.Proxy :: Mod.Proxy GasCap) (GasCap (Gas 100000000))
     let expect label result = do
           liftIO $ unless (erException result == Nothing) $ fail $ label ++ ": " ++ show (erException result)
           pure result

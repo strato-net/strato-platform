@@ -19,19 +19,23 @@ module SolidVM.Model.Value
     rlpEncodeVariable,
     rlpEncodeValue,
     rlpEncodeValues,
+    rlpLegacyValue,
     createVar,
     coerceType,
     defaultValue,
     createDefaultValue,
+    createDefaultValueWith,
     valEquals,
     valueTypeName,
     getConst,
     weakGetVar,
     forceLoadVar,
     renderValue,
+    renderValueShallow,
   )
 where
 
+import Control.Exception (throw)
 import Blockchain.Data.RLP
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Address
@@ -150,7 +154,7 @@ integerValue _ = Nothing
 
 unsignedInteger :: Integer -> Value
 unsignedInteger n
-  | n < 0 = arithmeticException "unsigned integer underflow" n
+  | n < 0 = throw (ArithmeticException "unsigned integer underflow" (show n))
   | otherwise = SUnsigned (fromInteger n)
 
 integerResult :: Bool -> Integer -> Value
@@ -217,7 +221,7 @@ instance Eq Value where
     (SBytes b1, SString b2) -> b1 == encodeUtf8 (T.pack b2)
     (SNULL, _) -> False
     (_, SNULL) -> False
-    _ -> todo "Value/Eq" (x, y)
+    _ -> throw (TypeError "unsupported value types for equality" (format (renderValueShallow x, renderValueShallow y)))
 
 instance Ord Value where
   compare x y = case (toNull x, toNull y) of
@@ -232,11 +236,11 @@ instance Ord Value where
     (SBytes b1, SString b2) -> compare b1 (encodeUtf8 (T.pack b2))
     (SNULL, _) -> LT
     (_, SNULL) -> GT
-    _ -> todo "Value/Ord" (x, y)
+    _ -> throw (TypeError "unsupported value types for ordering" (format (renderValueShallow x, renderValueShallow y)))
 
 instance RLPSerializable Value where
   rlpEncode = rlpEncodeValue
-  rlpDecode x = todo "Value/rlpDecode" x
+  rlpDecode x = throw (InternalError ("RLP decoding of Value is not supported: " ++ show x))
 
 rlpEncodeVariable :: Variable -> RLPObject
 rlpEncodeVariable (Variable _) = rlpEncodeValue SNULL
@@ -257,7 +261,53 @@ rlpEncodeValue (SStruct _ m) = RLPArray $ rlpEncodeVariable . snd <$> M.toList m
 rlpEncodeValue (STuple v) = RLPArray $ rlpEncodeVariable <$> V.toList v
 rlpEncodeValue (SArray v) = RLPArray $ rlpEncodeVariable <$> V.toList v
 rlpEncodeValue (SVariadic vs) = rlpEncodeValues vs
-rlpEncodeValue _ = RLPArray []
+rlpEncodeValue (SContract _ a) = rlpEncode a
+rlpEncodeValue (SUserDefined _ _ v) = rlpEncodeValue v
+rlpEncodeValue (SMap m) = RLPArray [RLPArray [rlpEncodeValue k, rlpEncodeVariable v] | (k, v) <- M.toList m]
+rlpEncodeValue (SContractFunction a f) = RLPArray [rlpEncode a, rlpEncode f]
+rlpEncodeValue (SEnum n) = rlpEncodeTagged "enum" [rlpEncode n]
+rlpEncodeValue (SStructDef n) = rlpEncodeTagged "structDef" [rlpEncode n]
+rlpEncodeValue (SContractDef n) = rlpEncodeTagged "contractDef" [rlpEncode n]
+rlpEncodeValue (SFunction n c) = rlpEncodeTagged "function" [rlpEncode n, rlpEncode $ CC._contractName <$> c]
+rlpEncodeValue (SBuiltinVariable n) = rlpEncodeTagged "builtinVariable" [rlpEncode n]
+rlpEncodeValue (SSetterGetter n v) = rlpEncodeTagged "setterGetter" [rlpEncode n, rlpEncode v]
+rlpEncodeValue (SContractItem a n) = rlpEncodeTagged "contractItem" [rlpEncode a, rlpEncode n]
+rlpEncodeValue (SPush v _) = rlpEncodeTagged "push" [rlpEncodeValue v]
+rlpEncodeValue SHexDecodeAndTrim = rlpEncodeTagged "hexDecodeAndTrim" []
+rlpEncodeValue SStringConcat = rlpEncodeTagged "stringConcat" []
+rlpEncodeValue (SDeferredConstant n) = rlpEncodeTagged "deferredConstant" [rlpEncode n]
+rlpEncodeValue SAddressToAscii = rlpEncodeTagged "addressToAscii" []
+rlpEncodeValue SBreak = rlpEncodeTagged "break" []
+rlpEncodeValue SContinue = rlpEncodeTagged "continue" []
+
+-- | Values that are not data (type names, builtins, bound members, control
+-- flow) are encoded as their constructor tag followed by their fields, so no
+-- two of them share an encoding.
+rlpEncodeTagged :: String -> [RLPObject] -> RLPObject
+rlpEncodeTagged tag fields = RLPArray $ rlpEncode tag : fields
+
+-- | Rewrites a value so 'rlpEncodeValue' gives its encoding from before the RLP
+-- encode fork, when every value without a data case of its own encoded as
+-- @RLPArray []@, the same as an empty tuple.
+rlpLegacyValue :: Value -> Value
+rlpLegacyValue = \case
+  SStruct n m -> SStruct n $ legacyVar <$> m
+  STuple v -> STuple $ legacyVar <$> v
+  SArray v -> SArray $ legacyVar <$> v
+  SVariadic vs -> SVariadic $ rlpLegacyValue <$> vs
+  v@SNULL -> v
+  v@SReference{} -> v
+  v@SIntegral{} -> v
+  v@SString{} -> v
+  v@SBytes{} -> v
+  v@SDecimal{} -> v
+  v@SBool{} -> v
+  v@SAddress{} -> v
+  v@SEnumVal{} -> v
+  _ -> STuple V.empty
+  where
+    legacyVar (Constant v) = Constant $ rlpLegacyValue v
+    legacyVar var = var
 
 rlpEncodeValues :: [Value] -> RLPObject
 rlpEncodeValues [x] = rlpEncodeValue x
@@ -275,7 +325,7 @@ coerceFromInt _ _ SString {} n = SString $ showHex n ""
 coerceFromInt _ _ SDecimal {} n = SDecimal $ Decimal 0 n
 coerceFromInt _ _ (SContract c _) n = SContract c $ fromIntegral n
 coerceFromInt ct cc (SEnumVal tipe _ _) n' =
-  fromMaybe (typeError "missing enum val" $ show (tipe, n')) $ do
+  fromMaybe (throw (TypeError "missing enum val" $ format (tipe, n'))) $ do
     let n = fromIntegral n'
     -- Look up enum in contract first, then fall back to file-level enums
     enumDef <- fmap fst $ M.lookup tipe (CC._enums ct) <|> M.lookup tipe (cc ^. CC.flEnums)
@@ -283,7 +333,7 @@ coerceFromInt ct cc (SEnumVal tipe _ _) n' =
     return $ SEnumVal tipe (enumDef !! n) $ fromIntegral n'
 coerceFromInt _ _ SNULL n = SInteger n
 coerceFromInt _ _ SReference{} n = SInteger n
-coerceFromInt _ _ t x = typeError "coerceFromInt: invalid literal for type" $ show (t, x)
+coerceFromInt _ _ t x = throw (TypeError "coerceFromInt: invalid literal for type" $ format (renderValueShallow t, x))
 
 -- coerceType allows integer literals to initialize integers, addresses, and
 -- strings (in the special case of 0) and bytes32, determined by type instead of value
@@ -294,7 +344,7 @@ coerceType ct cc xt = \case
     SVMType.String {} -> SString s
     SVMType.Bytes {} -> SString s
     SVMType.Decimal {} -> SDecimal (read s :: Decimal)
-    _ -> typeError "string literal must be string or bytes" $ show (xt, s)
+    _ -> throw (TypeError "string literal must be string or bytes" $ show xt ++ ": " ++ s)
   v -> v
 
 coerceUnsignedValue :: MonadIO m => CC.Contract -> CodeCollection -> SVMType.Type -> Value -> m Value
@@ -303,7 +353,7 @@ coerceUnsignedValue ct cc t value = case (t, value) of
   (SVMType.Int (Just False) _, SNULL) -> pure SNULL
   (SVMType.Int (Just False) _, SVariadic [v]) -> coerceUnsignedValue ct cc t v
   (SVMType.Int (Just False) _, SReference _) -> pure value
-  (SVMType.Int (Just False) _, _) -> typeError "expected unsigned integer" (show value)
+  (SVMType.Int (Just False) _, _) -> throw (TypeError "expected unsigned integer" (show value))
   (SVMType.Int _ _, SUnsigned n) -> pure (SInteger $ toInteger n)
   (SVMType.Array element _, SArray items) -> SArray <$> traverse (typed element) items
   (SVMType.Mapping _ _ element _ _, SMap items) -> SMap <$> traverse (typed element) items
@@ -374,7 +424,7 @@ defaultValue ctract (SVMType.UnknownLabel name) =
           return . SStruct name . M.map initializeField . M.fromList $ sdef
       ]
 defaultValue _ SVMType.Variadic = STuple V.empty
-defaultValue _ x = todo "defaultValue" x
+defaultValue _ x = throw (UnsupportedFeature "default value for type" (show x))
 
 createDefaultValue ::
   MonadIO m =>
@@ -382,23 +432,36 @@ createDefaultValue ::
   CC.Contract ->
   SVMType.Type ->
   m Value
-createDefaultValue _ _ (SVMType.Array _ _) = return $ SArray V.empty
-createDefaultValue _ _ (SVMType.Mapping _ _ _ _ _) = return $ SMap M.empty
-createDefaultValue _ _ (SVMType.Int _ _) = return $ SInteger 0
-createDefaultValue _ _ SVMType.Bool = return $ SBool False
-createDefaultValue _ _ (SVMType.Address _) = return $ (SAddress 0) False
-createDefaultValue _ _ (SVMType.String _) = return $ SString ""
-createDefaultValue _ _ (SVMType.Bytes _ mSize) = return $ SBytes $ case mSize of
+createDefaultValue = createDefaultValueWith (pure ())
+
+-- | 'createDefaultValue', running the given action before each struct field
+-- is created, so the caller can charge for a struct by its size as it is
+-- built: nested structs can make a short declaration very large.
+createDefaultValueWith ::
+  MonadIO m =>
+  m () ->
+  CC.CodeCollection ->
+  CC.Contract ->
+  SVMType.Type ->
+  m Value
+createDefaultValueWith _ _ _ (SVMType.Array _ _) = return $ SArray V.empty
+createDefaultValueWith _ _ _ (SVMType.Mapping _ _ _ _ _) = return $ SMap M.empty
+createDefaultValueWith _ _ _ (SVMType.Int _ _) = return $ SInteger 0
+createDefaultValueWith _ _ _ SVMType.Bool = return $ SBool False
+createDefaultValueWith _ _ _ (SVMType.Address _) = return $ (SAddress 0) False
+createDefaultValueWith _ _ _ (SVMType.String _) = return $ SString ""
+createDefaultValueWith _ _ _ (SVMType.Bytes _ mSize) = return $ SBytes $ case mSize of
   Just n -> BC.replicate (fromIntegral n) '\0'  -- Fixed-size bytes (e.g., bytes32)
   Nothing -> BC.empty  -- Dynamic bytes
-createDefaultValue _ _ SVMType.Decimal = return $ SDecimal 0
-createDefaultValue cc ctract (SVMType.UnknownLabel name) =
+createDefaultValueWith _ _ _ SVMType.Decimal = return $ SDecimal 0
+createDefaultValueWith perField cc ctract (SVMType.UnknownLabel name) =
   case (M.lookup name $ CC._enums ctract, M.lookup name $ CC._structs ctract) of
     (Just ((val : _), _), _) -> return $ SEnumVal name val 0x0
     (Nothing, Just sdef) -> do
       items <-
         forM sdef $ \(n, itemType, _) -> do
-          itemVal <- createDefaultValue cc ctract $ CC.fieldTypeType itemType
+          perField
+          itemVal <- createDefaultValueWith perField cc ctract $ CC.fieldTypeType itemType
           itemVar <- createVar itemVal
           return (n, itemVar)
       return $ SStruct name $ M.fromList items
@@ -408,7 +471,8 @@ createDefaultValue cc ctract (SVMType.UnknownLabel name) =
         (Nothing, Just sdef) -> do
           items <-
             forM sdef $ \(n, itemType, _) -> do
-              itemVal <- createDefaultValue cc ctract $ CC.fieldTypeType itemType
+              perField
+              itemVal <- createDefaultValueWith perField cc ctract $ CC.fieldTypeType itemType
               itemVar <- createVar itemVal
               return (n, itemVar)
           return $ SStruct name $ M.fromList items
@@ -416,9 +480,9 @@ createDefaultValue cc ctract (SVMType.UnknownLabel name) =
           [_] -> return $ SContract name 0x0
           (n:ns) -> case M.lookup (textToLabel n) $ cc ^. CC.contracts of
             Nothing -> return $ SContract name 0x0
-            Just c -> createDefaultValue cc c (SVMType.UnknownLabel . textToLabel $ T.intercalate "." ns)
+            Just c -> createDefaultValueWith perField cc c (SVMType.UnknownLabel . textToLabel $ T.intercalate "." ns)
           _ -> return $ SContract name 0x0
-createDefaultValue _ _ _ = pure SNULL
+createDefaultValueWith _ _ _ _ = pure SNULL
 
 {-
 byteStringToValue :: B.ByteString -> Maybe Value
@@ -477,6 +541,11 @@ instance Format Value where
   format (SAddress a _) = "Address(" ++ take 10 (show a) ++ "...)"
   format v = valueTypeName v
 
+instance Format Variable where
+  format (Constant value) = T.unpack (renderValueShallow value)
+  format (Variable _) = "variable"
+  format (TypedVariable _ variable) = format variable
+
 getConst :: Variable -> Value
 getConst (Constant v) = v
 getConst (Variable _) = SNULL
@@ -496,6 +565,22 @@ forceLoadVar = forceLoadVal <=< weakGetVar
           SArray vs -> SArray . fmap Constant <$> traverse forceLoadVar vs
           SMap m -> SMap . fmap Constant <$> traverse forceLoadVar m
           _ -> pure v
+
+-- | Shallow, pure rendering of a value: scalars verbatim, compounds
+-- summarized without dereferencing nested variables or storage.
+renderValueShallow :: Value -> T.Text
+renderValueShallow = \case
+  SIntegral i -> T.pack (show i)
+  SDecimal d -> T.pack (show d)
+  SString str -> T.pack (show str)
+  SBool b -> if b then "true" else "false"
+  SAddress addr _ -> T.pack (show addr)
+  SEnumVal enumName valName _ -> labelToText enumName <> "." <> labelToText valName
+  SStruct sname _ -> "<struct " <> labelToText sname <> ">"
+  STuple _ -> "<tuple>"
+  SArray _ -> "<array>"
+  SMap _ -> "<mapping>"
+  v -> T.take 100 . T.pack $ show v
 
 -- | JSON-ish text form of a fully evaluated value (only 'Constant' cells;
 -- see 'forceLoadVar'). Used for event args wherever they are shown as text.

@@ -43,7 +43,6 @@ module Blockchain.VMContext
     getDBs,
     readStore,
     writeStore,
-    GasCap (..),
     hashDB,
     codeDB,
     blockSummaryDB,
@@ -52,7 +51,6 @@ module Blockchain.VMContext
     memBlockSummaryDB,
     baggerState,
     bestBlockInfo,
-    vmGasCap,
     selfAddress,
     isProposer,
     runningTests,
@@ -85,6 +83,7 @@ module Blockchain.VMContext
   )
 where
 
+import Control.Exception (throw)
 import BlockApps.Init ()
 import BlockApps.Logging
 import Blockchain.Bagger.BaggerState (BaggerState, defaultBaggerState)
@@ -106,7 +105,6 @@ import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff (StateDiff)
 import qualified Blockchain.TxRunResultCache as TRC
@@ -157,9 +155,6 @@ knownExpensiveTxs =
   S.fromList
     [
     ]
-
-newtype GasCap = GasCap {unVmGasCap :: Gas}
-  deriving (Generic, NFData, Show, Eq)
 
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockHeader !Int
   deriving (Eq, Show, Generic, NFData)
@@ -222,7 +217,6 @@ data Backend
 data ContextState = ContextState
   { _baggerState :: !BaggerState,
     _bestBlockInfo :: !ContextBestBlockInfo,
-    _vmGasCap :: !Gas,
     _runningTests :: !Bool,
     _txRunResultsCache :: TRC.Cache,
     _debugSettings :: !(Maybe DebugSettings),
@@ -239,7 +233,6 @@ instance Default ContextState where
     ContextState
       { _baggerState = defaultBaggerState,
         _bestBlockInfo = Unspecified,
-        _vmGasCap = Gas (Conf.gasLimit $ networkConfig ethConf),
         _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
         _debugSettings = Nothing,
@@ -463,7 +456,6 @@ runTestContextM f =
             cstate <-
               newIORef $
                 def
-                  & vmGasCap .~ 100000
                   & runningTests .~ True
                   & txRunResultsCache .~ cache
             que <- newTQueueIO
@@ -626,12 +618,12 @@ getNewAddressWithSalt address salt hsh args = do
   when flags_debug $ liftIO $ putStrLn $ "Creating new address: owner=" ++ format address ++ ", nonce=" ++ show nonce'
   let saltAsString = case salt of
         (SString s) -> s
-        _ -> invalidArguments "big major bad" salt
+        _ -> throw (InvalidArguments "big major bad" (T.unpack (renderValueShallow salt)))
   let newAddress = getNewAddressWithSalt_unsafe address saltAsString (keccak256ToByteString hsh) args
   $logDebugS "getNewAddressWithSalt" $ T.pack $ show address ++ " " ++ saltAsString ++ " " ++ (show $ keccak256ToByteString hsh) ++ " " ++ show args
   doesAddressAlreadyExist <- A.lookup (Mod.Proxy @AddressState) newAddress
   case doesAddressAlreadyExist of
-    Just _ -> duplicateContract $ "The address " ++ show newAddress ++ " already exists. Try using a different salt or constructor arguments."
+    Just _ -> throw (DuplicateContract $ "The address " ++ show newAddress ++ " already exists. Try using a different salt or constructor arguments.")
     Nothing -> do
       incrementNonce address
       return newAddress

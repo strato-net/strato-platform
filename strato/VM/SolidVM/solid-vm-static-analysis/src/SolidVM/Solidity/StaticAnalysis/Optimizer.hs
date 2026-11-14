@@ -296,13 +296,31 @@ optimizeExpression (Binary x "=" a b) t = do
 --     (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA + valB) w
 --     (StringLiteral y valA, StringLiteral z valB) -> pure $ StringLiteral (y <> z) (valA <> valB)
 --     _ -> pure $ Binary x "=" a' b'
-optimizeExpression (Binary x "+" a b) t = do
-  a' <- optimizeExpression a t
-  b' <- optimizeExpression b t
-  case (a', b') of
-    (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA + valB) w
-    (StringLiteral y valA, StringLiteral z valB) -> pure $ StringLiteral (y <> z) (valA <> valB)
-    _ -> pure $ Binary x "+" a' b'
+-- A chain a + b + c + ... is folded in one pass over its operands. Folding
+-- pair by pair appended each string literal to the accumulated one, copying
+-- it every time: time quadratic in the length of the chain, at compile
+-- time, where nothing is charged. The result is the same: the literals
+-- leading the chain are joined, and from the first operand that cannot be
+-- joined onwards the additions are left in place.
+optimizeExpression e@(Binary _ "+" _ _) t = do
+  let operands (Binary x "+" a b) rest = operands a ((x, b) : rest)
+      operands first rest = (first, rest)
+      (firstOperand, others) = operands e []
+      isString (_, StringLiteral {}) = True
+      isString _ = False
+      add acc (x, operand) = Binary x "+" acc operand
+      addNumber (NumberLiteral y valA w) (_, NumberLiteral z valB _) = NumberLiteral (y <> z) (valA + valB) w
+      addNumber acc operand = add acc operand
+  first' <- optimizeExpression firstOperand t
+  others' <- mapM (\(x, operand) -> (,) x <$> optimizeExpression operand t) others
+  pure $ case first' of
+    StringLiteral y val ->
+      let (strings, rest) = span isString others'
+          annotation = foldl (<>) y [z | (_, StringLiteral z _) <- strings]
+          joined = concat (val : [v | (_, StringLiteral _ v) <- strings])
+       in foldl add (StringLiteral annotation joined) rest
+    NumberLiteral {} -> foldl addNumber first' others'
+    _ -> foldl add first' others'
 optimizeExpression (Binary x "-" a b) t = do
   a' <- optimizeExpression a t
   b' <- optimizeExpression b t
@@ -313,7 +331,9 @@ optimizeExpression (Binary x "*" a b) t = do
   a' <- optimizeExpression a t
   b' <- optimizeExpression b t
   case (a', b') of
-    (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA * valB) w
+    -- Only small factors are multiplied here: a long chain of large literals
+    -- would otherwise build a huge product where nothing is charged.
+    (NumberLiteral y valA w, NumberLiteral z valB _) | abs valA < 2 ^ (256 :: Int), abs valB < 2 ^ (256 :: Int) -> pure $ NumberLiteral (y <> z) (valA * valB) w
     _ -> pure $ Binary x "*" a' b'
 optimizeExpression (Binary x "/" a b) t = do
   a' <- optimizeExpression a t
@@ -333,7 +353,7 @@ optimizeExpression (Binary x "%" a b) t = do
   a' <- optimizeExpression a t
   b' <- optimizeExpression b t
   case (a', b') of
-    (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA `mod` valB) w
+    (NumberLiteral y valA w, NumberLiteral z valB _) | valB /= 0 -> pure $ NumberLiteral (y <> z) (valA `mod` valB) w
     _ -> pure $ Binary x "%" a' b'
 optimizeExpression (Binary     z "+=" lhs rhs) t = optimizeSetter t z "+" lhs rhs
 optimizeExpression (Binary     z "-=" lhs rhs) t = optimizeSetter t z "-" lhs rhs

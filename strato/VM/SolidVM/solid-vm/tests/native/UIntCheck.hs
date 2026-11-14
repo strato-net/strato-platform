@@ -3,11 +3,10 @@
 import BlockApps.Logging (runLogging)
 import qualified Blockchain.Data.BlockHeader as Header
 import Blockchain.SolidVM.Simple hiding (name)
-import Blockchain.VMContext (runMemContextM, GasCap (..))
+import Blockchain.VMContext (runMemContextM)
 import Blockchain.Strato.Model.Options ()
 import Blockchain.VMOptions ()
 import Blockchain.Wiring ()
-import qualified Control.Monad.Change.Modify as Mod
 import Control.Lens
 import Control.Monad
 import Control.Monad.Composable.Base (runEff)
@@ -45,7 +44,6 @@ main :: IO ()
 main = do
   void $ $initHFlags "uint declarations"
   void $ runEff . runLogging . runMemContextM (const $ pure Nothing) Nothing $ do
-    Mod.put (Mod.Proxy :: Mod.Proxy GasCap) (GasCap (Gas 100000000))
     let at height h = h {Header.number = height}
         expect label success result = do
           liftIO $ unless ((erException result == Nothing) == success) $ fail $ label ++ ": " ++ show (erException result)

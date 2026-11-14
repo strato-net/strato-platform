@@ -3,9 +3,64 @@ import test from "node:test";
 import JSONBig from "json-bigint";
 import { bloc, cirrus, eth, strato } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
-import { castVoteOnIssueById, createIssue } from "./user.service";
+import * as config from "../../config/config";
+import { recoverPersonalSigner } from "../../utils/personalSign";
+import { requestContext } from "../../utils/requestContext";
+import { validatePartnerClaim } from "../validators/user.validator";
+import {
+  castVoteOnIssueById,
+  createIssue,
+  getContractDetails,
+  governedInput,
+  ownerInput,
+  simulateCastVoteOnIssue,
+  claimPartnerReferral, partnerClaim, partnerClaimMessage,
+} from "./user.service";
 
 const JSONBigString = JSONBig({ storeAsString: true });
+
+test("contract details accepts valid addresses and uses the validated value", async (t) => {
+  const paths: string[] = [];
+  const details = { _contractName: "Example" };
+  t.mock.method(bloc, "get", (async (_token: string, path: string) => {
+    paths.push(path);
+    return { status: 200, data: details };
+  }) as typeof bloc.get);
+
+  for (const address of ["aB".repeat(20), "0x" + "12".repeat(20)]) {
+    assert.deepEqual(await getContractDetails("access-token", address), details);
+    assert.deepEqual(await getContractDetails("access-token", ` ${address} `), details);
+    assert.equal(paths[paths.length - 1], `/contracts/contract/${address}/details`);
+  }
+});
+
+test("contract lookups reject invalid addresses before making any node request", async (t) => {
+  const get = t.mock.method(bloc, "get", async () => { throw new Error("Unexpected node request"); });
+  const post = t.mock.method(bloc, "post", async () => { throw new Error("Unexpected simulation"); });
+  const tx = t.mock.method(strato, "post", async () => { throw new Error("Unexpected transaction"); });
+  const invalidAddresses = [
+    "../../../../strato-api/eth/v1.2/metadata?ignored=",
+    "%2e%2e/%2e%2e/%2e%2e/%2e%2e/internal-status#",
+    "..\\..\\..\\..\\internal-status#",
+    "http://attacker.invalid/",
+    "//attacker.invalid/",
+    "a".repeat(40) + "?query=value",
+    "a".repeat(40) + "#fragment",
+    "a".repeat(39),
+    "a".repeat(41),
+    "g".repeat(40),
+    "",
+  ];
+
+  for (const address of invalidAddresses) {
+    await assert.rejects(getContractDetails("access-token", address), { name: "ValidationError" });
+    await assert.rejects(createIssue("access-token", "a".repeat(40), address, "example", []), { name: "ValidationError" });
+    await assert.rejects(simulateCastVoteOnIssue("access-token", "a".repeat(40), address, "example", []), { name: "ValidationError" });
+  }
+  assert.equal(get.mock.callCount(), 0);
+  assert.equal(post.mock.callCount(), 0);
+  assert.equal(tx.mock.callCount(), 0);
+});
 
 test("traces create-issue argument transformations through the STRATO request", async (t) => {
   const target = "0x1111111111111111111111111111111111111111";
@@ -84,23 +139,20 @@ test("traces create-issue argument transformations through the STRATO request", 
     exit: result,
   }, (_key, value) => typeof value === "bigint" ? value.toString() : value, 2));
 
-  assert.equal(sentArgs.recipient.type, "address");
+  assert.equal(sent.txs[0].payload.method, "castVoteOnIssue");
+  assert.equal(sentArgs._target, target);
+  assert.equal(sentArgs._func, "captureArguments");
+  const [recipient, amount, enabled, label, labels] = sentArgs._args;
+  assert.equal(recipient.type, "address");
+  assert.equal(recipient.value, "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
+  assert.equal(amount.type, "uint256");
   assert.equal(
-    sentArgs.recipient.value,
-    "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-  );
-  assert.equal(sentArgs.amount.type, "uint256");
-  assert.equal(
-    sentArgs.amount.value,
+    amount.value,
     submittedArgs[1],
     "the backend must preserve every large integer digit before STRATO",
   );
   assert.deepEqual(
-    JSON.parse(JSON.stringify({
-      enabled: sentArgs.enabled,
-      label: sentArgs.label,
-      labels: sentArgs.labels,
-    })),
+    JSON.parse(JSON.stringify({ enabled, label, labels })),
     {
       enabled: { type: "bool", value: true },
       label: { type: "string", value: "preserve surrounding spaces" },
@@ -112,6 +164,51 @@ test("traces create-issue argument transformations through the STRATO request", 
     hash: "0xsemantictrace",
     issueId: "semantic-trace-issue",
     governed: true,
+  });
+});
+
+test("governedInput turns a direct call's named args into a typed castVoteOnIssue call", async (t) => {
+  const target = "0x0000000000000000000000000000000000001008";
+  t.mock.method(bloc, "get", (async (_token: string, path: string) => ({
+    status: path === `/contracts/contract/${target}/details` ? 200 : 404,
+    data: {
+      _contractName: "MercataBridge",
+      _functions: {
+        setAssetRoute: {
+          _funcArgs: [
+            ["enabled", { index: 3, type: { tag: "Bool" } }],
+            ["externalToken", { index: 0, type: { tag: "Address" } }],
+            ["externalChainId", { index: 1, type: { tag: "Int", signed: false, bytes: 32 } }],
+            ["targetStratoToken", { index: 2, type: { tag: "Address" } }],
+          ],
+        },
+      },
+    },
+  })) as typeof bloc.get);
+
+  const input = await governedInput("access-token", {
+    contractName: "MercataBridge",
+    contractAddress: target,
+    method: "setAssetRoute",
+    args: {
+      externalToken: "0000000000000000000000000000000000001234",
+      externalChainId: "900719925474099312345678901234567890",
+      targetStratoToken: "0x0000000000000000000000000000000000005555",
+      enabled: true,
+    },
+  });
+
+  assert.equal(input.contractAddress, constants.adminRegistry);
+  assert.equal(input.method, "castVoteOnIssue");
+  assert.deepEqual(JSON.parse(JSON.stringify(input.args)), {
+    _func: "setAssetRoute",
+    _target: target,
+    _args: [
+      { type: "address", value: "0x0000000000000000000000000000000000001234" },
+      { type: "uint256", value: "900719925474099312345678901234567890" },
+      { type: "address", value: "0x0000000000000000000000000000000000005555" },
+      { type: "bool", value: true },
+    ],
   });
 });
 
@@ -137,18 +234,32 @@ type VoteScenario = {
   votes?: any[];
   unreadableIndex?: boolean;
   landedIssueId?: string;
+  // Results of the node's simulate endpoint, one per simulation in order
+  simulations?: any[];
+  // The target's function, when not Rewards.addPositionActivity
+  func?: { contractName: string; name: string; funcArgs: any[] };
 };
 
 const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
   const posted: any[] = [];
+  const simulations = [...(scenario.simulations ?? [])];
+  const simulated: any[] = [];
+  const txLookups: string[] = [];
+
+  t.mock.method(bloc, "post", (async (_token: string, _path: string, body: any, config: any) => {
+    // Encoded as axios would send it: a replayed call's BigInts must survive
+    (config?.transformRequest?.[0] ?? JSON.stringify)(body);
+    simulated.push(body);
+    return { status: 200, data: [simulations.shift()] };
+  }) as typeof bloc.post);
 
   t.mock.method(bloc, "get", (async (_token: string, _path: string) => ({
     status: 200,
     data: {
-      _contractName: "Rewards",
+      _contractName: scenario.func?.contractName ?? "Rewards",
       _functions: {
-        addPositionActivity: {
-          _funcArgs: [
+        [scenario.func?.name ?? "addPositionActivity"]: {
+          _funcArgs: scenario.func?.funcArgs ?? [
             ["name", { index: 0, type: { tag: "String" } }],
             ["emissionRate", { index: 1, type: { tag: "Int", signed: false, bytes: 32 } }],
             ["sourceContract", { index: 2, type: { tag: "Address" } }],
@@ -166,13 +277,14 @@ const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
     status: 200,
     data: [{
       to: REWARDS,
-      funcName: "addPositionActivity",
+      funcName: scenario.func?.name ?? "addPositionActivity",
       args: scenario.txArgs ?? ["\"UI Arg Probe\"", "0", "\"0xdead0001\"", RENDERED_EVENTS],
     }],
   })) as typeof eth.get);
 
   t.mock.method(cirrus, "get", (async (_token: string, path: string, config: any) => {
     const params = config?.params ?? {};
+    if (params.transaction_hash) txLookups.push(params.transaction_hash);
     if (path.endsWith("-IssueCreated") && params.issueId?.startsWith("eq.")) {
       return {
         status: 200,
@@ -201,6 +313,10 @@ const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
 
   t.mock.method(strato, "post", (async (_token: string, _path: string, body: any) => {
     posted.push(body.txs[0].payload);
+    // Signing in a wallet: the node returns the transaction unsigned
+    if (requestContext.getStore()?.externalSigning) {
+      return { status: 200, data: [{ hash: "0xunsigned", data: { nonce: 7 } }] };
+    }
     if (posted.length === 1 && scenario.replayFailure === "node") {
       return {
         status: 200,
@@ -219,8 +335,50 @@ const mockVoteScenario = (t: any, scenario: VoteScenario = {}) => {
     return { status: 200, data: [{ status: "Success", hash: `0xvote${posted.length}` }] };
   }) as typeof strato.post);
 
-  return posted;
+  return Object.assign(posted, { simulated, txLookups });
 };
+
+// The node's simulate result for a vote: the registry's events for it
+const registryEvent = (name: string, issueId: string = ISSUE_ID) =>
+  ({ address: constants.adminRegistry, name, args: { issueId } });
+
+const simulatedSuccess = (...events: any[]) => ({ status: "Success", events });
+
+// A registry fallback is chosen on simulations: this one counts as a vote on the issue
+const votesOnIssue = simulatedSuccess(registryEvent("IssueVoted"));
+
+test("ownerInput calls an account-owned target directly and votes through a registry owner", async (t) => {
+  const token = "0x3333333333333333333333333333333333333333";
+  const account = "4444444444444444444444444444444444444444";
+  const registry = "5555555555555555555555555555555555555555";
+  t.mock.method(bloc, "get", (async (_token: string, path: string) => {
+    if (path === `/contracts/contract/${token}/details`) {
+      return {
+        status: 200,
+        data: {
+          _contractName: "Token",
+          _functions: { setStatus: { _funcArgs: [["newStatus", { index: 0, type: { tag: "Int", signed: false, bytes: 32 } }]] } },
+        },
+      };
+    }
+    if (path === `/contracts/contract/${registry}/details`) {
+      return { status: 200, data: { _contractName: "AdminRegistry", _functions: { castVoteOnIssue: { _funcArgs: [] } } } };
+    }
+    return { status: 400, data: {} };
+  }) as typeof bloc.get);
+  const direct = { contractName: "Token", contractAddress: token, method: "setStatus", args: { newStatus: 2 } };
+
+  assert.deepEqual(await ownerInput("access-token", direct, account), direct);
+
+  const voted = await ownerInput("access-token", direct, registry);
+  assert.equal(voted.contractAddress, registry);
+  assert.equal(voted.method, "castVoteOnIssue");
+  assert.deepEqual(JSON.parse(JSON.stringify(voted.args)), {
+    _func: "setStatus",
+    _target: token,
+    _args: [{ type: "uint256", value: 2 }],
+  });
+});
 
 test("votes by replaying the original transaction when it decodes", async (t) => {
   const posted = mockVoteScenario(t, {
@@ -235,7 +393,7 @@ test("votes by replaying the original transaction when it decodes", async (t) =>
 });
 
 test("falls back to the registry when the recorded arguments cannot be decoded", async (t) => {
-  const posted = mockVoteScenario(t);
+  const posted = mockVoteScenario(t, { simulations: [votesOnIssue] });
 
   const result = await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
 
@@ -262,6 +420,7 @@ test("falls back to the registry when the node rejects the replayed transaction"
   const posted = mockVoteScenario(t, {
     txArgs: ["\"UI Arg Probe\"", "0", "\"0xdead0001\"", '[{"eventName":"d","actionType":0}]'],
     replayFailure: "node",
+    simulations: [votesOnIssue],
   });
 
   const result = await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
@@ -269,6 +428,54 @@ test("falls back to the registry when the node rejects the replayed transaction"
   assert.equal(result.votedVia, "registry");
   assert.equal(posted.length, 2, "the replay was submitted and failed, then the fallback was sent");
   assert.equal(posted[1].method, "castVoteOnIssue");
+  // The original transaction's arguments (the event records two other actionable events)
+  assert.equal(posted[1].args._args[3].value[0].eventName, "d");
+});
+
+test("an OAuth vote on a forwarded issue goes through the registry with its variadic tail flat", async (t) => {
+  // A User contract's createContract forwarded the issue: the replay is rejected, and the
+  // event renders the variadic tail nested where the issueId covers it flat
+  const posted = mockVoteScenario(t, {
+    func: {
+      contractName: "User",
+      name: "createContract",
+      funcArgs: [
+        ["contractName", { index: 0, type: { tag: "String" } }],
+        ["contractSrc", { index: 1, type: { tag: "String" } }],
+        ["args", { index: 2, type: { tag: "Variadic" } }],
+      ],
+    },
+    txArgs: ["\"CDPEngine\"", "\"contract CDPEngine {}\"", "\"00000000000000000000000000000000deadbeef\""],
+    replayFailure: "node",
+    simulations: [votesOnIssue],
+  });
+
+  const result = await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
+
+  assert.equal(result.votedVia, "registry");
+  assert.equal(posted.length, 2);
+  assert.deepEqual(posted[1].args._args, [
+    { type: "string", value: "CDPEngine" },
+    { type: "string", value: "contract CDPEngine {}" },
+    "\"00000000000000000000000000000000deadbeef\"",
+  ]);
+});
+
+test("an OAuth fallback that no registry vote reaches submits nothing more", async (t) => {
+  // Submitting a vote that misses the issue would open another one
+  const elsewhere = simulatedSuccess(registryEvent("IssueVoted", "aaaa000000000000000000000000000000000000000000000000000000000000"));
+  const posted = mockVoteScenario(t, {
+    txArgs: ["\"UI Arg Probe\"", "0", "\"0xdead0001\"", '[{"eventName":"d","actionType":0}]'],
+    replayFailure: "node",
+    simulations: [elsewhere, elsewhere],
+  });
+
+  await assert.rejects(
+    () => castVoteOnIssueById("access-token", VOTER, ISSUE_ID),
+    (error: any) => error.status === 409 && /No vote reaches this issue/.test(error.message)
+      && /after replaying the original transaction failed/.test(error.message),
+  );
+  assert.equal(posted.length, 1, "only the failed replay was submitted");
 });
 
 test("refuses the fallback once this admin's vote is already recorded", async (t) => {
@@ -290,7 +497,7 @@ test("refuses the fallback once the issue has been executed", async (t) => {
 });
 
 test("allows the fallback when the only execution predates this issue", async (t) => {
-  const posted = mockVoteScenario(t, { executed: [{ issueId: ISSUE_ID, block_number: "99" }] });
+  const posted = mockVoteScenario(t, { executed: [{ issueId: ISSUE_ID, block_number: "99" }], simulations: [votesOnIssue] });
 
   const result = await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
 
@@ -327,6 +534,164 @@ test("reports a vote that hashed to a different issue instead of claiming succes
     () => castVoteOnIssueById("access-token", VOTER, ISSUE_ID),
     /landed on issue aaaa0000/,
   );
+});
+
+// ── castVoteOnIssueById: signing in a wallet ─────────────────────────────────
+// A wallet signs the vote after the request returns, so the replay and its fallback
+// are chosen on simulations of them, and the wallet is never handed a call that would
+// open an issue rather than vote on this one.
+
+const asWallet = <T>(fn: () => Promise<T>): Promise<T> =>
+  requestContext.run({ externalSigning: true, userAddress: VOTER.replace(/^0x/, "") }, fn);
+
+// An 18-decimal amount: past Number.MAX_SAFE_INTEGER, so the replayed call carries a BigInt
+const DECODABLE_TX_ARGS = ["\"UI Arg Probe\"", "1000000000000000000000", "\"0xdead0001\"", '[{"eventName":"d","actionType":"Deposit"}]'];
+
+test("a wallet vote replays the original transaction when it simulates as a vote on the issue", async (t) => {
+  const posted = mockVoteScenario(t, {
+    txArgs: DECODABLE_TX_ARGS,
+    simulations: [simulatedSuccess(registryEvent("IssueVoted"))],
+  });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.deepEqual(result, { status: "unsigned", hash: "0xunsigned", votedVia: "replay" });
+  assert.equal(posted.simulated.length, 1);
+  assert.equal(posted.simulated[0].address, VOTER.replace(/^0x/, ""), "simulated as the wallet");
+  assert.equal(posted.length, 1);
+  assert.equal(posted[0].method, "addPositionActivity");
+  assert.deepEqual(posted.txLookups, [], "an unsigned transaction has no events to wait for");
+});
+
+const failedOnChain = { status: "Failure", error: "Only an admin or a whitelisted account can call castVoteOnIssue", events: [] };
+
+test("a wallet vote sends the original transaction's arguments through the registry when the replay would fail on chain", async (t) => {
+  const posted = mockVoteScenario(t, {
+    txArgs: DECODABLE_TX_ARGS,
+    simulations: [failedOnChain, simulatedSuccess(registryEvent("IssueVoted"))],
+  });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.equal(result.votedVia, "registry");
+  assert.equal(posted.length, 1, "only the call that simulated as a vote is handed to the wallet");
+  assert.equal(posted[0].method, "castVoteOnIssue");
+  assert.equal(posted[0].contractAddress, constants.adminRegistry);
+  assert.equal(posted[0].args._func, "addPositionActivity");
+  // Decoded from the transaction (the event records this argument as 0)
+  assert.equal(String(posted[0].args._args[1].value), "1000000000000000000000");
+});
+
+test("a wallet vote lays a forwarded call's variadic tail flat in the registry vote", async (t) => {
+  // An issue a User contract's createContract forwarded to the registry: the event renders
+  // the variadic tail as a nested list, but the issueId covers it flat
+  const posted = mockVoteScenario(t, {
+    func: {
+      contractName: "User",
+      name: "createContract",
+      funcArgs: [
+        ["contractName", { index: 0, type: { tag: "String" } }],
+        ["contractSrc", { index: 1, type: { tag: "String" } }],
+        ["args", { index: 2, type: { tag: "Variadic" } }],
+      ],
+    },
+    txArgs: ["\"CDPEngine\"", "\"contract CDPEngine {}\"", "\"00000000000000000000000000000000deadbeef\""],
+    simulations: [failedOnChain, simulatedSuccess(registryEvent("IssueVoted"))],
+  });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.equal(result.votedVia, "registry");
+  assert.deepEqual(posted[0].args._args, [
+    { type: "string", value: "CDPEngine" },
+    { type: "string", value: "contract CDPEngine {}" },
+    "\"00000000000000000000000000000000deadbeef\"",
+  ]);
+});
+
+test("a wallet vote falls back to the issue's recorded arguments when neither transaction-based vote counts", async (t) => {
+  const posted = mockVoteScenario(t, {
+    txArgs: DECODABLE_TX_ARGS,
+    simulations: [failedOnChain, failedOnChain, simulatedSuccess(registryEvent("IssueVoted"))],
+  });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.equal(result.votedVia, "registry");
+  assert.equal(posted.simulated.length, 3);
+  // Rebuilt from the event, which records this argument as 0
+  assert.equal(String(posted[0].args._args[1].value), "0");
+});
+
+test("a wallet vote goes through the registry when the recorded arguments cannot be decoded", async (t) => {
+  const posted = mockVoteScenario(t, { simulations: [simulatedSuccess(registryEvent("IssueVoted"))] });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.equal(result.votedVia, "registry");
+  assert.equal(posted.simulated.length, 1, "an undecodable replay is never simulated");
+  assert.equal(posted[0].method, "castVoteOnIssue");
+});
+
+// The issue has no current votes, so the vote opens it anew
+const reopened = simulatedSuccess(registryEvent("IssueCreated"), registryEvent("IssueVoted"));
+
+test("a wallet vote restarts an issue whose votes a registry config change cleared", async (t) => {
+  const posted = mockVoteScenario(t, { txArgs: DECODABLE_TX_ARGS, simulations: [reopened] });
+
+  const result = await asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID));
+
+  assert.equal(result.votedVia, "replay");
+  assert.equal(posted.length, 1, "a vote OAuth would cast must not be refused for a wallet");
+});
+
+test("a wallet vote is refused when it would reopen an executed issue", async (t) => {
+  const posted = mockVoteScenario(t, {
+    txArgs: DECODABLE_TX_ARGS,
+    executed: [{ issueId: ISSUE_ID, block_number: "101" }],
+    simulations: [reopened, reopened, reopened],
+  });
+
+  await assert.rejects(
+    () => asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID)),
+    /would open the issue anew/,
+  );
+  assert.equal(posted.length, 0, "re-voting an executed issue would resurrect it");
+});
+
+test("a wallet vote is refused when it would vote on a different issue", async (t) => {
+  const elsewhere = simulatedSuccess(registryEvent("IssueVoted", "aaaa000000000000000000000000000000000000000000000000000000000000"));
+  const posted = mockVoteScenario(t, { txArgs: DECODABLE_TX_ARGS, simulations: [elsewhere, elsewhere, elsewhere] });
+
+  await assert.rejects(
+    () => asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID)),
+    // A 4xx, so the admin sees why rather than a generic server error
+    (error: any) => error.status === 409 && /would vote on issue aaaa0000/.test(error.message),
+  );
+  assert.equal(posted.length, 0);
+});
+
+test("a wallet vote counts only the registry's events", async (t) => {
+  // A nested multisig the issue executes emits its own IssueVoted, which is not this vote
+  const nested = simulatedSuccess({ address: REWARDS, name: "IssueVoted", args: { issueId: ISSUE_ID } });
+  const posted = mockVoteScenario(t, { txArgs: DECODABLE_TX_ARGS, simulations: [nested, nested, nested] });
+
+  await assert.rejects(
+    () => asWallet(() => castVoteOnIssueById("access-token", VOTER, ISSUE_ID)),
+    /would record no vote/,
+  );
+  assert.equal(posted.length, 0);
+});
+
+test("a wallet-signed issue is handed back without waiting for its events", async (t) => {
+  const posted = mockVoteScenario(t);
+
+  const result = await asWallet(() => createIssue("access-token", VOTER, REWARDS, "addPositionActivity",
+    ["UI Arg Probe", 0, "0xdead0001", [{ eventName: "d", actionType: 0 }]]));
+
+  assert.deepEqual(result, { status: "unsigned", hash: "0xunsigned", issueId: null, governed: false });
+  assert.equal(posted[0].method, "castVoteOnIssue");
+  assert.deepEqual(posted.txLookups, [], "an unsigned transaction has no events to look up");
 });
 
 // ── castVoteOnIssueById: replaying a registry-created issue ──────────────────
@@ -401,6 +766,16 @@ test("replays a registry-created issue's variadic tail as the values it rendered
   assert.deepEqual(posted[0].args._args, [false, true]);
 });
 
+test("replays a bytes value rendered as hex\"…\" as bytes, not as text", async (t) => {
+  // Re-sent verbatim, hex"…" arrives as a string and the vote opens a different issue
+  const value = "50056542149a3c5dd91db8d25b5f9e9d147e2d0fc5b59d1e2b46cf4ebf589177";
+  const posted = mockRegistryReplay(t, [`"${TOKEN}"`, "\"cancelVesting\"", `hex"${value}"`]);
+
+  await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(posted[0].args._args)), [{ type: "bytes", value }]);
+});
+
 test("keeps quoted variadic renderings verbatim so the node strips exactly one quote level", async (t) => {
   // Unquoted, the node re-types them by shape: "0000…1008" becomes the integer 1008
   // (integer is tried before address) and "\"mint\"" loses a quote level
@@ -410,4 +785,104 @@ test("keeps quoted variadic renderings verbatim so the node strips exactly one q
   await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
 
   assert.deepEqual(posted[0].args._args, tail);
+});
+
+// --- Partner referral claims by an external wallet ---
+
+// A real wallet signature: viem's signMessage with Hardhat's first test
+// account, over partnerClaimMessage for this code, time and network.
+const wallet = "f39fd6e51aad88f6f4ce6ab8827279cfffb92266";
+const stranger = "70997970c51812dc3a010c7d01b50e0d17dc79c8";
+const claimCode = "ABCDEFGHJK";
+const claimIssuedAt = "2026-11-13T10:00:00.000Z";
+const claimSignature =
+  "0xc5e4a894c5be54ae6439521badbb77d3a83a3ce92a2a5871ecaae33045774b570bc76a87611f215aee10b5474a60abacc61655baaabd6149221883040d99e7531c";
+
+/** The referral service configured and answering `answer` (or unreachable), with the clock `minutes` after the claim was issued. */
+const partnerReferrals = (t: any, minutes: number, answer?: object) => {
+  const previous = { url: config.partnerReferralsUrl, key: config.partnerReferralsKey, name: config.networkName };
+  Object.assign(config, { partnerReferralsUrl: "http://referrals.test", partnerReferralsKey: "k".repeat(32), networkName: "upquark" });
+  t.after(() => Object.assign(config, { partnerReferralsUrl: previous.url, partnerReferralsKey: previous.key, networkName: previous.name }));
+  t.mock.timers.enable({ apis: ["Date"], now: Date.parse(claimIssuedAt) + minutes * 60_000 });
+  const requests: { url: string; method: string; body: any; authorization: string }[] = [];
+  t.mock.method(globalThis, "fetch", async (url: string, init: any) => {
+    requests.push({ url, method: init.method, body: init.body && JSON.parse(init.body), authorization: init.headers.Authorization });
+    if (!answer) throw new TypeError("fetch failed");
+    return new Response(JSON.stringify(answer), { status: 200 });
+  });
+  return requests;
+};
+
+test("partner claim: the signer is recovered from a wallet's personal_sign signature", (t) => {
+  partnerReferrals(t, 1);
+  const message = partnerClaimMessage(claimCode, wallet, claimIssuedAt);
+  assert.equal(recoverPersonalSigner(message, claimSignature), wallet);
+  // Hardware wallets send v as 0/1 rather than 27/28
+  assert.equal(recoverPersonalSigner(message, `${claimSignature.slice(0, -2)}01`), wallet);
+  // Another code, wallet or time is another message: the signature recovers someone else
+  for (const other of [partnerClaimMessage("ZZZZZZZZZZ", wallet, claimIssuedAt), partnerClaimMessage(claimCode, stranger, claimIssuedAt), partnerClaimMessage(claimCode, wallet, "2026-11-13T10:00:00.001Z")]) {
+    const signer = recoverPersonalSigner(other, claimSignature);
+    assert.ok(signer !== wallet && signer !== stranger);
+  }
+  // Not a 65-byte r, s, v signature: 64 and 66 bytes (a contract wallet's is longer still), an impossible v, a zero r and s
+  for (const malformed of [claimSignature.slice(0, -2), `${claimSignature}00`, `${claimSignature.slice(0, -2)}1d`, `0x${"00".repeat(64)}1b`, "nonsense"]) {
+    assert.equal(recoverPersonalSigner(message, malformed), null);
+  }
+});
+
+test("partner claim: fields are normalized so that both requests rebuild one message", () => {
+  const asSent = validatePartnerClaim({ address: "0xF39Fd6e51aad88F6F4ce6aB8827279cffFb92266", code: "abcdefghjk" }, false);
+  assert.deepEqual(asSent, { address: wallet, code: claimCode });
+  assert.throws(() => validatePartnerClaim({ address: wallet, code: "not a code" }, false), /Partner Claim Validation Error/);
+  assert.throws(() => validatePartnerClaim({ address: "0x1234", code: claimCode }, false), /Partner Claim Validation Error/);
+  assert.throws(() => validatePartnerClaim({ address: wallet, code: claimCode, issuedAt: "today", signature: claimSignature }, true), /Partner Claim Validation Error/);
+  assert.throws(() => validatePartnerClaim({ address: wallet, code: claimCode, issuedAt: claimIssuedAt }, true), /Partner Claim Validation Error/);
+});
+
+test("partner claim: a wallet is given a message only when the service would record it", async (t) => {
+  const requests = partnerReferrals(t, 0, { claimable: true });
+  assert.deepEqual(await partnerClaim(claimCode, wallet), { message: partnerClaimMessage(claimCode, wallet, claimIssuedAt), issuedAt: claimIssuedAt });
+  assert.deepEqual(requests, [
+    { url: `http://referrals.test/partner-api/referrals/signups?code=${claimCode}&account=${wallet}`, method: "GET", body: undefined, authorization: `Bearer ${"k".repeat(32)}` },
+  ]);
+});
+
+test("partner claim: no message for a code or wallet the service would not record", async (t) => {
+  partnerReferrals(t, 0, { claimable: false });
+  assert.equal(await partnerClaim(claimCode, wallet), null);
+});
+
+test("partner claim: a signed claim is recorded once, to count from now", async (t) => {
+  const requests = partnerReferrals(t, 2, { recorded: true });
+  assert.equal(await claimPartnerReferral(claimCode, wallet, claimIssuedAt, claimSignature), true);
+  assert.deepEqual(requests, [
+    {
+      url: "http://referrals.test/partner-api/referrals/signups",
+      method: "POST",
+      body: { code: claimCode, account: wallet, since: "2026-11-13T10:02:00.000Z" },
+      authorization: `Bearer ${"k".repeat(32)}`,
+    },
+  ]);
+});
+
+test("partner claim: another wallet's signature, or an expired or post-dated message, records nothing", async (t) => {
+  const requests = partnerReferrals(t, 2, { recorded: true });
+  await assert.rejects(claimPartnerReferral(claimCode, stranger, claimIssuedAt, claimSignature), { status: 400, message: /not signed by this wallet/ });
+  await assert.rejects(claimPartnerReferral("ZZZZZZZZZZ", wallet, claimIssuedAt, claimSignature), { status: 400, message: /not signed by this wallet/ });
+  t.mock.timers.setTime(Date.parse(claimIssuedAt) + 11 * 60_000);
+  await assert.rejects(claimPartnerReferral(claimCode, wallet, claimIssuedAt, claimSignature), { status: 400, message: /expired/ });
+  t.mock.timers.setTime(Date.parse(claimIssuedAt) - 2 * 60_000);
+  await assert.rejects(claimPartnerReferral(claimCode, wallet, claimIssuedAt, claimSignature), { status: 400, message: /expired/ });
+  assert.equal(requests.length, 0);
+});
+
+test("partner claim: an unreachable or unconfigured service is a 503, after a single attempt", async (t) => {
+  const requests = partnerReferrals(t, 1);
+  await assert.rejects(claimPartnerReferral(claimCode, wallet, claimIssuedAt, claimSignature), { status: 503 });
+  await assert.rejects(partnerClaim(claimCode, wallet), { status: 503 });
+  assert.deepEqual(requests.map((r) => r.method), ["POST", "GET"]);
+  Object.assign(config, { partnerReferralsUrl: undefined });
+  await assert.rejects(claimPartnerReferral(claimCode, wallet, claimIssuedAt, claimSignature), { status: 503 });
+  await assert.rejects(partnerClaim(claimCode, wallet), { status: 503 });
+  assert.equal(requests.length, 2);
 });

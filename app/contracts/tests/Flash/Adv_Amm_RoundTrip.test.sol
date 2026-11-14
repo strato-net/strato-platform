@@ -10,7 +10,6 @@
 // lives in the it_a*/it_b* tests.
 
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Tokens/Token.sol";
 
@@ -81,7 +80,7 @@ contract RTAttacker {
     }
 }
 
-contract Describe_Adv_Amm_RoundTrip is Authorizable {
+contract Describe_Adv_Amm_RoundTrip {
 
     Mercata m;
     FlashMint fm;
@@ -89,7 +88,6 @@ contract Describe_Adv_Amm_RoundTrip is Authorizable {
     PoolFactory pf;
 
     address USDST;
-    Token usdstT;
 
     // mainnet 0x...101b : GOLDST 53.71 / USDST 239,376 (the deepest USDST venue)
     uint GOLD_RES;
@@ -106,7 +104,6 @@ contract Describe_Adv_Amm_RoundTrip is Authorizable {
     uint mult100k; uint mult500k; uint mult2m;   // price multiple achieved, x1000
 
     function beforeAll() public {
-        bypassAuthorizations = true;
 
         GOLD_RES  = 5371e16;      // 53.71e18
         USDST_RES = 239376e18;
@@ -116,25 +113,27 @@ contract Describe_Adv_Amm_RoundTrip is Authorizable {
         pf    = m.poolFactory();
         fm    = new FlashMint(address(admin));
 
-        USDST  = m.tokenFactory().createToken("USDST", "USD Stable", [], [], [], "USDST", 0, 18);
-        usdstT = Token(USDST);
-        usdstT.setStatus(2);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USD Stable", [], [], [], "USDST", 0, 18);
+        USDST  = address(ret);
+        admin.castVoteOnIssue(USDST, "setStatus", 2);
 
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(fm));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(fm));
 
-        fm.initialize(USDST, address(m.feeCollector()), 2000000e18);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), 2000000e18);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
     }
 
     // ── helper: fresh GOLDST + fresh pool seeded at mainnet 0x...101b depth ──
     function _newPool(string sym) internal returns (address, address) {
-        address gold = m.tokenFactory().createToken("GOLDST", "Gold", [], [], [], sym, 0, 18);
-        Token(gold).setStatus(2);
-        Token(gold).mint(address(this), 1000000e18);
-        usdstT.mint(address(this), 10000000e18);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "GOLDST", "Gold", [], [], [], sym, 0, 18);
+        address gold = address(ret);
+        admin.castVoteOnIssue(gold, "setStatus", 2);
+        admin.castVoteOnIssue(gold, "mint", address(this), 1000000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(this), 10000000e18);
 
-        address p = pf.createPool(gold, USDST);
+        (executed, ret) = admin.castVoteOnIssue(address(pf), "createPool", gold, USDST);
+        address p = address(ret);
         Token lp = Pool(p).lpToken();
         admin.castVoteOnIssue(address(admin), "addWhitelist", address(lp), "mint", p);
         admin.castVoteOnIssue(address(admin), "addWhitelist", address(lp), "burn", p);
@@ -186,8 +185,8 @@ contract Describe_Adv_Amm_RoundTrip is Authorizable {
         (address p, address gold) = _newPool("G2");
         bool poolRejected = false;
         bool factoryRejected = false;
-        try { pf.setPoolFeeParameters(p, 0, 7000); } catch { poolRejected = true; }
-        try { pf.setFeeParameters(0, 7000); } catch { factoryRejected = true; }
+        try { admin.castVoteOnIssue(address(pf), "setPoolFeeParameters", p, 0, 7000); } catch { poolRejected = true; }
+        try { admin.castVoteOnIssue(address(pf), "setFeeParameters", 0, 7000); } catch { factoryRejected = true; }
         require(poolRejected, "setPoolFeeParameters(0) must revert");
         require(factoryRejected, "setFeeParameters(0) must revert");
         require(pf.swapFeeRate() == 30, "factory fee untouched");
@@ -201,7 +200,7 @@ contract Describe_Adv_Amm_RoundTrip is Authorizable {
         (address p, address gold) = _newPool(sym);
         RTAttacker a = new RTAttacker();
         a.init(address(fm), p, USDST, gold);
-        usdstT.mint(address(a), 500000e18);      // its own float, only to absorb the round-trip loss
+        admin.castVoteOnIssue(USDST, "mint", address(a), 500000e18);      // its own float, only to absorb the round-trip loss
         a.go(loan);
         return a;
     }
@@ -292,12 +291,12 @@ contract Describe_Adv_Amm_RoundTrip is Authorizable {
     /// with a LIVE swap rather than pure arithmetic.
     function it_c2_min_expressible_fee_roundtrip() public {
         (address p, address gold) = _newPool("G7");
-        pf.setPoolFeeParameters(p, 1, 10000);      // 1 bp, all of it to LPs => protocolFee 0
+        admin.castVoteOnIssue(address(pf), "setPoolFeeParameters", p, 1, 10000);      // 1 bp, all of it to LPs => protocolFee 0
         require(Pool(p).swapFeeRate() == 1, "1 bp set");
 
         RTAttacker a = new RTAttacker();
         a.init(address(fm), p, USDST, gold);
-        usdstT.mint(address(a), 500000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(a), 500000e18);
         a.go(2000000e18);
 
         minFeeCost2m = a.netCost();

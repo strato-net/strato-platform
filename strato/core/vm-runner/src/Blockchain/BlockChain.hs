@@ -25,6 +25,7 @@ module Blockchain.BlockChain
   )
 where
 
+import Control.Exception (displayException)
 import BlockApps.Logging
 import BlockApps.Solidity.ABI (decodeABIArgs, valueToArgText, funcArgTypes)
 import qualified Blockchain.Bagger as Bagger
@@ -52,6 +53,7 @@ import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
 import Blockchain.Forks (isReceiptsRootForkActive, isReplayProtectionForkActive, isStratoGasForkActive)
+import Blockchain.HistoricalOutOfGas (isHistoricalOutOfGasTx)
 import qualified Blockchain.Verification as V
 import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
@@ -71,7 +73,7 @@ import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 import Blockchain.TheDAOFork
 import Blockchain.Timing
-import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, RevertError))
+import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, RevertError, TooMuchGas))
 import Blockchain.VMContext
 import Blockchain.VMOut
 import Blockchain.Wiring ()
@@ -446,7 +448,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
         | txSize >= sizeLimit = Left $ TFTXSizeLimitExceeded txSize sizeLimit t
         | otherwise = Right ()
 
-  let availableGas = 400_000
+  let availableGas = transactionGas
 
   case precheck of
     Left failure -> pure (Left failure)
@@ -485,7 +487,13 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
               P.incCounter txTypeCounter
 
               started <- liftIO Tr.nowNanos
-              execResults <- runCodeForTransaction b availableGas tAddr t proposer
+              -- ONE-OFF BACKWARDS-COMPATIBILITY HACK: a transaction that ran out of
+              -- gas under the original gas schedule is failed the same way here
+              -- without being executed. See Blockchain.HistoricalOutOfGas.
+              execResults <-
+                if isHistoricalOutOfGasTx (otHash t)
+                  then pure . solidvmErrorResults $ TooMuchGas 400_000 400_001
+                  else runCodeForTransaction b availableGas tAddr t proposer
               P.incCounter vmTxsProcessed
               liftIO $ recordExecuteSpan started b t (fromIntegral availableGas) execResults
 
@@ -520,7 +528,7 @@ recordExecuteSpan started b t availableGas er = do
           ++ maybe [] (\a -> [Tr.attrText "strato.contract_created" (T.pack (format a))]) (erNewContractAddress er)
       )
       []
-      (T.pack . show <$> erException er)
+      (T.pack . either displayException displayException <$> erException er)
 
 runCodeForTransaction ::
   (VMBase m) =>
@@ -753,8 +761,8 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
           Right r -> case erException r of
             Nothing -> (Success, "Success!", erRemainingTxGas r)
             Just ex ->
-              let fmt = either show show ex
-               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
+              let fmt = either displayException displayException ex
+               in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0)
       gasUsed = fromInteger $ TD.gasLimit t - gasRemaining
       etherUsed = gasUsed
 

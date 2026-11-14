@@ -235,7 +235,7 @@ const stripComments = (str) => {
 /** Combined, comment-stripped source exactly as it would be uploaded. Usable in dry runs (no credentials). */
 async function localSource(contractFile) {
   const config = require('./config');
-  const { importer } = require('blockapps-rest');
+  const { importer } = require('./strato');
   return combineSource(config, importer, contractFile);
 }
 
@@ -283,7 +283,8 @@ function saveState(env, nodeUrl, state) {
 // ---------------------------------------------------------------------------
 
 function issueIdFromReceipt(final) {
-  const v = final && final.txResult && final.txResult.response && final.txResult.response.v;
+  const vote = require('./util').getVoteResult(final);
+  const v = vote ? (vote.executed ? null : vote.value) : final && final.txResult && final.txResult.response && final.txResult.response.v;
   const value = Array.isArray(v) ? v[0] : v;
   return typeof value === 'string' && /^[0-9a-fA-F]{64}$/.test(value) ? value : null;
 }
@@ -322,8 +323,7 @@ async function submitImplementationDeploy(chain, source) {
   const hashes = (Array.isArray(response) ? response : [response]).map((r) => r && r.hash).filter(Boolean);
   if (hashes.length === 0) throw new Error('rest.createContract returned no tx hash: ' + JSON.stringify(response));
   const final = await awaitReceipt(chain, hashes, 'implementation deployment');
-  const created = final.txResult && final.txResult.contractsCreated;
-  const address = Array.isArray(created) ? created[0] : created;
+  const address = require('./util').getCreatedAddress(final);
   if (address) return { address: normalizeAddr(address) };
   const issueId = issueIdFromReceipt(final);
   if (issueId) return { issueId };
@@ -439,12 +439,12 @@ async function ensureImpl(chain, cirrus, profile, args, state, currentLogic, sou
 }
 
 async function callBridge(chain, target, method, callArgs) {
-  const response = await chain.rest.call(chain.tokenObj, {
+  const response = await chain.rest.call(chain.tokenObj, await require('./util').governedCallArgs(chain.tokenObj, {
     contract: target,
     method,
     args: callArgs,
     txParams: { gasPrice: chain.config.gasPrice, gasLimit: chain.config.gasLimit },
-  }, { config: chain.config, cacheNonce: true, isAsync: true });
+  }, chain.nodeUrl), { config: chain.config, cacheNonce: true, isAsync: true });
   const hashes = (Array.isArray(response) ? response : [response]).map((r) => r && r.hash).filter(Boolean);
   if (hashes.length === 0) throw new Error(`rest.call(${method}) returned no tx hash: ` + JSON.stringify(response));
   return awaitReceipt(chain, hashes, `${method} call`);
@@ -534,7 +534,7 @@ async function main() {
   // config.js reads NODE_URL at load time, so require it only after setting it.
   const config = require('./config');
   const auth = require('./auth');
-  const { rest, importer, util } = require('blockapps-rest');
+  const { rest, importer, util } = require('./strato');
   console.log(`\nAuthenticating as ${process.env.GLOBAL_ADMIN_NAME} against ${config.nodes[0].url}...`);
   const chain = {
     rest, importer, util, config, nodeUrl: config.nodes[0].url,

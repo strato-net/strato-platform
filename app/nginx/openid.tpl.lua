@@ -164,7 +164,7 @@ if ngx.req.get_headers()["Authorization"] then
 else
   -- Else - use the openidc authenticate flow
 
-  local authenticate_res, authenticate_err, authenticate_session
+  local authenticate_res, authenticate_err, _, authenticate_session
   -- Allow anonymous access:
   --   "true" -> only safe/read-only methods (GET/HEAD/OPTIONS)
   --   "all"  -> any method (for permissionless endpoints that don't sign server-side,

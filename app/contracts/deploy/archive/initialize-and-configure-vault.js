@@ -9,7 +9,7 @@
 require('dotenv').config();
 const config = require('../config');
 const auth = require('../auth');
-const { rest } = require('blockapps-rest');
+const { rest } = require('../strato');
 
 function parseArgs() {
   const args = process.argv.slice(2);

@@ -1,4 +1,4 @@
-# Registries. The STRATO node images (strato, nginx, apex, postgrest, prometheus,
+# Registries. The STRATO node images (strato, nginx, apex, postgres, postgrest, prometheus,
 # smd, local-auth and the app images) are published to the public GitHub
 # registry; the services BlockApps runs itself (vault, highway, bridge) stay in
 # the private AWS ECR. Every image is built once, under the name it is pushed
@@ -56,6 +56,7 @@ dir_hash = $(shell git ls-files $(1) 2>/dev/null | LC_ALL=C sort | xargs sha256s
 # Image content hashes - used for docker tags
 HASH_STRATO := $(call dir_hash,strato)
 HASH_POSTGREST := $(call dir_hash,postgrest-packager)
+HASH_POSTGRES := $(call dir_hash,postgres-packager)
 HASH_NGINX := $(call dir_hash,nginx-packager)
 HASH_APEX := $(call dir_hash,apex)
 HASH_APP_BACKEND := $(call dir_hash,app/backend)
@@ -68,6 +69,7 @@ HASH_SMD := $(call dir_hash,smd-ui)
 HASH_BRIDGE := $(call dir_hash,app/services/bridge)
 HASH_BRIDGE_NGINX := $(call dir_hash,app/services/bridge/nginx)
 HASH_HISTORY := $(call dir_hash,app/services/history)
+HASH_PARTNER_REFERRALS := $(call dir_hash,app/services/partner-referrals)
 HASH_LOCAL_AUTH := $(call dir_hash,local-auth)
 
 # Check if image exists in Docker — rebuild if missing (hash in tag handles source changes)
@@ -85,6 +87,7 @@ generate-version-file:
 	@echo "HASH_SMD=$(HASH_SMD)" >> BUILD_METADATA
 	@echo "HASH_APEX=$(HASH_APEX)" >> BUILD_METADATA
 	@echo "HASH_POSTGREST=$(HASH_POSTGREST)" >> BUILD_METADATA
+	@echo "HASH_POSTGRES=$(HASH_POSTGRES)" >> BUILD_METADATA
 	@echo "HASH_NGINX=$(HASH_NGINX)" >> BUILD_METADATA
 	@echo "HASH_PROMETHEUS=$(HASH_PROMETHEUS)" >> BUILD_METADATA
 	@echo "HASH_LOCAL_AUTH=$(HASH_LOCAL_AUTH)" >> BUILD_METADATA
@@ -103,7 +106,17 @@ HASH_SUBS = -e 's|<HASH_STRATO>|$(HASH_STRATO)|g' \
             -e 's|<HASH_BRIDGE>|$(HASH_BRIDGE)|g' \
             -e 's|<HASH_BRIDGE_NGINX>|$(HASH_BRIDGE_NGINX)|g'
 
-.PHONY: postgrest nginx apex app-backend app-ui app-nginx prometheus smd bridge bridge-nginx history local-auth
+.PHONY: postgrest nginx apex app-backend app-ui app-nginx prometheus smd bridge bridge-nginx history partner-referrals push-partner-referrals local-auth
+
+.PHONY: postgres
+postgres:
+	@if $(call image_missing,$(REPO_GHCR_URL)postgres:$(VERSION)-$(HASH_POSTGRES)); then \
+		echo "Building postgres ($(VERSION)-$(HASH_POSTGRES))..."; \
+		DOCKER_TAG=$(REPO_GHCR_URL)postgres:$(VERSION)-$(HASH_POSTGRES) DOCKER_TAG_ALIAS=postgres:$(VERSION)-$(HASH_POSTGRES) $(MAKE) --directory=postgres-packager/; \
+	else \
+		echo "postgres up to date"; \
+		docker tag $(REPO_GHCR_URL)postgres:$(VERSION)-$(HASH_POSTGRES) postgres:$(VERSION)-$(HASH_POSTGRES); \
+	fi
 
 postgrest:
 	@if $(call image_missing,$(REPO_GHCR_URL)postgrest:$(VERSION)-$(HASH_POSTGREST)); then \
@@ -213,27 +226,42 @@ history:
 		docker tag $(REPO_GHCR_URL)history:$(VERSION)-$(HASH_HISTORY) history:$(VERSION)-$(HASH_HISTORY); \
 	fi
 
+# The partner referrals service (app/services/partner-referrals): BlockApps
+# runs it itself, next to a Postgres of its own, so its image goes to the
+# private ECR like the bridge's.
+partner-referrals:
+	@if $(call image_missing,$(REPO_AWS_ECR_URL)partner-referrals:$(VERSION)-$(HASH_PARTNER_REFERRALS)); then \
+		echo "Building partner-referrals ($(VERSION)-$(HASH_PARTNER_REFERRALS))..."; \
+		docker build -t $(REPO_AWS_ECR_URL)partner-referrals:$(VERSION)-$(HASH_PARTNER_REFERRALS) ./app/services/partner-referrals; \
+	else \
+		echo "partner-referrals up to date"; \
+	fi
+
+# It has no compose file to be pushed from, so it is pushed by name.
+push-partner-referrals:
+	./scripts/docker-push-ecr.sh $(REPO_AWS_ECR_URL)partner-referrals:$(VERSION)-$(HASH_PARTNER_REFERRALS)
+
 all: local
 
-local: build_common apex nginx postgrest prometheus smd app-backend app-ui bridge bridge-nginx oracle local-auth
+local: build_common apex nginx postgres postgrest prometheus smd app-backend app-ui bridge bridge-nginx oracle local-auth
 
-# What a --role=validator directory runs: the binaries plus the two images it
-# starts (postgres and redis are stock images, pulled by compose). No app, SMD,
+# What a --role=validator directory runs: the binaries plus the three images it
+# starts (postgres is packaged locally; redis is pulled by compose). No app, SMD,
 # nginx, PostgREST, bridge, oracle or local-auth builds.
-validator: build_common apex prometheus
+validator: build_common postgres apex prometheus
 
-# What a --role=api-node directory runs: the binaries plus the four images it
-# starts (postgres and redis are stock images, pulled by compose). With
+# What a --role=api-node directory runs: the binaries plus the five images it
+# starts (postgres is packaged locally; redis is pulled by compose). With
 # --monitoring=false the apex and prometheus images go unused; with
 # --localAuth add the local-auth image (make api-node local-auth). No app,
 # SMD, bridge or oracle builds.
-api-node: build_common nginx apex prometheus postgrest
+api-node: build_common postgres nginx apex prometheus postgrest
 
-docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle local-auth docker-compose
+docker: build_common_docker strato_docker apex highway highway-nginx nginx postgres postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle local-auth docker-compose
 
 all_develop: build_develop docker-compose
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle local-auth
+build_develop: develop apex highway highway-nginx nginx postgres postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle local-auth
 
 .PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose push-node-images push-release-alias highway highway-nginx local validator api-node oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force app-backend-force app-ui-force bridge-force bridge-nginx-force app
 
@@ -303,7 +331,7 @@ oracle:
 
 build_formatter:
 	@echo building code formatter...
-	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-formatter:${STACK_RESOLVER} - < Dockerfile.formatter
+	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-formatter:${STACK_RESOLVER} - < strato/extraFiles/Dockerfile.formatter
 
 build_common: generate-version-file
 	@echo building haskell libraries and creating directories
@@ -462,18 +490,14 @@ vault-nginx:
 	DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
 docker-compose:
-	@echo Generating vault, highway, bridge, api, app compose files...
-	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
+	@echo Generating vault, highway, bridge compose files...
+	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' -e 's|<POSTGRES_IMAGE>|$(REPO_GHCR_URL)postgres:$(VERSION)-$(HASH_POSTGRES)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.yml
-	sed -e 's|<REPO_URL>|$(REPO_GHCR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.api.tpl.yml > docker-compose.api.push.yml
-	sed -e 's|<REPO_URL>|$(REPO_GHCR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.app.tpl.yml > docker-compose.app.push.yml
 
 	awk '/build: ./{getline} 1' docker-compose.vault.push.yml > docker-compose.vault.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.yml > docker-compose.highway.yml
 	awk '/build: ./{getline} 1' docker-compose.bridge.push.yml > docker-compose.bridge.yml
-	awk '/build: ./{getline} 1' docker-compose.api.push.yml > docker-compose.api.yml
-	awk '/build: ./{getline} 1' docker-compose.app.push.yml > docker-compose.app.yml
 
 # The node images of this build, by their GitHub registry name. CI pushes them
 # with push-node-images; images a build did not make are skipped. The strato
@@ -481,7 +505,7 @@ docker-compose:
 # from the VERSION file, and strato-setup inside it knows the other tags from
 # its BUILD_METADATA. The ECR services (vault, highway, bridge) are pushed
 # from their compose files with scripts/docker-push-ecr.sh.
-NODE_IMAGES = strato:$(VERSION)-$(HASH_STRATO) nginx:$(VERSION)-$(HASH_NGINX) apex:$(VERSION)-$(HASH_APEX) postgrest:$(VERSION)-$(HASH_POSTGREST) prometheus:$(VERSION)-$(HASH_PROMETHEUS) smd:$(VERSION)-$(HASH_SMD) local-auth:$(VERSION)-$(HASH_LOCAL_AUTH) app-backend:$(VERSION)-$(HASH_APP_BACKEND) app-ui:$(VERSION)-$(HASH_APP_UI) app-nginx:$(VERSION)-$(HASH_APP_NGINX) history:$(VERSION)-$(HASH_HISTORY)
+NODE_IMAGES = strato:$(VERSION)-$(HASH_STRATO) nginx:$(VERSION)-$(HASH_NGINX) apex:$(VERSION)-$(HASH_APEX) postgres:$(VERSION)-$(HASH_POSTGRES) postgrest:$(VERSION)-$(HASH_POSTGREST) prometheus:$(VERSION)-$(HASH_PROMETHEUS) smd:$(VERSION)-$(HASH_SMD) local-auth:$(VERSION)-$(HASH_LOCAL_AUTH) app-backend:$(VERSION)-$(HASH_APP_BACKEND) app-ui:$(VERSION)-$(HASH_APP_UI) app-nginx:$(VERSION)-$(HASH_APP_NGINX) history:$(VERSION)-$(HASH_HISTORY)
 
 push-node-images:
 	./scripts/docker-push-ecr.sh --registry-glob '$(REPO_GHCR_URL)*' $(addprefix $(REPO_GHCR_URL),$(NODE_IMAGES))

@@ -92,7 +92,6 @@ These are set per node when it starts (see [Node configuration](../node/configur
 | Flag | Default | Effect |
 |------|---------|--------|
 | `--txSizeLimit` | `2097152` bytes (2 MiB) | Larger transactions are rejected at submission, in the pool, and at execution |
-| `--gasLimit` | `1000000` | The VM's gas cap. The pool also rejects a transaction whose intrinsic gas reaches this value. |
 | `--maxTxsPerBlock` | `500` | Maximum transactions per block |
 
 nginx also limits request bodies to 4 MB (1 MB for `/api`).

@@ -1,6 +1,7 @@
 import { cirrus, strato } from "../../utils/appApiHelper";
 
 import { buildFunctionTx } from "../../utils/txBuilder";
+import { governedInput } from "./user.service";
 import { postAndWaitForTx, until } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import * as config from "../../config/config";
@@ -1283,7 +1284,7 @@ export const configureAsset = async (
   const minRAY = BigInt('1000000000000000000000000000'); // 1e27
   if (rayValue < minRAY) throw new Error("perSecondFactorRAY must be >= 1e27 (1 RAY)");
 
-  const tx = await buildFunctionTx({
+  const tx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(constants.PoolConfigurator),
     contractAddress: config.poolConfigurator,
     method: "configureAsset",
@@ -1296,7 +1297,7 @@ export const configureAsset = async (
       reserveFactor,
       perSecondFactorRAY,
     },
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -1321,14 +1322,14 @@ export const sweepReserves = async (
     throw new Error("Amount must be a valid positive integer");
   }
 
-  const tx = await buildFunctionTx({
+  const tx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(constants.PoolConfigurator),
     contractAddress: config.poolConfigurator,
     method: "sweepReserves",
     args: {
       amount,
     },
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -1357,7 +1358,7 @@ export const setDebtCeilings = async (
     throw new Error("USD value must be a valid number"); // convert to BigInt before making the API call.
   }
 
-  const tx = await buildFunctionTx({
+  const tx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(constants.PoolConfigurator),
     contractAddress: config.poolConfigurator,
     method: "setDebtCeilings",
@@ -1365,7 +1366,7 @@ export const setDebtCeilings = async (
       assetUnits,
       usdValue,
     },
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -1743,12 +1744,12 @@ export const pauseLendingPool = async (
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
-  const builtTx = await buildFunctionTx({
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(LendingPool),
     contractAddress: lendingPool,
     method: "pause",
     args: {},
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
@@ -1762,12 +1763,12 @@ export const unpauseLendingPool = async (
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
-  const builtTx = await buildFunctionTx({
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(LendingPool),
     contractAddress: lendingPool,
     method: "unpause",
     args: {},
-  }, userAddress, accessToken);
+  }), userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
