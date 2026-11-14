@@ -20,17 +20,15 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Data.AddressStateDB
 import Blockchain.DB.AddressStateDB (HasAccountDB)
-import Blockchain.DB.StorageDB (HasMemStorageDB)
 import Blockchain.DB.ModifyStateDB (pay)
-import Blockchain.SolidVM.SM (CallInfo, getCurrentAddress, readOnly, rlpForkValues)
-import Blockchain.VMContext (purgeStorageMap)
+import Blockchain.SolidVM.SM (CallInfo, getCurrentAddress, purgeStorageOnCommit, readOnly, rlpForkValues)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 
 payable :: Address -> (Address, Bool)
 payable address = (address, True)
 
-selfdestruct :: (Mod.Modifiable [CallInfo] m, HasAccountDB m, HasMemStorageDB m) => Address -> m Bool
+selfdestruct :: (Mod.Modifiable [CallInfo] m, HasAccountDB m) => Address -> m Bool
 selfdestruct recipient = do
   frames <- Mod.get (Mod.Proxy @[CallInfo])
   when (any readOnly $ take 1 frames) $ throw (InvalidWrite "Invalid selfdestruct during read-only access" (show recipient))
@@ -39,7 +37,7 @@ selfdestruct recipient = do
   A.adjustWithDefault_ (A.Proxy @AddressState) contract $ \state ->
     pure state {addressStateCodeHash = SolidVMCode "Code_0" (unsafeCreateKeccak256FromWord256 0)}
   sent <- pay "selfdestruct function" contract recipient amount
-  purgeStorageMap contract
+  purgeStorageOnCommit contract
   pure sent
 
 create :: forall engine m. MonadContractCreation engine m => String -> String -> ValList -> m Address

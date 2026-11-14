@@ -77,7 +77,6 @@ import Control.DeepSeq (force)
 import Control.Exception (throw)
 import Control.Lens hiding (Context, assign, from, to, uncons, unsnoc)
 import Control.Monad
-import qualified Control.Monad.Catch as EUnsafe
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Class
@@ -162,16 +161,14 @@ runExpr exprText = withoutDebugging . withStaticCallInfo $ do
   case eExpr of
     Left pe -> pure . Left . T.pack $ show pe
     Right expr -> do
-      eRes <- EUnsafe.try $ do
+      eRes <- attempt $ do
         var <- expToVar expr
         val <- getVar var
         str <- showSM val
         case (force str) of -- stupid code to get lazy exceptions to be thrown within the try block
           [] -> pure []
           xs -> pure xs
-      case eRes of
-        Left e@InternalError{} -> throwIO e
-        _ -> pure $ bimap (T.pack . (displayException :: SolidException -> String)) T.pack eRes
+      pure $ bimap (T.pack . displayException) T.pack eRes
 
 solidVMBreakpoint :: MonadSM m => SourceAnnotation () -> m ()
 solidVMBreakpoint ann = do
@@ -884,13 +881,11 @@ runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsF
   solidVMBreakpoint pos
   -- currentCallInfo <- getCurrentCallInfo
 
-  stackDepth <- getCallStackDepth
-  mRes <- EUnsafe.try $ do
+  mRes <- attempt $ do
     expResultVal <- getVar =<< expToVar tryExpression
     return expResultVal
   case mRes of
-    Left (ex :: SolidException) -> do
-      trimCallStackToDepth stackDepth
+    Left ex -> do
       res1 <- solidityExceptionHandler catchBlockMap ex
       return res1
     Right aRealVal -> do
@@ -913,13 +908,11 @@ runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsF
               return sfsRes'
 runStatement (CC.TryCatchStatement tryBlock catchBlockMap pos) = do
   solidVMBreakpoint pos
-  stackDepth <- getCallStackDepth
-  mRes <- EUnsafe.try $ do
+  mRes <- attempt $ do
     val <- runStatementBlock tryBlock
     pure $ val
   case mRes of
     Left ex -> do
-      trimCallStackToDepth stackDepth
       res1 <- solidVMExceptionHandler catchBlockMap ex
       return res1
     Right res -> return res
@@ -1395,7 +1388,7 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
       val <- getVar var
       case (val, theIndex) of
         (SArray theVector, SIntegral i) -> do
-          if (fromIntegral i) >= length theVector
+          if i < 0 || i >= fromIntegral (length theVector)
             then throw (IndexOutOfBounds ("index value was " ++ (format i) ++ ", but the array length was " ++ (format $ length theVector)) $ unparseExpression x)
             else typedElement var $ theVector V.! fromIntegral i
         (SBytes bs, SIntegral i) -> case bs B.!? fromIntegral i of

@@ -32,7 +32,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Type.Equality
 import Numeric.Natural (Natural)
-import Blockchain.SolidVM.Exception (SolidException (InternalError, TooMuchGas, ArithmeticException))
+import Blockchain.SolidVM.Exception (SolidException (ArithmeticException, Require))
 import qualified Blockchain.SolidVM.Builtins.Size as SharedSize
 import Blockchain.Strato.Model.Gas (Gas (..))
 import Blockchain.Strato.Model.Address (Address (..))
@@ -402,13 +402,9 @@ chargeAfter amount action = do
   pure value
 
 catchContractFailure :: SM a -> SM a -> SM a
-catchContractFailure action handler = action `U.catches`
-  [ U.Handler (\(_ :: Revert) -> handler)
-  , U.Handler (\(e :: SolidException) -> case e of
-      InternalError{} -> U.throwIO e
-      TooMuchGas{} -> U.throwIO e
-      _ -> handler)
-  ]
+catchContractFailure action handler =
+  SM.attempt (action `U.catch` \(Revert message) -> U.throwIO (Require (Just (T.unpack message))))
+    >>= either (const handler) pure
 
 thisAddress :: SM Address
 thisAddress = SM.getCurrentAddress
