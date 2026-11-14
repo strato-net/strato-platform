@@ -40,6 +40,16 @@ source = T.unlines
   , "   require(cells[7].value == 0); require(cells[7].flag == false);"
   , "   require(kinds[7] == Kind.First); require(arrays[7].length == 0); return true;"
   , " }"
+  , " function unsignedKey(bool expression, variadic args) returns (bool) {"
+  , "   mapping(uint => uint) values;"
+  , "   if (expression) { variadic(values[args[0]] = 5); } else { values[args[0]] = 5; }"
+  , "   return true;"
+  , " }"
+  , " function signedKey(bool expression, variadic args) returns (bool) {"
+  , "   mapping(int => uint) values;"
+  , "   if (expression) { variadic(values[args[0]] = 5); } else { values[args[0]] = 5; }"
+  , "   return values[args[0]] == 5;"
+  , " }"
   , "}"
   ]
 
@@ -67,4 +77,16 @@ main = do
     forM_ ["defaults", "compoundDefaults"] $ \function -> do
       result <- invoke function []
       liftIO $ unless (erReturnVal result == Just (SBool True)) $ fail $ show (function, erReturnVal result)
+    forM_ ["false", "true"] $ \expression -> do
+      forM_ [0, 7, 2 ^ (300 :: Int)] $ \key -> do
+        result <- invoke "unsignedKey" [expression, T.pack $ show (key :: Integer)]
+        liftIO $ unless (erReturnVal result == Just (SBool True)) $ fail "valid unsigned mapping key rejected"
+      forM_ [-1, negate $ 2 ^ (300 :: Int)] $ \key -> do
+        let args = [expression, T.pack $ show (key :: Integer)]
+        rejected <- call $ def & callCodeAddress .~ 0x7600 & callFuncName .~ "unsignedKey" & callArgs . argsArgs .~ args
+        liftIO $ case erException rejected of
+          Just (Left ArithmeticException{}) -> pure ()
+          other -> fail $ "negative unsigned mapping key accepted: " ++ show other
+        result <- invoke "signedKey" args
+        liftIO $ unless (erReturnVal result == Just (SBool True)) $ fail "negative signed mapping key rejected"
     liftIO $ putStrLn "PASS ordered arguments and mapping defaults"

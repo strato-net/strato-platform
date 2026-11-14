@@ -79,6 +79,10 @@ source = T.unlines
   , "   if (which == 45) { (values[0] = 1) - b; }"
   , "   if (which == 46) { a + address(this).call(\"signedLeaf\"); }"
   , "   if (which == 47) { address(this).call(\"signedLeaf\") + a; }"
+  , "   if (which == 48) { ~leaf(); }"
+  , "   if (which == 49) { ~unset; }"
+  , "   if (which == 50) { ~values[999]; }"
+  , "   if (which == 51) { ~cells[999].value; }"
   , " }"
   , " function signedLeaf() returns (int) { return -1; }"
   , " function dynamicArithmetic() returns (bool) { uint a = 3; return int(a + address(this).call(\"leaf\")) == 4 && int(address(this).call(\"leaf\") + a) == 4 && int(a) + int(address(this).call(\"signedLeaf\")) == 2; }"
@@ -104,7 +108,7 @@ main = do
       liftIO $ unless (erReturnVal dynamic == Just (SBool True)) $ fail "dynamic unsigned arithmetic changed"
       good <- invoke "good" []
       liftIO $ unless (erReturnVal good == Just (SBool True)) $ fail "valid arithmetic changed"
-      forM_ [0..47 :: Int] $ \which -> forM_ [False, True] $ \flag -> do
+      forM_ [0..51 :: Int] $ \which -> forM_ [False, True] $ \flag -> do
         let args = [T.pack (show which), if flag then "true" else "false"]
         rejected <- call $ def & callCodeAddress .~ address & callFuncName .~ "negative" & callArgs . argsArgs .~ args & callArgs . argsBlockData %~ at height
         liftIO $ case erException rejected of

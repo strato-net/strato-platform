@@ -771,6 +771,9 @@ runStatement st@(CC.SimpleStatement (CC.ExpressionStatement ep@(CC.Binary _ "=" 
         _ -> throw (TypeError ("array index value (" ++ (T.unpack (renderValueShallow indVal)) ++ ") is not an integer") (unparseStatement st))
     SMap theMap -> do
       theIndex <- getVar =<< expToVar indExp
+      case pVar of
+        TypedVariable (SVMType.Mapping _ keyType _ _ _) _ -> void $ enforceUnsignedType keyType theIndex
+        _ -> pure ()
       let newMap = M.insert theIndex srcVar theMap
       setVar pVar (SMap newMap)
       return Nothing
@@ -1205,10 +1208,12 @@ expToVar' (CC.Unitary _ "-" e) = do
     Left v -> pure . Constant $! integerResult (isUnsignedValue original) (negate v)
     Right v -> return $ Constant $ SDecimal $ v * (-1)
 expToVar' expression@(CC.Unitary _ "~" e) = do
-  value <- getVar =<< expToVar e
-  case value of
-    SUnsigned n -> pure . Constant $! unsignedInteger (complement $ toInteger n)
-    _ -> throw (UnsupportedFeature "expression" (unparseExpression expression))
+  value <- arithmeticValue e
+  unsigned <- checkUnsignedOperands e value e value
+  if unsigned then do
+    n <- getIntVal value
+    pure . Constant $! unsignedInteger (complement n)
+  else throw (UnsupportedFeature "expression" (unparseExpression expression))
 expToVar' (CC.PlusPlus _ e) = do
   var <- expToVar e
   original <- getVar var
@@ -1959,6 +1964,9 @@ expToVar' ep@(CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src) =
         _ -> throw (TypeError ("array index value (" ++ (T.unpack (renderValueShallow indVal)) ++ ") is not an integer") (unparseExpression ep))
     SMap theMap -> do
       theIndex <- getVar =<< expToVar indExp
+      case pVar of
+        TypedVariable (SVMType.Mapping _ keyType _ _ _) _ -> void $ enforceUnsignedType keyType theIndex
+        _ -> pure ()
       let newMap = M.insert theIndex srcVar theMap
       setVar pVar (SMap newMap)
       return $ Constant $ SBool True
