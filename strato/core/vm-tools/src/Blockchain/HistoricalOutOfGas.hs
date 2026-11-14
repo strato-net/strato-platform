@@ -15,7 +15,7 @@
 --
 -- The lists were taken from the public nodes' transaction results:
 --   upquark: complete through block 982720
---   helium:  complete through block 1168044
+--   helium:  complete through block 1169735
 -- A transaction that runs out of gas under the old schedule after those
 -- heights, before every validator runs the revised metering, must be added.
 -- Nothing mined under the revised metering ever belongs here.
@@ -59,7 +59,7 @@ upquarkOutOfGasTxs =
     , 0x658398de0d58e02740d30a42f722f68e3c6cf0baa547a62b5a3ee68fb08bf1dc -- block 947862, deliver
     ]
 
--- 2928 transactions.
+-- 2948 transactions.
 heliumOutOfGasTxs :: [Word256]
 heliumOutOfGasTxs =
     [ 0x7c49a7377d7b475619df043c5aedd59af5f1a17b74d46b2cd79a80665ac85520 -- block 319709, anchorBlockHeader
@@ -2990,4 +2990,24 @@ heliumOutOfGasTxs =
     , 0xf0ad3adcbbcc9ed16d7172d65690218009840d02399f715e9de24e5a0c8250c4 -- block 1167780, advanceCommittee
     , 0x94883e4976b5203b236c108d18623b6a5d32c2768e51d02a9910e47766a21cb8 -- block 1167869, advanceCommittee
     , 0x44d9a5ce694230019da91805bb211154b354f2741238fb67bee4aa9965411466 -- block 1167960, advanceCommittee
+    , 0xde12235f0b170dd78e663800495ceed752a50035e3bb970c7ce0316cdb2e9a01 -- block 1168054, advanceCommittee
+    , 0xe6ef287087678ea4cefccb83bd0e133a74598cab1378ff28cab180789d14e24e -- block 1168148, advanceCommittee
+    , 0xf68148af85862a9827b91f6f0b75584e50177a119b4e4ba114803d542150cfad -- block 1168243, advanceCommittee
+    , 0x6bc98858ac3906ce3fceaad711410ce8ba87422409f1d0b86090b098b6ec494a -- block 1168337, advanceCommittee
+    , 0x037bfc315ea9c6c3c3a1e84d442e95d690d83c112d491424a72b541c5abda812 -- block 1168432, advanceCommittee
+    , 0xa5c32c2eff1ababa369b1d530a7d34af61b26df50633e6971dfb9a3af56dce39 -- block 1168508, advanceCommittee
+    , 0xf716f658bfae41b8a5b7cee3c3830f75972b76c19fdb5ac534b9dfa1ac702e94 -- block 1168602, advanceCommittee
+    , 0x3c8cab0936f7fd6d91f06126e0f75b518b5188cb1d92dedf7d9eeb57568a5c75 -- block 1168686, advanceCommittee
+    , 0xca505c746df9e5fdc4197e0412c950bbb200550914af13e9495c2379fe9c0781 -- block 1168769, advanceCommittee
+    , 0xc70051ba3d443d15c844819ac5050e2b5075b1fbdf414d2c29316b0c42ab94b8 -- block 1168847, advanceCommittee
+    , 0xfcc6db88b6ffb8cd224366039194f36e05c6660ab9a569021e951f075a538baa -- block 1168921, advanceCommittee
+    , 0x1570bc5e9c9d56ae4d3926ec1680f92009e3bc4d2dbfc1575a8119f61bf9548f -- block 1169012, advanceCommittee
+    , 0x6153a62b97711c5abb97fbf1167e3fb77d49c9aa2131844e0daea0954193098e -- block 1169102, advanceCommittee
+    , 0x75fea23d63b0852cd538a766b9f5033cb14c504608d4ccef3b7ad84dcb7fcb7e -- block 1169189, advanceCommittee
+    , 0xdfe5e8f4217a985d572835b36c6dda917885ec6f9353970a76b4e14837e69378 -- block 1169289, advanceCommittee
+    , 0xdf9baa4716c107424e3a4cdbb8bfaa62ab34dc039ede5f269442f8c8e9c58f56 -- block 1169383, advanceCommittee
+    , 0x04e73e9da01b8b115f12732a42b9ebcf174474dbcb600178d32815f9dbe1302c -- block 1169453, advanceCommittee
+    , 0x9241584ea8bf707f162ef65a253b4ddaf52348857e27befbd83c013667a85003 -- block 1169547, advanceCommittee
+    , 0x097071c8431f316e4ccff4c77e8e7ef5ec1875d249e4565a42069eac93560741 -- block 1169629, advanceCommittee
+    , 0x9f3bca10eb7909feac16be7aa0f2f0cf58532a348a18471bce3120542980a9c4 -- block 1169722, advanceCommittee
     ]
