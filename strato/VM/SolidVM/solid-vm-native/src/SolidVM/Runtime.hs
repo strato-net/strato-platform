@@ -146,7 +146,7 @@ internalFrame name sig fun = go sig fun []
       withCallArguments callName values action
 
 callContract :: N.CallKind -> Address -> T.Text -> [N.Dyn] -> Maybe N.SomeTy -> SM [N.Dyn]
-callContract kind address name args expected = unwind $ do
+callContract kind address name args expected = do
   info <- getCurrentCallInfo
   let ctx = N.mkCtx (codeCollection info) (currentContract info)
       storageAddress = case kind of N.DelegateCall -> currentAddress info; _ -> address
@@ -179,7 +179,7 @@ encodeArguments packed args = do
   (if packed then ABI.abiEncodePacked else ABI.abiEncode) values
 
 createCode :: Maybe N.Dyn -> T.Text -> T.Text -> [N.Dyn] -> SM Address
-createCode salt name source args = unwind $ do
+createCode salt name source args = do
   saltValue <- traverse toValue salt
   values <- traverse toValue args
   Blockchain.createCode saltValue name source values
@@ -188,7 +188,7 @@ derive :: Address -> T.Text -> T.Text -> [N.Dyn] -> SM Address
 derive creator salt name args = Blockchain.derive creator salt name =<< traverse toValue args
 
 createContract :: T.Text -> Maybe (SM N.Dyn) -> SM [N.Dyn] -> SM Address
-createContract name salt args = unwind $
+createContract name salt args =
   Blockchain.createContractValues name ((>>= toValue) <$> salt) (traverse toValue =<< args)
 
 copyStorage :: StoragePath -> StoragePath -> SM ()
@@ -213,8 +213,3 @@ previousBlock = do
 proposer :: SM Address
 proposer = Env.proposer <$> getEnv
 
--- Nested contract failures must not leave frames behind when Solidity catches them.
-unwind :: SM a -> SM a
-unwind operation = do
-  depth <- getCallStackDepth
-  operation `catch` (\(e :: SolidException) -> trimCallStackToDepth depth >> throwIO e)
