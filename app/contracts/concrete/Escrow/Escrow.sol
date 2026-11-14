@@ -1,65 +1,79 @@
 import "../../abstract/ERC20/IERC20.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
-contract Escrow is Ownable {
+contract record Escrow is Ownable {
   struct Deposit {
     address sender;
     uint quantity;
     address[] tokens;
     uint[] amounts;
     uint expiry;
-    address[] recipients;
   }
 
   // Cirrus mapping keys:
   //  - key  = ephemeralAddress
-  mapping(address => Deposit) public deposits;
-  mapping(address => mapping (address => bool)) public depositRecipients;
+  // A deposit is open while quantity > 0. New deposits allow one redemption;
+  // deposits made before that change may have several left. A closed deposit
+  // keeps its sender, so its ephemeral address never takes another deposit.
+  mapping(address => Deposit) public record deposits;
+  mapping(address => mapping (address => bool)) public record depositRecipients;
+  mapping(address => mapping(address => uint)) minimumDeposits;
+  bool locked;
 
-  event Deposited(address indexed ephemeralAddress, uint quantity, address[] indexed tokens, uint256[] amounts, address indexed sender, uint expiry);
+  event Deposited(address indexed ephemeralAddress, address[] indexed tokens, uint256[] amounts, address indexed sender, uint expiry);
   event Redeemed(address indexed ephemeralAddress, address[] indexed tokens, uint256[] amounts, address sender, address recipient);
-  event Cancelled(address indexed ephemeralAddress, uint quantity, address[] indexed tokens, uint256[] amounts, address sender);
+  event Cancelled(address indexed ephemeralAddress, address[] indexed tokens, uint256[] amounts, address sender);
 
   constructor(address _initialOwner) Ownable(_initialOwner) { }
 
   uint public fee = 1e16;
 
-  function deposit(address[] tokens, uint256[] amounts, address ephemeralAddress, uint expiry, uint quantity) external {
+  // Every entry point moves tokens of caller-chosen contracts, so none may run inside another.
+  modifier nonReentrant() {
+    require(!locked, "reentrant call");
+    locked = true;
+    _;
+    locked = false;
+  }
+
+  function setMinimumDeposit(address _sender, address _token, uint _amount) external onlyOwner {
+    minimumDeposits[_sender][_token] = _amount;
+  }
+
+  function deposit(address[] tokens, uint256[] amounts, address ephemeralAddress, uint expiry) external nonReentrant {
     require(ephemeralAddress != address(0), "ephemeral=0");
     require(expiry > 0, "expiry=0");
-    require(quantity > 0, "quantity=0");
-
-    Deposit storage d = deposits[ephemeralAddress];
-    require(d.tokens.length == 0 && d.amounts.length == 0, "active deposit exists");
-
-    for (uint i = 0; i < tokens.length; i++) {
-        address token = tokens[i];
-        require(token != address(0), "token=0");
-        require(amounts[i] > 0, "amount=0");
-        bool ok = IERC20(token).transferFrom(msg.sender, address(this), quantity * amounts[i]);
-        require(ok, "transferFrom failed");
-    }
+    require(tokens.length > 0 && tokens.length == amounts.length, "tokens/amounts mismatch");
+    require(deposits[ephemeralAddress].sender == address(0), "ephemeral address already used");
 
     uint expiryTimestamp = block.timestamp + expiry;
 
     deposits[ephemeralAddress] = Deposit({
       sender: msg.sender,
-      quantity: quantity,
+      quantity: 1,
       tokens: tokens,
       amounts: amounts,
-      expiry: expiryTimestamp,
-      recipients: []
+      expiry: expiryTimestamp
     });
 
-    emit Deposited(ephemeralAddress, quantity, tokens, amounts, msg.sender, expiryTimestamp);
+    for (uint i = 0; i < tokens.length; i++) {
+        address token = tokens[i];
+        require(token != address(0), "token=0");
+        require(amounts[i] > 0, "amount=0");
+        require(amounts[i] >= minimumDeposits[msg.sender][token], "below minimum deposit");
+        bool ok = IERC20(token).transferFrom(msg.sender, address(this), amounts[i]);
+        require(ok, "transferFrom failed");
+    }
+
+    emit Deposited(ephemeralAddress, tokens, amounts, msg.sender, expiryTimestamp);
   }
 
   function redemptionHash(
-    address ephemeralAddress
+    address recipient
   ) public pure returns (string) {
     return keccak256(
         "STRATO_ESCROW_REDEEM_V1",
-        ephemeralAddress
+        recipient
     );
   }
 
@@ -68,88 +82,73 @@ contract Escrow is Ownable {
     uint8 v,
     string r,
     string s
-  ) external {
-    string h = redemptionHash(recipient);
-    address ephemeralAddress = recoverSigner(h, v, r, s);
+  ) external nonReentrant {
+    address ephemeralAddress = recoverSigner(redemptionHash(recipient), v, r, s);
 
     require(!depositRecipients[ephemeralAddress][recipient], "recipient has already redeemed this referral");
     Deposit storage d = deposits[ephemeralAddress];
-    require(d.quantity > 0, "referral quantity is 0");
-    require(d.sender != address(0) && d.tokens.length > 0 && d.amounts.length > 0, "no referral");
+    require(d.quantity > 0, "no referral");
 
+    address sender = d.sender;
     address[] tokens = [];
     uint[] amounts = [];
-    address sender = d.sender;
-
     for (uint i = 0; i < d.tokens.length; i++) {
-        uint feeAmount = (d.amounts[i] * fee) / 1e18;
-        bool ok = IERC20(d.tokens[i]).transfer(recipient, d.amounts[i] - feeAmount);
-        bool feeOk = true;
-        if (feeAmount > 0) {
-            feeOk = IERC20(d.tokens[i]).transfer(msg.sender, feeAmount);
-        }
         tokens.push(d.tokens[i]);
         amounts.push(d.amounts[i]);
-        if (d.quantity == 1) {
-          d.tokens[i] = address(0);
-          d.amounts[i] = 0;
-        }
-        require(ok && feeOk, "transfer failed");
     }
 
-    if (d.quantity == 1) {
-        d.sender = address(0);
-        d.tokens.length = 0;
-        d.amounts.length = 0;
-        d.expiry = 0;
-        for (uint j = 0; j < d.recipients.length; j++) {
-            depositRecipients[ephemeralAddress][d.recipients[j]] = false;
-            d.recipients[j] = address(0);
-        }
-        d.recipients.length = 0;
-    } else {
-        d.recipients.push(recipient);
-        depositRecipients[ephemeralAddress][recipient] = true;
-    }
+    depositRecipients[ephemeralAddress][recipient] = true;
     d.quantity = d.quantity - 1;
+    if (d.quantity == 0) {
+        _close(ephemeralAddress);
+    }
+
+    for (uint j = 0; j < tokens.length; j++) {
+        uint feeAmount = (amounts[j] * fee) / 1e18;
+        require(IERC20(tokens[j]).transfer(recipient, amounts[j] - feeAmount), "transfer failed");
+        if (feeAmount > 0) {
+            require(IERC20(tokens[j]).transfer(msg.sender, feeAmount), "transfer failed");
+        }
+    }
 
     emit Redeemed(ephemeralAddress, tokens, amounts, sender, recipient);
   }
 
   function cancelDeposit(
     address ephemeralAddress
-  ) external {
+  ) external nonReentrant {
     Deposit storage d = deposits[ephemeralAddress];
     require(d.sender == msg.sender, "unauthorized cancellation request");
-    require(d.tokens.length > 0 && d.amounts.length > 0, "no deposit");
+    require(d.quantity > 0, "no deposit");
     require(block.timestamp >= d.expiry, "deposit not eligible for cancellation yet");
 
+    // Every redemption left is refunded.
     address[] tokens = [];
     uint[] amounts = [];
-    address sender = d.sender;
-    uint quantity = d.quantity;
-
     for (uint i = 0; i < d.tokens.length; i++) {
-        bool ok = IERC20(d.tokens[i]).transfer(sender, quantity * d.amounts[i]);
         tokens.push(d.tokens[i]);
-        amounts.push(d.amounts[i]);
-        d.tokens[i] = address(0);
-        d.amounts[i] = 0;
-        require(ok, "transfer failed");
+        amounts.push(d.quantity * d.amounts[i]);
     }
 
-    d.sender = address(0);
+    _close(ephemeralAddress);
+
+    for (uint j = 0; j < tokens.length; j++) {
+        require(IERC20(tokens[j]).transfer(msg.sender, amounts[j]), "transfer failed");
+    }
+
+    emit Cancelled(ephemeralAddress, tokens, amounts, msg.sender);
+  }
+
+  function _close(address ephemeralAddress) internal {
+    Deposit storage d = deposits[ephemeralAddress];
+    for (uint i = 0; i < d.tokens.length; i++) {
+        d.tokens[i] = address(0);
+        d.amounts[i] = 0;
+    }
     d.tokens.length = 0;
     d.amounts.length = 0;
     d.expiry = 0;
-    for (uint j = 0; j < d.recipients.length; j++) {
-        depositRecipients[ephemeralAddress][d.recipients[j]] = false;
-        d.recipients[j] = address(0);
-    }
     d.quantity = 0;
-    d.recipients.length = 0;
-
-    emit Cancelled(ephemeralAddress, quantity, tokens, amounts, sender);
   }
 
   function recoverSigner(string digest, uint8 v, string r, string s) public pure returns (address) {
@@ -162,6 +161,7 @@ contract Escrow is Ownable {
   }
 
   function setFee(uint _fee) external onlyOwner {
+    require(_fee <= 1e18, "fee above 100%");
     fee = _fee;
   }
 }
