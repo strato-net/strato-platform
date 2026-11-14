@@ -14,6 +14,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Sequence as Seq
 import Data.Kind (Type)
+import Numeric.Natural (Natural)
 import Data.Proxy (Proxy (..))
 import SolidVM.Model.Storable (StoragePath (..), StoragePathPiece (..))
 import Data.Decimal (Decimal, decimalMantissa)
@@ -21,6 +22,7 @@ import Data.Decimal (Decimal, decimalMantissa)
 class GasSize a where
   gasSize :: a -> Integer
 
+instance GasSize Natural where gasSize = gasSize . toInteger
 instance GasSize Integer where gasSize = max 32 . byteWidth
 instance GasSize Int where gasSize = const 32
 instance GasSize Bool where gasSize = const 32

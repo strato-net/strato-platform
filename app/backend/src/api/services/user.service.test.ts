@@ -3,7 +3,10 @@ import test from "node:test";
 import JSONBig from "json-bigint";
 import { bloc, cirrus, eth, strato } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
+import * as config from "../../config/config";
+import { recoverPersonalSigner } from "../../utils/personalSign";
 import { requestContext } from "../../utils/requestContext";
+import { validatePartnerClaim } from "../validators/user.validator";
 import {
   castVoteOnIssueById,
   createIssue,
@@ -11,6 +14,7 @@ import {
   governedInput,
   ownerInput,
   simulateCastVoteOnIssue,
+  claimPartnerReferral, partnerClaim, partnerClaimMessage,
 } from "./user.service";
 
 const JSONBigString = JSONBig({ storeAsString: true });
@@ -781,4 +785,104 @@ test("keeps quoted variadic renderings verbatim so the node strips exactly one q
   await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
 
   assert.deepEqual(posted[0].args._args, tail);
+});
+
+// --- Partner referral claims by an external wallet ---
+
+// A real wallet signature: viem's signMessage with Hardhat's first test
+// account, over partnerClaimMessage for this code, time and network.
+const wallet = "f39fd6e51aad88f6f4ce6ab8827279cfffb92266";
+const stranger = "70997970c51812dc3a010c7d01b50e0d17dc79c8";
+const claimCode = "ABCDEFGHJK";
+const claimIssuedAt = "2026-11-13T10:00:00.000Z";
+const claimSignature =
+  "0xc5e4a894c5be54ae6439521badbb77d3a83a3ce92a2a5871ecaae33045774b570bc76a87611f215aee10b5474a60abacc61655baaabd6149221883040d99e7531c";
+
+/** The referral service configured and answering `answer` (or unreachable), with the clock `minutes` after the claim was issued. */
+const partnerReferrals = (t: any, minutes: number, answer?: object) => {
+  const previous = { url: config.partnerReferralsUrl, key: config.partnerReferralsKey, name: config.networkName };
+  Object.assign(config, { partnerReferralsUrl: "http://referrals.test", partnerReferralsKey: "k".repeat(32), networkName: "upquark" });
+  t.after(() => Object.assign(config, { partnerReferralsUrl: previous.url, partnerReferralsKey: previous.key, networkName: previous.name }));
+  t.mock.timers.enable({ apis: ["Date"], now: Date.parse(claimIssuedAt) + minutes * 60_000 });
+  const requests: { url: string; method: string; body: any; authorization: string }[] = [];
+  t.mock.method(globalThis, "fetch", async (url: string, init: any) => {
+    requests.push({ url, method: init.method, body: init.body && JSON.parse(init.body), authorization: init.headers.Authorization });
+    if (!answer) throw new TypeError("fetch failed");
+    return new Response(JSON.stringify(answer), { status: 200 });
+  });
+  return requests;
+};
+
+test("partner claim: the signer is recovered from a wallet's personal_sign signature", (t) => {
+  partnerReferrals(t, 1);
+  const message = partnerClaimMessage(claimCode, wallet, claimIssuedAt);
+  assert.equal(recoverPersonalSigner(message, claimSignature), wallet);
+  // Hardware wallets send v as 0/1 rather than 27/28
+  assert.equal(recoverPersonalSigner(message, `${claimSignature.slice(0, -2)}01`), wallet);
+  // Another code, wallet or time is another message: the signature recovers someone else
+  for (const other of [partnerClaimMessage("ZZZZZZZZZZ", wallet, claimIssuedAt), partnerClaimMessage(claimCode, stranger, claimIssuedAt), partnerClaimMessage(claimCode, wallet, "2026-11-13T10:00:00.001Z")]) {
+    const signer = recoverPersonalSigner(other, claimSignature);
+    assert.ok(signer !== wallet && signer !== stranger);
+  }
+  // Not a 65-byte r, s, v signature: 64 and 66 bytes (a contract wallet's is longer still), an impossible v, a zero r and s
+  for (const malformed of [claimSignature.slice(0, -2), `${claimSignature}00`, `${claimSignature.slice(0, -2)}1d`, `0x${"00".repeat(64)}1b`, "nonsense"]) {
+    assert.equal(recoverPersonalSigner(message, malformed), null);
+  }
+});
+
+test("partner claim: fields are normalized so that both requests rebuild one message", () => {
+  const asSent = validatePartnerClaim({ address: "0xF39Fd6e51aad88F6F4ce6aB8827279cffFb92266", code: "abcdefghjk" }, false);
+  assert.deepEqual(asSent, { address: wallet, code: claimCode });
+  assert.throws(() => validatePartnerClaim({ address: wallet, code: "not a code" }, false), /Partner Claim Validation Error/);
+  assert.throws(() => validatePartnerClaim({ address: "0x1234", code: claimCode }, false), /Partner Claim Validation Error/);
+  assert.throws(() => validatePartnerClaim({ address: wallet, code: claimCode, issuedAt: "today", signature: claimSignature }, true), /Partner Claim Validation Error/);
+  assert.throws(() => validatePartnerClaim({ address: wallet, code: claimCode, issuedAt: claimIssuedAt }, true), /Partner Claim Validation Error/);
+});
+
+test("partner claim: a wallet is given a message only when the service would record it", async (t) => {
+  const requests = partnerReferrals(t, 0, { claimable: true });
+  assert.deepEqual(await partnerClaim(claimCode, wallet), { message: partnerClaimMessage(claimCode, wallet, claimIssuedAt), issuedAt: claimIssuedAt });
+  assert.deepEqual(requests, [
+    { url: `http://referrals.test/partner-api/referrals/signups?code=${claimCode}&account=${wallet}`, method: "GET", body: undefined, authorization: `Bearer ${"k".repeat(32)}` },
+  ]);
+});
+
+test("partner claim: no message for a code or wallet the service would not record", async (t) => {
+  partnerReferrals(t, 0, { claimable: false });
+  assert.equal(await partnerClaim(claimCode, wallet), null);
+});
+
+test("partner claim: a signed claim is recorded once, to count from now", async (t) => {
+  const requests = partnerReferrals(t, 2, { recorded: true });
+  assert.equal(await claimPartnerReferral(claimCode, wallet, claimIssuedAt, claimSignature), true);
+  assert.deepEqual(requests, [
+    {
+      url: "http://referrals.test/partner-api/referrals/signups",
+      method: "POST",
+      body: { code: claimCode, account: wallet, since: "2026-11-13T10:02:00.000Z" },
+      authorization: `Bearer ${"k".repeat(32)}`,
+    },
+  ]);
+});
+
+test("partner claim: another wallet's signature, or an expired or post-dated message, records nothing", async (t) => {
+  const requests = partnerReferrals(t, 2, { recorded: true });
+  await assert.rejects(claimPartnerReferral(claimCode, stranger, claimIssuedAt, claimSignature), { status: 400, message: /not signed by this wallet/ });
+  await assert.rejects(claimPartnerReferral("ZZZZZZZZZZ", wallet, claimIssuedAt, claimSignature), { status: 400, message: /not signed by this wallet/ });
+  t.mock.timers.setTime(Date.parse(claimIssuedAt) + 11 * 60_000);
+  await assert.rejects(claimPartnerReferral(claimCode, wallet, claimIssuedAt, claimSignature), { status: 400, message: /expired/ });
+  t.mock.timers.setTime(Date.parse(claimIssuedAt) - 2 * 60_000);
+  await assert.rejects(claimPartnerReferral(claimCode, wallet, claimIssuedAt, claimSignature), { status: 400, message: /expired/ });
+  assert.equal(requests.length, 0);
+});
+
+test("partner claim: an unreachable or unconfigured service is a 503, after a single attempt", async (t) => {
+  const requests = partnerReferrals(t, 1);
+  await assert.rejects(claimPartnerReferral(claimCode, wallet, claimIssuedAt, claimSignature), { status: 503 });
+  await assert.rejects(partnerClaim(claimCode, wallet), { status: 503 });
+  assert.deepEqual(requests.map((r) => r.method), ["POST", "GET"]);
+  Object.assign(config, { partnerReferralsUrl: undefined });
+  await assert.rejects(claimPartnerReferral(claimCode, wallet, claimIssuedAt, claimSignature), { status: 503 });
+  await assert.rejects(partnerClaim(claimCode, wallet), { status: 503 });
+  assert.equal(requests.length, 2);
 });

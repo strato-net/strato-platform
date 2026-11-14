@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds, TypeFamilies #-}
 module SolidVM.Runtime where
 
+import Blockchain.Data.RLP (RLPObject)
 import Blockchain.SolidVM.SM (SM)
 import Blockchain.Strato.Model.Address (Address)
 import qualified Data.ByteString as B
@@ -13,6 +14,7 @@ messageSignature :: SM T.Text
 messageArguments :: SM [Dyn]
 callContract :: CallKind -> Address -> T.Text -> [Dyn] -> Maybe SomeTy -> SM [Dyn]
 encodeArguments :: Bool -> [Dyn] -> SM B.ByteString
+hashInput :: [Dyn] -> SM (Either B.ByteString RLPObject)
 createCode :: Maybe Dyn -> T.Text -> T.Text -> [Dyn] -> SM Address
 derive :: Address -> T.Text -> T.Text -> [Dyn] -> SM Address
 createContract :: T.Text -> Maybe (SM Dyn) -> SM [Dyn] -> SM Address

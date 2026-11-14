@@ -9,6 +9,8 @@ import JSONBig from "json-bigint";
 import { normalizeLegacyEscapes, repairStructuredJson } from "../helpers/jsonStringParsing.helper";
 import { FunctionInput } from "../../types/types";
 import { validateAddressField } from "../validators/common.validators";
+import { partnerReferralsUrl, partnerReferralsKey, networkName, networkId } from "../../config/config";
+import { recoverPersonalSigner } from "../../utils/personalSign";
 import { requestContext } from "../../utils/requestContext";
 const { AdminRegistry, adminRegistry, DAY_MS } = constants;
 const JSONBigString = JSONBig({ storeAsString: true });
@@ -23,6 +25,111 @@ type AbiType = {
   actual?: AbiType;
   contents?: string;
   typedef?: string;
+};
+
+/** One request to the partner referrals service's internal signups endpoint: a signup to record, or a query. */
+const partnerSignups = (query: string, signup?: object): Promise<Response> =>
+  fetch(`${partnerReferralsUrl}/partner-api/referrals/signups${query}`, {
+    method: signup ? "POST" : "GET",
+    headers: { Authorization: `Bearer ${partnerReferralsKey}`, ...(signup ? { "Content-Type": "application/json" } : {}) },
+    body: signup && JSON.stringify(signup),
+    signal: AbortSignal.timeout(5000),
+  });
+
+/**
+ * Records the partner referral code a new account signed up with. Not
+ * awaited: a signup never waits on, or fails with, the partner referrals
+ * service. While the service cannot be reached the call is tried again, for
+ * up to a day. The first failure and a final one are logged with the code,
+ * account and signup time, which is what it takes to replay the signup by
+ * hand. The signup time is sent along, so a signup that arrives late still
+ * counts in the period it happened in.
+ */
+export const recordPartnerReferral = async (code: string, account: string, email?: string): Promise<void> => {
+  if (!partnerReferralsUrl || !partnerReferralsKey) return;
+  const signedUpAt = new Date().toISOString();
+  const giveUpAt = Date.now() + DAY_MS;
+  for (let attempt = 1; ; attempt++) {
+    let failure: unknown;
+    let refused = false;
+    try {
+      const res = await partnerSignups("", { code, account, email, signed_up_at: signedUpAt });
+      if (res.ok) {
+        if (attempt > 1) console.info("Partner referral recorded on attempt %d (code %s, account %s)", attempt, code, account);
+        return;
+      }
+      failure = `HTTP ${res.status}`;
+      // Refused, not unavailable: trying again would be refused the same way
+      refused = res.status < 500 && res.status !== 429;
+    } catch (error) {
+      failure = error;
+    }
+    const final = refused || Date.now() >= giveUpAt;
+    if (attempt === 1 || final) console.error("Partner referral not recorded%s (code %s, account %s, signed up %s):", final ? "" : " yet", code, account, signedUpAt, failure);
+    if (final) return;
+    await new Promise((resolve) => setTimeout(resolve, Math.min(4 ** attempt * 1000, 5 * 60 * 1000)));
+  }
+};
+
+// A wallet confirms a referral with the message it was just given: one
+// issued up to ten minutes ago, with a minute's allowance between clocks.
+const CLAIM_MAX_AGE_MS = 10 * 60 * 1000;
+const CLAIM_MAX_AHEAD_MS = 60 * 1000;
+
+const partnerReferralsUnavailable = () => new StratoError("Partner referrals are unavailable", 503);
+
+/**
+ * The text an external wallet signs to confirm that a partner code referred
+ * it. `address` is 40 lowercase hex characters. Always built here, for the
+ * wallet to sign and again to check what it signed: never taken from a
+ * caller.
+ */
+export const partnerClaimMessage = (code: string, address: string, issuedAt: string): string =>
+  [
+    "STRATO referral",
+    "",
+    `I confirm that I was referred by code ${code}.`,
+    "Signing is free and sends no transaction.",
+    "",
+    `Wallet: 0x${address}`,
+    `Network: ${networkName ?? networkId}`,
+    `Issued: ${issuedAt}`,
+  ].join("\n");
+
+/**
+ * What the wallet at `address` signs to confirm `code`, or null when there
+ * is nothing to confirm: no partner issued the code, the wallet is the
+ * code owner's own, or it is referred already. Asked before the wallet is
+ * prompted, so that a visitor is not asked to sign for nothing.
+ */
+export const partnerClaim = async (code: string, address: string): Promise<{ message: string; issuedAt: string } | null> => {
+  if (!partnerReferralsUrl || !partnerReferralsKey) throw partnerReferralsUnavailable();
+  const res = await partnerSignups(`?code=${code}&account=${address}`).catch(() => null);
+  if (!res?.ok) throw partnerReferralsUnavailable();
+  if (!(await res.json()).claimable) return null;
+  const issuedAt = new Date().toISOString();
+  return { message: partnerClaimMessage(code, address, issuedAt), issuedAt };
+};
+
+/**
+ * Records the referral an external wallet confirmed by signing
+ * partnerClaimMessage, to count from now on. The signature is the only proof
+ * that the caller owns `address` (the wallet header on the request is not
+ * one), so the signer is recovered from the message as rebuilt here. One
+ * awaited call rather than recordPartnerReferral's retries: signing with a
+ * fresh key costs nothing, so a retry loop per claim could be piled up
+ * without limit while the service is down.
+ */
+export const claimPartnerReferral = async (code: string, address: string, issuedAt: string, signature: string): Promise<boolean> => {
+  const age = Date.now() - Date.parse(issuedAt);
+  if (!(age <= CLAIM_MAX_AGE_MS && age >= -CLAIM_MAX_AHEAD_MS)) throw new StratoError("The referral message has expired");
+  if (recoverPersonalSigner(partnerClaimMessage(code, address, issuedAt), signature) !== address) {
+    throw new StratoError("The referral message is not signed by this wallet");
+  }
+  if (!partnerReferralsUrl || !partnerReferralsKey) throw partnerReferralsUnavailable();
+  const res = await partnerSignups("", { code, account: address, since: new Date().toISOString() }).catch(() => null);
+  if (!res?.ok) throw partnerReferralsUnavailable();
+  return (await res.json()).recorded === true;
 };
 
 export const isUserAdmin = async (

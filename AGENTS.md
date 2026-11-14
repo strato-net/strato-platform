@@ -13,6 +13,13 @@
 - Tab switches use true crossfades (both panels rendered, opacity toggle); network/data switches should NOT animate -- just swap data in place; skeleton loaders only for genuinely async first-loads, never for cached data; data must be ready before animation starts; hide scrollbars with CSS when users want no visible track, not by forcing `overflow-hidden` if the area must still scroll
 - When adding derived/weighted APY sources or new computations, fold them into existing loops and widen existing Cirrus selects rather than adding extra passes or extra API calls; avoid unnecessary `useEffect` and prefer derived state, event handlers, or `useMemo`; user explicitly dislikes effect-heavy code
 
+## Consensus and language compatibility exceptions (STRICT)
+
+- Never add or broaden an exception to SolidVM or native compiler language rules merely to make historical chain replay or sync succeed without first discussing it with the user and obtaining explicit approval.
+- This includes accepting incorrect return types, bypassing validation, and preserving buggy historical behavior through special execution paths. Authorization to implement a feature, fix a bug, or run sync tests does not authorize these exceptions.
+- Before proposing an exception, explain the intended rule, the concrete historical behavior that conflicts with it, and the compatibility impact. Present contract fixes and coordinated hard fork activation as alternatives where applicable, and explain how any proposed exception could later be removed.
+- If an existing undisclosed exception is discovered, report it to the user before extending or relying on it as the solution.
+
 ## Node lifecycle & test runs (STRICT — no exceptions)
 
 - Stop the node ONLY with `strato-down`; start it ONLY with `strato-up`. Never stop/start/kill/manage individual components (no `convoke`, no `strato-p2p`, no manual process management).

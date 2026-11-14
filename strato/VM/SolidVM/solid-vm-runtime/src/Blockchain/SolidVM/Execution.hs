@@ -25,7 +25,7 @@ import SolidVM.Model.Value (Value, Variable, ValList)
 data Interpreted
 data Native
 
-class (MonadIO m, MonadLogger m, HasAccountDB m, Mod.Modifiable [CallInfo] m) => MonadContractCreation engine m where
+class (MonadIO m, MonadLogger m, HasAccountDB m, Mod.Modifiable [CallInfo] m, Mod.Accessible Env.Environment m) => MonadContractCreation engine m where
   prepareContractSource :: String -> m (Keccak256, CodeCollection)
   runContractConstructor :: Address -> Address -> Keccak256 -> CodeCollection -> SolidString -> ValList -> m ExecResults
 

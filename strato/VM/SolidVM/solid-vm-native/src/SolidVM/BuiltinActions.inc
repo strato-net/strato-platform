@@ -1,5 +1,4 @@
       \case
-        "keccak256" -> Just hashCall
         "ecrecover" -> Just recoverCall
         "addmod" -> Just (pure (SomeFunction (SigCons TInt (SigCons TInt (SigCons TInt (SigNil TInt)))) (EMIT_BEGIN Builtins.addmodValue EMIT_END)))
         "mulmod" -> Just (pure (SomeFunction (SigCons TInt (SigCons TInt (SigCons TInt (SigNil TInt)))) (EMIT_BEGIN Builtins.mulmodValue EMIT_END)))
