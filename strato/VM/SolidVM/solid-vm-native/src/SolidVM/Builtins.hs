@@ -13,7 +13,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Decimal
 import Data.Foldable (toList)
-import Data.List (sortOn)
 import qualified Data.Text as T
 import {-# SOURCE #-} qualified SolidVM.Runtime as Runtime
 import {-# SOURCE #-} qualified SolidVM.Blockchain as Blockchain
@@ -107,37 +106,7 @@ recover ds = case flatten ds of
   xs -> bad "ecrecover" xs
 
 keccak :: [Dyn] -> SM Dyn
-keccak ds = case flatten ds of
-  [Dyn TBytes bs] -> Dyn TBytes <$> Metered.keccak256 bs
-  xs -> Dyn TStr <$> keccakValue (encodeValues xs)
-
-encodeValues :: [Dyn] -> RLPObject
-encodeValues [d] = encodeValue d
-encodeValues ds = RLPArray (map encodeValue ds)
-
-encodeValue :: Dyn -> RLPObject
-encodeValue (Dyn ty v) = case ty of
-  TInt -> rlpEncode v
-  TDecimal -> rlpEncode (show v)
-  TBool -> rlpEncode v
-  TAddr -> rlpEncode v
-  TStr -> rlpEncode (T.unpack v)
-  TBytes -> rlpEncode v
-  TEnum _ _ -> rlpEncode (enumNumber v)
-  TWireEnum _ _ -> rlpEncode v
-  TStruct _ fs -> RLPArray (map (encodeValue . snd) (sortOn fst (fields fs v)))
-  TTuple fs -> RLPArray (map encodeValue (toDyns fs v))
-  TArr et -> RLPArray (map (encodeValue . Dyn et) (toList v))
-  TWireArray -> RLPArray (map encodeValue v)
-  TVariadic -> encodeValues v
-  TRaw -> case v of [] -> rlpEncode (0 :: Integer); _ -> encodeValues v
-  TUnit -> rlpEncode (0 :: Integer)
-  TRef _ -> rlpEncode (0 :: Integer)
-  _ -> RLPArray []
-  where
-    fields :: Fields ts -> HL ts -> [(T.Text, Dyn)]
-    fields FNil HNil = []
-    fields (FCons n t rest) (x :* xs) = (n, Dyn t x) : fields rest xs
+keccak ds = Runtime.hashInput (flatten ds) >>= either (fmap (Dyn TBytes) . Metered.keccak256) (fmap (Dyn TStr) . keccakValue)
 
 addmodValue, mulmodValue :: Integer -> Integer -> Integer -> SM Integer
 addmodValue = Metered.addmod
@@ -237,43 +206,6 @@ keccakValue :: RLPObject -> SM T.Text
 keccakValue = fmap T.pack . Metered.keccak256Hex
 
 -- These factories select and compose typed encoders once, while compiling.
-rlpEncoder :: Ty a -> a -> RLPObject
-rlpEncoder t = case t of
-  TInt -> rlpEncode
-  TDecimal -> rlpEncode . show
-  TBool -> rlpEncode
-  TAddr -> rlpEncode
-  TStr -> rlpEncode . T.unpack
-  TBytes -> rlpEncode
-  TEnum _ _ -> rlpEncode . enumNumber
-  TWireEnum _ _ -> rlpEncode
-  TStruct _ fields -> fieldEncoder $ map snd $ sortOn fst $ rlpFields fields
-  TTuple fields -> fieldEncoder $ map snd $ rlpFields fields
-  TArr element -> let encodeElement = rlpEncoder element in encodeElement `seq` RLPArray . map encodeElement . toList
-  TVariadic -> encodeValues
-  TRaw -> \values -> case values of [] -> rlpEncode (0 :: Integer); _ -> encodeValues values
-  TWireArray -> RLPArray . map encodeValue
-  TUnit -> const $ rlpEncode (0 :: Integer)
-  TRef _ -> const $ rlpEncode (0 :: Integer)
-  _ -> const $ RLPArray []
-  where
-    fieldEncoder :: [b -> RLPObject] -> b -> RLPObject
-    fieldEncoder encoders = let encodeFields = combine encoders in encodeFields `seq` RLPArray . encodeFields
-    combine :: [b -> RLPObject] -> b -> [RLPObject]
-    combine [] = const []
-    combine (encodeField : encoders) =
-      let next = combine encoders
-      in encodeField `seq` next `seq` \values -> encodeField values : next values
-
-rlpFields :: Fields as -> [(T.Text, HL as -> RLPObject)]
-rlpFields FNil = []
-rlpFields (FCons name t fields) =
-  let encodeField = rlpEncoder t
-      first = encodeField `seq` \(value :* _) -> encodeField value
-      tailField :: (HL bs -> RLPObject) -> HL (b ': bs) -> RLPObject
-      tailField encodeTail = encodeTail `seq` \(_ :* values) -> encodeTail values
-  in (name, first) : [(n, tailField encoder) | (n, encoder) <- rlpFields fields]
-
 abiEncoder :: Bool -> Ty a -> a -> SM (Bool, B.ByteString)
 abiEncoder packed t = case t of
   TInt -> scalar ABI.encodeInt256
@@ -327,10 +259,3 @@ arguments convert (FCons _ t fields) =
   let first = convert t
       remaining = arguments convert fields
   in first `seq` remaining `seq` \(value :* values) -> (:) <$> first value <*> remaining values
-
-rlpArgument :: Ty a -> a -> SM RLPObject
-rlpArgument t = let encoder = rlpEncoder t in encoder `seq` pure . encoder
-
-rlpArguments :: [RLPObject] -> RLPObject
-rlpArguments [value] = value
-rlpArguments values = RLPArray values

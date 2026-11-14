@@ -1496,7 +1496,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   (hsh, cc) <- getCurrentCodeCollection
   salt <- getVar =<< expToVar saltExpression
   argVals <- argsToVals args
-  newAddress <- getNewAddressWithSalt creator salt hsh (SString (labelToString contractName') : argVals)
+  newAddress <- getNewAddressWithSalt creator salt hsh =<< rlpForkValues (SString (labelToString contractName') : argVals)
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
   execResults <- create' creator newAddress hsh cc contractName' argVals
   onTraced $ do
@@ -1559,12 +1559,13 @@ expToVar' (CC.FunctionCall _ e args) = do
                       SVariadic v : rest -> reverse rest ++ v
                       _ -> vs
                     _ -> throw (TypeError "derive: first two arguments must be contract name and salt " $ intercalate ", " (map unparseExpression args))
-                  newAddress =
+              encodedArgs <- rlpForkValues args''
+              let newAddress =
                     getNewAddressWithSalt_unsafe
                       addr
                       salt
                       (keccak256ToByteString hsh)
-                      args''
+                      encodedArgs
               onTraced $ do
                 liftIO $
                   putStrLn $
@@ -2275,7 +2276,7 @@ callBuiltin "__solidvm_normalizeHex" [SString input] =
 callBuiltin "__solidvm_normalizeHex" args = throw (TypeError "normalizeHex" $ format (map renderValueShallow args))
 callBuiltin "log" args = SNULL <$ Builtin.log @Interpreted args
 callBuiltin "keccak256" [SBytes bs] = SBytes <$> Builtin.keccak256 bs
-callBuiltin "keccak256" args = SString <$> Builtin.keccak256Hex (rlpEncodeValues args)
+callBuiltin "keccak256" args = SString <$> (Builtin.keccak256Hex . rlpEncodeValues =<< rlpForkValues args)
 callBuiltin "ecrecover" [h', v', r', s'] = do
     bytestringHash <- getBytesVal h'
     v <- int v'
@@ -2300,9 +2301,9 @@ callBuiltin "verifyP256" (h' : r' : s' : p') = do
         _ -> throw (InvalidArguments "Could not decode public key: invalid value" (T.unpack (renderValueShallow pub')))
       _ -> throw (InvalidArguments "Invalid arguments for P-256 public key" (format (map renderValueShallow p')))
 callBuiltin "sha256" [SBytes bs] = SBytes <$> Builtin.sha256 bs
-callBuiltin "sha256" args = SString <$> Builtin.hashHex PureHashing.sha256 (rlpEncodeValues args)
+callBuiltin "sha256" args = SString <$> (Builtin.hashHex PureHashing.sha256 . rlpEncodeValues =<< rlpForkValues args)
 callBuiltin "ripemd160" [SBytes bs] = SBytes <$> Builtin.ripemd160 bs
-callBuiltin "ripemd160" args = SString <$> Builtin.hashHex PureHashing.ripemd160 (rlpEncodeValues args)
+callBuiltin "ripemd160" args = SString <$> (Builtin.hashHex PureHashing.ripemd160 . rlpEncodeValues =<< rlpForkValues args)
 callBuiltin "base64encode" [SBytes bs] = SBytes <$> Builtin.base64encode bs
 callBuiltin "base64encode" [SString s] = SString <$> Builtin.base64String PureHashing.base64encode s
 callBuiltin "base64urlencode" [SBytes bs] = SBytes <$> Builtin.base64urlencode bs

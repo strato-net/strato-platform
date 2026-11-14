@@ -21,7 +21,7 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.DB.AddressStateDB (HasAccountDB)
 import Blockchain.DB.StorageDB (HasMemStorageDB)
 import Blockchain.DB.ModifyStateDB (pay)
-import Blockchain.SolidVM.SM (CallInfo, getCurrentAddress)
+import Blockchain.SolidVM.SM (CallInfo, getCurrentAddress, rlpForkValues)
 import Blockchain.VMContext (purgeStorageMap)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -55,7 +55,7 @@ createContract salt name source args
       (hsh, cc) <- prepareContractSource @engine source
       address <- case salt of
         Nothing -> getNewAddress creator
-        Just value -> getNewAddressWithSalt creator value hsh (SString name : args)
+        Just value -> getNewAddressWithSalt creator value hsh =<< rlpForkValues (SString name : args)
       result <- runContractConstructor @engine creator address hsh cc (stringToLabel name) args
       --Need to check that this is a UserRegistry contract before creating cirrus table!  Add this code
 

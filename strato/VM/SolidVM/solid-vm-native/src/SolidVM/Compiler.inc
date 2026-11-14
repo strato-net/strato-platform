@@ -564,9 +564,6 @@ compileExpressionBody sc chargeDestination e = case e of
     isArrayTy :: Ty.Type -> Bool
     isArrayTy = \case Ty.Array{} -> True; _ -> False
 
-    isSeqLike :: Ty t -> Bool
-    isSeqLike = \case TArr _ -> True; TStr -> True; TBytes -> True; _ -> False
-
     incr :: Bool -> Expression -> Integer -> C (CE ls)
     incr prefix x d = do
       Destination t prepare <- compileDestination sc True x
@@ -1384,7 +1381,11 @@ compileCall sc callee args = case callee of
     [x] | Right (CE TBytes f) <- compileE sc x -> pure $ CE TBytes (CAPTURE f $ \compiled_0 ->
       EMIT_BEGIN (\env -> compiled_0 env >>= Metered.keccak256)
       EMIT_END)
-    _ -> builtinCall TStr "keccak256"
+    _ -> do
+      f <- hashArgs args
+      pure $ CE TStr (CAPTURE f $ \compiled_0 ->
+        EMIT_BEGIN (\env_1 -> compiled_0 env_1 >>= Builtins.keccak >>= fromDyn TStr)
+        EMIT_END)
   S.MemberAccess _ (S.Variable _ "abi") member ->
     fromMaybe (unknown ("builtin abi." <> member)) (lookupBuiltinCall sc True ("abi." <> member) args)
   S.MemberAccess _ target "derive" -> deriveCall target
@@ -1614,7 +1615,7 @@ compileCall sc callee args = case callee of
 
     deriveCall target = do
       addressF <- compileAs sc TAddr target
-      argsF <- dynArgs args
+      argsF <- hashArgs args
       pure $ CE TAddr $ (CAPTURE2 argsF addressF $ \compiled_0 compiled_1 ->
         EMIT_BEGIN (\env_2 -> do {ds_3 <- compiled_0 env_2;
         address_4 <- compiled_1 env_2;
@@ -1680,6 +1681,7 @@ compileCall sc callee args = case callee of
     typedArgs = compileTypedArgs sc
 
     dynArgs = compileDynArgs sc
+    hashArgs = compileHashArgs sc
 
 #include "BuiltinCalls.inc"
 
@@ -1712,7 +1714,44 @@ compileDynArgs sc [x] = do
       EMIT_END)
 compileDynArgs sc xs = do
   fs <- forM xs $ \x -> do CE t f <- compileE sc x; pure (functionMap (primitiveCode (DynPrimitive t)) f)
-  pure $ (CAPTURES fs $ \compiled_0 ->
+  pure $ combineDynArgs fs
+
+-- | Arguments of keccak256 and derive, evaluated as by 'compileDynArgs' except
+-- that a storage location is passed as a 'TRef' to its path. The runtime reads
+-- its slot as the interpreter does, so an empty slot (a zero scalar, or the root
+-- of an array, struct or mapping) stays a reference. A length or bounds-checked
+-- read is an integer, which encodes the same either way. A storage alias
+-- variable reaches the interpreter unread, so it is passed as 0, which is how a
+-- reference encodes. Each argument is charged as 'compileE' charges an expression.
+compileHashArgs :: Scope ls r -> [Expression] -> C (Code (Env ls -> SM [Dyn]))
+compileHashArgs sc xs = do
+  fs <- forM xs $ \x -> case (x, compileAliasLV sc x, compileStorage' sc x) of
+    (S.InlineBoundsCheck{}, _, _) -> dynArg x
+    (S.MemberAccess _ p "length", _, _) | Right (CE t _) <- compileE sc p, isSeqLike t -> dynArg x
+    (S.Variable{}, Right _, Right _) -> do
+      Destination t prepare <- compileDestination sc False x
+      pure (functionAfter 1 (CAPTURE2 prepare (primitiveCode (DynPrimitive t)) $ \compiled_0 compiled_1 ->
+        EMIT_BEGIN (\env_2 -> do {(path_3, get_4, _) <- compiled_0 env_2;
+        maybe (compiled_1 <$> get_4) (const (pure (Dyn TInt 0))) path_3})
+        EMIT_END))
+    (_, Right _, Right (st, _)) -> do
+      Destination t prepare <- compileDestination sc False x
+      pure (functionAfter 1 (CAPTURE3 prepare (primitiveCode (DynPrimitive t)) (primitiveCode (DynPrimitive (TRef st))) $ \compiled_0 compiled_1 compiled_2 ->
+        EMIT_BEGIN (\env_3 -> do {(path_4, get_5, _) <- compiled_0 env_3;
+        maybe (compiled_1 <$> get_5) (pure . compiled_2) path_4})
+        EMIT_END))
+    (_, _, Right (st, pathOf)) -> pure (functionAfter 1 (functionMap (primitiveCode (DynPrimitive (TRef st))) pathOf))
+    _ -> dynArg x
+  pure $ combineDynArgs fs
+  where
+    dynArg x = do CE t f <- compileE sc x; pure (functionMap (primitiveCode (DynPrimitive t)) f)
+
+isSeqLike :: Ty t -> Bool
+isSeqLike = \case TArr _ -> True; TStr -> True; TBytes -> True; _ -> False
+
+combineDynArgs :: [Code (Env ls -> SM Dyn)] -> Code (Env ls -> SM [Dyn])
+combineDynArgs fs =
+  (CAPTURES fs $ \compiled_0 ->
     EMIT_BEGIN (\env_1 -> mapM ($ env_1) compiled_0 >>= (\values_2 -> pure $ (case reverse values_2 of
     {Dyn (TVariadic)
     remaining_3 : rest_4 -> reverse rest_4 ++ remaining_3;

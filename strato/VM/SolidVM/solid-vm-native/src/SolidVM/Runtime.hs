@@ -5,9 +5,10 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module SolidVM.Runtime (compiledContract, compiledFunction, constructorStage, runAction, getCodeAndCollection, internalFrame, messageSignature, messageArguments, callContract, encodeArguments, createCode, derive, createContract, copyStorage, emitContractEvent, previousBlock, proposer) where
+module SolidVM.Runtime (compiledContract, compiledFunction, constructorStage, runAction, getCodeAndCollection, internalFrame, messageSignature, messageArguments, callContract, encodeArguments, hashInput, createCode, derive, createContract, copyStorage, emitContractEvent, previousBlock, proposer) where
 
 import SolidVM.Model.Storable (StoragePath)
+import Blockchain.Data.RLP (RLPObject)
 import qualified Data.ByteString as B
 import qualified Control.Monad.Change.Modify as Mod
 import {-# SOURCE #-} qualified SolidVM.Blockchain as Blockchain
@@ -184,8 +185,17 @@ createCode salt name source args = unwind $ do
   values <- traverse toValue args
   Blockchain.createCode saltValue name source values
 
+-- | keccak256 input as the interpreter builds it: raw bytes, or the RLP of the
+-- values with storage references read as the interpreter reads them.
+hashInput :: [N.Dyn] -> SM (Either B.ByteString RLPObject)
+hashInput args = do
+  values <- traverse (getVar . Constant <=< toValue) args
+  case values of
+    [SBytes bs] -> pure (Left bs)
+    _ -> Right . rlpEncodeValues <$> rlpForkValues values
+
 derive :: Address -> T.Text -> T.Text -> [N.Dyn] -> SM Address
-derive creator salt name args = Blockchain.derive creator salt name =<< traverse toValue args
+derive creator salt name args = Blockchain.derive creator salt name =<< traverse (getVar . Constant <=< toValue) args
 
 createContract :: T.Text -> Maybe (SM N.Dyn) -> SM [N.Dyn] -> SM Address
 createContract name salt args = unwind $
