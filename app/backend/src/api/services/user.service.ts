@@ -366,23 +366,25 @@ const parseVariadicArg = (text: string): any => {
 const formatArg = (type: AbiType, value: any): any => {
   const typeName = solidityTypeName(type);
   if (value === undefined) {
-    throw new Error(`Missing ${typeName || "function"} argument`);
+    throw new StratoError(`Missing ${typeName || "function"} argument`);
   }
 
   switch (type.tag) {
     case "String":
       return String(value);
     case "Int": {
-      const integer = String(value).trim();
-      if (!/^-?\d+$/.test(integer) || (!type.signed && integer.startsWith("-"))) {
-        throw new Error(`Invalid ${typeName}: ${value}`);
+      // Accepts the node's own integer literal forms, e.g. 20000e18, expanded exactly so
+      // either spelling hashes to the same issueId
+      const match = /^(-?\d+)(?:[eE](\d{1,2}))?$/.exec(String(value).trim());
+      if (!match || (!type.signed && match[1].startsWith("-"))) {
+        throw new StratoError(`Invalid ${typeName}: ${value}`);
       }
-      return JSONBigNumber.parse(integer);
+      return JSONBigNumber.parse((BigInt(match[1]) * 10n ** BigInt(match[2] ?? 0)).toString());
     }
     case "Decimal": {
       const decimal = String(value).trim();
       if (!/^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(decimal)) {
-        throw new Error(`Invalid decimal: ${value}`);
+        throw new StratoError(`Invalid decimal: ${value}`);
       }
       return JSONBigNumber.parse(decimal);
     }
@@ -390,29 +392,29 @@ const formatArg = (type: AbiType, value: any): any => {
       if (typeof value === "boolean") return value;
       if (/^true$/i.test(value)) return true;
       if (/^false$/i.test(value)) return false;
-      throw new Error(`Invalid bool: ${value}`);
+      throw new StratoError(`Invalid bool: ${value}`);
     case "Address":
     case "Account":
     case "Contract": {
       const address = String(value).trim().toLowerCase().replace(/^0x/, "");
       if (!/^[0-9a-f]{1,40}$/.test(address)) {
-        throw new Error(`Invalid address: ${value}`);
+        throw new StratoError(`Invalid address: ${value}`);
       }
       return `0x${address}`;
     }
     case "Bytes": {
       const bytes = String(value).trim().replace(/^0x/, "");
       if (!/^(?:[0-9a-fA-F]{2})*$/.test(bytes) || (type.bytes && bytes.length !== type.bytes * 2)) {
-        throw new Error(`Invalid ${typeName}: ${value}`);
+        throw new StratoError(`Invalid ${typeName}: ${value}`);
       }
       return bytes;
     }
     case "Array": {
       if (!Array.isArray(value)) {
-        throw new Error(`Invalid ${typeName}: expected an array`);
+        throw new StratoError(`Invalid ${typeName}: expected an array`);
       }
       if (type.length !== undefined && value.length !== type.length) {
-        throw new Error(`Invalid ${typeName}: expected ${type.length} values`);
+        throw new StratoError(`Invalid ${typeName}: expected ${type.length} values`);
       }
       return value.map((entry) => formatArg(type.entry || {}, entry));
     }
