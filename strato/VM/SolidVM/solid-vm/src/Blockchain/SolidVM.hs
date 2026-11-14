@@ -762,7 +762,9 @@ runStatement st@(CC.SimpleStatement (CC.ExpressionStatement ep@(CC.Binary _ "=" 
       case indVal of
         SIntegral ind -> do
           when ((ind >= toInteger (V.length fs) || 0 > ind)) (throw (InvalidWrite "Cannot assign a value outside the allocated space for an array" (unparseStatement st)))
-          let newVec = fs V.// [(fromIntegral ind, srcVar)]
+          -- a cell of its own: the source's cell would tie the element to the source
+          cell <- liftIO $ Variable <$> newIORef srcVal
+          let newVec = fs V.// [(fromIntegral ind, cell)]
           setVar pVar (SArray newVec)
           return Nothing
         _ -> throw (TypeError ("array index value (" ++ (T.unpack (renderValueShallow indVal)) ++ ") is not an integer") (unparseStatement st))
@@ -771,7 +773,8 @@ runStatement st@(CC.SimpleStatement (CC.ExpressionStatement ep@(CC.Binary _ "=" 
       case pVar of
         TypedVariable (SVMType.Mapping _ keyType _ _ _) _ -> void $ enforceUnsignedType keyType theIndex
         _ -> pure ()
-      let newMap = M.insert theIndex srcVar theMap
+      cell <- liftIO $ Variable <$> newIORef srcVal
+      let newMap = M.insert theIndex cell theMap
       setVar pVar (SMap newMap)
       return Nothing
     SBytes bs -> do
@@ -1951,7 +1954,9 @@ expToVar' ep@(CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src) =
       case indVal of
         SIntegral ind -> do
           when ((ind >= toInteger (V.length fs) || 0 > ind)) (throw (InvalidWrite "Cannot assign a value outside the allocated space for an array" (unparseExpression ep)))
-          let newVec = fs V.// [(fromIntegral ind, srcVar)]
+          -- a cell of its own: the source's cell would tie the element to the source
+          cell <- liftIO $ Variable <$> newIORef srcVal
+          let newVec = fs V.// [(fromIntegral ind, cell)]
           setVar pVar (SArray newVec)
           return $ Constant $ SBool True
         _ -> throw (TypeError ("array index value (" ++ (T.unpack (renderValueShallow indVal)) ++ ") is not an integer") (unparseExpression ep))
@@ -1960,7 +1965,8 @@ expToVar' ep@(CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src) =
       case pVar of
         TypedVariable (SVMType.Mapping _ keyType _ _ _) _ -> void $ enforceUnsignedType keyType theIndex
         _ -> pure ()
-      let newMap = M.insert theIndex srcVar theMap
+      cell <- liftIO $ Variable <$> newIORef srcVal
+      let newMap = M.insert theIndex cell theMap
       setVar pVar (SMap newMap)
       return $ Constant $ SBool True
     SBytes bs -> do
