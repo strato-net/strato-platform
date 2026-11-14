@@ -6,6 +6,7 @@ import {
   type SimulationResult,
   type TraceFrame,
 } from "@/services/simulation";
+import { voteExecuted } from "@/services/contracts";
 
 interface SimulationResultPanelProps {
   result: SimulationResult | null;
@@ -35,6 +36,13 @@ export function SimulationResultPanel({
 
   const failed = !!error || result?.status !== "Success";
   const message = error || result?.error || "";
+  // A castVoteOnIssue hop reports whether this vote itself crossed the
+  // threshold; the server only attaches an effect to castVoteOnIssue sims, so
+  // gate on that to avoid misreading unrelated boolean returns. A vote that
+  // passes under a timelock delay queues the issue instead of executing it.
+  const executed =
+    result?.effect != null && result.status === "Success" ? voteExecuted(result) : undefined;
+  const queued = result?.events?.some((e) => e.name === "IssueQueued");
   const returned = result?.data?.contents ?? result?.response;
   const traceRoots: TraceFrame[] = !result?.trace
     ? []
@@ -54,6 +62,16 @@ export function SimulationResultPanel({
         {title ? `${title}: ` : "Simulation: "}
         {failed ? "transaction would fail" : "transaction would succeed"}
       </div>
+
+      {typeof executed === "boolean" ? (
+        <div className="mt-1 text-xs text-muted-foreground">
+          {executed
+            ? "Threshold met — this vote executes the next step immediately."
+            : queued
+              ? "Threshold met — the next step is queued until its timelock delay passes."
+              : "Vote recorded — the next step waits for more votes here."}
+        </div>
+      ) : null}
 
       {message ? (
         <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap break-all text-xs text-destructive">
@@ -101,7 +119,9 @@ export function SimulationResultPanel({
     </div>
   );
 
-  // Show backend-supplied nested effects without interpreting protocol-specific returns.
+  // A castVoteOnIssue simulation carries the issue's effect (recursively, for
+  // votes wrapped through nested multisigs); show one panel per hop so the
+  // voter sees the vote tx and every step it would set in motion.
   if (!result?.effect) return panel;
   return (
     <div className="space-y-2">

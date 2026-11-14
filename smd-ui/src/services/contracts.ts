@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { env } from "@/lib/env";
 import { runtime } from "@/lib/env";
+import { strip0x } from "@/services/userWallets";
 
 export interface XabiFunc {
   name: string;
@@ -278,6 +279,42 @@ export async function queryCirrus(table: string, queryString: string) {
   const qs = queryString.startsWith("?") ? queryString.slice(1) : queryString;
   const { data } = await api.get(`${env.CIRRUS_URL}/${table}${qs ? `?${qs}` : ""}`);
   return data;
+}
+
+/** The flat state (`data`) blob a contract's Cirrus storage row holds. */
+async function fetchStorageData(address: string): Promise<Record<string, any>> {
+  const rows = await queryCirrus("storage", `address=eq.${strip0x(address)}&select=data`);
+  const data = Array.isArray(rows) ? rows[0]?.data : undefined;
+  return data && typeof data === "object" ? data : {};
+}
+
+/**
+ * A contract's owner when that owner is a governance registry (one that keeps a
+ * voting threshold, like the AdminRegistry): the contract's owner-only methods must
+ * be voted through `owner.castVoteOnIssue`. "" otherwise.
+ */
+export function useGovernanceOwner(contractAddress?: string | null) {
+  const q = useQuery({
+    queryKey: ["governance-owner", contractAddress],
+    enabled: !!contractAddress,
+    staleTime: 60_000,
+    queryFn: async (): Promise<string> => {
+      const owner = strip0x(String((await fetchStorageData(contractAddress!))["_owner"] ?? ""));
+      if (/^0*$/.test(owner)) return "";
+      const ownerData = await fetchStorageData(owner);
+      return ownerData["defaultVotingThresholdBps"] !== undefined ? owner : "";
+    },
+  });
+  return { owner: q.data ?? "", ...q };
+}
+
+/** castVoteOnIssue's `executed` flag from a resolved or a polled receipt. */
+export function voteExecuted(result: any): unknown {
+  const contents = result?.data?.tag === "Call" ? result.data.contents : null;
+  if (Array.isArray(contents)) return contents[0];
+  const response = result?.txResult?.response ?? result?.response;
+  const first = response?.t === "tup" ? response.v?.[0] : undefined;
+  return first?.t === "bool" ? first.v : undefined;
 }
 
 async function pollTransactionResult(hash: string, maxAttempts = 30): Promise<any> {
