@@ -1,11 +1,11 @@
 import {
   IChartApi,
-  IPanePrimitive,
   IPrimitivePaneRenderer,
   ISeriesApi,
+  ISeriesPrimitive,
   Logical,
-  PaneAttachedParameter,
   PrimitiveHoveredItem,
+  SeriesAttachedParameter,
   SeriesType,
   Time,
 } from "lightweight-charts";
@@ -53,15 +53,6 @@ export interface DrawingInk {
   /** inside a selected drawing's handles */
   surface: string;
   font: string;
-  /** of the BUY and SELL under and over the user's fills */
-  fillFont: string;
-}
-
-/** A trade of the user's own, marked on the chart where and when it filled */
-export interface Fill {
-  time: number;
-  price: number;
-  buy: boolean;
 }
 
 /** The market's drawings, the tool in hand and the selection: what the chart's controls show and change */
@@ -162,17 +153,21 @@ export class DrawingStore {
 }
 
 /**
- * Paints the store's drawings and the user's fills on the chart's price pane, and lets the
- * pointer draw, select, move and reshape drawings. A press that lands on a drawing, or is
- * made with a tool in hand, is kept from the chart, which would otherwise scroll.
+ * Paints the store's drawings over the price series and lets the pointer draw, select,
+ * move and reshape them. A press that lands on a drawing, or is made with a tool in hand,
+ * is kept from the chart, which would otherwise scroll.
+ *
+ * It rides on a series rather than on the pane: the chart paints a pane's own primitives
+ * under its candles, and only a series' primitives over them.
  */
-export class DrawingLayer implements IPanePrimitive<Time> {
+export class DrawingLayer implements ISeriesPrimitive<Time> {
   ink?: DrawingInk;
+  /** the price series on screen: what the layer paints over and reads prices off */
+  private series!: ISeriesApi<SeriesType>;
   private requestUpdate = () => {};
   /** the first candle's time and the seconds per candle: how a time maps to a place on the time axis */
   private first?: number;
   private step = 0;
-  private fills: Fill[] = [];
   /** being drawn from `origin`: its end follows the pointer */
   private pending?: Drawing;
   private origin?: DrawingPoint;
@@ -189,11 +184,9 @@ export class DrawingLayer implements IPanePrimitive<Time> {
 
   constructor(
     private chart: IChartApi,
-    private series: ISeriesApi<SeriesType>,
     private element: HTMLElement,
     private store: DrawingStore
   ) {
-    chart.panes()[0].attachPrimitive(this);
     element.addEventListener("pointerdown", this.press, true);
     element.addEventListener("mousedown", this.keepFromChart, true);
     element.addEventListener("touchstart", this.keepFromChart, { capture: true, passive: false });
@@ -218,6 +211,13 @@ export class DrawingLayer implements IPanePrimitive<Time> {
     window.removeEventListener("pointercancel", this.release);
   }
 
+  /** Paint over `series`, the price series now on screen */
+  attachTo(series: ISeriesApi<SeriesType>) {
+    this.series?.detachPrimitive(this);
+    this.series = series;
+    series.attachPrimitive(this);
+  }
+
   /** The candles on the chart changed: `first` is the oldest one's time, `step` the seconds per candle */
   setTimeline(first: number | undefined, step: number) {
     this.first = first;
@@ -225,12 +225,7 @@ export class DrawingLayer implements IPanePrimitive<Time> {
     this.requestUpdate();
   }
 
-  setFills(fills: Fill[]) {
-    this.fills = fills;
-    this.requestUpdate();
-  }
-
-  attached({ requestUpdate }: PaneAttachedParameter<Time>) {
+  attached({ requestUpdate }: SeriesAttachedParameter<Time>) {
     this.requestUpdate = requestUpdate;
   }
 
@@ -382,29 +377,11 @@ export class DrawingLayer implements IPanePrimitive<Time> {
     const { ink, store } = this;
     if (!ink) return;
     const { width, height } = this.chart.paneSize(0);
+    context.font = ink.font;
     context.textBaseline = "middle";
     context.textAlign = "left";
     context.lineWidth = 1.25;
     this.noteBoxes.clear();
-
-    // a buy is marked under its price and a sell over it, each pointing at the price
-    context.font = ink.fillFont;
-    for (const fill of this.fills) {
-      const at = this.pixel(fill);
-      if (!at) continue;
-      // a fill beyond the prices on screen stays at the edge it lies past
-      const y = Math.max(28, Math.min(height - 30, at.y));
-      const side = fill.buy ? 1 : -1;
-      context.fillStyle = fill.buy ? ink.up : ink.down;
-      context.beginPath();
-      context.moveTo(at.x, y + 8 * side);
-      context.lineTo(at.x - 5, y + 17 * side);
-      context.lineTo(at.x + 5, y + 17 * side);
-      context.closePath();
-      context.fill();
-      context.fillText(fill.buy ? "BUY" : "SELL", at.x - 8, y + 25 * side);
-    }
-    context.font = ink.font;
 
     const line = (from: Pixel, to: Pixel, color = ink.line, dash: number[] = []) => {
       context.strokeStyle = color;

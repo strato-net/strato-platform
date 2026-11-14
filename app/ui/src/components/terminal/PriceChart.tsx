@@ -28,7 +28,7 @@ import {
 } from "lightweight-charts";
 import { CandleResolution, Market, MarketCandle } from "@/interface";
 import { useToast } from "@/hooks/use-toast";
-import { MyTrades, useMarketCandles } from "@/hooks/terminal/useMarketData";
+import { useMarketCandles } from "@/hooks/terminal/useMarketData";
 import { priceDecimals } from "@/components/terminal/format";
 import { INDICATORS, Indicator, IndicatorPlot } from "@/components/terminal/indicators";
 import { DrawingLayer, DrawingStore } from "@/components/terminal/DrawingLayer";
@@ -230,7 +230,7 @@ const drawIndicator = (current: ChartHandles, { overlay, range, levels = [], lab
   return drawn;
 };
 
-export const PriceChart = ({ market, myTrades }: { market: Market; myTrades: MyTrades["entries"] }) => {
+export const PriceChart = ({ market }: { market: Market }) => {
   const { poolAddress } = market;
   const { toast } = useToast();
   const [resolution, setResolution] = useState<CandleResolution>("15m");
@@ -285,7 +285,7 @@ export const PriceChart = ({ market, myTrades }: { market: Market; myTrades: MyT
     );
     chart.panes()[1].setStretchFactor(VOLUME_PANE_STRETCH);
     const eases = [easeAutoscale(candleSeries), easeAutoscale(lineSeries), easeAutoscale(volumeSeries)];
-    const layer = new DrawingLayer(chart, candleSeries, containerRef.current, drawings);
+    const layer = new DrawingLayer(chart, containerRef.current, drawings);
     const current: ChartHandles = {
       chart,
       candles: candleSeries,
@@ -350,7 +350,6 @@ export const PriceChart = ({ market, myTrades }: { market: Market; myTrades: MyT
         note: themeColor("muted", 0.9),
         surface: themeColor("background"),
         font: `10px ${getComputedStyle(document.body).fontFamily}`,
-        fillFont: `8px ${getComputedStyle(document.body).fontFamily}`,
       };
     };
     applyTheme();
@@ -382,6 +381,7 @@ export const PriceChart = ({ market, myTrades }: { market: Market; myTrades: MyT
     if (!current) return;
     current.candles.applyOptions({ visible: chartType === "candles" });
     current.line.applyOptions({ visible: chartType === "line" });
+    current.drawings.attachTo(chartType === "candles" ? current.candles : current.line);
     // a line spans only the closes, candles the highs and lows: fit the new one at once
     current.eases.forEach((ease) => ease.reset());
   }, [chartType]);
@@ -465,22 +465,6 @@ export const PriceChart = ({ market, myTrades }: { market: Market; myTrades: MyT
     }
   }, [indicators]);
 
-  // the user's own trades in this pool, marked where they filled. A trade's price includes the
-  // pool's fee, taken from what was paid in, and the candles do not: with the fee taken out
-  // the mark sits on the candle the trade made
-  useEffect(() => {
-    const afterFee = 1 - market.feeBps / 10_000;
-    handles.current?.drawings.setFills(
-      myTrades
-        .filter((trade) => trade.poolAddress === poolAddress)
-        .map((trade) => {
-          const buy = trade.tokenOut === market.base.symbol;
-          const paid = Number(trade.impliedPrice);
-          return { time: trade.timestamp.getTime() / 1000, price: buy ? paid * afterFee : paid / afterFee, buy };
-        })
-    );
-  }, [myTrades, poolAddress, market.base.symbol, market.feeBps]);
-
   const toggleIndicator = (id: string) => {
     const next = enabledIndicators.includes(id) ? enabledIndicators.filter((other) => other !== id) : [...enabledIndicators, id];
     localStorage.setItem(INDICATORS_KEY, JSON.stringify(next));
@@ -493,6 +477,8 @@ export const PriceChart = ({ market, myTrades }: { market: Market; myTrades: MyT
       pendingView.current = view;
       setResolution(wanted);
     } else if (handles.current && candles?.length) {
+      // a jump, not a scroll: the price axis fits the new view at once rather than easing to it
+      handles.current.eases.forEach((ease) => ease.reset());
       view(handles.current.chart, candles);
     }
   };
