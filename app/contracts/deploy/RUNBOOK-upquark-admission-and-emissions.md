@@ -47,14 +47,14 @@ curl -s "$NODE_URL/bloc/v2.2/contracts/StratoStaking/$STAKING_PROXY/state" > upq
 
 Stop unless all of these hold (this branch assumes staking V2 is live on Upquark):
 
-- `governanceSyncEnabled` is `true` (or already off for step 5) and `activeValidators` holds
-  exactly governance's validators, each with `isValidator` true. If the index is short, run
-  `node deploy/staking-setup.js index` first, with the link on: it indexes governance's whole set
-  and reverts if governance lists a validator staking has not seated, or if any validator would
-  end up without a stake weight (`SS: validator without weight`: one that no longer qualifies
-  and that governance will not drop). An unindexed seat is left out of `S`.
-- Record `activeValidators`: these are the incumbents. Record `minStake` and `selfBondGraceUntil`
-  as well, and do not change them for this rollout: they are now the incumbents' rule only.
+- Every governance validator has `isValidator` true. Compare `activeValidators` with governance's
+  set and record any missing index entries. If the index is short, `governanceSyncEnabled` must
+  be `true`; do not run `index` until after the logic swap in step 2. If the index is complete,
+  the link may already be off for step 5. Stop if the index contains a validator governance
+  does not list. An unindexed seat is left out of `S`.
+- Record governance's validator set: these are the incumbents. Record `minStake` and
+  `selfBondGraceUntil` as well, and do not change them for this rollout: they are now the
+  incumbents' rule only.
 - Record `proposerFeeBps`, `maxConsecutiveMisses`, `jailCooldown` (step 3 re-submits them).
 
 ## 2. Swap the logic (votes)
@@ -76,6 +76,14 @@ Verify against `upquark-staking-before.json`:
 Then swap the governance logic at `0x100`, which adds `publishValidatorStakeSnapshot()`:
 `node deploy/gen-governance-source.js` once, then `node deploy/deploy-governance.js` once per
 admin. Verify that the validator list, every `validatorStake` and `stakingContract` are unchanged.
+
+If the index was short in step 1, with the governance link still on, run
+`node deploy/staking-setup.js index` against the upgraded staking logic. Its no-argument
+`indexValidatorSet()` reads governance's whole set, syncs every weight in one transaction and
+reverts if governance lists a validator staking has not seated, or if any member would remain
+without a weight (`SS: validator without weight`). Verify `activeValidators` now holds exactly
+governance's set, `validatorCount` matches, and every `validatorStake` is positive. Stop if the
+call fails or the set changes unexpectedly; do not fund the schedule or turn the link off.
 
 ## 3. Fee share (vote)
 
