@@ -153,6 +153,16 @@ spec = describe "stake-weighted consensus" $ do
       _lastRound ctx `shouldBe` 7
       _sequence (_view ctx) `shouldBe` 11
 
+    it "catches the view round up to a committed block's round, and never moves it back" $ do
+      let commit rnd = runConduit $ yieldMany ([] :: [InEvent]) .| commitBlock (Block (v3 [Validator me, Validator other] [] rnd [] []) [] []) .| sinkNull
+      -- a block the others committed at round 7 reaches a node still on round 0
+      behind <- runWith activeCtx $ commit 7 >> get
+      _view behind `shouldBe` View 7 11
+      -- a block locked in an earlier round and committed in a later one: the view stays
+      ahead <- runWith (activeCtx & view . round .~ 9) $ commit 7 >> get
+      _view ahead `shouldBe` View 9 11
+      _lastRound ahead `shouldBe` 7
+
     it "selects the leader by stake once active and round-robin before" $ do
       let weights = M.fromList [(Validator me, 1000), (Validator other, 0)]
       computeLeader activeCtx {_stakes = weights} `shouldBe` Validator me

@@ -313,7 +313,17 @@ commitBlock blk = do
   $logInfoS "blockstanbul" . T.pack $
     printf "Committed block #%d (%s)" blockNo (shortDescription hsh)
   lastParent .= Just hsh
-  lastRound .= getBlockRound (blockBlockData blk)
+  let blockRound = getBlockRound (blockBlockData blk)
+  lastRound .= blockRound
+  -- Catch the view round up to the committed block's round. Rounds persist across
+  -- heights, and the others committed this block at its header round or a later one.
+  -- A block that reaches this node by replay or sync advances its height only, so
+  -- without this the node sits on its old round: it rejects every proposal of the
+  -- next height as a view mismatch, misses its own slot, and the round change that
+  -- costs is what finally moves it. One validator a block behind during a round
+  -- change was enough to start that. A block committed here by its own quorum has a
+  -- header round at or below the view round, so this changes nothing for it.
+  view . round %= max (fromIntegral blockRound)
   clearLock
   myBlock .= Nothing
   whenM (use hasPreprepared) $
