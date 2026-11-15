@@ -9,6 +9,7 @@
 #   scripts/ha.sh <env> cdk <target> <args>...    any cdk command (diff, synth)
 #   scripts/ha.sh <env> context <target>          the context a target is given
 #   scripts/ha.sh <env> cells deploy              deploy every cell's stack, creating missing cells one at a time
+#   scripts/ha.sh <env> cells diff                cdk diff of every cell's stack
 #   scripts/ha.sh <env> cells upgrade [<id>]      upgrade every cell (or one) in place, standbys first
 #   scripts/ha.sh <env> cells restart [<id>]      restart every cell (or one) on the version it runs, standbys first
 #   scripts/ha.sh <env> cells replace <id>        a new instance for the cell, from the latest snapshot
@@ -364,6 +365,15 @@ cells_deploy() {
   done
 }
 
+# What cells deploy would change, for the pipeline's dry run.
+cells_diff() {
+  local id ctx
+  for id in $(cell_ids); do
+    ctx_cell "$id"
+    cdk_in core-cell diff "$P-cell-$id-network" "$P-cell-$id-host" "${ctx[@]}"
+  done
+}
+
 # The cells to act on, one per line: the given one, or every cell with the
 # standbys first and then the lease holder, whose lease a standby takes while
 # it restarts.
@@ -455,8 +465,9 @@ case $cmd in
     resolve "${1:?target}"
     if [[ -n $skip ]]; then log "skip ${1}: $skip"; else printf '%s\n' "${ctx[@]}" | paste -d' ' - -; fi ;;
   cells)
-    case ${1:?cells deploy|upgrade|restart|replace|instance|wait-ready|lease} in
+    case ${1:?cells deploy|diff|upgrade|restart|replace|instance|wait-ready|lease} in
       deploy) cells_deploy ;;
+      diff) cells_diff ;;
       upgrade) cells_upgrade "${2:-}" ;;
       restart) cells_restart "${2:-}" ;;
       replace) cells_replace "${2:-}" ;;

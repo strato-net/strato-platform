@@ -161,6 +161,11 @@ imds_token=$(curl -s -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 120' http:
 private_dns=$(curl -s -H "X-aws-ec2-metadata-token: $imds_token" http://169.254.169.254/latest/meta-data/local-hostname)
 public_ip=$(curl -s -H "X-aws-ec2-metadata-token: $imds_token" http://169.254.169.254/latest/meta-data/public-ipv4 || true)
 node_host=${public_ip:-$private_dns}
+# A statement on the cluster's postgres database, as the node's database login.
+cluster_sql() {
+  PGPASSWORD=$(aws secretsmanager get-secret-value --secret-id "$PG_SECRET_ID" --query SecretString --output text | jq -r .password) \
+    psql -v ON_ERROR_STOP=1 -h "$PG_WRITER_HOST" -p "$PG_PORT" -U "$PG_USER" -d postgres -Atqc "$1"
+}
 if [[ ! -d $NODE_DIR ]]; then
   log "setup: network=$NETWORK cell=$CELL_ID role=$ROLE writer=$WRITER validator=$VALIDATOR_BEHAVIOR host=$node_host"
   vmq=(); [[ "$VM_QUERY" == "true" ]] && vmq=(--vmQuery)
@@ -192,20 +197,17 @@ if [[ ! -d $NODE_DIR ]]; then
   # With SEED_EMPTY_CLUSTER the cluster says what this cell is, in a one-row
   # table of its postgres database. The cell that finds no eth database claims
   # the row, loads the snapshot's databases into the cluster, starts as the
-  # writer and marks the row done once they are loaded (below). Every other
+  # writer and marks the row done once they are loaded (4e). Every other
   # cell, and every later instance, then leaves the databases alone and starts
   # as a standby. An instance of the claiming cell that finds the row not done
   # replaces one that never finished loading, and loads again; another cell
   # that finds it not done stops here. A cluster with an eth database and no
   # row was filled some other way and is never loaded over, and a cluster
   # that cannot be asked stops the bootstrap.
-  cluster_sql() {
-    PGPASSWORD=$(aws secretsmanager get-secret-value --secret-id "$PG_SECRET_ID" --query SecretString --output text | jq -r .password) \
-      psql -v ON_ERROR_STOP=1 -h "$PG_WRITER_HOST" -p "$PG_PORT" -U "$PG_USER" -d postgres -Atqc "$1"
-  }
   if [[ "${SEED_EMPTY_CLUSTER:-false}" == "true" ]]; then
     cluster_sql "create table if not exists strato_cluster_seed (one boolean primary key default true check (one), cell text not null, done boolean not null default false)"
-    if [[ "$(cluster_sql "select count(*) from pg_database where datname = 'eth'")" == "0" ]]; then
+    eth_databases=$(cluster_sql "select count(*) from pg_database where datname = 'eth'")
+    if [[ "$eth_databases" == "0" ]]; then
       cluster_sql "insert into strato_cluster_seed (cell) values ('$CELL_ID') on conflict do nothing"
     fi
     seed=$(cluster_sql "select cell || ' ' || done::text from strato_cluster_seed")
@@ -248,9 +250,20 @@ if [[ ! -d $NODE_DIR ]]; then
     sudo -u $NODE_USER -H env PATH="$PATH" STRATO_SNAPSHOT_BUCKET="${STRATO_SNAPSHOT_BUCKET:-}" STRATO_SNAPSHOT_WORKDIR="$STRATO_ROOT/.snapshot-work" \
       strato-snapshot restore "$NODE_DIR" "${snap[@]}" --network "$NETWORK" --force
   fi
-  # The cluster is loaded: from here on every new instance joins as a standby.
-  if [[ "${SEED_EMPTY_CLUSTER:-false}" == "true" && "$SNAPSHOT_SKIP_DATABASES" == "false" ]]; then
+  # This instance loaded the cluster: what lets it finish the claim (4e), also on a rerun of this script.
+  if [[ "${SEED_EMPTY_CLUSTER:-false}" == "true" && "$SNAPSHOT_SKIP_DATABASES" == "false" ]]; then touch "$STRATO_ROOT/.cluster-loaded"; fi
+fi
+# 4e. The claim on the cluster's load, settled on every run before the node
+# starts: setup and restore above run once, so a rerun after a failure gets
+# here without them. Done is marked only by the instance that loaded the
+# databases; one that did not finish must not start a node on them, and is
+# replaced by an instance that loads them again.
+if [[ "${SEED_EMPTY_CLUSTER:-false}" == "true" ]]; then
+  seed=$(cluster_sql "select cell || ' ' || done::text from strato_cluster_seed")
+  if [[ "$seed" == "$CELL_ID false" ]]; then
+    [[ -e "$STRATO_ROOT/.cluster-loaded" ]] || { log "this instance did not finish loading the snapshot's databases into the cluster: replace it (scripts/ha.sh <env> cells replace $CELL_ID)"; exit 1; }
     cluster_sql "update strato_cluster_seed set done = true"
+    log "the cluster is loaded: every later instance joins as a standby"
   fi
 fi
 # 4d. Publish the node config for the API tier (its ETHCONF_BASE64). The tier
