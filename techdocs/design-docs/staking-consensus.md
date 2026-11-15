@@ -16,6 +16,9 @@ StratoStaking ──(stake/unstake/self-bond/slash)──► MercataGovernance(0
   ──► Delta.hs ──► ExecResults ──► Bagger.buildNextBlockHeader
   ──► BlockHeaderV3 { …V2 fields…, proposalRound, currentStakes, stakeUpdates }
   ──► verifyBlock re-derives stakeUpdates ──► Blockstanbul applies stakes on commit
+      (from the consensus-from-state fork, proposer and verifier skip the events: both read
+       governance's validators and validatorStake from the block's state and write the
+       difference from the set in force into the same header fields)
   ──► leader(height, round) = selectProposer(chainId, height, validators, stakes, parentRound, round)
 ```
 
@@ -38,7 +41,9 @@ StratoStaking ──(stake/unstake/self-bond/slash)──► MercataGovernance(0
 
 * candidates are the validators in address order; weight = stake published by governance
   (missing ⇒ 0);
-* `x = keccak256(chainId ‖ height ‖ round) mod totalWeight`, walk cumulative weights. The seed
+* `x = (keccak256(chainId ‖ height ‖ round) × totalWeight) >> 256`, walk cumulative weights
+  (the proportional pick; helium below its switch height still uses `seed mod totalWeight`, which
+  let a few wei of stake re-draw the proposer). The seed
   contains nothing the proposer chooses (no parent hash, no body), so the previous proposer cannot
   grind the next leader; leaders are predictable, which is fine for a known set of ≤ 50 operators;
 * if the total weight is 0 the pick is uniform (`x mod n`) — this is the fallback until the
@@ -78,10 +83,12 @@ live, one staked validator among unstaked peers is a one-validator quorum, so no
 published alone first: staking's governance link is off (`setGovernance(…, false)`) from before
 the activation height until the snapshot is in a header. Consequences of weighted
 votes (Key Decision 16): an operator holding more than 1/3 of the stake can stall the chain and
-cannot be jailed (nothing commits without its seal) — the tools are the inbound cap
-`maxOperatorStakeBps` (3300) and `ValidatorRegistry.emergencyKick` by the `emergencyKicker` key
-(only for a validator over 1/3, `StratoStaking.exceedsOneThird`), with an owner vote as the routine
-kick. The validator-set size is bounded on-chain (`MercataGovernance.hardCapValidators`, applied to
+cannot be jailed (nothing commits without its seal) — the tool is the inbound cap
+`maxOperatorStakeBps` (3300), with an owner vote as the routine kick while the holder is still
+under a third. There is no emergency kick: a holder of a third decides whether the block carrying
+its own removal commits, so recovery from one is off chain (the operators agree a validator set and
+run a release that applies it from an agreed height). `StratoStaking.exceedsOneThird` remains as a
+read-only check to alert on. The validator-set size is bounded on-chain (`MercataGovernance.hardCapValidators`, applied to
 both the staking and the admin-vote path, in addition to `StratoStaking.effectiveCap`); consensus
 itself never rejects a committed membership change, so a cap violation is a reverted transaction,
 not a stalled chain.
@@ -222,7 +229,11 @@ consent, admin `addValidator` still works) → **Active** (in the consensus set)
   `reconcileSet(candidates)` promotes the named waiters by (weight desc, address asc) within
   `maxSetMutationsPerBlock`; set-wide passes (eviction, resyncs) walk only the consensus set
   (`activeValidators`), never every record, so cheap sybil registrations cannot make them
-  unaffordable. Kicks bypass the mutation budget. `requestExit(v)` keeps the validator serving for
+  unaffordable. Kicks and leaves bypass the mutation budget and do not use it up: a validator
+  that no longer qualifies leaves in the transaction that got there. The operator's own bond
+  cannot be taken out from under a seat that cannot leave (governance's last validator, or any
+  seat while the governance link is off). Nobody new is seated while a validator governance lists
+  has no weight on record. `requestExit(v)` keeps the validator serving for
   `exitNoticeSeconds`, then any sync removes it; `cancelExit(v)` undoes it.
 * `maxOperatorStakeBps` caps **inbound** stake (stake / selfBond / moveStake target) at that share
   of `totalRewardableStake`; unstaking is never capped; 0 = off (switch it on after bootstrap).
@@ -254,8 +265,8 @@ the activation height; (2) deploy `StratoStaking` V2 + `ValidatorRegistry` V2 be
 `setStakingContract`; (4) list the current validators as operators with their node vault
 addresses, stake ≥ `minStake`, `setGovernance(0x100, true)`, then `tryActivate` each (or
 `reconcileSet`), `setSetParams(maxActiveValidators = live n, …, maxOperatorStakeBps = 3300)`
-(joins stay closed: no opening block is agreed yet), `gov.setHardCapValidators(50)`,
-`registry.setEmergencyKicker(<ops key>)` — all before the activation height; (5) deploy `FeeRouter`
+(joins stay closed: no opening block is agreed yet), `gov.setHardCapValidators(50)` — all before
+the activation height; (5) deploy `FeeRouter`
 and `DeciderState.updatePayFeeContract` (owner key); (6) migrate V1 stakers (stop schedule,
 `setParams(unbondingSeconds=0)`, users unstake/restake); (7) once weighted votes are live on every
 producer and every weight is in a header, vote `setJoinsOpenFromBlock` (Upquark: see

@@ -102,7 +102,9 @@ An active operator leaves automatically, in the same transaction, as soon as it 
 - reaching the end of an exit notice
 - being removed by the owner
 
-An operator that holds more than one third of the total stake can be removed with an emergency kick.
+A validator leaves in the same transaction that makes it ineligible; a leave is never held back by the per-block limit on set changes.
+
+There is no emergency kick. A validator that holds a third of the total stake decides whether any block commits, including one that would remove it, so the owner's vote only works while a validator is below a third. Recovery from a holder of a third is off chain.
 
 ## Staking phases
 
@@ -127,7 +129,7 @@ The activation height is a per-network setting, and every node must agree on it 
 **After activation,** `selectProposer` (`strato/core/strato-model/src/Blockchain/Strato/Model/ProposerSelection.hs`) picks the proposer for each height and round:
 
 1. **Seed.** It computes `seed = keccak256(chainId ‖ height ‖ round)`. The seed contains nothing the previous proposer can choose.
-2. **Weighted pick.** It walks the validators in address order, each weighted by stake, and picks at `seed mod totalStake`. If no validator has stake, the pick is uniform.
+2. **Weighted pick.** It walks the validators in address order, each weighted by stake, and picks at `(seed × totalStake) >> 256`: the seed read as a fraction of the total. A small change in the total moves that point by the same small fraction, so a few wei of stake cannot re-draw the proposer. (Helium below its switch height uses the first rule, `seed mod totalStake`.) If no validator has stake, the pick is uniform.
 3. **Exclusion.** Validators already picked for earlier rounds at the same height are skipped, so a round change always moves to a different validator.
 
 Contracts see facts about the parent block through these values:
