@@ -19,9 +19,10 @@ export interface ApiTierConfig {
   postgresPort: number;
   postgresUser: string;
   /**
-   * Every core cell's transaction ingress (strato-ingest, http://<cell private DNS name>:8600).
-   * A submitted batch is posted to all of them, so each cell's mempool holds it and a standby
-   * promoted later already has what the writer had; the submit succeeds once one cell accepts.
+   * The core tier's transaction ingress: its load balancer (the core-cell app's coreNlb stack,
+   * http://<DnsName>:8600), which hands a batch to one healthy cell, or without one every cell's
+   * strato-ingest (http://<cell private DNS name>:8600). A batch is posted to every URL listed
+   * and the submit succeeds once one accepts.
    */
   ingressUrls: string[];
   /** The node's networkConfig.httpPort: nginx listens on it inside the container. */
@@ -35,15 +36,16 @@ export interface ApiTierConfig {
   createSessionSecret: boolean;
   /** An existing regional certificate for the ALB. Without it, and with `domainName` set, the app creates a DNS-validated one (see CertificateStack). */
   albCertificateArn?: string;
-  /** Security groups this stack opens at deploy time: the Aurora cluster's to the tasks (5432), and a core cell's for its Prometheus (prometheusHost, to the tasks) and Grafana (grafanaInstanceId, to the ALB). The cells' ingress (8600) is opened either here (cellSecurityGroupIds) or by each cell (the core-cell app's clientSecurityGroupIds). Without these, allow the output TaskSecurityGroupId by hand. */
+  /** Security groups this stack opens at deploy time: the Aurora cluster's to the tasks (5432), and a core cell's for its Grafana (grafanaInstanceId, to the ALB) and, without a core load balancer, its Prometheus (prometheusHost, to the tasks). Without these, allow the output TaskSecurityGroupId by hand. */
   postgresSecurityGroupId?: string;
   coreSecurityGroupId?: string;
   /**
-   * Every core cell's security group, opened to the tasks on the transaction ingress (8600) by this
-   * stack. The alternative to each cell admitting the tasks (the core-cell app's
-   * clientSecurityGroupIds) for cells whose stacks are not redeployed; use one or the other.
+   * The core tier's load balancer's security group (the coreNlb stack's SecurityGroupId output),
+   * opened to the tasks on the transaction ingress (8600) and on prometheusHost's port. Without a
+   * load balancer each cell admits the tasks on its ingress itself (the core-cell app's
+   * clientSecurityGroupIds).
    */
-  cellSecurityGroupIds: string[];
+  coreLoadBalancerSecurityGroupId?: string;
   /** The tier's public hostname. With `hostedZoneId` it is the node hostname being cut over (weighted records below); without one it is a CNAME to the ALB kept at the registrar. */
   domainName?: string;
   /** Weighted cutover: the node hostname's Route 53 zone and the current node addresses. */
@@ -101,9 +103,11 @@ export interface ApiTierConfig {
    */
   nginxSessionSecretName?: string;
   /**
-   * A core cell's Prometheus as host:port (the core-cell app's exposePrometheus). apex reads the node's
-   * health and consensus data there, instead of reporting it unknown; the cell's security group
-   * (coreSecurityGroupId) is opened to the tasks on that port.
+   * A core cell's Prometheus as host:port (the core-cell app's exposePrometheus), through the core
+   * tier's load balancer when there is one. apex reads the node's health and consensus data there,
+   * instead of reporting it unknown; the load balancer's security group
+   * (coreLoadBalancerSecurityGroupId), else the cell's (coreSecurityGroupId), is opened to the
+   * tasks on that port.
    */
   prometheusHost?: string;
   /**
@@ -159,7 +163,7 @@ export function loadConfig(app: App): ApiTierConfig {
     createSessionSecret: String(ctx(app, "createSessionSecret", "false")) === "true",
     postgresSecurityGroupId: optional(app, "postgresSecurityGroupId"),
     coreSecurityGroupId: optional(app, "coreSecurityGroupId"),
-    cellSecurityGroupIds: String(ctx(app, "cellSecurityGroupIds", "")).split(",").map((s) => s.trim()).filter(Boolean),
+    coreLoadBalancerSecurityGroupId: optional(app, "coreLoadBalancerSecurityGroupId"),
     albCertificateArn: optional(app, "albCertificateArn"),
     hostedZoneId: optional(app, "hostedZoneId"),
     domainName: optional(app, "domainName"),

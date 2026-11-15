@@ -50,7 +50,7 @@ npx cdk deploy --all \
   -c postgrestImage=ghcr.io/strato-net/strato-platform/postgrest:<tag> \
   -c smdImage=ghcr.io/strato-net/strato-platform/smd:<tag> -c apexImage=ghcr.io/strato-net/strato-platform/apex:<tag> \
   -c postgresWriterHost=<writer> -c postgresReaderHost=<reader> \
-  -c ingressUrls=http://<cell-a private DNS name>:8600,http://<cell-b private DNS name>:8600 \
+  -c ingressUrls=http://<core load balancer DnsName>:8600 -c coreLoadBalancerSecurityGroupId=<its SecurityGroupId> \
   -c albCertificateArn=<cert> \
   -c hostedZoneId=Z123 -c domainName=node.testnet.example -c nodeIpAddresses=1.2.3.4 \
   -c apiTierWeight=10
@@ -70,7 +70,7 @@ Rolling back is the same weight going down. The node keeps serving until
 the weight is 100 and has been for a while; then re-set-up the node with
 `--role=core` at the next window.
 
-Security groups: pass `-c postgresSecurityGroupId=<Aurora cluster SG>` and the stack opens it to its task security group at deploy time; `-c coreSecurityGroupId=<a core cell SG>` is for that cell's Prometheus (`prometheusHost`) and Grafana (`grafanaInstanceId`) ports. The cells' ingress is opened on the cell side (`clientSecurityGroupIds` in the core-cell app, the output `TaskSecurityGroupId`); otherwise allow it by hand.
+Security groups: pass `-c postgresSecurityGroupId=<Aurora cluster SG>` and the stack opens it to its task security group at deploy time; `-c coreLoadBalancerSecurityGroupId=<the core-cell app's coreNlb stack SecurityGroupId>` admits the tasks on the core tier's load balancer, for the transaction ingress (8600) and Prometheus (`prometheusHost`); `-c coreSecurityGroupId=<a core cell SG>` is for that cell's Grafana (`grafanaInstanceId`). Without a load balancer, list every cell in `ingressUrls`, open their ingress on the cell side (`clientSecurityGroupIds` in the core-cell app, the output `TaskSecurityGroupId`), and `coreSecurityGroupId` also opens that cell's Prometheus port.
 
 ## Hostname and certificate
 
@@ -171,8 +171,9 @@ name. If the hostname was a node's A record, give the node another name first
 apex answers `/health` and `/apex-api/status` from Prometheus metrics of the
 core's processes, which run in a core cell, not in this tier. Expose the cell's
 Prometheus on its private address (the core-cell app's `-c exposePrometheus=true`)
-and pass `-c prometheusHost=<cell private DNS name>:9090`: apex reads it, the
-cell's security group (`coreSecurityGroupId`) opens that port to the tasks, and
+and pass `-c prometheusHost=<core load balancer DnsName>:9090`, which reaches
+the first cell's Prometheus: apex reads it, the load balancer's security group
+(`coreLoadBalancerSecurityGroupId`) opens that port to the tasks, and
 the required health jobs leave out core-api (strato-api runs in this task).
 Without it apex reports health, consensus data and the node address as unknown.
 

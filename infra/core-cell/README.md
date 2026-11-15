@@ -72,10 +72,39 @@ npx cdk deploy --all -c ...   # same context
 ```
 
 Then (unless `postgresSecurityGroupId` was given) allow the output
-`SecurityGroupId` on the Aurora security group, and add
+`SecurityGroupId` on the Aurora security group, and put the cell behind the
+core tier's load balancer (below: add its `InstanceId` and `SecurityGroupId`
+to that stack's context). Without a load balancer, add
 `http://<PrivateDnsName>:8600` to the API tier's `ingressUrls` so it submits
 transactions to this cell too (the cell admits the tier's tasks on that port
 through `clientSecurityGroupIds`).
+
+## The core tier's load balancer
+
+`-c coreNlb=true` deploys, instead of a cell, the environment's internal
+Network Load Balancer in front of its cells (`ha-<env>-core-nlb`,
+`lib/core-nlb-stack.ts`), so the API tier addresses the core tier by one name
+and a rebuilt cell changes nothing there:
+
+```sh
+npx cdk deploy -c coreNlb=true -c envName=testnet -c vpcId=vpc-0123 \
+  -c cellInstanceIds=i-0aaa,i-0bbb -c cellSecurityGroupIds=sg-0aaa,sg-0bbb
+```
+
+- **8600**, the transaction ingress, goes to every cell listed. A batch
+  reaches one healthy cell, which gossips it to the network and to the other
+  cells. Healthy is the cell's `strato-cell-health` on 8601, checked every
+  10 s: a cell whose node is down, behind the chain or draining for a restart
+  is out after two failures. With every cell unhealthy the load balancer
+  sends to all of them.
+- **9090** is the first listed cell's Prometheus alone (`exposePrometheus`
+  on that cell): apex's stall check compares one node's counters over time,
+  so it must not alternate between cells.
+
+The stack opens each cell's security group to the load balancer on those
+ports. Give its outputs to the api-tier app: `DnsName` as
+`ingressUrls=http://<DnsName>:8600` and `prometheusHost=<DnsName>:9090`,
+`SecurityGroupId` as `coreLoadBalancerSecurityGroupId`.
 
 ## Context
 
@@ -106,7 +135,7 @@ through `clientSecurityGroupIds`).
 | `oauthSecretName` | none | without localAuth: Secrets Manager secret, JSON `{discoveryUrl, clientId, clientSecret}`, holding the node's Keycloak client (confidential, service accounts enabled, the node's URL among its redirect URIs). The host writes it as strato-login would; strato-setup then creates the node key in the shared vault (`--vaultUrl`, default vault.blockapps.net) under that client |
 | `frontendLabels` | none | with `grafana`: names for the tier map's CloudFront distributions (`E123ABC=SMD,E456DEF=App UI,E789GHI=Portal`); once set, unnamed distributions are not drawn |
 | `ethconfParameterName` | none | SSM parameter this cell publishes its generated `ethconf.yaml` to (base64, SecureString, rewritten each boot): the API tier reads it as its node config (`-c ethconfParameterName=` there). Set it on the writer cell only |
-| `exposePrometheus` | `false` | publish the node's Prometheus on the cell's private IP, port 9090 (a socat container), for the API tier's apex: pass `-c prometheusHost=<PrivateDnsName>:9090` there |
+| `exposePrometheus` | `false` | publish the node's Prometheus on the cell's private IP, port 9090 (a socat container), for the API tier's apex: pass `-c prometheusHost=<core load balancer DnsName>:9090` there (`<PrivateDnsName>:9090` without a load balancer) |
 | `grafana` | `false` | Grafana container on port 3001 (anonymous viewer; admin password in `/etc/strato/grafana-admin-password`) over the node's Prometheus, with the repo's dashboards |
 | `tlsHostname` / `letsEncryptEmail` | none | public hostname (an A record to the cell's Elastic IP): the host obtains a Let's Encrypt certificate for it over port 80, sets its hostname to it, and the node serves `https://<hostname>/` (the app URL, the OAuth issuer) |
 | `webCidrs` | `0.0.0.0/0` | who may reach the app (`httpPort`, 443) |
@@ -124,7 +153,7 @@ through `clientSecurityGroupIds`).
 | `availabilityZone` | the VPC's first | pin the host to a zone, so two cells do not share one |
 | `extraSetupFlags` | empty | appended to strato-setup verbatim on first boot (`--vaultUrl=...`) |
 | `p2pCidrs` | `0.0.0.0/0` | who may reach 30303 tcp/udp |
-| `clientSecurityGroupIds` | none | allowed on 8600 (the transaction ingress): the API tier's task security group |
+| `clientSecurityGroupIds` | none | allowed on 8600 (the transaction ingress): the API tier's task security group, when it posts to the cells directly and not through the core tier's load balancer |
 | `sshSourceSecurityGroupId` | none | allowed on 22 |
 | `otelConfigParameterName` / `cloudWatchAgentParameterName` / `prometheusWorkspaceArn` | none | from the observability app; with a collector config the host runs the ADOT collector, its processes export spans to it, the role may write X-Ray, and (with `grafana`) the host's Grafana gets an X-Ray data source so the infrastructure map dashboard reads the service graph |
 | `terminationProtection` | `true` | stack termination protection and instance retention |

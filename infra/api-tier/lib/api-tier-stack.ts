@@ -33,8 +33,9 @@ export interface ApiTierStackProps extends StackProps {
  * sessions ride in the encrypted cookie, CSRF tokens stay per instance behind
  * ALB session stickiness, and nonce counters live in Aurora's writer.
  *
- * Transactions are posted to every core cell's ingress (ingressUrls). Reads
- * that need a VM go to vm-query, which every task runs over the SQL mirror
+ * Transactions are posted to the core tier's ingress (ingressUrls: its load
+ * balancer, which hands a batch to one healthy cell). Reads that need a VM
+ * go to vm-query, which every task runs over the SQL mirror
  * and publishes to the other copies through ECS Service Connect as
  * vm-query:8546, so a copy whose own instance is down or shedding uses
  * another's. Nothing here calls a core cell's VM: what the mirror cannot
@@ -273,22 +274,21 @@ export class ApiTierStack extends Stack {
     const coreSg = config.coreSecurityGroupId
       ? ec2.SecurityGroup.fromSecurityGroupId(this, "CoreSg", config.coreSecurityGroupId)
       : undefined;
-    if (coreSg) {
-      const core = coreSg;
-      // The cells' ingress (8600) is opened by cellSecurityGroupIds below, or on
-      // the cell side (the core-cell app's clientSecurityGroupIds). Nothing else: a core cell runs
-      // no strato-api, jsonrpc or vault wrapper (this tier runs its own, and
-      // signs against the external vault), and its VM is never called.
-      if (config.prometheusHost) {
-        const port = Number(config.prometheusHost.split(":")[1] ?? "9090");
-        core.addIngressRule(taskSg, ec2.Port.tcp(port), `${name} tasks: Prometheus (apex health)`);
-      }
+    // The tasks reach the core tier through its load balancer: the transaction
+    // ingress (8600) and a cell's Prometheus. Without one, the Prometheus cell
+    // admits them itself and the ingress is opened on the cell side (the
+    // core-cell app's clientSecurityGroupIds). Nothing else: a core cell runs
+    // no strato-api, jsonrpc or vault wrapper (this tier runs its own, and
+    // signs against the external vault), and its VM is never called.
+    const coreLbSg = config.coreLoadBalancerSecurityGroupId
+      ? ec2.SecurityGroup.fromSecurityGroupId(this, "CoreLbSg", config.coreLoadBalancerSecurityGroupId)
+      : undefined;
+    coreLbSg?.addIngressRule(taskSg, ec2.Port.tcp(8600), `${name} tasks: transaction ingress (strato-ingest)`);
+    const prometheusSg = coreLbSg ?? coreSg;
+    if (prometheusSg && config.prometheusHost) {
+      const port = Number(config.prometheusHost.split(":")[1] ?? "9090");
+      prometheusSg.addIngressRule(taskSg, ec2.Port.tcp(port), `${name} tasks: Prometheus (apex health)`);
     }
-
-    config.cellSecurityGroupIds.forEach((sgId, i) => {
-      ec2.SecurityGroup.fromSecurityGroupId(this, `CellSg${i}`, sgId)
-        .addIngressRule(taskSg, ec2.Port.tcp(8600), `${name} tasks: transaction ingress (strato-ingest)`);
-    });
 
     const service = new ecs.FargateService(this, "Service", {
       cluster,
