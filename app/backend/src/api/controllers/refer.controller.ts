@@ -16,7 +16,7 @@ class ReferController {
       const { accessToken, address: userAddress, body } = req;
       
         // Validate required fields
-        const { tokens, amounts, ephemeralAddress, expiry, quantity } = body;
+        const { tokens, amounts, ephemeralAddress, expiry } = body;
         
         if (!tokens || !Array.isArray(tokens) || tokens.length === 0) {
           res.status(400).json({ error: "tokens array is required and must not be empty" });
@@ -43,17 +43,11 @@ class ReferController {
           return;
         }
 
-        if (quantity === undefined || typeof quantity !== "number" || quantity <= 0 || !Number.isInteger(quantity)) {
-          res.status(400).json({ error: "quantity is required and must be a positive integer" });
-          return;
-        }
-
         const params: DepositParams = {
           tokens,
           amounts,
           ephemeralAddress,
           expiry,
-          quantity,
         };
 
       const result: TransactionResponse = await depositToEscrow(
