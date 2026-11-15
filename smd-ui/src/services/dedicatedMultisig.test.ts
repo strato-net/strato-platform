@@ -8,6 +8,7 @@ import {
   dedicatedWalletContractName,
   isUnlimitedTokenApproval,
   normalizeDedicatedArguments,
+  parseDedicatedPendingUpgrade,
   parseDedicatedTypedArguments,
 } from "./dedicatedMultisig";
 import {
@@ -292,6 +293,24 @@ test("typed argument JSON preserves arrays and integers above 2^53", () => {
   assert.deepEqual(parsed.types, ["uint256[]", "uint256"]);
   assert.deepEqual((parsed.args[0] as any).value, [1, "9007199254740993"]);
   assert.equal((parsed.args[1] as any).value, "9007199254740993");
+});
+
+test("pending upgrade is read from the JSON string Cirrus stores", () => {
+  const stored = "{\"epoch\":\"1\",\"executableAt\":\"1794706828\",\"exists\":true,\"expiresAt\":\"1795311628\"," +
+    "\"fromVersion\":\"3\",\"migrationFunction\":\"0000000000000000000000000000000000000000\"," +
+    "\"targetLogic\":\"ea7b44ddc7340afdac6382fbaed1b8d76e2a97b1\",\"targetVersion\":\"4\"}";
+  assert.deepEqual(parseDedicatedPendingUpgrade(stored), {
+    targetLogic: "ea7b44ddc7340afdac6382fbaed1b8d76e2a97b1",
+    fromVersion: "3",
+    targetVersion: "4",
+    migrationFunction: "",
+    executableAt: 1794706828,
+    expiresAt: 1795311628,
+  });
+  assert.equal(parseDedicatedPendingUpgrade({ exists: "true", migrationFunction: "migrate" })?.migrationFunction, "migrate");
+  assert.equal(parseDedicatedPendingUpgrade("{\"exists\":false}"), undefined);
+  assert.equal(parseDedicatedPendingUpgrade(undefined), undefined);
+  assert.equal(parseDedicatedPendingUpgrade("not json"), undefined);
 });
 
 test("backend configuration timeout does not block SMD startup", async () => {

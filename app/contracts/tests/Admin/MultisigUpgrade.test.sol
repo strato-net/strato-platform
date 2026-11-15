@@ -292,6 +292,48 @@ contract Describe_MultisigUpgrade {
         require(rejects(a, wallet, "freezeUpgrades"), "Freeze was reversible or repeatable");
     }
 
+    function freeze(address _wallet) internal {
+        string freezeIssue = a.invoke(_wallet, "proposeIssueNoArgs", _wallet, "freezeUpgrades");
+        b.invoke(_wallet, "approveIssueNoArgs", freezeIssue, _wallet, "freezeUpgrades");
+        require(MultisigWallet(_wallet).multisigUpgradesFrozen(), "Upgrades were not frozen");
+    }
+
+    function it_refuses_to_schedule_an_upgrade_on_a_frozen_wallet() {
+        address wallet = deploy(0);
+        freeze(wallet);
+        string[] argumentTypes = ["address", "string", "string"];
+        string issueId = a.invoke(
+            wallet, "proposeIssue", wallet, "scheduleUpgrade", argumentTypes, address(v2), "2", ""
+        );
+        require(
+            rejects(b, wallet, "approveIssue", issueId, wallet, "scheduleUpgrade", argumentTypes, address(v2), "2", ""),
+            "Frozen wallet scheduled an upgrade"
+        );
+        (,,,,,,, bool exists) = MultisigWallet(wallet).multisigPendingUpgrade();
+        require(!exists, "Frozen wallet has a pending upgrade");
+    }
+
+    function it_refuses_to_execute_a_ready_upgrade_after_a_freeze() {
+        address wallet = deploy(0);
+        schedule(wallet, "migrate");
+        fastForward(604800);
+        freeze(wallet);
+        require(rejects(outsider, wallet, "executeUpgrade"), "Upgrade executed after a freeze");
+        require(rejects(a, wallet, "executeUpgrade"), "Signer executed an upgrade after a freeze");
+        require(MultisigWallet(wallet).logicContract() == address(v1), "Logic changed after a freeze");
+    }
+
+    function it_keeps_a_freeze_through_later_changes() {
+        address wallet = deploy(0);
+        freeze(wallet);
+        string repeat = a.invoke(wallet, "proposeIssueNoArgs", wallet, "freezeUpgrades");
+        require(rejects(b, wallet, "approveIssueNoArgs", repeat, wallet, "freezeUpgrades"), "Freeze was repeated");
+        string timelockIssue = a.invoke(wallet, "proposeIssue", wallet, "setTransactionTimelock", ["uint256"], 3600);
+        b.invoke(wallet, "approveIssue", timelockIssue, wallet, "setTransactionTimelock", ["uint256"], 3600);
+        fastForward(31536000);
+        require(MultisigWallet(wallet).multisigUpgradesFrozen(), "Freeze was lost");
+    }
+
     function scheduleVersion(address _wallet, address _logic, string _version, string _migrationFunction) internal {
         string[] argumentTypes = ["address", "string", "string"];
         string issueId = a.invoke(
