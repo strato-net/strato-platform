@@ -97,6 +97,13 @@ if [[ ${1:-} == --check ]]; then
   check
   exit
 fi
+# A new instance is still being built by cell-bootstrap.sh (cloud-init runs
+# it), which installs binaries and scripts through the same scratch
+# directories: changing the node in the middle of that would mix two versions.
+if [[ "$(cloud-init status 2>/dev/null || true)" == *running* ]]; then
+  log "this instance is still bootstrapping: nothing was changed"
+  exit 1
+fi
 if [[ ${1:-} == --restart ]]; then
   drain
   log "restarting the node on $(cat "$CURRENT" 2>/dev/null || echo "$STRATO_IMAGE")"
