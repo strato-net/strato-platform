@@ -204,6 +204,7 @@ if [[ ! -d $NODE_DIR ]]; then
   # that finds it not done stops here. A cluster with an eth database and no
   # row was filled some other way and is never loaded over, and a cluster
   # that cannot be asked stops the bootstrap.
+  loading=false
   if [[ "${SEED_EMPTY_CLUSTER:-false}" == "true" ]]; then
     cluster_sql "create table if not exists strato_cluster_seed (one boolean primary key default true check (one), cell text not null, done boolean not null default false)"
     eth_databases=$(cluster_sql "select count(*) from pg_database where datname = 'eth'")
@@ -212,7 +213,7 @@ if [[ ! -d $NODE_DIR ]]; then
     fi
     seed=$(cluster_sql "select cell || ' ' || done::text from strato_cluster_seed")
     case "$seed" in
-      "$CELL_ID false") WRITER=true; SNAPSHOT_SKIP_DATABASES=false ;;
+      "$CELL_ID false") loading=true; WRITER=true; SNAPSHOT_SKIP_DATABASES=false ;;
       *" false") log "cell ${seed% false} has not finished loading the snapshot's databases into the cluster: this cell cannot start beside it"; exit 1 ;;
       *) WRITER=false; SNAPSHOT_SKIP_DATABASES=true ;;
     esac
@@ -247,11 +248,22 @@ if [[ ! -d $NODE_DIR ]]; then
     # has the room (the root volume does not) and which the node user can write
     # (this script's own directory, where strato-snapshot would default, it cannot).
     install -d -o $NODE_USER -g $NODE_USER "$STRATO_ROOT/.snapshot-work"
+    # The databases as they stand, to tell afterwards that the restore replaced them.
+    if [[ $loading == true ]]; then
+      databases_before=$(cluster_sql "select coalesce(string_agg(oid::text, ','), '') from pg_database where datname in ('eth', 'cirrus')")
+    fi
     sudo -u $NODE_USER -H env PATH="$PATH" STRATO_SNAPSHOT_BUCKET="${STRATO_SNAPSHOT_BUCKET:-}" STRATO_SNAPSHOT_WORKDIR="$STRATO_ROOT/.snapshot-work" \
       strato-snapshot restore "$NODE_DIR" "${snap[@]}" --network "$NETWORK" --force
+    # Loaded means the restore made both databases anew (it drops and recreates
+    # each one it loads). A snapshot without their dumps (strato-snapshot create
+    # --state-only) restores without an error and loads nothing.
+    if [[ $loading == true ]]; then
+      databases_loaded=$(cluster_sql "select count(*) from pg_database where datname in ('eth', 'cirrus') and not oid::text = any (string_to_array('$databases_before', ','))")
+      [[ "$databases_loaded" == "2" ]] || { log "the snapshot did not load eth and cirrus into the cluster ($databases_loaded of 2): it must carry both database dumps"; exit 1; }
+    fi
   fi
   # This instance loaded the cluster: what lets it finish the claim (4e), also on a rerun of this script.
-  if [[ "${SEED_EMPTY_CLUSTER:-false}" == "true" && "$SNAPSHOT_SKIP_DATABASES" == "false" ]]; then touch "$STRATO_ROOT/.cluster-loaded"; fi
+  if [[ $loading == true ]]; then touch "$STRATO_ROOT/.cluster-loaded"; fi
 fi
 # 4e. The claim on the cluster's load, settled on every run before the node
 # starts: setup and restore above run once, so a rerun after a failure gets
