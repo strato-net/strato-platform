@@ -93,7 +93,8 @@ export interface CoreCellConfig {
    * alone and starts as a standby. An instance replacing one of the claiming cell that never
    * finished loading loads again, and another cell arriving meanwhile stops. A replaced instance
    * boots again, so a fixed "first cell" setting would load a snapshot over the live databases;
-   * this cannot.
+   * this cannot. Without `snapshotSource` there is nothing to load: the claiming cell is simply
+   * the first writer, which fills the empty cluster as it syncs from genesis.
    */
   seedEmptyCluster: boolean;
   /** Run vm-query on the cell (only useful when the cell also serves RPC). */

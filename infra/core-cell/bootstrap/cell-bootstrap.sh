@@ -262,7 +262,9 @@ if [[ ! -d $NODE_DIR ]]; then
       [[ "$databases_loaded" == "2" ]] || { log "the snapshot did not load eth and cirrus into the cluster ($databases_loaded of 2): it must carry both database dumps"; exit 1; }
     fi
   fi
-  # This instance loaded the cluster: what lets it finish the claim (4e), also on a rerun of this script.
+  # This instance loaded the cluster (or, with no snapshot to load, is the
+  # first writer of an empty one): what lets it finish the claim (4e), also on
+  # a rerun of this script.
   if [[ $loading == true ]]; then touch "$STRATO_ROOT/.cluster-loaded"; fi
 fi
 # 4e. The claim on the cluster's load, settled on every run before the node
