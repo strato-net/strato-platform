@@ -462,7 +462,7 @@ YAML
   # names; the node's Prometheus has no env label to fill $env from. The tier
   # map's code scopes the account-wide CloudWatch results by it (__ENV__).
   for f in /tmp/dashboards/*.json; do sed -e 's/\${DS_PROMETHEUS}/prometheus/g' -e 's/\${DS_CLOUDWATCH}/cloudwatch/g' -e 's/\${DS_CLOUDWATCH_LOGS}/cloudwatch-logs/g' -e "s/\${DS_XRAY}/$xray_uid/g" \
-    -e 's/{env=\\"$env\\",/{/g' -e 's/,env=\\"$env\\"//g' -e 's/{env=\\"$env\\"}/{}/g' -e "s|ha-\$env-|ha-$STRATO_ENV-|g" -e "s/__ENV__/$STRATO_ENV/g" "$f" > "$G/dashboards/$(basename "$f")"; done
+    -e 's/{env=\\"$env\\",/{/g' -e 's/,env=\\"$env\\"//g' -e 's/{env=\\"$env\\"}/{}/g' -e "s|ha-\$env\([-/]\)|ha-$STRATO_ENV\1|g" -e "s/__ENV__/$STRATO_ENV/g" "$f" > "$G/dashboards/$(basename "$f")"; done
   # The tier map names CloudFront distributions from this (E123ABC=SMD,...).
   if [[ -n "${FRONTEND_LABELS:-}" ]]; then
     set -- $G/dashboards/*.json

@@ -134,6 +134,9 @@ const tierOf = (name) => {
   const m = /^ha-(.+)-(app|api)$/i.exec(name);
   return m && (!ENV || m[1].toLowerCase() === ENV) ? m[2].toLowerCase() : null;
 };
+// A task's tier, by its family. The history service's tasks (ha-<env>-history)
+// count with the app tier, behind whose load balancer they serve.
+const tierOfFamily = (family) => tierOf(family.replace(/-history$/i, "-app"));
 // RDS instance ids come from the data-plane stack's name (ha-<env>-data-postgres).
 const ownDb = (id) => (ENV ? id.toLowerCase().startsWith(`ha-${ENV}-data-`) : /^ha-.+-data-/i.test(id));
 const rate = (bytesPerSecond) => {
@@ -178,7 +181,7 @@ const current = (e) => {
 const containerOrder = ["nginx", "backend", "strato-api", "postgrest", "apex", "docs", "otel-collector"];
 const tiers = { app: [], api: [] };
 for (const e of entries.values()) {
-  const tier = tierOf(e.family);
+  const tier = tierOfFamily(e.family);
   if (!tier || !current(e)) continue;
   const t = e.taskRow || {};
   e.containers.sort((a, b) => containerOrder.indexOf(a.ContainerName) - containerOrder.indexOf(b.ContainerName));
