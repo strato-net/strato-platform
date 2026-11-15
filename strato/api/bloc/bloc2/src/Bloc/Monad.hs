@@ -50,7 +50,6 @@ type HasBlocEnv m = Accessible BlocEnv m
 data BlocEnv = BlocEnv
   { stateFetchLimit :: Integer,
     txSizeLimit :: Int,
-    gasLimit :: Integer,
     -- | How long a reserved nonce counter stays valid (see "Bloc.NonceStore";
     -- the counters live in the eth database's writer).
     nonceTtlSeconds :: Int,

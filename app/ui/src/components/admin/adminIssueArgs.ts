@@ -33,9 +33,9 @@ export const validateAdminIssueArg = (
     // Keep bigints as strings so large values survive without precision loss.
     if (typeof value === 'bigint') return [true, value.toString()];
     const val = typeof value === 'number' ? String(value) : String(value ?? '').trim();
-    const valNum = Number(val);
 
-    if (val === '' || isNaN(valNum) || !Number.isInteger(valNum)) {
+    // Digits with an optional integer exponent (e.g. 20000e18), as the node accepts
+    if (!/^-?\d+(?:[eE]\d{1,2})?$/.test(val)) {
       return [false, `Invalid integer value: ${String(value)}`];
     }
     return [true, val];

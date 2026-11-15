@@ -85,12 +85,16 @@ require("dotenv").config();
     },
     type: "FUNCTION",
   });
+  // onlyOwner calls on AdminRegistry-owned contracts go through castVoteOnIssue with positional {type, value} args
+  const ADMIN_REGISTRY = (process.env.ADMIN_REGISTRY_ADDRESS || "000000000000000000000000000000000000100c").toLowerCase();
+  const governedCall = (addr, method, args) =>
+    buildCall("AdminRegistry", ADMIN_REGISTRY, "castVoteOnIssue", { _target: addr, _func: method, _args: args });
 
   const txs = Object.entries(addrs).map(([sym, addr]) =>
-    buildCall("Token", addr, "mint", {
-      to: TO_ADDRESS.replace(/^0x/, ""),
-      amount: amounts[sym],
-    })
+    governedCall(addr, "mint", [
+      { type: "address", value: TO_ADDRESS.replace(/^0x/, "") },
+      { type: "uint256", value: amounts[sym] },
+    ])
   );
 
   console.log("Submitting batch mint transaction…");

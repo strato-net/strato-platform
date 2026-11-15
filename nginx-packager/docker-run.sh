@@ -79,7 +79,7 @@ fi
 # Host-side STRATO processes are reached as host.docker.internal (aliased by docker-compose)
 STRATO_HOSTNAME=host.docker.internal
 # Read config from ethconf.yaml (single source of truth)
-# As a sidecar in the API tier (docker-compose.api.yml) nginx proxies to the
+# As a sidecar in the API tier nginx proxies to the
 # strato-api container next to it, not to the host.
 if [[ -n "${API_UPSTREAM_HOST:-}" ]]; then
   STRATO_HOSTNAME=$API_UPSTREAM_HOST

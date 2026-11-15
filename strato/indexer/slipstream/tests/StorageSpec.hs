@@ -21,13 +21,53 @@ import qualified BlockApps.Solidity.Value as V
 import Conduit
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as C8
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import Data.Time (UTCTime (..), fromGregorian)
+import Control.Monad.Trans.Reader (runReaderT)
+import Database.Persist.Postgresql (withPostgresqlConn)
+import Database.Persist.Sql (rawExecute)
+import System.Environment (lookupEnv)
 import Test.Hspec
 
 spec :: Spec
 spec = do
+  describe "generated SQL execution" $ do
+    it "keeps forged names inside identifiers and literals" $ do
+      mDatabase <- lookupEnv "SLIPSTREAM_SQL_TEST_DATABASE"
+      case mDatabase of
+        Nothing -> pendingWith "set SLIPSTREAM_SQL_TEST_DATABASE to a disposable PostgreSQL database"
+        Just database -> do
+          let creator = "x'\"?; DROP TABLE sentinel;--$slipstream_0$"
+              contract = "Contract$$"
+              field = "z'\"?; DROP TABLE sentinel;--$slipstream_0$"
+          indexQueries <- runNoLoggingT . runConduit $
+            (createIndexTable def emptyCodeCollection (creator, contract) >> pure ()) .| sinkList
+          collectionQueries <- runNoLoggingT . runConduit $
+            (createCollectionTable (creator, contract) def emptyCodeCollection
+              ("items", [SVMType.String Nothing], SVMType.String Nothing) >>= createFkeyFunctions) .| sinkList
+          let fieldQueries =
+                [ q {viewColumns = [([(field, SqlText)], "data")]}
+                | q@CreateView{} <- indexQueries
+                ]
+          length fieldQueries `shouldBe` 1
+          runNoLoggingT $ withPostgresqlConn (C8.pack database) $ \backend ->
+            runReaderT (do
+              rawExecute "BEGIN" []
+              rawExecute "CREATE TABLE sentinel (id integer)" []
+              rawExecute "CREATE TABLE storage (address text PRIMARY KEY, block_hash text, block_timestamp text, block_number text, data jsonb)" []
+              rawExecute "CREATE TABLE mapping (address text, block_hash text, block_timestamp text, block_number text, collection_name text, collection_type text, key jsonb, path text, value jsonb, PRIMARY KEY (address, path))" []
+              rawExecute "CREATE TABLE contract (address text, code_hash text, contract_name text)" []
+              rawExecute "CREATE TABLE code (code_hash text, creator text)" []
+              rawExecute "CREATE TABLE contract_inheritance (creator text, parent text, child text)" []
+              rawExecute "CREATE PROCEDURE slipstream_upsert_view(vname text, vbody text) LANGUAGE plpgsql AS $proc$ BEGIN EXECUTE format('CREATE OR REPLACE VIEW %I AS %s', vname, vbody); END $proc$" []
+              mapM_ (\q -> rawExecute (slipstreamQueryPostgres q) [])
+                (indexQueries ++ fieldQueries ++ collectionQueries)
+              rawExecute "INSERT INTO sentinel DEFAULT VALUES" []
+              rawExecute "ROLLBACK" []
+              ) backend
+
   describe "binary collection keys" $ do
     let keyPath key = StoragePath [Field "counts", Index key]
         keys = [either error id $ B16.decode "c009e7c12890c67a2e36deb34ca9540060e3e542f456c818a91761be623b7fce", B.pack [0xc0, 0, 0xff], B.pack [0xc0, 0, 0xfe], B.replicate 32 0, B.replicate 32 65, "caf\xc3\xa9", "~hex:c000ff"]
@@ -66,9 +106,9 @@ spec = do
         [query@CreateView{}] -> do
           viewColumns query `shouldBe` [([("key", SqlBytesKey), ("key2", SqlDecimal), ("key3", SqlText), ("key4", SqlBytesKey)], "key")]
           let sql = slipstreamQueryPostgres query
-          T.isInfixOf "THEN s.\"key\"->>''key_hex''" sql `shouldBe` True
-          T.isInfixOf "THEN s.\"key\"->>''key4_hex''" sql `shouldBe` True
-          T.isInfixOf "->>''key2'')::numeric" sql `shouldBe` True
+          T.isInfixOf "THEN s.\"key\"->>'key_hex'" sql `shouldBe` True
+          T.isInfixOf "THEN s.\"key\"->>'key4_hex'" sql `shouldBe` True
+          T.isInfixOf "->>'key2')::numeric" sql `shouldBe` True
         _ -> expectationFailure "Expected one collection view"
 
   describe "history triggers" $ do

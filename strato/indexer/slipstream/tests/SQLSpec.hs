@@ -2,12 +2,22 @@
 
 module SQLSpec (spec) where
 
-import Blockchain.Slipstream.QueryFormatHelper (sanitizeCreator)
+import Blockchain.Slipstream.QueryFormatHelper
+  ( dollarQuote, sanitizeCreator, wrapEscapeDouble, wrapEscapeSingleQ )
 import Blockchain.Slipstream.SQL (isRecoverableSqlState)
 import Test.Hspec
 
 spec :: Spec
 spec = do
+  describe "generated SQL quoting" $ do
+    it "quotes identifiers and literals without mixing their escape rules" $ do
+      let name = "creator'\"?;--$$"
+      wrapEscapeDouble name `shouldBe` "\"creator'\"\"??;--$$\""
+      wrapEscapeSingleQ name `shouldBe` "'creator''\"??;--$$'"
+    it "chooses a dollar delimiter absent from the body" $
+      dollarQuote "body $slipstream_0$ end" `shouldBe`
+        "$slipstream_1$body $slipstream_0$ end$slipstream_1$"
+
   describe "isRecoverableSqlState" $ do
     it "retries statement errors but propagates connection, rollback, and cancellation errors" $ do
       isRecoverableSqlState "42703" `shouldBe` True

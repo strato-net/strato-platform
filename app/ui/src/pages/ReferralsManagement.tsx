@@ -81,15 +81,6 @@ const GuestReferralsView = () => {
                     <div className="flex items-start gap-3">
                       <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
                       <div>
-                        <h4 className="font-medium">Quantity Control</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Set how many redemptions a single deposit supports
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
-                      <div>
                         <h4 className="font-medium">Easy Sharing</h4>
                         <p className="text-sm text-muted-foreground">
                           Share via SMS, email, or any messaging app with one click
@@ -145,7 +136,6 @@ interface UserReferral {
   tokens: string[];
   amounts: string[];
   expiry: number;
-  quantity: number;
 }
 
 const ReferralsManagement = () => {
@@ -322,7 +312,6 @@ const ReferralsManagement = () => {
                         <TableRow>
                           <TableHead>Ephemeral Address</TableHead>
                           <TableHead>Tokens</TableHead>
-                          <TableHead>Quantity</TableHead>
                           <TableHead>Expiry</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
@@ -368,9 +357,6 @@ const ReferralsManagement = () => {
                                     );
                                   })}
                                 </div>
-                              </TableCell>
-                              <TableCell>
-                                <span className="text-sm font-medium">{referral.quantity || 1}</span>
                               </TableCell>
                               <TableCell>
                                 {referral.expiry === 0 ? (
@@ -548,7 +534,6 @@ const ReferralHistoryTable = ({ userAddress, getTokenInfo }: ReferralHistoryTabl
             <TableHead className="text-xs md:text-sm">Event</TableHead>
             <TableHead className="text-xs md:text-sm whitespace-nowrap">Ephemeral Address</TableHead>
             <TableHead className="text-xs md:text-sm">Tokens</TableHead>
-            <TableHead className="text-xs md:text-sm">Qty</TableHead>
             <TableHead className="text-xs md:text-sm">Recipient</TableHead>
           </TableRow>
         </TableHeader>
@@ -606,9 +591,6 @@ const ReferralHistoryTable = ({ userAddress, getTokenInfo }: ReferralHistoryTabl
                       );
                     })}
                   </div>
-                </TableCell>
-                <TableCell className="text-xs md:text-sm">
-                  <span className="font-medium">{entry.quantity || 1}</span>
                 </TableCell>
                 <TableCell>
                   {entry.recipient ? (

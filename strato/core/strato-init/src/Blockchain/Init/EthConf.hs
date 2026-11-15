@@ -9,7 +9,7 @@ import Blockchain.Init.Role
 import Control.Monad.Composable.Streaming.DockerConfig (brokerConfig, bcHost, bcPort)
 import qualified Blockchain.Init.Options as Opts
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Options (flags_network, flags_txSizeLimit, flags_gasLimit, computeNetworkID)
+import Blockchain.Strato.Model.Options (flags_network, flags_txSizeLimit, computeNetworkID)
 import Control.Concurrent
 import Data.Default
 import Network.HTTP.Types.Status
@@ -252,7 +252,6 @@ genEthConf nodeRole = do
         , chainId = computeChainId flags_network
         , httpPort = flags_httpPort
         , txSizeLimit = flags_txSizeLimit
-        , gasLimit = flags_gasLimit
         , blockPeriodMs = flags_blockstanbul_block_period_ms
         , roundPeriodS = flags_blockstanbul_round_period_s
         , maxTimestampDriftS = flags_blockstanbul_max_timestamp_drift_s

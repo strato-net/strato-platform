@@ -10,7 +10,7 @@ parseBootnodeString "" = []
 parseBootnodeString s | not $ elem '[' s = [s]
 parseBootnodeString s = read s
 
-defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
+defineFlag "u:pguser" ("strato" :: String) "Postgres user"
 defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname. Anything other than localhost is an external cluster (e.g. the Aurora writer endpoint): no postgres container is generated and --password must carry its password"
 defineFlag "pgReaderHost" ("" :: String) "Read-only Postgres endpoint (e.g. the Aurora reader endpoint) for PostgREST; defaults to --pghost"
 defineFlag "regenerate" (False :: Bool) "Re-generate ethconf.yaml, docker-compose.yml and commands.txt for an EXISTING directory from the flags given (state, secrets and genesis are kept). Pass the same flags as the original setup plus the changes; the network identity must not change"
@@ -67,7 +67,7 @@ defineFlag "localAuth" (False :: Bool) "Use local auth (Kratos/Hydra) and a node
 defineFlag "sslDir" ("" :: String) "Path to directory containing server.pem and server.key (enables SSL)"
 
 defineFlag "dockerMode" ("services" :: String) "What runs in Docker: 'services' (default): only the services, the node processes run on the host under convoke; 'all': the node processes too, in a strato container that strato-up starts from the same docker-compose.yml and that reaches the stores by service name"
-defineFlag "bundledApp" (True :: Bool) "Run app-backend and app-ui next to this node (default). False when the app runs on its own tier (docker-compose.app.yml / the app CDK stack); pass --appUrl so the node's root redirects there"
+defineFlag "bundledApp" (True :: Bool) "Run app-backend and app-ui next to this node (default). False when the app runs on its own tier (the app CDK stack); pass --appUrl so the node's root redirects there"
 defineFlag "appUrl" ("" :: String) "Public URL of the app tier, used when --bundledApp=false"
 defineFlag "bundledSmd" (True :: Bool) "Run the SMD next to this node (default). False when the SMD is served from its own deployment (S3 behind CloudFront); pass --smdUrl so the node's /smd redirects there"
 defineFlag "smdUrl" ("" :: String) "Public URL of the SMD deployment, used when --bundledSmd=false"

@@ -35,6 +35,7 @@ pay ::
   Address ->
   Integer ->
   m Bool
+pay _ _ _ val | val < 0 = return False
 pay _description fromAddr toAddr val = do
   balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy :: A.Proxy AddressState) fromAddr
   if balance < val

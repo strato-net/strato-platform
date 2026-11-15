@@ -1,6 +1,7 @@
 // Constants
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 export const STRATO_DECIMALS = 18;
+export const REFERRAL_REDEMPTION_DOMAIN = "STRATO_ESCROW_REDEEM_V1";
 
 // Error file configuration
 export const ERROR_FILE_NAME = "referral-error.flag";

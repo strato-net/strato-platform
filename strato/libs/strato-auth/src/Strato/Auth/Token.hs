@@ -11,6 +11,7 @@ module Strato.Auth.Token
 import Control.Exception (catch, SomeException)
 import Data.Aeson (FromJSON(..), decode, encode, object, withObject, (.:), (.=))
 import Data.Base64.Types as B64
+import Data.Bits ((.|.))
 import Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text as T
@@ -22,6 +23,7 @@ import Strato.Auth.Retry (withRetry)
 import System.Directory (createDirectoryIfMissing)
 import System.FileLock (withFileLock, SharedExclusive(Exclusive))
 import System.FilePath (takeDirectory)
+import System.Posix.Files (setFileMode, ownerReadMode, ownerWriteMode)
 import Text.URI as URI
 
 -- | Allow HTTP for local development: localhost, loopback, or unqualified hostnames (no dots)
@@ -81,6 +83,7 @@ writeCachedToken token expiresIn = do
         ]
   createDirectoryIfMissing True (takeDirectory tokenFilePath)
   LBS.writeFile tokenFilePath (encode tokenData)
+  setFileMode tokenFilePath (ownerReadMode .|. ownerWriteMode)
 
 -- | Fetch token endpoint from OpenID discovery document
 getTokenEndpoint :: T.Text -> IO T.Text

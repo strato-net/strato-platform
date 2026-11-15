@@ -34,7 +34,6 @@ export interface DepositParams {
   amounts: string[]; // Array of amounts in wei (as strings)
   ephemeralAddress: string; // Ephemeral address (with or without 0x)
   expiry: number; // Expiry in seconds from now
-  quantity: number; // Number of referrals this deposit supports
 }
 
 export const depositToEscrow = async (
@@ -78,25 +77,16 @@ export const depositToEscrow = async (
     throw new Error("Invalid expiry: must be a positive number of seconds");
   }
 
-  // Validate quantity
-  if (typeof params.quantity !== "number" || params.quantity <= 0 || !Number.isInteger(params.quantity)) {
-    throw new Error("Invalid quantity: must be a positive integer");
-  }
-
   // Build transaction: approve each token, then deposit all
-  // Note: approve amount needs to be quantity * amount for each token
-  const approveTxs = normalizedTokens.map((tokenAddress, index) => {
-    const totalAmount = BigInt(params.amounts[index]) * BigInt(params.quantity);
-    return {
-      contractName: extractContractName(Token),
-      contractAddress: tokenAddress,
-      method: "approve",
-      args: {
-        spender: escrowAddress,
-        value: totalAmount.toString(),
-      },
-    };
-  });
+  const approveTxs = normalizedTokens.map((tokenAddress, index) => ({
+    contractName: extractContractName(Token),
+    contractAddress: tokenAddress,
+    method: "approve",
+    args: {
+      spender: escrowAddress,
+      value: params.amounts[index],
+    },
+  }));
 
   const depositTx = {
     contractName: Escrow,
@@ -107,7 +97,6 @@ export const depositToEscrow = async (
       amounts: params.amounts,
       ephemeralAddress: ephemeralAddress,
       expiry: params.expiry,
-      quantity: params.quantity,
     },
   };
 
@@ -131,7 +120,6 @@ export interface EscrowDepositResult {
   tokens: string[];
   amounts: string[];
   expiry: number;
-  quantity: number;
 }
 
 export const getEscrowDeposit = async (
@@ -184,7 +172,6 @@ export const getEscrowDeposit = async (
       tokens: normalizeArrayLike(deposit.tokens),
       amounts: normalizeArrayLike(deposit.amounts),
       expiry: deposit.expiry || 0,
-      quantity: deposit.quantity || 1,
     };
   } catch (error: any) {
     // If it's a 404 or empty result, return null
@@ -255,7 +242,6 @@ export interface UserReferral {
   tokens: string[];
   amounts: string[];
   expiry: number;
-  quantity: number;
 }
 
 export const getUserReferrals = async (
@@ -304,7 +290,6 @@ export const getUserReferrals = async (
         tokens: normalizeArrayLike(deposit.tokens),
         amounts: normalizeArrayLike(deposit.amounts),
         expiry: deposit.expiry || 0,
-        quantity: deposit.quantity || 1,
       })).filter((deposit) => deposit.tokens.length > 0);
   } catch (error: any) {
     if (error.response?.status === 404 || error.response?.status === 200) {
@@ -366,7 +351,6 @@ export interface ReferralHistoryEntry {
   sender: string;
   recipient?: string; // Only for Redeemed events
   blockTimestamp: Date;
-  quantity?: number; // Quantity from event attributes (for Cancelled events)
 }
 
 export interface ReferralStatusResult {
@@ -560,7 +544,6 @@ export const getReferralHistory = async (
         sender: attributes.sender || "",
         recipient: attributes.recipient || undefined,
         blockTimestamp: event.block_timestamp ? new Date(event.block_timestamp) : new Date(),
-        quantity: attributes.quantity ? Number(attributes.quantity) : undefined,
       };
     });
   } catch (error: any) {

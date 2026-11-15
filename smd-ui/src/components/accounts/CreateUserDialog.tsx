@@ -83,7 +83,7 @@ export function CreateUserDialog({ disabled }: { disabled?: boolean }) {
       <DialogTrigger asChild>
         <Button variant="outline" disabled={disabled} className="gap-2">
           <UserPlus className="h-4 w-4" />
-          Create User
+          Create User wallet
         </Button>
       </DialogTrigger>
       <DialogContent>

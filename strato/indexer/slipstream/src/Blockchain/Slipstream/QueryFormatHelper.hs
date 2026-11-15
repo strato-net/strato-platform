@@ -86,8 +86,13 @@ wrapAndEscape = wrapParens . csv
 wrapEscapeSingle :: T.Text -> T.Text
 wrapEscapeSingle = wrapSingleQuotes . escapeSingleQuotes
 
+-- Persistent treats question marks as placeholders even inside SQL literals.
+-- Escape them at the leaf so nested SQL bodies are not escaped twice.
+wrapEscapeSingleQ :: T.Text -> T.Text
+wrapEscapeSingleQ = wrapSingleQuotes . escapeQuestionMarks . escapeSingleQuotes
+
 wrapEscapeDouble :: T.Text -> T.Text
-wrapEscapeDouble = wrapDoubleQuotes . escapeDoubleQuotes
+wrapEscapeDouble = wrapDoubleQuotes . escapeQuestionMarks . escapeIdentifierQuotes
 
 wrapAndEscapeSingle :: [T.Text] -> T.Text
 wrapAndEscapeSingle = wrapParens . csv . map wrapEscapeSingle
@@ -103,6 +108,10 @@ escapeSingleQuotes = T.replace "\'" "\'\'"
 
 escapeDoubleQuotes :: T.Text -> T.Text
 escapeDoubleQuotes = T.replace "\"" "\\\""
+
+-- PostgreSQL quoted identifiers use doubled quotes, not backslash escapes.
+escapeIdentifierQuotes :: T.Text -> T.Text
+escapeIdentifierQuotes = T.replace "\"" "\"\""
 
 escapeQuotes :: T.Text -> T.Text
 escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
@@ -229,13 +238,24 @@ tableNameToTextPostgres :: TableName -> T.Text
 tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char
 
 tableNameToSingleQuoteText :: TableName -> T.Text
-tableNameToSingleQuoteText = wrapSingleQuotes . escapeQuotes . tableNameToTextPostgres
+tableNameToSingleQuoteText = wrapEscapeSingleQ . tableNameToTextPostgres
 
 tableNameToDoubleQuoteText :: TableName -> T.Text
-tableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . tableNameToText
+tableNameToDoubleQuoteText = wrapEscapeDouble . tableNameToText
 
 textToDoubleQuoteText :: T.Text -> T.Text
-textToDoubleQuoteText =  wrapDoubleQuotes . escapeQuotes
+textToDoubleQuoteText = wrapEscapeDouble
+
+-- A generated SQL body may itself contain a dollar-quote delimiter.
+-- Pick one absent from the body rather than relying on a fixed $$ tag.
+dollarQuote :: T.Text -> T.Text
+dollarQuote body = go (0 :: Int)
+  where
+    go n =
+      let delimiter = "$slipstream_" <> tshow n <> "$"
+       in if delimiter `T.isInfixOf` body
+            then go (n + 1)
+            else delimiter <> body <> delimiter
 
 aesonHelper :: Map.Map T.Text T.Text -> Map.Map Aeson.Key Aeson.Value
 aesonHelper m = Map.fromList $ map (\(x, y) -> (AesonKey.fromText x, Aeson.toJSON y)) (Map.toList m)

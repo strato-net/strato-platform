@@ -5,6 +5,7 @@ declare module "express-serve-static-core" {
     address: string;
     accessToken: string;
     userName?: string;
+    userEmail?: string;
     isNewUser?: boolean;
     rawBody?: Buffer;
   }

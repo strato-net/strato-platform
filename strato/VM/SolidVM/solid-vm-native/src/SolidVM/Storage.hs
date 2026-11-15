@@ -35,11 +35,14 @@ module SolidVM.Storage
   )
 where
 
+import Blockchain.SolidVM.GasInfo (MonadBuiltinGas (..))
 import Control.Exception (throw)
 import Text.Format (format)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.Util
 import Blockchain.DB.SolidStorageDB
+import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Metered
+import Blockchain.SolidVM.Builtins.Size.Values (basicSize, chargeNested)
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM
@@ -56,6 +59,7 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8', encodeUtf8)
 import qualified Data.Vector as V
+import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
 import SolidVM.Model.Value
@@ -78,7 +82,7 @@ fromBasic = \case
 
 toBasic :: Integer -> Value -> Maybe MS.BasicValue
 toBasic currentBlockNum = \case
-  SInteger i -> Just $ MS.BInteger i
+  SIntegral i -> Just $ MS.BInteger i
   SString s -> Just . MS.BString . encodeUtf8 $ T.pack s
   SDecimal v -> Just $ MS.BDecimal $ BC.pack $ show v
   SBool b -> Just $ MS.BBool b
@@ -95,7 +99,14 @@ toBasic currentBlockNum = \case
 
 setVar :: MonadSM m => Variable -> Value -> m ()
 setVar (Constant dst) src = setVal dst src
-setVar (Variable var) val = liftIO $ writeIORef var val
+setVar (Variable var) val = Metered.localWrite >> liftIO (writeIORef var val)
+setVar (TypedVariable t var) val = checkTypedValue t val >>= setVar var
+
+checkTypedValue :: MonadSM m => SVMType.Type -> Value -> m Value
+checkTypedValue t value = do
+  contract <- getCurrentContract
+  (_, cc) <- getCurrentCodeCollection
+  coerceUnsignedValue contract cc t value
 
 setVal :: MonadSM m => Value -> Value -> m ()
 -- If val is a simple value, assign it. If it
@@ -144,15 +155,16 @@ setVal dst@(SReference path) src = do
   case basicSrc of
     Nothing -> throw (TypeError "non basic solidity type cannot be stored atomically" $ T.unpack (renderValueShallow src))
     Just b -> do
+      Metered.storageWrite path (basicSize b)
       markDiffForAction addr path b
       putSolidStorageKeyVal' addr path b
-setVal (SInteger dst) (SInteger _) = throw (ImmutableError "Cannot assign immutable or constants after assigned ->" (show dst)) -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
+setVal (SIntegral dst) (SIntegral _) = throw (ImmutableError "Cannot assign immutable or constants after assigned ->" (show dst)) -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
 setVal (SNULL) _ = return ()
 setVal dst src = throw (TypeError "unknown case called in setVal (Probably tried to change the value of a constant):" ("src = " ++ T.unpack (renderValueShallow src) ++ ", dst = " ++ T.unpack (renderValueShallow dst)))
 
-getStorageValue :: HasSolidStorageDB m => Address -> MS.StoragePath -> m Value
+getStorageValue :: (HasSolidStorageDB m, MonadBuiltinGas m) => Address -> MS.StoragePath -> m Value
 getStorageValue addr key = do
-  theValue <- getSolidStorageKeyVal' addr key
+  theValue <- Metered.storageRead key basicSize (getSolidStorageKeyVal' addr key)
   case theValue of
     MS.BDefault -> pure $ SReference key
     _ -> pure $ fromBasic theValue
@@ -203,30 +215,34 @@ getVar (Constant (SPush v (Just var))) = do
   return $ SPush v (Just $ Constant resolved)
 getVar (Constant v) = return v
 getVar (Variable v) = liftIO $ readIORef v
+getVar (TypedVariable t v) = getVar v >>= checkTypedValue t
 
 -- | Fully evaluate a value: every nested cell and storage reference is
 -- resolved, so the result holds only 'Constant's and can leave the VM.
 forceValue :: MonadSM m => Value -> m Value
-forceValue = \case
+forceValue value = chargeNested value >> forceValueWith getVar value
+
+forceValueWith :: MonadSM m => (Variable -> m Value) -> Value -> m Value
+forceValueWith load = \case
   v@(SReference _) -> do
-    v' <- getVar (Constant v)
+    v' <- load (Constant v)
     case v' of
       SReference _ -> pure v' -- unset storage slot resolves to itself
-      _ -> forceValue v'
+      _ -> forceValueWith load v'
   SStruct n m -> SStruct n <$> traverse forceVar m
   STuple vs -> STuple <$> traverse forceVar vs
   SArray vs -> SArray <$> traverse forceVar vs
   SMap m -> SMap <$> traverse forceVar m
   v -> pure v
   where
-    forceVar var = Constant <$> (getVar var >>= forceValue)
+    forceVar var = Constant <$> (load var >>= forceValueWith load)
 
 getIntEither :: MonadSM m => Variable -> m (Either Value Integer)
 getIntEither p = getIntValEither <$> getVar p
 
 getIntValEither :: Value -> Either Value Integer
 getIntValEither v' = case toNull v' of
-  SInteger s -> Right s
+  SIntegral s -> Right s
   SNULL -> Right 0
   v -> Left v
 
@@ -243,7 +259,7 @@ getRealNum :: MonadSM m => Variable -> m (Either Integer Decimal)
 getRealNum p = do
   v <- getVar p
   case toNull v of
-    SInteger s -> return $ Left s
+    SIntegral s -> return $ Left s
     SDecimal s -> return $ Right s
     SNULL -> return $ Left 0
     _ -> throw (TypeError "getRealNum" $ format (p, renderValueShallow v))
@@ -254,7 +270,7 @@ getBool = getBoolVal <=< getVar
 getBoolVal :: MonadSM m => Value -> m Bool
 getBoolVal v' = case toNull v' of
   SBool b -> return b
-  SInteger _ -> return True -- integer is guaranteed to not be 0
+  SIntegral _ -> return True -- integer is guaranteed to not be 0
   SNULL -> return False
   v -> throw (TypeError "getBool" $ T.unpack (renderValueShallow v))
 
@@ -263,7 +279,7 @@ getAddress = getAddressVal <=< getVar
 
 getAddressVal :: MonadSM m => Value -> m Address
 getAddressVal v' = case toNull v' of
-  SInteger i -> pure $ fromIntegral i
+  SIntegral i -> pure $ fromIntegral i
   SAddress a _ -> pure a
   SContract _ a -> pure a
   SString s -> case readMaybe s of
@@ -290,7 +306,7 @@ getBytes = getBytesVal <=< getVar
 
 getBytesVal :: MonadSM m => Value -> m BC.ByteString
 getBytesVal v' = case toNull v' of
-  SInteger i -> pure $ integer2Bytes i
+  SIntegral i -> pure $ integer2Bytes i
   SAddress a _ -> pure $ addressToByteString a
   SContract _ a -> pure $ addressToByteString a
   SString s -> case B16.decode $ BC.pack s of
@@ -307,9 +323,18 @@ deleteVar (Constant (SReference path)) = do
       addr = currentAddress cci
   when ro $ throw (InvalidWrite "Invalid delete during read-only access" $ "addr: " ++ format addr ++ ", path: " ++ format path)
   markDiffForAction addr path $ MS.BDefault
+  Metered.storageWrite path (basicSize MS.BDefault)
   putSolidStorageKeyVal' addr path $ MS.BDefault
 deleteVar v = throw (UnsupportedFeature "delete of a local variable" $ format v)
 
 -- | Trace/debug text for a value: force it, then use the one renderer.
 showSM :: MonadSM m => Value -> m String
-showSM = fmap (T.unpack . renderValue) . forceValue
+showSM = fmap (T.unpack . renderValue) . forceValueWith displayValue
+  where
+    displayValue (Constant (SReference key)) = do
+      address <- getCurrentAddress
+      basic <- getSolidStorageKeyVal' address key
+      pure $ case basic of
+        MS.BDefault -> SReference key
+        _ -> fromBasic basic
+    displayValue variable = weakGetVar variable

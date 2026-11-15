@@ -324,6 +324,38 @@ Open [http://localhost](http://localhost).
 
 ---
 
+## PostgreSQL permissions
+
+`postgres-packager/` installs the existing PostgreSQL configuration files into
+its image. Setup selects that image in Compose without generating or mounting
+separate PostgreSQL configuration files.
+
+`init-permissions.sql` preserves PostgreSQL's bootstrap administrator as
+`strato_admin` and creates a restricted application account named
+`strato` using the node's database password. The application account has no superuser,
+role-administration, replication or row-security-bypass privileges. Database creation and ownership rights remain
+available for startup and indexing. No Unix users or ownership are changed.
+
+`pg_hba.conf` requires password authentication over TCP and blocks the
+administrative role, `strato_admin`, from TCP entirely. That role has `NOLOGIN`
+and no password, so it cannot connect through the local socket either. It retains
+internal ownership for trusted extension installation; applications cannot assume
+its role. Privileged maintenance requires an operator-controlled offline procedure.
+No administrative credentials are supplied to services.
+
+Initialization SQL runs only when PostgreSQL creates a fresh data directory.
+Use the normal clean rebuild/resync workflow to apply it; regenerating config
+alone does not change an existing database's roles. Snapshot restore uses the
+node's PostgreSQL image when initializing its destination database. External clusters need
+equivalent permissions configured by their administrator.
+
+`strato/core/strato-init/test/postgres-permissions.sql` checks normal schema
+operations and rejection of command execution, server-file access and privilege
+escalation. Run it as the application role against a disposable database it owns;
+its test objects are rolled back.
+
+---
+
 ## Troubleshooting
 
 **`permission denied while trying to connect to the Docker daemon socket`**

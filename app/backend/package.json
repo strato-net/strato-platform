@@ -20,7 +20,6 @@
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
     "@types/pg": "^8.11.13",
-    "@types/winston": "^2.4.4",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.8.3"
   },
@@ -28,7 +27,7 @@
     "node": ">=22.12 <23.0"
   },
   "dependencies": {
-    "@sendgrid/mail": "^8.1.6",
+    "@noble/curves": "1.9.7",
     "@strato/shared-types": "file:../packages/shared-types",
     "@types/json-bigint": "^1.0.4",
     "axios": "^1.13.6",
@@ -43,7 +42,6 @@
     "stripe": "^20.3.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "winston": "^3.11.0",
     "joi": "^17.13.9"
   }
 }

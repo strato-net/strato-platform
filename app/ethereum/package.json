@@ -31,6 +31,9 @@
     "dotenv": "^17.2.1"
   },
   "overrides": {
+    "@openzeppelin/upgrades-core": {
+      "minimatch": "11.0.1"
+    },
     "hardhat": {
       "adm-zip": "^0.6.1"
     },
