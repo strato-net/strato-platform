@@ -101,6 +101,15 @@ export const config = {
     // Poll interval once caught up; while behind it pages continuously.
     intervalMs: Number(process.env.PARTNER_CIRRUS_INTERVAL_MS || 10000),
   },
+  // What /partner-api/status reports: "behind" once the indexed data is older
+  // than staleAfterSeconds. An answer is reused for cacheMs, so the endpoint,
+  // which needs no key, reads the database at most once in that time. A read
+  // that takes longer than timeoutMs is reported as "unavailable".
+  status: {
+    staleAfterSeconds: Number(process.env.PARTNER_STALE_AFTER_SECONDS || 120),
+    cacheMs: 5000,
+    timeoutMs: 3000,
+  },
 };
 
 if (!config.cirrus.nodeUrl) {

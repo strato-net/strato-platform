@@ -184,6 +184,18 @@ const carol = "44".repeat(20);
   await commit(state, [{ blockHash: "b", eventIndex: 7, account: dave, blockTs: ago(0.25), usdWad: 9n * 10n ** 18n }], at(6), at(7), asOf);
   assert.deepStrictEqual(await walletMetrics(), [1, 1, "9.00"]);
 
+  // --- Status, for a monitor: no key, always 200, the state in the body ---
+  const status = () => call("GET", "/status");
+  await query("UPDATE progress SET as_of = now() - interval '10 minutes'");
+  const behind = await status();
+  assert.deepStrictEqual([behind.status, behind.body.status, behind.body.lag_seconds >= 600], [200, "behind", true]);
+  // An answer is reused for a while, so the database is not read for every ask
+  await query("UPDATE progress SET as_of = now()");
+  assert.deepStrictEqual(await status(), behind);
+  config.status.cacheMs = 0;
+  const current = await status();
+  assert.deepStrictEqual([current.status, current.body.status, current.body.lag_seconds <= 5, typeof current.body.data_as_of], [200, "ok", true, "string"]);
+
   // --- The poller keeps its place when another node answers ---
   // A node as its Cirrus serves it: the chain's events under row ids that
   // start at the node's own offset. An ask with nothing new fails, which
@@ -244,8 +256,15 @@ const carol = "44".repeat(20);
   assert.deepStrictEqual([await position(), await counted()], [{ cursor: 7, block_hash: "h7" }, ["h2", "h6", "h7", "x3", "x4", "x5"]]);
   node.close();
 
-  server.close();
   await pool.end();
+  // Without its database the service still answers, and says so
+  const unavailable = { status: 200, body: { status: "unavailable", data_as_of: null, lag_seconds: null } };
+  assert.deepStrictEqual(await status(), unavailable);
+  // Nor does a database that never answers hold the answer back
+  (pool as any).query = () => new Promise(() => undefined);
+  config.status.timeoutMs = 50;
+  assert.deepStrictEqual(await status(), unavailable);
+  server.close();
   console.log("db.test: OK");
 })().catch((error) => {
   console.error(error);
