@@ -96,12 +96,14 @@ export class AlarmsStack extends Stack {
     });
 
     // --- Core cell hosts ---
-    config.cellInstanceIds.forEach((instanceId) => {
-      const dims = { InstanceId: instanceId };
+    // By Auto Scaling group, not by instance: the alarms stay on the cell when
+    // its instance is replaced.
+    config.cellGroupNames.forEach((group) => {
+      const dims = { AutoScalingGroupName: group };
       route(
-        new cloudwatch.Alarm(this, `CellStatus-${instanceId}`, {
-          alarmName: `${name}-cell-${instanceId}-unreachable`,
-          alarmDescription: `Core cell ${instanceId} failed its status checks`,
+        new cloudwatch.Alarm(this, `CellStatus-${group}`, {
+          alarmName: `${group}-unreachable`,
+          alarmDescription: `Core cell ${group} failed its status checks`,
           metric: new cloudwatch.Metric({ namespace: "AWS/EC2", metricName: "StatusCheckFailed", dimensionsMap: dims, statistic: "Maximum", period: Duration.minutes(1) }),
           threshold: 0,
           comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
@@ -109,11 +111,11 @@ export class AlarmsStack extends Stack {
         }),
         pages
       );
-      // The agent config aggregates disk and memory to the InstanceId dimension.
+      // The agent config aggregates disk and memory to the AutoScalingGroupName dimension too.
       route(
-        new cloudwatch.Alarm(this, `CellDisk-${instanceId}`, {
-          alarmName: `${name}-cell-${instanceId}-disk`,
-          alarmDescription: `Core cell ${instanceId} has under 15 percent disk free: LevelDB, the local broker and the logs share it`,
+        new cloudwatch.Alarm(this, `CellDisk-${group}`, {
+          alarmName: `${group}-disk`,
+          alarmDescription: `Core cell ${group} has under 15 percent disk free: LevelDB, the local broker and the logs share it`,
           metric: new cloudwatch.Metric({ namespace: "CWAgent", metricName: "disk_used_percent", dimensionsMap: dims, statistic: "Maximum", period: Duration.minutes(5) }),
           threshold: 85,
           comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
@@ -122,9 +124,9 @@ export class AlarmsStack extends Stack {
         pages
       );
       route(
-        new cloudwatch.Alarm(this, `CellMemory-${instanceId}`, {
-          alarmName: `${name}-cell-${instanceId}-memory`,
-          alarmDescription: `Core cell ${instanceId} memory over 90 percent: check the RTS heap of vm-runner and the sequencer`,
+        new cloudwatch.Alarm(this, `CellMemory-${group}`, {
+          alarmName: `${group}-memory`,
+          alarmDescription: `Core cell ${group} memory over 90 percent: check the RTS heap of vm-runner and the sequencer`,
           metric: new cloudwatch.Metric({ namespace: "CWAgent", metricName: "mem_used_percent", dimensionsMap: dims, statistic: "Average", period: Duration.minutes(5) }),
           threshold: 90,
           comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,

@@ -8,7 +8,7 @@ npm install
 npx cdk synth -c envName=testnet -c edgeUrl=https://app.testnet.example \
   -c auroraClusterIdentifier=ha-testnet-postgres \
   -c albFullNames=app/ha-testnet-api/abc,app/ha-testnet-app/def \
-  -c cellInstanceIds=i-0123,i-0456
+  -c cellGroupNames=ha-testnet-cell-a,ha-testnet-cell-b
 npx cdk deploy --all
 ```
 

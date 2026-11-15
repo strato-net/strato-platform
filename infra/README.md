@@ -82,7 +82,9 @@ same run builds the environment from nothing and updates it:
    loads the snapshot's eth and cirrus into it and starts as the writer,
    otherwise it leaves them alone and starts as a standby. For an existing
    cell the deploy only brings its launch template up to date, which is what
-   its next instance boots; the running instance is not touched.
+   its next instance boots; the running instance is not touched. The cell
+   running Grafana joins the Grafana target group once the API tier's load
+   balancer forwards to it, so on a new environment from the second run on.
 5. Existing cells are upgraded in place through SSM (`cells upgrade`):
    standbys first, then the lease holder, whose lease an upgraded standby
    takes while it restarts. Each cell gets the new image's binaries and the

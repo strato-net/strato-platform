@@ -129,10 +129,10 @@ ctx_data_plane() {
 
 ctx_obs() {
   ctx=(-c envName="$ENV_NAME" -c managedPrometheus=false -c managedGrafana=false -c auroraClusterIdentifier="$P-postgres")
-  local ids=() albs=() id n a
-  for id in $(existing_cells); do a=$(instance_of "$id"); [[ -n $a ]] && ids+=("$a"); done
+  local groups=() albs=() id n a
+  for id in $(existing_cells); do groups+=("$P-cell-$id"); done
   for n in "$P-api" "$P-app"; do a=$(alb_full_name "$n"); [[ -n $a ]] && albs+=("$a"); done
-  ((${#ids[@]})) && ctx+=(-c cellInstanceIds="$(IFS=,; echo "${ids[*]}")")
+  ((${#groups[@]})) && ctx+=(-c cellGroupNames="$(IFS=,; echo "${groups[*]}")")
   ((${#albs[@]})) && ctx+=(-c albFullNames="$(IFS=,; echo "${albs[*]}")")
   return 0
 }
@@ -162,7 +162,10 @@ ctx_cell() {
   if [[ $id == "$FIRST_CELL" ]]; then
     ctx+=(-c ethconfParameterName="/$P/api/ethconf-base64" -c grafana=true
       -c grafanaPublicUrl="https://$NODE_HOSTNAME/grafana/" -c grafanaAdminGroups="$GRAFANA_ADMIN_GROUPS" -c grafanaViewerGroups="$GRAFANA_VIEWER_GROUPS"
-      -c prometheusTargetGroupArn="$(need "$core" PrometheusTargetGroupArn)" -c grafanaTargetGroupArn="$(need "$core" GrafanaTargetGroupArn)")
+      -c prometheusTargetGroupArn="$(need "$core" PrometheusTargetGroupArn)")
+    # The Grafana target group gets its load balancer with the API tier, which
+    # is deployed after the cells: the cell joins it from the next run on.
+    exists "$P-api-tier" && ctx+=(-c grafanaTargetGroupArn="$(need "$core" GrafanaTargetGroupArn)")
   fi
   exists "$P-obs-core" && ctx+=(-c otelConfigParameterName="/$P/observability/otel-collector-cell" -c cloudWatchAgentParameterName="/$P/observability/cloudwatch-agent")
   return 0
