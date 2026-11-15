@@ -66,8 +66,8 @@ same run builds the environment from nothing and updates it:
    `ghcr.io/strato-net/strato-platform/<image>:<VERSION>-<commit>-<hash>`;
    the packages are public, so nothing logs in anywhere, and a commit not
    published yet fails the run before it deploys. strato-platform's
-   `bin/strato-*` and `core-cell/bootstrap/strato-cell-upgrade` go to
-   `NODE_SCRIPTS_S3`.
+   `bin/strato-*`, `core-cell/bootstrap/strato-cell-upgrade` and
+   `strato-cell-health` go to `NODE_SCRIPTS_S3`.
 2. `data-plane` and `obs-core`.
 3. Missing cells are created one at a time, each from the latest snapshot, the
    first of them restoring eth and cirrus into the empty cluster; the run
@@ -80,7 +80,9 @@ same run builds the environment from nothing and updates it:
    takes while it restarts. Each cell gets the new image's binaries and the
    new node scripts and must follow the chain again before the next one is
    touched. Its node directory and docker-compose.yml stay as they were set
-   up, so a change to the node's containers needs a rebuilt cell.
+   up, so a change to the node's containers needs a rebuilt cell. A cell is
+   drained before its node stops (its health check answers 503 for 30 s),
+   and the upgrade reinstalls its health endpoint and watchdog.
 5. `api-tier`, given every cell's ingress (`http://<cell>:8600`) and opening
    that port on each cell's security group itself (`cellSecurityGroupIds`),
    so no cell stack is redeployed for it; then `app-tier`, the front door
@@ -88,12 +90,29 @@ same run builds the environment from nothing and updates it:
    image set and both commits are recorded (`/ha-testnet-app/deploy/*`).
    A run with neither repo changed since does nothing.
 
+Restarting the cells on the version they run is a pipeline run with
+`CELL_ACTION=restart` (and `CELL=a` or `b` for one of them), or
+`scripts/ha.sh testnet-app cells restart [<id>]`: each cell is drained,
+restarted and back on the chain before the next, standbys first.
+
+Each cell also restarts itself. The node stops whole when any one of its
+processes exits (convoke), while systemd goes on reporting `strato-cell`
+active, so nothing else brings it back. `strato-cell-watchdog` restarts the
+node in place once it has been unhealthy for 2 minutes, at most once every 30
+minutes, and only after the node has followed the chain since the watchdog
+started (a bootstrap or an upgrade's catch-up is left alone). Each restart is
+counted in CloudWatch (`STRATO/Cell` `WatchdogRestart`). Healthy means every
+core process answers and the node is within 5 blocks of the network's best
+block (`strato-cell-upgrade --check`, the check the pipeline waits on);
+`strato-cell-health` answers the same over HTTP on port 8601.
+
 By hand, from a workstation with AWS credentials:
 
 ```sh
 scripts/ha.sh testnet-app context api-tier
 scripts/ha.sh testnet-app cdk api-tier diff
 scripts/ha.sh testnet-app cells lease
+scripts/ha.sh testnet-app cells restart b
 ```
 
 Before the first run:

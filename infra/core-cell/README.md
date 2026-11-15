@@ -133,6 +133,15 @@ through `clientSecurityGroupIds`).
 
 - `sudo systemctl status strato-cell` / `journalctl -u strato-cell`;
   `strato-ps /var/lib/strato/node` lists the processes.
+- `strato-cell-health` prints whether the cell can take transactions (every
+  core process answers, the node is within 5 blocks of the network, and the
+  cell is not draining), and serves that on port 8601 (200 or 503) for the
+  core tier's load balancer. `journalctl -u strato-cell-watchdog` shows the
+  watchdog, which restarts a node unhealthy for 2 minutes, at most once every
+  30 (`WATCHDOG_RESTART_AFTER`, `WATCHDOG_RESTART_EVERY` and
+  `WATCHDOG_RESTART_WAIT` in `/etc/strato/cell.env`, in seconds).
+- To restart the node by hand: `sudo strato-cell-upgrade --restart`, which
+  drains the cell first and waits until it follows the chain again.
 - To change flags (writer, validator behaviour): `strato-down`, then
   `strato-setup --regenerate <original flags> <changes> /var/lib/strato/node`,
   then `systemctl start strato-cell`. The password argument is needed again;

@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# This cell's health, for the core tier's load balancer and the cell's own
+# watchdog, as root. cell-bootstrap.sh installs both services on a new cell
+# and strato-cell-upgrade refreshes them on every upgrade:
+#
+#   strato-cell-health             exit 0 when the cell can take transactions, with a one-line status
+#   strato-cell-health --serve     the same answer over HTTP on HEALTH_PORT (8601): 200 or 503
+#   strato-cell-health --watch     the watchdog: restarts the node in place when it stays unhealthy
+#   strato-cell-health --install   (re)installs and (re)starts both as systemd services
+#
+# Healthy: the cell is not draining for a restart or an upgrade, and the node
+# follows the chain with every core process answering (strato-cell-upgrade
+# --check, the check the pipeline waits on).
+set -uo pipefail
+source /etc/strato/cell.env
+export AWS_DEFAULT_REGION="$AWS_REGION" AWS_PAGER=""
+DRAIN_FLAG=/run/strato-cell/maintenance
+HEALTH_PORT=${HEALTH_PORT:-8601}
+# The watchdog's timings in seconds; cell.env may set them.
+RESTART_AFTER=${WATCHDOG_RESTART_AFTER:-120}
+RESTART_EVERY=${WATCHDOG_RESTART_EVERY:-1800}
+RESTART_WAIT=${WATCHDOG_RESTART_WAIT:-600}
+log() { echo "[cell-health $(date -u +%FT%TZ)] $*"; }
+
+# strato-cell-upgrade drains the cell while it restarts or upgrades the node;
+# a flag left by a run that was killed counts for six hours at most.
+draining() { [[ -n $(find "$DRAIN_FLAG" -mmin -360 2>/dev/null) ]]; }
+
+health() {
+  if draining; then echo "cell $CELL_ID: draining for a restart or an upgrade"; return 1; fi
+  /usr/local/bin/strato-cell-upgrade --check 2>&1
+}
+
+serve() {
+  exec python3 - "$0" "$HEALTH_PORT" <<'PY'
+import http.server, subprocess, sys
+
+script, port = sys.argv[1], int(sys.argv[2])
+
+class Health(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        try:
+            r = subprocess.run([script], capture_output=True, text=True, timeout=20)
+            code, status = (200 if r.returncode == 0 else 503), r.stdout.strip() or "no status"
+        except subprocess.TimeoutExpired:
+            code, status = 503, "the health check timed out"
+        body = (status + "\n").encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "text/plain")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+http.server.ThreadingHTTPServer(("", port), Health).serve_forever()
+PY
+}
+
+# Restarts the node in place once it has been unhealthy for RESTART_AFTER, at
+# most once every RESTART_EVERY. It acts only once the node has followed the
+# chain since the watchdog started, so a first boot, a snapshot restore or the
+# catch-up after an upgrade is never cut short, and never while the cell
+# drains. Each restart is counted in CloudWatch (STRATO/Cell WatchdogRestart).
+watch() {
+  local cell=${TLS_HOSTNAME:-$(hostname)} state=/var/lib/strato-cell-health
+  local armed=false since=0 noted=false now last status
+  install -d -m 0755 "$state"
+  log "watching: a restart after ${RESTART_AFTER}s unhealthy, at most one every ${RESTART_EVERY}s"
+  while sleep 30; do
+    if draining; then since=0; continue; fi
+    if status=$(/usr/local/bin/strato-cell-upgrade --check 2>&1); then
+      [[ $armed == true && $since == 0 ]] || log "$status: healthy"
+      armed=true since=0 noted=false
+      continue
+    fi
+    [[ $armed == true ]] || continue
+    now=$(date +%s)
+    (( since )) || { since=$now; log "unhealthy: $status"; }
+    (( now - since >= RESTART_AFTER )) || continue
+    last=$(cat "$state/last-restart" 2>/dev/null || echo 0)
+    if (( now - last < RESTART_EVERY )); then
+      [[ $noted == true ]] || log "still unhealthy ($status); the last restart was $(( now - last ))s ago, the next may come in $(( last + RESTART_EVERY - now ))s"
+      noted=true
+      continue
+    fi
+    echo "$now" > "$state/last-restart"
+    log "RESTARTING the node, unhealthy for $(( now - since ))s: $status"
+    aws cloudwatch put-metric-data --namespace STRATO/Cell \
+      --metric-data "MetricName=WatchdogRestart,Dimensions=[{Name=Cell,Value=$cell}],Value=1,Unit=Count" || true
+    /usr/local/bin/strato-cell-upgrade --restart "$RESTART_WAIT" || log "restarted, but not following the chain yet"
+    since=0 noted=false
+  done
+}
+
+install_services() {
+  cat > /etc/systemd/system/strato-cell-health.service <<UNIT
+[Unit]
+Description=This cell's health over HTTP on port $HEALTH_PORT, for the core tier's load balancer
+After=network-online.target
+[Service]
+ExecStart=/usr/local/bin/strato-cell-health --serve
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target
+UNIT
+  cat > /etc/systemd/system/strato-cell-watchdog.service <<'UNIT'
+[Unit]
+Description=Restart the node in place when it stays unhealthy
+After=strato-cell.service
+[Service]
+ExecStart=/usr/local/bin/strato-cell-health --watch
+Restart=always
+RestartSec=10
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable strato-cell-health.service strato-cell-watchdog.service
+  systemctl restart strato-cell-health.service strato-cell-watchdog.service
+  log "health on port $HEALTH_PORT and the watchdog (re)started"
+}
+
+case ${1:-} in
+  "") health ;;
+  --serve) serve ;;
+  --watch) watch ;;
+  --install) install_services ;;
+  *) echo "usage: strato-cell-health [--serve | --watch | --install]" >&2; exit 2 ;;
+esac

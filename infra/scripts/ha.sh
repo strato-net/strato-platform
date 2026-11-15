@@ -9,12 +9,13 @@
 #   scripts/ha.sh <env> cdk <target> <args>...    any cdk command (diff, synth)
 #   scripts/ha.sh <env> context <target>          the context a target is given
 #   scripts/ha.sh <env> cells create              create missing cells, one at a time
-#   scripts/ha.sh <env> cells upgrade             upgrade every cell in place, standbys first
+#   scripts/ha.sh <env> cells upgrade [<id>]      upgrade every cell (or one) in place, standbys first
+#   scripts/ha.sh <env> cells restart [<id>]      restart every cell (or one) on the version it runs, standbys first
 #   scripts/ha.sh <env> cells wait-ready [<id>]   wait until cells follow the chain
 #   scripts/ha.sh <env> cells lease               who holds the writer lease
 #   scripts/ha.sh <env> install                   npm ci in every app
 #   scripts/ha.sh <env> build-ui                  build app/ui and smd-ui for the front door
-#   scripts/ha.sh <env> publish-scripts           node scripts and the cell upgrade script to NODE_SCRIPTS_S3
+#   scripts/ha.sh <env> publish-scripts           node scripts and the cell upgrade and health scripts to NODE_SCRIPTS_S3
 #   scripts/ha.sh <env> smoke                     check the deployment through its front door
 #   scripts/ha.sh <env> record <strato> <infra>   record the deployed image set and commits
 #   scripts/ha.sh <env> state                     the commits last deployed
@@ -322,10 +323,11 @@ cells_wait_ready() {
 
 # Creates the missing cells, one at a time: a cell joins a cluster the cells
 # before it have filled, so they must follow the chain first (also after a
-# run that stopped while one was still bootstrapping). Returns once every
-# cell follows the chain.
+# run that stopped while one was still bootstrapping). Returns once the cells
+# it created follow the chain; with none to create it waits for nothing, so a
+# broken cell does not block the cells upgrade that may fix it.
 cells_create() {
-  local id first_of_cluster=true ctx dir stacks
+  local id first_of_cluster=true created="" ctx dir stacks
   [[ -n $(existing_cells) ]] && first_of_cluster=false
   for id in $(cell_ids); do
     exists "$(host_stack "$id")" && continue
@@ -336,24 +338,50 @@ cells_create() {
     log "cell $id: creating $(host_stack "$id")"
     cdk_in core-cell deploy "$P-cell-$id-network" "$P-cell-$id-host" --require-approval never --progress events "${ctx[@]}"
     first_of_cluster=false
+    created+=" $id"
   done
-  cells_wait_ready
+  if [[ -n $created ]]; then cells_wait_ready "$created"; fi
 }
 
-# Standbys first, then the lease holder: while it restarts a standby takes the lease.
-cells_upgrade() {
-  load_images
-  local holder id ids order=()
+# The cells to act on, one per line: the given one, or every cell with the
+# standbys first and then the lease holder, whose lease a standby takes while
+# it restarts.
+cells_in_order() {
+  local holder id ids
   ids=$(existing_cells)
-  [[ -n $ids ]] || die "no cells to upgrade"
+  [[ -n $ids ]] || die "no cells"
+  if [[ -n ${1:-} ]]; then
+    grep -qx "$1" <<<"$ids" || die "no cell $1 (cells: $(echo $ids))"
+    echo "$1"
+    return 0
+  fi
   holder=$(lease_holder)
   log "writer lease held by: ${holder:-nobody}"
-  for id in $ids; do [[ $id != "$holder" ]] && order+=("$id"); done
-  for id in $ids; do [[ $id == "$holder" ]] && order+=("$id"); done
-  for id in "${order[@]}"; do
+  for id in $ids; do [[ $id != "$holder" ]] && echo "$id"; done
+  for id in $ids; do [[ $id == "$holder" ]] && echo "$id"; done
+  return 0
+}
+
+cells_upgrade() {
+  load_images
+  local id order
+  order=$(cells_in_order "${1:-}")
+  for id in $order; do
     log "cell $id: upgrading to $STRATO_IMAGE"
     ssm_run "$(instance_of "$id")" "$(( ${READY_TIMEOUT_MINUTES:-360} * 60 ))" "$(cell_script "$STRATO_IMAGE")" \
       || die "cell $id did not come back on $STRATO_IMAGE; the cells after it were left alone"
+  done
+}
+
+# The same version, restarted in place: drained, the node restarted, back on
+# the chain before the next cell is touched.
+cells_restart() {
+  local id order
+  order=$(cells_in_order "${1:-}")
+  for id in $order; do
+    log "cell $id: restarting"
+    ssm_run "$(instance_of "$id")" "$(( ${READY_TIMEOUT_MINUTES:-360} * 60 ))" "$(cell_script --restart)" \
+      || die "cell $id did not follow the chain again after its restart; the cells after it were left alone"
   done
 }
 
@@ -380,9 +408,10 @@ case $cmd in
     resolve "${1:?target}"
     if [[ -n $skip ]]; then log "skip ${1}: $skip"; else printf '%s\n' "${ctx[@]}" | paste -d' ' - -; fi ;;
   cells)
-    case ${1:?cells create|upgrade|wait-ready|lease} in
+    case ${1:?cells create|upgrade|restart|wait-ready|lease} in
       create) cells_create ;;
-      upgrade) cells_upgrade ;;
+      upgrade) cells_upgrade "${2:-}" ;;
+      restart) cells_restart "${2:-}" ;;
       wait-ready) cells_wait_ready "${2:-}" ;;
       lease) echo "${P}: writer lease held by $(lease_holder)" ;;
       *) die "unknown cells command $1" ;;
@@ -390,11 +419,11 @@ case $cmd in
   install) for d in data-plane core-cell api-tier app-tier observability; do node_run "$ROOT/$d" npm ci --no-audit --no-fund --loglevel=error; done ;;
   build-ui) for d in app/ui smd-ui; do log "build $d"; node_run "$STRATO_PLATFORM_DIR/$d" bash -c 'npm ci --no-audit --no-fund --loglevel=error && npm run build'; done ;;
   publish-scripts)
-    # What cell-bootstrap.sh installs from the NodeScripts asset, plus this repo's upgrade script.
+    # What cell-bootstrap.sh installs from the NodeScripts asset, plus this repo's upgrade and health scripts.
     staging=$(mktemp -d)
     trap 'rm -rf "$staging"' EXIT
     find "$STRATO_PLATFORM_DIR/bin" -maxdepth 1 -type f -name 'strato-*' ! -name '*.md' ! -name strato-pg-migrate ! -name strato-patch-app -exec cp {} "$staging/" \;
-    cp "$ROOT/core-cell/bootstrap/strato-cell-upgrade" "$staging/"
+    cp "$ROOT/core-cell/bootstrap/strato-cell-upgrade" "$ROOT/core-cell/bootstrap/strato-cell-health" "$staging/"
     aws s3 sync --delete --only-show-errors "$staging/" "$NODE_SCRIPTS_S3"
     log "published $(ls "$staging" | wc -l | tr -d ' ') scripts to $NODE_SCRIPTS_S3" ;;
   smoke) smoke ;;

@@ -560,6 +560,15 @@ UNIT
   systemctl enable --now strato-lease-watch.service
 fi
 
+# --- 7d. Health over HTTP (8601) and the watchdog that restarts a stuck node ---
+# Both scripts normally come with the node scripts (EXTRA_BINARIES_S3, step 3),
+# else from this bootstrap; every cells upgrade reinstalls them from S3.
+for s in strato-cell-upgrade strato-cell-health; do
+  command -v $s >/dev/null || install -m 0755 /opt/strato/bootstrap/$s /usr/local/bin/
+done
+log "health endpoint and watchdog"
+strato-cell-health --install
+
 # --- 8. Log rotation for the node's process logs ---
 cat > /etc/cron.daily/strato-logrotate <<EOF
 #!/bin/sh
