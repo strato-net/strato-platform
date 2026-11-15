@@ -98,11 +98,11 @@ router.get("/partner-api/health", (_req, res) => {
 const readStatus = async (): Promise<object> => {
   try {
     const asOf = (await query<{ as_of: Date }>("SELECT as_of FROM progress WHERE name = 'cirrus'")).rows[0]?.as_of ?? null;
-    const lag = asOf && Math.max(0, Math.round((Date.now() - asOf.getTime()) / 1000));
-    const current = lag !== null && lag <= config.status.staleAfterSeconds;
-    return { status: current ? "ok" : "behind", data_as_of: asOf?.toISOString() ?? null, lag_seconds: lag };
+    const age = asOf && Math.max(0, Date.now() - asOf.getTime());
+    const current = age !== null && age <= config.status.staleAfterSeconds * 1000;
+    return { status: current ? "ok" : "behind", data_as_of: asOf?.toISOString() ?? null, lag_seconds: age === null ? null : Math.round(age / 1000) };
   } catch {
-    return { status: "unavailable" };
+    return { status: "unavailable", data_as_of: null, lag_seconds: null };
   }
 };
 let status: { at: number; body: Promise<object> } | null = null;
