@@ -20,6 +20,8 @@ module Blockchain.Forks
   ( isReceiptsRootForkActive,
     isBlockRewardReceiptForkActive,
     isFeeConsensusDeltaForkActive,
+    isConsensusFromStateForkActive,
+    heliumConsensusFromStateForkBlock,
     isEmitArgForkActive,
     isOperatorPrecedenceForkActive,
     isRlpEncodeForkActive,
@@ -126,6 +128,39 @@ isFeeConsensusDeltaForkActive blockNum =
    in not $ (net == upquarkNetworkID  && blockNum < upquarkStakingForkBlock)
          || (net == heliumNetworkID   && blockNum < heliumFeeConsensusDeltaForkBlock)
          || (net == forktestNetworkID && blockNum < forktestFeeConsensusDeltaForkBlock)
+
+-- | Block from which the validator-set and stake-weight changes a block carries
+-- in its header are read from contract state, not added up from events.
+--
+-- The header's newValidators, removedValidators and stakeUpdates were derived
+-- from the ValidatorAdded, ValidatorRemoved and ValidatorStakeUpdated events of
+-- the block's transactions. Events are not state: a call that reverts and is
+-- caught by its caller has its storage rolled back, and on builds without the
+-- try/catch fix it kept its events, so a rolled-back call could add a validator
+-- or publish a weight that governance does not hold. Events of calls that run
+-- outside a transaction's own results (the fee payment, the block-reward call)
+-- needed a fork of their own to be counted at all.
+--
+-- From this block both proposer and verifier read the list of validators and
+-- each one's weight from MercataGovernance's storage as the block leaves it,
+-- and put the difference from the set and weights in force into the same
+-- header fields. The header format and the consensus layer do not change.
+--
+-- Proposer and verifier must switch at the same block. Helium has blocks
+-- sealed under the event rule and needs a height of its own; upquark switches
+-- with staking, the flag day it already has.
+heliumConsensusFromStateForkBlock :: Integer
+heliumConsensusFromStateForkBlock = forkNotScheduled
+
+forktestConsensusFromStateForkBlock :: Integer
+forktestConsensusFromStateForkBlock = forkNotScheduled
+
+isConsensusFromStateForkActive :: Integer -> Bool
+isConsensusFromStateForkActive blockNum =
+  let net = Conf.networkID $ networkConfig ethConf
+   in not $ (net == upquarkNetworkID  && blockNum < upquarkStakingForkBlock)
+         || (net == heliumNetworkID   && blockNum < heliumConsensusFromStateForkBlock)
+         || (net == forktestNetworkID && blockNum < forktestConsensusFromStateForkBlock)
 
 -- | Block from which SolidVM emits fully evaluated event args, with an arg that
 -- was never written replaced by its declared type's default.

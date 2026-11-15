@@ -15,6 +15,10 @@ import Blockchain.Data.TransactionResultStatus
 import Blockchain.Strato.Model.StateRoot (StateRoot (..))
 import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Validator (Validator (..))
+import Blockchain.EthConf (ethConf)
+import qualified Blockchain.EthConf.Model as Conf
+import Blockchain.Forks (isConsensusFromStateForkActive)
 import SolidVM.Model.Delta
 import SolidVM.Model.Event
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
@@ -24,8 +28,10 @@ import Control.DeepSeq
 import Control.Lens.Setter (set)
 import Control.Monad.IO.Class (MonadIO)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import Data.Maybe (catMaybes)
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.List (foldl')
 import Data.Time.Clock
 import GHC.Generics
@@ -291,6 +297,84 @@ getStakeDeltasFromResults = foldl' go M.empty
   where go acc trr = case trrResult trr of
           Left _ -> acc
           Right ExecResults{..} -> M.union erStakeUpdates acc
+
+-- | The validators MercataGovernance (0x100) lists and the weight it holds for
+-- each, read from the state the block leaves behind.
+--
+-- An empty result means "nothing to go by", never "no validators": governance
+-- does not drop its last validator, so an empty list is a network without the
+-- contract, and an entry that does not read as an address is storage this node
+-- cannot interpret. In both cases the caller leaves the set as it is.
+governanceValidatorsAndStakes :: HasSolidStorageDB m => m [(Validator, Integer)]
+governanceValidatorsAndStakes = do
+  len <- at [Field "validators", Field "length"]
+  case len of
+    BInteger n | n > 0 -> maybe [] id . sequence <$> mapM member [0 .. n - 1]
+    _ -> pure []
+  where
+    governance = Address 0x100
+    at path = getSolidStorageKeyVal' governance (StoragePath path)
+    member i = do
+      entry <- at [Field "validators", Index (BC.pack $ show i)]
+      case entry of
+        BAddress a -> Just <$> weighed a
+        BContract _ a -> Just <$> weighed a
+        _ -> pure Nothing
+    weighed a = do
+      weight <- at [Field "validatorStake", Index (BC.pack $ show a)]
+      pure . (,) (Validator a) $ case weight of
+        BInteger w -> max 0 w
+        _ -> 0
+
+-- | The changes that take the validator set and weights in force for a block
+-- to the ones the contracts hold after it: validators to add, validators to
+-- remove, and the weight of every held validator whose weight differs (a
+-- validator without an entry weighs 0). Lists are ascending, so every node
+-- writes the same header.
+--
+-- This is 'getDeltasFromResults' and 'getStakeDeltasFromResults' asked of the
+-- state. An empty @held@ changes nothing (see 'governanceValidatorsAndStakes').
+--
+-- One case is held back. While no weight is in force every validator has one
+-- vote, and the first weights to arrive switch the network to voting by stake,
+-- where a validator without a weight counts on neither side. If state held a
+-- weight for some validators and none for others at that moment, the ones with
+-- a weight would take the whole vote. So the first weights are written only
+-- once every held validator has one; until then the header carries the set
+-- changes and no weights, and the network stays on one vote each.
+consensusDeltasFromHeld :: S.Set Validator -> M.Map Validator Integer -> [(Validator, Integer)] -> (ValidatorDelta, StakeDelta)
+consensusDeltasFromHeld _ _ [] = (mempty, M.empty)
+consensusDeltasFromHeld inForce inForceStakes held =
+  ( toDelta (S.toAscList $ heldSet S.\\ inForce) (S.toAscList $ inForce S.\\ heldSet),
+    if noWeightInForce && partial then M.empty else changed
+  )
+  where
+    heldStakes = M.fromList held
+    heldSet = M.keysSet heldStakes
+    changed = M.filterWithKey (\v w -> M.findWithDefault 0 v inForceStakes /= w) heldStakes
+    noWeightInForce = all (<= 0) (M.elems inForceStakes)
+    partial = any (<= 0) (M.elems heldStakes) && any (> 0) (M.elems heldStakes)
+
+-- | The validator-set and stake-weight changes a block's header carries, given
+-- the block's number, the set and weights in force for it, and the results of
+-- its transactions.
+--
+-- From the fork (and only once staking is active, since earlier headers carry
+-- no weights) they are what governance's storage holds at the block's state
+-- root, so the caller must be positioned on that state. Before it they are
+-- added up from the transactions' events. Proposer and verifier both come
+-- through here, which is what keeps them on the same rule at the same block.
+blockConsensusDeltas ::
+  HasSolidStorageDB m =>
+  Integer ->
+  S.Set Validator ->
+  M.Map Validator Integer ->
+  [TxRunResult] ->
+  m (ValidatorDelta, StakeDelta)
+blockConsensusDeltas blockNum inForce inForceStakes trrs
+  | isConsensusFromStateForkActive blockNum && Conf.stakingActiveAt (Conf.networkConfig ethConf) blockNum =
+      consensusDeltasFromHeld inForce inForceStakes <$> governanceValidatorsAndStakes
+  | otherwise = pure (getDeltasFromResults trrs, getStakeDeltasFromResults trrs)
 
 -- | Convert a 'TxRunResult' to its canonical 'Receipt' for inclusion in the
 -- receipts trie (Phase 0 spec §6.2). Mirrors the gas/status accounting in
