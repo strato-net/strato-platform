@@ -84,6 +84,9 @@ data BlockstanbulContext = BlockstanbulContext
     _hasPrepared :: Bool,
     _hasCommitted :: Bool,
     _pendingRound :: Maybe RoundNumber,
+    -- The ROUNDCHANGE this node signed for the current view, re-sent unchanged
+    -- on every later timeout until the view changes
+    _sentRoundChange :: Maybe OutEvent,
     -- Which peers have we received a notice for a round-change
     _roundChanged :: M.Map RoundNumber (S.Set Validator),
     -- The identity of this node
@@ -169,6 +172,7 @@ newContext network' chainId' (Checkpoint v as mParent stakes' lastRound') addr v
           _hasPrepared = False,
           _hasCommitted = False,
           _pendingRound = Nothing,
+          _sentRoundChange = Nothing,
           _roundChanged = M.empty,
           _selfAddr = addr,
           _blockLock = Nothing,
