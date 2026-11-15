@@ -12,6 +12,9 @@ import { getOraclePrices } from "./oracle.service";
 const { Token, StratoStaking, ValidatorRegistry } = constants;
 const WAD = 10n ** 18n;
 const BPS_DIVISOR = 10000n;
+// StratoStaking.DEFAULT_SELF_BOND_MINIMUM: the operator's own bond a new seat needs until
+// the admins set selfBondMinimum.
+const DEFAULT_SELF_BOND_MINIMUM = 10000n * WAD;
 const YEAR_SECONDS = 365n * 24n * 60n * 60n;
 const MAX_UINT256 = (1n << 256n) - 1n;
 
@@ -43,6 +46,10 @@ export interface StratoOperatorInfo {
   isValidator: boolean;
   eligible: boolean;
   isWaiter: boolean;
+  // The stake eligibility holds this record to, and whether delegated stake counts toward
+  // it (v2: only for a seat from before the self-bond rule, until its grace ends). "0" on v1.
+  requiredStake: string;
+  requiredStakeCountsDelegations: boolean;
   jailedUntil: string;
   exitReadyTime: string;
   blocksProposed: string;
@@ -122,7 +129,10 @@ export interface StratoStakingInfo {
   exitNoticeSeconds: string;
   unkickCooldown: string;
   maxOperatorStakeBps: string;
+  // v2: true until a processed block reaches joinsOpenFromBlock ("0" = not agreed); there is
+  // no admin pause, admission opens for everyone at that block.
   joinsPaused: boolean;
+  joinsOpenFromBlock: string;
   governanceSyncEnabled: boolean;
   validatorCount: string;
   trackedUsdst: string;
@@ -289,6 +299,7 @@ const emptyInfo = (): StratoStakingInfo => ({
   unkickCooldown: "0",
   maxOperatorStakeBps: "0",
   joinsPaused: true,
+  joinsOpenFromBlock: "0",
   governanceSyncEnabled: false,
   validatorCount: "0",
   trackedUsdst: "0",
@@ -716,9 +727,22 @@ const recordOperator = (validator: string, record: Record<string, any>): string 
   return isNormalizedAddress(operator) && !/^0+$/.test(operator) ? operator : validator;
 };
 
+// _minSelfBond: selfBondMinimum, or the default while it was never set.
+const selfBondMinimumOf = (state: Record<string, any>): bigint => {
+  const set = parseBigIntLike(state.selfBondMinimum);
+  return set > 0n ? set : DEFAULT_SELF_BOND_MINIMUM;
+};
+
 const isSelfBondRuleActive = (state: Record<string, any>, now: bigint): boolean => {
   const graceUntil = parseBigIntLike(state.selfBondGraceUntil);
   return graceUntil > 0n && now >= graceUntil;
+};
+
+// _requireJoinsOpen, with the last processed block (the last block with a transaction)
+// standing in for the head.
+const isJoinsOpen = (state: Record<string, any>): boolean => {
+  const from = parseBigIntLike(state.joinsOpenFromBlock);
+  return from > 0n && parseBigIntLike(state.lastProcessedBlock) >= from;
 };
 
 type V2ValidatorRecord = {
@@ -734,6 +758,8 @@ type V2ValidatorRecord = {
   jailedUntil: bigint;
   exitReadyTime: bigint;
   status: StratoOperatorStatus;
+  requiredStake: bigint;
+  requiredStakeCountsDelegations: boolean;
   eligible: boolean;
 };
 
@@ -742,8 +768,10 @@ type V2ValidatorRecord = {
 const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => {
   const now = BigInt(Math.floor(Date.now() / 1000));
   const minStake = parseBigIntLike(state.minStake);
+  const selfBondMinimum = selfBondMinimumOf(state);
   const selfBondRuleActive = isSelfBondRuleActive(state, now);
   const isValidatorMap = addressKeyed(state.isValidator);
+  const selfBondRuleSeatMap = addressKeyed(state.seatedUnderSelfBondRule);
   const jailedUntilMap = addressKeyed(state.jailedUntil);
   const exitReadyMap = addressKeyed(state.exitReadyTime);
 
@@ -758,8 +786,13 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
       const totalStake = selfBond + delegatedStake;
       const jailedUntil = parseBigIntLike(jailedUntilMap.get(validator));
       const exitReadyTime = parseBigIntLike(exitReadyMap.get(validator));
-      // _meetsMinStake: combined stake until the self-bond grace ends, self-bond after.
-      const meetsMinStake = selfBondRuleActive ? selfBond >= minStake : totalStake >= minStake;
+      // _meetsMinStake: a candidate, or a seat taken under the self-bond rule, needs
+      // selfBondMinimum of self-bond; a seat from before the rule keeps minStake, on combined
+      // stake until the self-bond grace ends and on self-bond after.
+      const selfBondSeat = !isValidator || parseBoolLike(selfBondRuleSeatMap.get(validator));
+      const requiredStake = selfBondSeat ? selfBondMinimum : minStake;
+      const requiredStakeCountsDelegations = !selfBondSeat && !selfBondRuleActive;
+      const meetsMinStake = (requiredStakeCountsDelegations ? totalStake : selfBond) >= requiredStake;
 
       return {
         validator,
@@ -774,6 +807,8 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
         jailedUntil,
         exitReadyTime,
         status: !active ? 3 : isValidator ? 2 : 1,
+        requiredStake,
+        requiredStakeCountsDelegations,
         eligible: active && meetsMinStake && now >= jailedUntil && (exitReadyTime === 0n || now < exitReadyTime),
       };
     });
@@ -812,8 +847,9 @@ let recentRewardsCache: { address: string; expiresAt: number; totals: Promise<Ma
 const cirrusTimestamp = (epochSeconds: number): string =>
   new Date(epochSeconds * 1000).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
 
-// STRATO block rewards credited per validator over the trailing window. Summed in Postgres
-// (otherwise one row per block), with ::text keeping 18-decimal totals exact through JSON.
+// STRATO block rewards and emission-schedule payouts credited per validator over the trailing
+// window. Summed in Postgres (otherwise one row per block), with ::text keeping 18-decimal
+// totals exact through JSON.
 const getRecentBlockRewards = (accessToken: string): Promise<Map<string, bigint>> => {
   const address = stakingAddress();
   if (!address) return Promise.resolve(new Map());
@@ -825,7 +861,7 @@ const getRecentBlockRewards = (accessToken: string): Promise<Map<string, bigint>
   const totals = cirrus.get(accessToken, `/${constants.Event}`, {
     params: {
       address: `eq.${address}`,
-      event_name: "eq.BlockRewardCredited",
+      event_name: "in.(BlockRewardCredited,ProductionRewarded)",
       block_timestamp: `gte.${cirrusTimestamp(since)}`,
       select: "validator:attributes->>validator,amount:attributes->>amount::numeric.sum()::text",
     },
@@ -1238,6 +1274,8 @@ const getV1StakingInfo = async (
       isValidator: active,
       eligible: active,
       isWaiter: false,
+      requiredStake: "0",
+      requiredStakeCountsDelegations: false,
       jailedUntil: "0",
       exitReadyTime: "0",
       blocksProposed: "0",
@@ -1313,6 +1351,7 @@ const getV1StakingInfo = async (
     maxOperatorStakeBps: "0",
     // v1 has no permissionless join at all, so "paused" is the honest reading.
     joinsPaused: true,
+    joinsOpenFromBlock: "0",
     governanceSyncEnabled: false,
     // No separate set counter on v1; every active operator is in the consensus set,
     // which is exactly what activeOperatorCount counts.
@@ -1449,6 +1488,8 @@ const getV2StakingInfo = async (
       isValidator: record.isValidator,
       eligible: record.eligible,
       isWaiter: record.eligible && !record.isValidator,
+      requiredStake: record.requiredStake.toString(),
+      requiredStakeCountsDelegations: record.requiredStakeCountsDelegations,
       jailedUntil: record.jailedUntil.toString(),
       exitReadyTime: record.exitReadyTime.toString(),
       blocksProposed: uintString(blocksProposedMap.get(validator)),
@@ -1511,7 +1552,7 @@ const getV2StakingInfo = async (
     stakeRewardRate: "0",
     estimatedApy,
     minStake: uintString(state.minStake),
-    minSelfBond: "0",
+    minSelfBond: selfBondMinimumOf(state).toString(),
     selfBondGraceUntil: uintString(state.selfBondGraceUntil),
     selfBondRuleActive: isSelfBondRuleActive(state, now),
     proposerFeeBps: uintString(state.proposerFeeBps),
@@ -1524,7 +1565,8 @@ const getV2StakingInfo = async (
     exitNoticeSeconds: uintString(state.exitNoticeSeconds),
     unkickCooldown: uintString(state.unkickCooldown),
     maxOperatorStakeBps: uintString(state.maxOperatorStakeBps),
-    joinsPaused: parseBoolLike(state.joinsPaused),
+    joinsPaused: !isJoinsOpen(state),
+    joinsOpenFromBlock: uintString(state.joinsOpenFromBlock),
     governanceSyncEnabled: parseBoolLike(state.governanceSyncEnabled),
     validatorCount: uintString(state.validatorCount),
     trackedUsdst: uintString(state.trackedUsdst),
@@ -2402,6 +2444,21 @@ export const setStratoSelfBondGrace = async (
   ]);
 };
 
+// The operator's own bond a candidate, or a seat taken under the self-bond rule, needs. A
+// higher bar drops such seats that fall short from the set.
+export const setStratoSelfBondMinimum = async (
+  accessToken: string,
+  userAddress: string,
+  selfBondMinimum: string
+): Promise<{ status: string; hash: string }> => {
+  if (parseBigIntLike(selfBondMinimum) <= 0n) throw badRequest("selfBondMinimum must be positive");
+  await requireV2(accessToken);
+
+  return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setSelfBondMinimum", [
+    selfBondMinimum,
+  ]);
+};
+
 export const setStratoSetParams = async (
   accessToken: string,
   userAddress: string,
@@ -2413,7 +2470,6 @@ export const setStratoSetParams = async (
     exitNoticeSeconds: string;
     unkickCooldown: string;
     maxOperatorStakeBps: string;
-    joinsPaused: boolean;
   }
 ): Promise<{ status: string; hash: string }> => {
   await requireV2(accessToken);
@@ -2426,7 +2482,6 @@ export const setStratoSetParams = async (
     args.exitNoticeSeconds,
     args.unkickCooldown,
     args.maxOperatorStakeBps,
-    args.joinsPaused,
   ]);
 };
 

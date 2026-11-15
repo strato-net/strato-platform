@@ -143,6 +143,18 @@ contract Describe_MercataGovernance {
         require(gov.validatorStake(v1) == 7, "no quantum: every change is published");
     }
 
+    function it_requires_a_complete_positive_set_for_the_stake_snapshot() public {
+        stranger.doExpectingFailure(address(gov), "publishValidatorStakeSnapshot()", "No validators to publish");
+        _add(staking, v1, 100);
+        _add(staking, v2, 0);
+        stranger.doExpectingFailure(address(gov), "publishValidatorStakeSnapshot()", "Validator has no stake weight");
+
+        staking.doSuccessfully(address(gov), "updateValidatorStake(address,uint256)", v2, uint256(200));
+        stranger.doSuccessfully(address(gov), "publishValidatorStakeSnapshot()");
+        require(gov.validatorStake(v1) == 100 && gov.validatorStake(v2) == 200, "snapshot leaves stored weights unchanged");
+        stranger.doSuccessfully(address(gov), "publishValidatorStakeSnapshot()");
+    }
+
     // A vote to add must not count toward a removal once the validator has joined
     // through staking.
     function it_drops_pending_votes_when_membership_changes() public {
@@ -171,6 +183,7 @@ contract Describe_MercataGovernance {
         require(proxied.validatorCount() == 1, "validators survive the upgrade");
         require(proxied.validatorStake(v1) == 9, "stake survives the upgrade");
         require(proxied.stakingContract() == address(staking), "staking contract survives the upgrade");
+        stranger.doSuccessfully(address(proxied), "publishValidatorStakeSnapshot()");
     }
 
     function it_enforces_the_hard_cap_on_both_paths() public {
