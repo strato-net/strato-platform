@@ -624,17 +624,17 @@ contract  StratoStaking is Ownable {
     // back by the block's allowance of set changes and does not use it up: the allowance
     // cannot stop a validator switching off, only stop the chain recording that it left,
     // and a seat kept past its bond is retried by nobody. Joining is never implicit,
-    // except into a seat the admins pinned.
+    // except into a seat governance already gave the validator (an admin pin).
     function _syncValidator(address validator) internal {
         if (!governanceSyncEnabled) return;
         if (!isValidator[validator]) {
-            // The admins pinned it into governance's set: take the seat here too, whatever
-            // its eligibility, so its stake is published as its weight. Not a mutation:
-            // governance has already changed the set.
-            if (operators[validator].active && _pinnedIn(validator)) {
-                _activate(validator);
-            }
-            return;
+            // Governance lists it but staking never seated it: the admins pinned it in, and
+            // may have cleared the pin since. Take the seat here too, whatever its
+            // eligibility, so its stake is published as its weight and, without a pin, the
+            // rules below decide whether it stays. Not a mutation: governance has already
+            // changed the set.
+            if (!operators[validator].active || IStakingGovernance(governance).validatorMap(validator) == 0) return;
+            _activate(validator);
         }
         // Governance decides who is in the consensus set. A validator it no longer
         // lists (an admin vote removed it) gives up its seat here: adding it back
@@ -731,8 +731,8 @@ contract  StratoStaking is Ownable {
         require(!isValidator[validator], "SS: already active");
         require(eligible(validator), "SS: not eligible");
         require(!_pinnedOut(validator), "SS: pinned out by governance");
-        if (_pinnedIn(validator)) {
-            // Already in governance's set: no slot to find and nobody to evict.
+        if (IStakingGovernance(governance).validatorMap(validator) > 0) {
+            // Already in governance's set (an admin pin): no slot to find and nobody to evict.
             _activate(validator);
             return;
         }
