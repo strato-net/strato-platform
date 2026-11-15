@@ -469,8 +469,18 @@ contract  StratoStaking is Ownable {
     }
 
     // A waiter is eligible but not in the set; promotion is explicit (tryActivate / reconcileSet).
+    // A validator the admins pinned out is never a waiter.
     function isWaiter(address validator) public view returns (bool) {
-        return eligible(validator) && !isValidator[validator];
+        return eligible(validator) && !isValidator[validator] && !_pinnedOut(validator);
+    }
+
+    // Admin pins, read from governance (see MercataGovernance.pinnedIn / pinnedOut).
+    function _pinnedIn(address validator) internal view returns (bool) {
+        return governanceSyncEnabled && IStakingGovernance(governance).pinnedIn(validator);
+    }
+
+    function _pinnedOut(address validator) internal view returns (bool) {
+        return governanceSyncEnabled && IStakingGovernance(governance).pinnedOut(validator);
     }
 
     // Voting weight of the consensus set. Stake behind listed validators outside the set
@@ -601,9 +611,18 @@ contract  StratoStaking is Ownable {
     // eligible (same transaction, counts as a set mutation), refresh the weight otherwise.
     // With this block's mutation budget spent, a validator that should leave keeps its
     // seat until a later sync: failing instead would block the unstake or parameter
-    // change that got here. Joining is never implicit.
+    // change that got here. Joining is never implicit, except into a seat the admins pinned.
     function _syncValidator(address validator) internal {
-        if (!governanceSyncEnabled || !isValidator[validator]) return;
+        if (!governanceSyncEnabled) return;
+        if (!isValidator[validator]) {
+            // The admins pinned it into governance's set: take the seat here too, whatever
+            // its eligibility, so its stake is published as its weight. Not a mutation:
+            // governance has already changed the set.
+            if (operators[validator].active && _pinnedIn(validator)) {
+                _activate(validator);
+            }
+            return;
+        }
         // Governance decides who is in the consensus set. A validator it no longer
         // lists (an admin vote removed it) gives up its seat here: adding it back
         // would undo the vote, and anyone can trigger a sync.
@@ -612,7 +631,8 @@ contract  StratoStaking is Ownable {
             emit ValidatorSynced(operatorOf(validator), validator, false, 0);
             return;
         }
-        if (!eligible(validator) && _mutationsLeft() > 0) {
+        // A pinned seat stays, and its weight is still republished below.
+        if (!eligible(validator) && _mutationsLeft() > 0 && !_pinnedIn(validator)) {
             _consumeMutations(1);
             _deactivate(validator);
             return;
@@ -644,10 +664,12 @@ contract  StratoStaking is Ownable {
         }
     }
 
-    // Lowest validator by (weight asc, address asc): the eviction candidate.
+    // Lowest validator by (weight asc, address asc): the eviction candidate. A pinned seat
+    // is never one.
     function _lowestValidator() internal view returns (address lowest, uint256 lowestWeight) {
         for (uint256 i = 0; i < activeValidators.length; i++) {
             address validator = activeValidators[i];
+            if (_pinnedIn(validator)) continue;
             uint256 w = _validatorWeight(operators[validator]);
             if (lowest == address(0) || w < lowestWeight || (w == lowestWeight && uint256(validator) < uint256(lowest))) {
                 lowest = validator;
@@ -682,6 +704,12 @@ contract  StratoStaking is Ownable {
         _requireJoinsOpen();
         require(!isValidator[validator], "SS: already active");
         require(eligible(validator), "SS: not eligible");
+        require(!_pinnedOut(validator), "SS: pinned out by governance");
+        if (_pinnedIn(validator)) {
+            // Already in governance's set: no slot to find and nobody to evict.
+            _activate(validator);
+            return;
+        }
 
         if (validatorCount < effectiveCap()) {
             _consumeMutations(1);
@@ -964,9 +992,11 @@ contract  StratoStaking is Ownable {
         kickedAt[validator] = block.timestamp;
         totalRewardableStake -= _validatorWeight(v);
         _releaseSelfBond(validator, v, operatorOf(validator));
-        // A kick leaves the set immediately and is not bounded by the mutation cap.
-        if (governanceSyncEnabled && isValidator[validator]) {
-            _deactivate(validator);
+        // A kick leaves the set immediately, is not bounded by the mutation cap, and
+        // overrides an admin pin (governance drops the pin with the seat).
+        if (governanceSyncEnabled && IStakingGovernance(governance).removeKickedValidator(validator) && isValidator[validator]) {
+            _unseat(validator);
+            emit ValidatorSynced(operatorOf(validator), validator, false, 0);
         }
         emit ValidatorRecordSynced(validator, operatorOf(validator), false, v.commissionBps);
     }
