@@ -8,9 +8,16 @@ import {
   dedicatedWalletContractName,
   isUnlimitedTokenApproval,
   normalizeDedicatedArguments,
+  parseDedicatedPendingUpgrade,
   parseDedicatedTypedArguments,
 } from "./dedicatedMultisig";
-import { describeProposal } from "./dedicatedProposal";
+import {
+  canonicalSolidityType,
+  describeProposal,
+  describeProposalWarning,
+  proposalArgumentTypesMatch,
+} from "./dedicatedProposal";
+import { functionArgs } from "./contracts";
 import { loadBackendConfig } from "@/lib/env";
 
 const wallet = "efa890674cad5e3a7640bb720c2a70bf3ae76709";
@@ -40,6 +47,60 @@ test("dedicated logic calls encode with the logic ABI at the permanent wallet ad
 test("dedicated issue review flags unlimited approvals", () => {
   assert.equal(isUnlimitedTokenApproval("approve", [spender, String(1n << 256n)]), true);
   assert.equal(isUnlimitedTokenApproval("transfer", [spender, String(1n << 256n)]), false);
+});
+
+test("dedicated issue review flags high-risk custom calls", () => {
+  assert.equal(describeProposalWarning({
+    target: wallet,
+    functionName: "increaseAllowance",
+    arguments: [spender, "1"],
+  })?.title, "Token permission increase");
+  assert.equal(describeProposalWarning({
+    target: wallet,
+    functionName: "transferFrom",
+    arguments: [wallet, signer, "1"],
+  })?.title, "Delegated token transfer");
+  assert.equal(describeProposalWarning({
+    target: wallet,
+    functionName: "transferOwnership",
+    arguments: [signer],
+  })?.title, "Contract ownership transfer");
+  assert.equal(describeProposalWarning({
+    target: wallet,
+    functionName: "renounceOwnership",
+    arguments: [],
+  })?.title, "Contract ownership removal");
+  assert.equal(describeProposalWarning({
+    target: wallet,
+    functionName: "setLogicContract",
+    arguments: [signer],
+  })?.title, "Contract code replacement");
+  assert.equal(describeProposalWarning({
+    target: wallet,
+    functionName: "setApprovalForAll",
+    arguments: [signer, "true"],
+  })?.title, "Token operator permission");
+});
+
+test("proposal argument types use canonical Solidity integer names", () => {
+  assert.equal(canonicalSolidityType("uint"), "uint256");
+  assert.equal(canonicalSolidityType("int[]"), "int256[]");
+  assert.equal(canonicalSolidityType("uint128[2]"), "uint128[2]");
+  assert.equal(proposalArgumentTypesMatch(["address", "uint256"], ["address", "uint"]), true);
+  assert.equal(proposalArgumentTypesMatch(["address", "uint256"], ["uint256", "address"]), false);
+});
+
+test("contract-typed function arguments compare as addresses", () => {
+  const args = functionArgs({
+    _functions: {
+      setToken: {
+        _funcArgs: [["token", { index: 0, type: { tag: "Contract", typedef: "Token" } }]],
+      },
+    },
+  }, "setToken");
+  assert.equal(args[0]?.type, "Token");
+  assert.equal(args[0]?.abiType, "address");
+  assert.equal(proposalArgumentTypesMatch(args.map((argument) => argument.abiType || argument.type), ["address"]), true);
 });
 
 test("dedicated issue events decode JSON-string argument arrays", () => {
@@ -170,6 +231,30 @@ test("proposal descriptions expose stable liquidity and governance destinations"
     ).headline,
     "Set 2 signers and approvals needed to 2"
   );
+  const addSigner = describeProposal(
+    {
+      target: wallet,
+      functionName: "nominateConfiguration",
+      arguments: [spender, JSON.stringify([wallet, signer, receiver, spender]), "3"],
+    },
+    [],
+    { walletAddress: wallet, signers: [wallet, signer, receiver], requiredApprovals: 3, pools: [] }
+  );
+  assert.equal(addSigner.headline, "Add signer 0x5b8f21…9a71");
+  assert.equal(addSigner.detail, "3 signers become 4, approvals needed stays 3");
+  const legacyNomination = describeProposal(
+    {
+      target: wallet,
+      functionName: "nominateConfiguration",
+      arguments: [spender, JSON.stringify([wallet, signer, spender]), "2"],
+    },
+    [],
+    { walletAddress: wallet, signers: [wallet, signer, receiver], requiredApprovals: 3, pools: [] }
+  );
+  assert.equal(
+    legacyNomination.headline,
+    "Remove signer 0x333333…3333 and add signer 0x5b8f21…9a71 and change approvals needed to 2"
+  );
   assert.equal(
     describeProposal(
       { target: wallet, functionName: "cancelIssue", arguments: ["proposal-7"] },
@@ -208,6 +293,24 @@ test("typed argument JSON preserves arrays and integers above 2^53", () => {
   assert.deepEqual(parsed.types, ["uint256[]", "uint256"]);
   assert.deepEqual((parsed.args[0] as any).value, [1, "9007199254740993"]);
   assert.equal((parsed.args[1] as any).value, "9007199254740993");
+});
+
+test("pending upgrade is read from the JSON string Cirrus stores", () => {
+  const stored = "{\"epoch\":\"1\",\"executableAt\":\"1794706828\",\"exists\":true,\"expiresAt\":\"1795311628\"," +
+    "\"fromVersion\":\"3\",\"migrationFunction\":\"0000000000000000000000000000000000000000\"," +
+    "\"targetLogic\":\"ea7b44ddc7340afdac6382fbaed1b8d76e2a97b1\",\"targetVersion\":\"4\"}";
+  assert.deepEqual(parseDedicatedPendingUpgrade(stored), {
+    targetLogic: "ea7b44ddc7340afdac6382fbaed1b8d76e2a97b1",
+    fromVersion: "3",
+    targetVersion: "4",
+    migrationFunction: "",
+    executableAt: 1794706828,
+    expiresAt: 1795311628,
+  });
+  assert.equal(parseDedicatedPendingUpgrade({ exists: "true", migrationFunction: "migrate" })?.migrationFunction, "migrate");
+  assert.equal(parseDedicatedPendingUpgrade("{\"exists\":false}"), undefined);
+  assert.equal(parseDedicatedPendingUpgrade(undefined), undefined);
+  assert.equal(parseDedicatedPendingUpgrade("not json"), undefined);
 });
 
 test("backend configuration timeout does not block SMD startup", async () => {

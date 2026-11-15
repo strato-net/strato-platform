@@ -92,6 +92,7 @@ export function useContractState(name: string | null, address: string | null) {
 export interface FuncArg {
   name: string;
   type: string;
+  abiType?: string;
 }
 export interface ContractFunction {
   name: string;
@@ -146,6 +147,17 @@ function argType(def: any): string {
   return solidityTypeName(def?.type);
 }
 
+function abiArgType(t: any): string {
+  if (!t) return "";
+  if (t.tag === "Contract") return "address";
+  if (t.tag === "UserDefined") return abiArgType(t.actual);
+  if (t.tag === "Array") {
+    const inner = abiArgType(t.entry ?? t.type);
+    return inner ? `${inner}[${t.length ?? ""}]` : "";
+  }
+  return solidityTypeName(t);
+}
+
 /** GET /bloc/v2.2/contracts/:name/:address — full contract info (function arg names/types live here). */
 export function useContractInfo(name: string | null, address: string | null) {
   return useQuery({
@@ -172,16 +184,28 @@ export function functionArgs(info: any, fnName: string): FuncArg[] {
   // _funcArgs is an array of [name, { index, type: { tag } }] tuples; keep declared order.
   return [...args]
     .sort((x: any, y: any) => (x?.[1]?.index ?? 0) - (y?.[1]?.index ?? 0))
-    .map((entry: any) => ({ name: entry?.[0] ?? "", type: argType(entry?.[1]) }));
+    .map((entry: any) => ({
+      name: entry?.[0] ?? "",
+      type: argType(entry?.[1]),
+      abiType: abiArgType(entry?.[1]?.type),
+    }));
 }
 
-/** Resolve a deployed contract by address and return one function's declared arguments. */
-export async function fetchFunctionArgs(address: string, fnName: string): Promise<FuncArg[]> {
+export interface ResolvedContractFunction {
+  found: boolean;
+  args: FuncArg[];
+}
+
+/** Resolve a deployed contract function by address. */
+export async function fetchFunctionByAddress(
+  address: string,
+  fnName: string
+): Promise<ResolvedContractFunction> {
   const normalized = address.replace(/^0x/i, "").toLowerCase();
   const { data: groups } = await api.get(`${env.BLOC_URL}/contracts`, {
     params: { name: normalized, limit: 20, ...chainParam() },
   });
-  if (!groups || typeof groups !== "object") return [];
+  if (!groups || typeof groups !== "object") return { found: false, args: [] };
 
   for (const [name, rawInstances] of Object.entries(groups as Record<string, any>)) {
     const instances = Array.isArray(rawInstances) ? rawInstances : rawInstances?.instances ?? [];
@@ -193,9 +217,26 @@ export async function fetchFunctionArgs(address: string, fnName: string): Promis
     const { data: info } = await api.get(`${env.BLOC_URL}/contracts/${name}/${normalized}`, {
       params: chainParam(),
     });
-    return functionArgs(info, fnName);
+    if (info?._functions?.[fnName]) {
+      return { found: true, args: functionArgs(info, fnName) };
+    }
   }
-  return [];
+  return { found: false, args: [] };
+}
+
+/** Resolve a deployed contract by address and return one function's declared arguments. */
+export async function fetchFunctionArgs(address: string, fnName: string): Promise<FuncArg[]> {
+  return (await fetchFunctionByAddress(address, fnName)).args;
+}
+
+/** Resolve whether a deployed contract exposes a function and its declared arguments. */
+export function useFunctionByAddress(address: string, fnName: string) {
+  return useQuery({
+    queryKey: ["contract-function", address, fnName],
+    enabled: !!address && !!fnName,
+    staleTime: 5 * 60_000,
+    queryFn: (): Promise<ResolvedContractFunction> => fetchFunctionByAddress(address, fnName),
+  });
 }
 
 /** Whether a function is payable (accepts value), from its state mutability. */

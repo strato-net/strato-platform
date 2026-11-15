@@ -29,7 +29,60 @@ export interface ProposalMetadata {
 
 export interface ProposalDescription {
   headline: string;
+  detail?: string;
   addresses: { label: string; value: string }[];
+}
+
+export interface ProposalWarning {
+  title: string;
+  detail: string;
+}
+
+export const canonicalSolidityType = (type: string): string =>
+  type.replace(/\s+/g, "").replace(/\buint(?=(?:\[|$))/g, "uint256").replace(/\bint(?=(?:\[|$))/g, "int256");
+
+export const proposalArgumentTypesMatch = (expected: string[], committed: string[]): boolean =>
+  JSON.stringify(expected.map(canonicalSolidityType)) ===
+    JSON.stringify(committed.map(canonicalSolidityType));
+
+export function describeProposalWarning(proposal: ProposalPayload): ProposalWarning | null {
+  if (proposal.functionName === "increaseAllowance") {
+    return {
+      title: "Token permission increase",
+      detail: "This increases how many tokens another address can spend. Review the spender and amount carefully.",
+    };
+  }
+  if (proposal.functionName === "transferFrom") {
+    return {
+      title: "Delegated token transfer",
+      detail: "This transfers tokens from an address using an existing permission. Review the sender, recipient and amount carefully.",
+    };
+  }
+  if (proposal.functionName === "transferOwnership") {
+    return {
+      title: "Contract ownership transfer",
+      detail: "This gives another address control of the target contract. Review the new owner carefully.",
+    };
+  }
+  if (proposal.functionName === "renounceOwnership") {
+    return {
+      title: "Contract ownership removal",
+      detail: "This permanently removes the current owner from the target contract.",
+    };
+  }
+  if (proposal.functionName === "setLogicContract") {
+    return {
+      title: "Contract code replacement",
+      detail: "This changes the code used by the target contract. Review the new logic address carefully.",
+    };
+  }
+  if (proposal.functionName === "setApprovalForAll") {
+    return {
+      title: "Token operator permission",
+      detail: "This can give another address permission to manage every token in a collection. Review the operator and setting carefully.",
+    };
+  }
+  return null;
 }
 
 const formatAmount = (value: string, token?: TokenMetadata, defaultDecimals?: number) => {
@@ -194,9 +247,70 @@ export function describeProposal(
     };
   }
   if (targetIsWallet && proposal.functionName === "nominateConfiguration" && proposal.arguments[0]) {
+    let nextSigners: string[] | null = null;
+    try {
+      const parsed = JSON.parse(proposal.arguments[1] ?? "[]");
+      if (Array.isArray(parsed)) nextSigners = parsed.map((signer) => strip0x(String(signer)));
+    } catch {
+      nextSigners = null;
+    }
+    if (!nextSigners || metadata.historical) {
+      return {
+        headline: nextSigners
+          ? `Invite signer ${short(proposal.arguments[0])} for a ${nextSigners.length}-signer configuration`
+          : `Invite signer ${short(proposal.arguments[0])}`,
+        detail: nextSigners
+          ? `Approvals needed: ${proposal.arguments[2] ?? "unknown"}`
+          : undefined,
+        addresses: [address("Invited signer", proposal.arguments[0])],
+      };
+    }
+    const currentSigners = metadata.signers ?? [];
+    const removed = currentSigners.filter((signer) =>
+      !nextSigners.some((nextSigner) => strip0x(nextSigner) === strip0x(signer))
+    );
+    const added = nextSigners.filter((signer) =>
+      !currentSigners.some((currentSigner) => strip0x(currentSigner) === strip0x(signer))
+    );
+    const required = Number(proposal.arguments[2]);
+    const sameRequired = Number.isFinite(required) && required === metadata.requiredApprovals;
+    const pureAdd = removed.length === 0 && added.length === 1 &&
+      strip0x(added[0]) === strip0x(proposal.arguments[0]) &&
+      nextSigners.length === currentSigners.length + 1 && sameRequired;
+    if (pureAdd) {
+      return {
+        headline: `Add signer ${short(proposal.arguments[0])}`,
+        detail: `${currentSigners.length} signers become ${nextSigners.length}, approvals needed stays ${required}`,
+        addresses: [address("Invited signer", proposal.arguments[0])],
+      };
+    }
+    const changes = [
+      removed.length
+        ? `Remove signer${removed.length === 1 ? "" : "s"} ${removed.map(short).join(", ")}`
+        : "",
+      added.length
+        ? `add signer${added.length === 1 ? "" : "s"} ${added.map(short).join(", ")}`
+        : "",
+      Number.isFinite(required) && required !== metadata.requiredApprovals
+        ? `change approvals needed to ${required}`
+        : "",
+    ].filter(Boolean);
+    const headline = changes.map(
+      (change, index) => index === 0 ? change : `and ${change}`
+    ).join(" ");
     return {
-      headline: `Add or replace signer with ${short(proposal.arguments[0])}`,
-      addresses: [address("Invited signer", proposal.arguments[0])],
+      headline: headline
+        ? `${headline.charAt(0).toUpperCase()}${headline.slice(1)}`
+        : `Add signer ${short(proposal.arguments[0])}`,
+      detail: Number.isFinite(required)
+        ? `${currentSigners.length} signers become ${nextSigners.length}, approvals needed ${
+            sameRequired ? `stays ${required}` : `changes from ${metadata.requiredApprovals ?? "unknown"} to ${required}`
+          }`
+        : undefined,
+      addresses: [
+        ...removed.map((signer) => address("Signer to remove", signer)),
+        ...added.map((signer) => address("Signer to add", signer)),
+      ],
     };
   }
   if (targetIsWallet && proposal.functionName === "revokeNomination" && proposal.arguments[0]) {

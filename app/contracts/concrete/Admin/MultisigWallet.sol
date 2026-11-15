@@ -7,7 +7,7 @@ interface IMultisigVersionRegistry {
  * @title MultisigWallet
  * @notice Permanent treasury address and upgrade shell for MultisigLogic.
  */
-contract record MultisigWallet {
+contract MultisigWallet {
     uint public constant UPGRADE_DELAY = 604800; // 7 days
     uint public constant UPGRADE_EXPIRY_WINDOW = 604800; // 7 days
 
@@ -63,6 +63,7 @@ contract record MultisigWallet {
         multisigCurrentVersion = _initialVersion;
         multisigEpoch = 1;
         _initialLogic.delegatecall("initialize", _signers, _requiredApprovals, _transactionTimelock);
+        _requireHealthyLogic(_initialLogic, _initialVersion, msg.sender);
         multisigActive = true;
     }
 
@@ -86,6 +87,7 @@ contract record MultisigWallet {
             "An upgrade is already pending"
         );
         if (_migrationFunction != "") {
+            require(!_hasOpeningParenthesis(_migrationFunction), "Signature-style calls are not allowed");
             require(_isMigrationName(_migrationFunction), "Invalid migration function");
         }
 
@@ -137,6 +139,7 @@ contract record MultisigWallet {
             "Upgrade path is not approved"
         );
 
+        address factory = multisigFactory;
         address previousLogic = logicContract;
         address targetLogic = pending.targetLogic;
         string fromVersion = multisigCurrentVersion;
@@ -151,6 +154,8 @@ contract record MultisigWallet {
         if (migrationFunction != "") {
             targetLogic.delegatecall(migrationFunction);
         }
+        _requireHealthyLogic(targetLogic, targetVersion, factory);
+        require(multisigActive, "Logic changed shell state");
         emit UpgradeExecuted(msg.sender, previousLogic, targetLogic, fromVersion, targetVersion, multisigEpoch);
     }
 
@@ -172,6 +177,16 @@ contract record MultisigWallet {
         return true;
     }
 
+    function _requireHealthyLogic(address _logic, string _version, address _factory) internal {
+        bool healthy = _logic.delegatecall("multisigHealthCheck");
+        require(healthy, "Logic failed its health check");
+        require(
+            logicContract == _logic && multisigCurrentVersion == _version &&
+            multisigFactory == _factory && !multisigUpgradesFrozen,
+            "Logic changed shell state"
+        );
+    }
+
     function _isMigrationName(string _name) internal returns (bool) {
         bytes name = bytes(_name);
         bytes prefix = bytes("migrate");
@@ -180,6 +195,15 @@ contract record MultisigWallet {
             if (name[i] != prefix[i]) return false;
         }
         return true;
+    }
+
+    function _hasOpeningParenthesis(string _name) internal returns (bool) {
+        bytes name = bytes(_name);
+        bytes opening = bytes("(");
+        for (uint i = 0; i < name.length; i++) {
+            if (name[i] == opening[0]) return true;
+        }
+        return false;
     }
 
     function _clearPendingUpgrade() internal {
@@ -195,6 +219,7 @@ contract record MultisigWallet {
 
     fallback(variadic args) external returns (variadic) {
         require(multisigActive, "Wallet is not active");
+        require(!_hasOpeningParenthesis(msg.sig), "Signature-style calls are not allowed");
         require(!_isMigrationName(msg.sig), "Migration functions run only during an upgrade");
         return logicContract.delegatecall(msg.sig, args);
     }

@@ -47,7 +47,14 @@ import {
   useStakingMetadata,
   useV3AllowanceMetadata,
 } from "@/services/protocolMetadata";
-import { describeProposal, type ProposalMetadata } from "@/services/dedicatedProposal";
+import {
+  canonicalSolidityType,
+  describeProposal,
+  describeProposalWarning,
+  proposalArgumentTypesMatch,
+  type ProposalMetadata,
+} from "@/services/dedicatedProposal";
+import { useFunctionByAddress } from "@/services/contracts";
 import { useMyTokens, useTokenMetadata, type TokenMetadata } from "@/services/tokens";
 import { strip0x, useMyUserWallets } from "@/services/userWallets";
 
@@ -118,6 +125,17 @@ function IssueActions({
   const statuses = ["Awaiting approvals", "Waiting period", "Ready to execute", "Executed"];
   const remainingApprovals = Math.max(requiredApprovals - issue.approvals, 0);
   const description = describeProposal(issue, tokens, metadata);
+  const proposalWarning = describeProposalWarning(issue);
+  const customCall = description.headline === "Custom contract call";
+  const [detailsOpen, setDetailsOpen] = useState(customCall);
+  const { data: contractFunction, isLoading: functionLoading, isError: functionError } =
+    useFunctionByAddress(issue.target, issue.functionName);
+  const expectedAbiTypes = contractFunction?.args.map(
+    (argument) => canonicalSolidityType(argument.abiType || argument.type)
+  ) ?? [];
+  const committedTypes = issue.argumentTypes.map(canonicalSolidityType);
+  const argumentTypesMismatch = contractFunction?.found === true &&
+    !proposalArgumentTypesMatch(expectedAbiTypes, committedTypes);
 
   const cancelQueuedIssue = async () => {
     setBusy(true);
@@ -136,6 +154,9 @@ function IssueActions({
   return (
     <div className="rounded-md border p-3 text-sm space-y-2">
       <div className="text-base font-medium">{description.headline}</div>
+      {description.detail ? (
+        <div className="text-sm text-muted-foreground">{description.detail}</div>
+      ) : null}
       <div className="text-sm text-muted-foreground">
         {issue.approvals} of {requiredApprovals} approvals
         {remainingApprovals > 0 ? ` · waiting for ${remainingApprovals} more` : ""}
@@ -179,12 +200,41 @@ function IssueActions({
           <AlertDescription>Review the spender and amount carefully before approving.</AlertDescription>
         </Alert>
       ) : null}
-      <details className="rounded-md bg-muted/40 p-2">
+      {proposalWarning ? (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>{proposalWarning.title}</AlertTitle>
+          <AlertDescription>{proposalWarning.detail}</AlertDescription>
+        </Alert>
+      ) : null}
+      {argumentTypesMismatch ? (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Argument types do not match the target contract</AlertTitle>
+          <AlertDescription>
+            Expected {JSON.stringify(expectedAbiTypes)}, but this proposal declares {JSON.stringify(committedTypes)}.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {customCall && !functionLoading && (functionError || contractFunction?.found === false) ? (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Contract interface could not be verified</AlertTitle>
+          <AlertDescription>Review the function, argument types and values carefully before approving.</AlertDescription>
+        </Alert>
+      ) : null}
+      <details
+        className="rounded-md bg-muted/40 p-2"
+        open={detailsOpen}
+        onToggle={(event) => setDetailsOpen(event.currentTarget.open)}
+      >
         <summary className="cursor-pointer font-medium">Technical details</summary>
         <div className="mt-2 space-y-2">
           <div><span className="text-muted-foreground">Function:</span> <span className="font-mono">{issue.functionName}</span></div>
           <div><span className="text-muted-foreground">Types:</span> <span className="font-mono break-all">{JSON.stringify(issue.argumentTypes)}</span></div>
           <div><span className="text-muted-foreground">Arguments:</span> <span className="font-mono break-all">{JSON.stringify(issue.arguments)}</span></div>
+          <div><span className="text-muted-foreground">Epoch:</span> <span className="font-mono">{issue.epoch}</span></div>
+          <div><span className="text-muted-foreground">Nonce:</span> <span className="font-mono">{issue.nonce}</span></div>
           <div className="font-mono text-xs break-all">Proposal {issue.issueId}</div>
           <div className="text-xs text-muted-foreground">Expires {new Date(issue.expiresAt * 1000).toLocaleString()}</div>
           <Label>Exact typed arguments</Label>
@@ -260,7 +310,6 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
   const [migrationFunction, setMigrationFunction] = useState("");
   const [nomineeText, setNomineeText] = useState("");
   const [nominee, setNominee] = useState("");
-  const [replaceSigner, setReplaceSigner] = useState("");
   const [removeSigner, setRemoveSigner] = useState("");
   const [newRequiredApprovals, setNewRequiredApprovals] = useState("");
   const [newTimelockHours, setNewTimelockHours] = useState("");
@@ -391,13 +440,7 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
           const normalizedNominee = strip0x(nominee);
           if (!/^[0-9a-f]{40}$/i.test(normalizedNominee)) throw new Error("Enter a valid signer address");
           if (signers.some((signer) => strip0x(signer) === normalizedNominee)) throw new Error("That address is already a signer");
-          if (replaceSigner) {
-            const replaceIndex = signers.findIndex((signer) => strip0x(signer) === strip0x(replaceSigner));
-            if (replaceIndex < 0) throw new Error("Signer to replace is not in the current signer set");
-            signers[replaceIndex] = normalizedNominee;
-          } else {
-            signers.push(normalizedNominee);
-          }
+          signers.push(normalizedNominee);
           signers.sort();
           functionName = "nominateConfiguration";
           types = ["address", "address[]", "uint256"];
@@ -596,19 +639,6 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
               }}
               placeholder="Address or User wallet username"
             />
-            <Label>Signer to replace (leave empty to add)</Label>
-            <Select
-              value={replaceSigner || "none"}
-              onValueChange={(value) => setReplaceSigner(value === "none" ? "" : value)}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Add without replacing</SelectItem>
-                {state.signers.map((signer) => (
-                  <SelectItem key={signer} value={signer}>{shortenHex(signer, 8, 6)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Button disabled={busy || !state.verified} onClick={() => void proposeConfiguration("nominate")}>
               Propose new signer
             </Button>
@@ -761,7 +791,6 @@ function CreateDedicatedMultisig() {
   ]);
   const [required, setRequired] = useState(2);
   const [timelockHours, setTimelockHours] = useState(24);
-  const [initialVersion, setInitialVersion] = useState("");
   const [setupHash, setSetupHash] = useState("");
   const [registeredHere, setRegisteredHere] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -771,9 +800,9 @@ function CreateDedicatedMultisig() {
   const duplicateSigners = normalizedSignerEntries.length !== new Set(normalizedSignerEntries).size;
   const signers = [...new Set(normalizedSignerEntries.filter((value) => value.length === 40))].sort();
   const configured = factoryState?.verified === true;
-  const selectedInitialVersion = initialVersion ||
+  const latestVersion =
     factoryState?.approvedVersions[factoryState.approvedVersions.length - 1]?.version || "";
-  const { data: setup } = useDedicatedSetup(setupHash);
+  const { data: setup, isLoading: setupLoading } = useDedicatedSetup(setupHash);
   const { data: setupLifecycle = "unknown" } = useDedicatedSetupLifecycle(setupHash);
   const { data: createdWallet = "" } = useDedicatedCreatedWallet(
     setupHash,
@@ -808,7 +837,7 @@ function CreateDedicatedMultisig() {
         signers,
         requiredApprovals: required,
         transactionTimelock: Math.round(timelockHours * 3600),
-        initialVersion: selectedInitialVersion,
+        initialVersion: latestVersion,
         label,
       });
       setSetupHash("");
@@ -915,23 +944,9 @@ function CreateDedicatedMultisig() {
           <div><Label>Approvals needed</Label><Input type="number" min={2} step={1} value={required} onChange={(event) => setRequired(Number(event.target.value))} /></div>
           <div><Label>Waiting period (hours)</Label><Input type="number" min={0} max={720} step={1} value={timelockHours} onChange={(event) => setTimelockHours(Number(event.target.value))} /></div>
         </div>
-        <details>
-          <summary className="cursor-pointer text-sm font-medium">Advanced</summary>
-          <div className="mt-2 space-y-2">
-            <Label>Multisig wallet version</Label>
-            <Select value={selectedInitialVersion} onValueChange={setInitialVersion}>
-              <SelectTrigger><SelectValue placeholder="Select an approved version" /></SelectTrigger>
-              <SelectContent>
-                {(factoryState?.approvedVersions ?? []).map((version) => (
-                  <SelectItem key={version.version} value={version.version}>{version.version}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </details>
         <Button
           disabled={busy || !configured || invalidSigners.length > 0 || duplicateSigners ||
-            !validLabel || signers.length < 3 || !validRequired || !validTimelock || !selectedInitialVersion}
+            !validLabel || signers.length < 3 || !validRequired || !validTimelock || !latestVersion}
           onClick={() => void register()}
         >
           Create multisig wallet
@@ -959,6 +974,9 @@ function CreateDedicatedMultisig() {
             </div>
           </div>
         ) : null}
+        {setupLoading && setupHash ? (
+          <div className="text-sm text-muted-foreground">Checking invitation…</div>
+        ) : null}
         {setup ? (
           <div className="rounded-md border p-3 text-sm space-y-1">
             <div className="font-medium">{setup.label || "Unnamed multisig wallet"}</div>
@@ -971,6 +989,7 @@ function CreateDedicatedMultisig() {
               </div>
             ) : null}
             <div className="font-mono text-xs break-all">Invitation code: {setupHash}</div>
+            <div>Approvals needed: {setup.requiredApprovals} of {setup.signers.length}</div>
             <div>Signer confirmation: {setup.confirmedSigners.length} of {setup.signers.length}</div>
             <div className="font-mono text-xs break-all">Created by: {setup.creator}</div>
             {setupLifecycle !== "deployed" ? (

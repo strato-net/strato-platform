@@ -13,8 +13,10 @@ import {
 import {
   type MultisigWalletSummary,
   type PendingMultisigSetupSummary,
+  useDedicatedFactoryState,
   useDedicatedMultisigActions,
   useDedicatedSetup,
+  useDedicatedWalletState,
 } from "@/services/dedicatedMultisig";
 import { strip0x } from "@/services/userWallets";
 
@@ -22,6 +24,7 @@ export function SignerInvitationDialog({ wallet }: { wallet: MultisigWalletSumma
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const actions = useDedicatedMultisigActions(wallet.address);
+  const { data: state, isLoading } = useDedicatedWalletState(open ? wallet.address : undefined);
   const name = wallet.label || "Unnamed multisig wallet";
 
   const accept = async () => {
@@ -50,11 +53,24 @@ export function SignerInvitationDialog({ wallet }: { wallet: MultisigWalletSumma
           <div className="font-mono break-all">{wallet.address}</div>
           <div>Invited signer</div>
           <div className="font-mono break-all">{wallet.nomineeAddress}</div>
+          <div>Current signers</div>
+          {state?.signers.map((signer) => (
+            <div key={signer} className="font-mono break-all text-xs">{signer}</div>
+          ))}
+          <div>Approvals needed: {state ? `${state.requiredApprovals} of ${state.signers.length}` : "Checking…"}</div>
+          <div>
+            Waiting period: {state ? `${state.transactionTimelock / 3600} ${
+              state.transactionTimelock === 3600 ? "hour" : "hours"
+            }` : "Checking…"}
+          </div>
           <div>Sign as</div>
           <div>{wallet.nomineeUsername || "Connected account"}</div>
+          {!isLoading && state && !state.verified ? (
+            <div className="text-destructive">This multisig wallet could not be verified.</div>
+          ) : null}
         </div>
         <DialogFooter>
-          <Button disabled={busy} onClick={() => void accept()}>
+          <Button disabled={busy || isLoading || !state?.verified} onClick={() => void accept()}>
             {busy ? "Accepting…" : "Accept invitation"}
           </Button>
         </DialogFooter>
@@ -66,9 +82,13 @@ export function SignerInvitationDialog({ wallet }: { wallet: MultisigWalletSumma
 export function SetupInvitationDialog({ setup: summary }: { setup: PendingMultisigSetupSummary }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const { data: setup } = useDedicatedSetup(open ? summary.setupHash : undefined);
+  const { data: setup, isLoading: setupLoading, isError: setupError } =
+    useDedicatedSetup(open ? summary.setupHash : undefined);
+  const { data: factoryState, isLoading: factoryLoading, isError: factoryError } =
+    useDedicatedFactoryState();
   const actions = useDedicatedMultisigActions();
   const name = summary.label || "Unnamed multisig wallet";
+  const ready = !!setup && factoryState?.verified === true;
 
   const confirm = async () => {
     setBusy(true);
@@ -112,8 +132,13 @@ export function SetupInvitationDialog({ setup: summary }: { setup: PendingMultis
           <div className="font-mono break-all">{summary.setupHash}</div>
           <div>Created by</div>
           <div className="font-mono break-all">{setup?.creator ?? summary.creator}</div>
+          {setupLoading ? <div className="text-muted-foreground">Checking invitation…</div> : null}
+          {!setup && (setupError || !setupLoading) ? (
+            <div className="text-destructive">Could not load invitation.</div>
+          ) : null}
           {setup ? (
             <>
+              <div>Approvals needed: {setup.requiredApprovals} of {setup.signers.length}</div>
               <div>
                 Waiting period: {setup.transactionTimelock / 3600}{" "}
                 {setup.transactionTimelock === 3600 ? "hour" : "hours"}
@@ -133,6 +158,12 @@ export function SetupInvitationDialog({ setup: summary }: { setup: PendingMultis
               </div>
             </>
           ) : null}
+          {!factoryLoading && factoryState && !factoryState.verified ? (
+            <div className="text-destructive">Multisig wallets are not set up on this network.</div>
+          ) : null}
+          {factoryError && !factoryState ? (
+            <div className="text-destructive">Could not verify multisig wallet support for this network.</div>
+          ) : null}
           <div>Sign as</div>
           <div>{summary.signerUsername || (summary.signerAddress ? "Connected account" : "Not a signer")}</div>
           <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
@@ -144,7 +175,7 @@ export function SetupInvitationDialog({ setup: summary }: { setup: PendingMultis
             Cancel invitation
           </Button>
           {summary.canConfirm ? (
-            <Button disabled={busy} onClick={() => void confirm()}>
+            <Button disabled={busy || !ready} onClick={() => void confirm()}>
               {busy ? "Confirming…" : "Confirm invitation"}
             </Button>
           ) : (
