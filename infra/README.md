@@ -122,7 +122,10 @@ cell is healthy behind the load balancer (with none, the fault is likely the
 network's) and never in an instance's first 24 hours, so a build that cannot
 sync is restarted, not rebuilt over and over. `CELL_ACTION=replace` with
 `CELL=a` or `b`, or `scripts/ha.sh testnet-app cells replace <id>`, does the
-same by hand; the old instance's volumes go with it. Healthy means every
+same by hand, for any cell but the only healthy one; the old instance's
+volumes go with it. It is also how a first cell whose load of the cluster
+failed is started over: its bootstrap stops rather than run a node on
+half-loaded databases, and the instance that replaces it loads them again. Healthy means every
 core process answers and the node is within 5 blocks of the network's best
 block (`strato-cell-upgrade --check`, the check the pipeline waits on);
 `strato-cell-health` answers the same over HTTP on port 8601.

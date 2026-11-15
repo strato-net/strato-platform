@@ -419,16 +419,18 @@ cells_restart() {
 }
 
 # A new instance for the cell: its Auto Scaling group replaces the one marked
-# unhealthy, and the new one restores the latest snapshot. Refused unless
-# another cell is healthy behind the load balancer, since this one is away
-# for as long as a restore and a catch-up take.
+# unhealthy, and the new one restores the latest snapshot. Refused only for
+# the one healthy cell behind the load balancer, which would leave none for
+# as long as a restore and a catch-up take. A cell that is not serving has
+# nothing to lose: that is also the way out for a first cell whose load of
+# the cluster failed, which has no healthy peer yet.
 cells_replace() {
   local id=${1:?cells replace <id>} old new healthy deadline
   exists "$(host_stack "$id")" || die "no cell $id"
   old=$(instance_of "$id")
   healthy=$(aws elbv2 describe-target-health --target-group-arn "$(need "$P-core-nlb" IngressTargetGroupArn)" \
-    --query "length(TargetHealthDescriptions[?TargetHealth.State=='healthy' && Target.Id!='${old:-none}'])" --output text)
-  (( healthy > 0 )) || die "no other cell is healthy behind the load balancer: replacing cell $id would leave none"
+    --query "TargetHealthDescriptions[?TargetHealth.State=='healthy'].Target.Id" --output text)
+  [[ -n $old && $(echo $healthy) == "$old" ]] && die "cell $id is the only healthy cell behind the load balancer: replacing it would leave none"
   if [[ -n $old ]]; then
     log "cell $id: replacing instance $old"
     aws autoscaling set-instance-health --instance-id "$old" --health-status Unhealthy --no-should-respect-grace-period
