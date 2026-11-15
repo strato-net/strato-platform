@@ -30,9 +30,6 @@ contract record MockValidatorSync is IStratoStakingValidatorSync {
         validatorOperator[validator] = operator;
     }
 
-    mapping(address => bool) public record overOneThird;
-    function setOverOneThird(address validator, bool over) public { overOneThird[validator] = over; }
-    function exceedsOneThird(address validator) external view override returns (bool) { return overOneThird[validator]; }
 }
 
 // Signing is impossible inside a test, so this registry stands in a key's signature with a
@@ -187,20 +184,6 @@ contract Describe_ValidatorRegistry {
         require(staking.validatorActive(VALIDATOR_A), "relisted");
         require(registry.operatorOf(VALIDATOR_A) == address(operatorB), "relisted under a new operator");
         require(registry.validatorCount() == 1, "slot reused");
-    }
-
-    function it_emergency_kick_only_by_the_kicker_and_only_over_one_third() public {
-        _addValidatorA();
-        user.doExpectingFailure(address(registry), "emergencyKick(address)", "VR: not the emergency kicker", VALIDATOR_A);
-
-        registry.setEmergencyKicker(address(user));
-        user.doExpectingFailure(address(registry), "emergencyKick(address)", "VR: validator below one third of stake", VALIDATOR_A);
-
-        staking.setOverOneThird(VALIDATOR_A, true);
-        user.doSuccessfully(address(registry), "emergencyKick(address)", VALIDATOR_A);
-        (, bool active,,,,,) = registry.operators(VALIDATOR_A);
-        require(!active, "validator delisted");
-        require(!staking.lastActive(), "staking synced as delisted");
     }
 
     // Known vector, produced off-chain with:

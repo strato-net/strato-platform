@@ -586,6 +586,18 @@ contract  StratoStaking is Ownable {
 
     function _activate(address validator) internal {
         uint256 weight = _validatorWeight(operators[validator]);
+        // The door check. A newcomer's weight is published beside the weights of the
+        // validators governance already lists. If one of those has none (a seat whose
+        // stake was never put on record, as before the weight snapshot), the newcomer's
+        // would be the only vote that counts, so nobody new is seated until every member
+        // has a weight. A validator governance already lists (a genesis seat, an admin
+        // pin) adds no member and is not held to this.
+        if (IStakingGovernance(governance).validatorMap(validator) == 0) {
+            uint256 members = IStakingGovernance(governance).validatorCount();
+            for (uint256 i = 0; i < members; i++) {
+                require(IStakingGovernance(governance).validatorStake(IStakingGovernance(governance).validators(i)) > 0, "SS: validator without weight");
+            }
+        }
         // Straight to governance: it is the staking contract's own call (the
         // onlyStaking modifier authorises us), and it is what publishes the
         // weight as ValidatorStakeUpdated from 0x100. addValidatorFromStaking
@@ -608,10 +620,11 @@ contract  StratoStaking is Ownable {
     }
 
     // Keep governance in step with a validator already in the set: leave when no longer
-    // eligible (same transaction, counts as a set mutation), refresh the weight otherwise.
-    // With this block's mutation budget spent, a validator that should leave keeps its
-    // seat until a later sync: failing instead would block the unstake or parameter
-    // change that got here. Joining is never implicit, except into a seat the admins pinned.
+    // eligible (same transaction), refresh the weight otherwise. A leave is never held
+    // back by the block's allowance of set changes and does not use it up: the allowance
+    // cannot stop a validator switching off, only stop the chain recording that it left,
+    // and a seat kept past its bond is retried by nobody. Joining is never implicit,
+    // except into a seat the admins pinned.
     function _syncValidator(address validator) internal {
         if (!governanceSyncEnabled) return;
         if (!isValidator[validator]) {
@@ -632,8 +645,7 @@ contract  StratoStaking is Ownable {
             return;
         }
         // A pinned seat stays, and its weight is still republished below.
-        if (!eligible(validator) && _mutationsLeft() > 0 && !_pinnedIn(validator)) {
-            _consumeMutations(1);
+        if (!eligible(validator) && !_pinnedIn(validator)) {
             _deactivate(validator);
             return;
         }
@@ -662,6 +674,20 @@ contract  StratoStaking is Ownable {
             lastSyncedWeight[validator] = weight;
             emit ValidatorSynced(operatorOf(validator), validator, true, weight);
         }
+    }
+
+    // After the operator's own bond has been released (unbondSelf, a handover) and the
+    // validator synced. A seat that no longer qualifies has left in that sync, with two
+    // exceptions where it cannot: governance will not drop its last validator, and with
+    // the governance link off no seat can be given up. In both the bond stays in, so a
+    // seat never votes without it. A seat the admins pinned stays by their vote, and one
+    // that predates the index backfill has no weight published by this contract to outlive
+    // its bond. A delegator's unstake is never refused.
+    function _requireNoSeatWithoutBond(address validator) internal view {
+        require(
+            !isValidator[validator] || eligible(validator) || _pinnedIn(validator) || activeValidatorIndex[validator] == 0,
+            "SS: cannot leave the set"
+        );
     }
 
     // Lowest validator by (weight asc, address asc): the eviction candidate. A pinned seat
@@ -1005,6 +1031,7 @@ contract  StratoStaking is Ownable {
         require(operator != address(0), "SS: operator=0");
         _changeOperator(validator, operator);
         _syncValidator(validator);
+        _requireNoSeatWithoutBond(validator);
     }
 
     // ---- commission ------------------------------------------------------------------
@@ -1158,6 +1185,7 @@ contract  StratoStaking is Ownable {
 
         emit SelfBondUnbondingStarted(msg.sender, validator, requestId, amount, block.timestamp + unbondingSeconds);
         _syncValidator(validator);
+        _requireNoSeatWithoutBond(validator);
     }
 
     // ---- block rewards, fee routing and liveness ----------------------------------------
@@ -1367,8 +1395,11 @@ contract  StratoStaking is Ownable {
     // closed (from the highest earlier block timestamp, or the start if later), at most
     // MAX_CREDITED_GAP_SECONDS. Block timestamps are set by proposers: one behind its parent
     // closes no interval, and the cap bounds one ahead of it. The rate is the formula at the
-    // current consensus weight and reserve. A producer that is not seated, listed and
-    // eligible is paid nothing; what is not paid stays in the reserve.
+    // current consensus weight and reserve. Pay follows the seat: a producer that is seated
+    // and listed is paid, whichever rule or admin pin gave it the seat. The own-bond rule
+    // gates holding a seat by right (eligible), not being paid for the blocks it produces.
+    // A producer that is not seated or not listed is paid nothing; what is not paid stays
+    // in the reserve.
     function _payProduction(address producer) internal {
         if (producer == address(0) || emissionStartTime == 0 || previousBlockTime == 0) return;
         uint256 since = previousBlockTime > emissionStartTime ? previousBlockTime : emissionStartTime;
@@ -1376,7 +1407,7 @@ contract  StratoStaking is Ownable {
         uint256 elapsed = lastBlockTime - since;
         if (elapsed > MAX_CREDITED_GAP_SECONDS) elapsed = MAX_CREDITED_GAP_SECONDS;
 
-        if (!isValidator[producer] || !eligible(producer)) return;
+        if (!isValidator[producer] || !operators[producer].active) return;
         uint256 stake = consensusWeight();
         uint256 reserve = emissionReserve;
         if (stake == 0 || reserve == 0) return;

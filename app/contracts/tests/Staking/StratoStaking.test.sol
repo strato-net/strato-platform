@@ -469,12 +469,24 @@ contract Describe_StratoStaking {
         require(staking.status(VALIDATOR_A) == 3, "Kicked");
     }
 
+    // Governance keeps its last validator, so that seat cannot be given up. Its operator's
+    // bond then stays in: a seat must not vote without it. A delegator is never held back.
     function it_never_removes_the_last_validator() public {
         _selfBond(operatorA, VALIDATOR_A, 1000e18);
         _activate(VALIDATOR_A);
-        operatorA.do(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 500e18);
+        _stake(user1, VALIDATOR_A, 400e18);
+        operatorA.doExpectingFailure(address(staking), "unbondSelf(address,uint256)", "SS: cannot leave the set", VALIDATOR_A, 500e18);
+        require(_selfBondOf(VALIDATOR_A) == 1000e18, "the bond stays behind the seat");
         require(gov.isValidator(VALIDATOR_A), "governance keeps its last validator");
-        require(staking.isValidator(VALIDATOR_A), "still tracked until it can be removed");
+        require(staking.isValidator(VALIDATOR_A), "still seated");
+        require(gov.validatorStake(VALIDATOR_A) == 1400e18, "its published weight is still backed");
+
+        // a withdrawal that leaves the seat qualified goes through
+        _selfBond(operatorA, VALIDATOR_A, 200e18);
+        operatorA.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 200e18);
+        // and so does a delegator's
+        user1.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 400e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "weight follows the stake");
     }
 
     function it_reconciles_the_set_when_governance_is_enabled_later() public {
@@ -763,8 +775,9 @@ contract Describe_StratoStaking {
         require(staking.totalEmitted() - paid == (rate * 11) / 31536000, "only the 11 seconds not yet paid");
     }
 
-    // Only a seated, listed, eligible producer is paid; anything else stays in the reserve.
-    function it_pays_only_seated_eligible_producers() public {
+    // Pay follows the seat: a seated, listed producer is paid; anything else stays in the
+    // reserve. The own-bond rule gates holding a seat, not being paid for a block.
+    function it_pays_only_seated_producers() public {
         _bondBoth();
         _registerSelf(validatorC);
         _selfBond(validatorC, address(validatorC), 1000e18); // listed and eligible, not seated
@@ -782,11 +795,12 @@ contract Describe_StratoStaking {
         _processBlockAfter(101, VALIDATOR_A); // its exit notice is up; nothing has synced it out yet
         require(staking.isValidator(VALIDATOR_A) && !staking.eligible(VALIDATOR_A), "seated, no longer eligible");
         _processBlockAfter(60, VALIDATOR_A);
-        require(staking.totalEmitted() == 0, "nor does a seat that is due to leave");
+        uint256 paidToA = staking.totalEmitted();
+        require(paidToA > 0 && _pendingOperatorRewards(VALIDATOR_A) == paidToA, "a seat that is due to leave is paid for the blocks it produces until it is synced out");
 
         _processBlockAfter(60, VALIDATOR_B);
         _processBlockAfter(60, VALIDATOR_B);
-        require(staking.totalEmitted() > 0 && _pendingOperatorRewards(VALIDATOR_B) == staking.totalEmitted(), "a seated producer is");
+        require(staking.totalEmitted() > paidToA && _pendingOperatorRewards(VALIDATOR_B) == staking.totalEmitted() - paidToA, "a seated producer is");
     }
 
     function it_keeps_the_emission_reserve_out_of_payouts_and_recovery() public {
@@ -1408,9 +1422,10 @@ contract Describe_StratoStaking {
         user1.doExpectingFailure(address(staking), "stake(address,uint256)", "SS: above operator stake cap", address(validatorC), 1000e18);
     }
 
-    // Leaving is never refused for lack of mutation budget: a validator that should leave
-    // keeps its seat until a later sync, and the call that got there goes through.
-    function it_defers_a_leave_when_the_mutation_budget_is_spent() public {
+    // A leave is never held back by the block's mutation budget and does not use it up: a
+    // validator that should leave does so in the transaction that got there, and a join in
+    // the same block still has the whole budget.
+    function it_never_holds_a_leave_back_for_the_mutation_budget() public {
         _bondBoth();
         _registerSelf(validatorC);
         _selfBond(validatorC, address(validatorC), 1000e18);
@@ -1420,13 +1435,14 @@ contract Describe_StratoStaking {
 
         // A and C (1000 each) both fall under the new minStake; one mutation is allowed
         staking.setValidatorParams(1500e18, 5000, 3, 100);
-        require(gov.validatorCount() == 2, "one left in this block");
-        require(staking.validatorCount() == 2, "the other keeps its seat for now");
+        require(gov.validatorCount() == 1 && gov.isValidator(VALIDATOR_B), "both left in this block");
+        require(staking.validatorCount() == 1, "and staking agrees");
 
-        fastForward(1, 1);
-        staking.syncValidator(VALIDATOR_A);
-        staking.syncValidator(address(validatorC));
-        require(gov.validatorCount() == 1 && gov.isValidator(VALIDATOR_B), "left on the next sync");
+        // the block's one mutation is still there for a join
+        _registerSelf(attacker);
+        _selfBond(attacker, address(attacker), 1500e18);
+        attacker.doSuccessfully(address(staking), "tryActivate(address)", address(attacker));
+        require(gov.isValidator(address(attacker)), "a leave does not spend the budget a join needs");
     }
 
     function it_gives_notice_before_a_commission_raise() public {
@@ -1524,5 +1540,120 @@ contract Describe_StratoStaking {
         StratoStaking fresh = new StratoStaking(address(this));
         fresh.processBlock();
         require(fresh.lastProcessedBlock() == 0, "nothing processed");
+    }
+
+    // ---- a seat and its bond -----------------------------------------------------------
+
+    function _firstRequest() internal pure returns (uint256[] memory ids) {
+        ids = new uint256[](1);
+        ids[0] = 0;
+    }
+
+    // A fresh key lists itself, bonds the minimum and takes a seat by right.
+    function _joinByRight(User key) internal {
+        _mintAndApprove(key, 10000e18);
+        _registerSelf(key);
+        _selfBond(key, address(key), 1000e18);
+        key.doSuccessfully(address(staking), "tryActivate(address)", address(key));
+    }
+
+    // Four joins use the block's four set changes; a fifth validator then takes its whole
+    // bond out in the same block. It leaves with the bond: nothing is left to a later sync
+    // that nobody is bound to make.
+    function it_gives_up_the_seat_with_the_bond_when_the_mutation_budget_is_spent() public {
+        _bondBoth();
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1000e18);
+        _activate(address(validatorC));
+        _stake(user1, address(validatorC), 400e18);
+        fastForward(1, 1);
+        staking.setSetParams(50, 50, 500, 4, 100, 100, 0);
+
+        _joinByRight(new User());
+        _joinByRight(new User());
+        _joinByRight(new User());
+        _joinByRight(new User());
+        User fifth = new User();
+        _mintAndApprove(fifth, 10000e18);
+        _registerSelf(fifth);
+        _selfBond(fifth, address(fifth), 1000e18);
+        fifth.doExpectingFailure(address(staking), "tryActivate(address)", "SS: mutation cap", address(fifth));
+
+        validatorC.doSuccessfully(address(staking), "unbondSelf(address,uint256)", address(validatorC), uint256(1000e18));
+        require(!gov.isValidator(address(validatorC)) && !staking.isValidator(address(validatorC)), "the seat went with the bond");
+        require(gov.validatorStake(address(validatorC)) == 0, "no weight left behind for the delegations to vote through");
+
+        fastForward(101, 5);
+        validatorC.doSuccessfully(address(staking), "withdrawUnbonded", _firstRequest());
+        require(strato.balanceOf(address(validatorC)) == 10000e18, "principal returned in full");
+    }
+
+    // With the governance link off no seat can be given up, so the operator's bond stays
+    // in until the link is back. A delegator is never held back.
+    function it_keeps_a_seated_bond_in_while_the_governance_link_is_off() public {
+        _bondBoth();
+        _stake(user1, VALIDATOR_A, 400e18);
+        staking.setGovernance(address(gov), false);
+
+        operatorA.doExpectingFailure(address(staking), "unbondSelf(address,uint256)", "SS: cannot leave the set", VALIDATOR_A, 1000e18);
+        require(_selfBondOf(VALIDATOR_A) == 1000e18 && gov.isValidator(VALIDATOR_A), "bond and seat unchanged");
+        user1.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 400e18);
+
+        staking.setGovernance(address(gov), true);
+        operatorA.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 1000e18);
+        require(!gov.isValidator(VALIDATOR_A), "with the link back the seat leaves with the bond");
+    }
+
+    // ---- the door check ----------------------------------------------------------------
+
+    // Governance as a network has it before staking has seated anyone: validators listed by
+    // genesis or admin vote, with no weight on record. A newcomer seated beside them would
+    // publish the only weight in the set and hold the whole stake-weighted vote.
+    function it_seats_no_newcomer_beside_a_validator_without_a_weight() public {
+        GenesisGovernance pins = _pinningGovernance();
+        pins.seedValidator(VALIDATOR_A);
+        pins.seedValidator(VALIDATOR_B);
+        _stake(user1, VALIDATOR_A, 5000e18);
+        _stake(user2, VALIDATOR_B, 5000e18);
+
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1000e18);
+        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: validator without weight", address(validatorC));
+        require(!pins.isValidator(address(validatorC)) && pins.validatorStake(address(validatorC)) == 0, "not seated, nothing published");
+
+        // The admins pin the two in, and staking adopts each with its stake as its weight.
+        pins.voteToAddValidator(VALIDATOR_A);
+        staking.syncValidator(VALIDATOR_A);
+        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: validator without weight", address(validatorC));
+        pins.voteToAddValidator(VALIDATOR_B);
+        staking.syncValidator(VALIDATOR_B);
+        require(pins.validatorStake(VALIDATOR_A) == 5000e18 && pins.validatorStake(VALIDATOR_B) == 5000e18, "every member has its stake on record");
+
+        validatorC.doSuccessfully(address(staking), "tryActivate(address)", address(validatorC));
+        require(pins.isValidator(address(validatorC)) && pins.validatorStake(address(validatorC)) == 1000e18, "the newcomer joins with 1000 of 11000");
+    }
+
+    // ---- pay follows the seat ----------------------------------------------------------
+
+    // A seat the admins pinned holds no bond of its operator's own. It is paid for the
+    // blocks it produces like any other seat, and its delegators take their share.
+    function it_pays_a_pinned_seat_that_holds_no_bond() public {
+        GenesisGovernance pins = _pinningGovernance();
+        _stake(user1, VALIDATOR_A, 4000e18);
+        pins.voteToAddValidator(VALIDATOR_A);
+        staking.syncValidator(VALIDATOR_A);
+        require(staking.isValidator(VALIDATOR_A) && !staking.eligible(VALIDATOR_A), "seated by the pin, not by a bond");
+
+        _fundReserve(10000e18);
+        staking.commitEmissionSchedule(31536e18, 3000e18, 10000e18, 0);
+        _processBlockAfter(1, VALIDATOR_A);
+        _processBlockAfter(60, VALIDATOR_A);
+        _processBlockAfter(60, VALIDATOR_A);
+        uint256 paid = staking.totalEmitted();
+        require(paid > 0, "the pinned seat is paid for its blocks");
+
+        uint256 before = strato.balanceOf(address(user1));
+        user1.do(address(staking), "claimRewards", _list(VALIDATOR_A));
+        require(strato.balanceOf(address(user1)) > before, "and its delegator takes a share");
     }
 }
