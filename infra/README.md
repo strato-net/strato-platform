@@ -50,6 +50,9 @@ then the cells), `api-tier` (Network and Tier), the front door
   answers `isSynced: true`, and cannot tell an unresolvable name from a lagging
   node: the service never turns healthy and CloudFormation rolls back after
   about three hours.
+- The deployment has one ECS cluster, `ha-<env>`. The API tier stack
+  creates it and the app tier's services join it by name (`-c clusterName`),
+  so the app tier is destroyed before the API tier.
 - An app tier stack that rolls back takes its ALB with it. Re-point the front
   door's `appOriginDomainName` at the new ALB from the stack output afterwards.
 
@@ -69,7 +72,10 @@ same run builds the environment from nothing and updates it:
    published yet fails the run before it deploys. strato-platform's
    `bin/strato-*`, `core-cell/bootstrap/strato-cell-upgrade` and
    `strato-cell-health` go to `NODE_SCRIPTS_S3`.
-2. `data-plane` and `obs-core`.
+2. `data-plane` and `obs-core`. The data plane also generates the password
+   of the node's own database login (`strato`, secret
+   `ha-testnet-app/postgres/node`); the first cell to boot creates that
+   login on the cluster, and nothing else uses the master login.
 3. `core-nlb`: one internal load balancer in front of the cells, with the
    target groups a cell's instance registers in. Port 8600 hands a
    transaction batch to one healthy cell (the cell's own health check on 8601
@@ -97,7 +103,14 @@ same run builds the environment from nothing and updates it:
    and a new instance of any cell installs that one.
 6. `api-tier`, given the load balancer's name as its ingress
    (`http://<core>:8600`) and Prometheus host and admitted on its security
-   group (`coreLoadBalancerSecurityGroupId`); then `app-tier`, the front door
+   group (`coreLoadBalancerSecurityGroupId`). It creates the deployment's one
+   ECS cluster, `ha-testnet-app`, which the app tier's services join. Both
+   tiers' nginx are given the VPC's range and CloudFront's origin-facing
+   ranges (read from the managed prefix list on every run) as trusted
+   proxies, so they see the client's address. The app backend is pointed at
+   the partner referrals service of the environment's network (`NETWORK`:
+   helium's or upquark's, in `scripts/ha.sh`) with that service's internal
+   key. Then `app-tier`, the front door
    (with freshly built app UI and SMD) and `obs-alarms`, then smoke checks through CloudFront by name, and the
    image set and both commits are recorded (`/ha-testnet-app/deploy/*`).
    A run with neither repo changed since does nothing.

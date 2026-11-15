@@ -28,13 +28,15 @@
 //
 // The CloudWatch queries are account-wide (a dimension takes "*" or one
 // value), so the deployment is picked out here by $env: load balancers and ECS
-// clusters named ha-<env>-<tier>, and the RDS instances of the data-plane
-// stack (ha-<env>-data-...).
+// task families named ha-<env>-<tier> (both tiers' tasks run in the one
+// cluster ha-<env>), and the RDS instances of the data-plane stack
+// (ha-<env>-data-...).
 //
 // Queries (refIds):
 //   tasks      Logs Insights over the Container Insights performance groups:
 //              latest task and container figures, health and status, and the
-//              last-seen time per Type, ClusterName, TaskId, ContainerName
+//              last-seen time per Type, ClusterName, TaskDefinitionFamily,
+//              TaskId, ContainerName
 //   cdn        AWS/CloudFront Requests (Sum), DistributionId = *, Region = Global
 //   cdnBytes   AWS/CloudFront BytesDownloaded (Sum), same dimensions
 //   cdn4xx     AWS/CloudFront 4xxErrorRate (Average), same dimensions
@@ -152,7 +154,7 @@ for (const frame of byRef("tasks")) {
   for (const r of rowsFrom(frame)) {
     if (!r.TaskId || !r.ClusterName) continue;
     const key = `${r.ClusterName}/${r.TaskId}`;
-    if (!entries.has(key)) entries.set(key, { cluster: String(r.ClusterName), task: String(r.TaskId), seen: 0, taskRow: null, containers: [] });
+    if (!entries.has(key)) entries.set(key, { cluster: String(r.ClusterName), family: String(r.TaskDefinitionFamily || ""), task: String(r.TaskId), seen: 0, taskRow: null, containers: [] });
     const e = entries.get(key);
     if (numeric(toMs(r.seen))) e.seen = Math.max(e.seen, toMs(r.seen));
     if (r.Type === "Task" || !r.ContainerName) e.taskRow = r;
@@ -176,7 +178,7 @@ const current = (e) => {
 const containerOrder = ["nginx", "backend", "strato-api", "postgrest", "apex", "docs", "otel-collector"];
 const tiers = { app: [], api: [] };
 for (const e of entries.values()) {
-  const tier = tierOf(e.cluster);
+  const tier = tierOf(e.family);
   if (!tier || !current(e)) continue;
   const t = e.taskRow || {};
   e.containers.sort((a, b) => containerOrder.indexOf(a.ContainerName) - containerOrder.indexOf(b.ContainerName));

@@ -33,15 +33,21 @@ const API_PATHS = ["/strato/*", "/strato-api*", "/bloc/*", "/cirrus/*", "/apex-a
  * Viewer-request functions for the two buckets. Client-side routes (no file
  * extension in the last segment) get their SPA's index.html. Functions rather
  * than the distribution's error responses, which would also rewrite the tiers'
- * own 401s, 403s and 404s into HTML. The root redirects to /dashboard/, as the
- * node's nginx does (nginx-packager: location = /).
+ * own 401s, 403s and 404s into HTML. The root redirects to /dashboard/ with its
+ * query, as the node's nginx does (nginx-packager: location = /).
  */
 const APP_ROUTES = `
 function handler(event) {
   var request = event.request;
   var uri = request.uri;
   if (uri === "/") {
-    return { statusCode: 302, statusDescription: "Found", headers: { location: { value: "/dashboard/" } } };
+    // With its query: a ref link to the root (/?ref=CODE) has to reach the app with its code.
+    var query = [];
+    for (var key in request.querystring) {
+      var q = request.querystring[key];
+      (q.multiValue || [q]).forEach(function (v) { query.push(key + "=" + v.value); });
+    }
+    return { statusCode: 302, statusDescription: "Found", headers: { location: { value: "/dashboard/" + (query.length ? "?" + query.join("&") : "") } } };
   }
   if (uri.slice(uri.lastIndexOf("/") + 1).indexOf(".") === -1) {
     request.uri = "/index.html";

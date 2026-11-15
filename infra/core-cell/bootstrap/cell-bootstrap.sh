@@ -161,6 +161,34 @@ imds_token=$(curl -s -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 120' http:
 private_dns=$(curl -s -H "X-aws-ec2-metadata-token: $imds_token" http://169.254.169.254/latest/meta-data/local-hostname)
 public_ip=$(curl -s -H "X-aws-ec2-metadata-token: $imds_token" http://169.254.169.254/latest/meta-data/public-ipv4 || true)
 node_host=${public_ip:-$private_dns}
+# The node's database login. A new cluster has its master login alone, so the
+# instance that finds PG_USER missing creates it there, with what the node's
+# own Postgres image gives that login (it creates and owns the databases,
+# nothing more) and the password of PG_SECRET_ID. That is all the master
+# login is used for; a login that exists is left as it is. Nothing is done
+# when the node is set to connect as the master login itself, or without
+# PG_ADMIN_SECRET_ID (a cell.env from before it). Tried three times: another
+# cell may be creating the login at the same moment.
+ensure_database_login() {
+  local admin password attempt
+  [[ -n "${PG_ADMIN_SECRET_ID:-}" && "$PG_ADMIN_SECRET_ID" != "$PG_SECRET_ID" ]] || return 0
+  admin=$(aws secretsmanager get-secret-value --secret-id "$PG_ADMIN_SECRET_ID" --query SecretString --output text)
+  # -e: a secret without a password stops here, before a login is made with none.
+  password=$(aws secretsmanager get-secret-value --secret-id "$PG_SECRET_ID" --query SecretString --output text | jq -er .password)
+  for attempt in 1 2 3; do
+    if PGPASSWORD=$(jq -r .password <<<"$admin") NODE_LOGIN=$PG_USER NODE_LOGIN_PASSWORD=$password \
+      psql -v ON_ERROR_STOP=1 -h "$PG_WRITER_HOST" -p "$PG_PORT" -U "$(jq -r .username <<<"$admin")" -d postgres -Atq <<'SQL'
+\getenv login NODE_LOGIN
+\getenv password NODE_LOGIN_PASSWORD
+select format('create role %I login nosuperuser createdb nocreaterole noreplication nobypassrls password %L', :'login', :'password')
+  where not exists (select from pg_roles where rolname = :'login') \gexec
+SQL
+    then return 0; fi
+    sleep 5
+  done
+  log "could not make sure the database login $PG_USER exists on $PG_WRITER_HOST"
+  return 1
+}
 # A statement on the cluster's postgres database, as the node's database login.
 cluster_sql() {
   PGPASSWORD=$(aws secretsmanager get-secret-value --secret-id "$PG_SECRET_ID" --query SecretString --output text | jq -r .password) \
@@ -193,6 +221,7 @@ if [[ ! -d $NODE_DIR ]]; then
   [[ "${BUNDLED_POSTGREST:-true}" == "false" ]] && apps+=(--bundledPostgrest=false)
   # shellcheck disable=SC2206
   extra=($EXTRA_SETUP_FLAGS)
+  ensure_database_login
   pg_password=$(aws secretsmanager get-secret-value --secret-id "$PG_SECRET_ID" --query SecretString --output text | jq -r .password)
   # With SEED_EMPTY_CLUSTER the cluster says what this cell is, in a one-row
   # table of its postgres database. The cell that finds no eth database claims

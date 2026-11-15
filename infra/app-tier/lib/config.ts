@@ -11,6 +11,8 @@ export interface AppTierConfig {
   envName: string;
   /** Existing VPC to deploy into; a new one is created when absent. */
   vpcId?: string;
+  /** An existing ECS cluster for this tier's services: the deployment's one cluster, which the API tier app creates (its ClusterName output). Without it the tier gets a cluster of its own. */
+  clusterName?: string;
   /** Image URIs for the app's nginx and backend, as strato-platform's autobuild publishes them: ghcr.io/strato-net/strato-platform/app-nginx:<VERSION>-<commit>-<hash>, app-backend likewise (public; an ECR URI is pulled with the task's ECR permissions). */
   nginxImage: string;
   backendImage: string;
@@ -19,6 +21,7 @@ export interface AppTierConfig {
   /** Postgres host serving the cirrus database (the node, until the managed cluster exists). */
   postgresHost: string;
   postgresPort: number;
+  /** The node's database login (the data-plane app's NodeLogin), not the cluster's master login. */
   postgresUser: string;
   /** Node network identity, rendered into the UI's config.js. */
   chainId: number;
@@ -44,7 +47,7 @@ export interface AppTierConfig {
   secrets: {
     oauth: string;
     postgresPassword: string;
-    /** When set, `postgresPassword` names a JSON secret and this is the key holding the password (the data-plane master secret's "password"). */
+    /** When set, `postgresPassword` names a JSON secret and this is the key holding the password ("password" in the data-plane app's NodeLoginSecretName). */
     postgresPasswordJsonKey?: string;
     session: string;
     backend?: string;
@@ -64,6 +67,20 @@ export interface AppTierConfig {
   httpPort: number;
   /** Plain (non-secret) backend settings passed through as-is. */
   backendEnvironment: Record<string, string>;
+  /**
+   * The partner referrals service of the network this deployment follows: its URL
+   * (PARTNER_REFERRALS_URL) and the Secrets Manager name or complete ARN of its internal key, a
+   * plain string the service itself reads (PARTNER_INTERNAL_KEY; referenced, not copied). Without
+   * both the backend records no referrals.
+   */
+  partnerReferrals?: { url: string; internalKeySecretName: string };
+  /**
+   * Proxies in front of the load balancer whose X-Forwarded-For entry nginx takes as the client's
+   * address (NGINX_TRUST_PROXY_CIDRS), beside the VPC's own range, which covers the load balancer
+   * and is always trusted: behind the front door, CloudFront's origin-facing ranges. Each trusted
+   * hop appends the peer it saw, so a client cannot pass a forged address through them.
+   */
+  trustedProxyCidrs: string[];
   /** Deploy app/ui/dist to the bucket (requires `npm run build` in app/ui first). */
   deployUi: boolean;
   /** The Ui stack (S3 + CloudFront). `-c ui=false` leaves it out when the API tier app's front door serves the app UI. */
@@ -116,15 +133,21 @@ function optional(app: App, key: string): string | undefined {
 export function loadConfig(app: App): AppTierConfig {
   const envName = ctx(app, "envName", "testnet");
   const prefix = deploymentPrefix(envName);
+  const partnerReferralsUrl = optional(app, "partnerReferralsUrl");
+  const partnerInternalKeySecretName = optional(app, "partnerInternalKeySecretName");
+  if (Boolean(partnerReferralsUrl) !== Boolean(partnerInternalKeySecretName)) {
+    throw new Error("partnerReferralsUrl and partnerInternalKeySecretName go together: pass both or neither");
+  }
   return {
     envName,
     vpcId: optional(app, "vpcId"),
+    clusterName: optional(app, "clusterName"),
     nginxImage: ctx(app, "nginxImage"),
     backendImage: ctx(app, "backendImage"),
     nodeUrl: ctx(app, "nodeUrl"),
     postgresHost: ctx(app, "postgresHost"),
     postgresPort: Number(ctx(app, "postgresPort", "5432")),
-    postgresUser: ctx(app, "postgresUser", "postgres"),
+    postgresUser: ctx(app, "postgresUser", "strato"),
     chainId: Number(ctx(app, "chainId")),
     networkName: ctx(app, "networkName"),
     albCertificateArn: optional(app, "albCertificateArn"),
@@ -146,6 +169,10 @@ export function loadConfig(app: App): AppTierConfig {
     ethconfParameterName: optional(app, "ethconfParameterName"),
     httpPort: Number(ctx(app, "httpPort", "80")),
     backendEnvironment: ctx<Record<string, string>>(app, "backendEnvironment", {}),
+    partnerReferrals: partnerReferralsUrl && partnerInternalKeySecretName
+      ? { url: partnerReferralsUrl, internalKeySecretName: partnerInternalKeySecretName }
+      : undefined,
+    trustedProxyCidrs: String(ctx(app, "trustedProxyCidrs", "")).split(",").map((s) => s.trim()).filter(Boolean),
     deployUi: String(ctx(app, "deployUi", "false")) === "true",
     uiStack: String(ctx(app, "ui", "true")) === "true",
     desiredCount: Number(ctx(app, "desiredCount", "2")),
@@ -159,8 +186,8 @@ export function loadConfig(app: App): AppTierConfig {
             ? {
                 host: ctx(app, "historyDatabaseHost"),
                 port: Number(ctx(app, "historyDatabasePort", "5432")),
-                user: ctx(app, "historyDatabaseUser", "postgres"),
-                secretName: ctx(app, "historyDatabaseSecretName", `${prefix}/postgres`),
+                user: ctx(app, "historyDatabaseUser", "strato"),
+                secretName: ctx(app, "historyDatabaseSecretName", `${prefix}/postgres/node`),
                 securityGroupId: optional(app, "historyDatabaseSecurityGroupId"),
               }
             : undefined,

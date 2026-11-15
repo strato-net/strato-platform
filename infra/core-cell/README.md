@@ -33,7 +33,9 @@ host unchanged). At first boot the instance, with its own role:
 2. formats and mounts the data volume at `/var/lib/strato`;
 3. pulls the strato image from its registry and copies its `/usr/local/bin` onto the
    host, plus strato-platform's `bin/strato-*` scripts (shipped as a stack asset);
-4. reads the Aurora master secret and runs `strato-up --role=core ...` once,
+4. creates the node's database login on the cluster when it is missing (the
+   one use of the Aurora master secret), reads that login's secret and runs
+   `strato-up --role=core ...` once,
    which sets the node directory up (`/var/lib/strato/node`), restores a
    snapshot when one was given, and starts convoke;
 5. hands the node to `strato-cell.service` (systemd: `strato-up` on start,
@@ -61,8 +63,8 @@ are under `/var/lib/strato/node/logs`. `aws ssm start-session --target
    `strato:<tag>`. The packages are public: the host logs in nowhere (an
    ECR URI still works, through the instance role).
 2. The Aurora cluster (`data-plane`), allowing this stack's security
-   group (output `SecurityGroupId`) on 5432, and its master secret
-   `ha-<env>/postgres`.
+   group (output `SecurityGroupId`) on 5432, its master secret
+   `ha-<env>/postgres` and the node login's `ha-<env>/postgres/node`.
 3. The network's VPC id when the cell must peer with existing validators
    over private addresses (`-c vpcId`); otherwise the app creates a VPC.
 4. Optionally the observability app's outputs: the cell collector and
@@ -142,8 +144,9 @@ serves them. And to the api-tier app: `DnsName` as
 | `repoUrl` | registry prefix of `stratoImage` | `--repoUrl` for the generated compose |
 | `extraBinariesS3` | none | `s3://bucket/prefix/` of extra binaries installed into `/usr/local/bin` (for an image that lacks one) |
 | `network` | `upquark` | `--network`; carries the bootnodes and chain id |
-| `postgresWriterHost` / `postgresReaderHost` / `postgresPort` / `postgresUser` | required / writer / 5432 / postgres | Aurora endpoints |
-| `postgresSecretName` | `ha-<env>/postgres` | master secret, JSON with a `password` field |
+| `postgresWriterHost` / `postgresReaderHost` / `postgresPort` / `postgresUser` | required / writer / 5432 / strato | Aurora endpoints and the node's login (data-plane output `NodeLogin`) |
+| `postgresSecretName` | `ha-<env>/postgres/node` | that login's secret, JSON with a `password` field (data-plane output `NodeLoginSecretName`) |
+| `postgresAdminSecretName` | `ha-<env>/postgres` | the master secret, JSON with `username` and `password`: read at first boot only to create `postgresUser` when the cluster lacks it |
 | `postgresSecurityGroupId` | none | the cluster's security group; the stack opens it to the cell on the Postgres port |
 | `role` | `core` | `node` also runs the app on this host (nginx on httpPort/443, app UI and backend, SMD, apex, PostgREST); needs those images under `repoUrl` |
 | `bundledApp` | `true` | with role node: run app-ui and app-backend on this host; `false` when the app tier serves the app (the node's root redirects to `appUrl`) |

@@ -81,6 +81,17 @@ alb_full_name() {
   return 0
 }
 secret_exists() { aws secretsmanager describe-secret --secret-id "$1" >/dev/null 2>&1; }
+# CloudFront's origin-facing addresses, comma-separated: with them and the VPC's
+# range trusted, nginx behind the front door and a load balancer takes the
+# client's address from X-Forwarded-For.
+cloudfront_cidrs() {
+  local id cidrs
+  id=$(aws ec2 describe-managed-prefix-lists --filters Name=prefix-list-name,Values=com.amazonaws.global.cloudfront.origin-facing \
+    --query 'PrefixLists[0].PrefixListId' --output text 2>/dev/null) || id=""
+  [[ $id == pl-* ]] && cidrs=$(aws ec2 get-managed-prefix-list-entries --prefix-list-id "$id" --query 'sort(Entries[].Cidr)' --output text 2>/dev/null) || cidrs=""
+  [[ -n $cidrs && $cidrs != None ]] || die "cannot read CloudFront's origin-facing prefix list (ec2:DescribeManagedPrefixLists, ec2:GetManagedPrefixListEntries)"
+  printf '%s' "$cidrs" | tr -s '[:space:]' ,
+}
 ssm_get() { aws ssm get-parameter --name "$1" --query Parameter.Value --output text 2>/dev/null || true; }
 # --value=: a value starting with "-" (a recorded cell context) would otherwise read as an option.
 ssm_put() { aws ssm put-parameter --name "$1" --type String --tier Intelligent-Tiering --overwrite --value="$2" >/dev/null; }
@@ -119,7 +130,10 @@ node_run() {
 # --- Context per target (into the array ctx) ---
 otel_ecs() {
   exists "$P-obs-core" || return 0
-  ctx+=(-c otelConfigParameterName="$(need "$P-obs-core" EcsCollectorParameter)" -c otelSidecarPolicyArn="$(need "$P-obs-core" SidecarPolicyArn)")
+  local config policy
+  config=$(need "$P-obs-core" EcsCollectorParameter)
+  policy=$(need "$P-obs-core" SidecarPolicyArn)
+  ctx+=(-c otelConfigParameterName="$config" -c otelSidecarPolicyArn="$policy")
 }
 
 ctx_data_plane() {
@@ -146,27 +160,44 @@ ctx_obs() {
 # an instance asks the cluster whether to load the snapshot's databases and
 # start as the writer (an empty cluster) or to join as a standby.
 ctx_cell() {
-  local id=$1 pg="$P-data-postgres" core="$P-core-nlb"
+  local id=$1 pg="$P-data-postgres" core="$P-core-nlb" login login_secret admin_secret
+  local vpc writer reader pg_sg nlb_sg ingress_tg prometheus_tg grafana_tg
   load_images
+  # Each on its own line: a failed lookup inside the array below would not stop the script.
+  login=$(need "$pg" NodeLogin)
+  login_secret=$(need "$pg" NodeLoginSecretName)
+  admin_secret=$(need "$pg" SecretName)
+  vpc=$(vpc_id)
+  writer=$(need "$pg" WriterEndpoint)
+  reader=$(need "$pg" ReaderEndpoint)
+  pg_sg=$(need "$pg" ClusterSecurityGroupId)
+  nlb_sg=$(need "$core" SecurityGroupId)
+  ingress_tg=$(need "$core" IngressTargetGroupArn)
   ctx=(-c envName="$ENV_NAME" -c cellId="$id" -c role=core -c network="$NETWORK"
-    -c vpcId="$(vpc_id)" -c subnetType=public -c availabilityZone="$(cell_zone "$id")"
+    -c vpcId="$vpc" -c subnetType=public -c availabilityZone="$(cell_zone "$id")"
     -c instanceType="$CELL_INSTANCE_TYPE" -c dataVolumeGiB="$CELL_DATA_GIB"
     -c stratoImage="$STRATO_IMAGE" -c stratoImageParameter="$CELL_IMAGE"
-    -c postgresWriterHost="$(need "$pg" WriterEndpoint)" -c postgresReaderHost="$(need "$pg" ReaderEndpoint)"
-    -c postgresSecurityGroupId="$(need "$pg" ClusterSecurityGroupId)"
+    -c postgresWriterHost="$writer" -c postgresReaderHost="$reader"
+    -c postgresSecurityGroupId="$pg_sg"
+    -c postgresUser="$login" -c postgresSecretName="$login_secret" -c postgresAdminSecretName="$admin_secret"
     -c peerStore=sqlite -c validatorBehavior=false -c autoPromote=true -c seedEmptyCluster=true
     -c oauthSecretName="$OAUTH_SECRET" -c extraSetupFlags="--vaultUrl=$VAULT_URL"
     -c snapshotBucket="$SNAPSHOT_BUCKET" -c snapshotSource="$SNAPSHOT_SOURCE"
     -c extraBinariesS3="$NODE_SCRIPTS_S3" -c exposePrometheus=true
-    -c coreLoadBalancerSecurityGroupId="$(need "$core" SecurityGroupId)" -c ingressTargetGroupArn="$(need "$core" IngressTargetGroupArn)")
+    -c coreLoadBalancerSecurityGroupId="$nlb_sg" -c ingressTargetGroupArn="$ingress_tg")
   # The first cell publishes the node config for the API tier, runs Grafana and is the one whose Prometheus apex reads.
   if [[ $id == "$FIRST_CELL" ]]; then
+    prometheus_tg=$(need "$core" PrometheusTargetGroupArn)
     ctx+=(-c ethconfParameterName="/$P/api/ethconf-base64" -c grafana=true
       -c grafanaPublicUrl="https://$NODE_HOSTNAME/grafana/" -c grafanaAdminGroups="$GRAFANA_ADMIN_GROUPS" -c grafanaViewerGroups="$GRAFANA_VIEWER_GROUPS"
-      -c prometheusTargetGroupArn="$(need "$core" PrometheusTargetGroupArn)")
+      -c prometheusTargetGroupArn="$prometheus_tg")
     # The Grafana target group gets its load balancer with the API tier, which
     # is deployed after the cells: the cell joins it from the next run on.
-    exists "$P-api-tier" && ctx+=(-c grafanaTargetGroupArn="$(need "$core" GrafanaTargetGroupArn)")
+    # An if, not &&: a failed lookup in an && list would not stop the script.
+    if exists "$P-api-tier"; then
+      grafana_tg=$(need "$core" GrafanaTargetGroupArn)
+      ctx+=(-c grafanaTargetGroupArn="$grafana_tg")
+    fi
   fi
   exists "$P-obs-core" && ctx+=(-c otelConfigParameterName="/$P/observability/otel-collector-cell" -c cloudWatchAgentParameterName="/$P/observability/cloudwatch-agent")
   return 0
@@ -185,52 +216,98 @@ refuse_plain_instances() {
 # The core tier's load balancer and target groups: deployed before the cells, which register in them.
 ctx_core_nlb() {
   refuse_plain_instances
-  ctx=(-c envName="$ENV_NAME" -c coreNlb=true -c vpcId="$(vpc_id)")
+  local vpc
+  vpc=$(vpc_id)
+  ctx=(-c envName="$ENV_NAME" -c coreNlb=true -c vpcId="$vpc")
 }
 
 ctx_api() {
   load_images
-  local pg="$P-data-postgres" cell core
+  local pg="$P-data-postgres" cell core login login_secret cdn
+  local vpc writer reader pg_sg cell_sg nlb_sg grafana_tg
   cell=$(host_stack "$FIRST_CELL")
+  # Each on its own line: a failed lookup inside the array below would not stop the script.
+  login=$(need "$pg" NodeLogin)
+  login_secret=$(need "$pg" NodeLoginSecretName)
+  cdn=$(cloudfront_cidrs)
+  vpc=$(vpc_id)
+  writer=$(need "$pg" WriterEndpoint)
+  reader=$(need "$pg" ReaderEndpoint)
+  pg_sg=$(need "$pg" ClusterSecurityGroupId)
+  cell_sg=$(need "$cell" SecurityGroupId)
+  nlb_sg=$(need "$P-core-nlb" SecurityGroupId)
+  grafana_tg=$(need "$P-core-nlb" GrafanaTargetGroupArn)
   # The cells are reached through their load balancer: a submit goes to one healthy cell.
   core=$(need "$P-core-nlb" DnsName)
-  ctx=(-c envName="$ENV_NAME" -c vpcId="$(vpc_id)"
+  ctx=(-c envName="$ENV_NAME" -c vpcId="$vpc" -c clusterName="$P"
     -c stratoImage="$STRATO_IMAGE" -c nginxImage="$NGINX_IMAGE" -c postgrestImage="$POSTGREST_IMAGE" -c apexImage="$APEX_IMAGE"
-    -c postgresWriterHost="$(need "$pg" WriterEndpoint)" -c postgresReaderHost="$(need "$pg" ReaderEndpoint)"
-    -c postgresSecurityGroupId="$(need "$pg" ClusterSecurityGroupId)" -c coreSecurityGroupId="$(need "$cell" SecurityGroupId)"
-    -c ingressUrls="http://$core:8600" -c coreLoadBalancerSecurityGroupId="$(need "$P-core-nlb" SecurityGroupId)"
+    -c postgresWriterHost="$writer" -c postgresReaderHost="$reader"
+    -c postgresUser="$login" -c postgresSecretName="$login_secret"
+    -c postgresSecurityGroupId="$pg_sg" -c coreSecurityGroupId="$cell_sg"
+    -c ingressUrls="http://$core:8600" -c coreLoadBalancerSecurityGroupId="$nlb_sg"
     -c ethconfParameterName="/$P/api/ethconf-base64"
     -c createSessionSecret=true -c oauthJsonSecretName="$OAUTH_SECRET" -c csrfStateless=true
     -c desiredCount="$API_DESIRED_COUNT" -c albCertificateArn="$CERTIFICATE_ARN" -c chainId="$CHAIN_ID" -c networkName="$NETWORK"
-    -c prometheusHost="$core:9090" -c grafanaTargetGroupArn="$(need "$P-core-nlb" GrafanaTargetGroupArn)")
+    -c prometheusHost="$core:9090" -c grafanaTargetGroupArn="$grafana_tg"
+    -c trustedProxyCidrs="$cdn")
   otel_ecs
+}
+# The partner referrals service follows the network: one per network, each
+# with its own internal key (a plain-string secret that service reads too).
+# The backend gets its URL and that key. An environment file names another
+# service with PARTNER_REFERRALS_URL and PARTNER_INTERNAL_KEY_SECRET; a network
+# without one gets neither and records no referrals. helium's address is the
+# one ECS Express generated for the service: a recreated service has another.
+partner_referrals() {
+  local url=${PARTNER_REFERRALS_URL:-} key=${PARTNER_INTERNAL_KEY_SECRET:-}
+  if [[ -z $url && -z $key ]]; then
+    case $NETWORK in
+      helium) url=https://partner-referrals.example.invalid key=helium-partner-referrals/internal-key.example ;;
+      upquark) url=https://partner-api.strato.nexus key=upquark-partner-referrals/internal-key.example ;;
+    esac
+  fi
+  [[ -z $url && -z $key ]] || ctx+=(-c partnerReferralsUrl="$url" -c partnerInternalKeySecretName="$key")
 }
 
 ctx_app() {
   load_images
-  local pg="$P-data-postgres" session
+  local pg="$P-data-postgres" session cluster login login_secret cdn vpc reader pg_sg
   # The API tier mints the session cookie and this tier decrypts it: its
   # secret, by complete ARN (a name-only reference reads the random suffix
   # as part of the name).
   session=$(aws secretsmanager describe-secret --secret-id "$P/api/session-secret" --query ARN --output text 2>/dev/null) \
     || die "$P/api/session-secret does not exist: deploy api-tier first"
-  ctx=(-c envName="$ENV_NAME" -c vpcId="$(vpc_id)" -c nginxImage="$APP_NGINX_IMAGE" -c backendImage="$APP_BACKEND_IMAGE"
-    -c nodeUrl="https://$NODE_HOSTNAME" -c publicScheme=https
-    -c postgresHost="$(need "$pg" ReaderEndpoint)" -c postgresPasswordSecretName="$P/postgres" -c postgresPasswordJsonKey=password
-    -c postgresSecurityGroupId="$(need "$pg" ClusterSecurityGroupId)" -c chainId="$CHAIN_ID" -c networkName="$NETWORK"
+  # Each on its own line: a failed lookup inside the array below would not stop the script.
+  cluster=$(need "$P-api-tier" ClusterName)
+  login=$(need "$pg" NodeLogin)
+  login_secret=$(need "$pg" NodeLoginSecretName)
+  cdn=$(cloudfront_cidrs)
+  vpc=$(vpc_id)
+  reader=$(need "$pg" ReaderEndpoint)
+  pg_sg=$(need "$pg" ClusterSecurityGroupId)
+  ctx=(-c envName="$ENV_NAME" -c vpcId="$vpc" -c clusterName="$cluster"
+    -c nginxImage="$APP_NGINX_IMAGE" -c backendImage="$APP_BACKEND_IMAGE"
+    -c nodeUrl="https://$NODE_HOSTNAME" -c publicScheme=https -c trustedProxyCidrs="$cdn"
+    -c postgresHost="$reader" -c postgresUser="$login"
+    -c postgresPasswordSecretName="$login_secret" -c postgresPasswordJsonKey=password
+    -c postgresSecurityGroupId="$pg_sg" -c chainId="$CHAIN_ID" -c networkName="$NETWORK"
     -c oauthSecretName="$OAUTH_SECRET" -c csrfStateless=true -c createSessionSecret=false -c sessionSecretName="$session"
     -c ethconfParameterName="/$P/api/ethconf-base64" -c httpPort=80 -c ui=false -c deployUi=false
     -c albCertificateArn="$CERTIFICATE_ARN" -c desiredCount="$APP_DESIRED_COUNT")
   if [[ -n ${BACKEND_SECRET:-} && -n ${BACKEND_SECRET_KEYS:-} ]] && secret_exists "$BACKEND_SECRET"; then
     ctx+=(-c backendSecretName="$BACKEND_SECRET" -c backendSecretKeys="$(echo $BACKEND_SECRET_KEYS | tr ' ' ,)")
   fi
+  partner_referrals
   otel_ecs
 }
 
 ctx_front_door() {
   ctx_api
+  local api_origin app_origin
+  api_origin=$(need "$P-api-tier" AlbDnsName)
+  app_origin=$(need "$P-app-tier" AlbDnsName)
   ctx+=(-c frontDoorDomainName="$NODE_HOSTNAME" -c frontDoorCertificateArn="$CERTIFICATE_ARN"
-    -c apiOriginDomainName="$(need "$P-api-tier" AlbDnsName)" -c appOriginDomainName="$(need "$P-app-tier" AlbDnsName)"
+    -c apiOriginDomainName="$api_origin" -c appOriginDomainName="$app_origin"
     -c deployAppUi=true -c deploySmdUi=true)
 }
 

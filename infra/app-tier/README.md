@@ -17,6 +17,7 @@ away from the node.
    - `ha-<env>/app/postgres-password`: the node's Postgres password (plain string)
    - `ha-<env>/app/session-secret`: 64 random characters (plain string)
    - optionally a JSON secret with the backend's API keys (`-c backendSecretName=...`)
+   - for partner referrals, nothing to create: `-c partnerReferralsUrl=<the network's partner referrals service>` and `-c partnerInternalKeySecretName=<that service's internal-key secret>` (a plain string, read where the service keeps it) give the backend `PARTNER_REFERRALS_URL` and `PARTNER_INTERNAL_KEY`; without both it records no referrals
 3. Build the UI: `cd app/ui && npm ci && npm run build`.
 4. Allow the task security group (stack output `TaskSecurityGroupId`) on the node's Postgres port.
 5. **`-c nodeUrl=...` must already resolve in DNS.** The backend will not serve
@@ -57,8 +58,8 @@ Deploys when `-c historyImage=...` is given: a Fargate service under
 `/history-api` on the app ALB. Its tables go into a `history` database on
 the chain's Aurora cluster when `-c historyDatabaseHost=<writer endpoint>`
 is set (with `historyDatabasePort`, `historyDatabaseUser`,
-`historyDatabaseSecretName` defaulting to 5432, postgres and
-`ha-<env>/postgres`, and `historyDatabaseSecurityGroupId` to open the
+`historyDatabaseSecretName` defaulting to 5432, strato and
+`ha-<env>/postgres/node`, and `historyDatabaseSecurityGroupId` to open the
 cluster to the service); that is one cluster to run and the history writes
 are small. Without it the stack creates an Aurora Serverless v2 cluster of
 its own (0.5 to 8 ACU), which is the place to move to if chart queries show
@@ -97,6 +98,14 @@ README), this tier is the origin for `/api/*`, `/api-docs*` and
 - `-c csrfStateless=true` (nginx image 18.10-onehost or later), and the same
   session secret and OAuth client as the API tier's nginx.
 - This tier's hostname can then point straight at the ALB (`AlbDnsName`).
+- `-c clusterName=<the API tier's ClusterName output>` runs the services in
+  the deployment's one ECS cluster instead of one of this tier's own.
+- `-c trustedProxyCidrs=<CloudFront's origin-facing ranges>` (the managed
+  prefix list `com.amazonaws.global.cloudfront.origin-facing`,
+  comma-separated): nginx trusts them and the VPC's range
+  (`NGINX_TRUST_PROXY_CIDRS`, app-nginx images that have it), so the address
+  it logs and rate-limits by is the client's, not CloudFront's or the load
+  balancer's.
 - `-c ui=false` leaves the `Ui` stack out of the app; destroy a deployed one
   with `cdk destroy <prefix>-Ui` (its bucket is retained; empty and delete it
   by hand).

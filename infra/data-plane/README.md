@@ -9,6 +9,19 @@ app backend and later the API tier read the reader endpoint. Master
 credentials are generated into Secrets Manager under `ha-<env>/postgres`
 (a JSON secret with `username` and `password`); nothing here prints them.
 
+Nothing connects as the master login but the step that creates the node's
+own: `strato` (`-c nodeLogin`), whose password is generated under
+`ha-<env>/postgres/node` (`-c nodeLoginSecretName`, the same JSON shape;
+outputs `NodeLogin` and `NodeLoginSecretName`). Aurora itself knows nothing
+of it: the first core cell to boot creates the role with the master secret
+(`ensure_database_login` in `core-cell/bootstrap/cell-bootstrap.sh`), with
+what the node's own Postgres image gives it: it creates and owns the
+databases, no more. The cells, the API tier, the app tier and the history
+service all connect with it. A login that exists is left as it is, so a
+changed secret does not change the password. On PostgreSQL 15 and later the
+login cannot create the cells' seed table (`strato_cluster_seed`, in the
+`postgres` database's `public` schema); the cluster here is 14.
+
 ## Deploy
 
 ```sh

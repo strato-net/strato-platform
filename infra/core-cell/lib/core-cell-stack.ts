@@ -115,6 +115,8 @@ export class CoreCellStack extends Stack {
     });
     const postgres = secretsmanager.Secret.fromSecretNameV2(this, "PostgresSecret", config.postgresSecretName);
     postgres.grantRead(role);
+    // The master secret, for the bootstrap to create the node's login with.
+    secretsmanager.Secret.fromSecretNameV2(this, "PostgresAdminSecret", config.postgresAdminSecretName).grantRead(role);
     if (config.oauthSecretName) {
       secretsmanager.Secret.fromSecretNameV2(this, "OauthSecret", config.oauthSecretName).grantRead(role);
     }
@@ -238,6 +240,7 @@ export class CoreCellStack extends Stack {
       PG_PORT: String(config.postgresPort),
       PG_USER: config.postgresUser,
       PG_SECRET_ID: config.postgresSecretName,
+      PG_ADMIN_SECRET_ID: config.postgresAdminSecretName,
       ROLE: config.role,
       TLS_HOSTNAME: config.tlsHostname ?? "",
       LETSENCRYPT_EMAIL: config.letsEncryptEmail ?? "",

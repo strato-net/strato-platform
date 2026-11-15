@@ -1,6 +1,7 @@
 import { CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as rds from "aws-cdk-lib/aws-rds";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 import { deploymentPrefix } from "./naming";
 
@@ -18,6 +19,13 @@ export interface PostgresStackProps extends StackProps {
   clientCidrs: string[];
   /** Secrets Manager name for the generated master credentials. */
   secretName: string;
+  /**
+   * The login the node and the tiers connect with, and the Secrets Manager name for its generated
+   * password. Not `<secretName>-` and six characters: a lookup by name would read that as the
+   * master secret's name with its random suffix.
+   */
+  nodeLogin: string;
+  nodeLoginSecretName: string;
 }
 
 /**
@@ -111,9 +119,27 @@ export class PostgresStack extends Stack {
       removalPolicy: RemovalPolicy.RETAIN,
     });
 
+    // The node's own login, so that nothing but its creation uses the master
+    // login. Aurora knows nothing of it: the password is generated here and
+    // the first core cell creates the role with it (cell-bootstrap.sh).
+    // Letters and digits only: it is written into a YAML file and a
+    // connection URI.
+    new secretsmanager.Secret(this, "NodeLoginSecret", {
+      secretName: props.nodeLoginSecretName,
+      description: `${name}: the ${props.nodeLogin} login of the node, the API tier and the app tier`,
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({ username: props.nodeLogin }),
+        generateStringKey: "password",
+        passwordLength: 40,
+        excludePunctuation: true,
+      },
+    });
+
     new CfnOutput(this, "WriterEndpoint", { value: this.cluster.clusterEndpoint.hostname, description: "--pghost for the core" });
     new CfnOutput(this, "ReaderEndpoint", { value: this.cluster.clusterReadEndpoint.hostname, description: "--pgReaderHost; PostgREST, app backend, API tier reads" });
     new CfnOutput(this, "SecretName", { value: props.secretName, description: "Master credentials (JSON with username/password)" });
+    new CfnOutput(this, "NodeLogin", { value: props.nodeLogin, description: "--pguser for the core; the tiers' Postgres user" });
+    new CfnOutput(this, "NodeLoginSecretName", { value: props.nodeLoginSecretName, description: "Its credentials (JSON with username/password)" });
     new CfnOutput(this, "ClusterSecurityGroupId", { value: securityGroup.securityGroupId });
   }
 }

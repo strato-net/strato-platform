@@ -29,9 +29,9 @@ panel = {
     "datasource": MIXED,
     "targets": [
         {"refId": "tasks", "datasource": CWL, "queryMode": "Logs", "region": "default", "id": "",
-         "logGroupNames": ["/aws/ecs/containerinsights/ha-$env-app/performance", "/aws/ecs/containerinsights/ha-$env-api/performance"],
-         "expression": "fields Type, ClusterName, TaskId, ContainerName, CpuUtilized, CpuReserved, MemoryUtilized, MemoryReserved, NetworkRxBytes, NetworkTxBytes, ContainerHealthStatus, ContainerKnownStatus, KnownStatus, CreatedAt, Timestamp | filter Type = \"Task\" or Type = \"Container\" | stats latest(CpuUtilized) as cpu, latest(CpuReserved) as cpuReserved, latest(MemoryUtilized) as mem, latest(MemoryReserved) as memReserved, latest(NetworkRxBytes) as rx, latest(NetworkTxBytes) as tx, latest(ContainerHealthStatus) as health, latest(ContainerKnownStatus) as containerStatus, latest(KnownStatus) as taskStatus, latest(CreatedAt) as created, max(Timestamp) as seen by Type, ClusterName, TaskId, ContainerName",
-         "statsGroups": ["Type", "ClusterName", "TaskId", "ContainerName"]},
+         "logGroupNames": ["/aws/ecs/containerinsights/ha-$env/performance"],
+         "expression": "fields Type, ClusterName, TaskDefinitionFamily, TaskId, ContainerName, CpuUtilized, CpuReserved, MemoryUtilized, MemoryReserved, NetworkRxBytes, NetworkTxBytes, ContainerHealthStatus, ContainerKnownStatus, KnownStatus, CreatedAt, Timestamp | filter Type = \"Task\" or Type = \"Container\" | stats latest(CpuUtilized) as cpu, latest(CpuReserved) as cpuReserved, latest(MemoryUtilized) as mem, latest(MemoryReserved) as memReserved, latest(NetworkRxBytes) as rx, latest(NetworkTxBytes) as tx, latest(ContainerHealthStatus) as health, latest(ContainerKnownStatus) as containerStatus, latest(KnownStatus) as taskStatus, latest(CreatedAt) as created, max(Timestamp) as seen by Type, ClusterName, TaskDefinitionFamily, TaskId, ContainerName",
+         "statsGroups": ["Type", "ClusterName", "TaskDefinitionFamily", "TaskId", "ContainerName"]},
         cw_metric("alb", "AWS/ApplicationELB", "RequestCount", {"LoadBalancer": "*"}, "Sum"),
         cw_metric("healthy", "AWS/ApplicationELB", "HealthyHostCount", {"TargetGroup": "*", "LoadBalancer": "*"}),
         cw_metric("unhealthy", "AWS/ApplicationELB", "UnHealthyHostCount", {"TargetGroup": "*", "LoadBalancer": "*"}),

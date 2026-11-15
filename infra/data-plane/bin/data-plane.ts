@@ -26,5 +26,7 @@ new PostgresStack(app, `${prefix}-data-postgres`, {
   clientSecurityGroupIds: list("clientSecurityGroupIds"),
   clientCidrs: list("clientCidrs"),
   secretName: c("secretName", `${prefix}/postgres`),
+  nodeLogin: c("nodeLogin", "strato"),
+  nodeLoginSecretName: c("nodeLoginSecretName", `${prefix}/postgres/node`),
   terminationProtection: true,
 });

@@ -37,8 +37,15 @@ export interface CoreCellConfig {
   postgresWriterHost: string;
   postgresReaderHost: string;
   postgresPort: number;
+  /** The node's database login and the secret holding its password (the data-plane app's NodeLogin and NodeLoginSecretName). */
   postgresUser: string;
   postgresSecretName: string;
+  /**
+   * The cluster's master secret. A new instance uses it for one thing: to create `postgresUser`
+   * with its password when the cluster does not have that login yet. Nothing else connects as
+   * the master login.
+   */
+  postgresAdminSecretName: string;
   /** The Aurora cluster's security group (data-plane output ClusterSecurityGroupId): opened to this cell on the Postgres port at deploy time, so the first boot can reach it. */
   postgresSecurityGroupId?: string;
   /** "core" runs consensus, VM and indexers only; "node" also runs the app (nginx, app UI and backend, SMD, apex, PostgREST) on this host. */
@@ -209,8 +216,9 @@ export function loadConfig(app: App): CoreCellConfig {
     postgresWriterHost: writerHost,
     postgresReaderHost: ctx(app, "postgresReaderHost", writerHost),
     postgresPort: Number(ctx(app, "postgresPort", "5432")),
-    postgresUser: ctx(app, "postgresUser", "postgres"),
-    postgresSecretName: ctx(app, "postgresSecretName", `${prefix}/postgres`),
+    postgresUser: ctx(app, "postgresUser", "strato"),
+    postgresSecretName: ctx(app, "postgresSecretName", `${prefix}/postgres/node`),
+    postgresAdminSecretName: ctx(app, "postgresAdminSecretName", `${prefix}/postgres`),
     postgresSecurityGroupId: optional(app, "postgresSecurityGroupId"),
     role,
     localAuth: bool(app, "localAuth", "false"),

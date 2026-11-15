@@ -91,7 +91,8 @@ export class ApiTierStack extends Stack {
     const ethconfEnv = { ETHCONF_BASE64: ecs.Secret.fromSsmParameter(ethconf) };
 
     // --- ECS ---
-    const cluster = new ecs.Cluster(this, "Cluster", { vpc, clusterName: name, containerInsightsV2: ecs.ContainerInsights.ENABLED });
+    // The deployment's one cluster: the app tier's services join it by name.
+    const cluster = new ecs.Cluster(this, "Cluster", { vpc, clusterName: config.clusterName, containerInsightsV2: ecs.ContainerInsights.ENABLED });
     // Service Connect: each task's vm-query is reachable from every task as
     // vm-query:8546 through ECS's proxy, which sends only to healthy tasks
     // and ejects one that keeps failing. No listener of its own is needed.
@@ -222,6 +223,9 @@ export class ApiTierStack extends Stack {
         // TLS ends at the ALB (or CloudFront): the OpenID redirect goes back over https.
         ...(props.albCertificate || config.albCertificateArn ? { PUBLIC_SCHEME: "https" } : {}),
         ...(config.csrfStateless ? { CSRF_STATELESS: "true" } : {}),
+        // The client's address is the X-Forwarded-For entry before the proxies listed here:
+        // the load balancer (the VPC's range) and what stands in front of it.
+        NGINX_TRUST_PROXY_CIDRS: [vpc.vpcCidrBlock, ...config.trustedProxyCidrs].join(","),
       },
       secrets: {
         ...ethconfEnv,
@@ -400,6 +404,7 @@ export class ApiTierStack extends Stack {
     }
 
     new CfnOutput(this, "AlbDnsName", { value: this.loadBalancer.loadBalancerDnsName });
+    new CfnOutput(this, "ClusterName", { value: cluster.clusterName, description: "The deployment's ECS cluster: the app tier app's clusterName" });
     if (config.domainName && !config.hostedZoneId) {
       new CfnOutput(this, "HostnameRecord", {
         value: `${config.domainName} CNAME ${this.loadBalancer.loadBalancerDnsName}`,

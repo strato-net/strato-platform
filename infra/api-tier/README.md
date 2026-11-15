@@ -28,7 +28,8 @@ answer (a non-latest block tag, `eth_getProof`, a block replay) is an error.
 2. The Aurora cluster (`data-plane`) and the core cells, each admitting this
    stack's task security group (output `TaskSecurityGroupId`): the cluster on
    5432, the cells on 8600 (the core-cell app's `clientSecurityGroupIds`).
-3. Secrets Manager: the Aurora master secret (from the data-plane stack), the
+3. Secrets Manager: the secret of the node's database login (data-plane
+   output `NodeLoginSecretName`; the tier never uses the master login), the
    node's `secrets/oauth_credentials.yaml` contents as a plain-string secret,
    and a 64-character session secret. SSM Parameter Store: the node's
    `.ethereumH/ethconf.yaml` base64-encoded, under the name given as
@@ -55,6 +56,13 @@ npx cdk deploy --all \
   -c hostedZoneId=Z123 -c domainName=node.testnet.example -c nodeIpAddresses=1.2.3.4 \
   -c apiTierWeight=10
 ```
+
+The stack creates the deployment's ECS cluster, `ha-<env>` (`-c clusterName`,
+output `ClusterName`), which the app tier's services join. nginx takes the
+client's address from `X-Forwarded-For` behind the load balancer (the VPC's
+range is always trusted) and behind what `-c trustedProxyCidrs` lists: with
+the front door, CloudFront's origin-facing ranges (the managed prefix list
+`com.amazonaws.global.cloudfront.origin-facing`, comma-separated).
 
 The stack owns two weighted records for the node hostname: `node` (the
 existing address) and `api-tier` (the ALB). Delete the hostname's existing

@@ -28,7 +28,7 @@ export class AppTierStack extends Stack {
   readonly albUsesHttps: boolean;
   /** The ALB's one listener; other stacks add path rules to it. */
   readonly listener: elbv2.ApplicationListener;
-  readonly cluster: ecs.Cluster;
+  readonly cluster: ecs.ICluster;
 
   constructor(scope: Construct, id: string, props: AppTierStackProps) {
     super(scope, id, props);
@@ -58,9 +58,18 @@ export class AppTierStack extends Stack {
     const backendSecret = config.secrets.backend
       ? secretsmanager.Secret.fromSecretNameV2(this, "BackendSecret", config.secrets.backend)
       : undefined;
+    // The partner referrals service's own internal key, read where that service keeps it.
+    const partnerInternalKey = config.partnerReferrals
+      ? config.partnerReferrals.internalKeySecretName.startsWith("arn:")
+        ? secretsmanager.Secret.fromSecretCompleteArn(this, "PartnerInternalKey", config.partnerReferrals.internalKeySecretName)
+        : secretsmanager.Secret.fromSecretNameV2(this, "PartnerInternalKey", config.partnerReferrals.internalKeySecretName)
+      : undefined;
 
     // --- ECS ---
-    const cluster = new ecs.Cluster(this, "Cluster", { vpc, clusterName: name, containerInsightsV2: ecs.ContainerInsights.ENABLED });
+    // The deployment's one cluster (the API tier app creates it) when named, else this tier's own.
+    const cluster: ecs.ICluster = config.clusterName
+      ? ecs.Cluster.fromClusterAttributes(this, "Cluster", { clusterName: config.clusterName, vpc })
+      : new ecs.Cluster(this, "Cluster", { vpc, clusterName: name, containerInsightsV2: ecs.ContainerInsights.ENABLED });
     this.cluster = cluster;
     // DESTROY, not the CDK default of RETAIN: a retained group keeps its name,
     // and the next create of this stack then fails with "already exists".
@@ -96,12 +105,14 @@ export class AppTierStack extends Stack {
         postgres_port: String(config.postgresPort),
         postgres_user: config.postgresUser,
         ...backendDiscovery.environment,
+        ...(config.partnerReferrals ? { PARTNER_REFERRALS_URL: config.partnerReferrals.url } : {}),
         ...config.backendEnvironment,
       },
       secrets: {
         ...backendDiscovery.secrets,
         postgres_password: ecs.Secret.fromSecretsManager(postgresPassword, config.secrets.postgresPasswordJsonKey),
         ...(backendSecret ? backendSecretFields(backendSecret, config.secrets.backendKeys) : {}),
+        ...(partnerInternalKey ? { PARTNER_INTERNAL_KEY: ecs.Secret.fromSecretsManager(partnerInternalKey) } : {}),
       },
       healthCheck: {
         // /api/health is the backend's health route (/api/v1/metrics has no index route and answered 404).
@@ -132,6 +143,9 @@ export class AppTierStack extends Stack {
         // Browsers reach this nginx over https through CloudFront: the OpenID redirect goes back the same way.
         ...(config.domainName || this.node.tryGetContext("publicScheme") === "https" ? { PUBLIC_SCHEME: "https" } : {}),
         ...(config.csrfStateless ? { CSRF_STATELESS: "true" } : {}),
+        // The client's address is the X-Forwarded-For entry before the proxies listed here:
+        // the load balancer (the VPC's range) and what stands in front of it.
+        NGINX_TRUST_PROXY_CIDRS: [vpc.vpcCidrBlock, ...config.trustedProxyCidrs].join(","),
       },
       secrets: {
         ...(config.ethconfParameterName

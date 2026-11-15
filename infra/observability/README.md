@@ -64,7 +64,7 @@ A name with "app" or "SMD" in it is that UI; any other name is a frontend of
 its own, drawn with its arrow to the API tier. Once any distribution is named,
 unnamed ones are not drawn; with nothing named, every distribution is shown as
 the app UI. The CloudWatch queries are account-wide, so the map picks the
-deployment out by `$env`: load balancers and ECS clusters named
+deployment out by `$env`: load balancers and ECS task families named
 `ha-<env>-<tier>` and the RDS instances of the `ha-<env>-data-postgres`
 stack, which matters in an account that holds anything else. A distribution with no datapoints
 in the time range is not drawn, and one named `-` is hidden: CloudWatch keeps
@@ -96,8 +96,8 @@ What it needs:
   same data source share a request id, and the frontend cancels the Logs
   Insights StartQuery when the metric request goes out, which leaves the
   task boxes empty in the browser while server-side tests pass.
-- Container Insights on the app and api ECS clusters (task and container
-  boxes come from the performance log groups).
+- Container Insights on the deployment's ECS cluster, `ha-<env>` (task and
+  container boxes come from its performance log group).
 - On each cell, the `strato-cell-containers` timer from the cell bootstrap,
   which publishes a `STRATO/Cell` `ContainerUp` datapoint per container each
   minute (about $0.30 a month per container).

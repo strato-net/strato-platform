@@ -5,6 +5,8 @@ import { deploymentPrefix } from "./naming";
 export interface ApiTierConfig {
   envName: string;
   vpcId?: string;
+  /** The ECS cluster this stack creates, ha-<env> by default: the one cluster of the deployment, which the app tier's services join (its clusterName). */
+  clusterName: string;
   /** Image URIs, as strato-platform's autobuild publishes them: ghcr.io/strato-net/strato-platform/<image>:<VERSION>-<commit>-<hash> (public; an ECR URI is pulled with the task's ECR permissions). */
   stratoImage: string;
   nginxImage: string;
@@ -17,6 +19,7 @@ export interface ApiTierConfig {
   postgresWriterHost: string;
   postgresReaderHost: string;
   postgresPort: number;
+  /** The node's database login (the data-plane app's NodeLogin), not the cluster's master login. */
   postgresUser: string;
   /**
    * The core tier's transaction ingress: its load balancer (the core-cell app's coreNlb stack,
@@ -27,7 +30,7 @@ export interface ApiTierConfig {
   ingressUrls: string[];
   /** The node's networkConfig.httpPort: nginx listens on it inside the container. */
   httpPort: number;
-  /** Secrets Manager names: the Aurora master secret (JSON, "password" field), the node's
+  /** Secrets Manager names: the secret of `postgresUser` (JSON, "password" field; the data-plane app's NodeLoginSecretName), the node's
    * OAuth client credentials (YAML file contents), the nginx session secret, and the SSM
    * parameter holding the node's ethconf.yaml base64-encoded. */
   secrets: { postgres: string; oauthCredentialsYaml: string; session: string };
@@ -122,6 +125,13 @@ export interface ApiTierConfig {
   grafanaPort: number;
   /** Stateless CSRF tokens in nginx (CSRF_STATELESS=true): an HMAC of the session under the session secret, valid in every copy and tier sharing that secret. */
   csrfStateless: boolean;
+  /**
+   * Proxies in front of the load balancer whose X-Forwarded-For entry nginx takes as the client's
+   * address (NGINX_TRUST_PROXY_CIDRS), beside the VPC's own range, which covers the load balancer
+   * and is always trusted: behind the front door, CloudFront's origin-facing ranges. Each trusted
+   * hop appends the peer it saw, so a client cannot pass a forged address through them.
+   */
+  trustedProxyCidrs: string[];
 }
 
 function present(v: unknown): boolean {
@@ -144,6 +154,7 @@ export function loadConfig(app: App): ApiTierConfig {
   return {
     envName,
     vpcId: optional(app, "vpcId"),
+    clusterName: ctx(app, "clusterName", prefix),
     stratoImage: ctx(app, "stratoImage"),
     nginxImage: ctx(app, "nginxImage"),
     postgrestImage: ctx(app, "postgrestImage"),
@@ -153,11 +164,11 @@ export function loadConfig(app: App): ApiTierConfig {
     postgresWriterHost: ctx(app, "postgresWriterHost"),
     postgresReaderHost: ctx(app, "postgresReaderHost"),
     postgresPort: Number(ctx(app, "postgresPort", "5432")),
-    postgresUser: ctx(app, "postgresUser", "postgres"),
+    postgresUser: ctx(app, "postgresUser", "strato"),
     ingressUrls: String(ctx(app, "ingressUrls")).split(",").map((s) => s.trim()).filter(Boolean),
     httpPort: Number(ctx(app, "httpPort", "8081")),
     secrets: {
-      postgres: ctx(app, "postgresSecretName", `${prefix}/postgres`),
+      postgres: ctx(app, "postgresSecretName", `${prefix}/postgres/node`),
       oauthCredentialsYaml: ctx(app, "oauthCredentialsSecretName", `${prefix}/api/oauth-credentials`),
       session: ctx(app, "sessionSecretName", `${prefix}/api/session-secret`),
     },
@@ -195,5 +206,6 @@ export function loadConfig(app: App): ApiTierConfig {
     prometheusHost: optional(app, "prometheusHost"),
     grafanaTargetGroupArn: optional(app, "grafanaTargetGroupArn"),
     grafanaPort: Number(ctx(app, "grafanaPort", "3001")),
+    trustedProxyCidrs: String(ctx(app, "trustedProxyCidrs", "")).split(",").map((s) => s.trim()).filter(Boolean),
   };
 }
