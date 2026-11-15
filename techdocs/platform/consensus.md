@@ -68,7 +68,14 @@ There are two ways to change the set.
 
 ### Admin vote
 
-Registered admins call `voteToAddValidator(address)` or `voteToRemoveValidator(address)`. A change passes once it has `floor(2 × admins / 3) + 1` votes. Admins are added and removed the same way, with `voteToAddAdmin` and `voteToRemoveAdmin`.
+Registered admins call `voteToAddValidator(address)` or `voteToRemoveValidator(address)`. A change passes once it has `floor(2 × admins / 3) + 1` votes. A vote in the other direction restarts the count. Admins are added and removed the same way, with `voteToAddAdmin` and `voteToRemoveAdmin`.
+
+A passed vote also **pins** the validator, which overrides staking:
+
+- **Pinned in** (`voteToAddValidator`): the validator joins at once if it is not in the set, and staking can't remove it, however low its stake. Staking takes it into its own set at the next sync, so its stake still sets its weight. A validator with no stake has weight 0 and can't vote or propose.
+- **Pinned out** (`voteToRemoveValidator`): the validator leaves at once if it is in the set, and staking can't add it back. A validator outside the set can be pinned out before it joins.
+
+`voteToClearValidatorPin(address)` removes a pin. The validator keeps its membership until staking next syncs or activates it. A kick from `ValidatorRegistry` removes a pinned-in validator and clears its pin.
 
 At genesis, `MercataGovernance` is owned by `AdminRegistry` (`0x100c`), which is also its only admin. Votes are therefore carried out through `AdminRegistry` governance.
 
@@ -88,7 +95,7 @@ An operator joins in three steps:
 2. **Bond** stake: the operator's own self-bond must reach the self-bond minimum (`selfBondMinimum`, 10,000 STRATO until governance sets it). Delegated stake adds weight but does not count toward it. A validator seated before this rule keeps the rule it was admitted under (`minStake`, a governance parameter) until it leaves the set or changes operator.
 3. **Activate** with `StratoStaking.tryActivate`. This needs a free slot, or enough stake to evict the lowest-weighted validator by a margin. Anyone can activate an eligible operator from the agreed opening block (`joinsOpenFromBlock`); before it nobody can, the owner included.
 
-An active operator leaves automatically, in the same transaction, as soon as it stops being eligible. Reasons include:
+An active operator leaves automatically, in the same transaction, as soon as it stops being eligible, unless the admins have pinned it in. Reasons include:
 
 - falling below its minimum stake
 - being jailed

@@ -80,6 +80,11 @@ contract GenesisGovernance is MercataGovernance {
     function seedValidator(address validator) public {
         addValidator(validator);
     }
+
+    function seedAdmin(address admin) public {
+        admins.push(admin);
+        adminMap[admin] = admins.length;
+    }
 }
 
 contract Describe_StratoStaking {
@@ -1104,6 +1109,96 @@ contract Describe_StratoStaking {
         _selfBond(operatorA, VALIDATOR_A, 1e18);
         user2.doSuccessfully(address(staking), "indexValidatorSet");
         require(genesis.validatorStake(VALIDATOR_A) == 1000e18 && genesis.validatorStake(VALIDATOR_B) == 2000e18, "published whole once every seat qualifies");
+    }
+
+    // ---- admin pins --------------------------------------------------------------------
+
+    // Governance owned and administered by this contract alone, so each vote executes at once.
+    function _pinningGovernance() internal returns (GenesisGovernance pins) {
+        pins = new GenesisGovernance(address(this));
+        pins.seedAdmin(address(this));
+        pins.setStakingContract(address(staking));
+        staking.setGovernance(address(pins), true);
+    }
+
+    function it_keeps_a_pinned_validator_whatever_its_stake() public {
+        GenesisGovernance pins = _pinningGovernance();
+        staking.setSetParams(2, 50, 500, 10, 100, 100, 0);
+        _bondBoth();
+        _stake(user1, VALIDATOR_A, 300e18);
+        pins.voteToAddValidator(VALIDATOR_A);
+
+        operatorA.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 1000e18);
+        require(!staking.eligible(VALIDATOR_A), "no longer qualifies");
+        require(pins.isValidator(VALIDATOR_A) && staking.isValidator(VALIDATOR_A), "the pin keeps the seat");
+        require(pins.validatorStake(VALIDATOR_A) == 300e18, "its weight still follows its stake");
+
+        // The lowest seat is pinned, so a newcomer has to beat the next one up.
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1050e18);
+        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: set full", address(validatorC));
+        _selfBond(validatorC, address(validatorC), 1050e18);
+        validatorC.doSuccessfully(address(staking), "tryActivate(address)", address(validatorC));
+        require(pins.isValidator(VALIDATOR_A) && !pins.isValidator(VALIDATOR_B), "B evicted, the pinned seat kept");
+
+        pins.voteToClearValidatorPin(VALIDATOR_A);
+        require(pins.isValidator(VALIDATOR_A), "clearing changes no membership by itself");
+        staking.syncValidator(VALIDATOR_A);
+        require(!pins.isValidator(VALIDATOR_A) && staking.status(VALIDATOR_A) == 1, "the next sync applies the stake rules again");
+    }
+
+    // A validator the admins pin in takes a seat in staking too, whatever its stake and
+    // whatever room the set has, so the stake behind it becomes its weight.
+    function it_adopts_a_validator_the_admins_pin_in() public {
+        GenesisGovernance pins = _pinningGovernance();
+        staking.setSetParams(1, 50, 500, 10, 100, 100, 0);
+        _selfBond(operatorA, VALIDATOR_A, 100e18);
+        _stake(user1, VALIDATOR_A, 400e18);
+        require(!staking.eligible(VALIDATOR_A), "below minStake");
+
+        pins.voteToAddValidator(VALIDATOR_A);
+        require(pins.isValidator(VALIDATOR_A) && pins.validatorStake(VALIDATOR_A) == 0, "seated by the vote, no weight yet");
+        attacker.do(address(staking), "syncValidator(address)", VALIDATOR_A);
+        require(staking.isValidator(VALIDATOR_A) && staking.activeValidatorCount() == 1, "staking took the seat");
+        require(pins.validatorStake(VALIDATOR_A) == 500e18, "its stake is its weight");
+
+        _selfBond(operatorB, VALIDATOR_B, 1000e18);
+        pins.voteToAddValidator(VALIDATOR_B);
+        _activate(VALIDATOR_B);
+        require(staking.isValidator(VALIDATOR_B) && staking.validatorCount() == 2, "adopted past the cap");
+        require(pins.isValidator(VALIDATOR_A), "nobody evicted to make room");
+    }
+
+    // A validator the admins pin out leaves at the next sync and cannot come back by stake
+    // until the pin is cleared.
+    function it_keeps_a_pinned_out_validator_out() public {
+        GenesisGovernance pins = _pinningGovernance();
+        _bondBoth();
+        pins.voteToRemoveValidator(VALIDATOR_A);
+        require(!pins.isValidator(VALIDATOR_A), "voted out");
+        staking.syncValidator(VALIDATOR_A);
+        require(staking.status(VALIDATOR_A) == 1, "seat given up");
+
+        fastForward(1, 1);
+        require(staking.eligible(VALIDATOR_A) && !staking.isWaiter(VALIDATOR_A), "eligible, but not a waiter");
+        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: pinned out by governance", VALIDATOR_A);
+        staking.reconcileSet(_list(VALIDATOR_A));
+        require(!pins.isValidator(VALIDATOR_A), "reconciling passes it over");
+
+        pins.voteToClearValidatorPin(VALIDATOR_A);
+        require(staking.isWaiter(VALIDATOR_A), "a waiter again");
+        _activate(VALIDATOR_A);
+        require(pins.isValidator(VALIDATOR_A), "joins by stake once the pin is cleared");
+    }
+
+    // A kick overrides a pin: the validator leaves and the pin goes with it.
+    function it_kicks_a_pinned_validator() public {
+        GenesisGovernance pins = _pinningGovernance();
+        _bondBoth();
+        pins.voteToAddValidator(VALIDATOR_A);
+        registry.removeValidator(VALIDATOR_A);
+        require(!pins.isValidator(VALIDATOR_A) && !pins.pinnedIn(VALIDATOR_A), "out, pin dropped");
+        require(staking.status(VALIDATOR_A) == 3 && staking.validatorCount() == 1, "Kicked");
     }
 
     // ---- operators ---------------------------------------------------------------------
