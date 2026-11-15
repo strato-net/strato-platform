@@ -184,6 +184,18 @@ const carol = "44".repeat(20);
   await commit(state, [{ blockHash: "b", eventIndex: 7, account: dave, blockTs: ago(0.25), usdWad: 9n * 10n ** 18n }], at(6), at(7), asOf);
   assert.deepStrictEqual(await walletMetrics(), [1, 1, "9.00"]);
 
+  // --- Status, for a monitor: no key, always 200, the state in the body ---
+  const status = async () => (await call("GET", "/status")).body;
+  await query("UPDATE progress SET as_of = now() - interval '10 minutes'");
+  const behind = await status();
+  assert.deepStrictEqual([behind.status, behind.lag_seconds >= 600], ["behind", true]);
+  // An answer is reused for a while, so the database is not read for every ask
+  await query("UPDATE progress SET as_of = now()");
+  assert.strictEqual((await status()).status, "behind");
+  config.status.cacheMs = 0;
+  const current = await status();
+  assert.deepStrictEqual([current.status, current.lag_seconds <= 5, typeof current.data_as_of], ["ok", true, "string"]);
+
   // --- The poller keeps its place when another node answers ---
   // A node as its Cirrus serves it: the chain's events under row ids that
   // start at the node's own offset. An ask with nothing new fails, which
