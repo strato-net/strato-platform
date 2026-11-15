@@ -9,7 +9,7 @@ const EVENT_NAMES = [
   "PriceUpdated", "BatchPricesUpdated", "NewPool", "NewPoolV3",
   "Swap", "MetalMinted", "DepositCompleted", "Deposited", "SuppliedCollateral",
 ];
-const SELECT = "id,address,block_timestamp,transaction_sender,event_name,attributes";
+const SELECT = "id,address,block_hash,block_number,event_index,block_timestamp,transaction_sender,event_name,attributes";
 
 // How long the activity of an account nobody referred is kept. A signup can
 // reach this service after the account's first events were read (the backend
@@ -21,10 +21,24 @@ const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 interface CirrusEventRow {
   id: number | string;
   address: string;
+  block_hash: string;
+  block_number: number | string;
+  event_index: number | string;
   block_timestamp: string;
   transaction_sender: string;
   event_name: string;
   attributes: Record<string, unknown> | null;
+}
+
+/**
+ * Where the poller stands. Cirrus numbers its event rows per node database:
+ * the row id pages fast, but is another event on another node (one switched
+ * in behind a load balancer, or rebuilt). event is what that row is on the
+ * chain, the same on every node; null before the first event is read.
+ */
+export interface Position {
+  cursor: number;
+  event: { address: string; blockHash: string; eventIndex: number; blockNumber: number } | null;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -40,9 +54,11 @@ const parseCirrusTimestamp = (s: string): Date => {
 export const fromCirrusRow = (row: CirrusEventRow): ChainEvent | null => {
   const address = toAddress(row.address);
   const blockTs = parseCirrusTimestamp(String(row.block_timestamp));
-  if (!address || Number.isNaN(blockTs.getTime())) return null;
+  const eventIndex = Number(row.event_index);
+  if (!address || !row.block_hash || !Number.isInteger(eventIndex) || Number.isNaN(blockTs.getTime())) return null;
   return {
-    id: Number(row.id),
+    blockHash: String(row.block_hash),
+    eventIndex,
     address,
     name: String(row.event_name || ""),
     blockTs,
@@ -78,8 +94,17 @@ export const learnDecimals = async (state: State, assets: Iterable<string>): Pro
 // The position is read before the state that has to match it: if another
 // instance commits in between, this one's next commit finds the position
 // moved and fails, rather than pairing newer prices with an older position.
-const loadPosition = async (): Promise<{ cursor: number; state: State }> => {
-  const cursor = Number((await query<{ cursor: string }>("SELECT cursor FROM progress WHERE name = 'cirrus'")).rows[0]?.cursor ?? 0);
+const loadPosition = async (): Promise<Position & { state: State }> => {
+  const at = (
+    await query<{ cursor: string; address: string | null; block_hash: string | null; event_index: number | null; block_number: string | null }>(
+      "SELECT cursor, address, block_hash, event_index, block_number FROM progress WHERE name = 'cirrus'"
+    )
+  ).rows[0];
+  const cursor = Number(at?.cursor ?? 0);
+  const event =
+    at?.address && at.block_hash && at.event_index !== null
+      ? { address: at.address, blockHash: at.block_hash, eventIndex: at.event_index, blockNumber: Number(at.block_number) }
+      : null;
   const [prices, pools] = await Promise.all([
     query<{ asset: string; price: string }>("SELECT asset, price::text FROM prices"),
     query<{ address: string; token0: string; token1: string }>("SELECT address, token0, token1 FROM pools"),
@@ -92,7 +117,7 @@ const loadPosition = async (): Promise<{ cursor: number; state: State }> => {
     dirtyPools: new Set(),
   };
   await learnDecimals(state, state.prices.keys());
-  return { cursor, state };
+  return { cursor, event, state };
 };
 
 /**
@@ -102,13 +127,14 @@ const loadPosition = async (): Promise<{ cursor: number; state: State }> => {
  * succeeds from the position the page was read at, so two instances polling
  * at once (a deployment replacing a task) cannot commit over each other.
  */
-export const commit = async (state: State, activities: Activity[], from: number, cursor: number, asOf: Date): Promise<void> => {
+export const commit = async (state: State, activities: Activity[], from: number, to: Position, asOf: Date): Promise<void> => {
   await withTransaction(async (client) => {
     const moved = await client.query(
-      `INSERT INTO progress (name, cursor, as_of) VALUES ('cirrus', $2, $3)
-       ON CONFLICT (name) DO UPDATE SET cursor = EXCLUDED.cursor, as_of = EXCLUDED.as_of
+      `INSERT INTO progress (name, cursor, as_of, address, block_hash, event_index, block_number) VALUES ('cirrus', $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (name) DO UPDATE SET cursor = EXCLUDED.cursor, as_of = EXCLUDED.as_of, address = EXCLUDED.address,
+         block_hash = EXCLUDED.block_hash, event_index = EXCLUDED.event_index, block_number = EXCLUDED.block_number
        WHERE progress.cursor = $1`,
-      [from, cursor, asOf]
+      [from, to.cursor, asOf, to.event?.address ?? null, to.event?.blockHash ?? null, to.event?.eventIndex ?? null, to.event?.blockNumber ?? null]
     );
     if (moved.rowCount !== 1) throw new Error(`Position is no longer ${from}: another instance is polling`);
     const assets = [...state.dirtyPrices];
@@ -129,14 +155,15 @@ export const commit = async (state: State, activities: Activity[], from: number,
     }
     if (activities.length) {
       await client.query(
-        `INSERT INTO activity (event_id, account, block_ts, usd_wad)
-         SELECT v.event_id, v.account, v.block_ts, v.usd_wad
-         FROM unnest($1::bigint[], $2::text[], $3::timestamptz[], $4::numeric[]) AS v(event_id, account, block_ts, usd_wad)
-         WHERE v.block_ts > now() - make_interval(days => $5)
+        `INSERT INTO activity (block_hash, event_index, account, block_ts, usd_wad)
+         SELECT v.block_hash, v.event_index, v.account, v.block_ts, v.usd_wad
+         FROM unnest($1::text[], $2::int[], $3::text[], $4::timestamptz[], $5::numeric[]) AS v(block_hash, event_index, account, block_ts, usd_wad)
+         WHERE v.block_ts > now() - make_interval(days => $6)
             OR EXISTS (SELECT 1 FROM referrals r WHERE r.account = v.account)
-         ON CONFLICT (event_id) DO NOTHING`,
+         ON CONFLICT (block_hash, event_index) DO NOTHING`,
         [
-          activities.map((a) => a.eventId),
+          activities.map((a) => a.blockHash),
+          activities.map((a) => a.eventIndex),
           activities.map((a) => a.account),
           activities.map((a) => a.blockTs),
           activities.map((a) => a.usdWad.toString()),
@@ -160,6 +187,35 @@ export const prune = async (): Promise<void> => {
 };
 
 /**
+ * The id the position's event has on the node that answers now. A node that
+ * has not reached the event's block yet is asked again later. One that is
+ * past it without the event is on a chain that no longer has it (a
+ * rollback): what was read from the chain is dropped, to be read again.
+ */
+const locate = async (event: NonNullable<Position["event"]>, stored: number): Promise<number> => {
+  const url = `${config.cirrus.nodeUrl}/cirrus/search/event`;
+  const found = await axios.get<{ id: number | string }[]>(url, {
+    params: { select: "id", address: `eq.${event.address}`, block_hash: `eq.${event.blockHash}`, event_index: `eq.${event.eventIndex}` },
+    timeout: 60000,
+  });
+  if (Array.isArray(found.data) && found.data.length) return Number(found.data[0].id);
+  const newest = await axios.get<{ block_number: number | string }[]>(url, {
+    params: { select: "block_number", order: "id.desc", limit: 1 },
+    timeout: 60000,
+  });
+  const height = Array.isArray(newest.data) && newest.data.length ? Number(newest.data[0].block_number) : 0;
+  if (height <= event.blockNumber) throw new Error(`The node is at block ${height}, behind the position's block ${event.blockNumber}`);
+  await withTransaction(async (client) => {
+    const reset = await client.query(
+      "UPDATE progress SET cursor = 0, address = NULL, block_hash = NULL, event_index = NULL, block_number = NULL WHERE name = 'cirrus' AND cursor = $1",
+      [stored]
+    );
+    if (reset.rowCount === 1) await client.query("TRUNCATE activity, prices, pools");
+  });
+  throw new Error(`The node is past block ${event.blockNumber} without the position's event: reading the chain again from the start`);
+};
+
+/**
  * Pages Cirrus's global event table by id from the stored position until
  * something fails: from genesis on first start (which builds prices and
  * pools; events older than the grace period are only kept for referred
@@ -167,26 +223,41 @@ export const prune = async (): Promise<void> => {
  * order, so the price in state when an event is read is the price at its
  * execution. Anonymous reads: no Authorization header.
  */
-const pollFromStoredPosition = async (): Promise<never> => {
+export const pollFromStoredPosition = async (): Promise<never> => {
   const { cirrus } = config;
   const position = await loadPosition();
   const { state } = position;
-  let { cursor } = position;
+  let { cursor, event } = position;
+  // What progress holds, which a commit moves on from. cursor leaves it when the node numbers the event differently
+  let stored = cursor;
   let prunedAt = 0;
   logInfo("Cirrus", `Polling ${cirrus.nodeUrl}/cirrus/search/event from id ${cursor}`);
   for (;;) {
+    // A page starts at the position's own event: found there, the node still numbers it the same
     const { data } = await axios.get<CirrusEventRow[]>(`${cirrus.nodeUrl}/cirrus/search/event`, {
       params: {
         select: SELECT,
-        id: `gt.${cursor}`,
+        id: `${event ? "gte" : "gt"}.${cursor}`,
         order: "id.asc",
-        limit: cirrus.pageSize,
+        limit: cirrus.pageSize + (event ? 1 : 0),
         event_name: `in.(${EVENT_NAMES.join(",")})`,
       },
       transformResponse: [(text: string) => (typeof text === "string" ? parseJsonPreservingBigInts(text) : text)],
       timeout: 60000,
     });
-    const rows = Array.isArray(data) ? data : [];
+    let rows = Array.isArray(data) ? data : [];
+    if (event) {
+      const first = rows[0];
+      if (!first || first.block_hash !== event.blockHash || Number(first.event_index) !== event.eventIndex) {
+        const id = await locate(event, stored);
+        // Found where the page was just read from: two nodes answer in turn, so wait for one
+        if (id === cursor) throw new Error(`The position's event is ${id} on one node and not on the next`);
+        logInfo("Cirrus", `The node numbers the position's event ${id}, not ${cursor}: continuing from there`);
+        cursor = id;
+        continue;
+      }
+      rows = rows.slice(1);
+    }
     const caughtUp = rows.length < cirrus.pageSize;
     const activities: Activity[] = [];
     for (const row of rows) {
@@ -198,9 +269,12 @@ const pollFromStoredPosition = async (): Promise<never> => {
       if (activity) activities.push(activity);
     }
     const last = rows[rows.length - 1];
-    const next = last ? Number(last.id) : cursor;
-    await commit(state, activities, cursor, next, caughtUp ? new Date() : parseCirrusTimestamp(String(last.block_timestamp)));
-    cursor = next;
+    if (last) {
+      cursor = Number(last.id);
+      event = { address: last.address, blockHash: last.block_hash, eventIndex: Number(last.event_index), blockNumber: Number(last.block_number) };
+    }
+    await commit(state, activities, stored, { cursor, event }, caughtUp ? new Date() : parseCirrusTimestamp(String(last.block_timestamp)));
+    stored = cursor;
     if (rows.length) logInfo("Cirrus", `read ${rows.length} rows through id ${cursor}`, { candidates: activities.length });
     if (caughtUp) {
       if (Date.now() - prunedAt > PRUNE_INTERVAL_MS) {

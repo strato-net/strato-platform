@@ -131,6 +131,15 @@ One instance is enough. A second one polling at the same time (a deployment
 replacing the first) is safe: a page is only committed from the position it
 was read at, so the slower of the two is refused and starts over.
 
+`NODE_URL` can be a load balancer in front of several nodes. Each node
+numbers its Cirrus event rows itself, so the poller also remembers what its
+last event is on the chain (block hash and event index) and finds it on
+whichever node answers: after a switch to another node, or a rebuild of the
+node, it carries on where it was. A node that is behind is waited for. If
+the chain was rolled back past the poller's position, everything read from
+the chain is read again from the start (minutes); codes and referrals are
+not touched.
+
 ## Tests
 
 `npm test`. The Postgres suite runs when `postgres_host` is set.
