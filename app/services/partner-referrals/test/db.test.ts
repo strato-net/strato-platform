@@ -201,7 +201,8 @@ const carol = "44".repeat(20);
   const node = express()
     .get("/cirrus/search/BlockApps-Token", (_req, res) => res.json([{ address: token, customDecimals: 18 }]))
     .get("/cirrus/search/event", (req, res) => {
-      const q = req.query as Record<string, string>;
+      // Each parameter as one string, however it was sent
+      const q = Object.fromEntries(Object.entries(req.query).map(([name, value]) => [name, String(value)]));
       const rows = (second && asks++ % 2 ? second : chain).map((e, i) => ({ ...e, id: offset + i + 1 }));
       if (q.or) return res.json(rows.filter((r) => q.or.includes(`and(address.eq.${r.address},block_hash.eq.${r.block_hash},event_index.eq.${r.event_index})`)));
       if (q.order === "id.desc") return res.json(rows.slice(-1));
