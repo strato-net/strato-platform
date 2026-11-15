@@ -34,13 +34,20 @@ refresh_cloudwatch_agent() {
     || log "warning: could not refresh the cloudwatch agent config from $CW_AGENT_PARAMETER"
 }
 
-# Following the chain: the node runs (convoke stops all of it when any process
-# exits), every core process answers its metrics endpoint (most listen only on
-# the node's apiListenAddress, the docker bridge) and the ingress its health,
-# and the node has executed up to within a few blocks of the best block its
-# peers report (strato-indexer's chain gauges).
+# A new instance is still being built by cell-bootstrap.sh (cloud-init runs
+# it), which installs binaries and scripts through the same scratch
+# directories as an upgrade: changing the node in the middle of that would mix
+# two versions, and the cell is not ready before it ends.
+bootstrapping() { [[ "$(cloud-init status 2>/dev/null || true)" == *running* ]]; }
+
+# Following the chain: the instance is built, the node runs (convoke stops all
+# of it when any process exits), every core process answers its metrics
+# endpoint (most listen only on the node's apiListenAddress, the docker
+# bridge) and the ingress its health, and the node has executed up to within a
+# few blocks of the best block its peers report (strato-indexer's chain gauges).
 check() {
   local metrics best world listen p
+  if bootstrapping; then echo "the instance is still bootstrapping"; return 1; fi
   pgrep -x convoke >/dev/null || { echo "the node is not running (no convoke; see $NODE_DIR/logs/convoke.log)"; return 1; }
   listen=$(awk '$1 == "apiListenAddress:" {gsub(/"/, "", $2); print $2; exit}' "$NODE_DIR/.ethereumH/ethconf.yaml" 2>/dev/null || true)
   [[ -n $listen && $listen != 0.0.0.0 ]] || listen=127.0.0.1
@@ -96,6 +103,10 @@ install_health() {
 if [[ ${1:-} == --check ]]; then
   check
   exit
+fi
+if bootstrapping; then
+  log "this instance is still bootstrapping: nothing was changed"
+  exit 1
 fi
 if [[ ${1:-} == --restart ]]; then
   drain

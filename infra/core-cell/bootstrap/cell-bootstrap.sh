@@ -19,6 +19,20 @@ NODE_DIR=$STRATO_ROOT/node
 NODE_USER=strato
 log() { echo "[cell-bootstrap $(date -u +%FT%TZ)] $*"; }
 
+# --- 0. The cell's Elastic IP ---
+# The stack allocates it and the instance takes it: a replaced instance is
+# another machine, and the address peers dial has to follow the cell. Until
+# then the instance uses the public address it was launched with.
+if [[ -n "${EIP_ALLOCATION_ID:-}" ]]; then
+  imds() { curl -s -H "X-aws-ec2-metadata-token: $(curl -s -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' http://169.254.169.254/latest/api/token)" "http://169.254.169.254/latest/meta-data/$1"; }
+  if [[ "$(imds public-ipv4)" != "$EIP_PUBLIC_IP" ]]; then
+    log "elastic ip $EIP_PUBLIC_IP"
+    aws ec2 associate-address --allocation-id "$EIP_ALLOCATION_ID" --instance-id "$(imds instance-id)" --allow-reassociation >/dev/null
+    for i in $(seq 1 30); do [[ "$(imds public-ipv4)" == "$EIP_PUBLIC_IP" ]] && break; sleep 2; done
+    [[ "$(imds public-ipv4)" == "$EIP_PUBLIC_IP" ]] || { log "$EIP_PUBLIC_IP did not become this instance's address"; exit 1; }
+  fi
+fi
+
 # --- 1. Packages: docker, the strato binaries' runtime libraries, tooling ---
 log "packages"
 apt-get update -q
@@ -51,6 +65,19 @@ mountpoint -q $STRATO_ROOT || mount $STRATO_ROOT
 chown $NODE_USER:$NODE_USER $STRATO_ROOT
 
 # --- 3. Binaries from the strato image, node scripts from the repo ---
+# The image the environment's cells run, once cells upgrade has recorded one:
+# a cell replaced between deployments comes back on that, not on an older one.
+# Only a parameter that does not exist yet leaves the stack's image; any other
+# failure to read it is retried and then stops the bootstrap, since guessing
+# could bring the cell back on another version.
+if [[ -n "${STRATO_IMAGE_PARAMETER:-}" ]]; then
+  for attempt in 1 2 3 4 5; do
+    if recorded=$(aws ssm get-parameter --name "$STRATO_IMAGE_PARAMETER" --query Parameter.Value --output text 2>&1); then STRATO_IMAGE=$recorded; break; fi
+    grep -q ParameterNotFound <<<"$recorded" && break
+    (( attempt < 5 )) || { log "cannot read $STRATO_IMAGE_PARAMETER: $recorded"; exit 1; }
+    sleep 10
+  done
+fi
 log "image $STRATO_IMAGE"
 registry=${STRATO_IMAGE%%/*}
 # Both root (this script) and the node's user (convoke's compose pulls) need the registry login.
@@ -82,6 +109,8 @@ rm -rf /tmp/strato-bin && docker cp "$cid:/usr/local/bin" /tmp/strato-bin
 # Regular files only: the image's bin directory also holds a directory entry (queryStrato).
 find /tmp/strato-bin -maxdepth 1 -type f -exec install -m 0755 {} /usr/local/bin/ \;
 docker rm -f "$cid" >/dev/null; trap - EXIT
+# What strato-cell-upgrade compares a new image with.
+echo "$STRATO_IMAGE" > /etc/strato/current-image
 aws s3 cp "$NODE_SCRIPTS_S3" /tmp/node-scripts.zip
 rm -rf /tmp/node-scripts && mkdir /tmp/node-scripts && unzip -o -q /tmp/node-scripts.zip -d /tmp/node-scripts
 install -m 0755 /tmp/node-scripts/strato-* /usr/local/bin/
@@ -132,6 +161,11 @@ imds_token=$(curl -s -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 120' http:
 private_dns=$(curl -s -H "X-aws-ec2-metadata-token: $imds_token" http://169.254.169.254/latest/meta-data/local-hostname)
 public_ip=$(curl -s -H "X-aws-ec2-metadata-token: $imds_token" http://169.254.169.254/latest/meta-data/public-ipv4 || true)
 node_host=${public_ip:-$private_dns}
+# A statement on the cluster's postgres database, as the node's database login.
+cluster_sql() {
+  PGPASSWORD=$(aws secretsmanager get-secret-value --secret-id "$PG_SECRET_ID" --query SecretString --output text | jq -r .password) \
+    psql -v ON_ERROR_STOP=1 -h "$PG_WRITER_HOST" -p "$PG_PORT" -U "$PG_USER" -d postgres -Atqc "$1"
+}
 if [[ ! -d $NODE_DIR ]]; then
   log "setup: network=$NETWORK cell=$CELL_ID role=$ROLE writer=$WRITER validator=$VALIDATOR_BEHAVIOR host=$node_host"
   vmq=(); [[ "$VM_QUERY" == "true" ]] && vmq=(--vmQuery)
@@ -160,6 +194,31 @@ if [[ ! -d $NODE_DIR ]]; then
   # shellcheck disable=SC2206
   extra=($EXTRA_SETUP_FLAGS)
   pg_password=$(aws secretsmanager get-secret-value --secret-id "$PG_SECRET_ID" --query SecretString --output text | jq -r .password)
+  # With SEED_EMPTY_CLUSTER the cluster says what this cell is, in a one-row
+  # table of its postgres database. The cell that finds no eth database claims
+  # the row, loads the snapshot's databases into the cluster, starts as the
+  # writer and marks the row done once they are loaded (4e). Every other
+  # cell, and every later instance, then leaves the databases alone and starts
+  # as a standby. An instance of the claiming cell that finds the row not done
+  # replaces one that never finished loading, and loads again; another cell
+  # that finds it not done stops here. A cluster with an eth database and no
+  # row was filled some other way and is never loaded over, and a cluster
+  # that cannot be asked stops the bootstrap.
+  loading=false
+  if [[ "${SEED_EMPTY_CLUSTER:-false}" == "true" ]]; then
+    cluster_sql "create table if not exists strato_cluster_seed (one boolean primary key default true check (one), cell text not null, done boolean not null default false)"
+    eth_databases=$(cluster_sql "select count(*) from pg_database where datname = 'eth'")
+    if [[ "$eth_databases" == "0" ]]; then
+      cluster_sql "insert into strato_cluster_seed (cell) values ('$CELL_ID') on conflict do nothing"
+    fi
+    seed=$(cluster_sql "select cell || ' ' || done::text from strato_cluster_seed")
+    case "$seed" in
+      "$CELL_ID false") loading=true; WRITER=true; SNAPSHOT_SKIP_DATABASES=false ;;
+      *" false") log "cell ${seed% false} has not finished loading the snapshot's databases into the cluster: this cell cannot start beside it"; exit 1 ;;
+      *) WRITER=false; SNAPSHOT_SKIP_DATABASES=true ;;
+    esac
+    log "cluster seed [$seed]: writer=$WRITER, skip the snapshot's databases=$SNAPSHOT_SKIP_DATABASES"
+  fi
   # 4a. The node directory (ethconf, secrets, genesis, docker-compose.yml, commands.txt).
   sudo -u $NODE_USER -H env PATH="$PATH" \
     strato-setup "$NODE_DIR" --role="$ROLE" --network="$NETWORK" --nodeHost="$node_host" \
@@ -189,8 +248,36 @@ if [[ ! -d $NODE_DIR ]]; then
     # has the room (the root volume does not) and which the node user can write
     # (this script's own directory, where strato-snapshot would default, it cannot).
     install -d -o $NODE_USER -g $NODE_USER "$STRATO_ROOT/.snapshot-work"
+    # The databases as they stand, to tell afterwards that the restore replaced them.
+    if [[ $loading == true ]]; then
+      databases_before=$(cluster_sql "select coalesce(string_agg(oid::text, ','), '') from pg_database where datname in ('eth', 'cirrus')")
+    fi
     sudo -u $NODE_USER -H env PATH="$PATH" STRATO_SNAPSHOT_BUCKET="${STRATO_SNAPSHOT_BUCKET:-}" STRATO_SNAPSHOT_WORKDIR="$STRATO_ROOT/.snapshot-work" \
       strato-snapshot restore "$NODE_DIR" "${snap[@]}" --network "$NETWORK" --force
+    # Loaded means the restore made both databases anew (it drops and recreates
+    # each one it loads). A snapshot without their dumps (strato-snapshot create
+    # --state-only) restores without an error and loads nothing.
+    if [[ $loading == true ]]; then
+      databases_loaded=$(cluster_sql "select count(*) from pg_database where datname in ('eth', 'cirrus') and not oid::text = any (string_to_array('$databases_before', ','))")
+      [[ "$databases_loaded" == "2" ]] || { log "the snapshot did not load eth and cirrus into the cluster ($databases_loaded of 2): it must carry both database dumps"; exit 1; }
+    fi
+  fi
+  # This instance loaded the cluster (or, with no snapshot to load, is the
+  # first writer of an empty one): what lets it finish the claim (4e), also on
+  # a rerun of this script.
+  if [[ $loading == true ]]; then touch "$STRATO_ROOT/.cluster-loaded"; fi
+fi
+# 4e. The claim on the cluster's load, settled on every run before the node
+# starts: setup and restore above run once, so a rerun after a failure gets
+# here without them. Done is marked only by the instance that loaded the
+# databases; one that did not finish must not start a node on them, and is
+# replaced by an instance that loads them again.
+if [[ "${SEED_EMPTY_CLUSTER:-false}" == "true" ]]; then
+  seed=$(cluster_sql "select cell || ' ' || done::text from strato_cluster_seed")
+  if [[ "$seed" == "$CELL_ID false" ]]; then
+    [[ -e "$STRATO_ROOT/.cluster-loaded" ]] || { log "this instance did not finish loading the snapshot's databases into the cluster: replace it (scripts/ha.sh <env> cells replace $CELL_ID)"; exit 1; }
+    cluster_sql "update strato_cluster_seed set done = true"
+    log "the cluster is loaded: every later instance joins as a standby"
   fi
 fi
 # 4d. Publish the node config for the API tier (its ETHCONF_BASE64). The tier

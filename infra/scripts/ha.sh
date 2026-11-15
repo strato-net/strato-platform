@@ -8,9 +8,12 @@
 #   scripts/ha.sh <env> deploy <target>...        cdk deploy each target, in order
 #   scripts/ha.sh <env> cdk <target> <args>...    any cdk command (diff, synth)
 #   scripts/ha.sh <env> context <target>          the context a target is given
-#   scripts/ha.sh <env> cells create              create missing cells, one at a time
+#   scripts/ha.sh <env> cells deploy              deploy every cell's stack, creating missing cells one at a time
+#   scripts/ha.sh <env> cells diff                cdk diff of every cell's stack
 #   scripts/ha.sh <env> cells upgrade [<id>]      upgrade every cell (or one) in place, standbys first
 #   scripts/ha.sh <env> cells restart [<id>]      restart every cell (or one) on the version it runs, standbys first
+#   scripts/ha.sh <env> cells replace <id>        a new instance for the cell, from the latest snapshot
+#   scripts/ha.sh <env> cells instance <id>       the cell's current instance id
 #   scripts/ha.sh <env> cells wait-ready [<id>]   wait until cells follow the chain
 #   scripts/ha.sh <env> cells lease               who holds the writer lease
 #   scripts/ha.sh <env> install                   npm ci in every app
@@ -20,8 +23,8 @@
 #   scripts/ha.sh <env> record <strato> <infra>   record the deployed image set and commits
 #   scripts/ha.sh <env> state                     the commits last deployed
 #
-# Targets, in deploy order: data-plane, obs-core, core-nlb (after the cells:
-# the cells command), api-tier, app-tier, front-door, obs-alarms. Images come
+# Targets, in deploy order: data-plane, obs-core, core-nlb, the cells (the
+# cells command), api-tier, app-tier, front-door, obs-alarms. Images come
 # from STRATO_IMAGE, NGINX_IMAGE, POSTGREST_IMAGE, APEX_IMAGE, APP_NGINX_IMAGE
 # and APP_BACKEND_IMAGE when set (the pipeline sets them), else from the set
 # last deployed. strato-platform is read from STRATO_PLATFORM_DIR, default
@@ -40,6 +43,8 @@ export AWS_REGION AWS_DEFAULT_REGION=$AWS_REGION AWS_PAGER=""
 export STRATO_PLATFORM_DIR=${STRATO_PLATFORM_DIR:-$(cd "$ROOT/.." && pwd)/strato-platform}
 P=ha-$ENV_NAME
 STATE=/$P/deploy
+# The strato image the cells run: cells upgrade records it, a new instance of a cell installs it.
+CELL_IMAGE=/$P/core/strato-image
 IMAGE_KEYS="STRATO_IMAGE NGINX_IMAGE POSTGREST_IMAGE APEX_IMAGE APP_NGINX_IMAGE APP_BACKEND_IMAGE"
 
 die() { echo "ha.sh: $*" >&2; exit 1; }
@@ -125,61 +130,62 @@ ctx_data_plane() {
 
 ctx_obs() {
   ctx=(-c envName="$ENV_NAME" -c managedPrometheus=false -c managedGrafana=false -c auroraClusterIdentifier="$P-postgres")
-  local ids=() albs=() id n a
-  for id in $(existing_cells); do ids+=("$(need "$(host_stack "$id")" InstanceId)"); done
+  local groups=() albs=() id n a
+  for id in $(existing_cells); do groups+=("$P-cell-$id"); done
   for n in "$P-api" "$P-app"; do a=$(alb_full_name "$n"); [[ -n $a ]] && albs+=("$a"); done
-  ((${#ids[@]})) && ctx+=(-c cellInstanceIds="$(IFS=,; echo "${ids[*]}")")
+  ((${#groups[@]})) && ctx+=(-c cellGroupNames="$(IFS=,; echo "${groups[*]}")")
   ((${#albs[@]})) && ctx+=(-c albFullNames="$(IFS=,; echo "${albs[*]}")")
   return 0
 }
 
-# A cell's context is fixed when the cell is created and replayed afterwards:
-# it ends up in the instance's user data, which cloud-init reads only at first
-# boot, and a changed user data stops and starts the instance. Cells are
-# upgraded in place instead (cells upgrade), and the core tier's load balancer
-# opens their ingress (core-nlb) so a cell never needs its stack redeployed.
-ctx_cell_new() {
-  local id=$1 first_of_cluster=$2 pg="$P-data-postgres"
+# A cell's stack is deployed on every run, and nothing in it touches the
+# running instance: the launch template is what the next instance boots (after
+# cells replace, or when the watchdog or EC2 gives the current one up), so it
+# has to carry the current bootstrap, while the running node is upgraded in
+# place (cells upgrade). Every cell gets the same settings: at its first boot
+# an instance asks the cluster whether to load the snapshot's databases and
+# start as the writer (an empty cluster) or to join as a standby.
+ctx_cell() {
+  local id=$1 pg="$P-data-postgres" core="$P-core-nlb"
   load_images
   ctx=(-c envName="$ENV_NAME" -c cellId="$id" -c role=core -c network="$NETWORK"
     -c vpcId="$(vpc_id)" -c subnetType=public -c availabilityZone="$(cell_zone "$id")"
-    -c instanceType="$CELL_INSTANCE_TYPE" -c dataVolumeGiB="$CELL_DATA_GIB" -c stratoImage="$STRATO_IMAGE"
+    -c instanceType="$CELL_INSTANCE_TYPE" -c dataVolumeGiB="$CELL_DATA_GIB"
+    -c stratoImage="$STRATO_IMAGE" -c stratoImageParameter="$CELL_IMAGE"
     -c postgresWriterHost="$(need "$pg" WriterEndpoint)" -c postgresReaderHost="$(need "$pg" ReaderEndpoint)"
     -c postgresSecurityGroupId="$(need "$pg" ClusterSecurityGroupId)"
-    -c peerStore=sqlite -c validatorBehavior=false -c autoPromote=true
+    -c peerStore=sqlite -c validatorBehavior=false -c autoPromote=true -c seedEmptyCluster=true
     -c oauthSecretName="$OAUTH_SECRET" -c extraSetupFlags="--vaultUrl=$VAULT_URL"
     -c snapshotBucket="$SNAPSHOT_BUCKET" -c snapshotSource="$SNAPSHOT_SOURCE"
-    -c extraBinariesS3="$NODE_SCRIPTS_S3" -c exposePrometheus=true)
-  # Only the first cell of an empty cluster restores eth and cirrus into it.
-  [[ $first_of_cluster == true ]] && ctx+=(-c snapshotSkipDatabases=false)
+    -c extraBinariesS3="$NODE_SCRIPTS_S3" -c exposePrometheus=true
+    -c coreLoadBalancerSecurityGroupId="$(need "$core" SecurityGroupId)" -c ingressTargetGroupArn="$(need "$core" IngressTargetGroupArn)")
+  # The first cell publishes the node config for the API tier, runs Grafana and is the one whose Prometheus apex reads.
   if [[ $id == "$FIRST_CELL" ]]; then
-    ctx+=(-c writer=true -c ethconfParameterName="/$P/api/ethconf-base64" -c grafana=true
-      -c grafanaPublicUrl="https://$NODE_HOSTNAME/grafana/" -c grafanaAdminGroups="$GRAFANA_ADMIN_GROUPS" -c grafanaViewerGroups="$GRAFANA_VIEWER_GROUPS")
-  else
-    ctx+=(-c writer=false)
+    ctx+=(-c ethconfParameterName="/$P/api/ethconf-base64" -c grafana=true
+      -c grafanaPublicUrl="https://$NODE_HOSTNAME/grafana/" -c grafanaAdminGroups="$GRAFANA_ADMIN_GROUPS" -c grafanaViewerGroups="$GRAFANA_VIEWER_GROUPS"
+      -c prometheusTargetGroupArn="$(need "$core" PrometheusTargetGroupArn)")
+    # The Grafana target group gets its load balancer with the API tier, which
+    # is deployed after the cells: the cell joins it from the next run on.
+    exists "$P-api-tier" && ctx+=(-c grafanaTargetGroupArn="$(need "$core" GrafanaTargetGroupArn)")
   fi
   exists "$P-obs-core" && ctx+=(-c otelConfigParameterName="/$P/observability/otel-collector-cell" -c cloudWatchAgentParameterName="/$P/observability/cloudwatch-agent")
   return 0
 }
-ctx_cell() {
-  local saved line
-  saved=$(ssm_get "$STATE/cell-$1-context")
-  [[ -n $saved ]] || die "cell $1 has no recorded context ($STATE/cell-$1-context); cells create records it"
-  ctx=()
-  while IFS= read -r line; do ctx+=("$line"); done <<<"$saved"
+
+# A cell from before the cells became Auto Scaling groups has an instance of
+# its own, which a deploy of the core tier would leave running without a stack
+# and without its place behind the load balancer.
+refuse_plain_instances() {
+  local id
+  for id in $(existing_cells); do
+    [[ -z $(out "$(host_stack "$id")" InstanceId) ]] || die "cell $id is a plain instance: tear the environment down and build it again"
+  done
 }
 
-# The core tier's load balancer: every cell behind one name. The first cell,
-# which also runs Grafana, is the one whose Prometheus apex reads through it.
+# The core tier's load balancer and target groups: deployed before the cells, which register in them.
 ctx_core_nlb() {
-  local id ids=() sgs=()
-  for id in $(existing_cells); do
-    ids+=("$(need "$(host_stack "$id")" InstanceId)")
-    sgs+=("$(need "$(host_stack "$id")" SecurityGroupId)")
-  done
-  ((${#ids[@]})) || die "no cells: create them first (cells create)"
-  ctx=(-c envName="$ENV_NAME" -c coreNlb=true -c vpcId="$(vpc_id)"
-    -c cellInstanceIds="$(IFS=,; echo "${ids[*]}")" -c cellSecurityGroupIds="$(IFS=,; echo "${sgs[*]}")")
+  refuse_plain_instances
+  ctx=(-c envName="$ENV_NAME" -c coreNlb=true -c vpcId="$(vpc_id)")
 }
 
 ctx_api() {
@@ -196,7 +202,7 @@ ctx_api() {
     -c ethconfParameterName="/$P/api/ethconf-base64"
     -c createSessionSecret=true -c oauthJsonSecretName="$OAUTH_SECRET" -c csrfStateless=true
     -c desiredCount="$API_DESIRED_COUNT" -c albCertificateArn="$CERTIFICATE_ARN" -c chainId="$CHAIN_ID" -c networkName="$NETWORK"
-    -c prometheusHost="$core:9090" -c grafanaInstanceId="$(need "$cell" InstanceId)")
+    -c prometheusHost="$core:9090" -c grafanaTargetGroupArn="$(need "$P-core-nlb" GrafanaTargetGroupArn)")
   otel_ecs
 }
 
@@ -284,7 +290,11 @@ ssm_run() {
   aws ssm get-command-invocation --command-id "$id" --instance-id "$inst" --query '[StandardOutputContent,StandardErrorContent]' --output text || true
   [[ $status == Success ]]
 }
-instance_of() { need "$(host_stack "$1")" InstanceId; }
+# The cell's instance: the one its Auto Scaling group has in service, nothing while it is being replaced.
+instance_of() {
+  aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$P-cell-$1" \
+    --query 'AutoScalingGroups[0].Instances[?LifecycleState==`InService`] | [0].InstanceId' --output text 2>/dev/null | grep -v '^None$' || true
+}
 
 # The cell the lease names ("writer lease: held by <cell> ..."), empty when unheld or unknown.
 lease_holder() {
@@ -331,26 +341,37 @@ cells_wait_ready() {
   done
 }
 
-# Creates the missing cells, one at a time: a cell joins a cluster the cells
-# before it have filled, so they must follow the chain first (also after a
-# run that stopped while one was still bootstrapping). Returns once the cells
-# it created follow the chain; with none to create it waits for nothing, so a
-# broken cell does not block the cells upgrade that may fix it.
-cells_create() {
-  local id first_of_cluster=true created="" ctx dir stacks
-  [[ -n $(existing_cells) ]] && first_of_cluster=false
+# Deploys every cell's stack, one cell at a time. A missing cell is created
+# only once the cells before it follow the chain (also after a run that
+# stopped while one was still bootstrapping), and is waited for before the
+# next: the first boot of a cell on an empty cluster loads the snapshot's
+# databases into it, and a second cell starting beside it would do the same.
+# An existing cell only has its stack brought up to date, without waiting, so
+# a broken cell does not block the cells upgrade that may fix it.
+cells_deploy() {
+  local id new ctx dir stacks
+  refuse_plain_instances
   for id in $(cell_ids); do
-    exists "$(host_stack "$id")" && continue
-    [[ -z $(existing_cells) ]] || cells_wait_ready
-    secret_exists "$OAUTH_SECRET" || die "$OAUTH_SECRET does not exist: create it first (environments/$ENV_NAME.env)"
-    ctx_cell_new "$id" "$first_of_cluster"
-    ssm_put "$STATE/cell-$id-context" "$(printf '%s\n' "${ctx[@]}")"
-    log "cell $id: creating $(host_stack "$id")"
+    new=false
+    if ! exists "$(host_stack "$id")"; then
+      new=true
+      [[ -z $(existing_cells) ]] || cells_wait_ready
+      secret_exists "$OAUTH_SECRET" || die "$OAUTH_SECRET does not exist: create it first (environments/$ENV_NAME.env)"
+    fi
+    ctx_cell "$id"
+    log "cell $id: deploying $(host_stack "$id")"
     cdk_in core-cell deploy "$P-cell-$id-network" "$P-cell-$id-host" --require-approval never --progress events "${ctx[@]}"
-    first_of_cluster=false
-    created+=" $id"
+    if [[ $new == true ]]; then cells_wait_ready "$id"; fi
   done
-  if [[ -n $created ]]; then cells_wait_ready "$created"; fi
+}
+
+# What cells deploy would change, for the pipeline's dry run.
+cells_diff() {
+  local id ctx
+  for id in $(cell_ids); do
+    ctx_cell "$id"
+    cdk_in core-cell diff "$P-cell-$id-network" "$P-cell-$id-host" "${ctx[@]}"
+  done
 }
 
 # The cells to act on, one per line: the given one, or every cell with the
@@ -380,6 +401,8 @@ cells_upgrade() {
     log "cell $id: upgrading to $STRATO_IMAGE"
     ssm_run "$(instance_of "$id")" "$(( ${READY_TIMEOUT_MINUTES:-360} * 60 ))" "$(cell_script "$STRATO_IMAGE")" \
       || die "cell $id did not come back on $STRATO_IMAGE; the cells after it were left alone"
+    # Proven on a cell: what a replaced instance installs from now on.
+    ssm_put "$CELL_IMAGE" "$STRATO_IMAGE"
   done
 }
 
@@ -393,6 +416,32 @@ cells_restart() {
     ssm_run "$(instance_of "$id")" "$(( ${READY_TIMEOUT_MINUTES:-360} * 60 ))" "$(cell_script --restart)" \
       || die "cell $id did not follow the chain again after its restart; the cells after it were left alone"
   done
+}
+
+# A new instance for the cell: its Auto Scaling group replaces the one marked
+# unhealthy, and the new one restores the latest snapshot. Refused only for
+# the one healthy cell behind the load balancer, which would leave none for
+# as long as a restore and a catch-up take. A cell that is not serving has
+# nothing to lose: that is also the way out for a first cell whose load of
+# the cluster failed, which has no healthy peer yet.
+cells_replace() {
+  local id=${1:?cells replace <id>} old new healthy deadline
+  exists "$(host_stack "$id")" || die "no cell $id"
+  old=$(instance_of "$id")
+  healthy=$(aws elbv2 describe-target-health --target-group-arn "$(need "$P-core-nlb" IngressTargetGroupArn)" \
+    --query "TargetHealthDescriptions[?TargetHealth.State=='healthy'].Target.Id" --output text)
+  [[ -n $old && $(echo $healthy) == "$old" ]] && die "cell $id is the only healthy cell behind the load balancer: replacing it would leave none"
+  if [[ -n $old ]]; then
+    log "cell $id: replacing instance $old"
+    aws autoscaling set-instance-health --instance-id "$old" --health-status Unhealthy --no-should-respect-grace-period
+  fi
+  deadline=$(( $(date +%s) + 1800 ))
+  until new=$(instance_of "$id"); [[ -n $new && $new != "$old" ]]; do
+    (( $(date +%s) < deadline )) || die "cell $id has no new instance after 30 minutes; see the activity of its Auto Scaling group $P-cell-$id"
+    sleep 30
+  done
+  log "cell $id: new instance $new"
+  cells_wait_ready "$id"
 }
 
 # --- Front door checks: through CloudFront by name, whatever the hostname's DNS says ---
@@ -418,10 +467,13 @@ case $cmd in
     resolve "${1:?target}"
     if [[ -n $skip ]]; then log "skip ${1}: $skip"; else printf '%s\n' "${ctx[@]}" | paste -d' ' - -; fi ;;
   cells)
-    case ${1:?cells create|upgrade|restart|wait-ready|lease} in
-      create) cells_create ;;
+    case ${1:?cells deploy|diff|upgrade|restart|replace|instance|wait-ready|lease} in
+      deploy) cells_deploy ;;
+      diff) cells_diff ;;
       upgrade) cells_upgrade "${2:-}" ;;
       restart) cells_restart "${2:-}" ;;
+      replace) cells_replace "${2:-}" ;;
+      instance) instance_of "${2:?cells instance <id>}" ;;
       wait-ready) cells_wait_ready "${2:-}" ;;
       lease) echo "${P}: writer lease held by $(lease_holder)" ;;
       *) die "unknown cells command $1" ;;

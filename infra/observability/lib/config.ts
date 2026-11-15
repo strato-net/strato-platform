@@ -40,8 +40,8 @@ export interface ObservabilityConfig {
   auroraClusterIdentifier?: string;
   /** ALB full names (the `LoadBalancer` dimension, app/<name>/<id>) for 5xx ratio alarms. */
   albFullNames: string[];
-  /** EC2 instance ids of the core cells for host alarms. */
-  cellInstanceIds: string[];
+  /** Auto Scaling group names of the core cells (ha-<env>-cell-<id>) for host alarms: a replaced cell is another instance in the same group. */
+  cellGroupNames: string[];
 }
 
 function present(v: unknown): boolean {
@@ -92,6 +92,6 @@ export function loadConfig(app: App): ObservabilityConfig {
     grafanaVersion: ctx(app, "grafanaVersion", "10.4"),
     auroraClusterIdentifier: optional(app, "auroraClusterIdentifier"),
     albFullNames: list(app, "albFullNames"),
-    cellInstanceIds: list(app, "cellInstanceIds"),
+    cellGroupNames: list(app, "cellGroupNames"),
   };
 }

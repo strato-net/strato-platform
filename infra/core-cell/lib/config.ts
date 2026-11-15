@@ -14,13 +14,19 @@ export interface CoreCellConfig {
   availabilityZone?: string;
   instanceType: string;
   rootVolumeGiB: number;
-  /** Separate gp3 volume for the node directory: LevelDB, the JLog, Redis state, logs. */
+  /** Separate gp3 volume for the node directory: LevelDB, the JLog, Redis state, logs. It goes with its instance: a replaced cell starts on a new one, from a snapshot. */
   dataVolumeGiB: number;
   /** SSM public parameter naming the AMI. Default: Canonical's Ubuntu 24.04, the strato image's base. */
   amiParameter: string;
   keyPairName?: string;
   /** Registry URI of the strato image, tag included, as strato-platform's autobuild publishes it: ghcr.io/strato-net/strato-platform/strato:<VERSION>-<commit>-<hash> (public; an ECR URI is pulled with the instance role). Its binaries are extracted onto the host. */
   stratoImage: string;
+  /**
+   * SSM parameter naming the strato image the environment's cells run (scripts/ha.sh cells upgrade
+   * writes it). A new instance installs that image when the parameter exists and `stratoImage`
+   * otherwise, so a cell replaced between deployments comes back on the version the others run.
+   */
+  stratoImageParameter?: string;
   /** Registry prefix the generated compose pulls prometheus and streaming from (`--repoUrl`); derived from stratoImage. */
   repoUrl: string;
   /** Optional s3://bucket/prefix/ of extra binaries installed into /usr/local/bin (ones an older image lacks). */
@@ -56,7 +62,7 @@ export interface CoreCellConfig {
   letsEncryptEmail?: string;
   /** Who may reach the app (httpPort, 443). */
   webCidrs: string[];
-  /** Who may reach Grafana (3001) directly. Empty by default: with no CIDR here it is reachable only through SSM port forwarding, or through the API tier's ALB when that tier sets `grafanaInstanceId`. */
+  /** Who may reach Grafana (3001) directly. Empty by default: with no CIDR here it is reachable only through SSM port forwarding, or through the API tier's ALB when that tier sets `grafanaTargetGroupArn`. */
   grafanaCidrs: string[];
   /**
    * Put Grafana behind a Keycloak login instead of anonymous viewer access. Needs `grafanaPublicUrl`
@@ -76,9 +82,21 @@ export interface CoreCellConfig {
   peerDatabase?: string;
   /** Where the cell keeps peers and sync tasks (`--peerStore`): `sqlite` (default; a file in the node directory, so networking does not depend on the cluster) or `postgres`. */
   peerStore: "sqlite" | "postgres";
-  /** Writer lease and consensus role of this cell (design-documents/standby-core.md). */
+  /** Writer lease and consensus role of this cell (design-documents/standby-core.md). With `seedEmptyCluster` the first boot decides `writer`. */
   writer: boolean;
   validatorBehavior: boolean;
+  /**
+   * Let the first boot decide from the cluster what this cell is, instead of `writer` and
+   * `snapshotSkipDatabases`: when the cluster has no `eth` database the cell claims the load
+   * (one row in `strato_cluster_seed`, in the cluster's postgres database), loads the snapshot's
+   * databases into it, starts as the writer and marks the row done; otherwise it leaves them
+   * alone and starts as a standby. An instance replacing one of the claiming cell that never
+   * finished loading loads again, and another cell arriving meanwhile stops. A replaced instance
+   * boots again, so a fixed "first cell" setting would load a snapshot over the live databases;
+   * this cannot. Without `snapshotSource` there is nothing to load: the claiming cell is simply
+   * the first writer, which fills the empty cluster as it syncs from genesis.
+   */
+  seedEmptyCluster: boolean;
   /** Run vm-query on the cell (only useful when the cell also serves RPC). */
   vmQuery: boolean;
   /** Snapshot to restore on first boot: an s3:// URI or a published timestamp ("latest"). */
@@ -107,6 +125,16 @@ export interface CoreCellConfig {
   p2pCidrs: string[];
   /** Security groups allowed on the cell's transaction ingress (strato-ingest, 8600): the API tier's task SG. */
   clientSecurityGroupIds: string[];
+  /**
+   * The core tier's load balancer (the coreNlb stack's outputs): its security group, admitted on the
+   * cell's ingress (8600), health (8601) and, with `exposePrometheus`, Prometheus (9090); and the
+   * target groups this cell's instance registers in. Every cell takes the ingress group, one cell
+   * the Prometheus group, and the cell running Grafana the Grafana group.
+   */
+  coreLoadBalancerSecurityGroupId?: string;
+  ingressTargetGroupArn?: string;
+  prometheusTargetGroupArn?: string;
+  grafanaTargetGroupArn?: string;
   /** SSH from a bastion's security group, or nothing (SSM Session Manager always works). */
   sshSourceSecurityGroupId?: string;
   /** Observability (optional): the collector configs the observability app published and its Prometheus workspace. */
@@ -174,6 +202,7 @@ export function loadConfig(app: App): CoreCellConfig {
     amiParameter: ctx(app, "amiParameter", "/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id"),
     keyPairName: optional(app, "keyPairName"),
     stratoImage,
+    stratoImageParameter: optional(app, "stratoImageParameter"),
     repoUrl: ctx(app, "repoUrl", stratoImage.slice(0, stratoImage.lastIndexOf("/") + 1)),
     extraBinariesS3: optional(app, "extraBinariesS3"),
     network: ctx(app, "network", "upquark"),
@@ -201,6 +230,7 @@ export function loadConfig(app: App): CoreCellConfig {
     peerStore: peerStore(app),
     writer: bool(app, "writer", "false"),
     validatorBehavior: bool(app, "validatorBehavior", "false"),
+    seedEmptyCluster: bool(app, "seedEmptyCluster", "false"),
     vmQuery: bool(app, "vmQuery", "false"),
     snapshotSource: optional(app, "snapshotSource"),
     snapshotBucket: optional(app, "snapshotBucket"),
@@ -214,6 +244,10 @@ export function loadConfig(app: App): CoreCellConfig {
     frontendLabels: optional(app, "frontendLabels"),
     p2pCidrs: list(app, "p2pCidrs", "0.0.0.0/0"),
     clientSecurityGroupIds: list(app, "clientSecurityGroupIds", ""),
+    coreLoadBalancerSecurityGroupId: optional(app, "coreLoadBalancerSecurityGroupId"),
+    ingressTargetGroupArn: optional(app, "ingressTargetGroupArn"),
+    prometheusTargetGroupArn: optional(app, "prometheusTargetGroupArn"),
+    grafanaTargetGroupArn: optional(app, "grafanaTargetGroupArn"),
     sshSourceSecurityGroupId: optional(app, "sshSourceSecurityGroupId"),
     otelConfigParameterName: optional(app, "otelConfigParameterName"),
     cloudWatchAgentParameterName: optional(app, "cloudWatchAgentParameterName"),
@@ -229,19 +263,8 @@ export function loadConfig(app: App): CoreCellConfig {
 export interface CoreNlbConfig {
   envName: string;
   vpcId: string;
-  /**
-   * Every cell behind the load balancer: each cell stack's InstanceId and SecurityGroupId outputs,
-   * in the same order. The first cell's Prometheus is the one the API tier's apex reads.
-   */
-  cellInstanceIds: string[];
-  cellSecurityGroupIds: string[];
 }
 
 export function loadCoreNlbConfig(app: App): CoreNlbConfig {
-  const cellInstanceIds = list(app, "cellInstanceIds", "");
-  const cellSecurityGroupIds = list(app, "cellSecurityGroupIds", "");
-  if (!cellInstanceIds.length || cellInstanceIds.length !== cellSecurityGroupIds.length) {
-    throw new Error("cellInstanceIds and cellSecurityGroupIds must name the same cells, at least one");
-  }
-  return { envName: ctx(app, "envName", "testnet"), vpcId: ctx<string>(app, "vpcId"), cellInstanceIds, cellSecurityGroupIds };
+  return { envName: ctx(app, "envName", "testnet"), vpcId: ctx<string>(app, "vpcId") };
 }

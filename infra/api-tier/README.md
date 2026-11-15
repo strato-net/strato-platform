@@ -70,7 +70,7 @@ Rolling back is the same weight going down. The node keeps serving until
 the weight is 100 and has been for a while; then re-set-up the node with
 `--role=core` at the next window.
 
-Security groups: pass `-c postgresSecurityGroupId=<Aurora cluster SG>` and the stack opens it to its task security group at deploy time; `-c coreLoadBalancerSecurityGroupId=<the core-cell app's coreNlb stack SecurityGroupId>` admits the tasks on the core tier's load balancer, for the transaction ingress (8600) and Prometheus (`prometheusHost`); `-c coreSecurityGroupId=<a core cell SG>` is for that cell's Grafana (`grafanaInstanceId`). Without a load balancer, list every cell in `ingressUrls`, open their ingress on the cell side (`clientSecurityGroupIds` in the core-cell app, the output `TaskSecurityGroupId`), and `coreSecurityGroupId` also opens that cell's Prometheus port.
+Security groups: pass `-c postgresSecurityGroupId=<Aurora cluster SG>` and the stack opens it to its task security group at deploy time; `-c coreLoadBalancerSecurityGroupId=<the core-cell app's coreNlb stack SecurityGroupId>` admits the tasks on the core tier's load balancer, for the transaction ingress (8600) and Prometheus (`prometheusHost`); `-c coreSecurityGroupId=<a core cell SG>` is for that cell's Grafana (`grafanaTargetGroupArn`, the core tier's Grafana target group, which this load balancer forwards `/grafana` to). Without a load balancer, list every cell in `ingressUrls`, open their ingress on the cell side (`clientSecurityGroupIds` in the core-cell app, the output `TaskSecurityGroupId`), and `coreSecurityGroupId` also opens that cell's Prometheus port.
 
 ## Hostname and certificate
 

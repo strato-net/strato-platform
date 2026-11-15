@@ -1,4 +1,5 @@
-import { ArnFormat, CfnOutput, Duration, Fn, RemovalPolicy, Stack, StackProps, Tags } from "aws-cdk-lib";
+import { ArnFormat, CfnOutput, Duration, Fn, Stack, StackProps, Tags } from "aws-cdk-lib";
+import * as autoscaling from "aws-cdk-lib/aws-autoscaling";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3assets from "aws-cdk-lib/aws-s3-assets";
@@ -22,6 +23,13 @@ export interface CoreCellStackProps extends StackProps {
  * the binaries extracted from that image), and convoke is supervised by
  * systemd so a reboot brings the node back.
  *
+ * The host is the one instance of an Auto Scaling group, so a cell whose
+ * instance is lost, or handed back by its own watchdog or by `cells replace`,
+ * is built again from the launch template: the new instance takes the cell's
+ * Elastic IP, restores the latest snapshot and registers in the core tier's
+ * target groups. Nothing here replaces a running instance: a changed launch
+ * template only decides what the next one boots.
+ *
  * The cell is a follower by default (`--writer=false --validatorBehavior=false`):
  * it indexes into the cluster only when it holds the writer lease, and it
  * never votes. `-c writer=true` makes it the writer core; promotion of a
@@ -35,7 +43,6 @@ export interface CoreCellStackProps extends StackProps {
  * SSM.
  */
 export class CoreCellStack extends Stack {
-  readonly instance: ec2.Instance;
   readonly securityGroup: ec2.SecurityGroup;
 
   constructor(scope: Construct, id: string, props: CoreCellStackProps) {
@@ -79,6 +86,12 @@ export class CoreCellStack extends Stack {
       const client = ec2.SecurityGroup.fromSecurityGroupId(this, `ClientSg${i}`, sgId, { mutable: false });
       this.securityGroup.addIngressRule(client, ec2.Port.tcp(8600), "transaction ingress (strato-ingest; the API tier posts here)");
     });
+    if (config.coreLoadBalancerSecurityGroupId) {
+      const lb = ec2.SecurityGroup.fromSecurityGroupId(this, "CoreLbSg", config.coreLoadBalancerSecurityGroupId, { mutable: false });
+      this.securityGroup.addIngressRule(lb, ec2.Port.tcp(8600), "transaction ingress, through the core tier's load balancer");
+      this.securityGroup.addIngressRule(lb, ec2.Port.tcp(8601), "health check of the core tier's load balancer");
+      if (config.exposePrometheus) this.securityGroup.addIngressRule(lb, ec2.Port.tcp(9090), "Prometheus, through the core tier's load balancer");
+    }
     if (config.postgresSecurityGroupId) {
       // The cluster's group is imported mutable: the rule lives in this stack and goes with it.
       const cluster = ec2.SecurityGroup.fromSecurityGroupId(this, "ClusterSg", config.postgresSecurityGroupId);
@@ -121,7 +134,7 @@ export class CoreCellStack extends Stack {
       role.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("CloudWatchReadOnlyAccess"));
       role.addToPolicy(new iam.PolicyStatement({ actions: ["ec2:DescribeInstances", "ec2:DescribeRegions", "tag:GetResources", "logs:DescribeLogGroups", "logs:StartQuery", "logs:GetQueryResults", "logs:StopQuery"], resources: ["*"] }));
     }
-    const parameterArns = [config.otelConfigParameterName, config.cloudWatchAgentParameterName]
+    const parameterArns = [config.otelConfigParameterName, config.cloudWatchAgentParameterName, config.stratoImageParameter]
       .filter((p): p is string => !!p)
       .map((p) => this.formatArn({ service: "ssm", resource: "parameter", resourceName: p.replace(/^\//, "") }));
     if (parameterArns.length > 0) {
@@ -181,6 +194,32 @@ export class CoreCellStack extends Stack {
     nodeScripts.grantRead(role);
     dashboards.grantRead(role);
 
+    // --- The address peers dial: the instance takes it at boot ---
+    const eip = config.subnetType === "public" ? new ec2.CfnEIP(this, "Eip", { domain: "vpc", tags: [{ key: "Name", value: name }] }) : undefined;
+    if (eip) {
+      role.addToPolicy(
+        new iam.PolicyStatement({
+          actions: ["ec2:AssociateAddress"],
+          resources: [
+            this.formatArn({ service: "ec2", resource: "elastic-ip", resourceName: eip.attrAllocationId }),
+            this.formatArn({ service: "ec2", resource: "instance", resourceName: "*" }),
+            this.formatArn({ service: "ec2", resource: "network-interface", resourceName: "*" }),
+          ],
+        }),
+      );
+    }
+    // The watchdog hands an instance it cannot revive back to the group, and
+    // only while another cell is healthy behind the load balancer.
+    if (config.ingressTargetGroupArn) {
+      role.addToPolicy(new iam.PolicyStatement({ actions: ["elasticloadbalancing:DescribeTargetHealth"], resources: ["*"] }));
+      role.addToPolicy(
+        new iam.PolicyStatement({
+          actions: ["autoscaling:SetInstanceHealth"],
+          resources: [this.formatArn({ service: "autoscaling", resource: "autoScalingGroup", resourceName: `*:autoScalingGroupName/${name}`, arnFormat: ArnFormat.COLON_RESOURCE_NAME })],
+        }),
+      );
+    }
+
     // --- The host ---
     const userData = ec2.UserData.forLinux();
     const settings: Record<string, string> = {
@@ -188,6 +227,10 @@ export class CoreCellStack extends Stack {
       CELL_ID: config.cellId,
       NETWORK: config.network,
       STRATO_IMAGE: config.stratoImage,
+      STRATO_IMAGE_PARAMETER: config.stratoImageParameter ?? "",
+      EIP_ALLOCATION_ID: eip?.attrAllocationId ?? "",
+      EIP_PUBLIC_IP: eip?.attrPublicIp ?? "",
+      INGRESS_TARGET_GROUP_ARN: config.ingressTargetGroupArn ?? "",
       REPO_URL: config.repoUrl,
       EXTRA_BINARIES_S3: config.extraBinariesS3 ?? "",
       PG_WRITER_HOST: config.postgresWriterHost,
@@ -210,6 +253,7 @@ export class CoreCellStack extends Stack {
       PEER_DATABASE: config.peerDatabase ?? "",
       PEER_STORE: config.peerStore,
       WRITER: String(config.writer),
+      SEED_EMPTY_CLUSTER: String(config.seedEmptyCluster),
       VALIDATOR_BEHAVIOR: String(config.validatorBehavior),
       VM_QUERY: String(config.vmQuery),
       SNAPSHOT_SOURCE: config.snapshotSource ?? "",
@@ -246,60 +290,60 @@ export class CoreCellStack extends Stack {
       "bash /opt/strato/bootstrap/cell-bootstrap.sh 2>&1 | tee -a /var/log/strato-cell-bootstrap.log"
     );
 
-    this.instance = new ec2.Instance(this, "Cell", {
-      vpc,
-      vpcSubnets: {
-        subnetType: config.subnetType === "public" ? ec2.SubnetType.PUBLIC : ec2.SubnetType.PRIVATE_WITH_EGRESS,
-        ...(config.availabilityZone ? { availabilityZones: [config.availabilityZone] } : {}),
-      },
+    const launchTemplate = new ec2.LaunchTemplate(this, "CellTemplate", {
+      launchTemplateName: name,
       instanceType: new ec2.InstanceType(config.instanceType),
       machineImage: ec2.MachineImage.fromSsmParameter(config.amiParameter, { os: ec2.OperatingSystemType.LINUX }),
       securityGroup: this.securityGroup,
       role,
       keyPair: config.keyPairName ? ec2.KeyPair.fromKeyPairName(this, "KeyPair", config.keyPairName) : undefined,
       userData,
-      userDataCausesReplacement: false,
-      // The Deployment tag reaches the root and data volumes too.
-      propagateTagsToVolumeOnCreation: true,
+      requireImdsv2: true,
       detailedMonitoring: true,
-      instanceName: name,
+      // A public address from the first second, whatever the subnet's own
+      // setting: the bootstrap needs the network to take the Elastic IP.
+      associatePublicIpAddress: eip ? true : undefined,
+      // Both volumes go with their instance: the next one restores a snapshot.
       blockDevices: [
         { deviceName: "/dev/sda1", volume: ec2.BlockDeviceVolume.ebs(config.rootVolumeGiB, { volumeType: ec2.EbsDeviceVolumeType.GP3, encrypted: true, deleteOnTermination: true }) },
-        { deviceName: "/dev/sdf", volume: ec2.BlockDeviceVolume.ebs(config.dataVolumeGiB, { volumeType: ec2.EbsDeviceVolumeType.GP3, encrypted: true, deleteOnTermination: false }) },
+        { deviceName: "/dev/sdf", volume: ec2.BlockDeviceVolume.ebs(config.dataVolumeGiB, { volumeType: ec2.EbsDeviceVolumeType.GP3, encrypted: true, deleteOnTermination: true }) },
       ],
     });
-    // IMDSv2 through a launch template of our own rather than requireImdsv2,
-    // whose launch template CDK names itself, without the deployment prefix.
-    const imdsv2 = new ec2.CfnLaunchTemplate(this, "Imdsv2", {
-      launchTemplateName: `${name}-imdsv2`,
-      launchTemplateData: { metadataOptions: { httpTokens: "required" } },
+    // One instance, replaced only when EC2 loses it or it is marked unhealthy
+    // (the cell's watchdog, scripts/ha.sh cells replace): the node's own
+    // health is the watchdog's to judge, not the load balancer's.
+    const group = new autoscaling.AutoScalingGroup(this, "Cell", {
+      autoScalingGroupName: name,
+      vpc,
+      vpcSubnets: {
+        subnetType: config.subnetType === "public" ? ec2.SubnetType.PUBLIC : ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        ...(config.availabilityZone ? { availabilityZones: [config.availabilityZone] } : {}),
+      },
+      launchTemplate,
+      minCapacity: 1,
+      maxCapacity: 1,
+      // For the alarm on a cell left without an instance (the observability app).
+      groupMetrics: [new autoscaling.GroupMetrics(autoscaling.GroupMetric.IN_SERVICE_INSTANCES)],
     });
-    (this.instance.node.defaultChild as ec2.CfnInstance).launchTemplate = {
-      launchTemplateName: `${name}-imdsv2`,
-      version: imdsv2.attrLatestVersionNumber,
-    };
-    this.instance.applyRemovalPolicy(config.terminationProtection ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY);
-    Tags.of(this.instance).add("strato:cell", config.cellId);
-    Tags.of(this.instance).add("strato:env", config.envName);
-    Tags.of(this.instance).add("strato:role", `${config.role}-${config.writer ? "writer" : "follower"}`);
-
-    let publicAddress: string | undefined;
-    if (config.subnetType === "public") {
-      const eip = new ec2.CfnEIP(this, "Eip", { domain: "vpc", tags: [{ key: "Name", value: name }] });
-      new ec2.CfnEIPAssociation(this, "EipAssociation", { allocationId: eip.attrAllocationId, instanceId: this.instance.instanceId });
-      publicAddress = eip.attrPublicIp;
+    const targetGroupArns = [config.ingressTargetGroupArn, config.prometheusTargetGroupArn, config.grafanaTargetGroupArn].filter((arn): arn is string => !!arn);
+    if (targetGroupArns.length > 0) (group.node.defaultChild as autoscaling.CfnAutoScalingGroup).targetGroupArns = targetGroupArns;
+    // The group tags the instances it launches, the template their volumes.
+    for (const tagged of [group, launchTemplate]) {
+      Tags.of(tagged).add("Name", name);
+      Tags.of(tagged).add("strato:cell", config.cellId);
+      Tags.of(tagged).add("strato:env", config.envName);
+      Tags.of(tagged).add("strato:role", config.role);
     }
 
+    const publicAddress = eip?.attrPublicIp;
+
     // --- Outputs ---
-    new CfnOutput(this, "InstanceId", { value: this.instance.instanceId });
-    new CfnOutput(this, "PrivateIp", { value: this.instance.instancePrivateIp });
-    new CfnOutput(this, "PrivateDnsName", { value: this.instance.instancePrivateDnsName, description: "The cell's transaction ingress host: add http://<name>:8600 to the api-tier app's ingressUrls" });
+    new CfnOutput(this, "AutoScalingGroupName", { value: group.autoScalingGroupName, description: "The group whose one instance is the cell; scripts/ha.sh <env> cells instance <id> names that instance" });
     if (publicAddress) new CfnOutput(this, "PublicIp", { value: publicAddress, description: "Elastic IP; the address peers dial" });
     if (publicAddress && config.role === "node") new CfnOutput(this, "AppUrl", { value: config.tlsHostname ? `https://${config.tlsHostname}/` : Fn.join("", ["http://", publicAddress, `:${config.httpPort}/`]) });
     if (publicAddress && config.grafana) new CfnOutput(this, "GrafanaUrl", { value: Fn.join("", ["http://", publicAddress, ":3001/"]) });
     new CfnOutput(this, "SecurityGroupId", { value: this.securityGroup.securityGroupId, description: "The cell's group; already allowed on the cluster when postgresSecurityGroupId was given" });
     new CfnOutput(this, "NodeDirectory", { value: "/var/lib/strato/node", description: "strato-up/strato-down/strato-ps take this path; logs under logs/" });
-    new CfnOutput(this, "SessionManager", { value: Fn.join("", ["aws ssm start-session --target ", this.instance.instanceId]) });
     new CfnOutput(this, "BootstrapLog", { value: "/var/log/strato-cell-bootstrap.log", description: `Read it after the first boot; the node starts within about ${Duration.minutes(10).toMinutes()} minutes plus snapshot restore time` });
   }
 }
