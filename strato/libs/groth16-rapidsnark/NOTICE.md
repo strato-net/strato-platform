@@ -25,6 +25,8 @@ If you distribute binaries of this software, you must:
 
 **License:** MIT License  
 **Source:** https://github.com/wasm3/wasm3  
+**Version:** 0.9.0 (upstream tag `v0.9.0`)  
+**Commit:** `0cd38327f0c721e75172f4f1eeb55854dc0517af`  
 **Copyright:** Steven Massey, Volodymyr Shymanskyy
 
 Used for native WebAssembly execution to calculate circuit witnesses.

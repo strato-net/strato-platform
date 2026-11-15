@@ -19,6 +19,8 @@ import {
 import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
 import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
+import { useTokenContext } from "@/context/TokenContext";
+import NetworkFee, { FeeNotices } from "@/components/NetworkFee";
 
 type ModalType = "supply" | "withdraw";
 
@@ -30,9 +32,7 @@ interface CollateralModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAction: (amount: string) => void;
-  usdstBalance: string;
-  voucherBalance: string;
-  transactionFee: string;
+  calls: number;
 }
 
 const CollateralModal = ({
@@ -43,10 +43,9 @@ const CollateralModal = ({
   isOpen,
   onClose,
   onAction,
-  usdstBalance,
-  voucherBalance,
-  transactionFee,
+  calls,
 }: CollateralModalProps) => {
+  const { feeQuote } = useTokenContext();
   const [amount, setAmount] = useState<string>("");
   const [amountError, setAmountError] = useState<string>("");
   const [feeError, setFeeError] = useState<string>("");
@@ -59,11 +58,12 @@ const CollateralModal = ({
   });
 
   const isSupply = type === "supply";
+  // A withdrawal returns to the wallet, so the fee is checked but not reserved from it.
   const maxAmount = useMemo(() => {
-    return isSupply 
-      ? computeMaxTransferable(asset?.userBalance || "0", false, voucherBalance, usdstBalance, safeParseUnits(transactionFee).toString(), setFeeError)
-      : computeMaxTransferable(getMaxSafeWithdrawAmount(asset, loanData).toString(), false, voucherBalance, usdstBalance, safeParseUnits(transactionFee).toString(), setFeeError)
-  }, [asset, loanData, isSupply, voucherBalance, usdstBalance, transactionFee]);
+    return isSupply
+      ? computeMaxTransferable(asset?.userBalance || "0", asset?.address, calls, feeQuote, setFeeError)
+      : computeMaxTransferable(getMaxSafeWithdrawAmount(asset, loanData).toString(), undefined, calls, feeQuote, setFeeError)
+  }, [asset, loanData, isSupply, feeQuote, calls]);
   
   // NEW: reflect on-chain 1 wei safety when there is outstanding debt
   const hasDebt = BigInt(loanData?.totalAmountOwed || "0") > 0n;
@@ -340,35 +340,9 @@ const CollateralModal = ({
           <div className="px-4 bg-muted/50 rounded-md">
             <div className="flex justify-between text-sm mb-2">
               <span className="text-muted-foreground">Transaction Fee</span>
-              <span className="font-medium">{transactionFee} USDST ({parseFloat(transactionFee) * 100} voucher)</span>
+              <span className="font-medium"><NetworkFee calls={calls} /></span>
             </div>
-            {(() => {
-              const feeAmount = safeParseUnits(transactionFee);
-              const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-
-              // Check if USDST balance is running low after fee
-              const lowBalanceThreshold = safeParseUnits("0.10");
-              const remainingBalance = usdstBalanceBigInt - feeAmount;
-              const isLowBalanceWarning =
-                remainingBalance >= 0n &&
-                remainingBalance <= lowBalanceThreshold;
-
-              return (
-                <>
-                  {feeError && (
-                    <p className="text-yellow-600 text-sm mt-1">
-                      {feeError}
-                    </p>
-                  )}
-                  {isLowBalanceWarning && !feeError && (
-                    <p className="text-yellow-600 text-sm mt-1">
-                      Warning: Your USDST balance is running low. Add more funds
-                      now to avoid issues with future transactions.
-                    </p>
-                  )}
-                </>
-              );
-            })()}
+            <FeeNotices calls={calls} />
           </div>
         </div>
 

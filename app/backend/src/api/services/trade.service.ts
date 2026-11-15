@@ -16,6 +16,7 @@ import {
   getTokenBalance,
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
+import * as config from "../../config/config";
 import {
   swap as executeV2Swap,
   exchangeMultiToken,
@@ -304,7 +305,7 @@ export const findCandidatePools = async (
     }
   }
 
-  // --- V3 pools (one per fee tier; getPoolsByPair already excludes disabled) ---
+  // --- V3 pools (one per fee tier; getPoolsByPair already excludes disabled and hidden) ---
   for (const pool of v3Pools) {
     const zeroForOne = pool.token0.address === a;
     const priceWad = BigInt(pool.priceWad || "0");
@@ -526,6 +527,9 @@ export const executeTradeSwap = async (
   userAddress: string
 ): Promise<TransactionResponse> => {
   const poolAddress = normalizeAddress(params.poolAddress);
+  // hidden pools are never listed or quoted; refuse execution too so a stale
+  // client (cached quote from before the pool was hidden) cannot trade on them
+  if (config.hiddenSwapPools.has(poolAddress)) throw new Error("Pool is not available for trading");
   const tokenIn = normalizeAddress(params.tokenIn);
   const tokenOut = normalizeAddress(params.tokenOut);
   if (tokenIn === tokenOut) throw new Error("Cannot trade a token with itself");

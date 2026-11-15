@@ -42,16 +42,16 @@ library
     , data-default
     , deepseq
     , ethereum-rlp
-    , fastMP
     , format
     , hashable
     , leveldb-haskell
-    , merkle-patricia-db
+    , merkle-patricia-db-baremetal
     , monad-alter
     , monad-logger
     , monad-loops
     , nibblestring
     , solid-vm-model
+    , statedb-monad
     , strato-model
     , transformers
     , unliftio-core
@@ -79,7 +79,6 @@ test-suite blockapps-mpdbs-test
     , hspec-expectations-lifted
     , lens
     , leveldb-haskell
-    , merkle-patricia-db
     , monad-alter
     , nibblestring
     , resourcet

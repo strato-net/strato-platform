@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,10 +10,13 @@ import {
 import { useForm } from "react-hook-form";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from '@/context/SwapContext';
-import { WITHDRAW_FEE } from "@/lib/constants";
+import { WITHDRAW_CALLS } from "@/lib/constants";
+import NetworkFee, { FeeNotices } from "@/components/NetworkFee";
 import { Pool } from '@/interface';
-import { safeParseUnits, formatWeiAmount, formatUnits } from '@/utils/numberUtils';
-import { handleAmountInputChange, computeMaxTransferable } from '@/utils/transferValidation';
+import { formatWeiAmount, formatUnits } from '@/utils/numberUtils';
+import { useTokenContext } from '@/context/TokenContext';
+import { feeShortfall } from '@/utils/feeUtils';
+import { handleAmountInputChange } from '@/utils/transferValidation';
 import { RewardsWidget } from '@/components/rewards/RewardsWidget';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { isMultiTokenPool } from '@/helpers/swapCalculations';
@@ -28,8 +31,6 @@ interface LiquidityWithdrawModalProps {
   selectedPool: Pool | null;
   onWithdrawSuccess: () => Promise<void>;
   operationInProgressRef: React.MutableRefObject<boolean>;
-  usdstBalance: string;
-  voucherBalance: string;
 }
 
 const LiquidityWithdrawModal = ({
@@ -38,17 +39,12 @@ const LiquidityWithdrawModal = ({
   selectedPool,
   onWithdrawSuccess,
   operationInProgressRef,
-  usdstBalance,
-  voucherBalance,
 }: LiquidityWithdrawModalProps) => {
   const [withdrawPercent, setWithdrawPercent] = useState('');
   const [withdrawPercentError, setWithdrawPercentError] = useState('');
-  const [feeError, setFeeError] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
-
-  useEffect(() => {
-    computeMaxTransferable("100", false, voucherBalance, usdstBalance, safeParseUnits(WITHDRAW_FEE).toString(), setFeeError);
-  }, [usdstBalance, voucherBalance]);
+  const { feeQuote } = useTokenContext();
+  const feeError = feeQuote ? feeShortfall(feeQuote, WITHDRAW_CALLS) : "";
 
   const totalLiquidityBalance = useMemo(() => {
     if (!selectedPool) return "0";
@@ -331,24 +327,9 @@ const LiquidityWithdrawModal = ({
             )}
             <div className="flex justify-between items-center text-sm mt-5 text-muted-foreground">
               <span>Transaction fee</span>
-              <span>{WITHDRAW_FEE} USDST ({parseFloat(WITHDRAW_FEE) * 100} voucher)</span>
+              <span><NetworkFee calls={WITHDRAW_CALLS} /></span>
             </div>
-            {feeError && (
-              <p className="text-yellow-600 text-sm mt-1">{feeError}</p>
-            )}
-            {(() => {
-              const usdstBalanceWei = BigInt(usdstBalance || "0");
-              const feeWei = safeParseUnits(WITHDRAW_FEE, 18);
-              const lowBalanceThreshold = safeParseUnits("0.10", 18);
-              const remainingBalance = usdstBalanceWei - feeWei;
-              const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
-
-              return isLowBalanceWarning && usdstBalanceWei >= feeWei ? (
-                <p className="text-yellow-600 text-sm mt-1">
-                  Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
-                </p>
-              ) : null;
-            })()}
+            <FeeNotices calls={WITHDRAW_CALLS} />
           </div>
 
           {/* Estimated Rewards Display - Always visible */}

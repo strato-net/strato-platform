@@ -4,6 +4,7 @@ const Transaction = require ('../../models/strato/eth/transaction');
 const config = require('../../config/app.config')
 const db = require("../../models/strato/eth/connection");
 const { hasBlockIndex } = require("../../lib/strato-db-data/block-index");
+const winston = require('winston-color');
 
 let userCount
 
@@ -26,6 +27,8 @@ async function getUserCount() {
       userCount = newUserCount
       emitter.emit(ON_SOCKET_PUBLISH_EVENTS, USERS_COUNT, userCount)
     }
+  }).catch((err) => {
+    winston.warn(`Could not fetch user count, retrying next poll: ${err.message}`);
   })
 }
 

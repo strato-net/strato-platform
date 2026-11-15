@@ -35,6 +35,9 @@ const config = {
   voucher: {
     address: getEnv("VOUCHER_ADDRESS") || DEFAULTS.voucherAddress,
   },
+  adminRegistry: {
+    address: getEnv("ADMIN_REGISTRY_ADDRESS") || DEFAULTS.adminRegistryAddress,
+  },
   polling: {
     interval: getNumberEnvOrDefault("POLLING_INTERVAL", DEFAULTS.pollingIntervalMs),
     maxBatchSize: getNumberEnvOrDefault("MAX_BATCH_SIZE", DEFAULTS.maxBatchSize),
@@ -62,6 +65,7 @@ const config = {
     maxDelay: getNumberEnvOrDefault("RETRY_MAX_DELAY", DEFAULTS.retryMaxDelayMs),
   },
   strato: {
+    tokenAddress: getEnv("STRATO_TOKEN_ADDRESS"),
     gas: {
       limit: DEFAULTS.stratoGasLimit,
       price: DEFAULTS.stratoGasPrice,

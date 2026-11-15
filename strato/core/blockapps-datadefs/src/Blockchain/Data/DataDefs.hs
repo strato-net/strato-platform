@@ -76,6 +76,7 @@ indexAll = do
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS proposal_signature_ref_block_data_ref_id_idx ON proposal_signature_ref (block_data_ref_id);"
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS commitment_signature_ref_block_data_ref_id_idx ON commitment_signature_ref (block_data_ref_id);"
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS block_stake_ref_block_data_ref_id_idx ON block_stake_ref (block_data_ref_id);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS block_transaction_block_data_ref_id_idx ON block_transaction (block_data_ref_id);"
 
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS address_state_ref_address_idx ON address_state_ref (address);"
 

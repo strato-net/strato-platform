@@ -1,5 +1,4 @@
 import { CollateralData, NewLoanData } from "@/interface";
-import { SUPPLY_COLLATERAL_FEE, BORROW_FEE } from "@/lib/constants";
 import { safeParseUnits } from "@/utils/numberUtils";
 
 export const getMaxSafeWithdrawAmount = (
@@ -335,18 +334,6 @@ export const determineErrorMessage = (
     return "Borrow amount exceeds the maximum at this health factor.\nConsider bridging in more collateral, or increase risk level.";
   }
   return "";
-};
-
-/**
- * Calculate the total fees for all of the transactions that will be triggered by this borrow.
- * @param collateralCount The number of distinct additional collateral assets being supplied.
- * @returns The fee in USDST numeric (i.e. 0.03) and voucher integer (i.e. 3)
- */
-export const calculateBorrowTxFee = (collateralCount: number): { fee: number, voucher: number } =>
-{
-    const fee = collateralCount * parseFloat(SUPPLY_COLLATERAL_FEE) + parseFloat(BORROW_FEE);
-    const voucher = Math.round(fee * 100);
-    return { fee, voucher };
 };
 
 /**

@@ -21,6 +21,8 @@ module Blockchain.Slipstream.OutputData (
   OnConflict(..),
   SlipstreamQuery(..),
   slipstreamQueryPostgres,
+  batchStateQueries,
+  stateKind,
   slipstreamQueryText,
   dedupC,
   ProcessedCollectionRow(..),
@@ -266,6 +268,8 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
     _ -> [])
 slipstreamQueryText _ CreateView{..} =
   let baseColumnSet = Set.fromList $ sourceTableColumns ++ contractTableColumns ++ codeTableColumns
+      sqlName = wrapEscapeDouble
+      sqlLiteral = wrapEscapeSingleQ
       mappingKeyCount = length . concatMap fst $ filter ((== "key") . snd) viewColumns
       mappingKeyName i = if i == 1 then "key" else "key" <> T.pack (show (i :: Int))
       -- Array fields of struct values are stored as separate rows in the source
@@ -281,30 +285,30 @@ slipstreamQueryText _ CreateView{..} =
          in T.concat $
               [ "CASE WHEN jsonb_typeof(s."
               , wrapEscapeDouble dataColumn
-              , "->'"
-              , c
-              , "') = 'object' THEN jsonb_obj_to_array(s."
+              , "->"
+              , sqlLiteral c
+              , ") = 'object' THEN jsonb_obj_to_array(s."
               , wrapEscapeDouble dataColumn
-              , "->'"
-              , c
-              , "') ELSE COALESCE((SELECT jsonb_agg(e.\"value\" ORDER BY (e.\"key\"->>'"
-              , idxKey
-              , "')::numeric) FROM "
+              , "->"
+              , sqlLiteral c
+              , ") ELSE COALESCE((SELECT jsonb_agg(e.\"value\" ORDER BY (e.\"key\"->>"
+              , sqlLiteral idxKey
+              , ")::numeric) FROM "
               , tableNameToDoubleQuoteText sourceTableName
               , " e WHERE e.address = s.address AND e.collection_name = s.collection_name"
               ]
-           ++ [ T.concat [" AND e.\"key\"->>'", k, "_hex' = s.\"key\"->>'", k, "_hex'"]
+           ++ [ T.concat [" AND e.\"key\"->>", sqlLiteral (k <> "_hex"), " = s.\"key\"->>", sqlLiteral (k <> "_hex")]
               | k <- mappingKeyName <$> [1 .. mappingKeyCount]
               ]
-           ++ [ " AND e.\"key\"->>'"
-              , fieldKey
-              , "' = '"
-              , c
-              , "' AND jsonb_exists(e.\"key\", '"
-              , idxKey
-              , "') AND NOT jsonb_exists(e.\"key\", '"
-              , deeperKey
-              , "')), '[]'::jsonb) END"
+           ++ [ " AND e.\"key\"->>"
+              , sqlLiteral fieldKey
+              , " = "
+              , sqlLiteral c
+              , " AND jsonb_exists(e.\"key\", "
+              , sqlLiteral idxKey
+              , ") AND NOT jsonb_exists(e.\"key\", "
+              , sqlLiteral deeperKey
+              , ")), '[]'::jsonb) END"
               ]
       -- The view is handed to slipstream_upsert_view rather than dropped and
       -- recreated here: DROP VIEW ... CASCADE takes every fkey function touching
@@ -312,64 +316,64 @@ slipstreamQueryText _ CreateView{..} =
       -- this code collection and so would never be recreated (#5665).
       upsertView body = T.concat
         [ "CALL slipstream_upsert_view("
-        , wrapEscapeSingle $ tableNameToTextPostgres viewName
+        , sqlLiteral $ tableNameToTextPostgres viewName
         , ", "
-        , wrapEscapeSingle body
+        , dollarQuote body
         , ");\n"
         ]
    in upsertView . T.concat $
         [ "SELECT "
         , T.intercalate ", " $
-            (("s." <>) <$> sourceTableColumns)
-         ++ (("x." <>) <$> codeTableColumns)
-         ++ (("c." <>) <$> contractTableColumns)
+            (("s." <>) . sqlName <$> sourceTableColumns)
+         ++ (("x." <>) . sqlName <$> codeTableColumns)
+         ++ (("c." <>) . sqlName <$> contractTableColumns)
          ++ concatMap (\(cols', dataColumn) -> (\(c, t) -> T.concat
             [ "CASE WHEN jsonb_exists(s."
             , wrapEscapeDouble dataColumn
-            , ", '"
-            , c
-            , "') "
+            , ", "
+            , sqlLiteral c
+            , ") "
             , case t of
                 SqlDecimal -> T.concat
                   [ "AND (s."
                   , wrapEscapeDouble dataColumn
-                  , "->>'"
-                  , c
-                  , "') ~ '^\\s*-{0,1}\\d+(\\.\\d*){0,1}\\s*$' "
+                  , "->>"
+                  , sqlLiteral c
+                  , ") ~ '^\\s*-{0,1}\\d+(\\.\\d*){0,1}\\s*$' "
                   ]
                 SqlBool -> T.concat
                   [ "AND jsonb_typeof(s."
                   , wrapEscapeDouble dataColumn
-                  , "->'"
-                  , c
-                  , "') = 'string' "
+                  , "->"
+                  , sqlLiteral c
+                  , ") = 'string' "
                   ]
                 _ -> ""
             , case t of
                 SqlBytesKey -> T.concat
-                  [ "THEN s.", wrapEscapeDouble dataColumn, "->>'", c, "_hex' ELSE NULL::text" ]
+                  [ "THEN s.", wrapEscapeDouble dataColumn, "->>", sqlLiteral (c <> "_hex"), " ELSE NULL::text" ]
                 SqlJsonbArray -> T.concat
                   [ "THEN jsonb_obj_to_array(s."
                   , wrapEscapeDouble dataColumn
-                  , "->'"
-                  , c
-                  , "')"
+                  , "->"
+                  , sqlLiteral c
+                  , ")"
                   , " ELSE '[]'::jsonb"
                   ]
                 SqlJsonb -> T.concat
                   [ "THEN (s."
                   , wrapEscapeDouble dataColumn
-                  , "->'"
-                  , c
-                  , "')"
+                  , "->"
+                  , sqlLiteral c
+                  , ")"
                   , " ELSE to_jsonb(''::text)"
                   ]
                 _ -> T.concat
                   [ "THEN (s."
                   , wrapEscapeDouble dataColumn
-                  , "->>'"
-                  , c
-                  , "')"
+                  , "->>"
+                  , sqlLiteral c
+                  , ")"
                   , case t of
                       SqlDecimal -> "::numeric"
                       SqlBool -> " = 'true'"
@@ -389,29 +393,29 @@ slipstreamQueryText _ CreateView{..} =
             (<> T.concat [") AS ", wrapEscapeDouble dataColumn])
             . ("jsonb_build_object(" <>)
             . T.intercalate ", " $ concatMap (\(c, t) ->
-            [ wrapEscapeSingle $ if c `Set.member` baseColumnSet then "arg_" <> c else c
+            [ sqlLiteral $ if c `Set.member` baseColumnSet then "arg_" <> c else c
             , case t of
                 SqlJsonbArray -> arrayFieldColumn dataColumn c
                 _ -> T.concat
                   [ "to_jsonb(CASE WHEN jsonb_exists(s."
                   , wrapEscapeDouble dataColumn
-                  , ", '"
-                  , c
-                  , "') "
+                  , ", "
+                  , sqlLiteral c
+                  , ") "
                   , case t of
                       SqlJsonb -> T.concat
                         [ "THEN (s."
                         , wrapEscapeDouble dataColumn
-                        , "->'"
-                        , c
-                        , "')"
+                        , "->"
+                        , sqlLiteral c
+                        , ")"
                         ]
                       _ -> T.concat
                         [ "THEN (s."
                         , wrapEscapeDouble dataColumn
-                        , "->>'"
-                        , c
-                        , "')"
+                        , "->>"
+                        , sqlLiteral c
+                        , ")"
                         ]
                   , case t of
                       SqlBool -> "::text = 'true'"
@@ -431,23 +435,23 @@ slipstreamQueryText _ CreateView{..} =
         , " FROM "
         , tableNameToDoubleQuoteText sourceTableName
         , " s INNER JOIN "
-        , tableNameToText contractTableName
+        , tableNameToDoubleQuoteText contractTableName
         , " c ON s.address = c.address INNER JOIN "
-        , tableNameToText codeTableName
-        , " x ON c.code_hash = x.code_hash WHERE x.creator = '"
-        , tableNameCreator viewName
+        , tableNameToDoubleQuoteText codeTableName
+        , " x ON c.code_hash = x.code_hash WHERE x.creator = "
+        , sqlLiteral $ tableNameCreator viewName
         -- Derived contracts are looked up in the inheritance table rather than
         -- listed here, so that registering a code collection holding only some of
         -- a contract's children cannot shrink the view (#5665). The ARRAY subquery
         -- is an uncorrelated InitPlan, evaluated once per query.
-        , "' AND c.contract_name = ANY (ARRAY(SELECT i.child FROM "
+        , " AND c.contract_name = ANY (ARRAY(SELECT i.child FROM "
         , tableNameToDoubleQuoteText inheritanceTableName
         , " i WHERE i.creator = "
-        , wrapEscapeSingle $ tableNameCreator viewName
+        , sqlLiteral $ tableNameCreator viewName
         , " AND i.parent = "
-        , wrapEscapeSingle $ tableNameContractName viewName
+        , sqlLiteral $ tableNameContractName viewName
         , ") || "
-        , wrapEscapeSingle $ tableNameContractName viewName
+        , sqlLiteral $ tableNameContractName viewName
         , "::text)"
         , T.concat $ (\(cols, mOp, val) -> T.concat
             [ " AND "
@@ -502,54 +506,56 @@ slipstreamQueryText _ InsertTable{..} = T.concat $
       ])
 slipstreamQueryText _ InsertDelegatecall{} = ""
 slipstreamQueryText _ (CreateFkeyFunction ForeignKeyInfo{..}) = T.concat
-  [ "CREATE OR REPLACE FUNCTION \""
-  , fkiFunctionName
-  , "\"(\n  lp "
+  [ "CREATE OR REPLACE FUNCTION "
+  , textToDoubleQuoteText fkiFunctionName
+  , "(\n  lp "
   , tableNameToDoubleQuoteText fkiSourceTableName
   , "\n) RETURNS SETOF "
   , tableNameToDoubleQuoteText fkiDestTableName
   , "\n"
   , if fkiOneToMany then "" else "ROWS 1\n"
-  , "LANGUAGE sql STABLE AS $$\n"
-  , "  SELECT v.*\n  FROM "
-  , tableNameToDoubleQuoteText fkiDestTableName
-  , " AS v\n"
-  , case fkiColumnType of
-      SqlJsonb -> T.concat
-        [ "  WHERE v.address = COALESCE(\n"
-        , "    (lp).\""
-        , fkiColumnName
-        , "\"->>'address',\n"
-        , "    CASE WHEN jsonb_typeof((lp).\""
-        , fkiColumnName
-        , "\") = 'string'\n"
-        , "         THEN btrim((lp).\""
-        , fkiColumnName
-        , "\"::text, '\"')\n"
-        , "    END\n"
-        , "  )\n"
-        ]
-      _ -> T.concat
-        [ "  WHERE v.address = COALESCE(\n"
-        , "    (lp).\""
-        , fkiColumnName
-        , "\"::text,\n"
-        , "    (lp).\""
-        , fkiColumnName
-        , "\"\n"
-        , "  )\n"
-        ]
-  , if fkiOneToMany then "" else "  LIMIT 1"
-  , ";\n"
-  , "$$;\n\n"
-  , "GRANT EXECUTE ON FUNCTION \""
-  , fkiFunctionName
-  , "\"(\n  "
+  , "LANGUAGE sql STABLE AS "
+  , dollarQuote $ T.concat
+      [ "\n  SELECT v.*\n  FROM "
+      , tableNameToDoubleQuoteText fkiDestTableName
+      , " AS v\n"
+      , case fkiColumnType of
+          SqlJsonb -> T.concat
+            [ "  WHERE v.address = COALESCE(\n"
+            , "    (lp)."
+            , textToDoubleQuoteText fkiColumnName
+            , "->>'address',\n"
+            , "    CASE WHEN jsonb_typeof((lp)."
+            , textToDoubleQuoteText fkiColumnName
+            , ") = 'string'\n"
+            , "         THEN btrim((lp)."
+            , textToDoubleQuoteText fkiColumnName
+            , "::text, '\"')\n"
+            , "    END\n"
+            , "  )\n"
+            ]
+          _ -> T.concat
+            [ "  WHERE v.address = COALESCE(\n"
+            , "    (lp)."
+            , textToDoubleQuoteText fkiColumnName
+            , "::text,\n"
+            , "    (lp)."
+            , textToDoubleQuoteText fkiColumnName
+            , "\n"
+            , "  )\n"
+            ]
+      , if fkiOneToMany then "" else "  LIMIT 1"
+      , ";\n"
+      ]
+  , ";\n\n"
+  , "GRANT EXECUTE ON FUNCTION "
+  , textToDoubleQuoteText fkiFunctionName
+  , "(\n  "
   , tableNameToDoubleQuoteText fkiSourceTableName
-  , "\n) TO postgres;\n\n"
+  , "\n) TO CURRENT_USER;\n\n"
   , "GRANT SELECT ON "
   , tableNameToDoubleQuoteText fkiDestTableName
-  , " TO postgres;"
+  , " TO CURRENT_USER;"
   ]
 slipstreamQueryText _ (RefreshMaterializedView _tableName) = T.concat []
   -- [ "REFRESH MATERIALIZED VIEW CONCURRENTLY "
@@ -601,7 +607,7 @@ tableUpsert :: [Text] -> Text
 tableUpsert = csv . map go
   where
     go x =
-      let y = wrapDoubleQuotes $ escapeQuotes x
+      let y = wrapEscapeDouble x
        in wrap1 y " = excluded."
 
 dedupC :: (MonadLogger m, Ord a) => ConduitM a a m ()
@@ -721,7 +727,7 @@ createCollectionTable (creator, n) c cc (collectionName, keyTypes, valueType) = 
     [(keyNames, "key")]
     (maybe [] (\s -> [(s, "value")]) mStructVal)
     (["address", "collection_name"] ++ (fst <$> keyNames))
-    [ ([Right "collection_name"], Nothing, wrapEscapeSingle $ tableNameCollectionName tableName)
+    [ ([Right "collection_name"], Nothing, wrapEscapeSingleQ $ tableNameCollectionName tableName)
     , ([Right "value"], Just "IS", "NOT NULL")
     , ([Right "value", Left "::text"], Just "NOT IN", "('\"\"', '0', 'false')")
     , ([Left "jsonb_typeof(", Right "value", Left ")"], Just "IS", "NOT NULL")
@@ -766,8 +772,8 @@ createEventArrayTable (creator, n, e) cc (arr, arrType) = do
     [(keyNames, "key")]
     []
     (["address", "block_hash", "event_index", "collection_name"] ++ (fst <$> keyNames))
-    [ ([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName)
-    , ([Right "collection_name"], Nothing, wrapEscapeSingle $ tableNameCollectionName tableName)
+    [ ([Right "event_name"], Nothing, wrapEscapeSingleQ $ tableNameEventName tableName)
+    , ([Right "collection_name"], Nothing, wrapEscapeSingleQ $ tableNameCollectionName tableName)
     ]
     Nothing
   pure $ case getTableColumnAndType False cc [("value", arrType)] of
@@ -1037,7 +1043,7 @@ createEventTable ::
 createEventTable (creator, n) evName ev cc = do
   $logInfoS "createEventTable" . T.pack $ show ev
   let (crtr, cname) = constructTableNameParameters creator n
-      evNameText = escapeQuotes $ labelToText evName
+      evNameText = labelToText evName
       eventTable = EventTableName crtr cname evNameText
       isEvent = True
       evLogToPair (EventLog n' _ t') = (n', t')
@@ -1058,11 +1064,11 @@ createEventTable (creator, n) evName ev cc = do
             [(cols', "attributes")]
             []
             ["address", "block_hash", "event_index"]
-            [([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName')]
+            [([Right "event_name"], Nothing, wrapEscapeSingleQ $ tableNameEventName tableName')]
             (Just $ ["s.address", "s.block_hash", "s.event_index", "x.creator", "c.contract_name"])
     ) <$> [False] -- , (True, tableNameToText tableName)]
   arrayFkeys <- forM arrayNamesAndTypes $
-    createEventArrayTable (crtr, cname, escapeQuotes $ labelToText evName) cc
+    createEventArrayTable (crtr, cname, evNameText) cc
   let addressFK = ForeignKeyInfo (tableNameToText $ indexTableName creator n) eventTable (indexTableName creator n) False "address" SqlText
   let o2mFK = ForeignKeyInfo (tableNameToText eventTable) (indexTableName creator n) eventTable True "address" SqlText
   pure . ([addressFK, o2mFK] ++) $ fcols ++ catMaybes arrayFkeys
@@ -1556,3 +1562,80 @@ jsonbObjToArraySQL = T.unlines
   , "SELECT COALESCE((SELECT jsonb_agg(val ORDER BY idx::int) FROM jsonb_each(obj) AS e(idx, val) WHERE idx != '_length'), '[]'::jsonb);"
   , "$fn$ LANGUAGE sql IMMUTABLE;"
   ]
+
+-- Batch only the standard storage/mapping upserts. DDL, events and unknown
+-- conflict policies remain barriers. Intermediate versions go directly to
+-- history; the final current-state writes retain the existing history triggers.
+batchStateQueries :: [SlipstreamQuery] -> [SlipstreamQuery]
+batchStateQueries = go
+  where
+    go [] = []
+    go queries@(q : rest)
+      | Just _ <- stateKind q =
+          let (state, following) = span (maybe False (const True) . stateKind) queries
+              storage = filter ((== Just False) . stateKind) state
+              mapping = filter ((== Just True) . stateKind) state
+          in batch False storage ++ batch True mapping ++ go following
+      | otherwise = q : go rest
+    batch _ [] = []
+    batch isMapping rows
+      | length rows < 2 = rows
+      | otherwise = [RawSQL $ bulkStateSQL isMapping rows]
+
+stateKind :: SlipstreamQuery -> Maybe Bool
+stateKind InsertTable {tableName = name, tableColumns = cols, values = rows,
+                       onConflict = Just (OnConflict keys updates extra condition)}
+  | name == storageTableName, cols == baseColumns ++ [("data", SqlJsonb)],
+    keys == ["address"], updates == (fst <$> baseColumns),
+    extra == Just (jsonbUpdateClause table "data"), condition == Just (newerBlockClause table),
+    validRows && all (all (/= Nothing)) rows = Just False
+  | name == mappingTableName,
+    cols == baseMappingColumns ++ [("key", SqlJsonb), ("path", SqlText), ("value", SqlJsonb)],
+    keys == ["address", "path"], updates == (fst <$> baseMappingColumns),
+    extra `elem` [Just (jsonbUpdateClause table "value"), Just "value = COALESCE(excluded.value, \"mapping\".value)"],
+    condition == Just (newerBlockClause table), validRows && all (all (/= Nothing) . take 6) rows = Just True
+  where
+    table = tableNameToDoubleQuoteText name
+    positions = map (\key -> fromMaybe (-1) $ lookup key $ zip (fst <$> cols) [0..]) keys
+    rowKeys = map (\row -> map (row !!) positions) rows
+    validRows = all ((== length cols) . length) rows && all (all (/= Nothing)) rowKeys
+      && Set.size (Set.fromList rowKeys) == length rows
+stateKind _ = Nothing
+
+bulkStateSQL :: Bool -> [SlipstreamQuery] -> Text
+bulkStateSQL isMapping queries = T.concat
+  [ "CREATE TEMP TABLE IF NOT EXISTS ", tmp, " (LIKE ", table, ", _rank bigint, _last bigint, _until timestamp);"
+  , "TRUNCATE ", tmp, ";"
+  , "DO $batch$ BEGIN IF to_regprocedure('pg_temp.slip_fold(jsonb,jsonb,boolean)') IS NULL THEN "
+  , "EXECUTE $fn$ CREATE FUNCTION pg_temp.slip_fold(old jsonb, new jsonb, merge boolean) RETURNS jsonb LANGUAGE sql IMMUTABLE AS 'SELECT CASE WHEN new IS NULL THEN old WHEN merge AND jsonb_typeof(old) = ''object'' AND jsonb_typeof(new) = ''object'' THEN public.jsonb_merge_deep(old,new) ELSE new END' $fn$;"
+  , "EXECUTE 'CREATE AGGREGATE pg_temp.slip_merge(jsonb,boolean) (SFUNC=pg_temp.slip_fold, STYPE=jsonb)'; END IF; END $batch$;"
+  , "INSERT INTO ", tmp, " WITH incoming(", names, ",_ordinal,_merge) AS (VALUES ", T.intercalate "," incoming, "),"
+  , "eligible AS (SELECT i.* FROM (SELECT *,max(block_number::bigint) OVER (PARTITION BY ", keys, " ORDER BY _ordinal ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS _previous FROM incoming) i LEFT JOIN ", table, " old USING (", keys, ") WHERE (i._previous IS NULL OR i.block_number::bigint > i._previous) AND (old.address IS NULL OR i.block_number::bigint > old.block_number::bigint)),"
+  , "ranked AS (SELECT ", names, ",_merge,row_number() OVER (PARTITION BY ", keys, " ORDER BY _ordinal) AS _rank FROM eligible),"
+  , "seeded AS (SELECT ", names, ",_merge,_rank FROM ranked UNION ALL SELECT ", seedCols, ",false,0::bigint FROM (SELECT * FROM ranked WHERE _rank=1) k LEFT JOIN ", table, " old USING (", keys, ")),"
+  , "merged AS (SELECT ", stateCols, ",_rank,max(_rank) OVER (PARTITION BY ", keys, ") AS _last,lead(block_timestamp::timestamp,1,'infinity'::timestamp) OVER (PARTITION BY ", keys, " ORDER BY _rank) AS _until FROM seeded) SELECT * FROM merged WHERE _rank > 0;"
+  , "UPDATE ", history, " h SET valid_to=t.block_timestamp::timestamp FROM ", tmp, " t WHERE t._rank=1 AND ", joinKeys "h" "t", " AND h.valid_to='infinity'::timestamp;"
+  , "INSERT INTO ", history, " (", names, ",valid_from,valid_to) SELECT ", names, ",block_timestamp::timestamp,_until FROM ", tmp, " WHERE _rank<_last;"
+  , "INSERT INTO ", table, " (", names, ") SELECT ", names, " FROM ", tmp, " WHERE _rank=_last ON CONFLICT (", keys, ") DO UPDATE SET ", T.intercalate "," [c <> "=excluded." <> c | c <- cols, c /= "key", c /= "path"], " WHERE ", newerBlockClause table, ";"
+  ]
+  where
+    table = if isMapping then "\"mapping\"" else "\"storage\""
+    history = if isMapping then "\"history@mapping\"" else "\"history@storage\""
+    tmp = if isMapping then "pg_temp.slip_mapping" else "pg_temp.slip_storage"
+    cols = if isMapping then ["address","block_hash","block_timestamp","block_number","collection_name","collection_type","key","path","value"] else ["address","block_hash","block_timestamp","block_number","data"]
+    names = T.intercalate "," $ map wrapEscapeDouble cols
+    keyCols = if isMapping then ["address","path"] else ["address"]
+    keys = T.intercalate "," keyCols
+    payload = if isMapping then "value" else "data"
+    partition = "PARTITION BY " <> keys <> " ORDER BY _rank ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"
+    stateCols = T.intercalate "," [if c == payload then "pg_temp.slip_merge(" <> c <> ",_merge) OVER (" <> partition <> ")" else if c == "key" then "first_value(key) OVER (" <> partition <> ")" else wrapEscapeDouble c | c <- cols]
+    seedCols = T.intercalate "," [if c `elem` keyCols then "k." <> c else if c == "key" then "CASE WHEN old.address IS NULL THEN k.key ELSE old.key END" else "old." <> wrapEscapeDouble c | c <- cols]
+    joinKeys a b = T.intercalate " AND " [a <> "." <> c <> "=" <> b <> "." <> c | c <- keyCols]
+    incoming = concat $ zipWith render [1 :: Int ..] [(q,row) | q@InsertTable {values = rows} <- queries, row <- rows]
+    render ordinal (InsertTable {tableColumns = columns, onConflict = policy}, row) =
+      let merge = case policy of
+            Just OnConflict {extraSQL = Just extra} -> extra == jsonbUpdateClause table payload
+            _ -> False
+          fields = [fromMaybe "NULL" (valueToSQLText typ =<< val) <> "::" <> sqlTypePostgres typ | ((_,typ),val) <- zip columns row]
+      in ["(" <> T.intercalate "," (fields ++ [tshow ordinal, if merge then "true" else "false"]) <> ")"]
+    render _ _ = []

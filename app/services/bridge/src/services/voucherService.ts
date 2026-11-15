@@ -1,5 +1,5 @@
 import { config, STRATO_DECIMALS } from "../config";
-import { execute } from "../utils/stratoHelper";
+import { executeGoverned } from "../utils/stratoHelper";
 import { logInfo, logError } from "../utils/logger";
 
 export const mintVouchersForDeposits = async (stratoRecipients: string[]) => {
@@ -21,7 +21,7 @@ export const mintVouchersForDeposits = async (stratoRecipients: string[]) => {
       }
     }));
 
-    const result = await execute(mintTransactions);
+    const result = await executeGoverned(mintTransactions);
     logInfo("VoucherService", `Successfully minted ${voucherCount} vouchers for ${stratoRecipients.length} users, tx: ${result.hash}`);
   } catch (error) {
     logError("VoucherService", error as Error, { 

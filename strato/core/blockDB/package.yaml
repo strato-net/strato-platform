@@ -46,6 +46,7 @@ library:
   - time
   - text
   - unliftio
+  - uuid
 
 tests:
   blockdb-test:

@@ -552,8 +552,9 @@ transformBlocks ibs = do
           "Rejecting " ++ prettyIBlock ib
           ++ " - could not recover signer for tx(s): " ++ unwords failedTxHashes
         lift $ P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
-      Just sb -> do
-        runConsensus sb
+      Just sb
+        | not (isMalformedBlock sb) -> runConsensus sb
+        | otherwise -> pure ()
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock {ibOrigin = o, ibBlockData = bd, ibReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"

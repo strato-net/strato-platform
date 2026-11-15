@@ -301,6 +301,8 @@ instance TransactionLike OutputTx where
   txTxData = txTxData . otBaseTx
   txTxVersion = txTxVersion . otBaseTx
   txAttribution = txAttribution . otBaseTx
+  txEnvelopeType = txEnvelopeType . otBaseTx
+  txMaxPriorityFeePerGas = txMaxPriorityFeePerGas . otBaseTx
 
   morphTx t =
     OutputTx

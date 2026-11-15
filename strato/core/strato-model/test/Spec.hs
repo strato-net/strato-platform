@@ -10,6 +10,7 @@
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
+import Blockchain.Strato.Model.Code (Code(..))
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.ProposerSelection
@@ -41,6 +42,15 @@ main = hspec spec
 
 spec :: Spec
 spec = do
+  describe "Code persistence" $ do
+    it "stores the source as plain Text and reads it unchanged" $
+      property $ \code@(Code source) -> do
+        toPersistValue code `shouldBe` PersistText source
+        fromPersistValue (PersistText source) `shouldBe` Right code
+
+    it "preserves the binary encoding of the source Text" $
+      property $ \code@(Code source) -> encode code `shouldBe` encode source
+
   describe "selectProposer" $ do
     let vals = S.fromList . map Validator
         run chainId height vs stakes start rnd = selectProposer chainId height (vals vs) (M.fromList $ map (\(a, w) -> (Validator a, w)) stakes) start rnd

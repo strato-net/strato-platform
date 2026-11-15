@@ -8,8 +8,6 @@ const moment = require('moment');
 
 const config = require('../config/app.config');
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
 // This process's previous check: {validBlocksCount, pendingTxsCount}, none before the first.
 let previousCheck;
 

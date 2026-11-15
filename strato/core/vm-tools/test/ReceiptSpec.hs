@@ -7,7 +7,7 @@ module ReceiptSpec (spec) where
 
 import Blockchain.Data.RLP
 import Blockchain.Data.Receipt
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Verification (receiptsVerificationValue)
 import qualified Data.ByteString as B

@@ -8,7 +8,7 @@ module Blockchain.Data.AddressStateRef where
 
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256

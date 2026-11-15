@@ -20,7 +20,6 @@ pragma solidity ^0.8.0;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Tokens/Token.sol";
 
@@ -178,7 +177,7 @@ contract Donor {
     }
 }
 
-contract Describe_Adv_Credit_Lending is Authorizable {
+contract Describe_Adv_Credit_Lending {
 
     Mercata m;
     FlashMint fm;
@@ -191,12 +190,11 @@ contract Describe_Adv_Credit_Lending is Authorizable {
     Desk desk;
 
     address USDST; address MUSDST; address GOLD;
-    Token usdstT; Token mT; Token goldT;
+    Token usdstT; Token mT;
 
     uint RAY; uint CAP;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         RAY = 1e27;
         CAP = 2000000e18;
 
@@ -209,38 +207,41 @@ contract Describe_Adv_Credit_Lending is Authorizable {
         oracle = m.priceOracle();
         admin  = m.adminRegistry();
 
-        USDST  = m.tokenFactory().createToken("USDST","USDST",[],[],[],"USDST",0,18);
-        MUSDST = m.tokenFactory().createToken("mUSDST","mUSDST",[],[],[],"mUSDST",0,18);
-        GOLD   = m.tokenFactory().createToken("GOLDST","GOLDST",[],[],[],"GOLDST",0,18);
-        usdstT = Token(USDST); mT = Token(MUSDST); goldT = Token(GOLD);
-        usdstT.setStatus(2); mT.setStatus(2); goldT.setStatus(2);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USDST",[],[],[],"USDST",0,18);
+        USDST  = address(ret);
+        (executed, ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "mUSDST","mUSDST",[],[],[],"mUSDST",0,18);
+        MUSDST = address(ret);
+        (executed, ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "GOLDST","GOLDST",[],[],[],"GOLDST",0,18);
+        GOLD   = address(ret);
+        usdstT = Token(USDST); mT = Token(MUSDST);
+        admin.castVoteOnIssue(USDST, "setStatus", 2); admin.castVoteOnIssue(MUSDST, "setStatus", 2); admin.castVoteOnIssue(GOLD, "setStatus", 2);
 
         admin.castVoteOnIssue(address(admin), "addWhitelist", MUSDST, "mint", address(liq));
         admin.castVoteOnIssue(address(admin), "addWhitelist", MUSDST, "burn", address(liq));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(fm));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(fm));
 
-        conf.setBorrowableAsset(USDST);
-        conf.setMToken(MUSDST);
-        conf.setDebtCeilings(100000000e18, 100000000e18);
-        conf.setSafetyShareBps(1000);
+        admin.castVoteOnIssue(address(conf), "setBorrowableAsset", USDST);
+        admin.castVoteOnIssue(address(conf), "setMToken", MUSDST);
+        admin.castVoteOnIssue(address(conf), "setDebtCeilings", 100000000e18, 100000000e18);
+        admin.castVoteOnIssue(address(conf), "setSafetyShareBps", 1000);
         // 5% APY on the borrowable asset, 10% reserve factor
-        conf.configureAsset(USDST, 0, 0, 11000, 500, 1000, 1000000001547125956666413085);
-        conf.configureAsset(GOLD, 7500, 8000, 10500, 0, 0, RAY);
+        admin.castVoteOnIssue(address(conf), "configureAsset", USDST, 0, 0, 11000, 500, 1000, 1000000001547125956666413085);
+        admin.castVoteOnIssue(address(conf), "configureAsset", GOLD, 7500, 8000, 10500, 0, 0, RAY);
 
-        oracle.setAssetPrice(USDST, 1e18);
-        oracle.setAssetPrice(GOLD, 2000e18);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", USDST, 1e18);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", GOLD, 2000e18);
 
-        fm.initialize(USDST, address(m.feeCollector()), CAP);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), CAP);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
 
         desk = new Desk();
         desk.setPrice(USDST, 1e18);
         desk.setPrice(GOLD, 2000e18);
-        usdstT.mint(address(desk), 5000000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(desk), 5000000e18);
 
         // Seed the pool: 1,000,000 USDST of supply.
-        usdstT.mint(address(this), 1000000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(this), 1000000e18);
         IERC20(USDST).approve(address(liq), 1000000e18);
         pool.depositLiquidity(1000000e18);
     }
@@ -255,7 +256,7 @@ contract Describe_Adv_Credit_Lending is Authorizable {
     function it_aa_flash_minted_balance_does_not_perturb_index_or_share_price() public {
         // Create real debt, then let a year of interest actually accrue.
         User b = new User();
-        goldT.mint(address(b), 500e18);                       // 500 GOLD @ $2,000 = $1,000,000
+        admin.castVoteOnIssue(GOLD, "mint", address(b), 500e18);                       // 500 GOLD @ $2,000 = $1,000,000
         b.do(GOLD, "approve", address(cvault), 500e18);
         b.do(address(pool), "supplyCollateral", GOLD, 500e18);
         b.do(address(pool), "borrow", 400000e18);
@@ -274,7 +275,7 @@ contract Describe_Adv_Credit_Lending is Authorizable {
 
         IndexProbe p = new IndexProbe();
         p.init(address(fm), address(pool), USDST);
-        usdstT.mint(address(p), 1e18);
+        admin.castVoteOnIssue(USDST, "mint", address(p), 1e18);
         p.probe(CAP);   // 2,000,000 USDST sitting on the borrower's balance sheet
 
         log("5a index  before/during flash   : " + string(p.idxBefore()) + " / " + string(p.idxDuring()));
@@ -301,7 +302,7 @@ contract Describe_Adv_Credit_Lending is Authorizable {
     // ═════════════════════════════════════════════════════════════════════════
     function it_ba_zero_capital_lending_liquidation() public {
         User v = new User();
-        goldT.mint(address(v), 100e18);                 // 100 GOLD @ $2,000 = $200,000
+        admin.castVoteOnIssue(GOLD, "mint", address(v), 100e18);                 // 100 GOLD @ $2,000 = $200,000
         v.do(GOLD, "approve", address(cvault), 100e18);
         v.do(address(pool), "supplyCollateral", GOLD, 100e18);
         v.do(address(pool), "borrow", 140000e18);       // LTV 75% -> $150k capacity
@@ -309,7 +310,7 @@ contract Describe_Adv_Credit_Lending is Authorizable {
         log("5c borrower debt                : " + string(pool.getUserDebt(address(v))));
         log("5c health factor before the gap : " + string(pool.getHealthFactor(address(v))));
 
-        oracle.setAssetPrice(GOLD, 1200e18);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", GOLD, 1200e18);
         desk.setPrice(GOLD, 1200e18);
         log("5c health factor after the gap  : " + string(pool.getHealthFactor(address(v))));
 
@@ -330,7 +331,7 @@ contract Describe_Adv_Credit_Lending is Authorizable {
         require(pl.seized() > 0, "DEMONSTRATED: collateral seized without any liquidator capital");
         require(pl.profit() > 0, "DEMONSTRATED: the 5% liquidationBonus captured from zero capital");
 
-        oracle.setAssetPrice(GOLD, 2000e18);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", GOLD, 2000e18);
         desk.setPrice(GOLD, 2000e18);
     }
 
@@ -340,13 +341,13 @@ contract Describe_Adv_Credit_Lending is Authorizable {
     function it_ca_flash_mint_cannot_jump_the_withdrawal_queue() public {
         QueueJumper q = new QueueJumper();
         q.init(address(fm), address(pool), USDST, MUSDST, address(liq));
-        usdstT.mint(address(q), 200000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(q), 200000e18);
         q.seed(200000e18);
         uint sharesSeeded = mT.balanceOf(address(q));
 
         // Drain the pool's cash so an honest withdrawal is impossible.
         User hog = new User();
-        goldT.mint(address(hog), 2000e18);              // $4,000,000 of collateral
+        admin.castVoteOnIssue(GOLD, "mint", address(hog), 2000e18);              // $4,000,000 of collateral
         hog.do(GOLD, "approve", address(cvault), 2000e18);
         hog.do(address(pool), "supplyCollateral", GOLD, 2000e18);
         uint cashPre = usdstT.balanceOf(address(liq));
@@ -362,7 +363,7 @@ contract Describe_Adv_Credit_Lending is Authorizable {
         string honest = "NO REVERT";
         try q.seedlessWithdrawAll() { } catch Error(string e) { honest = e; }
 
-        usdstT.mint(address(q), 1000e18);   // dust float only
+        admin.castVoteOnIssue(USDST, "mint", address(q), 1000e18);   // dust float only
         uint own0 = usdstT.balanceOf(address(q));
         q.attack(CAP);
         uint own1 = usdstT.balanceOf(address(q));
@@ -390,7 +391,7 @@ contract Describe_Adv_Credit_Lending is Authorizable {
         d.init(address(fm), address(pool), USDST, address(liq));
         // The borrower must repay out of its OWN float, because the donated principal
         // cannot come back: LiquidityPool has no path that returns unaccounted cash.
-        usdstT.mint(address(d), CAP);
+        admin.castVoteOnIssue(USDST, "mint", address(d), CAP);
         uint ownBefore = usdstT.balanceOf(address(d));
 
         d.probe(CAP);

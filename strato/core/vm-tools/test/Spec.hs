@@ -24,6 +24,7 @@
 --import Blockchain.Strato.Model.Secp256k1
 --import Blockchain.VMContext
 
+import Blockchain.Bagger (buildNextBlockHeader)
 import Blockchain.Bagger.Transactions (TxRunResult (..), getStakeDeltasFromResults)
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
@@ -31,7 +32,8 @@ import Blockchain.Data.ExecResults
 import Blockchain.Data.ProposalFacts
 import Blockchain.Data.RLP
 import Blockchain.Data.VmTrace
-import Blockchain.Forks (isBlockRewardReceiptForkActive)
+import Blockchain.EthConf (ethConf, networkConfig, networkID)
+import Blockchain.Forks (isBlockRewardReceiptForkActive, constructorPublicationForkBlock, isConstructorPublicationForkActive)
 import Blockchain.Model.SyncState (BestSequencedBlock (..))
 import Blockchain.Strato.Model.Address (Address (..))
 import SolidVM.Model.Delta (getStakeDeltasFromEvents)
@@ -42,12 +44,14 @@ import Blockchain.Strato.Model.Validator
 import Blockchain.VMOptions ()
 import Control.Monad
 import qualified Data.Map.Strict as M
+import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Executable.EVMFlags ()
 import HFlags
 import qualified ActionEncodeSpec
 import qualified CrossLangFixtureSpec
 import qualified ReplayProtectionSpec
 import qualified ReceiptSpec
+import qualified StratoGasEnvelopeSpec
 import qualified TypedArgConversionSpec
 import Test.Hspec (Spec, describe, hspec, it, shouldBe, shouldSatisfy)
 import Test.QuickCheck (arbitrary, forAll)
@@ -84,10 +88,23 @@ spec = do
   ActionEncodeSpec.spec
   ReplayProtectionSpec.spec
   ReceiptSpec.spec
+  StratoGasEnvelopeSpec.spec
   TypedArgConversionSpec.spec
   CrossLangFixtureSpec.spec
   callTraceSpec
   stakingSpec
+  timestampSpec
+
+timestampSpec :: Spec
+timestampSpec = describe "block timestamps" $ do
+  let t = posixSecondsToUTCTime
+      parent = BlockHeaderV2 zeroHash "" "" "" "" 11 (t 1000) "" [Validator 0x1] [] [] Nothing []
+      child now = buildNextBlockHeader parent zeroHash "" [] [] "" now mempty M.empty
+
+  it "never stamps a proposed block before its parent" $ do
+    timestamp (child (t 990)) `shouldBe` t 1000 -- the parent's proposer ran ahead of our clock
+    timestamp (child (t 1000)) `shouldBe` t 1000
+    timestamp (child (t 1010)) `shouldBe` t 1010
 
 stakingSpec :: Spec
 stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
@@ -131,15 +148,26 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
     getStakeDeltasFromEvents (Just stakingAddr) evs `shouldBe` M.fromList [(v1, 7), (v2, 0)]
     getStakeDeltasFromEvents Nothing evs `shouldBe` M.empty
 
-  -- The test config is the default (upquark-shaped, staking not scheduled), so
-  -- the block-reward receipt fork must track the staking activation height
-  -- rather than switching on its own. Only helium carries a bespoke height.
+  -- The test config is the default (upquark-shaped, so staking activates at
+  -- defaultStakingActivationBlock "upquark" = 2,000,000), so the block-reward
+  -- receipt fork must track the staking activation height rather than
+  -- switching on its own. Only helium carries a bespoke height.
   it "ties the block-reward receipt fork to staking activation off helium" $ do
-    let stakingNotScheduled = 2 ^ (62 :: Int) :: Integer
+    let upquarkActivation = 2000000 :: Integer
     isBlockRewardReceiptForkActive 0 `shouldBe` False
     isBlockRewardReceiptForkActive 320000 `shouldBe` False
-    isBlockRewardReceiptForkActive (stakingNotScheduled - 1) `shouldBe` False
-    isBlockRewardReceiptForkActive stakingNotScheduled `shouldBe` True
+    isBlockRewardReceiptForkActive (upquarkActivation - 1) `shouldBe` False
+    isBlockRewardReceiptForkActive upquarkActivation `shouldBe` True
+
+  it "activates constructor publication at the network fork height" $ do
+    constructorPublicationForkBlock 114784819836269 `shouldBe` 76752
+    constructorPublicationForkBlock 33056204878082667 `shouldBe` 65607
+    constructorPublicationForkBlock 7381244120123405172 `shouldBe` 10000
+    constructorPublicationForkBlock 42 `shouldBe` 0
+    let activation = constructorPublicationForkBlock (networkID $ networkConfig ethConf)
+    isConstructorPublicationForkActive (activation - 1) `shouldBe` False
+    isConstructorPublicationForkActive activation `shouldBe` True
+    isConstructorPublicationForkActive (activation + 1) `shouldBe` True
 
   it "reads ValidatorStakeUpdated once the source is governance" $ do
     let govAddr = Address 0x100

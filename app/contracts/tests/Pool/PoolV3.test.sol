@@ -1,6 +1,5 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../concrete/Pools/PoolV3Factory.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 
 /*
  * PoolV3 test suite — canonical Uniswap V3 parity.
@@ -80,7 +79,7 @@ contract FlashBorrower {
     }
 }
 
-contract Describe_PoolV3 is Authorizable {
+contract Describe_PoolV3 {
 
     Mercata m;
     string[] emptyArray;
@@ -103,7 +102,6 @@ contract Describe_PoolV3 is Authorizable {
     uint constant BIG = 100000000e18;
 
     function beforeAll() {
-        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
         emptyArray = new string[](0);
@@ -111,20 +109,23 @@ contract Describe_PoolV3 is Authorizable {
 
     function beforeEach() {
         // Create fresh tokens for each test
-        token0Address = m.tokenFactory().createToken(
+        AdminRegistry reg = m.adminRegistry();
+        (bool executed, variadic ret) = reg.castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Token 0", "Test Token 0", emptyArray, emptyArray, emptyArray, "TK0", 10000000e18, 18
         );
-        token1Address = m.tokenFactory().createToken(
+        token0Address = address(ret);
+        (executed, ret) = reg.castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Token 1", "Test Token 1", emptyArray, emptyArray, emptyArray, "TK1", 10000000e18, 18
         );
+        token1Address = address(ret);
 
         // Activate tokens
-        Token(token0Address).setStatus(2); // ACTIVE
-        Token(token1Address).setStatus(2); // ACTIVE
+        reg.castVoteOnIssue(token0Address, "setStatus", 2); // ACTIVE
+        reg.castVoteOnIssue(token1Address, "setStatus", 2); // ACTIVE
 
         // Mint tokens to test contract
-        Token(token0Address).mint(address(this), BIG);
-        Token(token1Address).mint(address(this), BIG);
+        reg.castVoteOnIssue(token0Address, "mint", address(this), BIG);
+        reg.castVoteOnIssue(token1Address, "mint", address(this), BIG);
 
         // Create standalone V3 factory owned by this test contract
         factory = new PoolV3Factory(address(this));
@@ -136,6 +137,31 @@ contract Describe_PoolV3 is Authorizable {
     }
 
     // ============ HELPERS ============
+
+    function it_preserves_pool_state_and_gas_restriction_across_a_proxy_upgrade() {
+        _mintRange(-6000, 6000, 1e20);
+        address router = address(new User());
+        pool.setGasSwapRouter(router);
+        uint price = pool.sqrtPriceX96();
+        uint activeLiquidity = pool.liquidity();
+        uint balance0 = pool.token0Balance();
+        uint balance1 = pool.token1Balance();
+        Proxy(poolAddress).setLogicContract(address(new PoolV3(address(this))));
+        require(pool.gasSwapRouter() == router, "router lost on upgrade");
+        require(pool.sqrtPriceX96() == price && pool.liquidity() == activeLiquidity, "price or liquidity changed");
+        require(pool.token0Balance() == balance0 && pool.token1Balance() == balance1, "reserves changed");
+        (uint positionLiquidity, , ) = pool.getPosition(address(this), -6000, 6000);
+        require(positionLiquidity == 1e20, "LP position changed");
+    }
+
+    function it_gas_restrictions_are_per_pool_and_can_only_be_cleared_by_the_owner() {
+        _mintRange(-6000, 6000, 1e20);
+        address other = factory.createPoolV3(token0Address, token1Address, 500, Q96);
+        pool.setGasSwapRouter(address(new User()));
+        require(PoolV3(other).gasSwapRouter() == address(0), "another pool was restricted");
+        pool.setGasSwapRouter(address(0));
+        require(_swap(true, 1e16) > 0, "owner could not restore ordinary trading");
+    }
 
     function _approveBoth(uint amount0, uint amount1) internal {
         require(ERC20(token0Address).approve(address(pool), amount0), "Token0 approval failed");
@@ -166,8 +192,8 @@ contract Describe_PoolV3 is Authorizable {
     /// @dev Create a user with token balances and pool approvals for both tokens
     function _newUser() internal returns (User) {
         User u = new User();
-        Token(token0Address).mint(address(u), BIG);
-        Token(token1Address).mint(address(u), BIG);
+        m.adminRegistry().castVoteOnIssue(token0Address, "mint", address(u), BIG);
+        m.adminRegistry().castVoteOnIssue(token1Address, "mint", address(u), BIG);
         u.do(token0Address, "approve", poolAddress, BIG);
         u.do(token1Address, "approve", poolAddress, BIG);
         return u;
@@ -185,8 +211,8 @@ contract Describe_PoolV3 is Authorizable {
     function _newBorrower() internal returns (FlashBorrower) {
         FlashBorrower b = new FlashBorrower();
         b.init(poolAddress, token0Address, token1Address);
-        Token(token0Address).mint(address(b), 100e18);
-        Token(token1Address).mint(address(b), 100e18);
+        m.adminRegistry().castVoteOnIssue(token0Address, "mint", address(b), 100e18);
+        m.adminRegistry().castVoteOnIssue(token1Address, "mint", address(b), 100e18);
         return b;
     }
 
@@ -254,7 +280,7 @@ contract Describe_PoolV3 is Authorizable {
     }
 
     function it_factory_rejects_inactive_token() {
-        Token(token0Address).setStatus(1); // not ACTIVE
+        m.adminRegistry().castVoteOnIssue(token0Address, "setStatus", 1); // not ACTIVE
         bool thrown = false;
         try {
             factory.createPoolV3(token0Address, token1Address, 10000, Q96);
@@ -262,7 +288,7 @@ contract Describe_PoolV3 is Authorizable {
             thrown = true;
         }
         require(thrown, "Inactive token should revert");
-        Token(token0Address).setStatus(2); // restore
+        m.adminRegistry().castVoteOnIssue(token0Address, "setStatus", 2); // restore
     }
 
     function it_factory_enable_new_fee_tier_and_create_pool() {
@@ -1031,6 +1057,23 @@ contract Describe_PoolV3 is Authorizable {
 
     // ============ EXACT-OUTPUT SWAP TESTS (canonical amountSpecified < 0) ============
 
+    function _checkGasQuoteAcrossTicks(bool zeroForOne) internal {
+        _mintRange(-6000, 6000, 100000e18);
+        _mintRange(-60, 60, 100000e18);
+        uint beforePrice = pool.sqrtPriceX96();
+        int beforeTick = pool.currentTick();
+        int beforeGrowth0 = pool.feeGrowthGlobal0X128();
+        int beforeGrowth1 = pool.feeGrowthGlobal1X128();
+        (uint input, uint rounding, bool complete) = pool.quoteGasExactOutput(zeroForOne, 5000e18);
+        require(complete && input > rounding, "bad multistep quote");
+        require(pool.sqrtPriceX96() == beforePrice && pool.currentTick() == beforeTick && pool.feeGrowthGlobal0X128() == beforeGrowth0 && pool.feeGrowthGlobal1X128() == beforeGrowth1, "quote wrote pool state");
+        uint spent = _swapExactOut(zeroForOne, 5000e18, input);
+        require(spent == input, "multistep quote differs from swap");
+        require(zeroForOne ? pool.currentTick() < -60 : pool.currentTick() > 60, "did not cross initialized tick");
+    }
+    function it_quotes_gas_output_across_initialized_ticks_zero_for_one() public { _checkGasQuoteAcrossTicks(true); }
+    function it_quotes_gas_output_across_initialized_ticks_one_for_zero() public { _checkGasQuoteAcrossTicks(false); }
+
     function it_swap_exact_output_within_range() {
         _mintRange(-6000, 6000, 100000e18);
         uint bal1Before = ERC20(token1Address).balanceOf(address(this));
@@ -1536,7 +1579,7 @@ contract Describe_PoolV3 is Authorizable {
     function it_flash_reverts_without_liquidity() {
         // CANONICAL 'L': nothing to pay fees to, so no flash
         FlashBorrower b = _newBorrower();
-        Token(token0Address).mint(poolAddress, 10e18); // pool has tokens but no liquidity
+        m.adminRegistry().castVoteOnIssue(token0Address, "mint", poolAddress, 10e18); // pool has tokens but no liquidity
 
         string err;
         try b.go(address(b), 1e18, 0, 0) { } catch Error(string e) { err = e; }
@@ -1605,11 +1648,11 @@ contract Describe_PoolV3 is Authorizable {
         require(thrown, "Paused pool should reject flash");
         pool.setPaused(false);
 
-        Token(token0Address).setStatus(1); // deactivate
+        m.adminRegistry().castVoteOnIssue(token0Address, "setStatus", 1); // deactivate
         thrown = false;
         try b.go(address(b), 1e18, 0, 0) { } catch { thrown = true; }
         require(thrown, "Inactive token should block flash");
-        Token(token0Address).setStatus(2);
+        m.adminRegistry().castVoteOnIssue(token0Address, "setStatus", 2);
 
         thrown = false;
         try b.go(address(0), 1e18, 0, 0) { } catch { thrown = true; }
@@ -1658,8 +1701,8 @@ contract Describe_PoolV3 is Authorizable {
         tier.mint(address(this), -6000, 6000, 100000e18, BIG, BIG, block.timestamp + DEADLINE_OFFSET);
         FlashBorrower b = new FlashBorrower();
         b.init(tierAddr, token0Address, token1Address);
-        Token(token0Address).mint(address(b), 100e18); // float to pay the fees from
-        Token(token1Address).mint(address(b), 100e18);
+        m.adminRegistry().castVoteOnIssue(token0Address, "mint", address(b), 100e18); // float to pay the fees from
+        m.adminRegistry().castVoteOnIssue(token1Address, "mint", address(b), 100e18);
         uint poolBefore0 = ERC20(token0Address).balanceOf(tierAddr);
         uint poolBefore1 = ERC20(token1Address).balanceOf(tierAddr);
 
@@ -1737,7 +1780,7 @@ contract Describe_PoolV3 is Authorizable {
 
     function it_flash_leaves_pre_existing_excess_untouched_and_skimmable() {
         _mintRange(-6000, 6000, 100000e18);
-        Token(token0Address).mint(poolAddress, 5e18);
+        m.adminRegistry().castVoteOnIssue(token0Address, "mint", poolAddress, 5e18);
         FlashBorrower b = _newBorrower();
         require(ERC20(token0Address).balanceOf(poolAddress) - pool.token0Balance() == 5e18, "Excess should be 5e18 before");
 
@@ -1773,9 +1816,10 @@ contract Describe_PoolV3 is Authorizable {
     function it_flash_funds_a_swap_on_a_v2_pool() {
         // borrow from V3, trade on the V2 pool of the same pair, repay from float: the locks are
         // per pool, so a flash callback can freely use other venues
-        address v2Address = m.poolFactory().createPool(token0Address, token1Address);
-        Pool v2 = Pool(v2Address);
         AdminRegistry adminRegistry = m.adminRegistry();
+        (bool executed, variadic ret) = adminRegistry.castVoteOnIssue(address(m.poolFactory()), "createPool", token0Address, token1Address);
+        address v2Address = address(ret);
+        Pool v2 = Pool(v2Address);
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(v2.lpToken()), "mint", v2Address);
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(v2.lpToken()), "burn", v2Address);
         require(ERC20(token0Address).approve(v2Address, 2000e18) && ERC20(token1Address).approve(v2Address, 2000e18), "V2 approval failed");
@@ -2300,7 +2344,7 @@ contract Describe_PoolV3 is Authorizable {
     function it_inactive_token_blocks_trading_allows_exit() {
         _mintRange(-6000, 6000, 100000e18);
         _swap(true, 100e18); // accrue some fees first
-        Token(token0Address).setStatus(1); // deactivate
+        m.adminRegistry().castVoteOnIssue(token0Address, "setStatus", 1); // deactivate
 
         require(ERC20(token0Address).approve(address(pool), 10e18), "Approval failed");
         bool thrown = false;
@@ -2324,7 +2368,7 @@ contract Describe_PoolV3 is Authorizable {
         (uint got0, uint got1) = pool.collect(address(this), -6000, 6000, BIG, BIG);
         require(got0 > 0 && got1 > 0, "Exit must work with inactive token");
 
-        Token(token0Address).setStatus(2);
+        m.adminRegistry().castVoteOnIssue(token0Address, "setStatus", 2);
     }
 
     function it_initialize_only_once() {
@@ -2392,8 +2436,8 @@ contract Describe_PoolV3 is Authorizable {
         uint tracked0 = pool.token0Balance();
         uint tracked1 = pool.token1Balance();
 
-        Token(token0Address).mint(poolAddress, 5e18);
-        Token(token1Address).mint(poolAddress, 7e18);
+        m.adminRegistry().castVoteOnIssue(token0Address, "mint", poolAddress, 5e18);
+        m.adminRegistry().castVoteOnIssue(token1Address, "mint", poolAddress, 7e18);
         require(ERC20(token0Address).balanceOf(poolAddress) == tracked0 + 5e18, "Donation 0 should land");
 
         User receiver = new User();
@@ -2410,7 +2454,7 @@ contract Describe_PoolV3 is Authorizable {
 
     function it_sync_repairs_tracked_balances() {
         _mintRange(-600, 600, 1000e18);
-        Token(token0Address).mint(poolAddress, 5e18);
+        m.adminRegistry().castVoteOnIssue(token0Address, "mint", poolAddress, 5e18);
 
         factory.syncPools([poolAddress]);
         require(pool.token0Balance() == ERC20(token0Address).balanceOf(poolAddress), "Sync should adopt actual 0 balance");

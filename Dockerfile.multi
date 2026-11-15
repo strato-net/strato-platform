@@ -27,7 +27,8 @@ RUN apt -y update && apt install -y \
   && apt clean \
   && ln -s /lib/x86_64-linux-gnu/libleveldb.so.1.23.0 /lib/x86_64-linux-gnu/libleveldb.so.1 \
   && locale-gen en_US.UTF-8 \
-  && ldconfig
+  && ldconfig \
+  && userdel -r ubuntu
 
 ENV LANG="en_US.UTF-8" \
     LANGUAGE="en_US:en" \
@@ -81,6 +82,8 @@ ENTRYPOINT ["/highway/doit.sh"]
 
 
 FROM base as vault-wrapper
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 COPY usr/local/bin/blockapps-vault-wrapper-server /usr/local/bin/
 COPY ./vault-wrapper /vault-wrapper
 EXPOSE 8000

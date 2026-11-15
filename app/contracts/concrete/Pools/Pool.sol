@@ -2,6 +2,7 @@
 import "PoolFactory.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
+import "../Admin/AdminRegistry.sol";
 import "../Admin/FeeCollector.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
@@ -313,7 +314,7 @@ contract record Pool is Ownable {
             mintAmount = tokenBAmount;
         }
 
-        lpToken.mint(msg.sender, mintAmount);
+        AdminRegistry(lpToken.owner()).castVoteOnIssue(address(lpToken), "mint", msg.sender, mintAmount);
         require(tokenB.transferFrom(msg.sender, address(this), tokenBAmount), "TokenB transfer failed");
         require(tokenA.transferFrom(msg.sender, address(this), tokenAAmount), "TokenA transfer failed");
 
@@ -350,7 +351,7 @@ contract record Pool is Ownable {
         require(tokenB.transfer(msg.sender, tokenBAmount), "TokenB transfer failed");
         require(tokenA.transfer(msg.sender, tokenAAmount), "TokenA transfer failed");
 
-        lpToken.burn(msg.sender, lpTokenAmount);
+        AdminRegistry(lpToken.owner()).castVoteOnIssue(address(lpToken), "burn", msg.sender, lpTokenAmount);
         _updateStateVars(tokenABalance - tokenAAmount, tokenBBalance - tokenBAmount);
         emit RemoveLiquidity(msg.sender, tokenBAmount, tokenAAmount);
 
@@ -541,7 +542,7 @@ contract record Pool is Ownable {
         uint256 liquidityB = (tokenBAmount * totalLiquidity) / postB;
         liquidityMinted = liquidityA < liquidityB ? liquidityA : liquidityB;
         require(liquidityMinted > 0, "Insufficient liquidity");
-        lpToken.mint(msg.sender, liquidityMinted);
+        AdminRegistry(lpToken.owner()).castVoteOnIssue(address(lpToken), "mint", msg.sender, liquidityMinted);
 
         // 5) Update final reserves (opposite side unchanged)
         if (isAToB) {

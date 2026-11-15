@@ -19,7 +19,7 @@ library:
     - containers
     - ethereum-rlp
     - format
-    - merkle-patricia-db
+    - statedb-monad
     - monad-alter
     - nibblestring
     - persistent

@@ -11,7 +11,6 @@
 
 import "../../concrete/BaseCodeCollection.sol";
 import "../../concrete/Pools/PoolV3Factory.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Tokens/Token.sol";
 
@@ -84,7 +83,7 @@ contract PriceProbe {
     }
 }
 
-contract Describe_Adv_Amm_OracleReads is Authorizable {
+contract Describe_Adv_Amm_OracleReads {
 
     Mercata m;
     FlashMint fm;
@@ -97,7 +96,6 @@ contract Describe_Adv_Amm_OracleReads is Authorizable {
     CDPRegistry reg;
 
     address USDST;
-    Token usdstT;
 
     uint constant Q96 = 79228162514264337593543950336;
     uint constant BIG = 100000000e18;
@@ -119,7 +117,6 @@ contract Describe_Adv_Amm_OracleReads is Authorizable {
     uint probeOracleBefore; uint probeOracleMid; uint probeCrBefore; uint probeCrMid;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         WAD = 1e18; LR = 150e16; MINCR = 155e16;
         GOLD_RES = 5371e16;
         USDST_RES = 239376e18;
@@ -128,19 +125,19 @@ contract Describe_Adv_Amm_OracleReads is Authorizable {
         admin = m.adminRegistry(); pf = m.poolFactory(); fm = new FlashMint(address(admin));
         oracle = m.priceOracle(); cdp = m.cdpEngine(); cdpVault = m.cdpVault(); reg = m.cdpRegistry();
 
-        USDST = m.tokenFactory().createToken("USDST", "USD Stable", [], [], [], "USDST", 0, 18);
-        usdstT = Token(USDST);
-        usdstT.setStatus(2);
-        reg.setUSDST(USDST);
-        oracle.setAssetPrice(USDST, 1e18);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USD Stable", [], [], [], "USDST", 0, 18);
+        USDST = address(ret);
+        admin.castVoteOnIssue(USDST, "setStatus", 2);
+        admin.castVoteOnIssue(address(reg), "setUSDST", USDST);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", USDST, 1e18);
 
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(cdp));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(cdp));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(fm));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(fm));
 
-        fm.initialize(USDST, address(m.feeCollector()), 2000000e18);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), 2000000e18);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
 
         GOLD_PRICE = (USDST_RES * 1e18) / GOLD_RES;
 
@@ -150,10 +147,12 @@ contract Describe_Adv_Amm_OracleReads is Authorizable {
 
     // ── PoolV3 helper: fresh pair + pool at price 1.0, tick 0 ──
     function _newV3(string s0, string s1) internal returns (PoolV3, address, address) {
-        address t0 = m.tokenFactory().createToken("T0", "T0", [], [], [], s0, 0, 18);
-        address t1 = m.tokenFactory().createToken("T1", "T1", [], [], [], s1, 0, 18);
-        Token(t0).setStatus(2); Token(t1).setStatus(2);
-        Token(t0).mint(address(this), BIG); Token(t1).mint(address(this), BIG);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "T0", "T0", [], [], [], s0, 0, 18);
+        address t0 = address(ret);
+        (executed, ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "T1", "T1", [], [], [], s1, 0, 18);
+        address t1 = address(ret);
+        admin.castVoteOnIssue(t0, "setStatus", 2); admin.castVoteOnIssue(t1, "setStatus", 2);
+        admin.castVoteOnIssue(t0, "mint", address(this), BIG); admin.castVoteOnIssue(t1, "mint", address(this), BIG);
         address pa = v3f.createPoolV3(t0, t1, 3000, Q96);
         PoolV3 p = PoolV3(pa);
         require(ERC20(t0).approve(pa, BIG), "a0");
@@ -304,14 +303,16 @@ contract Describe_Adv_Amm_OracleReads is Authorizable {
     /// surface the protocol consumes. All of them are push-based and none of them budge.
     function it_g1_no_price_surface_moves_with_the_pool() public {
         // fresh GOLDST + pool at mainnet depth, oracle pinned to pool parity
-        address gold = m.tokenFactory().createToken("GOLDST", "Gold", [], [], [], "GG1", 0, 18);
-        Token(gold).setStatus(2);
-        Token(gold).mint(address(this), 100000e18);
-        usdstT.mint(address(this), 20000000e18);
-        oracle.setAssetPrice(gold, GOLD_PRICE);
-        cdp.setCollateralAssetParams(gold, LR, MINCR, 1000, 5000, 1e27, 1e18, 1e30, false);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "GOLDST", "Gold", [], [], [], "GG1", 0, 18);
+        address gold = address(ret);
+        admin.castVoteOnIssue(gold, "setStatus", 2);
+        admin.castVoteOnIssue(gold, "mint", address(this), 100000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(this), 20000000e18);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", gold, GOLD_PRICE);
+        admin.castVoteOnIssue(address(cdp), "setCollateralAssetParams", gold, LR, MINCR, 1000, 5000, 1e27, 1e18, 1e30, false);
 
-        address pa = pf.createPool(gold, USDST);
+        (executed, ret) = admin.castVoteOnIssue(address(pf), "createPool", gold, USDST);
+        address pa = address(ret);
         Token lp = Pool(pa).lpToken();
         admin.castVoteOnIssue(address(admin), "addWhitelist", address(lp), "mint", pa);
         admin.castVoteOnIssue(address(admin), "addWhitelist", address(lp), "burn", pa);
@@ -321,14 +322,14 @@ contract Describe_Adv_Amm_OracleReads is Authorizable {
 
         // A victim CDP vault whose CR is what an attacker would want to move.
         User v = new User();
-        Token(gold).mint(address(v), 100e18);
+        admin.castVoteOnIssue(gold, "mint", address(v), 100e18);
         v.do(gold, "approve", address(cdpVault), 100e18);
         v.do(address(cdp), "deposit", gold, 100e18);
         v.do(address(cdp), "mint", gold, 200000e18);
 
         PriceProbe probe = new PriceProbe();
         probe.init(address(fm), pa, address(oracle), address(cdp), USDST, gold, address(v));
-        usdstT.mint(address(probe), 100000e18);   // float to absorb the round-trip slippage cost
+        admin.castVoteOnIssue(USDST, "mint", address(probe), 100000e18);   // float to absorb the round-trip slippage cost
         probe.go(2000000e18);
 
         probePriceBefore = probe.poolPriceBefore();

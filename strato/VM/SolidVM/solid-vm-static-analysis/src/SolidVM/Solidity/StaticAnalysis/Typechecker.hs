@@ -9,9 +9,12 @@ module SolidVM.Solidity.StaticAnalysis.Typechecker
   ( detector
   , detector'
   , showType
+  , expressionType
+  , isIntegerLiteral
   )
 where
 
+import Control.Exception (throw)
 import Control.Applicative ((<|>))
 import Control.Arrow ((&&&))
 import Control.Lens hiding (enum)
@@ -24,7 +27,7 @@ import Data.Foldable (traverse_)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe, isNothing)
 import qualified Data.Set as S
 import Data.Source
 import Data.String (IsString, fromString)
@@ -42,6 +45,26 @@ import Blockchain.VM.SolidException
 
 emptyAnnotation :: SourceAnnotation Text
 emptyAnnotation = (SourceAnnotation (initialPosition "") (initialPosition "") "")
+
+isIntegerLiteral :: ExpressionF a -> Bool
+isIntegerLiteral = \case
+  NumberLiteral{} -> True
+  InlineBoundsCheck _ _ _ e -> isIntegerLiteral e
+  Unitary _ "-" e -> isIntegerLiteral e
+  Binary _ operator a b | operator `elem` ["+", "-", "*", "/", "%", "**", "|", "&", "^", "<<", ">>"] ->
+    isIntegerLiteral a && isIntegerLiteral b
+  _ -> False
+
+expressionType :: CodeCollection -> Contract -> M.Map SolidString SVMType.Type -> Expression -> Maybe SVMType.Type
+expressionType cc ct locals expression = concrete result
+  where
+    annotate annotation = annotation {_sourceAnnotationAnnotation = ""}
+    environment = R False (annotate <$> cc) (annotate <$> ct) Nothing Nothing Nothing
+    variables = M.mapWithKey (\name typ -> VarDefEntry (Just typ) Nothing name emptyAnnotation) locals
+    result = runReader (evalStateT (tcExpr $ annotate <$> expression) ((Nothing, variables) :| [])) environment
+    concrete (Static typ _) = Just typ
+    concrete (Mutable typ) = concrete typ
+    concrete _ = Nothing
 
 data R = R
   { isRunningTests :: Bool,
@@ -1361,7 +1384,7 @@ statementsHelperM args ss = do
   case fm of
     Nothing -> do
       x <- asks $ _contractContext . contract
-      modifierError "you cannot return a value as part of a modifier" (x)
+      throw (ModifierError "you cannot return a value as part of a modifier" (show x))
     Just m -> do
       let x = _modifierContext m
       ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ traverse statementHelper ss
@@ -2048,6 +2071,11 @@ statementHelper (AssemblyStatement _ x) = pure $ topType' x
 statementHelper (SimpleStatement stmt x) = simpleStatementHelper x stmt
 
 simpleStatementHelper :: SourceAnnotation Text -> Annotated SimpleStatementF -> SSS Type'
+simpleStatementHelper x (VariableDefinition vdefs Nothing)
+  | any (isNothing . getVarDefType) vdefs =
+      pure . bottom $ "inferred variable declaration requires an initializer" <$ x
+  | length vdefs /= 1 =
+      pure . bottom $ "tuple declaration requires an initializer" <$ x
 simpleStatementHelper x (VariableDefinition vdefs mExpr) = do
   vdefs' <- traverse (varDefsToType' x) vdefs
   pushLocalVariables $ (\(vdef, t') -> case t' of

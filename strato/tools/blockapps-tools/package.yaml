@@ -26,6 +26,7 @@ library:
     - bytestring
     - common-log
     - data-default
+    - directory
     - ethereum-discovery
     - ethereum-rlp
     - format
@@ -35,7 +36,7 @@ library:
     - streaming
     - labeled-error
     - leveldb-haskell
-    - merkle-patricia-db
+    - statedb-monad
     - monad-logger
     - monad-loops
     - nibblestring
@@ -62,7 +63,7 @@ executables:
       - directory
       - filepath
       - labeled-error
-      - merkle-patricia-db
+      - statedb-monad
       - seqevents
       - strato-model
       - strato-p2p

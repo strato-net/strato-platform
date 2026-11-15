@@ -7,6 +7,7 @@ module Blockchain.Strato.Discovery.UDP
   ( dataToPacket,
     sendPacket,
     ndPacketToRLP,
+    pongSenderTcpPort,
     NodeDiscoveryPacket (..),
     Endpoint (..),
     Neighbor (..),
@@ -217,10 +218,20 @@ dataToPacket msg = do
     typeToPacket :: Word8 -> RLPObject -> Either DiscoverException NodeDiscoveryPacket
     typeToPacket 1 (RLPArray [version, from, to, timestamp]) = Right $ Ping (rlpDecode version) (rlpDecode from) (rlpDecode to) (rlpDecode timestamp)
     typeToPacket 2 (RLPArray (to : echo : timestamp : rest)) =
-      Right $ Pong (rlpDecode to) (rlpDecode echo) (rlpDecode timestamp) (TCPPort . fromInteger . rlpDecode <$> listToMaybe rest)
+      Right $ Pong (rlpDecode to) (rlpDecode echo) (rlpDecode timestamp) (listToMaybe rest >>= pongSenderTcpPort)
     typeToPacket 3 (RLPArray [target, timestamp]) = Right $ FindNeighbors (rlpDecode target) (rlpDecode timestamp)
     typeToPacket 4 (RLPArray [RLPArray neighbors, timestamp]) = Right $ Neighbors (map rlpDecode neighbors) (rlpDecode timestamp)
     typeToPacket x y = Left $ MalformedUDPException $ "Unsupported case called in typeToPacket: " ++ show x ++ ", " ++ show y
+
+-- | A Pong's fourth field, when it is a TCP port. Other nodes put their ENR
+-- sequence number there (devp2p v4), often a timestamp or a small count, and
+-- taking that for the sender's port leaves the peer undialable.
+pongSenderTcpPort :: RLPObject -> Maybe TCPPort
+pongSenderTcpPort o
+  | p >= 1024 && p <= 65535 = Just (TCPPort (fromInteger p))
+  | otherwise = Nothing
+  where
+    p = rlpDecode o :: Integer
 
 sendPacket ::
   ( HasVault m

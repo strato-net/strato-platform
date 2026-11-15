@@ -18,7 +18,10 @@ import { useUserTokens } from "@/context/UserTokensContext";
 import { useEarnContext } from "@/context/EarnContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useToast } from "@/hooks/use-toast";
-import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE, mUsdstAddress, rewardsEnabled } from "@/lib/constants";
+import { LENDING_DEPOSIT_CALLS, LENDING_WITHDRAW_CALLS, mUsdstAddress, rewardsEnabled, usdstAddress } from "@/lib/constants";
+import NetworkFee, { FeeNotices } from "@/components/NetworkFee";
+import { computeMaxTransferable } from "@/utils/transferValidation";
+import { feeCurrencySpend, feeShortfall } from "@/utils/feeUtils";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
@@ -31,7 +34,7 @@ const EarnLending = () => {
   const { isLoggedIn } = useUser();
   const guestMode = !isLoggedIn;
   const { loading: tokensLoading, fetchTokens } = useUserTokens();
-  const { fetchUsdstBalance } = useTokenContext();
+  const { fetchUsdstBalance, feeQuote } = useTokenContext();
   const {
     liquidityInfo,
     loadingLiquidity,
@@ -81,10 +84,9 @@ const EarnLending = () => {
     try {
       const amountWei = safeParseUnits(depositAmount, 18);
       const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
-      const feeWei = safeParseUnits(LENDING_DEPOSIT_FEE, 18);
       if (amountWei <= 0n) return false;
       if (amountWei > availableWei) return false;
-      if (amountWei + feeWei > availableWei) return false;
+      if (feeQuote && feeShortfall(feeQuote, LENDING_DEPOSIT_CALLS, feeCurrencySpend(feeQuote, usdstAddress, amountWei))) return false;
       return true;
     } catch {
       return false;
@@ -97,11 +99,9 @@ const EarnLending = () => {
     try {
       const amountWei = safeParseUnits(withdrawAmount, 18);
       const maxWithdrawableWei = getMaxWithdrawableAmount();
-      const feeWei = safeParseUnits(LENDING_WITHDRAW_FEE, 18);
-      const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
       if (amountWei <= 0n) return false;
       if (amountWei > maxWithdrawableWei) return false;
-      if (usdstBalanceWei < feeWei) return false;
+      if (feeQuote && feeShortfall(feeQuote, LENDING_WITHDRAW_CALLS)) return false;
       return true;
     } catch {
       return false;
@@ -246,10 +246,9 @@ const EarnLending = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
-                          const feeWei = safeParseUnits(LENDING_DEPOSIT_FEE, 18);
-                          const maxDepositableWei = availableWei > feeWei ? availableWei - feeWei : 0n;
-                          const formatted = formatUnits(maxDepositableWei, 18);
+                          const availableWei = liquidityInfo?.supplyable?.userBalance || "0";
+                          const maxDepositableWei = computeMaxTransferable(availableWei, usdstAddress, LENDING_DEPOSIT_CALLS, feeQuote, () => {});
+                          const formatted = formatUnits(BigInt(maxDepositableWei), 18);
                           const [whole, frac = ""] = formatted.split(".");
                           setDepositAmount(`${whole}.${frac.slice(0, 18)}`);
                         }}
@@ -260,7 +259,14 @@ const EarnLending = () => {
                       Available: {loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.supplyable?.userBalance || 0n, undefined, 18, 2)} USDST
                     </div>
 
-                    <div className="text-sm text-muted-foreground">Transaction Fee: {LENDING_DEPOSIT_FEE} USDST</div>
+                    <div className="text-sm text-muted-foreground">Transaction Fee: <NetworkFee calls={LENDING_DEPOSIT_CALLS} /></div>
+                    {!loadingLiquidity && (
+                      <FeeNotices
+                        calls={LENDING_DEPOSIT_CALLS}
+                        spendingWei={depositAmount ? safeParseUnits(depositAmount, 18) : 0n}
+                        tokenAddress={usdstAddress}
+                      />
+                    )}
 
                     <RewardsWidget
                       userRewards={userRewards}
@@ -342,9 +348,7 @@ const EarnLending = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
-                          const feeWei = safeParseUnits(LENDING_WITHDRAW_FEE, 18);
-                          if (usdstBalanceWei < feeWei) return;
+                          if (feeQuote && feeShortfall(feeQuote, LENDING_WITHDRAW_CALLS)) return;
                           const maxWithdrawableWei = getMaxWithdrawableAmount();
                           if (maxWithdrawableWei <= 0n) return;
                           const formatted = formatUnits(maxWithdrawableWei, 18);
@@ -359,7 +363,8 @@ const EarnLending = () => {
                       Withdrawable: {loadingLiquidity ? "Loading..." : formatBalance(getMaxWithdrawableAmount(), undefined, 18, 2)} USDST
                     </div>
 
-                    <div className="text-sm text-muted-foreground">Transaction Fee: {LENDING_WITHDRAW_FEE} USDST</div>
+                    <div className="text-sm text-muted-foreground">Transaction Fee: <NetworkFee calls={LENDING_WITHDRAW_CALLS} /></div>
+                    {!loadingLiquidity && <FeeNotices calls={LENDING_WITHDRAW_CALLS} />}
 
                     <RewardsWidget
                       userRewards={userRewards}

@@ -34,8 +34,7 @@ import Blockchain.Data.ExecResults
 import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TXO
-import Blockchain.Database.MerklePatricia as MP
-import Blockchain.DB.SQLDB
+import Control.Monad.Composable.StateDB as MP
 import Blockchain.GenesisBlocks.Builder
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SVM
@@ -78,6 +77,7 @@ import Data.Time.Clock.POSIX
 import Executable.EVMFlags ()
 import qualified LabeledError
 import qualified Numeric (readHex, showHex)
+import SolidVM.Model.Event (evName)
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
 import SolidVM.Model.Value (Value(..))
@@ -90,9 +90,9 @@ import Text.RawString.QQ
 -- those that are returned in ExecResults
 newtype HandledException = HE SolidException deriving (Show, Exception)
 
-anyTODO :: Selector HandledException
-anyTODO (HE TODO {}) = True
-anyTODO _ = False
+anyUnsupportedFeature :: Selector HandledException
+anyUnsupportedFeature (HE UnsupportedFeature {}) = True
+anyUnsupportedFeature _ = False
 
 anyParseError :: Selector HandledException
 anyParseError (HE ParseError {}) = True
@@ -304,9 +304,6 @@ writeBlockSummary block =
       header = obBlockData block
       txCnt = fromIntegral $ length (obReceiptTransactions block)
    in putBSum sha (blockHeaderToBSum header txCnt)
-
-instance AccessibleEnv SQLDB ContextM where
-  accessEnv = fmap (view $ dbs . sqldb) accessEnv
 
 runTestWithTimeout :: Int -> ContextM a -> IO ()
 runTestWithTimeout timeout f = do
@@ -3588,6 +3585,152 @@ contract qq is parent {
     emit x(6);
   }
 }|]
+
+  it "drops the events of a call that fails and is caught" . runTest $ do
+    er <-
+      runBS'
+        [r|
+contract Inner {
+  uint public x;
+  event Ping(uint n);
+  function emitOk() public {
+    emit Ping(1);
+  }
+  function emitAndFail() public {
+    x = 5;
+    emit Ping(2);
+    require(false, "boom");
+  }
+}
+
+contract qq {
+  event Before();
+  event Done();
+  constructor() {
+    Inner i = new Inner();
+    try i.emitAndFail() { } catch { }
+    emit Done();
+  }
+}|]
+    liftIO $ map evName (erEvents er) `shouldBe` ["Done"]
+
+  it "drops the events of a call that fails inside a caught block" . runTest $ do
+    er <-
+      runBS'
+        [r|
+contract Inner {
+  uint public x;
+  event Ping(uint n);
+  function emitOk() public {
+    emit Ping(1);
+  }
+  function emitAndFail() public {
+    x = 5;
+    emit Ping(2);
+    require(false, "boom");
+  }
+}
+
+contract qq {
+  event Before();
+  event Done();
+  constructor() {
+    Inner i = new Inner();
+    try {
+      i.emitAndFail();
+    } catch {
+    }
+    emit Done();
+  }
+}|]
+    liftIO $ map evName (erEvents er) `shouldBe` ["Done"]
+
+  it "drops the events of a successful call made by a call that fails and is caught" . runTest $ do
+    er <-
+      runBS'
+        [r|
+contract Inner {
+  uint public x;
+  event Ping(uint n);
+  function emitOk() public {
+    emit Ping(1);
+  }
+  function emitAndFail() public {
+    x = 5;
+    emit Ping(2);
+    require(false, "boom");
+  }
+}
+
+contract Outer {
+  function run(Inner i) public {
+    i.emitOk();
+    require(false, "boom");
+  }
+}
+
+contract qq {
+  event Before();
+  event Done();
+  constructor() {
+    Inner i = new Inner();
+    Outer o = new Outer();
+    try o.run(i) { } catch { }
+    emit Done();
+  }
+}|]
+    liftIO $ map evName (erEvents er) `shouldBe` ["Done"]
+
+  it "keeps the events around a call that fails and is caught, in order" . runTest $ do
+    er <-
+      runBS'
+        [r|
+contract Inner {
+  uint public x;
+  event Ping(uint n);
+  function emitOk() public {
+    emit Ping(1);
+  }
+  function emitAndFail() public {
+    x = 5;
+    emit Ping(2);
+    require(false, "boom");
+  }
+}
+
+contract qq {
+  event Before();
+  event Done();
+  constructor() {
+    Inner i = new Inner();
+    emit Before();
+    try i.emitOk() { } catch { }
+    try i.emitAndFail() { } catch { }
+    emit Done();
+  }
+}|]
+    liftIO $ map evName (erEvents er) `shouldBe` ["Before", "Ping", "Done"]
+
+  it "drops the events and storage writes made directly in a caught block that fails" . runTest $ do
+    er <-
+      runBS'
+        [r|
+contract qq {
+  uint x;
+  event Before();
+  event Done();
+  constructor() {
+    try {
+      x = 7;
+      emit Before();
+      require(false, "boom");
+    } catch {
+    }
+    emit Done();
+  }
+}|]
+    liftIO $ map evName (erEvents er) `shouldBe` ["Done"]
+    getFields ["x"] `shouldReturn` [BInteger 0]
 
   it "can assign directly to index of an array" . runTest $ do
     runBS
@@ -8361,7 +8504,7 @@ contract qq {
     delete b;
     delete yy;
   }
-}|]) `shouldThrow` anyTODO
+}|]) `shouldThrow` anyUnsupportedFeature
 
   it "can successfully use the 'blockhash' built-in" $ runTest ( do
     runBS [r|

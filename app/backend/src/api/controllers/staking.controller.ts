@@ -93,7 +93,14 @@ const pick = (...values: unknown[]): any =>
 class StakingController {
   static async getInfo(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const info = await getStratoStakingInfo(req.accessToken, req.address as string | undefined);
+      const requestedAddress = req.query?.address;
+      const normalizedAddress = typeof requestedAddress === "string" ? requestedAddress.trim() : requestedAddress;
+      if (normalizedAddress !== undefined && !isAddressLike(normalizedAddress)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid staking account address" });
+        return;
+      }
+      const userAddress = String(normalizedAddress ?? req.address ?? "").trim().replace(/^0x/i, "") || undefined;
+      const info = await getStratoStakingInfo(req.accessToken, userAddress);
       res.status(RestStatus.OK).json(info);
     } catch (error) {
       next(error);

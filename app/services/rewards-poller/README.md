@@ -70,6 +70,7 @@ cp .env.example .env
 #### Balance Configuration
 - `GAS_FEE_USDST` - Gas fee in USDST, multiplied by 1e16 (default: `1` = 0.01 USDST)
 - `GAS_FEE_VOUCHER` - Gas fee in Voucher, multiplied by 1e16 (default: `100` = 1 Voucher)
+- `STRATO_TOKEN_ADDRESS` - STRATO token address, counted toward the gas balance once the fee router charges STRATO (USDST then counts at half, since it buys STRATO at up to twice the call's value)
 - `MIN_TRANSACTIONS_THRESHOLD` - Minimum transactions that can be processed with current balance (default: `1`)
 - `WARNING_TRANSACTIONS_THRESHOLD` - Threshold for low balance warning (default: `100`)
 

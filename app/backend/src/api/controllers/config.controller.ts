@@ -1,5 +1,10 @@
 import { Request, Response } from "express";
-import { networkId, networkName, featuredEarnOpportunity } from "../../config/config";
+import {
+  networkId,
+  networkName,
+  featuredEarnOpportunity,
+  multisigFactory,
+} from "../../config/config";
 
 class ConfigController {
   static async getConfig(req: Request, res: Response) {
@@ -14,6 +19,7 @@ class ConfigController {
           featuredEarnOpportunity: featuredEarnOpportunity || undefined,
           stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null,
           contactEnabled: !!process.env.SENDGRID_API_KEY,
+          multisigFactory,
         }
       });
     } catch (error) {

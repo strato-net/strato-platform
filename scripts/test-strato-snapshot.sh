@@ -193,8 +193,75 @@ if STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapsho
   exit 1
 fi
 
-STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium --force
+# The extraction dir is gone when restore exits, so a tar wrapper records the
+# files each extraction (tar ... -C <dir>) wrote.
+TAR_FAKEBIN="$TMP/tar-fakebin"
+mkdir -p "$TAR_FAKEBIN"
+cat > "$TAR_FAKEBIN/tar" <<'SH'
+#!/usr/bin/env bash
+"${REAL_TAR:?}" "$@" || exit
+dest=""
+prev=""
+for arg in "$@"; do
+  [[ "$prev" == "-C" ]] && dest="$arg"
+  prev="$arg"
+done
+[[ -z "$dest" ]] || find "$dest" -type f >> "${FAKE_TAR_LOG:?}"
+SH
+chmod +x "$TAR_FAKEBIN/tar"
+TAR_ENV=(STRATO_SNAPSHOT_OFFLINE_TEST=1 REAL_TAR="$(command -v tar)" PATH="$TAR_FAKEBIN:$PATH")
+
+env "${TAR_ENV[@]}" FAKE_TAR_LOG="$TMP/tar-all-dbs.log" "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium --force
 assert_no_appledouble "$NODE"
+assert_contains "$TMP/tar-all-dbs.log" "/payload/postgres-dumps/eth.dump$"
+assert_contains "$TMP/tar-all-dbs.log" "/payload/postgres-dumps/cirrus.dump$"
+
+# A validator loads only eth; cirrus.dump is not extracted.
+env "${TAR_ENV[@]}" FAKE_TAR_LOG="$TMP/tar-eth-only.log" "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium --force \
+  --databases eth 2> "$TMP/restore-eth-only.err"
+assert_contains "$TMP/restore-eth-only.err" "Leaving out the dumps that are not loaded: cirrus.dump$"
+assert_contains "$TMP/tar-eth-only.log" "/payload/postgres-dumps/eth.dump$"
+if grep -q "/payload/postgres-dumps/cirrus.dump$" "$TMP/tar-eth-only.log"; then
+  echo "a restore of --databases eth must not extract cirrus.dump" >&2
+  exit 1
+fi
+assert_contains "$NODE/.ethereumH/state/value" "state-from-snapshot"
+
+# A restore that cannot fit is refused before the chain state is replaced: the
+# node keeps its old state rather than mixing the snapshot's chain with its old
+# databases. df reports a full node volume and a roomy work area, either on the
+# same volume or on another one (FAKE_DF_WORK_MOUNT), where moving the state
+# into the node is a copy that needs room of its own.
+DF_FAKEBIN="$TMP/df-fakebin"
+mkdir -p "$DF_FAKEBIN"
+cat > "$DF_FAKEBIN/df" <<'SH'
+#!/usr/bin/env bash
+echo "Filesystem 1024-blocks Used Available Capacity Mounted"
+if [[ "$*" == *.snapshot-work* ]]; then
+  echo "fake 1000000000 0 1000000000 0% ${FAKE_DF_WORK_MOUNT:?}"
+else
+  echo "fake 100 100 0 100% /node"
+fi
+SH
+chmod +x "$DF_FAKEBIN/df"
+for work_mount in /node /work; do
+  echo "state-before-refused-restore" > "$NODE/.ethereumH/state/value"
+  if STRATO_SNAPSHOT_OFFLINE_TEST=1 FAKE_DF_WORK_MOUNT="$work_mount" PATH="$DF_FAKEBIN:$PATH" \
+      "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium --force > "$TMP/restore-full-disk.out" 2>&1; then
+    echo "a restore that cannot fit should fail (work area on $work_mount)" >&2
+    exit 1
+  fi
+  if [[ "$work_mount" == /node ]]; then
+    assert_contains "$TMP/restore-full-disk.out" "not enough room in .* for the databases rebuilt from the dumps:"
+  else
+    assert_contains "$TMP/restore-full-disk.out" "not enough room in .* for the chain state copied from the work area and the databases rebuilt from the dumps:"
+  fi
+  assert_contains "$NODE/.ethereumH/state/value" "state-before-refused-restore"
+  if grep -q "\[5/7\]" "$TMP/restore-full-disk.out"; then
+    echo "a refused restore must stop before the chain state is replaced (work area on $work_mount)" >&2
+    exit 1
+  fi
+done
 
 cat > "$TMP/metadata.json" <<'JSON'
 {

@@ -29,6 +29,7 @@ import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions as 
 import qualified SolidVM.Solidity.StaticAnalysis.Pragmas.IncorrectSolidityVersion as IncorrectSolidityVersion
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.MultipleDeclarations as MultipleDeclarations
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.StateVariableShadowing as StateVariableShadowing
+import qualified SolidVM.Solidity.StaticAnalysis.Statements.Unchecked as Unchecked
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.UninitializedLocalVariables as UninitializedLocalVariables
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite as WriteAfterWrite
 import SolidVM.Solidity.StaticAnalysis.Types
@@ -55,6 +56,26 @@ forContract detector c = runNewMemCodeDB . runNewMemAddressStateDB . runMainChai
 
 spec :: Spec
 spec = describe "Static analysis detectors" $ do
+  describe "Unchecked detector" $ do
+    it "does not warn for ordinary arithmetic" $ do
+      anns <- Unchecked.detector `forContract` "contract A { function f(uint x) returns (uint) { return x + 1; } }"
+      length anns `shouldBe` 0
+    it "warns for unchecked blocks in constructors, modifiers, and nested function bodies" $ do
+      anns <- Unchecked.detector `forContract` [r|
+contract A {
+  constructor() { unchecked {} }
+  modifier m() { unchecked {} _; }
+  function f(bool b) {
+    if (b) { unchecked { unchecked {} } }
+    else { unchecked {} }
+    while (b) { unchecked {} break; }
+    for (uint i = 0; i < 1; i++) { unchecked {} }
+    do { unchecked {} } while (false);
+    try { unchecked {} } catch { unchecked {} }
+  }
+}
+|]
+      length anns `shouldBe` 10
   describe "Incorrect SolidVM version detector" $ do
     it "warns when using a solidvm pragma" $
       let anns =

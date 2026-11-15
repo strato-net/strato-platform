@@ -59,10 +59,13 @@ computeSelector funcName argTypes =
   let sig = T.unpack (labelToText funcName) ++ "(" ++ intercalate "," (map svmTypeToCanonical argTypes) ++ ")"
    in B.take 4 $ keccak256ToByteString $ hash $ BC.pack sig
 
+-- | The function whose canonical signature hashes to @selector@. A name's
+-- overloads share its entry, so each one is tried under the same name.
 matchFunction :: [(T.Text, Int)] -> B.ByteString -> [(SolidString, CC.Func)] -> Maybe (SolidString, CC.Func)
 matchFunction _enumSizes selector = go
   where
     go [] = Nothing
     go ((name, func) : rest) =
-      let computed = computeSelector name (funcArgTypes func)
-       in if computed == selector then Just (name, func) else go rest
+      case filter ((== selector) . computeSelector name . funcArgTypes) (func : CC._funcOverload func) of
+        hit : _ -> Just (name, hit)
+        [] -> go rest

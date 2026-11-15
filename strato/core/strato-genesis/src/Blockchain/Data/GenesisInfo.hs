@@ -19,7 +19,7 @@ import Blockchain.Data.AddressInfo
 import Blockchain.Data.CodeInfo
 import SolidVM.Model.Event
 import Blockchain.Strato.Model.Address
-import Blockchain.Database.MerklePatricia
+import Control.Monad.Composable.StateDB
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Validator (Validator)
 import Blockchain.Stream.Action (Delegatecall)

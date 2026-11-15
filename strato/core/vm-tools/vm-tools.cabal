@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.38.1.
+-- This file has been generated from package.yaml by hpack version 0.39.6.
 --
 -- see: https://github.com/sol/hpack
 
@@ -24,6 +24,7 @@ library
       Blockchain.DB.BlockSummaryDB
       Blockchain.DB.ModifyStateDB
       Blockchain.Forks
+      Blockchain.HistoricalOutOfGas
       Blockchain.StateRootMismatch
       Blockchain.Stream.Action
       Blockchain.Stream.VMEvent
@@ -42,7 +43,8 @@ library
       src/
   ghc-options: -Wall -O2 -fexpose-all-unfoldings -fspecialise-aggressively
   build-depends:
-      aeson
+      accountdb-monad
+    , aeson
     , base
     , binary
     , binary-instances
@@ -71,22 +73,20 @@ library
     , lens
     , leveldb-haskell
     , lrucache
-    , merkle-patricia-db
     , monad-alter
     , mtl
     , nibblestring
-    , nodedb-monad
     , ordered-containers
-    , persistent-sqlite
     , prometheus-client
     , quickcheck-instances
+    , redis-monad
     , resourcet
     , seqevents
     , solid-vm-model
+    , statedb-monad
     , store
     , strato-conf
     , strato-model
-    , strato-redis-blockdb
     , strato-statediff
     , streaming
     , text
@@ -104,6 +104,7 @@ test-suite contextm-test
       CrossLangFixtureSpec
       ReceiptSpec
       ReplayProtectionSpec
+      StratoGasEnvelopeSpec
       TypedArgConversionSpec
       Paths_vm_tools
   hs-source-dirs:
@@ -112,6 +113,7 @@ test-suite contextm-test
   build-depends:
       Decimal
     , QuickCheck
+    , aeson
     , base
     , base16-bytestring
     , binary
@@ -123,12 +125,14 @@ test-suite contextm-test
     , ethereum-rlp
     , hflags
     , hspec
-    , merkle-patricia-db
     , ordered-containers
     , quickcheck-instances
     , solid-vm-model
+    , statedb-monad
+    , strato-conf
     , strato-model
     , text
+    , time
     , vector
     , vm-tools
   default-language: Haskell2010

@@ -18,14 +18,16 @@ import Blockchain.Event (BlockVerificationFailure)
 import Control.Monad.IO.Class (liftIO)
 import Blockchain.Model.WrappedBlock (OutputBlock (..), outputBlockHash)
 import Blockchain.Data.RLP (rlpDecode, rlpDeserialize)
-import qualified Blockchain.Database.MerklePatricia.Internal as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Sequencer.Event (VmTask (..))
 import Blockchain.Sequencer.Kafka (seqVmTasksTopicName)
 import Blockchain.Strato.Model.Options ()
-import Blockchain.VMContext (evalContextM, initReplayContext)
+import Blockchain.VMContext (evalContextM, initReplayContext, memContext, runContextIO)
 import Blockchain.VMOptions ()
 import Control.Monad (forM, unless, when)
-import Control.Monad.Composable.Base (accessEnv, runEff)
+import Blockchain.EthConf (lookupRedisBlockDBConfig, runStreamMConfigured)
+import Control.Monad.Composable.Base (runEff)
+import Control.Monad.Composable.Redis (runRedisM)
 import Control.Monad.Composable.Streaming (runConsume)
 import Data.Binary (decode, encode, get)
 import Data.Binary.Get (Decoder (..), Get, runGetIncremental)
@@ -69,8 +71,9 @@ dumpBlocks n outPath = do
     hPutStrLn stderr "dump: n must be > 0"
     exitFailure
   hPutStrLn stderr $ printf "dumping first %d VmBlock(s) from vm_tasks to %s" n outPath
-  -- Only the stream is needed here, so the in-memory seed context is reused as is.
-  blocks <- runEff . runLogging . evalContextM "vm-apply-dump" accessEnv $ do
+  -- Only the stream is needed here, so no LevelDB is opened.
+  ctx <- memContext (const (pure Nothing)) Nothing
+  blocks <- runEff . runLogging . runRedisM lookupRedisBlockDBConfig . runStreamMConfigured "vm-apply-dump" . MP.runMemStateDBM . runContextIO ctx $ do
     acc <- liftIO $ newIORef ([] :: [OutputBlock])
     -- Fresh group each dump-all so we reread vm_tasks from offset 0.
     runConsume "vm-apply-loop-dump-all" seqVmTasksTopicName $ \evs -> do
@@ -127,7 +130,7 @@ applyBlocksPreloaded inPath mRange = do
       txCount
       (show expectSR)
   t0 <- getCurrentTime
-  failures <- runEff . runLogging . evalContextM "vm-apply-replay" initReplayContext $ do
+  failures <- runEff . runLogging . runRedisM lookupRedisBlockDBConfig . evalContextM "vm-apply-replay" initReplayContext $ do
       -- Historical MP nodes come from a copied LevelDB (helium-ldb).
       -- Rebuilding genesis.json storage here hits a BasicValue parse on HTML
       -- strings and is not how a live node boots (strato-setup already wrote the trie).
@@ -326,7 +329,7 @@ applyBlocksStreamed chunkSize inPath mRange = do
         chunkSize
         inPath
     t0 <- getCurrentTime
-    (failures, maybeStats, finalSource) <- runEff . runLogging . evalContextM "vm-apply-replay-stream" initReplayContext $ do
+    (failures, maybeStats, finalSource) <- runEff . runLogging . runRedisM lookupRedisBlockDBConfig . evalContextM "vm-apply-replay-stream" initReplayContext $ do
         gi <- getGenesisInfo
         seedDatabases (genesisInfoToBlock gi)
         initializeBestBlock
@@ -448,7 +451,7 @@ auditLastBlock :: OutputBlock -> IO ()
 auditLastBlock lastB = do
   let expectSR = stateRoot (obBlockData lastB)
       expectHash = outputBlockHash lastB
-  (accountCount, storageCount) <- runEff . runLogging . evalContextM "vm-apply-audit" initReplayContext $ do
+  (accountCount, storageCount) <- runEff . runLogging . runRedisM lookupRedisBlockDBConfig . evalContextM "vm-apply-audit" initReplayContext $ do
       accountPairs <- MP.unsafeGetAllKeyVals expectSR
       let states =
             [ rlpDecode (rlpDeserialize (rlpDecode encoded)) :: AddressState

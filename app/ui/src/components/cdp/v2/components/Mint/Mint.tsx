@@ -12,16 +12,16 @@ import { formatUnits } from 'ethers';
 import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { RewardsWidget } from '@/components/rewards/RewardsWidget';
+import NetworkFee from '@/components/NetworkFee';
 import { requestWalletConnection } from '@/lib/auth';
 import MintProgressModal, { type ProgressStep } from '../../../MintProgressModal';
 import LoanForm from './LoanForm';
 import VaultBreakdown from './VaultBreakdown';
 import {
-  formatUSD,
   parseDecimalToUnits,
   addAllocationsToVaultCandidates,
   calculateTransactionCount,
-  calculateTotalFees,
+  calculateTotalCalls,
   calculateTotalMaxMint,
   calculateAvailableToMint,
   calculateWeightedAverageAPR,
@@ -233,7 +233,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
 
   const transactionCount = useMemo(() => calculateTransactionCount(allocations), [allocations]);
 
-  const totalFees = useMemo(() => calculateTotalFees(allocations), [allocations]);
+  const totalCalls = useMemo(() => calculateTotalCalls(allocations), [allocations]);
 
   // ============================================================================
   // Memos - Rewards
@@ -890,7 +890,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
               <div className="flex items-center justify-between gap-3">
                 <span>Transaction Fee</span>
                 <span className="font-medium text-foreground">
-                  {formatUSD(totalFees, 2)} USDST ({Math.round(totalFees * 100)} vouchers)
+                  <NetworkFee calls={totalCalls} />
                 </span>
               </div>
             )}

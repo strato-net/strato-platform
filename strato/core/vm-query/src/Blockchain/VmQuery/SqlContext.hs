@@ -61,10 +61,14 @@ import Blockchain.Strato.Model.Class (blockHeaderHash)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext (Backend (..), Context (..), ContextBestBlockInfo (..), ContextM, ContextState (..), MemContextDBs, StateMirror (..), TrieAccess (..), runContextIO)
+import Control.Exception (bracket)
 import Control.Concurrent.MVar (MVar, withMVar)
 import Control.Concurrent.STM (newTQueueIO)
 import Control.Monad (when)
 import Control.Monad.Composable.Base (Eff, provide, runEff, withLogger)
+import Control.Monad.Composable.Redis (RedisEnv (..), runRedisMUsingEnv)
+import Control.Monad.Composable.StateDB (runMemStateDBM)
+import qualified Database.Redis as Redis
 import Control.Monad.Composable.Streaming (runStreamMUsingEnv, unconnectedStreamEnv)
 import Control.Monad.IO.Unlift (withRunInIO)
 import Control.Monad.Logger (LogLevel (..), defaultOutput)
@@ -201,10 +205,10 @@ runSqlQueryM env m = do
           { _backend = Mirror (sqeOverlay env) (mirrorOf env),
             _state = sqeState env,
             _stateDiffQueue = que,
-            _resolveFile = const (pure Nothing),
-            _fetchMissingNodes = False
+            _resolveFile = const (pure Nothing)
           }
-  runEff . withLogger logger . runStreamMUsingEnv stream $ runContextIO ctx m
+  bracket (Redis.connect Redis.defaultConnectInfo) Redis.disconnect $ \redis ->
+    runEff . withLogger logger . runRedisMUsingEnv (RedisEnv redis) . runStreamMUsingEnv stream . runMemStateDBM $ runContextIO ctx m
 
 -- | The mirror as the VM context reads it.
 mirrorOf :: SqlQueryEnv -> StateMirror
@@ -284,7 +288,6 @@ resetForRequest env mHeader = do
 -- | Drop the command's overlay so the next command starts from the mirror.
 withFreshOverlay :: SqlQueryEnv -> IO a -> IO a
 withFreshOverlay env act = do
-  modifyIORef' (sqeState env) (\s -> s {_memDBs = def})
   writeIORef (sqeOverlay env) def
   writeIORef (sqeAccountIds env) M.empty
   writeIORef (sqePrefetched env) M.empty

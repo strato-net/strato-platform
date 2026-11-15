@@ -5,10 +5,9 @@ module BlockApps.Tools.State (doit) where
 import BlockApps.Tools.Util
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.RLP
-import qualified Blockchain.Database.MerklePatricia.Internal as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Control.Monad
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader (runReaderT)
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
 import Data.Default
@@ -23,7 +22,7 @@ nibbleStringToByteString _ = error "nibbleStringToByteString called for Odd leng
 
 showVals :: DB.DB -> DB.DB -> MP.StateRoot -> ResourceT IO ()
 showVals sdb db sr = do
-  kvs <- runReaderT (MP.unsafeGetKeyVals sr "") sdb
+  kvs <- MP.runStateDBOn sdb (MP.unsafeGetKeyVals sr "")
   liftIO $ putStrLn $ "Number of items: " ++ show (length kvs) ++ "\n------------------------"
   forM_ kvs $ \(key, val) -> do
     unhashed <- DB.get db def $ nibbleStringToByteString key

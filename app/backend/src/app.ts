@@ -19,6 +19,8 @@ app.use(tracingMiddleware);
 app.use(
   cors(),
   express.json({
+    // nginx's limit on /api/: an admin issue's args can carry a whole contract source
+    limit: "1mb",
     verify: (req: any, _res, buf) => {
       req.rawBody = buf;
     },

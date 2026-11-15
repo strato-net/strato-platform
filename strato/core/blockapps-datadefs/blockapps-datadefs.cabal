@@ -36,6 +36,7 @@ library
     , format
     , generic-arbitrary
     , generic-random
+    , integer-conversion
     , labeled-error
     , persistent
     , postgresql-simple

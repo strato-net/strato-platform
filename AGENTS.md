@@ -13,12 +13,25 @@
 - Tab switches use true crossfades (both panels rendered, opacity toggle); network/data switches should NOT animate -- just swap data in place; skeleton loaders only for genuinely async first-loads, never for cached data; data must be ready before animation starts; hide scrollbars with CSS when users want no visible track, not by forcing `overflow-hidden` if the area must still scroll
 - When adding derived/weighted APY sources or new computations, fold them into existing loops and widen existing Cirrus selects rather than adding extra passes or extra API calls; avoid unnecessary `useEffect` and prefer derived state, event handlers, or `useMemo`; user explicitly dislikes effect-heavy code
 
+## Consensus and language compatibility exceptions (STRICT)
+
+- Never add or broaden an exception to SolidVM or native compiler language rules merely to make historical chain replay or sync succeed without first discussing it with the user and obtaining explicit approval.
+- This includes accepting incorrect return types, bypassing validation, and preserving buggy historical behavior through special execution paths. Authorization to implement a feature, fix a bug, or run sync tests does not authorize these exceptions.
+- Before proposing an exception, explain the intended rule, the concrete historical behavior that conflicts with it, and the compatibility impact. Present contract fixes and coordinated hard fork activation as alternatives where applicable, and explain how any proposed exception could later be removed.
+- If an existing undisclosed exception is discovered, report it to the user before extending or relying on it as the solution.
+
 ## Node lifecycle & test runs (STRICT — no exceptions)
 
 - Stop the node ONLY with `strato-down`; start it ONLY with `strato-up`. Never stop/start/kill/manage individual components (no `convoke`, no `strato-p2p`, no manual process management).
 - ALWAYS fully clear `mynode` between runs (rename to `mynode.backup*` or `rm`). Never restart on top of an existing `mynode`.
 - The only valid restart sequence is: `strato-down` → remove/rename `mynode` → `strato-up`. Confirm the prior node is down before starting a new one.
 - Rationale: partial restarts / reused `mynode` leave half-broken state (e.g. a stray second `strato-p2p`) and make test results untrustworthy; a full teardown is the only way to guarantee a clean, reproducible run.
+
+## Building (STRICT)
+
+- Build ONLY with `make` from the repo root. No per-package `stack build`/`stack install`/`stack test` as the build step, and never `--force-dirty` (it unregisters every dependent package and leaves the next `make` re-registering/rebuilding dozens of packages). `stack test <pkg>` leaves the package configured with tests, which forces `make` to reconfigure and recompile it and its dependents.
+- Watch what rebuilds. A warm `make` is well under a minute; ~4 min or more means something is wrong unless the reason is known (fresh clone, deliberate compiler-flag experiment). If packages or docker images rebuild that have no changed inputs, tell the user — do not just wait it out.
+- Known Makefile behaviour: docker image tags embed the commit SHA (`VERSION-HASH`), so every new HEAD rebuilds every image even when its content hash is unchanged.
 
 ## Learned Workspace Facts
 

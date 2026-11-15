@@ -110,9 +110,11 @@ main = do
 --   2. Environment variable (same names the vault-wrapper daemon reads from
 --      docker-compose: @postgres_host@, @postgres_port@, @postgres_user@,
 --      @postgres_password@, @postgres_vault_wrapper_db@), if set and non-empty.
---   3. The built-in HFlags default from 'Options'.
+--   3. @PGPASSFILE@ for the password, if set and non-empty. An empty password
+--      lets libpq read the matching entry from that file.
+--   4. The built-in HFlags default from 'Options'.
 --
--- This matches the standard Unix CLI > env > default convention while still
+-- This follows CLI > env > passfile > default precedence while still
 -- letting operators run the tool inside an existing vault-wrapper container
 -- without re-typing connection settings that are already in its environment.
 connectInfo :: IO ConnectInfo
@@ -120,7 +122,13 @@ connectInfo = do
   host <- resolve "postgres_host" Options.flags_pghost "postgres"
   portStr <- resolve "postgres_port" Options.flags_pgport "5432"
   user <- resolve "postgres_user" Options.flags_pguser "postgres"
-  pw <- resolve "postgres_password" Options.flags_password "api"
+  passwordEnv <- lookupEnv "postgres_password"
+  passfile <- lookupEnv "PGPASSFILE"
+  let pw = case (Options.flags_password, passwordEnv, passfile) of
+        (s, _, _) | s /= "api" -> s
+        (_, Just s, _) | not (null s) -> s
+        (_, _, Just s) | not (null s) -> ""
+        _ -> "api"
   db <- resolve "postgres_vault_wrapper_db" Options.flags_database "oauth"
   pure
     ConnectInfo

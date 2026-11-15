@@ -4,8 +4,8 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
-const { getCreatedAddress, getIssueId, pollForCreateIssueExecution } = require('./util');
-const { rest, importer, util } = require('blockapps-rest');
+const { getCreatedAddress, getIssueId, pollForCreateIssueExecution, proxyOwnerCallArgs } = require('./util');
+const { rest, importer, util } = require('./strato');
 const fs = require('fs-extra');
 const path = require('path');
 
@@ -44,6 +44,7 @@ function printUsage() {
   console.error('  --contract-file <file>       Filename of BCC source file which imports the implementation contract (probably BaseCodeCollection.sol)');
   console.error('');
   console.error('Optional arguments:');
+  console.error('  --deploy-only                Deploy the implementation without upgrading a proxy');
   console.error('  --constructor-args <json>    JSON string of constructor arguments (default: ' + JSON.stringify(DEFAULT_CONSTRUCTOR_ARGS) + ')');
   console.error('  +OVERRIDE-CHECKS             Override the contract name check');
   console.error('');
@@ -52,6 +53,7 @@ function printUsage() {
   console.error('');
   console.error('Example:');
   console.error('  node upgrade.js --proxy-address abc123 --contract-name PoolFactory --contract-file BaseCodeCollection.sol');
+  console.error('  node upgrade.js --deploy-only --contract-name MultisigLogic --contract-file BaseCodeCollection.sol --constructor-args \'{}\'');
   console.error('  node upgrade.js --proxy-address abc123 --contract-name LendingPool --contract-file BaseCodeCollection.sol --constructor-args \'{"param":"value"}\'');
   console.error('  node upgrade.js --batch --contract-name Pool --contract-file BaseCodeCollection.sol');
 }
@@ -67,7 +69,7 @@ function parseArgs() {
     const arg = args[i];
     if (arg.startsWith('--')) {
       const key = arg.slice(2);
-      if (key === 'batch') {
+      if (key === 'batch' || key === 'deploy-only') {
         parsed[key] = true;
         continue;
       }
@@ -255,9 +257,12 @@ async function main() {
       printUsage();
       process.exit(1);
     }
+    if (args['deploy-only'] && (args['batch'] || args['proxy-address'])) {
+      throw new Error('--deploy-only cannot be combined with --batch or --proxy-address');
+    }
     
     // Check for required arguments
-    const requiredArgs = args['batch']
+    const requiredArgs = args['batch'] || args['deploy-only']
       ? ['contract-name', 'contract-file']
       : ['proxy-address', 'contract-name', 'contract-file'];
     const missingArgs = requiredArgs.filter(arg => !args[arg]);
@@ -286,7 +291,9 @@ async function main() {
     const password = process.env.GLOBAL_ADMIN_PASSWORD;
 
     // Build targets list: proxy addresses to upgrade
-    const targets = args['batch']
+    const targets = args['deploy-only']
+      ? []
+      : args['batch']
       ? BATCH_TARGETS
       : [args['proxy-address']];
 
@@ -376,6 +383,20 @@ async function main() {
     const implementationAddress = await deployImplementationAsync(tokenObj, contractArgs, deployOptions);
     console.log(`Implementation deployed at: ${implementationAddress}\n`);
 
+    if (args['deploy-only']) {
+      console.log('====== Implementation Deployment Successful ======');
+      console.log(`Contract: ${contractName}`);
+      console.log(`Implementation: ${implementationAddress}`);
+      console.log(`DEPLOYED_IMPLEMENTATION_ADDRESS=${implementationAddress}`);
+      console.log('==================================================\n');
+      return {
+        newImplementation: implementationAddress,
+        contractName,
+        contractFile,
+        deploymentTime: new Date().toISOString(),
+      };
+    }
+
     // Step 2: Upgrade each proxy to point to the new implementation
     const results = [];
 
@@ -389,7 +410,7 @@ async function main() {
       console.log(`Upgrading proxy at ${proxyAddress}...`);
       console.log(`New implementation: ${implementationAddress}`);
 
-      const callArgs = {
+      const callArgs = await proxyOwnerCallArgs(tokenObj, {
         contract: { address: proxyAddress, name: 'Proxy' },
         method: 'setLogicContract',
         args: { _logicContract: implementationAddress },
@@ -397,7 +418,7 @@ async function main() {
           gasPrice: config.gasPrice,
           gasLimit: config.gasLimit,
         },
-      };
+      });
 
       const callOptions = {
         config,

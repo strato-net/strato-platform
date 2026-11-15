@@ -7,6 +7,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { HelpCircle, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { safeParseUnits, addCommasToInput, formatUnits, formatBalance } from "@/utils/numberUtils";
+import { SUPPLY_COLLATERAL_CALLS, BORROW_CALLS } from "@/lib/constants";
+import { feeShortfall } from "@/utils/feeUtils";
+import NetworkFee from "@/components/NetworkFee";
+import { useTokenContext } from "@/context/TokenContext";
 import { NewLoanData, CollateralData } from "@/interface";
 import { 
   calculateAvailableToBorrowUSD, 
@@ -14,7 +18,6 @@ import {
   calculateAfterBorrowHealthFactor,
   recommendCollateralToSupply,
   calculateAdditionalValueNeeded,
-  calculateBorrowTxFee,
   determineErrorMessage,
   calculateAdditionalCollateralAmountFromValue,
   sortCollateralAssets,
@@ -34,8 +37,6 @@ interface BorrowFormProps {
   loans: NewLoanData | null;
   borrowLoading: boolean;
   onBorrow: (amount: string) => void;
-  usdstBalance: string;
-  voucherBalance: string;
   collateralInfo: CollateralData[] | null;
   startPolling?: () => void;
   stopPolling?: () => void;
@@ -51,7 +52,8 @@ type CustomCollateralEntry =
   | { source: "wei"; wei: bigint }
   | { source: "usd"; usd: string };
 
-const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalance, collateralInfo, startPolling, stopPolling, userRewards, rewardsLoading, guestMode = false }: BorrowFormProps) => {
+const BorrowForm = ({ loans, borrowLoading, onBorrow, collateralInfo, startPolling, stopPolling, userRewards, rewardsLoading, guestMode = false }: BorrowFormProps) => {
+  const { feeQuote } = useTokenContext();
   const [borrowAmount, setBorrowAmount] = useState<string>("");
   const [borrowAmountError, setBorrowAmountError] = useState<string>("");
   const [customBorrowError, setCustomBorrowError] = useState<string>("");
@@ -220,25 +222,16 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     return additionalCollateralShortfall < -EXCESS_COLLATERAL_ALLOWANCE;
   }, [autoSupplyCollateral, additionalCollateralShortfall, borrowAmount]);
 
-  // Calculate transaction fee based on number of collateral assets being supplied
-  const txFee = useMemo(() => {
+  // One supply call per collateral asset supplied, then the borrow itself
+  const txCalls = useMemo(() => {
     const collateralCount = collateralTableData.filter(item => item.amount > 0n).length;
-    return calculateBorrowTxFee(collateralCount);
+    return collateralCount * SUPPLY_COLLATERAL_CALLS + BORROW_CALLS;
   }, [collateralTableData]);
 
   // Check if user can afford the transaction fee (separate from borrow amount)
   useEffect(() => {
-    const feeWei = safeParseUnits(txFee.fee.toString(), 18);
-    const voucherBal = BigInt(voucherBalance || 0);
-    const usdstBal = safeParseUnits(usdstBalance || "0", 18);
-    
-    const canCover = voucherBal >= BigInt(txFee.voucher) || usdstBal >= feeWei;
-    if (!canCover) {
-      setFeeError("Insufficient USDST + voucher balance for transaction fee");
-    } else {
-      setFeeError("");
-    }
-  }, [txFee, voucherBalance, usdstBalance]);
+    setFeeError(feeQuote ? feeShortfall(feeQuote, txCalls) : "");
+  }, [txCalls, feeQuote]);
 
 
 
@@ -806,7 +799,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       {/* Transaction Fee */}
       <div className="flex justify-between text-sm">
         <span className="text-muted-foreground underline cursor-help" title="Fee paid to process this transaction">Transaction Fee</span>
-        <span className="font-medium">{txFee.fee.toFixed(2)} USDST ({txFee.voucher} vouchers)</span>
+        <span className="font-medium"><NetworkFee calls={txCalls} /></span>
       </div>
       {feeError && (
         <p className="text-yellow-600 text-sm">{feeError}</p>

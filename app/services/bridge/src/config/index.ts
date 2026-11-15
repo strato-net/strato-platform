@@ -65,6 +65,9 @@ const config = {
     safeProposerPrivateKey: process.env.SAFE_PROPOSER_PRIVATE_KEY,
     apiKey: process.env.SAFE_API_KEY,
   },
+  adminRegistry: {
+    address: process.env.ADMIN_REGISTRY_ADDRESS || "000000000000000000000000000000000000100c",
+  },
   voucher: {
     contractAddress:
       process.env.VOUCHER_CONTRACT_ADDRESS ||
@@ -83,6 +86,7 @@ const config = {
     minTransactionsThreshold: BigInt(process.env.MIN_TRANSACTIONS_THRESHOLD || '200'),
   },
   strato: {
+    tokenAddress: process.env.STRATO_TOKEN_ADDRESS,
     gas: {
       limit: 32_100_000_000,
       price: 1,

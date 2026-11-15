@@ -10,9 +10,10 @@ import { useTradeForm } from "@/context/TradeFormContext";
 import { useTradeTokens, useTradePairableTokens } from "@/hooks/trade/useTradeTokens";
 import { useDerivedTradeInfo } from "@/hooks/trade/useDerivedTradeInfo";
 import { useTradeSwap } from "@/hooks/trade/useTradeSwap";
-import { usdstAddress, SWAP_FEE } from "@/lib/constants";
+import { usdstAddress, SWAP_CALLS } from "@/lib/constants";
 import { safeParseUnits, formatAmount, formatUnits } from "@/utils/numberUtils";
 import { computeMaxTransferable } from "@/utils/transferValidation";
+import { feeBalanceLow, feeCurrencySpend } from "@/utils/feeUtils";
 import { TokenInputPanel } from "@/components/swap/TokenInputPanel";
 import { PoolSelector } from "@/components/swap/PoolSelector";
 import { SwapDetails } from "@/components/swap/SwapDetails";
@@ -22,7 +23,6 @@ import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { UserRewardsData } from "@/services/rewardsService";
 
 const USDST_BALANCE_REFRESH_MS = 10_000;
-const LOW_USDST_THRESHOLD = "0.10";
 
 interface SwapWidgetProps {
   userRewards?: UserRewardsData | null;
@@ -41,7 +41,7 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
   const { state, dispatch } = useTradeForm();
   const { tokenIn, tokenOut, typedValue, independentField, selectedPoolAddress, slippage } = state;
 
-  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
+  const { feeQuote, fetchUsdstBalance } = useTokenContext();
   const { fetchTokens } = useUserTokens();
   const { refreshLoans, refreshCollateral } = useLendingContext();
   const { toast } = useToast();
@@ -108,20 +108,18 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
     return () => clearInterval(timer);
   }, [fetchUsdstBalance]);
 
-  const feeWei = safeParseUnits(SWAP_FEE);
   const { maxSpendableWei, maxTransferableError } = useMemo(() => {
     if (!liveTokenIn) return { maxSpendableWei: 0n, maxTransferableError: "" };
     let error = "";
     const max = computeMaxTransferable(
       liveTokenIn.balance || "0",
-      liveTokenIn.address === usdstAddress,
-      voucherBalance,
-      usdstBalance,
-      feeWei.toString(),
+      liveTokenIn.address,
+      SWAP_CALLS,
+      feeQuote,
       (e) => { error = typeof e === "function" ? e(error) : e; }
     );
     return { maxSpendableWei: BigInt(max), maxTransferableError: error };
-  }, [liveTokenIn, voucherBalance, usdstBalance, feeWei]);
+  }, [liveTokenIn, feeQuote]);
 
   // ========================================================================
   // DERIVED TRADE INFO (quotes across all pools; dependent field amounts)
@@ -139,11 +137,9 @@ const SwapWidget = ({ userRewards, guestMode = false }: SwapWidgetProps) => {
   const hasAmount = typedValueWei > 0n;
 
   const isLowBalanceWarning = useMemo(() => {
-    if (tokenIn?.address !== usdstAddress || inputAmountWei === 0n) return false;
-    const usdstWei = BigInt(usdstBalance || "0");
-    if (usdstWei < inputAmountWei + feeWei) return false;
-    return usdstWei - inputAmountWei - feeWei <= safeParseUnits(LOW_USDST_THRESHOLD);
-  }, [tokenIn?.address, inputAmountWei, usdstBalance, feeWei]);
+    if (!feeQuote || inputAmountWei === 0n) return false;
+    return feeBalanceLow(feeQuote, SWAP_CALLS, feeCurrencySpend(feeQuote, tokenIn?.address, inputAmountWei));
+  }, [tokenIn?.address, inputAmountWei, feeQuote]);
 
   // ========================================================================
   // EXECUTION

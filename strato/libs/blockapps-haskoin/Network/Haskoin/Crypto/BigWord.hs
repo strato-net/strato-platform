@@ -296,10 +296,12 @@ instance Binary (BigWord Mod256Block) where
 
 instance Binary (BigWord Mod160) where
   get = do
-    a <- fromIntegral <$> getWord32be
-    b <- fromIntegral <$> getWord64be
-    c <- fromIntegral <$> getWord64be
-    return $ (a `shiftL` 128) + (b `shiftL` 64) + c
+    hi <- getWord32be
+    mid <- getWord64be
+    lo <- getWord64be
+    -- These pieces fit exactly in 160 bits; no modular reduction is needed.
+    pure . BigWord $
+      (toInteger hi `shiftL` 128) .|. (toInteger mid `shiftL` 64) .|. toInteger lo
 
   put (BigWord i) = do
     putWord32be $ fromIntegral (i `shiftR` 128)

@@ -14,6 +14,7 @@ import { formatBalance, formatUnits, safeBigInt } from '@/utils/numberUtils';
 import { useUser } from '@/context/UserContext';
 import { useTokenContext } from '@/context/TokenContext';
 import { metalForgeService } from '@/services/metalForgeService';
+import { metalPurchasesEnabled } from '@/lib/constants';
 import { buildFundBuyPath, buildFundMetalBuyPath, fetchBridgeBuyableAddresses, normBridgeAddr } from '@/lib/bridgeLinks';
 
 type SortKey = 'price' | 'marketCap' | 'totalSupply';
@@ -185,9 +186,11 @@ const Explore = () => {
     let cancelled = false;
     Promise.all([
       fetchBridgeBuyableAddresses().catch(() => new Set<string>()),
-      metalForgeService.getConfigs()
-        .then((config) => new Set(config.metals.filter((metal) => metal.isEnabled).map((metal) => normBridgeAddr(metal.address))))
-        .catch(() => new Set<string>()),
+      metalPurchasesEnabled
+        ? metalForgeService.getConfigs()
+          .then((config) => new Set(config.metals.filter((metal) => metal.isEnabled).map((metal) => normBridgeAddr(metal.address))))
+          .catch(() => new Set<string>())
+        : Promise.resolve(new Set<string>()),
     ])
       .then(([bridgeAddresses, metalAddresses]) => {
         if (!cancelled) {

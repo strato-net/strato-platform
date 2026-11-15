@@ -20,6 +20,7 @@ module Blockchain.Model.SyncTask (
   ) where
 
 import           Blockchain.Strato.Model.Host
+import           Data.Text (Text)
 import           Data.Time
 import           Database.Persist.Sql
 import           Database.Persist.TH
@@ -41,6 +42,7 @@ SyncTask
     assignmentTime UTCTime default=now()
     host Host
     status SyncTaskStatus default='Assigned'
+    connectionId Text Maybe
     deriving Show Read Eq
 |]
 

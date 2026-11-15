@@ -53,10 +53,10 @@ library
     , format
     , json-stream
     , labeled-error
-    , merkle-patricia-db
     , monad-alter
     , solid-vm-compiler
     , solid-vm-model
+    , statedb-monad
     , strato-model
     , template-haskell
     , text
@@ -85,7 +85,7 @@ test-suite strato-genesis-test
     , hspec
     , json-stream
     , labeled-error
-    , merkle-patricia-db
+    , statedb-monad
     , strato-genesis
     , strato-model
     , text

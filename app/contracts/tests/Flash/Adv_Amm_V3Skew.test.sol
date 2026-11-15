@@ -25,7 +25,6 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../concrete/Pools/PoolV3Factory.sol";
 import "../../concrete/Pools/PositionManagerV3.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Tokens/Token.sol";
 
@@ -136,7 +135,7 @@ contract V3SkewAttacker {
     }
 }
 
-contract Describe_Adv_Amm_V3Skew is Authorizable {
+contract Describe_Adv_Amm_V3Skew {
 
     Mercata m;
     FlashMint fm;
@@ -145,7 +144,6 @@ contract Describe_Adv_Amm_V3Skew is Authorizable {
     PositionManagerV3 pm;
 
     address USDST;
-    Token usdstT;
 
     uint constant Q96 = 79228162514264337593543950336;
     uint constant MAXC = 340282366920938463463374607431768211456;
@@ -179,21 +177,20 @@ contract Describe_Adv_Amm_V3Skew is Authorizable {
     uint bHonestDelta; bool bHonestBetterOff; uint bDep0; uint bDep1; uint bPWad;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
 
         m = new Mercata();
         admin = m.adminRegistry();
         fm = new FlashMint(address(admin));
 
-        USDST = m.tokenFactory().createToken("USDST", "USD Stable", [], [], [], "USDST", 0, 18);
-        usdstT = Token(USDST);
-        usdstT.setStatus(2);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USD Stable", [], [], [], "USDST", 0, 18);
+        USDST = address(ret);
+        admin.castVoteOnIssue(USDST, "setStatus", 2);
 
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(fm));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(fm));
 
-        fm.initialize(USDST, address(m.feeCollector()), 2000000e18);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), 2000000e18);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
 
         v3f = new PoolV3Factory(address(this));
         v3f.initialize(address(m.tokenFactory()), address(m.feeCollector()));
@@ -207,10 +204,11 @@ contract Describe_Adv_Amm_V3Skew is Authorizable {
     function _venue(string sym, uint fee, uint initSqrt, int tl, int tu, uint L)
         internal returns (PoolV3, address, uint, uint)
     {
-        address other = m.tokenFactory().createToken("OTHER", "Other", [], [], [], sym, 0, 18);
-        Token(other).setStatus(2);
-        Token(other).mint(address(this), BIG);
-        usdstT.mint(address(this), BIG);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "OTHER", "Other", [], [], [], sym, 0, 18);
+        address other = address(ret);
+        admin.castVoteOnIssue(other, "setStatus", 2);
+        admin.castVoteOnIssue(other, "mint", address(this), BIG);
+        admin.castVoteOnIssue(USDST, "mint", address(this), BIG);
 
         address pa = v3f.createPoolV3(other, USDST, fee, initSqrt);
         PoolV3 p = PoolV3(pa);
@@ -238,7 +236,7 @@ contract Describe_Adv_Amm_V3Skew is Authorizable {
     {
         V3SkewAttacker a = new V3SkewAttacker();
         a.init(address(fm), address(p), address(pm), USDST, other, tl, tu);
-        usdstT.mint(address(a), seed);
+        admin.castVoteOnIssue(USDST, "mint", address(a), seed);
         return a;
     }
 

@@ -10,7 +10,7 @@ parseBootnodeString "" = []
 parseBootnodeString s | not $ elem '[' s = [s]
 parseBootnodeString s = read s
 
-defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
+defineFlag "u:pguser" ("strato" :: String) "Postgres user"
 defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname. Anything other than localhost is an external cluster (e.g. the Aurora writer endpoint): no postgres container is generated and --password must carry its password"
 defineFlag "pgReaderHost" ("" :: String) "Read-only Postgres endpoint (e.g. the Aurora reader endpoint) for PostgREST; defaults to --pghost"
 defineFlag "regenerate" (False :: Bool) "Re-generate ethconf.yaml, docker-compose.yml and commands.txt for an EXISTING directory from the flags given (state, secrets and genesis are kept). Pass the same flags as the original setup plus the changes; the network identity must not change"
@@ -67,7 +67,7 @@ defineFlag "localAuth" (False :: Bool) "Use local auth (Kratos/Hydra) and a node
 defineFlag "sslDir" ("" :: String) "Path to directory containing server.pem and server.key (enables SSL)"
 
 defineFlag "dockerMode" ("services" :: String) "What runs in Docker: 'services' (default): only the services, the node processes run on the host under convoke; 'all': the node processes too, in a strato container that strato-up starts from the same docker-compose.yml and that reaches the stores by service name"
-defineFlag "bundledApp" (True :: Bool) "Run app-backend and app-ui next to this node (default). False when the app runs on its own tier (docker-compose.app.yml / the app CDK stack); pass --appUrl so the node's root redirects there"
+defineFlag "bundledApp" (True :: Bool) "Run app-backend and app-ui next to this node (default). False when the app runs on its own tier (the app CDK stack); pass --appUrl so the node's root redirects there"
 defineFlag "appUrl" ("" :: String) "Public URL of the app tier, used when --bundledApp=false"
 defineFlag "bundledSmd" (True :: Bool) "Run the SMD next to this node (default). False when the SMD is served from its own deployment (S3 behind CloudFront); pass --smdUrl so the node's /smd redirects there"
 defineFlag "smdUrl" ("" :: String) "Public URL of the SMD deployment, used when --bundledSmd=false"
@@ -76,6 +76,8 @@ defineFlag "role" ("node" :: String) "What this directory runs: 'node' (everythi
 defineFlag "monitoring" (True :: Bool) "Run the prometheus and apex containers, which produce /health and /apex-api for the network monitor (default). Only --role=api-node may turn this off, for operators who scrape the processes themselves; /health then answers 502"
 
 defineFlag "repoUrl" ("" :: String) "Registry prefix of the node's images in docker-compose.yml, e.g. 'ghcr.io/strato-net/strato-platform/' (bin/strato-up --prebuilt sets it); images built locally have none"
+
+defineFlag "syncFromFile" ("" :: String) "Sync a new node from saved blocks, then continue syncing from peers"
 
 -- P2P config flags
 -- The ethconf.yaml flag migration silently raised these from 20/30 to
@@ -102,11 +104,14 @@ defineFlag "mempoolLivenessCutoff" (60 :: Integer) "Max age of a transaction in 
 -- Consensus timing flags
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag "blockstanbul_round_period_s" (3600 :: Int) "Seconds without progress before a forced PBFT round change (a missed proposal is detected within seconds regardless)"
+defineFlag "blockstanbul_max_timestamp_drift_s" (15 :: Int) "Seconds a proposed block's timestamp may run ahead of this node's clock before the node refuses to vote for it (local policy, not consensus)"
 defineFlag "stakingActivationBlock" (-1 :: Integer) "Block number from which stake-weighted proposer selection is in force (-1 = network default: from genesis for new networks, unscheduled for existing ones)"
 
 -- VM config flags
 defineFlag "sqlDiff" (True :: Bool) "Update account state and storage in SQL DB (set false for faster sync)"
 defineFlag "diffPublish" (True :: Bool) "Publish state changes to streaming for indexer"
+defineFlag "disableSqlIndexing" (False :: Bool) "Skip VM SQL indexing messages; keep blocks and best-block updates for Redis"
+defineFlag "disableCirrusIndexing" (False :: Bool) "Skip VM Cirrus indexing messages; keep transaction results"
 
 -- Kafka log retention flags (defaults match Kafka's own defaults / the current
 -- generated config, so behavior is unchanged unless overridden). Nodes whose

@@ -79,31 +79,13 @@ executables:
       - warp
 
 tests:
-  slipstream-batching-test:
-    main: Main.hs
-    source-dirs: tests-batching/
-    dependencies:
-      - base
-      - base16-bytestring
-      - bytestring
-      - conduit
-      - containers
-      - data-default
-      - evm-solidity
-      - hspec
-      - slipstream
-      - solid-vm-model
-      - strato-model
-      - text
-      - time
-      - vm-tools
-
   slipstream-test:
     main: Main.hs
     source-dirs: tests/
     ghc-options: -dynamic
     dependencies:
       - base
+      - base16-bytestring
       - aeson
       - aeson-qq
       - bytestring
@@ -116,16 +98,19 @@ tests:
       - hspec-expectations-lifted
       - labeled-error
       - persistent-sqlite
+      - persistent-postgresql
       - QuickCheck
       - slipstream
       - solid-vm-model
       - strato-model
       - text
       - time
+      - transformers
       - unliftio
       - vm-tools
       - ordered-containers
       - monad-alter
+      - persistent
       - core-api2
       - blockapps-haskoin
       - blockapps-mpdbs

@@ -5,9 +5,9 @@
 -- broker, and a 'RoleApi' directory runs strato-api and ethereum-jsonrpc
 -- with the nginx sidecar, PostgREST and the edge Redis, pointed at a core's
 -- Postgres and broker. A 'RoleValidator' directory is a lite validator: the
--- chain processes and the Redis block index they need, apex for the network
--- monitor, and nothing that serves users or APIs (no app, no Cirrus, no SQL
--- block index). A 'RoleApiNode' directory is a full node without the
+-- chain processes and the SQL block index they read, apex for the network
+-- monitor, and nothing that serves users or APIs (no app, no Cirrus, no
+-- state mirror). A 'RoleApiNode' directory is a full node without the
 -- services that only serve people: the chain, Cirrus and every API behind
 -- nginx, but no app, SMD or Swagger docs, and with @--monitoring=false@ no
 -- Prometheus or apex either. The role decides what strato-setup generates:
@@ -21,7 +21,7 @@ module Blockchain.Init.Role
     roleName,
     roleRunsCore,
     roleRunsApi,
-    roleIndexesSql,
+    roleRunsCirrus,
     roleRunsLocalAuth,
     roleAllowsMonitoringOff,
   )
@@ -63,11 +63,13 @@ roleRunsCore = (/= RoleApi)
 roleRunsApi :: Role -> Bool
 roleRunsApi role = role `elem` [RoleNode, RoleApi, RoleApiNode]
 
--- | Keeps the SQL block index and Cirrus: strato-indexer's SQL side,
--- slipstream, and the state diffs the VM computes for them. A validator
--- keeps the chain and the Redis block index only.
-roleIndexesSql :: Role -> Bool
-roleIndexesSql = (/= RoleValidator)
+-- | Runs Cirrus and what feeds it: slipstream, the @vmevents@ stream and the
+-- SQL state mirror the VM computes for them. A validator does not. The SQL
+-- block index (the eth block tables strato-indexer writes) is not a per-role
+-- choice: every role that runs the chain keeps it, because strato-p2p and
+-- vm-runner read blocks from it.
+roleRunsCirrus :: Role -> Bool
+roleRunsCirrus = (/= RoleValidator)
 
 -- | May run the bundled identity provider and node-local Vault
 -- (@--localAuth@): the roles that serve the API through nginx and hold a node

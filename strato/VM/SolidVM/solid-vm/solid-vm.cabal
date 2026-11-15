@@ -1,4 +1,4 @@
-cabal-version: 1.12
+cabal-version: 1.22
 
 -- This file has been generated from package.yaml by hpack version 0.38.1.
 --
@@ -13,28 +13,29 @@ library
   exposed-modules:
       Blockchain.SolidVM
       Blockchain.SolidVM.Builtins
-      Blockchain.SolidVM.Environment
-      Blockchain.SolidVM.GasInfo
       Blockchain.SolidVM.Simple
-      Blockchain.SolidVM.SM
-      Blockchain.SolidVM.BLS12381
-      Blockchain.SolidVM.BLS12381.Compress
-      Blockchain.SolidVM.BLS12381.HashToCurve
-      Blockchain.SolidVM.BLS12381.HashToCurve.G1
-      Blockchain.SolidVM.BLS12381.HashToCurve.G2
-      Blockchain.SolidVM.BLS12381.HashToCurve.HashToField
   other-modules:
       Blockchain.SolidVM.SetGet
       Blockchain.SolidVM.TraceTools
       Paths_solid_vm
+  reexported-modules:
+      solid-vm-runtime:Blockchain.SolidVM.SM
+    , solid-vm-runtime:Blockchain.SolidVM.GasInfo
+    , solid-vm-runtime:Blockchain.SolidVM.Environment
+    , solid-vm-builtins:Blockchain.SolidVM.BLS12381
+    , solid-vm-builtins:Blockchain.SolidVM.BLS12381.Compress
+    , solid-vm-builtins:Blockchain.SolidVM.BLS12381.HashToCurve
+    , solid-vm-builtins:Blockchain.SolidVM.BLS12381.HashToCurve.G1
+    , solid-vm-builtins:Blockchain.SolidVM.BLS12381.HashToCurve.G2
+    , solid-vm-builtins:Blockchain.SolidVM.BLS12381.HashToCurve.HashToField
   hs-source-dirs:
       src/
   ghc-options: -Wall -O2 -fexpose-all-unfoldings -fspecialise-aggressively -fdicts-cheap -fsolve-constant-dicts
   build-depends:
       Decimal
+    , accountdb-monad
     , base
     , base16-bytestring
-    , base64-bytestring
     , blockapps-data
     , blockapps-datadefs
     , blockapps-haskoin
@@ -43,30 +44,26 @@ library
     , common-log
     , composable-monads-base
     , containers
-    , cryptohash
-    , crypton
     , data-default
     , debugger
     , deepseq
-    , elliptic-curve
     , ethereum-rlp
     , evm-solidity
     , exceptions
     , format
     , lens
-    , memory
-    , merkle-patricia-db
     , monad-alter
     , nibblestring
     , ordered-containers
-    , pairing
     , parsec
-    , poseidon-hash
+    , solid-vm-builtins
     , solid-vm-compiler
     , solid-vm-model
     , solid-vm-parser
+    , solid-vm-runtime
     , solid-vm-static-analysis
     , source-tools
+    , statedb-monad
     , strato-conf
     , strato-model
     , text
@@ -92,12 +89,36 @@ executable exprs-needed
     , text
   default-language: Haskell2010
 
+test-suite solid-vm-native-check
+  type: exitcode-stdio-1.0
+  main-is: NativeCheck.hs
+  hs-source-dirs:
+      tests/native
+  ghc-options: -O2 -threaded -rtsopts
+  build-depends:
+      base
+    , blockapps-data
+    , common-log
+    , composable-monads-base
+    , hflags
+    , lens
+    , monad-alter
+    , prometheus-client
+    , solid-vm
+    , solid-vm-model
+    , strato-model
+    , text
+    , time
+    , unliftio
+    , vector
+    , vm-tools
+  default-language: Haskell2010
+
 test-suite solid-vm-spec
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      BLS12381Spec
-      BuiltinsSpec
+      ErrorHandlingSpec
       OptimizerSpec
       SolidVMSpec
       Spec
@@ -130,7 +151,6 @@ test-suite solid-vm-spec
     , hspec-expectations-lifted
     , labeled-error
     , lens
-    , merkle-patricia-db
     , monad-alter
     , ordered-containers
     , pairing
@@ -142,6 +162,7 @@ test-suite solid-vm-spec
     , solid-vm-parser
     , solid-vm-static-analysis
     , source-tools
+    , statedb-monad
     , strato-genesis
     , strato-init
     , strato-model

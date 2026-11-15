@@ -46,12 +46,12 @@ library
     , containers
     , ethereum-rlp
     , format
-    , merkle-patricia-db
     , monad-alter
     , nibblestring
     , persistent
     , persistent-postgresql
     , solid-vm-model
+    , statedb-monad
     , strato-model
     , text
     , unliftio
