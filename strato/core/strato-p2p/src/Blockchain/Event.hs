@@ -133,7 +133,10 @@ handleEvents :: MonadP2P m => PPeer -> ConduitM Event (Either P2PCNC Message) m 
 handleEvents peer = awaitForever $ \case
   MsgEvt Hello {} -> error "A hello message appeared after the handshake"
   MsgEvt Status {} -> error "A status message appeared after the handshake"
-  MsgEvt Ping -> yieldR Pong
+  MsgEvt Ping -> do
+    lift stampActionTimestamp
+    yieldR Pong
+  MsgEvt Pong -> lift stampActionTimestamp
   MsgEvt (Transactions txs) -> handleGossipedTransactions nodeIntakeRules peer txs
   MsgEvt (NewBlock block' _) -> do
     lift stampActionTimestamp
@@ -453,6 +456,11 @@ handleEvents peer = awaitForever $ \case
         ts <- liftIO getCurrentTime
         let diffTime = ts `diffUTCTime` oldTS
         liftIO $ setTitle $ "timer: " ++ show (fromIntegral (Conf.connectionTimeout (p2pConfig ethConf)) - diffTime)
+        -- An idle chain sends nothing for minutes. Ping a quiet peer from half
+        -- the timeout on, so a live link is kept by its Pong instead of being
+        -- dropped as UselessPeer and backed off for hours.
+        when (diffTime > fromIntegral (Conf.connectionTimeout (p2pConfig ethConf)) / 2) $
+          yieldR Ping
         when (diffTime > fromIntegral (Conf.connectionTimeout (p2pConfig ethConf))) $ do
           yieldR $ Disconnect UselessPeer
           liftIO $ setTitle "timer timed out!"
@@ -464,7 +472,6 @@ handleEvents peer = awaitForever $ \case
   AbortEvt reason -> do
     $logInfoS "handleEvents/AbortEvt" . T.pack $ "Received AbortEvt: " ++ reason
     yieldR $ Disconnect AlreadyConnected
-  event -> liftIO . error $ "unrecognized event: " ++ show event
 
 -- | How close to the tip we have to be before gossiped transactions are worth
 -- forwarding to the sequencer.
