@@ -1687,4 +1687,110 @@ contract Describe_StratoStaking {
         user1.do(address(staking), "claimRewards", _list(VALIDATOR_A));
         require(strato.balanceOf(address(user1)) > before, "and its delegator takes a share");
     }
+
+    // ---- the stake delay ---------------------------------------------------------------
+
+    // New stake earns from the moment it arrives but joins the validator's vote only after
+    // the wait: with a delay of 100 seconds, from the start of the window after next.
+    function it_counts_new_stake_toward_the_vote_only_after_the_delay() public {
+        _bondBoth();
+        staking.setStakeDelay(100);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "stake held before the delay was set counts");
+
+        _stake(user1, VALIDATOR_A, 400e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "a new delegation does not move the weight");
+        require(staking.unmaturedStake(VALIDATOR_A) == 400e18 && staking.votingWeight(VALIDATOR_A) == 1000e18, "it is waiting");
+
+        fastForward(100, 1);
+        staking.syncValidator(VALIDATOR_A);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "still waiting one window later");
+
+        fastForward(100, 1);
+        require(staking.votingWeight(VALIDATOR_A) == 1400e18 && staking.unmaturedStake(VALIDATOR_A) == 0, "its wait is over");
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "published at the validator's next sync");
+        attacker.do(address(staking), "syncValidator(address)", VALIDATOR_A);
+        require(gov.validatorStake(VALIDATOR_A) == 1400e18, "which anyone may make");
+    }
+
+    // Stake that leaves takes the leaver's waiting stake first, so taking back a stake that
+    // never counted takes nothing from the vote, and a stake that did count leaves at once.
+    function it_takes_the_leavers_waiting_stake_first() public {
+        _bondBoth();
+        _stake(user2, VALIDATOR_A, 300e18);
+        staking.setStakeDelay(100);
+        require(gov.validatorStake(VALIDATOR_A) == 1300e18, "user2's stake counts");
+
+        _stake(user1, VALIDATOR_A, 400e18);
+        user1.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 150e18);
+        require(staking.unmaturedStake(VALIDATOR_A) == 250e18 && gov.validatorStake(VALIDATOR_A) == 1300e18, "user1 took back part of what was waiting");
+
+        user2.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 300e18);
+        require(staking.unmaturedStake(VALIDATOR_A) == 250e18 && gov.validatorStake(VALIDATOR_A) == 1000e18, "user2's counted stake left the vote at once");
+
+        user1.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 250e18);
+        require(staking.unmaturedStake(VALIDATOR_A) == 0 && gov.validatorStake(VALIDATOR_A) == 1000e18, "nothing waiting, the vote untouched");
+    }
+
+    // The delay covers a new seat: a seat by right is taken with a bond that has already
+    // waited, or a join would go around the delay.
+    function it_seats_a_newcomer_only_once_its_bond_has_waited() public {
+        _bondBoth();
+        staking.setStakeDelay(100);
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1000e18);
+        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: bond not matured", address(validatorC));
+        require(!staking.isWaiter(address(validatorC)), "not promoted by reconcileSet either");
+
+        fastForward(200, 1);
+        require(staking.isWaiter(address(validatorC)), "a waiter once the bond has waited");
+        validatorC.doSuccessfully(address(staking), "tryActivate(address)", address(validatorC));
+        require(gov.isValidator(address(validatorC)) && gov.validatorStake(address(validatorC)) == 1000e18, "seated with its whole bond as its weight");
+    }
+
+    // Moved stake leaves the old validator's vote at once and waits where it lands.
+    function it_makes_moved_stake_wait_where_it_lands() public {
+        _bondBoth();
+        _stake(user1, VALIDATOR_A, 400e18);
+        staking.setStakeDelay(100);
+        require(gov.validatorStake(VALIDATOR_A) == 1400e18, "counted before the delay was set");
+
+        user1.doSuccessfully(address(staking), "moveStake(address,address,uint256)", VALIDATOR_A, VALIDATOR_B, 400e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "it leaves A's vote at once");
+        require(gov.validatorStake(VALIDATOR_B) == 2000e18 && staking.unmaturedStake(VALIDATOR_B) == 400e18, "and waits behind B");
+
+        fastForward(200, 1);
+        staking.syncValidator(VALIDATOR_B);
+        require(gov.validatorStake(VALIDATOR_B) == 2400e18, "then counts");
+    }
+
+    // Changing the delay starts a new generation of windows: what was waiting under the
+    // earlier setting counts at once, and with the delay off stake counts as it arrives.
+    function it_counts_waiting_stake_at_once_when_the_delay_changes() public {
+        _bondBoth();
+        staking.setStakeDelay(100);
+        _stake(user1, VALIDATOR_A, 400e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "waiting");
+
+        staking.setStakeDelay(50);
+        require(gov.validatorStake(VALIDATOR_A) == 1400e18 && staking.unmaturedStake(VALIDATOR_A) == 0, "counted when the delay changed");
+        _stake(user2, VALIDATOR_A, 100e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1400e18, "new stake waits under the new setting");
+
+        staking.setStakeDelay(0);
+        require(gov.validatorStake(VALIDATOR_A) == 1500e18, "off: everything counts");
+        _stake(user2, VALIDATOR_A, 100e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1600e18, "and new stake counts as it arrives");
+    }
+
+    // Stake that is waiting still earns: the delay is on the vote, not on income.
+    function it_pays_waiting_stake_its_share_of_income() public {
+        _bondBoth();
+        staking.setStakeDelay(100);
+        _stake(user1, VALIDATOR_A, 1000e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "waiting");
+        _reward(VALIDATOR_A, 100e18);
+        uint256 before = strato.balanceOf(address(user1));
+        user1.do(address(staking), "claimRewards", _list(VALIDATOR_A));
+        require(strato.balanceOf(address(user1)) > before, "a delegator whose stake is waiting is paid");
+    }
 }

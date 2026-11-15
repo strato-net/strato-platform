@@ -24,6 +24,7 @@ import {
   setStratoGovernance,
   setStratoSelfBondGrace,
   setStratoSelfBondMinimum,
+  setStratoStakeDelay,
   setStratoSetParams,
   setStratoStakingParams,
   setStratoOperator,
@@ -666,6 +667,21 @@ class StakingController {
       }
 
       const result = await setStratoSelfBondMinimum(req.accessToken, req.address as string, String(selfBondMinimum));
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async setStakeDelay(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { stakeDelaySeconds } = req.body || {};
+      if (!/^\d+$/.test(String(stakeDelaySeconds ?? ""))) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid stakeDelaySeconds" });
+        return;
+      }
+
+      const result = await setStratoStakeDelay(req.accessToken, req.address as string, String(stakeDelaySeconds));
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

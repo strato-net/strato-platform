@@ -103,6 +103,7 @@ const StakingAdminTab = () => {
   const [validatorAddressEdit, setValidatorAddressEdit] = useState({ operator: "", validatorAddress: "" });
   const [selfBondGrace, setSelfBondGrace] = useState("");
   const [selfBondMinimum, setSelfBondMinimum] = useState("");
+  const [stakeDelay, setStakeDelay] = useState("");
   const [hardCap, setHardCap] = useState("");
   const [recovery, setRecovery] = useState({ to: "", amount: "" });
 
@@ -251,6 +252,29 @@ const StakingAdminTab = () => {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">A higher minimum applies at once: seats taken under the rule whose operator holds less leave the set. Seats held from before the rule stay on min stake.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {isV2 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Stake delay</CardTitle>
+            <CardDescription>The wait before new stake counts toward a validator's vote. New stake earns at once but joins the vote after between one and two delays, and a seat by right needs a bond that has already waited. 0 switches it off.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="space-y-1 text-xs">
+                <span className="text-muted-foreground">Delay (seconds)</span>
+                <Input value={stakeDelay} onChange={(event) => setStakeDelay(event.target.value)} placeholder="86400" className="w-48" />
+              </label>
+              <Button size="sm" disabled={blocked || !/^\d+$/.test(stakeDelay.trim())} onClick={() => run("stake-delay", () => api.patch("/staking/admin/stake-delay", {
+                stakeDelaySeconds: stakeDelay.trim(),
+              }), "Stake delay vote")}>
+                {label("stake-delay", "Set delay")}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Choose a delay longer than the admins need to act on a hostile stake. Changing it counts whatever was still waiting under the earlier setting.</p>
           </CardContent>
         </Card>
       )}

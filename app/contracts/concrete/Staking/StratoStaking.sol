@@ -38,6 +38,15 @@ import "./IStakingGovernance.sol";
 // listed each validator as its own operator, so a record written before the switch has no
 // operator field and its key is its operator. The retired schedule's final indexes are
 // settled once per record by _settleRetiredSchedule and are otherwise dead.
+// A staker's arrivals in the two most recent windows of the stake delay (see
+// stakeDelaySeconds): the newer window with its amount, and the one just before it.
+struct PendingStake {
+    uint256 newWindow;
+    uint256 newAmount;
+    uint256 oldWindow;
+    uint256 oldAmount;
+}
+
 struct StakingValidator {
     bool exists;
     bool active;
@@ -75,6 +84,7 @@ contract  StratoStaking is Ownable {
     event SelfBondMinimumSet(uint256 selfBondMinimum);
     event SetParamsUpdated(uint256 maxActiveValidators, uint256 hardCapActiveValidators, uint256 evictionMarginBps, uint256 maxSetMutationsPerBlock, uint256 exitNoticeSeconds, uint256 unkickCooldown, uint256 maxOperatorStakeBps);
     event JoinsOpenFromBlockSet(uint256 blockNumber);
+    event StakeDelaySet(uint256 stakeDelaySeconds);
     event ParamsUpdated(uint256 unbondingSeconds, uint256 maxCommissionBps, uint256 maxBatchSize);
     event EmissionScheduleCommitted(uint256 e0, uint256 s0, uint256 r0, uint256 startTime);
     event EmissionReserveFunded(address indexed funder, uint256 amount, uint256 reserve);
@@ -157,6 +167,30 @@ contract  StratoStaking is Ownable {
     uint256 public unkickCooldown;
     uint256 public maxOperatorStakeBps;     // inbound stake cap per validator (0 = off)
     uint256 public joinsOpenFromBlock;      // first block of permissionless activation (0 = not yet agreed)
+
+    // The stake delay. New stake behind a validator (a delegation, the operator's bond,
+    // stake moved from another validator) earns from the moment it arrives but counts
+    // toward the validator's vote only after a wait, and a seat by right is taken with a
+    // bond that has already waited. Without it, weight arrives in the block that brings
+    // it: a third of the vote can be bought and used before anyone can respond, and a few
+    // wei re-draw the next proposer.
+    //
+    // Time is cut into windows of stakeDelaySeconds. Stake that arrives in one window
+    // counts from the start of the window after next, so the wait is between one and two
+    // delays, and what is waiting is always the arrivals of the current window and the
+    // one before it: two reads, no queue to walk, and nobody can push another's stake
+    // back by adding their own. Stake that leaves takes the leaver's waiting stake first.
+    //
+    // 0 = off: stake counts at once. Changing the delay starts a new generation of
+    // windows, so stake still waiting under the earlier setting counts at once.
+    uint256 public stakeDelaySeconds;
+    uint256 public stakeDelayGeneration;
+    // validator => window => stake that arrived behind it in that window
+    mapping(address => mapping(uint256 => uint256)) public pendingWeight;
+    // delegator => validator => the delegator's two most recent windows of arrivals
+    mapping(address => mapping(address => PendingStake)) public pendingStakeOf;
+    // validator => the same for its operator's bond
+    mapping(address => PendingStake) public pendingSelfBond;
     uint256 public validatorCount;
     uint256 public mutationBlock;
     uint256 public setMutationsThisBlock;
@@ -411,6 +445,16 @@ contract  StratoStaking is Ownable {
         emit JoinsOpenFromBlockSet(_joinsOpenFromBlock);
     }
 
+    // Set the wait before new stake counts toward a vote (0 = off). The change starts a
+    // new generation of windows, so stake waiting under the earlier setting counts at once;
+    // every seated validator's weight is republished.
+    function setStakeDelay(uint256 _stakeDelaySeconds) external onlyOwner onlyInitialized {
+        stakeDelaySeconds = _stakeDelaySeconds;
+        stakeDelayGeneration += 1;
+        emit StakeDelaySet(_stakeDelaySeconds);
+        _syncAllValidators();
+    }
+
     // Lowering maxCommissionBps needs no pass over the validators: commission is capped
     // where it is charged (_commissionBps).
     function setParams(uint256 _unbondingSeconds, uint256 _maxCommissionBps, uint256 _maxBatchSize) external onlyOwner onlyInitialized {
@@ -426,8 +470,104 @@ contract  StratoStaking is Ownable {
 
     // ---- consensus validator lifecycle -------------------------------------------
 
+    // All the stake behind a validator: what it earns on, and what the stake cap and the
+    // emission rate measure.
     function _validatorWeight(StakingValidator storage v) internal view returns (uint256) {
         return v.selfBond + v.delegatedStake;
+    }
+
+    // ---- stake delay ---------------------------------------------------------------
+
+    uint256 constant WINDOW_SPAN = 2 ** 64;
+
+    // The current window: the generation in the high part, so windows of an earlier
+    // setting are never adjacent to this one.
+    function _window() internal view returns (uint256) {
+        return stakeDelayGeneration * WINDOW_SPAN + block.timestamp / stakeDelaySeconds;
+    }
+
+    // Stake behind a validator that does not count toward its vote yet: the arrivals of
+    // the current window and the one before it.
+    function _unmatured(address validator) internal view returns (uint256) {
+        if (stakeDelaySeconds == 0) return 0;
+        uint256 w = _window();
+        uint256 waiting = pendingWeight[validator][w];
+        if (w > 0) waiting += pendingWeight[validator][w - 1];
+        return waiting;
+    }
+
+    // What a validator votes with: its stake less what is still waiting. This is the
+    // weight published to governance and the one seats are compared by.
+    function _votingWeight(address validator) internal view returns (uint256) {
+        uint256 weight = _validatorWeight(operators[validator]);
+        uint256 waiting = _unmatured(validator);
+        return waiting >= weight ? 0 : weight - waiting;
+    }
+
+    function votingWeight(address validator) external view returns (uint256) {
+        return _votingWeight(validator);
+    }
+
+    function unmaturedStake(address validator) external view returns (uint256) {
+        return _unmatured(validator);
+    }
+
+    // How much of a staker's stake behind a validator is still waiting.
+    function _waiting(PendingStake storage p) internal view returns (uint256) {
+        if (stakeDelaySeconds == 0) return 0;
+        uint256 w = _window();
+        if (p.newWindow == w) {
+            if (w > 0 && p.oldWindow == w - 1) return p.newAmount + p.oldAmount;
+            return p.newAmount;
+        }
+        if (w > 0 && p.newWindow == w - 1) return p.newAmount;
+        return 0;
+    }
+
+    // Stake arrives: it waits from the current window.
+    function _notePending(PendingStake storage p, address validator, uint256 amount) internal {
+        if (stakeDelaySeconds == 0) return;
+        uint256 w = _window();
+        if (p.newWindow != w) {
+            if (p.newWindow + 1 == w) {
+                p.oldWindow = p.newWindow;
+                p.oldAmount = p.newAmount;
+            } else {
+                p.oldWindow = 0;
+                p.oldAmount = 0;
+            }
+            p.newWindow = w;
+            p.newAmount = 0;
+        }
+        p.newAmount += amount;
+        pendingWeight[validator][w] += amount;
+    }
+
+    // Stake leaves: the leaver's waiting stake goes first, newest first, so taking back a
+    // stake that never counted takes nothing from the vote.
+    function _dropPending(PendingStake storage p, address validator, uint256 amount) internal {
+        if (stakeDelaySeconds == 0) return;
+        uint256 w = _window();
+        bool newWaits = p.newWindow == w || (w > 0 && p.newWindow == w - 1);
+        if (newWaits && p.newAmount > 0) {
+            uint256 take = amount < p.newAmount ? amount : p.newAmount;
+            p.newAmount -= take;
+            pendingWeight[validator][p.newWindow] -= take;
+            amount -= take;
+        }
+        if (amount > 0 && p.newWindow == w && w > 0 && p.oldWindow == w - 1 && p.oldAmount > 0) {
+            uint256 takeOld = amount < p.oldAmount ? amount : p.oldAmount;
+            p.oldAmount -= takeOld;
+            pendingWeight[validator][p.oldWindow] -= takeOld;
+        }
+    }
+
+    // A seat by right is taken with a bond that already counts: the delay covers a new
+    // seat as it covers new stake, or a join would go around it.
+    function _bondMatured(address validator) internal view returns (bool) {
+        uint256 bond = operators[validator].selfBond;
+        uint256 waiting = _waiting(pendingSelfBond[validator]);
+        return bond >= waiting && bond - waiting >= _minSelfBond();
     }
 
     // A seat taken under this logic, and any candidate for one, needs _minSelfBond() of the
@@ -471,7 +611,7 @@ contract  StratoStaking is Ownable {
     // A waiter is eligible but not in the set; promotion is explicit (tryActivate / reconcileSet).
     // A validator the admins pinned out is never a waiter.
     function isWaiter(address validator) public view returns (bool) {
-        return eligible(validator) && !isValidator[validator] && !_pinnedOut(validator);
+        return eligible(validator) && !isValidator[validator] && !_pinnedOut(validator) && _bondMatured(validator);
     }
 
     // Admin pins, read from governance (see MercataGovernance.pinnedIn / pinnedOut).
@@ -483,18 +623,27 @@ contract  StratoStaking is Ownable {
         return governanceSyncEnabled && IStakingGovernance(governance).pinnedOut(validator);
     }
 
-    // Voting weight of the consensus set. Stake behind listed validators outside the set
-    // carries no vote, so shares of the quorum are measured against this, not against
-    // totalRewardableStake.
+    // All the stake behind the consensus set, waiting or not: what the emission rate and
+    // the stake cap measure. Stake behind listed validators outside the set carries no
+    // vote, so it is left out. The set's vote, without stake that is still waiting, is
+    // consensusVotingWeight.
     function consensusWeight() public view returns (uint256 total) {
         for (uint256 i = 0; i < activeValidators.length; i++) {
             total += _validatorWeight(operators[activeValidators[i]]);
         }
     }
 
-    // More than a third of the consensus set's weight: can stall a stake-weighted quorum.
+    // The vote of the consensus set: what its members' weights published to governance
+    // add up to once every one of them is synced.
+    function consensusVotingWeight() public view returns (uint256 total) {
+        for (uint256 i = 0; i < activeValidators.length; i++) {
+            total += _votingWeight(activeValidators[i]);
+        }
+    }
+
+    // More than a third of the consensus set's vote: can stall a stake-weighted quorum.
     function exceedsOneThird(address validator) external view returns (bool) {
-        return isValidator[validator] && _validatorWeight(operators[validator]) * 3 > consensusWeight();
+        return isValidator[validator] && _votingWeight(validator) * 3 > consensusVotingWeight();
     }
 
     function effectiveCap() public view returns (uint256) {
@@ -585,7 +734,7 @@ contract  StratoStaking is Ownable {
     }
 
     function _activate(address validator) internal {
-        uint256 weight = _validatorWeight(operators[validator]);
+        uint256 weight = _votingWeight(validator);
         // The door check. A newcomer's weight is published beside the weights of the
         // validators governance already lists. If one of those has none (a seat whose
         // stake was never put on record, as before the weight snapshot), the newcomer's
@@ -652,7 +801,9 @@ contract  StratoStaking is Ownable {
         // A seated member absent from the index predates the backfill. Do not publish
         // its weight alone; indexValidatorSet syncs the whole governance set at once.
         if (activeValidatorIndex[validator] == 0) return;
-        uint256 weight = _validatorWeight(operators[validator]);
+        // Stake that is still waiting (see stakeDelaySeconds) is left out. It joins the
+        // weight at the first sync after its wait is over; anyone may call syncValidator.
+        uint256 weight = _votingWeight(validator);
 
         // Publish unconditionally. lastSyncedWeight is only this contract's guess
         // at what governance holds, and a guess is exactly how governance ended up
@@ -696,7 +847,7 @@ contract  StratoStaking is Ownable {
         for (uint256 i = 0; i < activeValidators.length; i++) {
             address validator = activeValidators[i];
             if (_pinnedIn(validator)) continue;
-            uint256 w = _validatorWeight(operators[validator]);
+            uint256 w = _votingWeight(validator);
             if (lowest == address(0) || w < lowestWeight || (w == lowestWeight && uint256(validator) < uint256(lowest))) {
                 lowest = validator;
                 lowestWeight = w;
@@ -709,7 +860,7 @@ contract  StratoStaking is Ownable {
         for (uint256 i = 0; i < candidates.length; i++) {
             address validator = candidates[i];
             if (!isWaiter(validator)) continue;
-            uint256 w = _validatorWeight(operators[validator]);
+            uint256 w = _votingWeight(validator);
             if (best == address(0) || w > bestWeight || (w == bestWeight && uint256(validator) < uint256(best))) {
                 best = validator;
                 bestWeight = w;
@@ -736,13 +887,14 @@ contract  StratoStaking is Ownable {
             _activate(validator);
             return;
         }
+        require(_bondMatured(validator), "SS: bond not matured");
 
         if (validatorCount < effectiveCap()) {
             _consumeMutations(1);
             _activate(validator);
         } else {
             (address lowest, uint256 lowestWeight) = _lowestValidator();
-            uint256 weight = _validatorWeight(operators[validator]);
+            uint256 weight = _votingWeight(validator);
             require(lowest != address(0) && weight * BPS_DIVISOR >= lowestWeight * (BPS_DIVISOR + evictionMarginBps), "SS: set full");
             _consumeMutations(2);
             require(_deactivate(lowest), "SS: cannot evict");
@@ -953,6 +1105,7 @@ contract  StratoStaking is Ownable {
         v.selfBond = 0;
         totalSelfBond -= amount;
         if (v.active) totalRewardableStake -= amount;
+        _dropPending(pendingSelfBond[validator], validator, amount);
 
         uint256 requestId = _createUnbondRequest(to, amount);
         emit SelfBondUnbondingStarted(to, validator, requestId, amount, block.timestamp + unbondingSeconds);
@@ -1087,6 +1240,7 @@ contract  StratoStaking is Ownable {
         operators[validator].delegatedStake += received;
         totalUserStake += received;
         totalRewardableStake += received;
+        _notePending(pendingStakeOf[msg.sender][validator], validator, received);
 
         emit Staked(msg.sender, validator, received);
         _requireWithinStakeCap(validator);
@@ -1119,10 +1273,13 @@ contract  StratoStaking is Ownable {
         delegatedStake[msg.sender][fromValidator] -= amount;
         operators[fromValidator].delegatedStake -= amount;
         if (operators[fromValidator].active) totalRewardableStake -= amount;
+        _dropPending(pendingStakeOf[msg.sender][fromValidator], fromValidator, amount);
 
+        // Moved stake is new stake where it lands: it waits there like any other arrival.
         delegatedStake[msg.sender][toValidator] += amount;
         operators[toValidator].delegatedStake += amount;
         totalRewardableStake += amount;
+        _notePending(pendingStakeOf[msg.sender][toValidator], toValidator, amount);
 
         emit StakeMoved(msg.sender, fromValidator, toValidator, amount);
         _requireWithinStakeCap(toValidator);
@@ -1140,6 +1297,7 @@ contract  StratoStaking is Ownable {
         operators[validator].delegatedStake -= amount;
         totalUserStake -= amount;
         if (operators[validator].active) totalRewardableStake -= amount;
+        _dropPending(pendingStakeOf[msg.sender][validator], validator, amount);
 
         uint256 requestId = _createUnbondRequest(msg.sender, amount);
 
@@ -1164,6 +1322,7 @@ contract  StratoStaking is Ownable {
         v.selfBond += received;
         totalSelfBond += received;
         totalRewardableStake += received;
+        _notePending(pendingSelfBond[validator], validator, received);
 
         emit SelfBonded(msg.sender, validator, received);
         _requireWithinStakeCap(validator);
@@ -1180,6 +1339,7 @@ contract  StratoStaking is Ownable {
         v.selfBond -= amount;
         totalSelfBond -= amount;
         if (v.active) totalRewardableStake -= amount;
+        _dropPending(pendingSelfBond[validator], validator, amount);
 
         uint256 requestId = _createUnbondRequest(msg.sender, amount);
 

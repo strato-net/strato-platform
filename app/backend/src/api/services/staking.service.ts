@@ -2447,6 +2447,21 @@ export const setStratoSelfBondMinimum = async (
   ]);
 };
 
+// The wait before new stake counts toward a validator's vote, in seconds; 0 switches it
+// off. A change counts whatever was still waiting under the earlier setting.
+export const setStratoStakeDelay = async (
+  accessToken: string,
+  userAddress: string,
+  stakeDelaySeconds: string
+): Promise<{ status: string; hash: string }> => {
+  if (parseBigIntLike(stakeDelaySeconds) < 0n) throw badRequest("stakeDelaySeconds must not be negative");
+  await requireV2(accessToken);
+
+  return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setStakeDelay", [
+    stakeDelaySeconds,
+  ]);
+};
+
 export const setStratoSetParams = async (
   accessToken: string,
   userAddress: string,

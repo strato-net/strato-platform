@@ -180,6 +180,7 @@ router.patch("/admin/operators/operator", walletAuth, StakingController.setValid
 router.patch("/admin/validator-params", walletAuth, StakingController.setValidatorParams);
 router.patch("/admin/self-bond-grace", walletAuth, StakingController.setSelfBondGrace);
 router.patch("/admin/self-bond-minimum", walletAuth, StakingController.setSelfBondMinimum);
+router.patch("/admin/stake-delay", walletAuth, StakingController.setStakeDelay);
 router.patch("/admin/set-params", walletAuth, StakingController.setSetParams);
 router.patch("/admin/governance", walletAuth, StakingController.setGovernance);
 router.post("/admin/recover-fees", walletAuth, StakingController.recoverUnattributedFees);
