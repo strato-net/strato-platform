@@ -224,3 +224,24 @@ export function loadConfig(app: App): CoreCellConfig {
     autoPromoteAfter: Number(ctx(app, "autoPromoteAfter", "3")),
   };
 }
+
+/** The core tier's load balancer (`-c coreNlb=true`): see CoreNlbStack. */
+export interface CoreNlbConfig {
+  envName: string;
+  vpcId: string;
+  /**
+   * Every cell behind the load balancer: each cell stack's InstanceId and SecurityGroupId outputs,
+   * in the same order. The first cell's Prometheus is the one the API tier's apex reads.
+   */
+  cellInstanceIds: string[];
+  cellSecurityGroupIds: string[];
+}
+
+export function loadCoreNlbConfig(app: App): CoreNlbConfig {
+  const cellInstanceIds = list(app, "cellInstanceIds", "");
+  const cellSecurityGroupIds = list(app, "cellSecurityGroupIds", "");
+  if (!cellInstanceIds.length || cellInstanceIds.length !== cellSecurityGroupIds.length) {
+    throw new Error("cellInstanceIds and cellSecurityGroupIds must name the same cells, at least one");
+  }
+  return { envName: ctx(app, "envName", "testnet"), vpcId: ctx<string>(app, "vpcId"), cellInstanceIds, cellSecurityGroupIds };
+}

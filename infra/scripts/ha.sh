@@ -20,8 +20,8 @@
 #   scripts/ha.sh <env> record <strato> <infra>   record the deployed image set and commits
 #   scripts/ha.sh <env> state                     the commits last deployed
 #
-# Targets, in deploy order: data-plane, obs-core, api-tier, app-tier,
-# front-door, obs-alarms (cells: the cells command). Images come
+# Targets, in deploy order: data-plane, obs-core, core-nlb (after the cells:
+# the cells command), api-tier, app-tier, front-door, obs-alarms. Images come
 # from STRATO_IMAGE, NGINX_IMAGE, POSTGREST_IMAGE, APEX_IMAGE, APP_NGINX_IMAGE
 # and APP_BACKEND_IMAGE when set (the pipeline sets them), else from the set
 # last deployed. strato-platform is read from STRATO_PLATFORM_DIR, default
@@ -136,8 +136,8 @@ ctx_obs() {
 # A cell's context is fixed when the cell is created and replayed afterwards:
 # it ends up in the instance's user data, which cloud-init reads only at first
 # boot, and a changed user data stops and starts the instance. Cells are
-# upgraded in place instead (cells upgrade), and the API tier opens their
-# ingress (cellSecurityGroupIds) so a cell never needs its stack redeployed.
+# upgraded in place instead (cells upgrade), and the core tier's load balancer
+# opens their ingress (core-nlb) so a cell never needs its stack redeployed.
 ctx_cell_new() {
   local id=$1 first_of_cluster=$2 pg="$P-data-postgres"
   load_images
@@ -169,25 +169,34 @@ ctx_cell() {
   while IFS= read -r line; do ctx+=("$line"); done <<<"$saved"
 }
 
-ctx_api() {
-  load_images
-  local pg="$P-data-postgres" cell id urls=() sgs=()
-  cell=$(host_stack "$FIRST_CELL")
-  # Every cell's ingress: a submit is posted to all of them.
+# The core tier's load balancer: every cell behind one name. The first cell,
+# which also runs Grafana, is the one whose Prometheus apex reads through it.
+ctx_core_nlb() {
+  local id ids=() sgs=()
   for id in $(existing_cells); do
-    urls+=("http://$(need "$(host_stack "$id")" PrivateDnsName):8600")
+    ids+=("$(need "$(host_stack "$id")" InstanceId)")
     sgs+=("$(need "$(host_stack "$id")" SecurityGroupId)")
   done
-  ((${#urls[@]})) || die "no cells: create them first (cells create)"
+  ((${#ids[@]})) || die "no cells: create them first (cells create)"
+  ctx=(-c envName="$ENV_NAME" -c coreNlb=true -c vpcId="$(vpc_id)"
+    -c cellInstanceIds="$(IFS=,; echo "${ids[*]}")" -c cellSecurityGroupIds="$(IFS=,; echo "${sgs[*]}")")
+}
+
+ctx_api() {
+  load_images
+  local pg="$P-data-postgres" cell core
+  cell=$(host_stack "$FIRST_CELL")
+  # The cells are reached through their load balancer: a submit goes to one healthy cell.
+  core=$(need "$P-core-nlb" DnsName)
   ctx=(-c envName="$ENV_NAME" -c vpcId="$(vpc_id)"
     -c stratoImage="$STRATO_IMAGE" -c nginxImage="$NGINX_IMAGE" -c postgrestImage="$POSTGREST_IMAGE" -c apexImage="$APEX_IMAGE"
     -c postgresWriterHost="$(need "$pg" WriterEndpoint)" -c postgresReaderHost="$(need "$pg" ReaderEndpoint)"
     -c postgresSecurityGroupId="$(need "$pg" ClusterSecurityGroupId)" -c coreSecurityGroupId="$(need "$cell" SecurityGroupId)"
-    -c ingressUrls="$(IFS=,; echo "${urls[*]}")" -c cellSecurityGroupIds="$(IFS=,; echo "${sgs[*]}")"
+    -c ingressUrls="http://$core:8600" -c coreLoadBalancerSecurityGroupId="$(need "$P-core-nlb" SecurityGroupId)"
     -c ethconfParameterName="/$P/api/ethconf-base64"
     -c createSessionSecret=true -c oauthJsonSecretName="$OAUTH_SECRET" -c csrfStateless=true
     -c desiredCount="$API_DESIRED_COUNT" -c albCertificateArn="$CERTIFICATE_ARN" -c chainId="$CHAIN_ID" -c networkName="$NETWORK"
-    -c prometheusHost="$(need "$cell" PrivateDnsName):9090" -c grafanaInstanceId="$(need "$cell" InstanceId)")
+    -c prometheusHost="$core:9090" -c grafanaInstanceId="$(need "$cell" InstanceId)")
   otel_ecs
 }
 
@@ -231,6 +240,7 @@ resolve() {
     obs-core) dir=observability; stacks=("$P-obs-core"); ctx_obs ;;
     obs-alarms) dir=observability; stacks=("$P-obs-alarms"); ctx_obs ;;
     cell-*) dir=core-cell; stacks=("$P-$1-network" "$P-$1-host"); ctx_cell "${1#cell-}" ;;
+    core-nlb) dir=core-cell; stacks=("$P-core-nlb"); ctx_core_nlb ;;
     api-tier) dir=api-tier; stacks=("$P-api-network" "$P-api-tier"); ctx_api ;;
     app-tier) dir=app-tier; stacks=("$P-app-network" "$P-app-tier"); ctx_app ;;
     # --exclusively: the tier is deployed by its own target.

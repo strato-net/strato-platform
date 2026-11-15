@@ -24,26 +24,56 @@ log() { echo "[cell-health $(date -u +%FT%TZ)] $*"; }
 
 # strato-cell-upgrade drains the cell while it restarts or upgrades the node;
 # a flag left by a run that was killed counts for six hours at most.
-draining() { [[ -n $(find "$DRAIN_FLAG" -mmin -360 2>/dev/null) ]]; }
+DRAIN_MAX_MINUTES=360
+DRAINING="cell $CELL_ID: draining for a restart or an upgrade"
+draining() { [[ -n $(find "$DRAIN_FLAG" -mmin "-$DRAIN_MAX_MINUTES" 2>/dev/null) ]]; }
 
 health() {
-  if draining; then echo "cell $CELL_ID: draining for a restart or an upgrade"; return 1; fi
+  if draining; then echo "$DRAINING"; return 1; fi
   /usr/local/bin/strato-cell-upgrade --check 2>&1
 }
 
+# The check runs every REFRESH seconds in the background, never in a request:
+# a probe is answered at once from the last result, however slowly the node's
+# processes answer theirs, and a result too old to trust counts as unhealthy.
+# Only the drain flag is read on every request, whatever check is in flight:
+# a draining cell fails its very next probe, and the load balancer's two
+# failed probes ten seconds apart take it out within 20 s, inside
+# strato-cell-upgrade's 30 s drain.
 serve() {
-  exec python3 - "$0" "$HEALTH_PORT" <<'PY'
-import http.server, subprocess, sys
+  exec python3 - "$0" "$HEALTH_PORT" "$DRAIN_FLAG" "$DRAIN_MAX_MINUTES" "$DRAINING" <<'PY'
+import http.server, os, subprocess, sys, threading, time
 
-script, port = sys.argv[1], int(sys.argv[2])
+script, port, drain_flag, drain_max_minutes, draining_status = sys.argv[1], int(sys.argv[2]), sys.argv[3], int(sys.argv[4]), sys.argv[5]
+REFRESH, STALE = 2, 60
+last = (503, "no health check has run yet", time.monotonic())
 
-class Health(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
+def draining():
+    try:
+        return time.time() - os.stat(drain_flag).st_mtime < drain_max_minutes * 60
+    except OSError:
+        return False
+
+def refresh():
+    global last
+    while True:
         try:
             r = subprocess.run([script], capture_output=True, text=True, timeout=20)
             code, status = (200 if r.returncode == 0 else 503), r.stdout.strip() or "no status"
         except subprocess.TimeoutExpired:
             code, status = 503, "the health check timed out"
+        except Exception as e:
+            code, status = 503, f"the health check failed: {e}"
+        last = (code, status, time.monotonic())
+        time.sleep(REFRESH)
+
+class Health(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        code, status, at = last
+        if draining():
+            code, status = 503, draining_status
+        elif time.monotonic() - at > STALE:
+            code, status = 503, "the health check has stopped"
         body = (status + "\n").encode()
         self.send_response(code)
         self.send_header("Content-Type", "text/plain")
@@ -54,6 +84,7 @@ class Health(http.server.BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
+threading.Thread(target=refresh, daemon=True).start()
 http.server.ThreadingHTTPServer(("", port), Health).serve_forever()
 PY
 }

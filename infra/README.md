@@ -40,7 +40,8 @@ create a second set of resources beside it.
 
 ## Deploy order
 
-`data-plane`, `core-cell`, `api-tier` (Network and Tier), the front door
+`data-plane`, `core-cell` (the cells, then their load balancer,
+`ha-<env>-core-nlb`), `api-tier` (Network and Tier), the front door
 (`ha-<env>-api-frontdoor`) **and its DNS record**, `app-tier`, then
 `observability`.
 
@@ -83,9 +84,14 @@ same run builds the environment from nothing and updates it:
    up, so a change to the node's containers needs a rebuilt cell. A cell is
    drained before its node stops (its health check answers 503 for 30 s),
    and the upgrade reinstalls its health endpoint and watchdog.
-5. `api-tier`, given every cell's ingress (`http://<cell>:8600`) and opening
-   that port on each cell's security group itself (`cellSecurityGroupIds`),
-   so no cell stack is redeployed for it; then `app-tier`, the front door
+5. `core-nlb`: one internal load balancer in front of every cell, which
+   opens the cells' security groups to itself, so no cell stack is redeployed
+   for it. Port 8600 hands a transaction batch to one healthy cell (the
+   cell's own health check on 8601 decides); port 9090 is the first cell's
+   Prometheus, for apex.
+6. `api-tier`, given the load balancer's name as its ingress
+   (`http://<core>:8600`) and Prometheus host and admitted on its security
+   group (`coreLoadBalancerSecurityGroupId`); then `app-tier`, the front door
    (with freshly built app UI and SMD) and `obs-alarms`, then smoke checks through CloudFront by name, and the
    image set and both commits are recorded (`/ha-testnet-app/deploy/*`).
    A run with neither repo changed since does nothing.
@@ -144,8 +150,8 @@ Before the first run:
   after a failover they describe a standby, and with the first cell down they
   are unknown while the chain carries on. Every cell now publishes its
   Prometheus on its private address (`exposePrometheus`); apex needs to read
-  the lease holder's (or all of them), and the API tier to open 9090 on every
-  cell (`cellSecurityGroupIds`), not only on `coreSecurityGroupId`.
+  the lease holder's (or all of them), and the core tier's load balancer to
+  carry every cell's Prometheus, not only the first one's.
 - **Managed Prometheus**, when there is a reason to pay for it. Without it
   (`managedPrometheus=false`, as in `testnet-app`) the per-tier dashboard's
   edge panels, its ECS sidecar panel and the infrastructure map's requests per
