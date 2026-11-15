@@ -24,26 +24,35 @@ log() { echo "[cell-health $(date -u +%FT%TZ)] $*"; }
 
 # strato-cell-upgrade drains the cell while it restarts or upgrades the node;
 # a flag left by a run that was killed counts for six hours at most.
-draining() { [[ -n $(find "$DRAIN_FLAG" -mmin -360 2>/dev/null) ]]; }
+DRAIN_MAX_MINUTES=360
+DRAINING="cell $CELL_ID: draining for a restart or an upgrade"
+draining() { [[ -n $(find "$DRAIN_FLAG" -mmin "-$DRAIN_MAX_MINUTES" 2>/dev/null) ]]; }
 
 health() {
-  if draining; then echo "cell $CELL_ID: draining for a restart or an upgrade"; return 1; fi
+  if draining; then echo "$DRAINING"; return 1; fi
   /usr/local/bin/strato-cell-upgrade --check 2>&1
 }
 
 # The check runs every REFRESH seconds in the background, never in a request:
 # a probe is answered at once from the last result, however slowly the node's
 # processes answer theirs, and a result too old to trust counts as unhealthy.
-# A drain therefore shows within REFRESH, and the load balancer's two failed
-# probes ten seconds apart then take the cell out: about 22 s, inside
+# Only the drain flag is read on every request, whatever check is in flight:
+# a draining cell fails its very next probe, and the load balancer's two
+# failed probes ten seconds apart take it out within 20 s, inside
 # strato-cell-upgrade's 30 s drain.
 serve() {
-  exec python3 - "$0" "$HEALTH_PORT" <<'PY'
-import http.server, subprocess, sys, threading, time
+  exec python3 - "$0" "$HEALTH_PORT" "$DRAIN_FLAG" "$DRAIN_MAX_MINUTES" "$DRAINING" <<'PY'
+import http.server, os, subprocess, sys, threading, time
 
-script, port = sys.argv[1], int(sys.argv[2])
+script, port, drain_flag, drain_max_minutes, draining_status = sys.argv[1], int(sys.argv[2]), sys.argv[3], int(sys.argv[4]), sys.argv[5]
 REFRESH, STALE = 2, 60
 last = (503, "no health check has run yet", time.monotonic())
+
+def draining():
+    try:
+        return time.time() - os.stat(drain_flag).st_mtime < drain_max_minutes * 60
+    except OSError:
+        return False
 
 def refresh():
     global last
@@ -61,7 +70,9 @@ def refresh():
 class Health(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         code, status, at = last
-        if time.monotonic() - at > STALE:
+        if draining():
+            code, status = 503, draining_status
+        elif time.monotonic() - at > STALE:
             code, status = 503, "the health check has stopped"
         body = (status + "\n").encode()
         self.send_response(code)
