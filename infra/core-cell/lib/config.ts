@@ -87,10 +87,13 @@ export interface CoreCellConfig {
   validatorBehavior: boolean;
   /**
    * Let the first boot decide from the cluster what this cell is, instead of `writer` and
-   * `snapshotSkipDatabases`: when the cluster has no `eth` database the cell loads the snapshot's
-   * databases into it and starts as the writer; otherwise it leaves them alone and starts as a
-   * standby. A replaced instance boots again, so a fixed "first cell" setting would load a
-   * snapshot over the live databases; this cannot. Create an environment's cells one at a time.
+   * `snapshotSkipDatabases`: when the cluster has no `eth` database the cell claims the load
+   * (one row in `strato_cluster_seed`, in the cluster's postgres database), loads the snapshot's
+   * databases into it, starts as the writer and marks the row done; otherwise it leaves them
+   * alone and starts as a standby. An instance replacing one of the claiming cell that never
+   * finished loading loads again, and another cell arriving meanwhile stops. A replaced instance
+   * boots again, so a fixed "first cell" setting would load a snapshot over the live databases;
+   * this cannot.
    */
   seedEmptyCluster: boolean;
   /** Run vm-query on the cell (only useful when the cell also serves RPC). */

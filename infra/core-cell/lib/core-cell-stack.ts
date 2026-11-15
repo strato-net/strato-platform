@@ -322,6 +322,8 @@ export class CoreCellStack extends Stack {
       launchTemplate,
       minCapacity: 1,
       maxCapacity: 1,
+      // For the alarm on a cell left without an instance (the observability app).
+      groupMetrics: [new autoscaling.GroupMetrics(autoscaling.GroupMetric.IN_SERVICE_INSTANCES)],
     });
     const targetGroupArns = [config.ingressTargetGroupArn, config.prometheusTargetGroupArn, config.grafanaTargetGroupArn].filter((arn): arn is string => !!arn);
     if (targetGroupArns.length > 0) (group.node.defaultChild as autoscaling.CfnAutoScalingGroup).targetGroupArns = targetGroupArns;

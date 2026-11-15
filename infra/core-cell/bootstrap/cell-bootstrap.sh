@@ -67,8 +67,16 @@ chown $NODE_USER:$NODE_USER $STRATO_ROOT
 # --- 3. Binaries from the strato image, node scripts from the repo ---
 # The image the environment's cells run, once cells upgrade has recorded one:
 # a cell replaced between deployments comes back on that, not on an older one.
-if [[ -n "${STRATO_IMAGE_PARAMETER:-}" ]] && recorded=$(aws ssm get-parameter --name "$STRATO_IMAGE_PARAMETER" --query Parameter.Value --output text 2>/dev/null) && [[ -n "$recorded" ]]; then
-  STRATO_IMAGE=$recorded
+# Only a parameter that does not exist yet leaves the stack's image; any other
+# failure to read it is retried and then stops the bootstrap, since guessing
+# could bring the cell back on another version.
+if [[ -n "${STRATO_IMAGE_PARAMETER:-}" ]]; then
+  for attempt in 1 2 3 4 5; do
+    if recorded=$(aws ssm get-parameter --name "$STRATO_IMAGE_PARAMETER" --query Parameter.Value --output text 2>&1); then STRATO_IMAGE=$recorded; break; fi
+    grep -q ParameterNotFound <<<"$recorded" && break
+    (( attempt < 5 )) || { log "cannot read $STRATO_IMAGE_PARAMETER: $recorded"; exit 1; }
+    sleep 10
+  done
 fi
 log "image $STRATO_IMAGE"
 registry=${STRATO_IMAGE%%/*}
@@ -181,15 +189,32 @@ if [[ ! -d $NODE_DIR ]]; then
   # shellcheck disable=SC2206
   extra=($EXTRA_SETUP_FLAGS)
   pg_password=$(aws secretsmanager get-secret-value --secret-id "$PG_SECRET_ID" --query SecretString --output text | jq -r .password)
-  # With SEED_EMPTY_CLUSTER the cluster says what this cell is. The one that
-  # finds no eth database loads the snapshot's databases into the cluster and
-  # starts as the writer; every other cell, and every later instance of this
-  # one, leaves them alone and starts as a standby. Only an answer of exactly
-  # 0 seeds, and a cluster that cannot be asked stops the bootstrap here.
+  # With SEED_EMPTY_CLUSTER the cluster says what this cell is, in a one-row
+  # table of its postgres database. The cell that finds no eth database claims
+  # the row, loads the snapshot's databases into the cluster, starts as the
+  # writer and marks the row done once they are loaded (below). Every other
+  # cell, and every later instance, then leaves the databases alone and starts
+  # as a standby. An instance of the claiming cell that finds the row not done
+  # replaces one that never finished loading, and loads again; another cell
+  # that finds it not done stops here. A cluster with an eth database and no
+  # row was filled some other way and is never loaded over, and a cluster
+  # that cannot be asked stops the bootstrap.
+  cluster_sql() {
+    PGPASSWORD=$(aws secretsmanager get-secret-value --secret-id "$PG_SECRET_ID" --query SecretString --output text | jq -r .password) \
+      psql -v ON_ERROR_STOP=1 -h "$PG_WRITER_HOST" -p "$PG_PORT" -U "$PG_USER" -d postgres -Atqc "$1"
+  }
   if [[ "${SEED_EMPTY_CLUSTER:-false}" == "true" ]]; then
-    eth_databases=$(PGPASSWORD="$pg_password" psql -h "$PG_WRITER_HOST" -p "$PG_PORT" -U "$PG_USER" -d postgres -Atc "select count(*) from pg_database where datname = 'eth'")
-    if [[ "$eth_databases" == "0" ]]; then WRITER=true; SNAPSHOT_SKIP_DATABASES=false; else WRITER=false; SNAPSHOT_SKIP_DATABASES=true; fi
-    log "the cluster has $eth_databases eth database: writer=$WRITER, skip the snapshot's databases=$SNAPSHOT_SKIP_DATABASES"
+    cluster_sql "create table if not exists strato_cluster_seed (one boolean primary key default true check (one), cell text not null, done boolean not null default false)"
+    if [[ "$(cluster_sql "select count(*) from pg_database where datname = 'eth'")" == "0" ]]; then
+      cluster_sql "insert into strato_cluster_seed (cell) values ('$CELL_ID') on conflict do nothing"
+    fi
+    seed=$(cluster_sql "select cell || ' ' || done::text from strato_cluster_seed")
+    case "$seed" in
+      "$CELL_ID false") WRITER=true; SNAPSHOT_SKIP_DATABASES=false ;;
+      *" false") log "cell ${seed% false} has not finished loading the snapshot's databases into the cluster: this cell cannot start beside it"; exit 1 ;;
+      *) WRITER=false; SNAPSHOT_SKIP_DATABASES=true ;;
+    esac
+    log "cluster seed [$seed]: writer=$WRITER, skip the snapshot's databases=$SNAPSHOT_SKIP_DATABASES"
   fi
   # 4a. The node directory (ethconf, secrets, genesis, docker-compose.yml, commands.txt).
   sudo -u $NODE_USER -H env PATH="$PATH" \
@@ -222,6 +247,10 @@ if [[ ! -d $NODE_DIR ]]; then
     install -d -o $NODE_USER -g $NODE_USER "$STRATO_ROOT/.snapshot-work"
     sudo -u $NODE_USER -H env PATH="$PATH" STRATO_SNAPSHOT_BUCKET="${STRATO_SNAPSHOT_BUCKET:-}" STRATO_SNAPSHOT_WORKDIR="$STRATO_ROOT/.snapshot-work" \
       strato-snapshot restore "$NODE_DIR" "${snap[@]}" --network "$NETWORK" --force
+  fi
+  # The cluster is loaded: from here on every new instance joins as a standby.
+  if [[ "${SEED_EMPTY_CLUSTER:-false}" == "true" && "$SNAPSHOT_SKIP_DATABASES" == "false" ]]; then
+    cluster_sql "update strato_cluster_seed set done = true"
   fi
 fi
 # 4d. Publish the node config for the API tier (its ETHCONF_BASE64). The tier

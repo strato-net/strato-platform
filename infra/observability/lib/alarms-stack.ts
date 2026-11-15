@@ -100,14 +100,17 @@ export class AlarmsStack extends Stack {
     // its instance is replaced.
     config.cellGroupNames.forEach((group) => {
       const dims = { AutoScalingGroupName: group };
+      // The group replaces an instance that fails its status checks by itself;
+      // what needs someone is a group that cannot keep an instance in service.
+      // Three minutes, so an ordinary replacement does not page.
       route(
-        new cloudwatch.Alarm(this, `CellStatus-${group}`, {
-          alarmName: `${group}-unreachable`,
-          alarmDescription: `Core cell ${group} failed its status checks`,
-          metric: new cloudwatch.Metric({ namespace: "AWS/EC2", metricName: "StatusCheckFailed", dimensionsMap: dims, statistic: "Maximum", period: Duration.minutes(1) }),
-          threshold: 0,
-          comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-          evaluationPeriods: 2,
+        new cloudwatch.Alarm(this, `CellInstance-${group}`, {
+          alarmName: `${group}-no-instance`,
+          alarmDescription: `Core cell ${group} has no instance in service: see the activity of its Auto Scaling group`,
+          metric: new cloudwatch.Metric({ namespace: "AWS/AutoScaling", metricName: "GroupInServiceInstances", dimensionsMap: dims, statistic: "Minimum", period: Duration.minutes(1) }),
+          threshold: 1,
+          comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+          evaluationPeriods: 3,
         }),
         pages
       );
