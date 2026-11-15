@@ -18,7 +18,12 @@ of it: the first core cell to boot creates the role with the master secret
 what the node's own Postgres image gives it: it creates and owns the
 databases, no more. The cells, the API tier, the app tier and the history
 service all connect with it. A login that exists is left as it is, so a
-changed secret does not change the password. On PostgreSQL 15 and later the
+changed secret does not change the password. A cluster that was set up with
+the master login is not converted: its databases and the cells' seed table
+belong to `postgres`, its running cells keep the master login in their
+node configuration, and the tiers would ask for a login it does not have.
+Such an environment is built again from nothing, as testnet-app is for this
+change. On PostgreSQL 15 and later the
 login cannot create the cells' seed table (`strato_cluster_seed`, in the
 `postgres` database's `public` schema); the cluster here is 14.
 

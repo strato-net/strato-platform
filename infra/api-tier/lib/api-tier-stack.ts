@@ -96,7 +96,9 @@ export class ApiTierStack extends Stack {
     // Service Connect: each task's vm-query is reachable from every task as
     // vm-query:8546 through ECS's proxy, which sends only to healthy tasks
     // and ejects one that keeps failing. No listener of its own is needed.
-    cluster.addDefaultCloudMapNamespace({ name, type: servicediscovery.NamespaceType.HTTP, useForServiceConnect: true });
+    // The namespace carries the cluster's name: a cluster under another name gets a namespace
+    // of its own, so its vm-query never meets one registered for the cluster it replaces.
+    cluster.addDefaultCloudMapNamespace({ name: config.clusterName, type: servicediscovery.NamespaceType.HTTP, useForServiceConnect: true });
     const vmQueryPort = 8546;
     // DESTROY, not the CDK default of RETAIN: a retained group keeps its name,
     // and the next create of this stack then fails with "already exists".
@@ -148,6 +150,8 @@ export class ApiTierStack extends Stack {
         PG_ENV_POSTGRES_DB: "cirrus",
         PG_ENV_POSTGRES_HOST: config.postgresReaderHost,
         PG_ENV_POSTGRES_USER: config.postgresUser,
+        // The role anonymous requests run as: the image's default is postgres, which the node's login may not become.
+        POSTGREST_ANONYMOUS: config.postgresUser,
         PG_PORT_5432_TCP_PORT: String(config.postgresPort),
         POSTGREST_LOG_LEVEL: "error",
         POSTGREST_SCHEMA_RELOAD_SECONDS: "30",
