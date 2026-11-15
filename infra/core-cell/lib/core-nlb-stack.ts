@@ -28,7 +28,7 @@ const PROMETHEUS_PORT = 9090;
  * Healthy is what the cell's own check says on port 8601 (every core process
  * answers, the node follows the chain, the cell is not draining for a restart
  * or an upgrade), so a cell that could accept a batch and get it nowhere is
- * out within twenty seconds. With every cell unhealthy the load balancer
+ * out within about 25 seconds. With every cell unhealthy the load balancer
  * sends to all of them, which is right when the fault is the network's.
  *
  * Port 9090 is the first cell's Prometheus alone, for the API tier's apex:
@@ -75,6 +75,8 @@ export class CoreNlbStack extends Stack {
       protocol: elbv2.Protocol.TCP,
       targetType: elbv2.TargetType.INSTANCE,
       targets: config.cellInstanceIds.map((instanceId) => new InstanceIdTarget(instanceId, INGRESS_PORT)),
+      // The cell answers a probe at once from its last check (it runs one every
+      // 2 s), so the timeout only has to cover the network.
       healthCheck: {
         protocol: elbv2.Protocol.HTTP,
         port: String(HEALTH_PORT),

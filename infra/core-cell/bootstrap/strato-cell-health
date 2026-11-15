@@ -31,19 +31,38 @@ health() {
   /usr/local/bin/strato-cell-upgrade --check 2>&1
 }
 
+# The check runs every REFRESH seconds in the background, never in a request:
+# a probe is answered at once from the last result, however slowly the node's
+# processes answer theirs, and a result too old to trust counts as unhealthy.
+# A drain therefore shows within REFRESH, and the load balancer's two failed
+# probes ten seconds apart then take the cell out: about 22 s, inside
+# strato-cell-upgrade's 30 s drain.
 serve() {
   exec python3 - "$0" "$HEALTH_PORT" <<'PY'
-import http.server, subprocess, sys
+import http.server, subprocess, sys, threading, time
 
 script, port = sys.argv[1], int(sys.argv[2])
+REFRESH, STALE = 2, 60
+last = (503, "no health check has run yet", time.monotonic())
 
-class Health(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
+def refresh():
+    global last
+    while True:
         try:
             r = subprocess.run([script], capture_output=True, text=True, timeout=20)
             code, status = (200 if r.returncode == 0 else 503), r.stdout.strip() or "no status"
         except subprocess.TimeoutExpired:
             code, status = 503, "the health check timed out"
+        except Exception as e:
+            code, status = 503, f"the health check failed: {e}"
+        last = (code, status, time.monotonic())
+        time.sleep(REFRESH)
+
+class Health(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        code, status, at = last
+        if time.monotonic() - at > STALE:
+            code, status = 503, "the health check has stopped"
         body = (status + "\n").encode()
         self.send_response(code)
         self.send_header("Content-Type", "text/plain")
@@ -54,6 +73,7 @@ class Health(http.server.BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
+threading.Thread(target=refresh, daemon=True).start()
 http.server.ThreadingHTTPServer(("", port), Health).serve_forever()
 PY
 }
