@@ -237,7 +237,12 @@ consent, admin `addValidator` still works) → **Active** (in the consensus set)
 * **Stake delay** (`setStakeDelay`, 0 = off): new stake earns at once but counts toward the
   validator's vote only from the start of the window after next (between one and two delays),
   and `tryActivate` / `reconcileSet` need a bond that has already waited. The published weight
-  picks matured stake up at the validator's next sync, which anyone may call. `requestExit(v)` keeps the validator serving for
+  picks matured stake up at the validator's next sync, which anyone may call.
+* **Re-filing** (`refileStake`, owner): where an operator's record is keyed by its own address
+  and its consensus validators are other addresses, the owner moves each named delegator's stake
+  from that record onto the operator's validators in equal shares. Pin the validators first:
+  one that governance lists and staking has not seated is adopted at its first sync and leaves
+  in the same sync if it is neither pinned nor bonded. `requestExit(v)` keeps the validator serving for
   `exitNoticeSeconds`, then any sync removes it; `cancelExit(v)` undoes it.
 * `maxOperatorStakeBps` caps **inbound** stake (stake / selfBond / moveStake target) at that share
   of `totalRewardableStake`; unstaking is never capped; 0 = off (switch it on after bootstrap).

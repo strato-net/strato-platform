@@ -1793,4 +1793,102 @@ contract Describe_StratoStaking {
         user1.do(address(staking), "claimRewards", _list(VALIDATOR_A));
         require(strato.balanceOf(address(user1)) > before, "a delegator whose stake is waiting is paid");
     }
+
+    // ---- re-filing an operator's delegations onto its validators -----------------------
+
+    address constant NODE_1 = address(0xc1c1);
+    address constant NODE_2 = address(0xc2c2);
+
+    function _two(address a, address b) internal pure returns (address[] memory list) {
+        list = new address[](2);
+        list[0] = a;
+        list[1] = b;
+    }
+
+    // An operator's record from before the switch to validator-keyed records: keyed by the
+    // operator's own address, which is not a consensus validator, with two delegators behind
+    // it. The operator's two validators are listed beside it and have nothing.
+    function _operatorKeyedRecord() internal {
+        _registerSelf(validatorC);
+        staking.forgetOperatorField(address(validatorC));
+        _stake(user1, address(validatorC), 401e18 + 1);
+        _stake(user2, address(validatorC), 300e18);
+        registry.addValidator(NODE_1, address(validatorC), 0, "Node 1", "", "", "node-1");
+        registry.addValidator(NODE_2, address(validatorC), 0, "Node 2", "", "", "node-2");
+    }
+
+    function _refileFailure(address fromRecord, address[] memory toValidators, address[] memory delegators) internal returns (string) {
+        string reason = "";
+        try staking.refileStake(fromRecord, toValidators, delegators) {
+        } catch Error(string e) {
+            reason = e;
+        }
+        return reason;
+    }
+
+    function it_refiles_an_operators_delegations_onto_its_validators() public {
+        _operatorKeyedRecord();
+        _reward(address(validatorC), 70e18);
+        staking.setStakeDelay(100);
+        uint256 userStake = staking.totalUserStake();
+        uint256 rewardable = staking.totalRewardableStake();
+
+        staking.refileStake(address(validatorC), _two(NODE_1, NODE_2), _two(address(user1), address(user2)));
+
+        require(staking.delegatedStake(address(user1), address(validatorC)) == 0 && staking.delegatedStake(address(user2), address(validatorC)) == 0, "nothing left behind the old record");
+        require(staking.delegatedStake(address(user1), NODE_1) == 2005e17 + 1 && staking.delegatedStake(address(user1), NODE_2) == 2005e17, "an equal share each, the first takes the odd wei");
+        require(staking.delegatedStake(address(user2), NODE_1) == 150e18 && staking.delegatedStake(address(user2), NODE_2) == 150e18, "the second delegator likewise");
+        require(staking.totalUserStake() == userStake && staking.totalRewardableStake() == rewardable, "no stake created or lost");
+        require(staking.unmaturedStake(NODE_1) == 0 && staking.votingWeight(NODE_1) == 3505e17 + 1, "a re-filing is not new stake: it counts at once");
+
+        // what a delegator earned behind the old record is still claimable there
+        uint256 before = strato.balanceOf(address(user1));
+        user1.do(address(staking), "claimRewards", _list(address(validatorC)));
+        require(strato.balanceOf(address(user1)) > before, "rewards earned behind the old record are paid");
+
+        // and it keeps earning behind the new ones
+        _reward(NODE_1, 70e18);
+        before = strato.balanceOf(address(user1));
+        user1.do(address(staking), "claimRewards", _list(NODE_1));
+        require(strato.balanceOf(address(user1)) > before, "the re-filed stake earns");
+
+        // a batch sent again moves nothing
+        staking.refileStake(address(validatorC), _two(NODE_1, NODE_2), _two(address(user1), address(user2)));
+        require(staking.delegatedStake(address(user1), NODE_1) == 2005e17 + 1 && staking.delegatedStake(address(user2), NODE_2) == 150e18, "unchanged by the repeat");
+    }
+
+    // Stake moves only between records of one operator, and only the owner moves it.
+    function it_refiles_only_within_one_operator_and_only_for_the_owner() public {
+        _bondBoth();
+        _operatorKeyedRecord();
+        require(_refileFailure(address(validatorC), _two(NODE_1, VALIDATOR_A), _list(address(user1))) == "SS: another operator's validator", "a delegator is not put behind an operator it did not choose");
+        require(_refileFailure(address(validatorC), _two(NODE_1, NODE_1), _list(address(user1))) == "SS: duplicate validator", "each validator once");
+        require(_refileFailure(address(validatorC), _two(NODE_1, address(validatorC)), _list(address(user1))) == "SS: same validator", "not onto itself");
+        bool refused = false;
+        try attacker.do(address(staking), "refileStake", address(validatorC), _two(NODE_1, NODE_2), _list(address(user1))) {
+        } catch {
+            refused = true;
+        }
+        require(refused, "only the owner re-files");
+        require(staking.delegatedStake(address(user1), address(validatorC)) == 401e18 + 1, "nothing moved");
+    }
+
+    // The incumbents are in the consensus set with nothing on record. Pinned, they take the
+    // re-filed stake as their weight. Unpinned, the first sync would adopt them and drop
+    // them for having no bond, so the re-filing is refused until they are pinned.
+    function it_gives_refiled_stake_to_pinned_incumbents_as_their_weight() public {
+        GenesisGovernance pins = _pinningGovernance();
+        pins.seedValidator(NODE_1);
+        pins.seedValidator(NODE_2);
+        _operatorKeyedRecord();
+
+        require(_refileFailure(address(validatorC), _two(NODE_1, NODE_2), _two(address(user1), address(user2))) == "SS: pin the validator first", "refused while an incumbent is unpinned");
+        require(pins.isValidator(NODE_1) && pins.isValidator(NODE_2), "both still in the consensus set");
+
+        pins.voteToAddValidator(NODE_1);
+        pins.voteToAddValidator(NODE_2);
+        staking.refileStake(address(validatorC), _two(NODE_1, NODE_2), _two(address(user1), address(user2)));
+        require(pins.isValidator(NODE_1) && pins.isValidator(NODE_2) && staking.isValidator(NODE_1) && staking.isValidator(NODE_2), "seated in staking too");
+        require(pins.validatorStake(NODE_1) == 3505e17 + 1 && pins.validatorStake(NODE_2) == 3505e17, "each votes with the stake filed behind it");
+    }
 }

@@ -85,6 +85,7 @@ contract  StratoStaking is Ownable {
     event SetParamsUpdated(uint256 maxActiveValidators, uint256 hardCapActiveValidators, uint256 evictionMarginBps, uint256 maxSetMutationsPerBlock, uint256 exitNoticeSeconds, uint256 unkickCooldown, uint256 maxOperatorStakeBps);
     event JoinsOpenFromBlockSet(uint256 blockNumber);
     event StakeDelaySet(uint256 stakeDelaySeconds);
+    event StakeRefiled(address indexed fromRecord, uint256 validators, uint256 delegators, uint256 amount);
     event ParamsUpdated(uint256 unbondingSeconds, uint256 maxCommissionBps, uint256 maxBatchSize);
     event EmissionScheduleCommitted(uint256 e0, uint256 s0, uint256 r0, uint256 startTime);
     event EmissionReserveFunded(address indexed funder, uint256 amount, uint256 reserve);
@@ -1267,24 +1268,88 @@ contract  StratoStaking is Ownable {
         require(!operators[fromValidator].active || block.timestamp >= moveLockedUntil[msg.sender][fromValidator], "SS: stake recently moved");
         moveLockedUntil[msg.sender][toValidator] = block.timestamp + unbondingSeconds;
 
-        _updateUser(msg.sender, fromValidator);
-        _updateUser(msg.sender, toValidator);
-
-        delegatedStake[msg.sender][fromValidator] -= amount;
-        operators[fromValidator].delegatedStake -= amount;
-        if (operators[fromValidator].active) totalRewardableStake -= amount;
-        _dropPending(pendingStakeOf[msg.sender][fromValidator], fromValidator, amount);
-
         // Moved stake is new stake where it lands: it waits there like any other arrival.
-        delegatedStake[msg.sender][toValidator] += amount;
-        operators[toValidator].delegatedStake += amount;
-        totalRewardableStake += amount;
-        _notePending(pendingStakeOf[msg.sender][toValidator], toValidator, amount);
-
-        emit StakeMoved(msg.sender, fromValidator, toValidator, amount);
+        _moveDelegation(msg.sender, fromValidator, toValidator, amount, true);
         _requireWithinStakeCap(toValidator);
         _syncValidator(fromValidator);
         _syncValidator(toValidator);
+    }
+
+    // Take a delegator's stake from behind one record and put it behind another, with its
+    // rewards settled on both first. `waits` says whether it arrives as new stake (see
+    // stakeDelaySeconds). The target must be listed.
+    function _moveDelegation(address delegator, address fromValidator, address toValidator, uint256 amount, bool waits) internal {
+        _updateUser(delegator, fromValidator);
+        _updateUser(delegator, toValidator);
+
+        delegatedStake[delegator][fromValidator] -= amount;
+        operators[fromValidator].delegatedStake -= amount;
+        if (operators[fromValidator].active) totalRewardableStake -= amount;
+        _dropPending(pendingStakeOf[delegator][fromValidator], fromValidator, amount);
+
+        delegatedStake[delegator][toValidator] += amount;
+        operators[toValidator].delegatedStake += amount;
+        totalRewardableStake += amount;
+        if (waits) _notePending(pendingStakeOf[delegator][toValidator], toValidator, amount);
+
+        emit StakeMoved(delegator, fromValidator, toValidator, amount);
+    }
+
+    // Re-file delegations from one record onto the validators of the same operator, an
+    // equal share to each (the first named takes the remainder).
+    //
+    // For a network upgraded in place from the operator-keyed layout, where an operator's
+    // record is keyed by its own address and its consensus validators are other addresses:
+    // the delegators' stake sits behind a record nobody votes with, and the operator's
+    // validators have none. Waiting for each delegator to move would bring the weights in
+    // piecemeal and leave them to whoever holds the most.
+    //
+    // - The owner names the delegators, since the contract keeps no list of them, at most
+    //   maxBatchSize a call. One with nothing behind the record is skipped, so a batch can
+    //   be sent again.
+    // - Stake only moves between records of one operator, so no delegator ends up behind an
+    //   operator it did not choose. What a delegator earned behind the old record stays
+    //   claimable there.
+    // - It is a re-filing, not new stake: it counts at once and sets no move lock.
+    // - A validator governance lists and staking has not seated is adopted at its first
+    //   sync, and leaves in the same sync if nothing holds it there. So such a validator
+    //   must be pinned before stake is filed behind it.
+    function refileStake(address fromRecord, address[] calldata toValidators, address[] calldata delegators) external onlyOwner onlyInitialized onlyListed(fromRecord) {
+        require(toValidators.length > 0 && toValidators.length <= maxBatchSize, "SS: bad validators");
+        require(delegators.length > 0 && delegators.length <= maxBatchSize, "SS: bad batch");
+        address operator = operatorOf(fromRecord);
+        for (uint256 i = 0; i < toValidators.length; i++) {
+            address to = toValidators[i];
+            require(to != fromRecord, "SS: same validator");
+            require(operators[to].exists && operators[to].active, "SS: target inactive");
+            require(operatorOf(to) == operator, "SS: another operator's validator");
+            for (uint256 j = 0; j < i; j++) {
+                require(toValidators[j] != to, "SS: duplicate validator");
+            }
+            if (governanceSyncEnabled && !isValidator[to] && IStakingGovernance(governance).validatorMap(to) > 0) {
+                require(_pinnedIn(to), "SS: pin the validator first");
+            }
+        }
+
+        uint256 moved = 0;
+        for (uint256 d = 0; d < delegators.length; d++) {
+            uint256 amount = delegatedStake[delegators[d]][fromRecord];
+            if (amount == 0) continue;
+            uint256 share = amount / toValidators.length;
+            _moveDelegation(delegators[d], fromRecord, toValidators[0], amount - share * (toValidators.length - 1), false);
+            if (share > 0) {
+                for (uint256 k = 1; k < toValidators.length; k++) {
+                    _moveDelegation(delegators[d], fromRecord, toValidators[k], share, false);
+                }
+            }
+            moved += amount;
+        }
+
+        emit StakeRefiled(fromRecord, toValidators.length, delegators.length, moved);
+        _syncValidator(fromRecord);
+        for (uint256 s = 0; s < toValidators.length; s++) {
+            _syncValidator(toValidators[s]);
+        }
     }
 
     function unstake(address validator, uint256 amount) external onlyInitialized onlyListed(validator) {
