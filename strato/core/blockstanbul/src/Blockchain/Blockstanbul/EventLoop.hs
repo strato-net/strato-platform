@@ -290,6 +290,13 @@ nextRound nt = do
 
   when (isJust self) $ isValidator .= (Validator (fromJust self) `elem` vals)
 
+  -- Round changes that reached us for this height while we were still on an
+  -- earlier one: re-emit them so they loop back through authorization and the
+  -- vote count against this view. Those for heights we skipped are dropped.
+  s <- use $ view . sequence
+  early <- futureRoundChanges <<%= M.filter ((> s) . _sequence . fst)
+  forM_ (M.filter ((== s) . _sequence . fst) early) $ yieldR . snd
+
 applyValidatorChanges :: MonadState BlockstanbulContext m =>
                          BlockHeader -> m ()
 applyValidatorChanges BlockHeader{} = pure ()
@@ -310,6 +317,10 @@ commitBlock blk = do
     printf "Committed block #%d (%s)" blockNo (shortDescription hsh)
   lastParent .= Just hsh
   lastRound .= getBlockRound (blockBlockData blk)
+  -- A block committed at a later round than our view (we missed the round
+  -- changes, e.g. while syncing) shows the network moved on; follow it, or we
+  -- keep proposing for, and rejecting proposals against, a stale round.
+  view . round %= max (fromIntegral $ getBlockRound (blockBlockData blk))
   clearLock
   myBlock .= Nothing
   whenM (use hasPreprepared) $
@@ -526,8 +537,12 @@ eventLoop ctx = execStateC ctx $
                 commitBlock $ addCommitmentSeals seals blk
         IMsg auth rc@(RoundChange vn _) -> do
           let intSeq = fromIntegral . _sequence
-          when (_sequence v < _sequence vn) $
+          when (_sequence v < _sequence vn) $ do
             yieldR $ GapFound (intSeq v) (intSeq vn) (sender auth)
+            -- Keep the sender's latest vote for a height we have not reached;
+            -- nextRound replays it when we get there.
+            let later new old = if fst old > fst new then old else new
+            futureRoundChanges %= M.insertWith later (Validator $ sender auth) (vn, OMsg auth rc)
           when (_sequence v == _sequence vn && _round v < _round vn) $ do
             let rn = _round vn
             mSigners <- use $ roundChanged . at rn

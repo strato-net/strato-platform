@@ -137,6 +137,22 @@ spec = describe "stake-weighted consensus" $ do
         get
       M.keys (_roundChanged ctx') `shouldBe` [2]
 
+    it "replays a round change for the next height once it gets there" $ do
+      ctx <- runWith activeCtx $ do
+        _ <- sendAllMessages [IMsg (MsgAuth other dummySig) (RoundChange (View 1 11) 0)]
+        _ <- sendAllMessages [ForcedConfigChange (ForcedSequence 11)]
+        get
+      _view ctx `shouldBe` View 1 11
+      _futureRoundChanges ctx `shouldBe` M.empty
+
+    it "drops buffered round changes for heights it skipped" $ do
+      ctx <- runWith activeCtx $ do
+        _ <- sendAllMessages [IMsg (MsgAuth other dummySig) (RoundChange (View 1 11) 0)]
+        _ <- sendAllMessages [ForcedConfigChange (ForcedSequence 12)]
+        get
+      _view ctx `shouldBe` View 0 12
+      _futureRoundChanges ctx `shouldBe` M.empty
+
   describe "stake bookkeeping" $ do
     it "applies stake updates and drops removed validators on commit" $ do
       let hdr = v3 [] [] 0 [Validator other] [(Validator me, 5), (Validator other, 9)]
@@ -152,6 +168,18 @@ spec = describe "stake-weighted consensus" $ do
         get
       _lastRound ctx `shouldBe` 7
       _sequence (_view ctx) `shouldBe` 11
+
+    it "catches the view round up to a committed block's later round" $ do
+      ctx <- runWith activeCtx $ do
+        runConduit $ yieldMany ([] :: [InEvent]) .| commitBlock (Block (v3 [Validator me, Validator other] [] 7 [] []) [] []) .| sinkNull
+        get
+      _view ctx `shouldBe` View 7 11
+
+    it "never moves the view round back on commit" $ do
+      ctx <- runWith (activeCtx & view . round .~ 9) $ do
+        runConduit $ yieldMany ([] :: [InEvent]) .| commitBlock (Block (v3 [Validator me, Validator other] [] 7 [] []) [] []) .| sinkNull
+        get
+      _view ctx `shouldBe` View 9 11
 
     it "selects the leader by stake once active and round-robin before" $ do
       let weights = M.fromList [(Validator me, 1000), (Validator other, 0)]
