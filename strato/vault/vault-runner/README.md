@@ -236,7 +236,7 @@ in shell history.
 Postgres connection settings are resolved with CLI > env > passfile > default
 precedence:
 
-1. **CLI flag** if set to a non-default value: `--pghost`, `--pgport`, `--pguser`,
+1. **CLI flag** if passed: `--pghost`, `--pgport`, `--pguser`,
    `--password`, `--database`.
 2. **Environment variable** (the same names used by vault-wrapper):
    - `postgres_host`
@@ -244,7 +244,7 @@ precedence:
    - `postgres_user`
    - `postgres_password`
    - `postgres_vault_wrapper_db`
-3. **`PGPASSFILE`** for the password if no non-default password flag or
+3. **`PGPASSFILE`** for the password if no password flag or
    nonempty `postgres_password` is set. The generated Compose template mounts
    this file.
 4. **Default** if none is set: `postgres` / `5432` / `postgres` / `api` /

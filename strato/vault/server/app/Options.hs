@@ -3,9 +3,11 @@
 
 module Options where
 
+import Data.List (isPrefixOf)
+import Data.Maybe (fromMaybe)
 import Database.PostgreSQL.Simple (ConnectInfo (..))
 import HFlags
-import System.Environment (lookupEnv)
+import System.Environment (getArgs, lookupEnv)
 
 defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
 defineFlag "P:pghost" ("postgres" :: String) "Postgres hostname"
@@ -30,8 +32,7 @@ defineFlag "indexToStartAt" (1 :: Int) "The index in the postgres table to conve
 
 -- | Resolve Postgres connection settings using the following precedence:
 --
---   1. CLI flag, if the operator passed a value different from the built-in
---      HFlags default (i.e. explicitly overrode it).
+--   1. CLI flag, if the operator passed it, whatever its value.
 --   2. Environment variable (same names the vault-wrapper daemon reads from
 --      docker-compose: @postgres_host@, @postgres_port@, @postgres_user@,
 --      @postgres_password@, @postgres_vault_wrapper_db@), if set and non-empty.
@@ -44,17 +45,30 @@ defineFlag "indexToStartAt" (1 :: Int) "The index in the postgres table to conve
 -- without re-typing connection settings that are already in its environment.
 connectInfo :: IO ConnectInfo
 connectInfo = do
-  host <- resolve "postgres_host" flags_pghost "postgres"
-  portStr <- resolve "postgres_port" flags_pgport "5432"
-  user <- resolve "postgres_user" flags_pguser "postgres"
+  args <- getArgs
+  -- HFlags exposes a flag's value, not whether it was passed, so the
+  -- arguments are checked: --name, an unambiguous prefix of it, or -c.
+  let passed short long = any isFlag args
+        where
+          isFlag ('-' : '-' : rest) = let name = takeWhile (/= '=') rest in not (null name) && name `isPrefixOf` long
+          isFlag ('-' : c : _) = Just c == short
+          isFlag _ = False
+      resolve envName flagVal isPassed
+        | isPassed = pure flagVal
+        | otherwise = fromMaybe flagVal . nonEmpty <$> lookupEnv envName
+      nonEmpty (Just s) | not (null s) = Just s
+      nonEmpty _ = Nothing
+  host <- resolve "postgres_host" flags_pghost (passed (Just 'P') "pghost")
+  portStr <- resolve "postgres_port" flags_pgport (passed Nothing "pgport")
+  user <- resolve "postgres_user" flags_pguser (passed (Just 'u') "pguser")
   passwordEnv <- lookupEnv "postgres_password"
   passfile <- lookupEnv "PGPASSFILE"
-  let pw = case (flags_password, passwordEnv, passfile) of
-        (s, _, _) | s /= "api" -> s
-        (_, Just s, _) | not (null s) -> s
-        (_, _, Just s) | not (null s) -> ""
-        _ -> "api"
-  db <- resolve "postgres_vault_wrapper_db" flags_database "oauth"
+  let pw = case (nonEmpty passwordEnv, nonEmpty passfile) of
+        _ | passed (Just 'p') "password" -> flags_password
+        (Just s, _) -> s
+        (_, Just _) -> ""
+        _ -> flags_password
+  db <- resolve "postgres_vault_wrapper_db" flags_database (passed (Just 'd') "database")
   pure
     ConnectInfo
       { connectHost = host,
@@ -63,14 +77,3 @@ connectInfo = do
         connectPassword = pw,
         connectDatabase = db
       }
-  where
-    -- envName: env var name; flagVal: current HFlags value; flagDefault: the
-    -- value HFlags would have had if the operator did not pass the flag.
-    resolve :: String -> String -> String -> IO String
-    resolve envName flagVal flagDefault
-      | flagVal /= flagDefault = pure flagVal -- operator explicitly overrode via CLI
-      | otherwise = do
-          mEnv <- lookupEnv envName
-          pure $ case mEnv of
-            Just s | not (null s) -> s
-            _ -> flagDefault
