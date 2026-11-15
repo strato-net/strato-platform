@@ -9,11 +9,11 @@ import Blockchain.Data.GenesisBlock (genesisInfoToBlock)
 import Blockchain.Data.GenesisInfo (getGenesisInfo)
 import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.EthConf (lookupRedisBlockDBConfig, runStreamMConfigured)
-import Blockchain.Model.SyncState (bestSequencedBlockNumber, bestSequencedBlockHash)
+import Blockchain.Model.SyncState (BestBlock (..), bestSequencedBlockNumber, bestSequencedBlockHash)
 import Blockchain.Model.WrappedBlock (blockToIngestBlock)
 import Blockchain.Sequencer.Event (IngestEvent (IEBlock))
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
-import Blockchain.SyncDB (getBestSequencedBlockInfo, updateWorldBestBlockInfo)
+import Blockchain.SyncDB (getBestSequencedBlockInfo, putWorldBestBlockInfo)
 import Control.Concurrent (threadDelay)
 import Control.Monad (replicateM, unless, void, when)
 import Control.Monad.Composable.Base (runEff)
@@ -47,8 +47,7 @@ replayBlocks = do
                   fail "Replay recording disagrees with the existing sequenced chain")
                 [block | block <- batch, number (blockBlockData block) == start]) initial
               let header = blockBlockData $ last batch
-              liftIO $ Redis.runRedis conn (updateWorldBestBlockInfo (headerHash header) (number header))
-                >>= either (fail . show) (const $ pure ())
+              liftIO . Redis.runRedis conn . putWorldBestBlockInfo $ BestBlock (headerHash header) (number header)
               let events = [IEBlock $ blockToIngestBlock (Origin.PeerString "replay.blocks") block
                            | block <- batch, number (blockBlockData block) > start]
               unless (null events) $ void $ writeUnseqEvents events

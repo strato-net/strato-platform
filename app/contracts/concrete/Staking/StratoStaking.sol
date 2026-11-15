@@ -10,22 +10,27 @@ import "./IStakingGovernance.sol";
 // (consensus proposer selection) and keeps liveness counters.
 //
 // Validators earn from what the chain produces, for blocks they propose:
-//   - the block reward FeeRouter.payBlockRewards pushes through creditBlockReward (STRATO)
+//   - the emission schedule: a prefunded reserve released at E0 * sqrt(S / S0) * (R / R0)
+//     STRATO a year, paid in processBlock to each block's producer (STRATO)
+//   - the block reward FeeRouter.payBlockRewards pushes through creditBlockReward (STRATO;
+//     disabled, see creditBlockReward)
 //   - the proposer's share of each transaction fee, attributed in processBlock (USDST)
 // and from discretionary rewards anyone may send in any token (distributeRewards /
 // distributeRewardsTo). STRATO and USDST income is split pro rata between the operator's
 // self-bond and delegated stake; delegators get their part net of the validator's commission
 // through a per-stake index. Discretionary rewards in any other token go wholly to the
-// operator. Nothing here seizes tokens: a missed proposal costs that block's income and,
-// optionally after maxConsecutiveMisses, a temporary jail.
+// operator. Nothing here seizes tokens: a missed proposal costs that block's income and is
+// counted. Jailing is disabled: no number of misses takes a validator out of the set.
 //
 // Validator lifecycle (status is derived, not stored):
 //   Missing    = no record
 //   Registered = listed, not in the consensus set (may receive stake)
 //   Active     = in the consensus set (explicit tryActivate / reconcileSet; room or eviction)
 //   Kicked     = delisted by the registry owner (self-bond force-unbonded)
-// Leaving the set (under minStake, exit notice, jail, kick) is automatic and same-tx;
+// Leaving the set (under minStake, exit notice, kick) is automatic and same-tx;
 // joining is explicit and bounded by maxActiveValidators / hardCapActiveValidators.
+// Joining is open to anyone from joinsOpenFromBlock and needs selfBondMinimum of the operator's
+// own bond; a seat held from before that rule keeps the rule it was admitted under.
 //
 // Upgraded in place on helium from an operator-keyed layout that also paid a funded reward
 // schedule. SolidVM storage is keyed by name, so historical names are kept (operators,
@@ -67,8 +72,13 @@ contract  StratoStaking is Ownable {
     event GovernanceSet(address indexed governance, bool syncEnabled);
     event ValidatorParamsUpdated(uint256 minStake, uint256 proposerFeeBps, uint256 maxConsecutiveMisses, uint256 jailCooldown);
     event SelfBondGraceSet(uint256 selfBondGraceUntil);
-    event SetParamsUpdated(uint256 maxActiveValidators, uint256 hardCapActiveValidators, uint256 evictionMarginBps, uint256 maxSetMutationsPerBlock, uint256 exitNoticeSeconds, uint256 unkickCooldown, uint256 maxOperatorStakeBps, bool joinsPaused);
+    event SelfBondMinimumSet(uint256 selfBondMinimum);
+    event SetParamsUpdated(uint256 maxActiveValidators, uint256 hardCapActiveValidators, uint256 evictionMarginBps, uint256 maxSetMutationsPerBlock, uint256 exitNoticeSeconds, uint256 unkickCooldown, uint256 maxOperatorStakeBps);
+    event JoinsOpenFromBlockSet(uint256 blockNumber);
     event ParamsUpdated(uint256 unbondingSeconds, uint256 maxCommissionBps, uint256 maxBatchSize);
+    event EmissionScheduleCommitted(uint256 e0, uint256 s0, uint256 r0, uint256 startTime);
+    event EmissionReserveFunded(address indexed funder, uint256 amount, uint256 reserve);
+    event ProductionRewarded(address indexed operator, address indexed validator, uint256 amount, uint256 elapsed, uint256 stake, uint256 reserve);
     event ValidatorRecordSynced(address indexed validator, address indexed operator, bool active, uint256 commissionBps);
     event OperatorChanged(address indexed validator, address indexed oldOperator, address indexed newOperator);
     event ValidatorSetIndexed(uint256 count);
@@ -85,6 +95,7 @@ contract  StratoStaking is Ownable {
     event ProposalMissed(address indexed validator, address indexed operator, uint256 blockNumber);
     event ValidatorJailed(address indexed operator, address indexed validator, uint256 jailedUntil);
     event CommissionUpdated(address indexed validator, uint256 oldCommissionBps, uint256 newCommissionBps);
+    event CommissionIncreaseAnnounced(address indexed validator, uint256 newCommissionBps, uint256 readyTime);
     event Staked(address indexed user, address indexed validator, uint256 amount);
     event StakeMoved(address indexed user, address indexed fromValidator, address indexed toValidator, uint256 amount);
     event UnbondingStarted(address indexed user, address indexed validator, uint256 indexed requestId, uint256 amount, uint256 releaseTime);
@@ -101,6 +112,13 @@ contract  StratoStaking is Ownable {
 
     uint256 public constant PRECISION = 1e18;
     uint256 public constant BPS_DIVISOR = 10000;
+    // Self-bond a seat taken under the admission rule needs until the admins set
+    // selfBondMinimum (see _minSelfBond).
+    uint256 public constant DEFAULT_SELF_BOND_MINIMUM = 10000e18;
+    // The longest interval one block is paid for by the emission schedule, and the year its
+    // rate is quoted over.
+    uint256 public constant MAX_CREDITED_GAP_SECONDS = 3600;
+    uint256 public constant YEAR = 31536000;
 
     Token public stratoToken;
     IERC20 public usdstToken;
@@ -113,14 +131,21 @@ contract  StratoStaking is Ownable {
     // republishes weights as ValidatorStakeUpdated for consensus to read.
     address public governance;
     bool public governanceSyncEnabled;
-    uint256 public minStake;              // self-bond a validator must hold (see _meetsMinStake)
+    uint256 public minStake;              // the bar for seats held since before the self-bond rule (see _meetsMinStake)
+    // Own bond a candidate, or a seat taken under the self-bond rule, needs (see _minSelfBond).
+    // 0 = never set, read as DEFAULT_SELF_BOND_MINIMUM. Not named minSelfBond: an early V2
+    // stored a field of that name, which a proxy upgraded in place may still hold.
+    uint256 public selfBondMinimum;
+    // Applies only to seats held since before the self-bond rule (see _meetsMinStake).
     // Until this time validators qualify on self-bond + delegated stake, the rule the first
     // validators were admitted under; from it on, minStake must be met by self-bond alone.
     // Zero means never set: a proxy upgraded in place keeps the old rule until the admins
     // choose a deadline. initialize() writes 1, so fresh deployments start on self-bond.
     uint256 public selfBondGraceUntil;
     uint256 public proposerFeeBps;        // share of each transaction fee routed here
-    uint256 public maxConsecutiveMisses;  // 0 = never jail
+    // Jailing is disabled, so these two are stored but not acted on, and jailedUntil is
+    // never written: it only holds windows set before jailing was switched off.
+    uint256 public maxConsecutiveMisses;
     uint256 public jailCooldown;
 
     // Consensus set size and admission.
@@ -131,13 +156,15 @@ contract  StratoStaking is Ownable {
     uint256 public exitNoticeSeconds;
     uint256 public unkickCooldown;
     uint256 public maxOperatorStakeBps;     // inbound stake cap per validator (0 = off)
-    bool public joinsPaused;                // permissionless activation switch (owner may still activate)
+    uint256 public joinsOpenFromBlock;      // first block of permissionless activation (0 = not yet agreed)
     uint256 public validatorCount;
     uint256 public mutationBlock;
     uint256 public setMutationsThisBlock;
     mapping(address => uint256) public  exitReadyTime;
     mapping(address => uint256) public  kickedAt;
     mapping(address => bool) public  isValidator;
+    // Seats taken under the self-bond rule; a seat held since before it reads false.
+    mapping(address => bool) public  seatedUnderSelfBondRule;
     mapping(address => uint256) public  lastSyncedWeight;
     mapping(address => uint256) public  jailedUntil;
     // The consensus set itself, so set-wide passes are bounded by the set, not by how many
@@ -172,6 +199,22 @@ contract  StratoStaking is Ownable {
     uint256 public allocatedRewardLiability;
     uint256 public totalRewardsCredited;
 
+    // Emission schedule: E0 STRATO a year at S0 of consensus weight with R0 in reserve, scaled
+    // by sqrt(S / S0) and R / R0 (see _emission). Committed once. The reserve leaves only
+    // through _payProduction and is kept out of reward payouts and recoverable STRATO. Not
+    // named rewardReserve: the retired schedule kept its reserve under that name, and SolidVM
+    // storage is keyed by name.
+    uint256 public emissionReserve;
+    uint256 public emissionRateE0;
+    uint256 public emissionStakeS0;
+    uint256 public emissionReserveR0;
+    uint256 public emissionStartTime;       // 0 = not committed
+    uint256 public totalEmitted;
+    // The last processed block's timestamp, and the highest one before it: the interval the
+    // last block closed. previousBlockTime never moves back, so no time is paid twice.
+    uint256 public lastBlockTime;
+    uint256 public previousBlockTime;
+
     // Discretionary rewards in tokens other than STRATO and USDST, owed to operators:
     // operator => token => amount. Keyed by the operator account rather than the validator, so
     // a later change of operator never hands accrued rewards to the successor.
@@ -182,6 +225,14 @@ contract  StratoStaking is Ownable {
     // Final indexes of the retired reward schedule. Frozen; read only by _settleRetiredSchedule.
     uint256 public baseRewardPerOperatorStored;
     uint256 public globalStakeRewardPerTokenStored;
+
+    // An operator's announced commission raise and when it may be applied (0 = none).
+    mapping(address => uint256) public  announcedCommissionBps;
+    mapping(address => uint256) public  announcedCommissionTime;
+
+    // user => validator => time until which stake moved onto the validator cannot be
+    // moved on again.
+    mapping(address => mapping(address => uint256)) public  moveLockedUntil;
 
     // Every validator ever listed, and its record.
     address[] public  operatorList;
@@ -223,7 +274,6 @@ contract  StratoStaking is Ownable {
         maxSetMutationsPerBlock = 2;
         exitNoticeSeconds = _unbondingSeconds;
         unkickCooldown = _unbondingSeconds;
-        joinsPaused = true;
 
         emit Initialized(_stratoToken, _unbondingSeconds, _maxCommissionBps);
     }
@@ -317,6 +367,16 @@ contract  StratoStaking is Ownable {
         _syncAllValidators();
     }
 
+    // Set the own bond a candidate, or a seat taken under the self-bond rule, needs. A higher
+    // bar applies to the set at once: such seats that fall short leave, as far as this
+    // block's change budget allows. Seats held since before the rule stay on minStake.
+    function setSelfBondMinimum(uint256 _selfBondMinimum) external onlyOwner onlyInitialized {
+        require(_selfBondMinimum > 0, "SS: self-bond minimum=0");
+        selfBondMinimum = _selfBondMinimum;
+        emit SelfBondMinimumSet(_selfBondMinimum);
+        _syncAllValidators();
+    }
+
     function setSetParams(
         uint256 _maxActiveValidators,
         uint256 _hardCapActiveValidators,
@@ -324,8 +384,7 @@ contract  StratoStaking is Ownable {
         uint256 _maxSetMutationsPerBlock,
         uint256 _exitNoticeSeconds,
         uint256 _unkickCooldown,
-        uint256 _maxOperatorStakeBps,
-        bool _joinsPaused
+        uint256 _maxOperatorStakeBps
     ) external onlyOwner onlyInitialized {
         // Unset (0) means the cap was never written; only-lowers applies once set.
         require(_hardCapActiveValidators > 0 && (hardCapActiveValidators == 0 || _hardCapActiveValidators <= hardCapActiveValidators), "SS: hard cap only lowers");
@@ -340,8 +399,16 @@ contract  StratoStaking is Ownable {
         exitNoticeSeconds = _exitNoticeSeconds;
         unkickCooldown = _unkickCooldown;
         maxOperatorStakeBps = _maxOperatorStakeBps;
-        joinsPaused = _joinsPaused;
-        emit SetParamsUpdated(_maxActiveValidators, _hardCapActiveValidators, _evictionMarginBps, _maxSetMutationsPerBlock, _exitNoticeSeconds, _unkickCooldown, _maxOperatorStakeBps, _joinsPaused);
+        emit SetParamsUpdated(_maxActiveValidators, _hardCapActiveValidators, _evictionMarginBps, _maxSetMutationsPerBlock, _exitNoticeSeconds, _unkickCooldown, _maxOperatorStakeBps);
+    }
+
+    // Agree the block from which anyone may seat an eligible validator. It can be set, or
+    // moved, only to a future block and only until it is reached; admission then stays open.
+    function setJoinsOpenFromBlock(uint256 _joinsOpenFromBlock) external onlyOwner onlyInitialized {
+        require(joinsOpenFromBlock == 0 || block.number < joinsOpenFromBlock, "SS: joins already open");
+        require(_joinsOpenFromBlock > block.number, "SS: block passed");
+        joinsOpenFromBlock = _joinsOpenFromBlock;
+        emit JoinsOpenFromBlockSet(_joinsOpenFromBlock);
     }
 
     // Lowering maxCommissionBps needs no pass over the validators: commission is capped
@@ -363,13 +430,23 @@ contract  StratoStaking is Ownable {
         return v.selfBond + v.delegatedStake;
     }
 
-    // minStake is a self-bond requirement: a validator must have its own stake at risk, and
-    // delegations add weight but cannot qualify it on their own. See selfBondGraceUntil.
-    function _meetsMinStake(StakingValidator storage v) internal view returns (bool) {
+    // A seat taken under this logic, and any candidate for one, needs _minSelfBond() of the
+    // operator's own bond: delegations add weight but never qualify it. A seat held since
+    // before the rule keeps the one it was admitted under (minStake, with selfBondGraceUntil)
+    // until the validator leaves the set or changes operator.
+    function _meetsMinStake(address validator, StakingValidator storage v) internal view returns (bool) {
+        if (!isValidator[validator] || seatedUnderSelfBondRule[validator]) {
+            return v.selfBond >= _minSelfBond();
+        }
         if (selfBondGraceUntil == 0 || block.timestamp < selfBondGraceUntil) {
             return _validatorWeight(v) >= minStake;
         }
         return v.selfBond >= minStake;
+    }
+
+    // Virtual so a test harness can price it in small amounts.
+    function _minSelfBond() internal view virtual returns (uint256) {
+        return selfBondMinimum == 0 ? DEFAULT_SELF_BOND_MINIMUM : selfBondMinimum;
     }
 
     // 0 = Missing, 1 = Registered, 2 = Active, 3 = Kicked
@@ -386,7 +463,7 @@ contract  StratoStaking is Ownable {
     function eligible(address validator) public view returns (bool) {
         StakingValidator storage v = operators[validator];
         if (!v.exists || !v.active) return false;
-        return _meetsMinStake(v)
+        return _meetsMinStake(validator, v)
             && block.timestamp >= jailedUntil[validator]
             && (exitReadyTime[validator] == 0 || block.timestamp < exitReadyTime[validator]);
     }
@@ -396,9 +473,18 @@ contract  StratoStaking is Ownable {
         return eligible(validator) && !isValidator[validator];
     }
 
-    // More than a third of the rewardable stake: can stall a stake-weighted quorum.
+    // Voting weight of the consensus set. Stake behind listed validators outside the set
+    // carries no vote, so shares of the quorum are measured against this, not against
+    // totalRewardableStake.
+    function consensusWeight() public view returns (uint256 total) {
+        for (uint256 i = 0; i < activeValidators.length; i++) {
+            total += _validatorWeight(operators[activeValidators[i]]);
+        }
+    }
+
+    // More than a third of the consensus set's weight: can stall a stake-weighted quorum.
     function exceedsOneThird(address validator) external view returns (bool) {
-        return isValidator[validator] && _validatorWeight(operators[validator]) * 3 > totalRewardableStake;
+        return isValidator[validator] && _validatorWeight(operators[validator]) * 3 > consensusWeight();
     }
 
     function effectiveCap() public view returns (uint256) {
@@ -411,6 +497,13 @@ contract  StratoStaking is Ownable {
 
     function _mutationCap() internal view returns (uint256) {
         return maxSetMutationsPerBlock == 0 ? 4 : maxSetMutationsPerBlock;
+    }
+
+    function _mutationsLeft() internal view returns (uint256) {
+        uint256 cap = _mutationCap();
+        if (mutationBlock != block.number) return cap;
+        if (setMutationsThisBlock >= cap) return 0;
+        return cap - setMutationsThisBlock;
     }
 
     function _consumeMutations(uint256 n) internal {
@@ -426,6 +519,7 @@ contract  StratoStaking is Ownable {
     // cache and the set index.
     function _seat(address validator, uint256 weight) internal {
         isValidator[validator] = true;
+        seatedUnderSelfBondRule[validator] = true;
         lastSyncedWeight[validator] = weight;
         validatorCount += 1;
         if (activeValidatorIndex[validator] == 0) {
@@ -454,18 +548,30 @@ contract  StratoStaking is Ownable {
     }
 
     // One-time backfill for a proxy upgraded in place, whose consensus set predates
-    // activeValidators. Permissionless and idempotent: it only indexes validators that
-    // isValidator already records. Until it runs, set-wide passes see no members, which
-    // fails safe (no resync, no eviction).
-    function indexValidatorSet(address[] calldata validators) external onlyInitialized {
-        for (uint256 i = 0; i < validators.length; i++) {
-            address validator = validators[i];
-            if (isValidator[validator] && activeValidatorIndex[validator] == 0) {
+    // activeValidators. Permissionless and idempotent. Read the full set from governance
+    // so a caller cannot index just one member and publish a partial weight vector; all
+    // weights are then synced together. Until it runs, set-wide passes see no members,
+    // which fails safe (no resync, no eviction).
+    function indexValidatorSet() external onlyInitialized {
+        require(governanceSyncEnabled, "SS: governance sync off");
+        uint256 count = IStakingGovernance(governance).validatorCount();
+        for (uint256 i = 0; i < count; i++) {
+            address validator = IStakingGovernance(governance).validators(i);
+            require(isValidator[validator], "SS: validator not seated here");
+            if (activeValidatorIndex[validator] == 0) {
                 activeValidators.push(validator);
                 activeValidatorIndex[validator] = activeValidators.length;
             }
         }
         emit ValidatorSetIndexed(activeValidators.length);
+        _syncAllValidators();
+        // The sync leaves a member without a weight when it no longer qualifies and
+        // governance refuses to drop it (a seat staking never managed, or the last one).
+        // Its peers' weights alone would be a partial vector, so nothing is published.
+        count = IStakingGovernance(governance).validatorCount();
+        for (uint256 i = 0; i < count; i++) {
+            require(IStakingGovernance(governance).validatorStake(IStakingGovernance(governance).validators(i)) > 0, "SS: validator without weight");
+        }
     }
 
     function _activate(address validator) internal {
@@ -493,14 +599,27 @@ contract  StratoStaking is Ownable {
 
     // Keep governance in step with a validator already in the set: leave when no longer
     // eligible (same transaction, counts as a set mutation), refresh the weight otherwise.
-    // Joining is never implicit.
+    // With this block's mutation budget spent, a validator that should leave keeps its
+    // seat until a later sync: failing instead would block the unstake or parameter
+    // change that got here. Joining is never implicit.
     function _syncValidator(address validator) internal {
         if (!governanceSyncEnabled || !isValidator[validator]) return;
-        if (!eligible(validator)) {
+        // Governance decides who is in the consensus set. A validator it no longer
+        // lists (an admin vote removed it) gives up its seat here: adding it back
+        // would undo the vote, and anyone can trigger a sync.
+        if (IStakingGovernance(governance).validatorMap(validator) == 0) {
+            _unseat(validator);
+            emit ValidatorSynced(operatorOf(validator), validator, false, 0);
+            return;
+        }
+        if (!eligible(validator) && _mutationsLeft() > 0) {
             _consumeMutations(1);
             _deactivate(validator);
             return;
         }
+        // A seated member absent from the index predates the backfill. Do not publish
+        // its weight alone; indexValidatorSet syncs the whole governance set at once.
+        if (activeValidatorIndex[validator] == 0) return;
         uint256 weight = _validatorWeight(operators[validator]);
 
         // Publish unconditionally. lastSyncedWeight is only this contract's guess
@@ -511,10 +630,10 @@ contract  StratoStaking is Ownable {
         // setValidatorStake drops a no-op without emitting, so republishing costs
         // one call and never a spurious ValidatorStakeUpdated.
         //
-        // addValidatorFromStaking rather than updateValidatorStake: the latter
-        // reverts when governance does not already list the validator, which would
-        // propagate out of stake() and unstake() and break staking for users. The
-        // former reconciles that case instead of failing on it.
+        // addValidatorFromStaking rather than updateValidatorStake: governance lists
+        // the validator at this point, so nothing is added, and it also marks the
+        // validator staking-managed, which removeValidatorFromStaking requires (the
+        // genesis validators arrive unmanaged).
         IStakingGovernance(governance).addValidatorFromStaking(validator, weight);
 
         // ValidatorSynced stays change-gated: consensus consumes it as a delta
@@ -550,14 +669,15 @@ contract  StratoStaking is Ownable {
         }
     }
 
+    // Admission is open to everyone from the agreed block, and to nobody before it.
     function _requireJoinsOpen() internal view {
-        require(!joinsPaused || msg.sender == owner(), "SS: joins paused");
+        require(joinsOpenFromBlock != 0 && block.number >= joinsOpenFromBlock, "SS: joins not open");
         require(governanceSyncEnabled, "SS: governance sync off");
     }
 
     // Put an eligible validator into the consensus set: into a free slot, or by evicting
     // the lowest validator it beats by evictionMarginBps. Anyone may call once joins are
-    // open; the owner may always.
+    // open.
     function tryActivate(address validator) external onlyInitialized onlyListed(validator) {
         _requireJoinsOpen();
         require(!isValidator[validator], "SS: already active");
@@ -594,11 +714,16 @@ contract  StratoStaking is Ownable {
         }
     }
 
-    // Inbound stake may not push a validator above maxOperatorStakeBps of the rewardable
-    // stake (grandfathered validators simply cannot receive more).
+    // Inbound stake may not push a validator above maxOperatorStakeBps of the consensus
+    // set's weight (grandfathered validators simply cannot receive more). A validator
+    // outside the set is measured as if it had joined. No cap while the set is empty.
     function _requireWithinStakeCap(address validator) internal view {
-        if (maxOperatorStakeBps == 0 || totalRewardableStake == 0) return;
-        require(_validatorWeight(operators[validator]) * BPS_DIVISOR <= totalRewardableStake * maxOperatorStakeBps, "SS: above operator stake cap");
+        if (maxOperatorStakeBps == 0) return;
+        uint256 total = consensusWeight();
+        if (total == 0) return;
+        uint256 weight = _validatorWeight(operators[validator]);
+        if (!isValidator[validator]) total += weight;
+        require(weight * BPS_DIVISOR <= total * maxOperatorStakeBps, "SS: above operator stake cap");
     }
 
     // An active validator announces it will leave; it keeps serving for exitNoticeSeconds,
@@ -616,13 +741,6 @@ contract  StratoStaking is Ownable {
         emit ExitCancelled(msg.sender, validator);
     }
 
-    // Used from the fee path, which must never revert.
-    function _trySyncValidator(address validator) internal {
-        try _syncValidator(validator) {
-        } catch {
-        }
-    }
-
     // Walks the set from the end: a removal swaps the last member into the removed slot,
     // and walking backwards means that member has already been visited.
     function _syncAllValidators() internal {
@@ -633,7 +751,7 @@ contract  StratoStaking is Ownable {
         }
     }
 
-    // Permissionless resync (e.g. after a jail cooldown expires).
+    // Permissionless resync (e.g. once an exit notice is up).
     function syncValidator(address validator) external onlyInitialized onlyListed(validator) {
         _syncValidator(validator);
     }
@@ -747,6 +865,9 @@ contract  StratoStaking is Ownable {
 
     function _payRewards(address to, uint256 amount) internal {
         if (amount == 0) return;
+        // Whatever the reward bookkeeping says is owed, rewards are never paid out of
+        // staked or unbonding principal, or out of the unreleased emission reserve.
+        require(IERC20(address(stratoToken)).balanceOf(address(this)) >= principalBalance() + emissionReserve + amount, "SS: rewards unavailable");
         if (amount >= allocatedRewardLiability) {
             allocatedRewardLiability = 0;
         } else {
@@ -785,7 +906,8 @@ contract  StratoStaking is Ownable {
 
     // A new operator takes over a record. What the outgoing operator owns leaves with it:
     // its self-bond is queued for unbonding to it and its accrued rewards and fees are paid
-    // out, so the incoming operator starts from zero.
+    // out, so the incoming operator starts from zero. A seat it takes over is held under the
+    // self-bond rule from then on.
     function _changeOperator(address validator, address newOperator) internal {
         address oldOperator = operatorOf(validator);
         if (oldOperator == newOperator) return;
@@ -800,6 +922,7 @@ contract  StratoStaking is Ownable {
         v.pendingFeeCommission = 0;
         _releaseSelfBond(validator, v, oldOperator);
         v.operator = newOperator;
+        seatedUnderSelfBondRule[validator] = true;
 
         _payRewards(oldOperator, rewards);
         _payFees(oldOperator, fees);
@@ -856,8 +979,21 @@ contract  StratoStaking is Ownable {
 
     // ---- commission ------------------------------------------------------------------
 
+    // An operator lowers its commission at once. Raising it takes two calls with the same
+    // value, unbondingSeconds apart: the first announces the raise, so delegators can
+    // leave before it is charged, and the second applies it.
     function setCommissionBps(address validator, uint256 newCommissionBps) external onlyInitialized onlyOperatorOf(validator) {
         require(operators[validator].active, "SS: validator inactive");
+        require(newCommissionBps <= maxCommissionBps, "SS: commission too high");
+        if (newCommissionBps > operators[validator].commissionBps) {
+            if (announcedCommissionTime[validator] == 0 || announcedCommissionBps[validator] != newCommissionBps) {
+                announcedCommissionBps[validator] = newCommissionBps;
+                announcedCommissionTime[validator] = block.timestamp + unbondingSeconds;
+                emit CommissionIncreaseAnnounced(validator, newCommissionBps, announcedCommissionTime[validator]);
+                return;
+            }
+            require(block.timestamp >= announcedCommissionTime[validator], "SS: commission notice running");
+        }
         _setCommissionBps(validator, newCommissionBps);
     }
 
@@ -873,6 +1009,7 @@ contract  StratoStaking is Ownable {
 
         uint256 oldCommissionBps = v.commissionBps;
         v.commissionBps = newCommissionBps;
+        announcedCommissionTime[validator] = 0;
         emit CommissionUpdated(validator, oldCommissionBps, newCommissionBps);
     }
 
@@ -913,6 +1050,11 @@ contract  StratoStaking is Ownable {
         require(fromValidator != toValidator, "SS: same validator");
         require(operators[toValidator].active, "SS: target inactive");
         require(delegatedStake[msg.sender][fromValidator] >= amount, "SS: insufficient stake");
+        // Moving is instant, so without this a delegator could follow each block's
+        // proposer around and collect a share of every validator's income. Stake on a
+        // delisted validator can always be moved away.
+        require(!operators[fromValidator].active || block.timestamp >= moveLockedUntil[msg.sender][fromValidator], "SS: stake recently moved");
+        moveLockedUntil[msg.sender][toValidator] = block.timestamp + unbondingSeconds;
 
         _updateUser(msg.sender, fromValidator);
         _updateUser(msg.sender, toValidator);
@@ -995,7 +1137,11 @@ contract  StratoStaking is Ownable {
     // actually paid in; anyone else calling it simply adds their own STRATO to a validator's
     // income. The router catches a failure, and a SolidVM catch does not roll back, so every
     // check that can fail runs before the first write.
+    //
+    // Disabled: the emission schedule pays block producers, so the flat reward is refused
+    // and stays with the router. Kept so the router's call resolves and v2 stays detectable.
     function creditBlockReward(address validator, uint256 amount) external onlyInitialized {
+        require(false, "SS: block reward disabled");
         StakingValidator storage v = operators[validator];
         require(v.exists && v.active, "SS: validator not listed");
         require(amount > 0, "SS: amount=0");
@@ -1132,14 +1278,14 @@ contract  StratoStaking is Ownable {
             // of this that can throw; the fee path catches that, and a SolidVM catch
             // does not roll back, so latching first would leave the block marked
             // processed with nothing counted and no way for a later transaction to
-            // retry. Everything after this point is local writes plus _jail's
-            // already-guarded sync.
+            // retry. Everything after this point is local writes.
             address actual = block.prevProposer;
             address intended = block.prevIntendedProposer;
-            // Latch before _processPrevBlock, not after: _jail calls out to
-            // governance, and a reentrant processBlock must not count twice.
             lastProcessedBlock = block.number;
             _processPrevBlock(actual, intended);
+            _payProduction(actual);
+            if (lastBlockTime > previousBlockTime) previousBlockTime = lastBlockTime;
+            lastBlockTime = block.timestamp;
         }
     }
 
@@ -1157,7 +1303,8 @@ contract  StratoStaking is Ownable {
 
         address proposer = block.proposer;
         StakingValidator storage v = operators[proposer];
-        if (!v.exists) {
+        // A delisted validator governance kept in the set earns nothing.
+        if (!v.exists || !v.active) {
             unattributedFees += received;
             emit UnattributedFees(proposer, received);
             return;
@@ -1170,8 +1317,8 @@ contract  StratoStaking is Ownable {
     // Record who proposed the previous block and whether its intended proposer
     // (the one selected for the round the height started at) missed. A miss is
     // consensus-derived but not cryptographically attributable (a round change
-    // carries no signed "missed" evidence), so it only costs the block's income,
-    // feeds the dashboard and — optionally — a temporary jail. No tokens move.
+    // carries no signed "missed" evidence), so it only costs the block's income
+    // and feeds the dashboard. No tokens move and the set does not change.
     function _processPrevBlock(address actual, address intended) internal {
         if (actual != address(0)) {
             blocksProposed[actual] += 1;
@@ -1182,19 +1329,89 @@ contract  StratoStaking is Ownable {
         missedProposals[intended] += 1;
         consecutiveMisses[intended] += 1;
         emit ProposalMissed(intended, operatorOf(intended), block.number - 1);
-
-        if (maxConsecutiveMisses > 0 && consecutiveMisses[intended] >= maxConsecutiveMisses) {
-            _jail(intended);
-        }
     }
 
-    // Take the validator out of the set until jailedUntil; stake is untouched.
-    function _jail(address validator) internal {
-        if (!operators[validator].exists) return;
-        consecutiveMisses[validator] = 0;
-        jailedUntil[validator] = block.timestamp + jailCooldown;
-        emit ValidatorJailed(operatorOf(validator), validator, jailedUntil[validator]);
-        _trySyncValidator(validator);
+    // ---- emission schedule -------------------------------------------------------------
+
+    // Pay the previous block's producer the schedule's release for the interval its block
+    // closed (from the highest earlier block timestamp, or the start if later), at most
+    // MAX_CREDITED_GAP_SECONDS. Block timestamps are set by proposers: one behind its parent
+    // closes no interval, and the cap bounds one ahead of it. The rate is the formula at the
+    // current consensus weight and reserve. A producer that is not seated, listed and
+    // eligible is paid nothing; what is not paid stays in the reserve.
+    function _payProduction(address producer) internal {
+        if (producer == address(0) || emissionStartTime == 0 || previousBlockTime == 0) return;
+        uint256 since = previousBlockTime > emissionStartTime ? previousBlockTime : emissionStartTime;
+        if (lastBlockTime <= since) return;
+        uint256 elapsed = lastBlockTime - since;
+        if (elapsed > MAX_CREDITED_GAP_SECONDS) elapsed = MAX_CREDITED_GAP_SECONDS;
+
+        if (!isValidator[producer] || !eligible(producer)) return;
+        uint256 stake = consensusWeight();
+        uint256 reserve = emissionReserve;
+        if (stake == 0 || reserve == 0) return;
+        uint256 amount = _emission(stake, reserve, elapsed);
+        if (amount > reserve) amount = reserve;
+        if (amount == 0) return;
+
+        StakingValidator storage v = operators[producer];
+        _settleRetiredSchedule(v);
+        _creditRewards(v, amount);
+        emissionReserve = reserve - amount;
+        allocatedRewardLiability += amount;
+        totalEmitted += amount;
+        emit ProductionRewarded(operatorOf(producer), producer, amount, elapsed, stake, emissionReserve);
+    }
+
+    // E0 * sqrt(S / S0) * (R / R0) a year, over `elapsed` seconds. sqrt(S / S0) is taken as
+    // sqrt(S * S0) / S0 so the integer root keeps its precision.
+    function _emission(uint256 stake, uint256 reserve, uint256 elapsed) internal view returns (uint256) {
+        uint256 annual = (emissionRateE0 * _sqrt(stake * emissionStakeS0)) / emissionStakeS0;
+        annual = (annual * reserve) / emissionReserveR0;
+        return (annual * elapsed) / YEAR;
+    }
+
+    // The yearly release at the current consensus weight and reserve (0 before the commitment).
+    function emissionAnnualRate() external view returns (uint256) {
+        if (emissionStartTime == 0) return 0;
+        uint256 stake = consensusWeight();
+        if (stake == 0 || emissionReserve == 0) return 0;
+        return _emission(stake, emissionReserve, YEAR);
+    }
+
+    // Integer square root, rounded down (Babylonian).
+    function _sqrt(uint256 x) internal pure returns (uint256) {
+        if (x == 0) return 0;
+        uint256 z = (x + 1) / 2;
+        uint256 y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
+        return y;
+    }
+
+    // Commit the schedule, once: e0 STRATO a year at s0 of consensus weight with r0 in
+    // reserve, from startTime (a past time means now). The reserve must already hold r0, so
+    // what is advertised is funded. There is no pause, restart or re-calibration, and no
+    // owner call takes the reserve back; later top-ups only raise R.
+    function commitEmissionSchedule(uint256 e0, uint256 s0, uint256 r0, uint256 startTime) external onlyOwner onlyInitialized {
+        require(emissionStartTime == 0, "SS: schedule committed");
+        require(e0 > 0 && s0 > 0 && r0 > 0, "SS: bad schedule");
+        require(emissionReserve >= r0, "SS: reserve unfunded");
+        emissionRateE0 = e0;
+        emissionStakeS0 = s0;
+        emissionReserveR0 = r0;
+        emissionStartTime = startTime > block.timestamp ? startTime : block.timestamp;
+        emit EmissionScheduleCommitted(e0, s0, r0, emissionStartTime);
+    }
+
+    // Add STRATO to the emission reserve, pulled from the caller (approve this contract
+    // first). Anyone may fund it, before or after the commitment; nothing takes it back out.
+    function fundEmissionReserve(uint256 amount) external onlyInitialized {
+        uint256 received = _pullReward(address(stratoToken), amount);
+        emissionReserve += received;
+        emit EmissionReserveFunded(msg.sender, received, emissionReserve);
     }
 
     // ---- claims ----------------------------------------------------------------------
@@ -1314,11 +1531,11 @@ contract  StratoStaking is Ownable {
         return totalUserStake + totalSelfBond + totalUnbonding;
     }
 
-    // STRATO held beyond principal and unclaimed rewards (including anything left in the
-    // retired schedule's reserve).
+    // STRATO held beyond principal, unclaimed rewards and the emission reserve (including
+    // anything left in the retired schedule's reserve).
     function recoverableUntrackedStrato() public view returns (uint256) {
         uint256 balance = IERC20(address(stratoToken)).balanceOf(address(this));
-        uint256 tracked = principalBalance() + allocatedRewardLiability;
+        uint256 tracked = principalBalance() + allocatedRewardLiability + emissionReserve;
         if (balance <= tracked) return 0;
         return balance - tracked;
     }
