@@ -7,10 +7,9 @@ import "../../concrete/Tokens/TokenFactory.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/ERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
-contract Describe_PoolFactory is Authorizable {
+contract Describe_PoolFactory {
     Mercata m;
     address tokenAAddress;
     address tokenBAddress;
@@ -21,31 +20,33 @@ contract Describe_PoolFactory is Authorizable {
     string[] emptyArray;
 
     function beforeAll() {
-        bypassAuthorizations = true;
         m = new Mercata();
     }
 
     function beforeEach() {
         // Create fresh tokens for each test
-        tokenAAddress = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Token A", "Test Token A", emptyArray, emptyArray, emptyArray, "TKA", 10000000e18, 18
         );
-        tokenBAddress = m.tokenFactory().createToken(
+        tokenAAddress = address(ret);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Token B", "Test Token B", emptyArray, emptyArray, emptyArray, "TKB", 10000000e18, 18
         );
-        tokenCAddress = m.tokenFactory().createToken(
+        tokenBAddress = address(ret);
+        (executed, ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "Token C", "Test Token C", emptyArray, emptyArray, emptyArray, "TKC", 10000000e18, 18
         );
+        tokenCAddress = address(ret);
 
         // Activate tokens
-        Token(tokenAAddress).setStatus(2); // ACTIVE
-        Token(tokenBAddress).setStatus(2); // ACTIVE
-        Token(tokenCAddress).setStatus(2); // ACTIVE
+        m.adminRegistry().castVoteOnIssue(tokenAAddress, "setStatus", 2); // ACTIVE
+        m.adminRegistry().castVoteOnIssue(tokenBAddress, "setStatus", 2); // ACTIVE
+        m.adminRegistry().castVoteOnIssue(tokenCAddress, "setStatus", 2); // ACTIVE
 
         // Mint tokens to test contract
-        Token(tokenAAddress).mint(address(this), 100000000e18);
-        Token(tokenBAddress).mint(address(this), 100000000e18);
-        Token(tokenCAddress).mint(address(this), 100000000e18);
+        m.adminRegistry().castVoteOnIssue(tokenAAddress, "mint", address(this), 100000000e18);
+        m.adminRegistry().castVoteOnIssue(tokenBAddress, "mint", address(this), 100000000e18);
+        m.adminRegistry().castVoteOnIssue(tokenCAddress, "mint", address(this), 100000000e18);
     }
 
     // ============ BASIC FUNCTIONALITY TESTS ============
@@ -130,21 +131,21 @@ contract Describe_PoolFactory is Authorizable {
     function it_pool_factory_can_set_admin_registry() {
         // Test setting admin registry (owner only)
         address newAdminRegistry = address(0x123);
-        m.poolFactory().setAdminRegistry(newAdminRegistry);
+        m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "setAdminRegistry", newAdminRegistry);
         require(m.poolFactory().adminRegistry() == newAdminRegistry, "adminRegistry should be updated");
     }
 
     function it_pool_factory_can_set_token_factory() {
         // Test setting token factory (owner only)
         address newTokenFactory = address(0x456);
-        m.poolFactory().setTokenFactory(newTokenFactory);
+        m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "setTokenFactory", newTokenFactory);
         require(m.poolFactory().tokenFactory() == newTokenFactory, "tokenFactory should be updated");
     }
 
     function it_pool_factory_can_set_fee_collector() {
         // Test setting fee collector (owner only)
         address newFeeCollector = address(0x789);
-        m.poolFactory().setFeeCollector(newFeeCollector);
+        m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "setFeeCollector", newFeeCollector);
         require(m.poolFactory().feeCollector() == newFeeCollector, "feeCollector should be updated");
     }
 
@@ -153,7 +154,7 @@ contract Describe_PoolFactory is Authorizable {
         uint256 newSwapFeeRate = 50; // 0.5%
         uint256 newLpSharePercent = 8000; // 80%
 
-        m.poolFactory().setFeeParameters(newSwapFeeRate, newLpSharePercent);
+        m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "setFeeParameters", newSwapFeeRate, newLpSharePercent);
         require(m.poolFactory().swapFeeRate() == newSwapFeeRate, "swapFeeRate should be updated");
         require(m.poolFactory().lpSharePercent() == newLpSharePercent, "lpSharePercent should be updated");
     }
@@ -278,14 +279,14 @@ contract Describe_PoolFactory is Authorizable {
         uint256 maxSwapFeeRate = 1000; // 10%
         uint256 maxLpSharePercent = 10000; // 100%
 
-        m.poolFactory().setFeeParameters(maxSwapFeeRate, maxLpSharePercent);
+        m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "setFeeParameters", maxSwapFeeRate, maxLpSharePercent);
         require(m.poolFactory().swapFeeRate() == maxSwapFeeRate, "Should accept maximum swap fee rate");
         require(m.poolFactory().lpSharePercent() == maxLpSharePercent, "Should accept maximum LP share percent");
 
         // Test minimum fee parameters (both must be > 0)
         uint256 minSwapFeeRate = 1; // 0.01%
         uint256 minLpSharePercent = 1; // 0.01%
-        m.poolFactory().setFeeParameters(minSwapFeeRate, minLpSharePercent);
+        m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "setFeeParameters", minSwapFeeRate, minLpSharePercent);
         require(m.poolFactory().swapFeeRate() == minSwapFeeRate, "Should accept minimum swap fee rate");
         require(m.poolFactory().lpSharePercent() == minLpSharePercent, "Should accept minimum LP share percent");
     }

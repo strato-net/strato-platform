@@ -233,7 +233,8 @@ withPeerStoreConn act = case peerSqlitePath ethConf of
 -- are taken from the migration, made idempotent, and given SQLite-legal
 -- defaults where the models carry Postgres ones (sync_task's
 -- @nextval('chiliad')@ and @now()@; inserts always supply those columns,
--- see "Blockchain.SyncDB"). Nothing else is applied: persistent's SQLite
+-- see "Blockchain.SyncDB"), and a table that already exists is given the
+-- columns it lacks. Nothing else is applied: persistent's SQLite
 -- migration rebuilds a table whose stored DDL differs from its own, and
 -- it would do so on every start once the defaults differ.
 runPeerStoreMigration :: MonadUnliftIO m => SQL.Migration -> SQL.SqlPersistT m ()
@@ -244,13 +245,42 @@ runPeerStoreMigration migration = do
     else do
       statements <- SQL.getMigration migration
       forM_ statements $ \statement ->
-        when ("CREATE TABLE" `T.isPrefixOf` statement) $
+        when ("CREATE TABLE" `T.isPrefixOf` statement) $ do
           SQL.rawExecute (sqliteCompatible statement) []
+          addMissingColumns statement
   where
     sqliteCompatible =
       T.replace "CREATE TABLE " "CREATE TABLE IF NOT EXISTS "
         . T.replace "DEFAULT nextval('chiliad')" "DEFAULT 0"
         . T.replace "DEFAULT now()" "DEFAULT CURRENT_TIMESTAMP"
+    -- CREATE TABLE IF NOT EXISTS leaves a table made by an earlier version
+    -- as it was, so a column added to the model since (sync_task's
+    -- connection_id) was missing and every statement naming it failed: on
+    -- 2026-11-06 both testnet app cells stopped following the chain.
+    -- SQLite parses the wanted definition into a temporary table of the
+    -- same name, and each column the stored table lacks is added. SQLite
+    -- adds only a column that is nullable or has a constant default; any
+    -- other fails here, at startup, not at every write.
+    addMissingColumns statement = do
+      let table = T.takeWhile (/= '(') (T.drop (T.length "CREATE TABLE ") statement)
+          columns schema =
+            SQL.rawSql
+              "SELECT name, type, \"notnull\", dflt_value FROM pragma_table_info(?, ?)"
+              [SQL.PersistText (T.dropAround (== '"') table), SQL.PersistText schema]
+      SQL.rawExecute (T.replace "CREATE TABLE IF NOT EXISTS " "CREATE TEMP TABLE " (sqliteCompatible statement)) []
+      wanted <- columns "temp"
+      SQL.rawExecute ("DROP TABLE temp." <> table) []
+      present <- map (\(SQL.Single name, _, _, _) -> name) <$> columns "main"
+      forM_ wanted $ \(SQL.Single name, SQL.Single sqlType, SQL.Single notNull, SQL.Single dflt) ->
+        when (name `notElem` present) $
+          SQL.rawExecute
+            ( T.concat
+                [ "ALTER TABLE ", table, " ADD COLUMN \"", name, "\" ", sqlType,
+                  if notNull then " NOT NULL" else " NULL",
+                  maybe "" (" DEFAULT " <>) dflt
+                ]
+            )
+            []
 
 withGlobalSQLPool :: (MonadUnliftIO m) => (SQLDB -> m a) -> m a
 withGlobalSQLPool m = liftIO (readIORef globalSQLPool) >>= guardPeerStore . m

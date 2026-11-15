@@ -10,7 +10,6 @@
 // OUTPUT: it_zz_print_* dump measured numbers via log().
 
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Tokens/Token.sol";
 
@@ -184,7 +183,7 @@ contract StableProbe {
     }
 }
 
-contract Describe_Adv_Amm_LpValue is Authorizable {
+contract Describe_Adv_Amm_LpValue {
 
     Mercata m;
     FlashMint fm;
@@ -193,7 +192,6 @@ contract Describe_Adv_Amm_LpValue is Authorizable {
     PriceOracle oracle;
 
     address USDST;
-    Token usdstT;
 
     uint GOLD_RES; uint USDST_RES; uint GOLD_PRICE;
 
@@ -212,35 +210,36 @@ contract Describe_Adv_Amm_LpValue is Authorizable {
     bool sLastMoved; bool sEmaMoved; bool sOracleMoved; bool sDMoved;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         GOLD_RES = 5371e16;
         USDST_RES = 239376e18;
 
         m = new Mercata();
         admin = m.adminRegistry(); pf = m.poolFactory(); fm = new FlashMint(address(admin)); oracle = m.priceOracle();
 
-        USDST = m.tokenFactory().createToken("USDST", "USD Stable", [], [], [], "USDST", 0, 18);
-        usdstT = Token(USDST);
-        usdstT.setStatus(2);
-        oracle.setAssetPrice(USDST, 1e18);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USD Stable", [], [], [], "USDST", 0, 18);
+        USDST = address(ret);
+        admin.castVoteOnIssue(USDST, "setStatus", 2);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", USDST, 1e18);
 
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(fm));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(fm));
 
-        fm.initialize(USDST, address(m.feeCollector()), 2000000e18);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), 2000000e18);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
 
         GOLD_PRICE = (USDST_RES * 1e18) / GOLD_RES;
     }
 
     function _newPool(string sym) internal returns (address, address, address) {
-        address gold = m.tokenFactory().createToken("GOLDST", "Gold", [], [], [], sym, 0, 18);
-        Token(gold).setStatus(2);
-        Token(gold).mint(address(this), 1000000e18);
-        usdstT.mint(address(this), 20000000e18);
-        oracle.setAssetPrice(gold, GOLD_PRICE);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "GOLDST", "Gold", [], [], [], sym, 0, 18);
+        address gold = address(ret);
+        admin.castVoteOnIssue(gold, "setStatus", 2);
+        admin.castVoteOnIssue(gold, "mint", address(this), 1000000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(this), 20000000e18);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", gold, GOLD_PRICE);
 
-        address p = pf.createPool(gold, USDST);
+        (executed, ret) = admin.castVoteOnIssue(address(pf), "createPool", gold, USDST);
+        address p = address(ret);
         Token lp = Pool(p).lpToken();
         admin.castVoteOnIssue(address(admin), "addWhitelist", address(lp), "mint", p);
         admin.castVoteOnIssue(address(admin), "addWhitelist", address(lp), "burn", p);
@@ -275,7 +274,7 @@ contract Describe_Adv_Amm_LpValue is Authorizable {
         (address p, address gold, address lp) = _newPool(sym);
         ZapAttacker a = new ZapAttacker();
         a.init(address(fm), p, USDST, gold, lp);
-        usdstT.mint(address(a), 500000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(a), 500000e18);
         a.go(loan);
         return (a, p, gold, lp);
     }
@@ -294,7 +293,7 @@ contract Describe_Adv_Amm_LpValue is Authorizable {
 
         ZapAttacker a3 = new ZapAttacker();
         a3.init(address(fm), p, USDST, gold, lp);
-        usdstT.mint(address(a3), 500000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(a3), 500000e18);
         a3.go(2000000e18);
 
         z2mCost = a3.netCost();
@@ -330,7 +329,7 @@ contract Describe_Adv_Amm_LpValue is Authorizable {
 
         ZapAttacker a = new ZapAttacker();
         a.init(address(fm), p, USDST, gold, lp);
-        usdstT.mint(address(a), 500000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(a), 500000e18);
         a.go(2000000e18);
 
         uint v1 = _lpValue(p, lp, address(this));
@@ -348,7 +347,7 @@ contract Describe_Adv_Amm_LpValue is Authorizable {
 
         ManipZapAttacker a = new ManipZapAttacker();
         a.init(address(fm), p, USDST, gold, lp);
-        usdstT.mint(address(a), 1000000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(a), 1000000e18);
         a.go(2000000e18);
 
         mzCost = a.netCost();
@@ -372,14 +371,16 @@ contract Describe_Adv_Amm_LpValue is Authorizable {
     /// getVirtualPrice / getDy / calculateTokenAmount do not exist. What DOES exist is a
     /// Curve-style oracle set. Establish which members a single-transaction flash mint moves.
     function it_i1_stablepool_spot_moves_but_ema_does_not() public {
-        address other = m.tokenFactory().createToken("USDC", "USDC", [], [], [], "SUSDC", 0, 18);
-        Token(other).setStatus(2);
-        Token(other).mint(address(this), 10000000e18);
-        usdstT.mint(address(this), 20000000e18);
-        oracle.setAssetPrice(other, 1e18);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDC", "USDC", [], [], [], "SUSDC", 0, 18);
+        address other = address(ret);
+        admin.castVoteOnIssue(other, "setStatus", 2);
+        admin.castVoteOnIssue(other, "mint", address(this), 10000000e18);
+        admin.castVoteOnIssue(USDST, "mint", address(this), 20000000e18);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", other, 1e18);
 
         fastForward(100);
-        address sp = pf.createStablePool(USDST, other);
+        (executed, ret) = admin.castVoteOnIssue(address(pf), "createStablePool", USDST, other);
+        address sp = address(ret);
         StablePool pool = StablePool(sp);
         Token lp = pool.lpToken();
         admin.castVoteOnIssue(address(admin), "addWhitelist", address(lp), "mint", sp);
@@ -392,7 +393,7 @@ contract Describe_Adv_Amm_LpValue is Authorizable {
 
         StableProbe probe = new StableProbe();
         probe.init(address(fm), sp, USDST, other);
-        usdstT.mint(address(probe), 1000000e18);   // float to absorb the two-leg stable fee
+        admin.castVoteOnIssue(USDST, "mint", address(probe), 1000000e18);   // float to absorb the two-leg stable fee
         probe.go(400000e18);
 
         sLastBefore = probe.lastPriceBefore();   sLastMid = probe.lastPriceMid();

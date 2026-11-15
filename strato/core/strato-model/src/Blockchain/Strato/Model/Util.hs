@@ -8,8 +8,14 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Word
 
+-- Splits large values in halves: adding a byte at a time to the whole number
+-- takes time quadratic in its size.
 byteString2Integer :: B.ByteString -> Integer
-byteString2Integer = bytes2Integer . B.unpack
+byteString2Integer b
+  | B.length b <= 64 = B.foldl' (\n w -> n * 256 + fromIntegral w) 0 b
+  | otherwise =
+      let (hi, lo) = B.splitAt (B.length b `div` 2) b
+       in (byteString2Integer hi `shiftL` (8 * B.length lo)) + byteString2Integer lo
 
 --I hate this, it is an ugly way to create an Integer from its component bytes.
 --There should be an easier way....

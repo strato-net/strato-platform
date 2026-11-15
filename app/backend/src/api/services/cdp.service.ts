@@ -4,6 +4,7 @@
 
 import { strato, cirrus } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
+import { governedInput } from "./user.service";
 import { FunctionInput } from "../../types/types";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
@@ -300,6 +301,7 @@ interface VaultData {
 interface AssetConfig {
   asset: string;
   symbol: string;
+  decimals?: number;
   liquidationRatio: number;
   minCR: number;
   liquidationPenaltyBps: number;
@@ -1338,21 +1340,25 @@ export const getSupportedAssets = async (
 
   const { data: symbols } = await cirrus.get(accessToken, `/${Token}`, {
     params: {
-      select: "address,_symbol",
+      select: "address,_symbol,customDecimals",
       "status": "eq.2",
       address: `in.(${supportedAssetAddresses.join(",")})`,
     },
   });
 
-  const symbolMap = new Map(symbols.map((s: any) => [s.address, s._symbol]));
+  const tokenMap = new Map<string, { _symbol?: string; customDecimals?: number | null }>(
+    symbols.map((token: any) => [token.address, token])
+  );
 
   return registryData.cdpEngine.collateralConfigs
-    .filter((config: any) => symbolMap.has(config.asset))
+    .filter((config: any) => tokenMap.has(config.asset))
     .map((config: any) => {
       const cfg = config.CollateralConfig;
+      const token = tokenMap.get(config.asset);
       return {
         asset: config.asset,
-        symbol: symbolMap.get(config.asset),
+        symbol: token?._symbol,
+        decimals: Number(token?.customDecimals ?? 18),
         liquidationRatio: Number(cfg.liquidationRatio) / Number(WAD) * 100,
         minCR: Number(cfg.minCR) / Number(WAD) * 100,
         liquidationPenaltyBps: parseInt(cfg.liquidationPenaltyBps),
@@ -1365,6 +1371,27 @@ export const getSupportedAssets = async (
         isSupported: true,
       };
     });
+};
+
+/** Read-only deployment metadata consumed by SMD's multisig proposal builder. */
+export const getCDPMetadata = async (accessToken: string) => {
+  const [registry, assets] = await Promise.all([
+    getCDPRegistry(accessToken, undefined, {
+      select: "address,cdpEngine,cdpVault,usdst",
+    }, "getCDPMetadata"),
+    getSupportedAssets(accessToken),
+  ]);
+  const usdstAddress = String(registry.usdst || "").replace(/^0x/i, "").toLowerCase();
+  return {
+    registryAddress: registry.address,
+    engineAddress: registry.cdpEngine?.address || registry.cdpEngine,
+    vaultAddress: registry.cdpVault?.address || registry.cdpVault,
+    usdstAddress: registry.usdst,
+    // USDST may be enabled in the engine for protocol bookkeeping, but it cannot be
+    // selected as collateral. Keep it out of governance-aware client pickers.
+    assets: assets.filter((asset) =>
+      String(asset.asset || "").replace(/^0x/i, "").toLowerCase() !== usdstAddress),
+  };
 };
 
 export const getMaxLiquidatable = async (
@@ -1494,7 +1521,7 @@ export const setCollateralConfig = async (
     },
   };
 
-  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, tx), userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
@@ -1521,7 +1548,7 @@ export const setAssetPaused = async (
     },
   };
 
-  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, tx), userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
@@ -1547,7 +1574,7 @@ export const setGlobalPaused = async (
     },
   };
 
-  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, tx), userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
@@ -1574,7 +1601,7 @@ export const setAssetSupported = async (
     },
   };
 
-  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
+  const builtTx = await buildFunctionTx(await governedInput(accessToken, tx), userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );

@@ -1,5 +1,4 @@
 import "../utils/Context.sol";
-import "../../../concrete/Admin/AdminRegistry.sol";
 
 /**
  * @dev Contract module which provides a basic access control mechanism, where
@@ -15,11 +14,6 @@ import "../../../concrete/Admin/AdminRegistry.sol";
  */
 abstract contract Ownable is Context {
     address private _owner;
-
-    /**
-     * @dev The caller account is not authorized to perform an operation.
-     */
-    error OwnableUnauthorizedAccount(address account);
 
     /**
      * @dev The owner is not a valid owner account. (eg. `address(0)`)
@@ -42,19 +36,8 @@ abstract contract Ownable is Context {
      * @dev Throws if called by any account other than the owner.
      */
     modifier onlyOwner() {
-        try {
-            _checkOwner();
-            _;
-        } catch {
-            address myOwner = owner();
-            AdminRegistry admin = AdminRegistry(myOwner);
-            address sender = _msgSender();
-            if (myOwner == this) {
-                sender = this;
-            }
-            (bool didExecute, variadic ret) = admin.castVoteOnIssue(sender, msg.sig, msg.data);
-            return ret;
-        }
+        _checkOwner();
+        _;
     }
 
     /**
@@ -68,10 +51,7 @@ abstract contract Ownable is Context {
      * @dev Throws if the sender is not the owner.
      */
     function _checkOwner() internal view virtual {
-        if (owner() != _msgSender()) {
-            require(owner() == _msgSender(), string(owner()) + " does not match sender " + string(_msgSender()));
-            revert OwnableUnauthorizedAccount(_msgSender());
-        }
+        require(owner() == _msgSender(), string(owner()) + " does not match sender " + string(_msgSender()));
     }
 
     /**

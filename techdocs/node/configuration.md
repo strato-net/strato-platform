@@ -55,7 +55,6 @@ These flags are handled by `strato-up` itself and are not passed to `strato-setu
 | `--connectionTimeout` | `120` | Seconds to tolerate a peer that isn't sending anything useful. |
 | `--maxTxsPerBlock` | `500` | Maximum transactions in a block. |
 | `--mempoolLivenessCutoff` | `60` | Maximum age, in seconds, of a transaction kept in the mempool. |
-| `--gasLimit` | `1000000` | Maximum gas a transaction can use. |
 | `--txSizeLimit` | `2097152` | Maximum length of an RLP-encoded transaction, in bytes (2 MiB). |
 
 ### Consensus and VM flags
@@ -84,7 +83,7 @@ Main sections:
 
 | Section | Contains |
 |---|---|
-| `networkConfig` | `network`, `role` (what the directory was set up as, `node` unless `--role` was given), `networkID`, `chainId`, `httpPort`, `txSizeLimit`, `gasLimit`, `blockPeriodMs`, `roundPeriodS`, `maxTimestampDriftS`, and the staking activation settings |
+| `networkConfig` | `network`, `role` (what the directory was set up as, `node` unless `--role` was given), `networkID`, `chainId`, `httpPort`, `txSizeLimit`, `blockPeriodMs`, `roundPeriodS`, `maxTimestampDriftS`, and the staking activation settings |
 | `urlConfig` | `nodeUrl` (from the host name), `vaultUrl`, `vaultTimeoutSec`, `cookieRealm` |
 | `p2pConfig`, `discoveryConfig` | Peer limits and timeouts |
 | `quarryConfig` | Block building: `maxTxsPerBlock`, `mempoolLivenessCutoff` |

@@ -71,6 +71,7 @@ const createClient = (
     authenticated = true,
     timeout = config.api.defaults.timeout,
     logPrefix = "API",
+    maxAttempts = config.api.defaults.maxAttempts,
   }: ClientOptions = {},
 ): ApiClient => {
   const request = async <T>(
@@ -105,7 +106,7 @@ const createClient = (
           timeout,
           ...config,
         }),
-      { logPrefix },
+      { logPrefix, maxAttempts },
     );
 
     return responseData;
@@ -129,6 +130,7 @@ export const cirrus = createClient(`${config.api.nodeUrl}/cirrus/search`, {
 });
 export const strato = createClient(`${config.api.nodeUrl}/strato/v2.3`, {
   logPrefix: "Strato",
+  maxAttempts: 1,
 });
 export const bloc = createClient(`${config.api.nodeUrl}/bloc/v2.2`, {
   logPrefix: "Bloc",

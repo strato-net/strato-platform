@@ -16,6 +16,7 @@ library:
     - SolidVM.Solidity.StaticAnalysis.Optimizer
     - SolidVM.Solidity.StaticAnalysis.Statements.MultipleDeclarations
     - SolidVM.Solidity.StaticAnalysis.Statements.StateVariableShadowing
+    - SolidVM.Solidity.StaticAnalysis.Statements.Unchecked
     - SolidVM.Solidity.StaticAnalysis.Statements.UninitializedLocalVariables
     - SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite
     - SolidVM.Solidity.StaticAnalysis.Typechecker

@@ -263,7 +263,6 @@ main = do
   let env =
         BlocEnv
           { Bloc.Monad.txSizeLimit = Conf.txSizeLimit (networkConfig ethConf),
-            Bloc.Monad.gasLimit = Conf.gasLimit (networkConfig ethConf),
             Bloc.Monad.stateFetchLimit = stateFetchLimit',
             Bloc.Monad.nonceTtlSeconds = nonceCounterTimeout,
             Bloc.Monad.vmJsonRpcUrl = "http://" ++ rpcHost ++ ":" ++ show Conf.jsonRpcPort,

@@ -12,7 +12,6 @@
 // ============================================================================
 
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 
 /// @dev Minimal actor so we can make calls with a msg.sender other than the test contract.
 contract Actor {
@@ -21,7 +20,7 @@ contract Actor {
     }
 }
 
-contract Describe_StablePool_Audit2 is Authorizable {
+contract Describe_StablePool_Audit2 {
 
     Mercata m;
     string[] emptyArray;
@@ -36,7 +35,6 @@ contract Describe_StablePool_Audit2 is Authorizable {
     uint constant MINIMUM_LIQUIDITY = 1000;
 
     function beforeAll() {
-        bypassAuthorizations = true;
         m = new Mercata();
         emptyArray = new string[](0);
     }
@@ -44,11 +42,12 @@ contract Describe_StablePool_Audit2 is Authorizable {
     // ---------------------------------------------------------------- helpers
 
     function newTokenDec(string name, string sym, uint8 dec) internal returns (address) {
-        address t = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             name, "audit token", emptyArray, emptyArray, emptyArray, sym, 100000000000e18, dec
         );
-        Token(t).setStatus(2); // ACTIVE
-        Token(t).mint(address(this), 10000000000e18);
+        address t = address(ret);
+        m.adminRegistry().castVoteOnIssue(t, "setStatus", 2); // ACTIVE
+        m.adminRegistry().castVoteOnIssue(t, "mint", address(this), 10000000000e18);
         return t;
     }
 
@@ -68,7 +67,8 @@ contract Describe_StablePool_Audit2 is Authorizable {
         tA = newToken("Audit A", "AUDA");
         tB = newToken("Audit B", "AUDB");
         fastForward(100);
-        pool = StablePool(m.poolFactory().createStablePool(tA, tB));
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "createStablePool", tA, tB);
+        pool = StablePool(address(ret));
         lp = pool.lpToken();
         grantLpRights(pool);
         ERC20(tA).approve(address(pool), 10000000000e18);
@@ -82,12 +82,13 @@ contract Describe_StablePool_Audit2 is Authorizable {
         tA = newToken("Rebase A", "RBA");
         tB = newToken("Rebase B", "RBB");
         fastForward(100);
-        pool = StablePool(m.poolFactory().createMultiTokenStablePool(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "createMultiTokenStablePool",
             [tA, tB],
             [uint(1e18), uint(1e18)],
             [uint(2), uint(2)],
             [address(0), address(0)]
-        ));
+        );
+        pool = StablePool(address(ret));
         lp = pool.lpToken();
         grantLpRights(pool);
         ERC20(tA).approve(address(pool), 10000000000e18);
@@ -162,16 +163,17 @@ contract Describe_StablePool_Audit2 is Authorizable {
 
         // (a) a seed too small to raise D is refused outright
         bool tiny = false;
-        try m.poolFactory().addCoinToStablePool(address(pool), tC, 1e18, 1, address(0), 1000e18, address(this)) {
+        try m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "addCoinToStablePool", address(pool), tC, 1e18, 1, address(0), 1000e18, address(this)) {
             tiny = true;
         } catch { tiny = false; }
         require(!tiny, "G2: a value-destroying seed reverts");
         require(pool.getNumCoins() == 2, "G2: ...and leaves the pool untouched");
 
         // (b) a balanced seed mints exactly its share and moves no value
-        uint minted = m.poolFactory().addCoinToStablePool(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "addCoinToStablePool",
             address(pool), tC, 1e18, 1, address(0), 100000e18, address(this)
         );
+        uint minted = uint(ret);
         uint d1 = pool.computeInvariant();
         require(pool.getNumCoins() == 3, "G2: coin added");
         require(within(minted, 100000e18, 1), "G2: 100000 balanced coins mint ~100000 LP");
@@ -251,7 +253,7 @@ contract Describe_StablePool_Audit2 is Authorizable {
     function it_g5_paused_pool_blocks_curve_priced_exits() {
         freshPool();
         uint minted = pool.addLiquidityGeneral([uint(100000e18), uint(100000e18)], 1, address(0));
-        pool.setPaused(true);
+        m.adminRegistry().castVoteOnIssue(address(pool), "setPaused", true);
         require(pool.isPaused(), "G5: paused");
 
         bool oneCoin = false;
@@ -276,7 +278,8 @@ contract Describe_StablePool_Audit2 is Authorizable {
         address t6 = newTokenDec("Six Dec", "SIX", 6);
         address t18 = newToken("Eighteen Dec", "EIGHTEEN");
         fastForward(100);
-        StablePool p = StablePool(m.poolFactory().createStablePool(t6, t18));
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "createStablePool", t6, t18);
+        StablePool p = StablePool(address(ret));
         grantLpRights(p);
         require(p.rateMultipliers(t6) == 1e30 && p.rateMultipliers(t18) == 1e18, "G6: multipliers follow decimals");
         ERC20(t6).approve(address(p), 10000000000e18);

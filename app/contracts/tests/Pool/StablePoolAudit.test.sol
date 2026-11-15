@@ -10,7 +10,6 @@
 // ============================================================================
 
 import "../../concrete/BaseCodeCollection.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 
 /// @dev Minimal actor so we can make calls with a msg.sender other than the test contract.
 contract Actor {
@@ -19,7 +18,7 @@ contract Actor {
     }
 }
 
-contract Describe_StablePool_Audit is Authorizable {
+contract Describe_StablePool_Audit {
 
     Mercata m;
     string[] emptyArray;
@@ -34,7 +33,6 @@ contract Describe_StablePool_Audit is Authorizable {
     uint constant PRECISION = 1e18;
 
     function beforeAll() {
-        bypassAuthorizations = true;
         m = new Mercata();
         emptyArray = new string[](0);
     }
@@ -42,11 +40,12 @@ contract Describe_StablePool_Audit is Authorizable {
     // ---------------------------------------------------------------- helpers
 
     function newToken(string name, string sym) internal returns (address) {
-        address t = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             name, "audit token", emptyArray, emptyArray, emptyArray, sym, 100000000000e18, 18
         );
-        Token(t).setStatus(2); // ACTIVE
-        Token(t).mint(address(this), 10000000000e18);
+        address t = address(ret);
+        m.adminRegistry().castVoteOnIssue(t, "setStatus", 2); // ACTIVE
+        m.adminRegistry().castVoteOnIssue(t, "mint", address(this), 10000000000e18);
         return t;
     }
 
@@ -62,7 +61,8 @@ contract Describe_StablePool_Audit is Authorizable {
         tA = newToken("Audit A", "AUDA");
         tB = newToken("Audit B", "AUDB");
         fastForward(100);
-        pool = StablePool(m.poolFactory().createStablePool(tA, tB));
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "createStablePool", tA, tB);
+        pool = StablePool(address(ret));
         lp = pool.lpToken();
         grantLpRights(pool);
         ERC20(tA).approve(address(pool), 10000000000e18);
@@ -244,12 +244,13 @@ contract Describe_StablePool_Audit is Authorizable {
         address t1 = newToken("Audit C1", "AUDC1");
         address t2 = newToken("Audit C2", "AUDC2");
         fastForward(100);
-        StablePool p3 = StablePool(m.poolFactory().createMultiTokenStablePool(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.poolFactory()), "createMultiTokenStablePool",
             [t0, t1, t2],
             [uint(1e18), uint(1e18), uint(1e18)],
             [uint(1), uint(1), uint(1)],
             [address(0), address(0), address(0)]
-        ));
+        );
+        StablePool p3 = StablePool(address(ret));
         grantLpRights(p3);
         ERC20(t0).approve(address(p3), 10000000000e18);
         ERC20(t1).approve(address(p3), 10000000000e18);
@@ -288,12 +289,12 @@ contract Describe_StablePool_Audit is Authorizable {
     // =========================================================================
     function it_f5_offpeg_multiplier_is_inert_at_peg() {
         freshPool();
-        pool.setNewFee(30000000, 10000000000);      // multiplier = FEE_DENOMINATOR
+        m.adminRegistry().castVoteOnIssue(address(pool), "setNewFee", 30000000, 10000000000);      // multiplier = FEE_DENOMINATOR
         pool.addLiquidityGeneral([uint(100000e18), uint(100000e18)], 1, address(0));
         uint mintedFlat = pool.addLiquidityGeneral([uint(10000e18), uint(0)], 1, address(0));
 
         freshPool();
-        pool.setNewFee(30000000, 20000000000);      // multiplier = 2x
+        m.adminRegistry().castVoteOnIssue(address(pool), "setNewFee", 30000000, 20000000000);      // multiplier = 2x
         pool.addLiquidityGeneral([uint(100000e18), uint(100000e18)], 1, address(0));
         uint mintedOffpeg = pool.addLiquidityGeneral([uint(10000e18), uint(0)], 1, address(0));
 
@@ -368,7 +369,7 @@ contract Describe_StablePool_Audit is Authorizable {
         freshPool();
         uint coinsBefore = pool.getNumCoins();
         bool reinit = false;
-        try pool.initialize(50, 1000, 1e10, 866, [tA, tB],
+        try m.adminRegistry().castVoteOnIssue(address(pool), "initialize", 50, 1000, 1e10, 866, [tA, tB],
                             [uint(1e18), uint(1e18)], [uint(1), uint(1)],
                             [address(0), address(0)], address(lp)) {
             reinit = true;

@@ -8,6 +8,7 @@ module Blockchain.Init.BuildMetadata
   , hashSmd
   , hashApex
   , hashPostgrest
+  , hashPostgres
   , hashNginx
   , hashPrometheus
   , hashLocalAuth
@@ -35,6 +36,9 @@ hashApex = $(getValue "HASH_APEX")
 
 hashPostgrest :: String
 hashPostgrest = $(getValue "HASH_POSTGREST")
+
+hashPostgres :: String
+hashPostgres = $(getValue "HASH_POSTGRES")
 
 hashNginx :: String
 hashNginx = $(getValue "HASH_NGINX")

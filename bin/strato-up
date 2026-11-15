@@ -245,6 +245,15 @@ else
 fi
 
 if [[ "$FROM_SNAPSHOT" == "true" ]]; then
+    # Pull the node's images before the restore: a failed pull (the restore
+    # loads the databases with the postgres image) stops the run here, not
+    # after the snapshot is downloaded and extracted. Images that are already
+    # present, the locally built ones among them, are left alone.
+    echo "Pulling the docker images of $NODE_DIR/docker-compose.yml..."
+    if ! (cd "$NODE_DIR" && docker compose -p strato pull --policy missing); then
+        echo "Error: could not pull the node's docker images; not restoring the snapshot." >&2
+        exit 1
+    fi
     if [[ -n "$SNAPSHOT_SOURCE" ]]; then
         SNAPSHOT_ARG=(--source "$SNAPSHOT_SOURCE")
         echo "Restoring node from $NETWORK snapshot source ($SNAPSHOT_SOURCE)..."
@@ -329,7 +338,7 @@ export MALLOC_ARENA_MAX=2
 : > logs/convoke.log
 # BSD tee (macOS) has no "-p"; there a closed output ends that tee as before.
 TEE_P=""; tee -p </dev/null >/dev/null 2>&1 && TEE_P="-p"
-nohup strato-fast-cores convoke > >(trap '' HUP; tee -a $TEE_P logs/convoke.log >/dev/null) 2> >(trap '' HUP; tee -a $TEE_P logs/convoke.log >&2) &
+TEE_P="$TEE_P" setsid bash -c 'exec nohup strato-fast-cores convoke > >(trap "" HUP; tee -a $TEE_P logs/convoke.log >/dev/null) 2> >(trap "" HUP; tee -a $TEE_P logs/convoke.log >&2)' </dev/null &
 CONVOKE_PID=$!
 echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
 

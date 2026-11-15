@@ -98,16 +98,19 @@ tests:
       - hspec-expectations-lifted
       - labeled-error
       - persistent-sqlite
+      - persistent-postgresql
       - QuickCheck
       - slipstream
       - solid-vm-model
       - strato-model
       - text
       - time
+      - transformers
       - unliftio
       - vm-tools
       - ordered-containers
       - monad-alter
+      - persistent
       - core-api2
       - blockapps-haskoin
       - blockapps-mpdbs

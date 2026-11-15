@@ -155,8 +155,9 @@ contract Describe_FeeRouter {
     // The paused-token whitelist lives in the AdminRegistry that owns the token factory.
     function beforeAll() public {
         feeCollector = new User();
-        admin = new AdminRegistry();
+        admin = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
         admin.initialize([this]);
+        Ownable(address(admin)).transferOwnership(address(admin));
     }
 
     function beforeEach() public {

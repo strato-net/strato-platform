@@ -124,17 +124,19 @@ fi
 # cluster named in ethconf's sqlConfig (--pghost at setup); psql goes through
 # the container in the first case and runs on the host in the second.
 pg_password="$(tr -d '\n' < secrets/postgres_password)"
-read -r PG_HOST PG_PORT < <(python3 - <<'PY'
+read -r PG_HOST PG_PORT PG_USER < <(python3 - <<'PY'
 import re
 text = open(".ethereumH/ethconf.yaml").read()
 m = re.search(r"^sqlConfig:(.*?)(?=^\S|\Z)", text, re.S | re.M)
 block = m.group(1) if m else ""
 host = re.search(r"host:\s*['\"]?([^'\",}\s]+)", block)
 port = re.search(r"port:\s*['\"]?([0-9]+)", block)
-print((host.group(1) if host else ""), (port.group(1) if port else ""))
+user = re.search(r"user:\s*['\"]?([^'\",}\s]+)", block)
+if not all((host, port, user)):
+    raise SystemExit("ethconf.yaml must define sqlConfig.host, sqlConfig.port and sqlConfig.user")
+print(host.group(1), port.group(1), user.group(1))
 PY
 )
-PG_HOST="${PG_HOST:-localhost}"; PG_PORT="${PG_PORT:-5432}"
 if "${COMPOSE[@]}" config --services 2>/dev/null | grep -qx "postgres"; then
   PG_MODE=container
   for _ in $(seq 1 90); do
@@ -157,9 +159,9 @@ else
 fi
 pg_psql() {
   if [[ "$PG_MODE" == container ]]; then
-    "${COMPOSE[@]}" exec -T postgres psql -U postgres "$@"
+    "${COMPOSE[@]}" exec -T postgres psql -U "$PG_USER" "$@"
   else
-    PGPASSWORD="$pg_password" psql -h "$PG_HOST" -p "$PG_PORT" -U postgres "$@"
+    PGPASSWORD="$pg_password" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" "$@"
   fi
 }
 
@@ -471,7 +473,7 @@ import_key() {
     import_cmd=("${COMPOSE[@]}" exec -T strato strato-vault-import-key)
   fi
   printf "%s" "$private_key" | "${import_cmd[@]}" \
-    --pghost "$PG_HOST" --pgport "$PG_PORT" \
+    --pghost "$PG_HOST" --pgport "$PG_PORT" --pguser "$PG_USER" \
     --password "$pg_password" \
     --database oauth \
     --vaultPasswordFile secrets/vault_password \

@@ -16,7 +16,6 @@
 
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/Metals/MetalForge.sol";
 import "../../concrete/Pools/Pool.sol";
@@ -74,7 +73,7 @@ contract ArbRaider {
     }
 }
 
-contract Describe_Adv_Peg_ForgeArb is Authorizable {
+contract Describe_Adv_Peg_ForgeArb {
 
     uint public INFINITY = 2 ** 256 - 1;
     uint public WAD = 1e18;
@@ -103,14 +102,14 @@ contract Describe_Adv_Peg_ForgeArb is Authorizable {
     uint public headroom;       // GOLDST still mintable
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata();
         areg = m.adminRegistry();
         oracle = m.priceOracle();
 
-        USDST = Token(m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18));
-        USDST.setStatus(2);
-        oracle.setAssetPrice(address(USDST), 1e18);
+        (bool executed, variadic ret) = areg.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",[],[],[],"USDST",0,18);
+        USDST = Token(address(ret));
+        areg.castVoteOnIssue(address(USDST), "setStatus", 2);
+        areg.castVoteOnIssue(address(oracle), "setAssetPrice", address(USDST), 1e18);
 
         // ── MetalForge at the VERIFIED live config
         treasurer = new User();
@@ -120,10 +119,10 @@ contract Describe_Adv_Peg_ForgeArb is Authorizable {
 
         // ── FlashMint
         fm = new FlashMint(address(areg));
-        areg.addWhitelist(address(USDST), "mint", address(fm));
-        areg.addWhitelist(address(USDST), "burn", address(fm));
-        fm.initialize(address(USDST), address(m.feeCollector()), MAXLOAN);
-        fm.setWhitelistEnabled(false);
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(USDST), "mint", address(fm));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(USDST), "burn", address(fm));
+        areg.castVoteOnIssue(address(fm), "initialize", address(USDST), address(m.feeCollector()), MAXLOAN);
+        areg.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
 
         poolPrice = (POOL_U * WAD) / POOL_G;
         _freshVenue();
@@ -145,27 +144,29 @@ contract Describe_Adv_Peg_ForgeArb is Authorizable {
     /// Every test gets a virgin metal token + pool at the exact live reserves, so no test's
     /// real swap contaminates the next one's price impact measurement.
     function _freshVenue() internal {
-        GOLDST = Token(m.tokenFactory().createToken("GOLDST","Gold",[],[],[],"GOLDST",0,18));
-        GOLDST.setStatus(2);
-        oracle.setAssetPrice(address(GOLDST), ORACLE_BASE);
+        (bool executed, variadic ret) = areg.castVoteOnIssue(address(m.tokenFactory()), "createToken", "GOLDST","Gold",[],[],[],"GOLDST",0,18);
+        GOLDST = Token(address(ret));
+        areg.castVoteOnIssue(address(GOLDST), "setStatus", 2);
+        areg.castVoteOnIssue(address(oracle), "setAssetPrice", address(GOLDST), ORACLE_BASE);
         forge.setMetalConfig(address(GOLDST), true, MINT_CAP, FORGE_FEE);
-        areg.addWhitelist(address(GOLDST), "mint", address(forge));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(GOLDST), "mint", address(forge));
 
         // reproduce totalMinted 6.4573e18 through the forge itself
         uint prePay = (PREMINTED * ORACLE_BASE) / (WAD - (WAD * FORGE_FEE) / 10000);
         User seeder = new User();
-        USDST.mint(address(seeder), prePay + 1e18);
+        areg.castVoteOnIssue(address(USDST), "mint", address(seeder), prePay + 1e18);
         seeder.do(address(USDST), "approve", address(forge), INFINITY);
         seeder.do(address(forge), "mintMetal", address(GOLDST), address(USDST), prePay, 0);
         headroom = MINT_CAP - forge.totalMinted(address(GOLDST));
 
         // the real Pool, seeded to the live reserves
-        pool = Pool(m.poolFactory().createPool(address(GOLDST), address(USDST)));
+        (executed, ret) = areg.castVoteOnIssue(address(m.poolFactory()), "createPool", address(GOLDST), address(USDST));
+        pool = Pool(address(ret));
         Token lpToken = pool.lpToken();
-        areg.addWhitelist(address(lpToken), "mint", address(pool));
-        areg.addWhitelist(address(lpToken), "burn", address(pool));
-        GOLDST.mint(address(this), POOL_G);
-        USDST.mint(address(this), POOL_U);
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(lpToken), "mint", address(pool));
+        areg.castVoteOnIssue(address(areg), "addWhitelist", address(lpToken), "burn", address(pool));
+        areg.castVoteOnIssue(address(GOLDST), "mint", address(this), POOL_G);
+        areg.castVoteOnIssue(address(USDST), "mint", address(this), POOL_U);
         IERC20(address(GOLDST)).approve(address(pool), POOL_G);
         IERC20(address(USDST)).approve(address(pool), POOL_U);
         // addLiquidity(tokenBAmount = USDST, maxTokenAAmount = GOLDST, deadline)
@@ -270,7 +271,7 @@ contract Describe_Adv_Peg_ForgeArb is Authorizable {
         uint G = pool.tokenABalance();
         uint U = pool.tokenBBalance();
         uint Po = _oracleFor(50000000000000000);   // pool 5% over oracle
-        oracle.setAssetPrice(address(GOLDST), Po);
+        areg.castVoteOnIssue(address(oracle), "setAssetPrice", address(GOLDST), Po);
 
         (uint bestX, uint bestP) = _best(G, U, Po);
 
@@ -294,14 +295,14 @@ contract Describe_Adv_Peg_ForgeArb is Authorizable {
         require(r.kept() == bestP, "execution matches the quote exactly");
         require(r.kept() < 100e18, "MAX PROFIT AT +5% IS UNDER $100, NOT thousands");
 
-        oracle.setAssetPrice(address(GOLDST), ORACLE_BASE);
+        areg.castVoteOnIssue(address(oracle), "setAssetPrice", address(GOLDST), ORACLE_BASE);
     }
 
     function it_g3_max_profit_at_plus_10_percent() public {
         uint G = pool.tokenABalance();
         uint U = pool.tokenBBalance();
         uint Po = _oracleFor(100000000000000000);   // pool 10% over oracle
-        oracle.setAssetPrice(address(GOLDST), Po);
+        areg.castVoteOnIssue(address(oracle), "setAssetPrice", address(GOLDST), Po);
 
         (uint bestX, uint bestP) = _best(G, U, Po);
 
@@ -327,7 +328,7 @@ contract Describe_Adv_Peg_ForgeArb is Authorizable {
         log("quote at 10x the optimum    = " + string(_quote(over, G, U, Po)) + " wei (price impact has eaten it)");
         require(_quote(over, G, U, Po) == 0, "oversizing turns the trade negative");
 
-        oracle.setAssetPrice(address(GOLDST), ORACLE_BASE);
+        areg.castVoteOnIssue(address(oracle), "setAssetPrice", address(GOLDST), ORACLE_BASE);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -338,7 +339,7 @@ contract Describe_Adv_Peg_ForgeArb is Authorizable {
         uint G = pool.tokenABalance();
         uint U = pool.tokenBBalance();
         uint Po = _oracleFor(100000000000000000);
-        oracle.setAssetPrice(address(GOLDST), Po);
+        areg.castVoteOnIssue(address(oracle), "setAssetPrice", address(GOLDST), Po);
 
         // USDST needed to consume the whole 1,493.5427 GOLDST headroom
         uint usdstToHitCap = (headroom * Po) / (WAD - (WAD * FORGE_FEE) / 10000);
@@ -372,6 +373,6 @@ contract Describe_Adv_Peg_ForgeArb is Authorizable {
         log("running 1,000,000 notional        -> " + err2);
         require(err2 != "", "1,000,000 also unrepayable");
 
-        oracle.setAssetPrice(address(GOLDST), ORACLE_BASE);
+        areg.castVoteOnIssue(address(oracle), "setAssetPrice", address(GOLDST), ORACLE_BASE);
     }
 }

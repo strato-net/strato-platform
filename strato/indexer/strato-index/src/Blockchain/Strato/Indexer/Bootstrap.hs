@@ -35,7 +35,7 @@ bootstrapIndexer = do
   bootstrapIndexerTopic
   let ethconf = UEC.ethConf
       pgconf = EC.sqlConfig ethconf
-      rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}
+      rawConn = EC.postgreSQLConnectionString pgconf {EC.database = "postgres"}
       localConn = EC.postgreSQLConnectionString pgconf
       db = EC.database pgconf
 

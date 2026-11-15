@@ -42,6 +42,7 @@ library:
   - containers
   - directory
   - filepath
+  - file-embed
   - format
   - hflags
   - http-types
