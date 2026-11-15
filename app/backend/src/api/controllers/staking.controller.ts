@@ -21,7 +21,6 @@ import {
   setGovernanceHardCap,
   setGovernanceStakingContract,
   setStratoCommission,
-  setStratoEmergencyKicker,
   setStratoGovernance,
   setStratoSelfBondGrace,
   setStratoSelfBondMinimum,
@@ -727,21 +726,6 @@ class StakingController {
       }
 
       const result = await recoverStratoUnattributedFees(req.accessToken, req.address as string, to, String(amount));
-      res.status(RestStatus.OK).json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async setEmergencyKicker(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { kicker } = req.body || {};
-      if (!isAddressLike(kicker)) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid kicker" });
-        return;
-      }
-
-      const result = await setStratoEmergencyKicker(req.accessToken, req.address as string, kicker);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

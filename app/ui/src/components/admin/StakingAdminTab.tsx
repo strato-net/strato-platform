@@ -104,7 +104,6 @@ const StakingAdminTab = () => {
   const [selfBondGrace, setSelfBondGrace] = useState("");
   const [selfBondMinimum, setSelfBondMinimum] = useState("");
   const [hardCap, setHardCap] = useState("");
-  const [emergencyKicker, setEmergencyKicker] = useState("");
   const [recovery, setRecovery] = useState({ to: "", amount: "" });
 
   const refresh = useCallback(async () => {
@@ -334,13 +333,6 @@ const StakingAdminTab = () => {
           </label>
           <Button size="sm" variant="outline" disabled={blocked || !/^\d+$/.test(hardCap)} onClick={() => run("gov-cap", () => api.patch("/staking/admin/governance/hard-cap", { hardCap }), "Governance hard-cap vote")}>
             {label("gov-cap", "Set hard cap")}
-          </Button>
-          <label className="space-y-1 text-xs">
-            <span className="text-muted-foreground">Emergency kicker (ops key)</span>
-            <Input value={emergencyKicker} onChange={(event) => setEmergencyKicker(event.target.value)} placeholder="address" className="w-96" />
-          </label>
-          <Button size="sm" variant="outline" disabled={blocked || !isAddressLike(emergencyKicker)} onClick={() => run("kicker", () => api.patch("/staking/admin/emergency-kicker", { kicker: emergencyKicker.trim() }), "Emergency kicker vote")}>
-            {label("kicker", "Set kicker")}
           </Button>
         </CardContent>
       </Card>

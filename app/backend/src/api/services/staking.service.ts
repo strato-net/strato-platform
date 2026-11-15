@@ -2335,18 +2335,6 @@ export const setStratoValidatorAddress = async (
   throw badRequest("This network's validator registry has no validator address binding.");
 };
 
-export const setStratoEmergencyKicker = async (
-  accessToken: string,
-  userAddress: string,
-  kicker: string
-): Promise<{ status: string; hash: string }> => {
-  await requireV2(accessToken);
-
-  return await castVoteOnIssue(accessToken, userAddress, requireValidatorRegistryAddress(), "setEmergencyKicker", [
-    normalizeAddress(kicker),
-  ]);
-};
-
 export const startStratoRewardSchedule = async (
   accessToken: string,
   userAddress: string,

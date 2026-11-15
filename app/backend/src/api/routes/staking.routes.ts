@@ -183,7 +183,6 @@ router.patch("/admin/self-bond-minimum", walletAuth, StakingController.setSelfBo
 router.patch("/admin/set-params", walletAuth, StakingController.setSetParams);
 router.patch("/admin/governance", walletAuth, StakingController.setGovernance);
 router.post("/admin/recover-fees", walletAuth, StakingController.recoverUnattributedFees);
-router.patch("/admin/emergency-kicker", walletAuth, StakingController.setEmergencyKicker);
 router.patch("/admin/governance/staking-contract", walletAuth, StakingController.setGovernanceStakingContract);
 router.patch("/admin/governance/hard-cap", walletAuth, StakingController.setGovernanceHardCap);
 router.post("/admin/operators", walletAuth, StakingController.addOperator);
