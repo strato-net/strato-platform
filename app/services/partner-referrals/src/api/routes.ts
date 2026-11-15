@@ -97,7 +97,10 @@ router.get("/partner-api/health", (_req, res) => {
 // status here would count against a deployment while its poller catches up.
 const readStatus = async (): Promise<object> => {
   try {
-    const asOf = (await query<{ as_of: Date }>("SELECT as_of FROM progress WHERE name = 'cirrus'")).rows[0]?.as_of ?? null;
+    // A database that does not answer at all must not leave the monitor without an answer
+    const late = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("no answer")), config.status.timeoutMs).unref());
+    const read = query<{ as_of: Date }>("SELECT as_of FROM progress WHERE name = 'cirrus'");
+    const asOf = (await Promise.race([read, late])).rows[0]?.as_of ?? null;
     const age = asOf && Math.max(0, Date.now() - asOf.getTime());
     const current = age !== null && age <= config.status.staleAfterSeconds * 1000;
     return { status: current ? "ok" : "behind", data_as_of: asOf?.toISOString() ?? null, lag_seconds: age === null ? null : Math.round(age / 1000) };

@@ -6,7 +6,7 @@ each code brought in and how much they traded.
 | | |
 |---|---|
 | Base URL | `https://partner-api.strato.nexus` |
-| Authentication | `Authorization: Bearer <your API key>` on every call |
+| Authentication | `Authorization: Bearer <your API key>` on every call, except status and health |
 | Format | JSON in, JSON out |
 
 Keep the API key on your servers. Do not put it in a browser or a mobile app.

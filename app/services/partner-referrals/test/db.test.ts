@@ -258,7 +258,12 @@ const carol = "44".repeat(20);
 
   await pool.end();
   // Without its database the service still answers, and says so
-  assert.deepStrictEqual(await status(), { status: 200, body: { status: "unavailable", data_as_of: null, lag_seconds: null } });
+  const unavailable = { status: 200, body: { status: "unavailable", data_as_of: null, lag_seconds: null } };
+  assert.deepStrictEqual(await status(), unavailable);
+  // Nor does a database that never answers hold the answer back
+  (pool as any).query = () => new Promise(() => undefined);
+  config.status.timeoutMs = 50;
+  assert.deepStrictEqual(await status(), unavailable);
   server.close();
   console.log("db.test: OK");
 })().catch((error) => {
