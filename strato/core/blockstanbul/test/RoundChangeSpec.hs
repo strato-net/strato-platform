@@ -62,6 +62,9 @@ baseCtx valB self =
 roundChanges :: [OutEvent] -> [TrustedMessage]
 roundChanges evs = [m | OMsg _ m@RoundChange {} <- evs]
 
+roundChangeEvents :: [OutEvent] -> [OutEvent]
+roundChangeEvents evs = [e | e@(OMsg _ RoundChange {}) <- evs]
+
 spec :: Spec
 spec = describe "ROUNDCHANGE emission" $ do
   it "does not originate a ROUNDCHANGE when this node is not in the validator set" $ do
@@ -85,14 +88,31 @@ spec = describe "ROUNDCHANGE emission" $ do
     got <- runTest ctx $ sendMessages [Timeout (View 20 18)]
     map (_round . roundchangeView) (roundChanges got) `shouldBe` [21]
 
-  it "does not emit another ROUNDCHANGE for the same pending round" $ do
+  it "re-sends the identical signed ROUNDCHANGE on later timeouts for the same round" $ do
     let ctx =
           baseCtx True (Just me)
             & validators .~ S.fromList [Validator me, Validator other]
-    got <- runTest ctx $ do
-      _ <- sendMessages [Timeout (View 20 18)]
-      sendMessages [Timeout (View 20 18)]
-    roundChanges got `shouldBe` []
+    (first, again) <- runTest ctx $ do
+      a <- sendMessages [Timeout (View 20 18)]
+      b <- sendMessages [Timeout (View 20 18)]
+      pure (a, b)
+    length (roundChangeEvents first) `shouldBe` 1
+    roundChangeEvents again `shouldBe` roundChangeEvents first
+
+  it "re-sends a joined ROUNDCHANGE on a later timeout for that round" $ do
+    let fakeAuth a = MsgAuth a (signMsg myPriv (B.replicate 32 0))
+        inbound = RoundChange (View 21 18) 0xdeadbeef
+        own = filter ((== me) . sender . oAuth) . roundChangeEvents
+        ctx =
+          baseCtx True (Just me)
+            & validators .~ S.fromList [Validator me, Validator other, Validator third]
+    (joined, again) <- runTest ctx $ do
+      _ <- sendMessages [IMsg (fakeAuth other) inbound]
+      a <- sendMessages [IMsg (fakeAuth third) inbound]
+      b <- sendMessages [Timeout (View 20 18)]
+      pure (a, b)
+    length (own joined) `shouldBe` 1
+    own again `shouldBe` own joined
 
   it "rebroadcasts an inbound ROUNDCHANGE with the original nonce" $ do
     let auth = MsgAuth other (signMsg myPriv (B.replicate 32 0))
