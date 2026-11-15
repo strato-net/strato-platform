@@ -11,6 +11,7 @@ module Blockchain.SolidVM.Simple
     argsBlockData,
     argsSender,
     argsOrigin,
+    argsGas,
     argsTxHash,
     argsArgs,
     argsChainId,
@@ -86,6 +87,7 @@ data SolidVMTxArgs = SolidVMTxArgs
     _argsSender :: Address,
     _argsOrigin :: Address,
     _argsProposer :: Address,
+    _argsGas :: Gas,
     _argsTxHash :: Keccak256,
     _argsArgs :: [T.Text],
     _argsChainId :: Maybe Word256,
@@ -102,6 +104,7 @@ instance Default SolidVMTxArgs where
       0
       0
       (Address 0)
+      transactionGas
       emptyHash
       []
       Nothing
@@ -158,7 +161,7 @@ create s =
     (s ^. createArgs . argsSender)
     (s ^. createArgs . argsOrigin)
     (s ^. createArgs . argsProposer)
-    (Gas 100000000)
+    (s ^. createArgs . argsGas)
     (s ^. createNewAddress)
     (s ^. createCode)
     (s ^. createArgs . argsTxHash)
@@ -175,7 +178,7 @@ createReturnEnv s =
     (s ^. createArgs . argsSender)
     (s ^. createArgs . argsOrigin)
     (s ^. createArgs . argsProposer)
-    (Gas 100000000)
+    (s ^. createArgs . argsGas)
     (s ^. createNewAddress)
     (s ^. createCode)
     (s ^. createArgs . argsTxHash)
@@ -192,7 +195,7 @@ call s =
     (s ^. callCodeAddress)
     (s ^. callArgs . argsSender)
     (s ^. callArgs . argsProposer)
-    (Gas 100000000)
+    (s ^. callArgs . argsGas)
     (s ^. callArgs . argsOrigin)
     (s ^. callArgs . argsTxHash)
     (s ^. callFuncName)
@@ -209,7 +212,7 @@ callReturnEnv s =
     (s ^. callCodeAddress)
     (s ^. callArgs . argsSender)
     (s ^. callArgs . argsProposer)
-    (Gas 100000000)
+    (s ^. callArgs . argsGas)
     (s ^. callArgs . argsOrigin)
     (s ^. callArgs . argsTxHash)
     (s ^. callFuncName)

@@ -72,7 +72,7 @@ authorize = \case
 isAuthorized :: StateMachineM m => InEvent -> m AuthResult
 isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ do
   doAuthn <- use productionAuth
-  authenticated <- authenticate iev
+  authenticated <- flip authenticate iev =<< use chainId
   let raiseInProd reason = when doAuthn $ do
         $logWarnS "blockstanbul/auth" . T.pack $ reason
         throwE reason --debug statement?
@@ -456,7 +456,12 @@ eventLoop ctx = execStateC ctx $
                   yieldR $ GapFound (intSeq v) (intSeq v') (sender auth)
                 when (_sequence v > _sequence v') $
                   yieldR $ LeadFound (intSeq v) (intSeq v') (sender auth)
-                roundChange
+                -- An older view means a late or re-sent copy of a proposal
+                -- this proposer made before, which says nothing about the
+                -- current view. Voting to change round on it would let anyone
+                -- holding an old proposal skip the proposer, so ignore it and
+                -- wait for the real proposal or the view timer.
+                when (v < v') roundChange
               | isJust mBlockLock && Just pp /= mBlockLock -> do
                 $logWarnS "blockstanbul/ppl" "Rejecting proposal: block does not match lock"
                 $logInfoS "blockstanbul/roundchange" "lock mismatch"
@@ -479,7 +484,7 @@ eventLoop ctx = execStateC ctx $
                       proposal .= Just pp
                       -- run in vm before sending prepare
                       whenM mayVote . yieldR $ RunPreprepare pp
-        IMsg auth ppp@(Prepare v' di) -> when (v <= v') $ do
+        IMsg auth ppp@(Prepare v' di) -> when (v == v') $ do
           preparers <- use prepared
           unless (M.member (Validator $ sender auth) preparers) . yieldL $ OMsg auth ppp
           ps <- prepared <%= M.insert (Validator $ sender auth) di
@@ -494,12 +499,13 @@ eventLoop ctx = execStateC ctx $
             whenM mayVote $ do
               msg <- signMessage (Commit v di seal)
               yieldR msg
-        IMsg auth ccc@(Commit v' di seal) -> when (v <= v') $ do
+        IMsg auth ccc@(Commit v' di seal) -> when (v == v') $ do
           committors <- use committed
           unless (M.member (Validator $ sender auth) committors) . yieldL $ OMsg auth ccc
           cs <- committed <%= M.insert (Validator $ sender auth) (di, seal)
           weights <- gets currentVoteWeights
-          let quorum = hasSupermajority weights . M.keysSet . M.filter ((== di) . fst) $ cs
+          let votes = M.filter ((== di) . fst) cs
+              quorum = hasSupermajority weights $ M.keysSet votes
           sameHash <- hasSameHash di
           -- TODO(tim): Is it necessary to check that we have prepared?
           hasSent <- use hasCommitted
@@ -509,7 +515,7 @@ eventLoop ctx = execStateC ctx $
             case ppl of
               Nothing -> error "TODO(tim): Decide how to handle this"
               Just blk -> do
-                let seals = map snd . M.elems $ cs
+                let seals = map snd $ M.elems votes
                 let blockNo = number . blockBlockData $ blk
                 recordMaxBlockNumber "pbft_commit" blockNo
                 commitBlock $ addCommitmentSeals seals blk

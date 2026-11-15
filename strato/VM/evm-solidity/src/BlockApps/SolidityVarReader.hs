@@ -117,7 +117,7 @@ svmValueToSolidityValues svmVal mReturnTypes =
       _ -> [svmToSol svmVal]
 
 svmToSol :: SVM.Value -> SolidityValue
-svmToSol (SVM.SInteger n) = SolidityValueAsString $ Text.pack $ show n
+svmToSol (SVM.SIntegral n) = SolidityValueAsString $ Text.pack $ show n
 svmToSol (SVM.SBool b) = SolidityBool b
 svmToSol (SVM.SString s) = SolidityValueAsString $ Text.pack s
 svmToSol (SVM.SAddress a _) = SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral ((\(Address x) -> x) a) :: Integer)

@@ -3,6 +3,8 @@ import { depositToEscrow, DepositParams, getEscrowDeposit, EscrowDepositQuery, r
 import { TransactionResponse } from "@strato/shared-types";
 import { constants } from "../../config/constants";
 import { referralUrl } from "../../config/config";
+import { partnerClaim, claimPartnerReferral } from "../services/user.service";
+import { validatePartnerClaim } from "../validators/user.validator";
 
 class ReferController {
   static async deposit(
@@ -267,6 +269,37 @@ class ReferController {
         success: true,
         data: status,
       });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  // What a guest's external wallet signs to confirm the partner ref code it
+  // arrived with; message is null when there is nothing to confirm.
+  static async getPartnerClaim(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { address, code } = validatePartnerClaim({ address: req.headers["x-wallet-address"], code: req.query.code }, false);
+      res.json((await partnerClaim(code, address)) ?? { message: null });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  // The signed confirmation. The wallet header only names the address; the
+  // signature is what proves the caller owns it.
+  static async claimPartner(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { code, issuedAt, signature } = req.body ?? {};
+      const claim = validatePartnerClaim({ address: req.headers["x-wallet-address"], code, issuedAt, signature }, true);
+      res.json({ recorded: await claimPartnerReferral(claim.code, claim.address, claim.issuedAt, claim.signature) });
     } catch (error: any) {
       next(error);
     }
