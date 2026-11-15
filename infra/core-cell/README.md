@@ -8,9 +8,19 @@ same layout the testnet hosts run by hand today, built from nothing at boot
 and supervised by systemd. The API tier reaches a cell on one port: 8600,
 where `strato-ingest` takes its transaction batches.
 
+The host is the one instance of an Auto Scaling group. When that instance is
+lost, or handed back by the cell's watchdog or by `scripts/ha.sh cells
+replace`, the group launches another from the launch template: it takes the
+cell's Elastic IP, restores the latest snapshot onto new volumes and
+registers in the core tier's target groups. Deploying the stack never
+replaces a running instance; a changed launch template is what the next one
+boots.
+
 A cell is a **follower** by default: `--writer=false` (it indexes into the
 cluster only when it holds the writer lease) and `--validatorBehavior=false`
-(it never votes). Pass `-c writer=true` for the writer core. Promotion of a
+(it never votes). Pass `-c writer=true` for the writer core, or
+`-c seedEmptyCluster=true` on every cell and let each instance's first boot
+decide: writer on an empty cluster, standby otherwise. Promotion of a
 running follower is `strato-promote` on the host; see
 `design-documents/standby-core.md`.
 
@@ -30,6 +40,11 @@ host unchanged). At first boot the instance, with its own role:
    `strato-down` on stop, enabled at boot);
 6. starts the ADOT collector and the CloudWatch agent when the observability
    app's configs are named.
+
+Before all that a public cell attaches its Elastic IP to itself. With
+`stratoImageParameter`, step 3 installs the image recorded there; with
+`seedEmptyCluster`, step 4 first asks the cluster whether this instance loads
+the snapshot's databases and starts as the writer, or joins as a standby.
 
 The bootstrap log is `/var/log/strato-cell-bootstrap.log`; the node's logs
 are under `/var/lib/strato/node/logs`. `aws ssm start-session --target
@@ -72,39 +87,44 @@ npx cdk deploy --all -c ...   # same context
 ```
 
 Then (unless `postgresSecurityGroupId` was given) allow the output
-`SecurityGroupId` on the Aurora security group, and put the cell behind the
-core tier's load balancer (below: add its `InstanceId` and `SecurityGroupId`
-to that stack's context). Without a load balancer, add
-`http://<PrivateDnsName>:8600` to the API tier's `ingressUrls` so it submits
-transactions to this cell too (the cell admits the tier's tasks on that port
-through `clientSecurityGroupIds`).
+`SecurityGroupId` on the Aurora security group. The cell is behind the core
+tier's load balancer (below) when it was given that stack's outputs.
 
 ## The core tier's load balancer
 
 `-c coreNlb=true` deploys, instead of a cell, the environment's internal
 Network Load Balancer in front of its cells (`ha-<env>-core-nlb`,
 `lib/core-nlb-stack.ts`), so the API tier addresses the core tier by one name
-and a rebuilt cell changes nothing there:
+and a rebuilt cell changes nothing there. Deploy it before the cells: it
+knows none of them, and each cell registers its instance in its target
+groups.
 
 ```sh
-npx cdk deploy -c coreNlb=true -c envName=testnet -c vpcId=vpc-0123 \
-  -c cellInstanceIds=i-0aaa,i-0bbb -c cellSecurityGroupIds=sg-0aaa,sg-0bbb
+npx cdk deploy -c coreNlb=true -c envName=testnet -c vpcId=vpc-0123
 ```
 
-- **8600**, the transaction ingress, goes to every cell listed. A batch
+- **8600**, the transaction ingress, goes to every cell in the ingress
+  target group. A batch
   reaches one healthy cell, which gossips it to the network and to the other
   cells. Healthy is the cell's `strato-cell-health` on 8601, checked every
   10 s: a cell whose node is down, behind the chain or draining for a restart
   is out after two failures. With every cell unhealthy the load balancer
   sends to all of them.
-- **9090** is the first listed cell's Prometheus alone (`exposePrometheus`
-  on that cell): apex's stall check compares one node's counters over time,
-  so it must not alternate between cells.
+- **9090** is one cell's Prometheus alone, the cell given the Prometheus
+  target group (with `exposePrometheus`): apex's stall check compares one
+  node's counters over time, so it must not alternate between cells.
+- The **Grafana** target group has no listener here: the API tier's load
+  balancer forwards `/grafana` to it, and the cell running Grafana registers
+  in it.
 
-The stack opens each cell's security group to the load balancer on those
-ports. Give its outputs to the api-tier app: `DnsName` as
+Give its outputs to the cells: `SecurityGroupId` as
+`coreLoadBalancerSecurityGroupId` (the cell admits the load balancer on its
+ports) and `IngressTargetGroupArn` as `ingressTargetGroupArn` on every cell,
+`PrometheusTargetGroupArn` and `GrafanaTargetGroupArn` on the one cell that
+serves them. And to the api-tier app: `DnsName` as
 `ingressUrls=http://<DnsName>:8600` and `prometheusHost=<DnsName>:9090`,
-`SecurityGroupId` as `coreLoadBalancerSecurityGroupId`.
+`SecurityGroupId` as `coreLoadBalancerSecurityGroupId`,
+`GrafanaTargetGroupArn` as `grafanaTargetGroupArn`.
 
 ## Context
 
@@ -144,6 +164,10 @@ ports. Give its outputs to the api-tier app: `DnsName` as
 | `peerStore` | `sqlite` | where the cell keeps peers and sync tasks (`--peerStore`): `sqlite` is a file in the node directory, so a database failover or maintenance no longer restarts ethereum-discover and strato-p2p; `postgres` keeps them in the cluster as a monolith does
 | `peerDatabase` | none | per-cell peer store database on Postgres (`--peerDatabase`); only read with `peerStore: postgres`. strato-p2p keeps block reads on the eth database and peers on this one |
 | `writer` | `false` | claim the writer lease at start |
+| `seedEmptyCluster` | `false` | let the first boot decide `writer` and `snapshotSkipDatabases` from the cluster: with no `eth` database there, the cell loads the snapshot's databases into it and starts as the writer; otherwise it leaves them alone and starts as a standby. A replaced instance boots again, so this is the only safe way to name a "first cell" of a group. Create the cells one at a time |
+| `stratoImageParameter` | none | SSM parameter naming the image the environment's cells run (`scripts/ha.sh cells upgrade` writes it): a new instance installs that image when the parameter exists, `stratoImage` otherwise |
+| `coreLoadBalancerSecurityGroupId` | none | the core tier's load balancer's security group: admitted on 8600, 8601 and, with `exposePrometheus`, 9090 |
+| `ingressTargetGroupArn` / `prometheusTargetGroupArn` / `grafanaTargetGroupArn` | none | the core tier's target groups this cell's instance registers in; with the ingress group the watchdog may also have an instance it cannot revive replaced |
 | `validatorBehavior` | `false` | vote in consensus |
 | `vmQuery` | `false` | run vm-query on the cell |
 | `snapshotSource` | none | `s3://bucket/key.tar.zst`, or a published timestamp / `latest` |
@@ -156,7 +180,7 @@ ports. Give its outputs to the api-tier app: `DnsName` as
 | `clientSecurityGroupIds` | none | allowed on 8600 (the transaction ingress): the API tier's task security group, when it posts to the cells directly and not through the core tier's load balancer |
 | `sshSourceSecurityGroupId` | none | allowed on 22 |
 | `otelConfigParameterName` / `cloudWatchAgentParameterName` / `prometheusWorkspaceArn` | none | from the observability app; with a collector config the host runs the ADOT collector, its processes export spans to it, the role may write X-Ray, and (with `grafana`) the host's Grafana gets an X-Ray data source so the infrastructure map dashboard reads the service graph |
-| `terminationProtection` | `true` | stack termination protection and instance retention |
+| `terminationProtection` | `true` | stack termination protection |
 
 ## Operating
 
@@ -168,16 +192,22 @@ ports. Give its outputs to the api-tier app: `DnsName` as
   core tier's load balancer. `journalctl -u strato-cell-watchdog` shows the
   watchdog, which restarts a node unhealthy for 2 minutes, at most once every
   30 (`WATCHDOG_RESTART_AFTER`, `WATCHDOG_RESTART_EVERY` and
-  `WATCHDOG_RESTART_WAIT` in `/etc/strato/cell.env`, in seconds).
+  `WATCHDOG_RESTART_WAIT` in `/etc/strato/cell.env`, in seconds). If the node
+  is still not following the chain `WATCHDOG_RESTART_WAIT` (10 minutes) after
+  a restart, the watchdog marks its instance unhealthy and the Auto Scaling
+  group replaces it, but only while another cell is healthy in the ingress
+  target group and once the instance is `WATCHDOG_REPLACE_AFTER_AGE` (a day)
+  old.
 - To restart the node by hand: `sudo strato-cell-upgrade --restart`, which
   drains the cell first and waits until it follows the chain again.
 - To change flags (writer, validator behaviour): `strato-down`, then
   `strato-setup --regenerate <original flags> <changes> /var/lib/strato/node`,
   then `systemctl start strato-cell`. The password argument is needed again;
   read it on the host from the secret, never into a shared log.
-- Replacing the instance (a new instance type, a new AMI) keeps the data
-  volume only if it is detached and reattached by hand; the stack does not
-  do that for you. A follower can instead be rebuilt from a snapshot.
+- Replacing the instance (a new instance type, a new AMI, a damaged node):
+  deploy the stack, then `scripts/ha.sh <env> cells replace <id>`. The new
+  instance starts on new volumes from the latest snapshot; nothing of the
+  old one is kept.
 
 ## When the first boot fails
 
@@ -207,7 +237,7 @@ bootstrap) before restarting, and check the processes afterwards
 The Host stack has termination protection on, which also blocks deleting one
 that rolled back before it created anything: clear it first
 (`aws cloudformation update-termination-protection --no-enable-termination-protection`).
-The instance and its data volume are retained on delete; see the repo README.
+The instance and its volumes go with the stack.
 
 ## Not done here
 

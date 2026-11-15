@@ -19,6 +19,20 @@ NODE_DIR=$STRATO_ROOT/node
 NODE_USER=strato
 log() { echo "[cell-bootstrap $(date -u +%FT%TZ)] $*"; }
 
+# --- 0. The cell's Elastic IP ---
+# The stack allocates it and the instance takes it: a replaced instance is
+# another machine, and the address peers dial has to follow the cell. Until
+# then the instance uses the public address it was launched with.
+if [[ -n "${EIP_ALLOCATION_ID:-}" ]]; then
+  imds() { curl -s -H "X-aws-ec2-metadata-token: $(curl -s -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' http://169.254.169.254/latest/api/token)" "http://169.254.169.254/latest/meta-data/$1"; }
+  if [[ "$(imds public-ipv4)" != "$EIP_PUBLIC_IP" ]]; then
+    log "elastic ip $EIP_PUBLIC_IP"
+    aws ec2 associate-address --allocation-id "$EIP_ALLOCATION_ID" --instance-id "$(imds instance-id)" --allow-reassociation >/dev/null
+    for i in $(seq 1 30); do [[ "$(imds public-ipv4)" == "$EIP_PUBLIC_IP" ]] && break; sleep 2; done
+    [[ "$(imds public-ipv4)" == "$EIP_PUBLIC_IP" ]] || { log "$EIP_PUBLIC_IP did not become this instance's address"; exit 1; }
+  fi
+fi
+
 # --- 1. Packages: docker, the strato binaries' runtime libraries, tooling ---
 log "packages"
 apt-get update -q
@@ -51,6 +65,11 @@ mountpoint -q $STRATO_ROOT || mount $STRATO_ROOT
 chown $NODE_USER:$NODE_USER $STRATO_ROOT
 
 # --- 3. Binaries from the strato image, node scripts from the repo ---
+# The image the environment's cells run, once cells upgrade has recorded one:
+# a cell replaced between deployments comes back on that, not on an older one.
+if [[ -n "${STRATO_IMAGE_PARAMETER:-}" ]] && recorded=$(aws ssm get-parameter --name "$STRATO_IMAGE_PARAMETER" --query Parameter.Value --output text 2>/dev/null) && [[ -n "$recorded" ]]; then
+  STRATO_IMAGE=$recorded
+fi
 log "image $STRATO_IMAGE"
 registry=${STRATO_IMAGE%%/*}
 # Both root (this script) and the node's user (convoke's compose pulls) need the registry login.
@@ -82,6 +101,8 @@ rm -rf /tmp/strato-bin && docker cp "$cid:/usr/local/bin" /tmp/strato-bin
 # Regular files only: the image's bin directory also holds a directory entry (queryStrato).
 find /tmp/strato-bin -maxdepth 1 -type f -exec install -m 0755 {} /usr/local/bin/ \;
 docker rm -f "$cid" >/dev/null; trap - EXIT
+# What strato-cell-upgrade compares a new image with.
+echo "$STRATO_IMAGE" > /etc/strato/current-image
 aws s3 cp "$NODE_SCRIPTS_S3" /tmp/node-scripts.zip
 rm -rf /tmp/node-scripts && mkdir /tmp/node-scripts && unzip -o -q /tmp/node-scripts.zip -d /tmp/node-scripts
 install -m 0755 /tmp/node-scripts/strato-* /usr/local/bin/
@@ -160,6 +181,16 @@ if [[ ! -d $NODE_DIR ]]; then
   # shellcheck disable=SC2206
   extra=($EXTRA_SETUP_FLAGS)
   pg_password=$(aws secretsmanager get-secret-value --secret-id "$PG_SECRET_ID" --query SecretString --output text | jq -r .password)
+  # With SEED_EMPTY_CLUSTER the cluster says what this cell is. The one that
+  # finds no eth database loads the snapshot's databases into the cluster and
+  # starts as the writer; every other cell, and every later instance of this
+  # one, leaves them alone and starts as a standby. Only an answer of exactly
+  # 0 seeds, and a cluster that cannot be asked stops the bootstrap here.
+  if [[ "${SEED_EMPTY_CLUSTER:-false}" == "true" ]]; then
+    eth_databases=$(PGPASSWORD="$pg_password" psql -h "$PG_WRITER_HOST" -p "$PG_PORT" -U "$PG_USER" -d postgres -Atc "select count(*) from pg_database where datname = 'eth'")
+    if [[ "$eth_databases" == "0" ]]; then WRITER=true; SNAPSHOT_SKIP_DATABASES=false; else WRITER=false; SNAPSHOT_SKIP_DATABASES=true; fi
+    log "the cluster has $eth_databases eth database: writer=$WRITER, skip the snapshot's databases=$SNAPSHOT_SKIP_DATABASES"
+  fi
   # 4a. The node directory (ethconf, secrets, genesis, docker-compose.yml, commands.txt).
   sudo -u $NODE_USER -H env PATH="$PATH" \
     strato-setup "$NODE_DIR" --role="$ROLE" --network="$NETWORK" --nodeHost="$node_host" \

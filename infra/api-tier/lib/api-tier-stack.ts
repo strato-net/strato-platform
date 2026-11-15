@@ -1,11 +1,10 @@
-import { CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
+import { Annotations, CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as ecr from "aws-cdk-lib/aws-ecr";
 import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
-import { InstanceIdTarget } from "aws-cdk-lib/aws-elasticloadbalancingv2-targets";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as targets from "aws-cdk-lib/aws-route53-targets";
@@ -356,22 +355,14 @@ export class ApiTierStack extends Stack {
     // --- Grafana on a core cell, reached through this ALB ---
     // Grafana runs on the cell, not in this tier, and the only public name in
     // front of it is the front door, so /grafana* comes in over CloudFront,
-    // lands here and is forwarded to the instance. Grafana itself does the
+    // lands here and is forwarded to the core tier's Grafana target group,
+    // where that cell's instance registers itself. Grafana itself does the
     // Keycloak login (generic_oauth) and refuses anyone outside the whitelisted
     // group, so this rule is routing only - it is not the access control. The
     // cell's 3001 stays shut to everything except this load balancer.
-    if (config.grafanaInstanceId) {
-      const grafanaTargets = new elbv2.ApplicationTargetGroup(this, "GrafanaTargets", {
-        targetGroupName: elbName(`${name}-grafana`),
-        vpc,
-        port: config.grafanaPort,
-        protocol: elbv2.ApplicationProtocol.HTTP,
-        targetType: elbv2.TargetType.INSTANCE,
-        targets: [new InstanceIdTarget(config.grafanaInstanceId, config.grafanaPort)],
-        // Served under the sub path, so the health endpoint is under it too.
-        healthCheck: { path: "/grafana/api/health", interval: Duration.seconds(30), healthyThresholdCount: 2 },
-        deregistrationDelay: Duration.seconds(30),
-      });
+    if (config.grafanaTargetGroupArn) {
+      const grafanaTargets = elbv2.ApplicationTargetGroup.fromTargetGroupAttributes(this, "GrafanaTargets", { targetGroupArn: config.grafanaTargetGroupArn });
+      Annotations.of(grafanaTargets).acknowledgeWarning("@aws-cdk/aws-elbv2:albTargetGroupCannotRegisterListener", "the cell's security group is opened to this load balancer below");
       listener.addTargetGroups("Grafana", {
         priority: 10,
         conditions: [elbv2.ListenerCondition.pathPatterns(["/grafana", "/grafana/*"])],

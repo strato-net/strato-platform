@@ -40,8 +40,8 @@ create a second set of resources beside it.
 
 ## Deploy order
 
-`data-plane`, `core-cell` (the cells, then their load balancer,
-`ha-<env>-core-nlb`), `api-tier` (Network and Tier), the front door
+`data-plane`, `core-cell` (the cells' load balancer, `ha-<env>-core-nlb`,
+then the cells), `api-tier` (Network and Tier), the front door
 (`ha-<env>-api-frontdoor`) **and its DNS record**, `app-tier`, then
 `observability`.
 
@@ -70,25 +70,29 @@ same run builds the environment from nothing and updates it:
    `bin/strato-*`, `core-cell/bootstrap/strato-cell-upgrade` and
    `strato-cell-health` go to `NODE_SCRIPTS_S3`.
 2. `data-plane` and `obs-core`.
-3. Missing cells are created one at a time, each from the latest snapshot, the
-   first of them restoring eth and cirrus into the empty cluster; the run
-   waits until each follows the chain. A cell's context is recorded when it
-   is created (SSM `/ha-testnet-app/deploy/cell-<id>-context`) and replayed
-   afterwards: it is the instance's user data, which cloud-init reads once,
-   and a changed user data stops and starts the instance.
-4. Existing cells are upgraded in place through SSM (`cells upgrade`):
+3. `core-nlb`: one internal load balancer in front of the cells, with the
+   target groups a cell's instance registers in. Port 8600 hands a
+   transaction batch to one healthy cell (the cell's own health check on 8601
+   decides); port 9090 is the first cell's Prometheus, for apex; the Grafana
+   target group is for the API tier's load balancer.
+4. Every cell's stack is deployed (`cells deploy`). A cell is one instance in
+   an Auto Scaling group; a missing cell is created, one at a time, from the
+   latest snapshot, and the run waits until it follows the chain. An instance
+   asks the cluster at its first boot what it is: on an empty cluster it
+   loads the snapshot's eth and cirrus into it and starts as the writer,
+   otherwise it leaves them alone and starts as a standby. For an existing
+   cell the deploy only brings its launch template up to date, which is what
+   its next instance boots; the running instance is not touched.
+5. Existing cells are upgraded in place through SSM (`cells upgrade`):
    standbys first, then the lease holder, whose lease an upgraded standby
    takes while it restarts. Each cell gets the new image's binaries and the
    new node scripts and must follow the chain again before the next one is
    touched. Its node directory and docker-compose.yml stay as they were set
    up, so a change to the node's containers needs a rebuilt cell. A cell is
    drained before its node stops (its health check answers 503 for 30 s),
-   and the upgrade reinstalls its health endpoint and watchdog.
-5. `core-nlb`: one internal load balancer in front of every cell, which
-   opens the cells' security groups to itself, so no cell stack is redeployed
-   for it. Port 8600 hands a transaction batch to one healthy cell (the
-   cell's own health check on 8601 decides); port 9090 is the first cell's
-   Prometheus, for apex.
+   and the upgrade reinstalls its health endpoint and watchdog. The image a
+   cell came back on is recorded (SSM `/ha-testnet-app/core/strato-image`),
+   and a new instance of any cell installs that one.
 6. `api-tier`, given the load balancer's name as its ingress
    (`http://<core>:8600`) and Prometheus host and admitted on its security
    group (`coreLoadBalancerSecurityGroupId`); then `app-tier`, the front door
@@ -107,7 +111,16 @@ active, so nothing else brings it back. `strato-cell-watchdog` restarts the
 node in place once it has been unhealthy for 2 minutes, at most once every 30
 minutes, and only after the node has followed the chain since the watchdog
 started (a bootstrap or an upgrade's catch-up is left alone). Each restart is
-counted in CloudWatch (`STRATO/Cell` `WatchdogRestart`). Healthy means every
+counted in CloudWatch (`STRATO/Cell` `WatchdogRestart`). When the node is
+still not following the chain 10 minutes after such a restart, the watchdog
+hands the instance back to its Auto Scaling group (`WatchdogReplace`), which
+builds the cell again from the latest snapshot: on the cell's Elastic IP, as
+a standby, registered with the load balancer. It does so only while another
+cell is healthy behind the load balancer (with none, the fault is likely the
+network's) and never in an instance's first 24 hours, so a build that cannot
+sync is restarted, not rebuilt over and over. `CELL_ACTION=replace` with
+`CELL=a` or `b`, or `scripts/ha.sh testnet-app cells replace <id>`, does the
+same by hand; the old instance's volumes go with it. Healthy means every
 core process answers and the node is within 5 blocks of the network's best
 block (`strato-cell-upgrade --check`, the check the pipeline waits on);
 `strato-cell-health` answers the same over HTTP on port 8601.
@@ -119,6 +132,7 @@ scripts/ha.sh testnet-app context api-tier
 scripts/ha.sh testnet-app cdk api-tier diff
 scripts/ha.sh testnet-app cells lease
 scripts/ha.sh testnet-app cells restart b
+aws ssm start-session --target "$(scripts/ha.sh testnet-app cells instance a)"
 ```
 
 Before the first run:
@@ -254,11 +268,11 @@ The checkout is expected beside this repo at `../strato-platform`. Set
 
 ## Teardown
 
-Several resources outlive their stack on purpose: the core cell's EC2
-instance (DeletionPolicy Retain) and its data volume, the Aurora cluster
-(RETAIN plus deletion protection) and the front-door S3 buckets. A plain
-`delete-stack` leaves them running and then hangs on the cell security group.
-Clean up retained resources before deleting the stack that owns them.
+Some resources outlive their stack on purpose: the Aurora cluster (RETAIN
+plus deletion protection) and the front-door S3 buckets. Clean up retained
+resources before deleting the stack that owns them. A cell's instance and
+volumes go with its stack (its Auto Scaling group); delete the cells before
+`ha-<env>-core-nlb`, whose target groups they are registered in.
 
 ## Context drift
 

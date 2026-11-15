@@ -25,7 +25,7 @@ const APP_PATHS = ["/api-docs*", "/api/*", "/history-api/*"];
  * did on a single node; the app tier's nginx reads the same session cookie.
  */
 // "/grafana*" reaches a core cell's Grafana: the API tier's ALB has a rule that
-// forwards it to that instance (grafanaInstanceId there). Grafana runs its own
+// forwards it to that cell (grafanaTargetGroupArn there). Grafana runs its own
 // Keycloak login, so this only carries the request to it.
 const API_PATHS = ["/strato/*", "/strato-api*", "/bloc/*", "/cirrus/*", "/apex-api*", "/apex-ws/*", "/rpc*", "/docs*", "/login*", "/auth/*", "/csrf-init", "/health", "/_ping", "/grafana*"];
 

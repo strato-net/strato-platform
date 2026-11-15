@@ -36,7 +36,7 @@ export interface ApiTierConfig {
   createSessionSecret: boolean;
   /** An existing regional certificate for the ALB. Without it, and with `domainName` set, the app creates a DNS-validated one (see CertificateStack). */
   albCertificateArn?: string;
-  /** Security groups this stack opens at deploy time: the Aurora cluster's to the tasks (5432), and a core cell's for its Grafana (grafanaInstanceId, to the ALB) and, without a core load balancer, its Prometheus (prometheusHost, to the tasks). Without these, allow the output TaskSecurityGroupId by hand. */
+  /** Security groups this stack opens at deploy time: the Aurora cluster's to the tasks (5432), and a core cell's for its Grafana (grafanaTargetGroupArn, to the ALB) and, without a core load balancer, its Prometheus (prometheusHost, to the tasks). Without these, allow the output TaskSecurityGroupId by hand. */
   postgresSecurityGroupId?: string;
   coreSecurityGroupId?: string;
   /**
@@ -111,12 +111,14 @@ export interface ApiTierConfig {
    */
   prometheusHost?: string;
   /**
-   * A core cell running Grafana (the core-cell app's `grafana`): this ALB gains a /grafana* rule
-   * forwarding to that instance, so the front door can reach it over the one public hostname, and
-   * the cell's security group is opened on that port to this load balancer alone. Access control is
-   * Grafana's own Keycloak login, not this rule.
+   * The Grafana target group of the core tier (the core-cell app's coreNlb stack output
+   * GrafanaTargetGroupArn), in which the cell running Grafana registers its instance: this ALB
+   * gains a /grafana* rule forwarding to it, so the front door can reach Grafana over the one
+   * public hostname, and that cell's security group (coreSecurityGroupId) is opened on
+   * `grafanaPort` to this load balancer alone. Access control is Grafana's own Keycloak login,
+   * not this rule.
    */
-  grafanaInstanceId?: string;
+  grafanaTargetGroupArn?: string;
   grafanaPort: number;
   /** Stateless CSRF tokens in nginx (CSRF_STATELESS=true): an HMAC of the session under the session secret, valid in every copy and tier sharing that secret. */
   csrfStateless: boolean;
@@ -191,7 +193,7 @@ export function loadConfig(app: App): ApiTierConfig {
     nginxSessionSecretName: optional(app, "nginxSessionSecretName"),
     csrfStateless: String(ctx(app, "csrfStateless", "false")) === "true",
     prometheusHost: optional(app, "prometheusHost"),
-    grafanaInstanceId: optional(app, "grafanaInstanceId"),
+    grafanaTargetGroupArn: optional(app, "grafanaTargetGroupArn"),
     grafanaPort: Number(ctx(app, "grafanaPort", "3001")),
   };
 }

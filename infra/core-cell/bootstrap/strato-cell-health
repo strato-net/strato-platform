@@ -5,7 +5,7 @@
 #
 #   strato-cell-health             exit 0 when the cell can take transactions, with a one-line status
 #   strato-cell-health --serve     the same answer over HTTP on HEALTH_PORT (8601): 200 or 503
-#   strato-cell-health --watch     the watchdog: restarts the node in place when it stays unhealthy
+#   strato-cell-health --watch     the watchdog: restarts the node in place when it stays unhealthy, and has the instance replaced when that does not help
 #   strato-cell-health --install   (re)installs and (re)starts both as systemd services
 #
 # Healthy: the cell is not draining for a restart or an upgrade, and the node
@@ -20,6 +20,7 @@ HEALTH_PORT=${HEALTH_PORT:-8601}
 RESTART_AFTER=${WATCHDOG_RESTART_AFTER:-120}
 RESTART_EVERY=${WATCHDOG_RESTART_EVERY:-1800}
 RESTART_WAIT=${WATCHDOG_RESTART_WAIT:-600}
+REPLACE_AFTER_AGE=${WATCHDOG_REPLACE_AFTER_AGE:-86400}
 log() { echo "[cell-health $(date -u +%FT%TZ)] $*"; }
 
 # strato-cell-upgrade drains the cell while it restarts or upgrades the node;
@@ -89,13 +90,42 @@ http.server.ThreadingHTTPServer(("", port), Health).serve_forever()
 PY
 }
 
+# One more of what the watchdog did, in CloudWatch (STRATO/Cell).
+count() {
+  aws cloudwatch put-metric-data --namespace STRATO/Cell \
+    --metric-data "MetricName=$1,Dimensions=[{Name=Cell,Value=${TLS_HOSTNAME:-$(hostname)}}],Value=1,Unit=Count" || true
+}
+
+# Hands this instance back to its Auto Scaling group, which builds the cell
+# again from the latest snapshot, when a restart did not bring the node back
+# within RESTART_WAIT. Only for an instance behind the core tier's load
+# balancer that has lived REPLACE_AFTER_AGE (a build that cannot sync gets
+# restarts, not one new instance after another) and only while another cell
+# is healthy there: with none, the fault is likely the network's, and
+# rebuilding every cell at once would only add hours to it.
+replace() {
+  local status=$1 me age healthy
+  [[ -n ${INGRESS_TARGET_GROUP_ARN:-} ]] || return 0
+  # cell.env is written once, at the instance's first boot.
+  age=$(( $(date +%s) - $(stat -c %Y /etc/strato/cell.env) ))
+  (( age >= REPLACE_AFTER_AGE )) || { log "not replacing: this instance is ${age}s old, a replacement comes only after ${REPLACE_AFTER_AGE}s"; return 0; }
+  me=$(cat /var/lib/cloud/data/instance-id)
+  healthy=$(aws elbv2 describe-target-health --target-group-arn "$INGRESS_TARGET_GROUP_ARN" \
+    --query "length(TargetHealthDescriptions[?TargetHealth.State=='healthy' && Target.Id!='$me'])" --output text) \
+    || { log "not replacing: the load balancer's target group cannot be read"; return 0; }
+  [[ $healthy =~ ^[0-9]+$ ]] && (( healthy > 0 )) || { log "not replacing: no other cell is healthy behind the load balancer"; return 0; }
+  log "REPLACING this instance ($me), unhealthy after a restart: $status"
+  count WatchdogReplace
+  aws autoscaling set-instance-health --instance-id "$me" --health-status Unhealthy || log "could not mark $me unhealthy"
+}
+
 # Restarts the node in place once it has been unhealthy for RESTART_AFTER, at
 # most once every RESTART_EVERY. It acts only once the node has followed the
 # chain since the watchdog started, so a first boot, a snapshot restore or the
 # catch-up after an upgrade is never cut short, and never while the cell
 # drains. Each restart is counted in CloudWatch (STRATO/Cell WatchdogRestart).
 watch() {
-  local cell=${TLS_HOSTNAME:-$(hostname)} state=/var/lib/strato-cell-health
+  local state=/var/lib/strato-cell-health
   local armed=false since=0 noted=false now last status
   install -d -m 0755 "$state"
   log "watching: a restart after ${RESTART_AFTER}s unhealthy, at most one every ${RESTART_EVERY}s"
@@ -118,9 +148,11 @@ watch() {
     fi
     echo "$now" > "$state/last-restart"
     log "RESTARTING the node, unhealthy for $(( now - since ))s: $status"
-    aws cloudwatch put-metric-data --namespace STRATO/Cell \
-      --metric-data "MetricName=WatchdogRestart,Dimensions=[{Name=Cell,Value=$cell}],Value=1,Unit=Count" || true
-    /usr/local/bin/strato-cell-upgrade --restart "$RESTART_WAIT" || log "restarted, but not following the chain yet"
+    count WatchdogRestart
+    if ! /usr/local/bin/strato-cell-upgrade --restart "$RESTART_WAIT"; then
+      log "restarted, but not following the chain after ${RESTART_WAIT}s"
+      replace "$status"
+    fi
     since=0 noted=false
   done
 }
