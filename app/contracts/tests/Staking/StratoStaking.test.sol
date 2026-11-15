@@ -1191,6 +1191,38 @@ contract Describe_StratoStaking {
         require(pins.isValidator(VALIDATOR_A), "joins by stake once the pin is cleared");
     }
 
+    // Clearing a pin hands the seat back to staking even when staking never took it: the
+    // first sync adopts it, then the stake rules remove it.
+    function it_hands_back_a_seat_whose_pin_was_cleared_before_adoption() public {
+        GenesisGovernance pins = _pinningGovernance();
+        _bondBoth();
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 100e18);
+        pins.voteToAddValidator(address(validatorC));
+        pins.voteToClearValidatorPin(address(validatorC));
+        require(pins.isValidator(address(validatorC)) && !staking.isValidator(address(validatorC)), "seated by governance only");
+
+        attacker.do(address(staking), "syncValidator(address)", address(validatorC));
+        require(!pins.isValidator(address(validatorC)) && staking.status(address(validatorC)) == 1, "below minStake, so out");
+        require(staking.validatorCount() == 2, "counts balance");
+    }
+
+    // An eligible seat whose pin was cleared before adoption joins staking's set without
+    // taking a slot from anyone.
+    function it_activates_a_cleared_seat_without_evicting() public {
+        GenesisGovernance pins = _pinningGovernance();
+        staking.setSetParams(2, 50, 500, 10, 100, 100, 0);
+        _bondBoth();
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1100e18);
+        pins.voteToAddValidator(address(validatorC));
+        pins.voteToClearValidatorPin(address(validatorC));
+
+        _activate(address(validatorC));
+        require(pins.isValidator(VALIDATOR_A) && pins.isValidator(VALIDATOR_B), "nobody evicted");
+        require(staking.isValidator(address(validatorC)) && staking.validatorCount() == 3, "adopted");
+    }
+
     // A kick overrides a pin: the validator leaves and the pin goes with it.
     function it_kicks_a_pinned_validator() public {
         GenesisGovernance pins = _pinningGovernance();
