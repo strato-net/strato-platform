@@ -30,6 +30,7 @@ library:
   - composable-monads-base
   - containers
   - solid-vm-model
+  - solid-vm-parser
   - data-default
   - deepseq
   - esqueleto
@@ -72,3 +73,4 @@ tests:
       - hspec
       - ethereum-rlp
       - strato-model
+      - text
