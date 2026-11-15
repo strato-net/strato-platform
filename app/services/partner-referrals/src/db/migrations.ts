@@ -75,4 +75,27 @@ CREATE INDEX activity_account_ts ON activity (account, block_ts);
 ALTER TABLE referrals ADD COLUMN counted_from TIMESTAMPTZ;
 `,
   },
+  {
+    name: "003_chain_position",
+    sql: `
+-- Cirrus numbers its event rows per node database, so a row id is another
+-- event on another node. The position also holds what its event is on the
+-- chain, by which the poller finds it on whichever node answers.
+ALTER TABLE progress
+  ADD COLUMN address      TEXT,
+  ADD COLUMN block_hash   TEXT,
+  ADD COLUMN event_index  INT,
+  ADD COLUMN block_number BIGINT;
+
+-- Counted events are keyed the same way. Rows stored under a row id cannot
+-- be keyed again, so the chain is read once more from the start.
+UPDATE progress SET cursor = 0;
+TRUNCATE activity, prices, pools;
+ALTER TABLE activity
+  DROP COLUMN event_id,
+  ADD COLUMN block_hash  TEXT NOT NULL,
+  ADD COLUMN event_index INT NOT NULL,
+  ADD PRIMARY KEY (block_hash, event_index);
+`,
+  },
 ];

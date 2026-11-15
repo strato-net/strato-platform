@@ -3,7 +3,8 @@ import { parseJsonPreservingBigInts, toAddress, toBigInt } from "../utils/num";
 
 /** One row of Cirrus's event table. */
 export interface ChainEvent {
-  id: number;
+  blockHash: string;
+  eventIndex: number;
   address: string;
   name: string;
   blockTs: Date;
@@ -26,8 +27,11 @@ export interface State {
   dirtyPools: Set<string>;
 }
 
+// blockHash and eventIndex name the event: a block's events are numbered in one sequence. Only the
+// genesis block numbers them per contract, and no referral counts from that far back
 export interface Activity {
-  eventId: number;
+  blockHash: string;
+  eventIndex: number;
   account: string;
   blockTs: Date;
   usdWad: bigint;
@@ -117,7 +121,7 @@ export const activityOf = (e: ChainEvent, state: State): Activity | null => {
     const n = toBigInt(amount);
     if (price === undefined || decimals == null || n === null) continue;
     // Amounts are in the token's smallest unit, prices per whole token
-    return { eventId: e.id, account: who, blockTs: e.blockTs, usdWad: ((n < 0n ? -n : n) * price) / 10n ** BigInt(decimals) };
+    return { blockHash: e.blockHash, eventIndex: e.eventIndex, account: who, blockTs: e.blockTs, usdWad: ((n < 0n ? -n : n) * price) / 10n ** BigInt(decimals) };
   }
   return null;
 };

@@ -25,13 +25,13 @@ const router = "22".repeat(20);
 
 let id = 0;
 const ev = (name: string, address: string, args: Record<string, unknown>, txSender = alice): ChainEvent => ({
-  id: ++id, address, name, blockTs: new Date("2026-11-11T12:00:00Z"), txSender, args,
+  blockHash: "b1", eventIndex: ++id, address, name, blockTs: new Date("2026-11-11T12:00:00Z"), txSender, args,
 });
 const state: State = { prices: new Map(), decimals: new Map([[usdst, 18], [eth, 18], [sixDecimals, 6], [notAToken, null]]), pools: new Map(), dirtyPrices: new Set(), dirtyPools: new Set() };
 const usd = (e: ChainEvent) => activityOf(e, state)?.usdWad.toString() ?? null;
 
 // A Cirrus row as served: uint256 as bare numbers, arrays as JSON text.
-const raw = `[{"id":7,"address":"${oracle}","block_timestamp":"2026-11-11 12:00:00 UTC","transaction_sender":"${alice}","event_name":"BatchPricesUpdated","attributes":{"assets":"[\\"${usdst}\\", \\"${eth}\\"]","priceValues":"[1000000000000000000, 2000000000000000000000]"}}]`;
+const raw = `[{"id":7,"address":"${oracle}","block_hash":"b7","block_number":"7","event_index":1,"block_timestamp":"2026-11-11 12:00:00 UTC","transaction_sender":"${alice}","event_name":"BatchPricesUpdated","attributes":{"assets":"[\\"${usdst}\\", \\"${eth}\\"]","priceValues":"[1000000000000000000, 2000000000000000000000]"}}]`;
 const batch = fromCirrusRow((parseJsonPreservingBigInts(raw) as any[])[0])!;
 assert.strictEqual(batch.blockTs.toISOString(), "2026-11-11T12:00:00.000Z");
 
@@ -48,7 +48,7 @@ assert.deepStrictEqual([...state.dirtyPools], [pool, poolV3]);
 // Swaps: valued by the input, credited to the transaction's sender
 const swap = { sender: router, tokenIn: eth, tokenOut: usdst, amountIn: "500000000000000000", amountOut: "1" };
 assert.deepStrictEqual(activityOf(ev("Swap", pool, swap), state), {
-  eventId: id, account: alice, blockTs: new Date("2026-11-11T12:00:00Z"), usdWad: 1000n * 10n ** 18n,
+  blockHash: "b1", eventIndex: id, account: alice, blockTs: new Date("2026-11-11T12:00:00Z"), usdWad: 1000n * 10n ** 18n,
 });
 assert.strictEqual(usd(ev("Swap", "ee".repeat(20), swap)), null, "a Swap from an unknown contract is not counted");
 assert.strictEqual(usd(ev("Swap", pool, { ...swap, tokenIn: unpriced })), "1", "falls back to the output leg");
