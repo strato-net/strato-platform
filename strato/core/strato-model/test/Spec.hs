@@ -97,6 +97,57 @@ spec = do
       property $ \(chainId :: Integer) (height :: Integer) (rnd :: NonNegative Integer) ->
         run chainId (abs height) [7] [] 0 (getNonNegative rnd) `shouldBe` Validator 7
 
+  describe "selectProposer, proportional rule" $ do
+    let vals = S.fromList . map Validator
+        run chainId height vs stakes start rnd = selectProposer chainId height (vals vs) (M.fromList $ map (\(a, w) -> (Validator a, w)) stakes) start rnd
+        helium = 114784819836269 :: Integer
+        -- helium block 1172041: round 27818, no round change, proposed by f1e40824...
+        heliumVals = [0x0c4cecae296c33f71f9a6e6fb57f418f9d5f7e82, 0x97ee72c1615848f171cd059606a7a5f0dd7e3c5f, 0xa6840907c8126c370f8a2305cd6d416c83452690, 0xbdd3fe1b9a87a88cff8259528c0a4d6464625713, 0xebcd85c4212e53a2546cbcea765c1de531b14fb1, 0xf1e4082464ff5c399e43f2c9177904db9547d6a2] :: [Address]
+        heliumStakes = zip heliumVals [12482281000000000000000, 10000000000000000000000, 10000000000000000000280, 10674875059352226155225, 10078570000000000000000, 10058204586430556063300]
+        heliumSeed = selectionSeed helium 1172041 27818
+        heliumTotal = sum (map snd heliumStakes)
+        third = 10 ^ (22 :: Int) :: Integer
+        -- how many of the heights pick a different proposer once one validator gains 1 wei
+        redrawn chainId =
+          length
+            [ ()
+              | i <- [1 .. 2000 :: Integer],
+                run chainId i [1, 2, 3] [(1, third), (2, third), (3, third)] 0 0
+                  /= run chainId i [1, 2, 3] [(1, third), (2, third), (3, third + 1)] 0 0
+            ]
+
+    it "keeps the first rule on helium below its switch height, so its history replays" $ do
+      proportionalSelectionActive helium 1172041 `shouldBe` False
+      heliumSeed `shouldBe` 0x653b850a9ae5168b0b2b81282c79f9f3c7579b7daf583ebb99bea8a68368ddae
+      weightedPoint False heliumSeed heliumTotal `shouldBe` 54863233632135708174857
+      run helium 1172041 heliumVals heliumStakes 27818 27818 `shouldBe` Validator 0xf1e4082464ff5c399e43f2c9177904db9547d6a2
+
+    it "switches helium at its height and is in force everywhere else from the start" $ do
+      proportionalSelectionActive helium (heliumProportionalSelectionBlock - 1) `shouldBe` False
+      proportionalSelectionActive helium heliumProportionalSelectionBlock `shouldBe` True
+      proportionalSelectionActive 33056204878082667 2000000 `shouldBe` True
+      proportionalSelectionActive 1 0 `shouldBe` True
+
+    it "takes the seed's fraction of the total" $ do
+      weightedPoint True heliumSeed heliumTotal `shouldBe` 25028917024270817395016
+      weightedPoint True 0 heliumTotal `shouldBe` 0
+      weightedPoint True (2 ^ (256 :: Int) - 1) heliumTotal `shouldBe` heliumTotal - 1
+
+    it "always lands inside the total" $
+      property $ \(NonNegative seed) (Positive weight) ->
+        weightedPoint True (seed `mod` (2 ^ (256 :: Int))) weight `shouldSatisfy` (\x -> x >= 0 && x < weight)
+
+    it "does not re-draw the proposer when the total moves by one unit, as the first rule did" $ do
+      redrawn 1 `shouldBe` 0
+      redrawn helium `shouldSatisfy` (> 1000)
+
+    it "still picks in proportion to stake" $ do
+      let picks = [run 1 i [1, 2, 3] [(1, 6), (2, 3), (3, 1)] 0 0 | i <- [1 .. 6000 :: Integer]]
+          share a = fromIntegral (length $ filter (== Validator a) picks) / (6000 :: Double)
+      share 1 `shouldSatisfy` (\x -> x > 0.56 && x < 0.64)
+      share 2 `shouldSatisfy` (\x -> x > 0.27 && x < 0.33)
+      share 3 `shouldSatisfy` (\x -> x > 0.08 && x < 0.12)
+
   describe "fastSerialize" $ do
     it "works on 0" $ word256ToBytes 0 `shouldBe` B.replicate 32 0
     it "works on ff" $ word256ToBytes 0xff `shouldBe` (B.replicate 31 0 <> B.replicate 1 0xff)

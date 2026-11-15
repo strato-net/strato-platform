@@ -13,17 +13,59 @@ module Blockchain.Strato.Model.ProposerSelection
   ( StakeMap,
     selectProposer,
     selectionSeed,
+    proportionalSelectionActive,
+    heliumProportionalSelectionBlock,
+    weightedPoint,
   )
 where
 
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Validator
+import Data.Bits (shiftR)
 import qualified Data.ByteString as B
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
 type StakeMap = M.Map Validator Integer
+
+-- | Helium ran stake-weighted selection under the first rule (@seed `mod` total@)
+-- from its staking fork, so its history only replays with that rule below this
+-- height. Not scheduled yet: replace it with the agreed flag-day height when
+-- the upgrade is coordinated. Every validator must run a build that knows the
+-- height before the chain reaches it.
+heliumProportionalSelectionBlock :: Integer
+heliumProportionalSelectionBlock = 2 ^ (62 :: Int)
+
+-- | Is the proportional pick ('weightedPoint') in force for a block?
+--
+-- It is everywhere except on helium below its switch height. Upquark needs no
+-- height of its own: stake-weighted selection starts there with the staking
+-- fork, so the first rule never produces a block on it.
+proportionalSelectionActive :: Integer -> Integer -> Bool
+proportionalSelectionActive chainId height =
+  not (chainId == heliumNetworkID && height < heliumProportionalSelectionBlock)
+  where
+    heliumNetworkID = 114784819836269
+
+-- | The point on the line of cumulative stake, in @[0, total)@, that a seed
+-- picks. @total@ must be positive.
+--
+-- The first rule took @seed `mod` total@. Its answer for one total says
+-- nothing about its answer for the next, so anyone who could move the total by
+-- one unit (a few wei of stake) re-drew the proposer, and could keep re-drawing
+-- until the block went to a validator of their choosing.
+--
+-- The proportional rule reads the seed as a fraction of 2^256 and takes that
+-- fraction of the total: @(seed * total) `div` 2^256@. Each validator still
+-- wins in proportion to its weight, and the pick is as deterministic as
+-- before. But a small change to the total now moves the point by the same
+-- small fraction, so the proposer changes only when the point lay that close
+-- to a boundary between two validators.
+weightedPoint :: Bool -> Integer -> Integer -> Integer
+weightedPoint proportional seed total
+  | proportional = (seed * total) `shiftR` 256
+  | otherwise = seed `mod` total
 
 -- | keccak256(chainId ‖ height ‖ round), as an unbounded non-negative Integer.
 selectionSeed :: Integer -> Integer -> Integer -> Integer
@@ -59,12 +101,14 @@ selectProposer chainId height validators stakes startRound rnd
       let pick = pickWeighted (selectionSeed chainId height r) cands
        in if r >= rnd then pick else go (r + 1) (filter (/= pick) cands)
 
+    proportional = proportionalSelectionActive chainId height
+
     pickWeighted seed cands =
       let weights = [(c, max 0 (M.findWithDefault 0 c stakes)) | c <- cands]
           total = sum (map snd weights)
        in if total == 0
             then cands !! fromInteger (seed `mod` toInteger (length cands))
-            else walk (seed `mod` total) weights
+            else walk (weightedPoint proportional seed total) weights
 
     walk _ [] = error "selectProposer: exhausted weights"
     walk x ((c, w) : rest)
