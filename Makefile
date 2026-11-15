@@ -382,7 +382,7 @@ build_common_with_tests: generate-version-file
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	cd strato && stack install ${NIX_FLAG} \
-	  --test --no-run-tests
+	  --test --no-run-tests $(BUILD_TEST_TARGETS)
 
 build_common_profiled: generate-version-file
 	@echo building haskell libraries and creating directories (profiled)

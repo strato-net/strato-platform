@@ -147,7 +147,7 @@ internalFrame name sig fun = go sig fun []
       withCallArguments callName values action
 
 callContract :: N.CallKind -> Address -> T.Text -> [N.Dyn] -> Maybe N.SomeTy -> SM [N.Dyn]
-callContract kind address name args expected = do
+callContract kind address name args expected = unwindLegacy $ do
   info <- getCurrentCallInfo
   let ctx = N.mkCtx (codeCollection info) (currentContract info)
       storageAddress = case kind of N.DelegateCall -> currentAddress info; _ -> address
@@ -180,7 +180,7 @@ encodeArguments packed args = do
   (if packed then ABI.abiEncodePacked else ABI.abiEncode) values
 
 createCode :: Maybe N.Dyn -> T.Text -> T.Text -> [N.Dyn] -> SM Address
-createCode salt name source args = do
+createCode salt name source args = unwindLegacy $ do
   saltValue <- traverse toValue salt
   values <- traverse toValue args
   Blockchain.createCode saltValue name source values
@@ -198,7 +198,7 @@ derive :: Address -> T.Text -> T.Text -> [N.Dyn] -> SM Address
 derive creator salt name args = Blockchain.derive creator salt name =<< traverse (getVar . Constant <=< toValue) args
 
 createContract :: T.Text -> Maybe (SM N.Dyn) -> SM [N.Dyn] -> SM Address
-createContract name salt args =
+createContract name salt args = unwindLegacy $
   Blockchain.createContractValues name ((>>= toValue) <$> salt) (traverse toValue =<< args)
 
 copyStorage :: StoragePath -> StoragePath -> SM ()
@@ -223,3 +223,11 @@ previousBlock = do
 proposer :: SM Address
 proposer = Env.proposer <$> getEnv
 
+-- Before atomic catches, native calls themselves unwind unfinished frames.
+-- After activation, attempt owns the boundary and must see those frames.
+unwindLegacy :: SM a -> SM a
+unwindLegacy operation = do
+  forked <- caughtFailureForkActive
+  if forked then operation else do
+    depth <- getCallStackDepth
+    operation `catch` (\(e :: SolidException) -> trimCallStackToDepth depth >> throwIO e)
