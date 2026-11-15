@@ -175,21 +175,25 @@ mayVote = do
 
 roundChange :: (StateMachineM m) => ConduitM InEvent EOutEvent m ()
 roundChange = do
-  nextView <- uses view (over round (+ 1))
-  let target = _round nextView
+  v <- use view
   already <- use pendingRound
+  -- A round joined on a minority of votes can be past this view's next one.
+  -- Keep retrying that round rather than falling back to a lower one.
+  let target = max (_round v + 1) (fromMaybe 0 already)
   pendingRound .= Just target
   -- One signed ROUNDCHANGE per target round. Retransmitting with a new
   -- nonce breaks P2P rlpHash dedup and is what produced the floods.
-  if already /= Just target
-    then whenM mayVote $ do
-      rawMsg <- createRoundChangeMessage nextView
-      msg <- signMessage rawMsg
-      sentRoundChange ?= msg
-      yieldR msg
-    -- Re-send the same signed bytes: P2P forwards them only to peers that
-    -- never got them, so a vote lost to a dropped link still arrives.
-    else use sentRoundChange >>= mapM_ yieldR
+  whenM mayVote $ do
+    sent <- use sentRoundChange
+    case sent of
+      -- Re-send the same signed bytes: P2P forwards them only to peers that
+      -- never got them, so a vote lost to a dropped link still arrives.
+      Just msg@(OMsg _ RoundChange {roundchangeView = rv}) | _round rv == target -> yieldR msg
+      _ -> do
+        rawMsg <- createRoundChangeMessage (v & round .~ target)
+        msg <- signMessage rawMsg
+        sentRoundChange ?= msg
+        yieldR msg
 
 -- | Stamp the consensus data this node is responsible for (the validator set,
 -- and — once staking is active — the round and the stake weights in force) and

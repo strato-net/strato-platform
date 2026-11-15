@@ -114,6 +114,32 @@ spec = describe "ROUNDCHANGE emission" $ do
     length (own joined) `shouldBe` 1
     own again `shouldBe` own joined
 
+  it "keeps re-sending a joined ROUNDCHANGE for a round past the next one" $ do
+    let fakeAuth a = MsgAuth a (signMsg myPriv (B.replicate 32 0))
+        inbound = RoundChange (View 24 18) 0xdeadbeef
+        own = filter ((== me) . sender . oAuth) . roundChangeEvents
+        ctx =
+          baseCtx True (Just me)
+            & validators .~ S.fromList [Validator me, Validator other, Validator third]
+    (joined, again) <- runTest ctx $ do
+      _ <- sendMessages [IMsg (fakeAuth other) inbound]
+      a <- sendMessages [IMsg (fakeAuth third) inbound]
+      b <- sendMessages [Timeout (View 20 18)]
+      pure (a, b)
+    map (_round . roundchangeView . oMessage) (own joined) `shouldBe` [24]
+    own again `shouldBe` own joined
+
+  it "stops re-sending its ROUNDCHANGE once it may no longer vote" $ do
+    let ctx =
+          baseCtx True (Just me)
+            & validators .~ S.fromList [Validator me, Validator other]
+    (first, again) <- runTest ctx $ do
+      a <- sendMessages [Timeout (View 20 18)]
+      b <- sendMessages [ValidatorBehaviorChange (ForcedValidator False), Timeout (View 20 18)]
+      pure (a, b)
+    length (roundChangeEvents first) `shouldBe` 1
+    roundChangeEvents again `shouldBe` []
+
   it "rebroadcasts an inbound ROUNDCHANGE with the original nonce" $ do
     let auth = MsgAuth other (signMsg myPriv (B.replicate 32 0))
         inbound = RoundChange (View 24 18) 0xdeadbeef
