@@ -65,11 +65,20 @@ removed `Blockchain.Strato.Model.Account` import) and
 `blockDB` tests (missing `Arbitrary OutputBlock` instance and removed
 `BlockData'` type).
 
-Before release: run the existing hardened TryCatch suite, both engine boundary
-fixtures, and clean genesis replays on both public networks with canonical
-hash/root comparisons and durable Cirrus coverage. Full historical block replay
-and clean network sync have not been performed with this patch. Do not skip
-validation or substitute a snapshot for the genesis replay.
+Validated on Linux on 2026-11-15: the repository-root production image build
+and the same 120 regression checks plus 28 TryCatch tests passed. The audit node
+is replaying Upquark from genesis using commit `a559256501b1`, with no snapshot,
+reused chain/database state, or validation bypass. At 23:48 UTC the accepted VM
+head was 368798; hashes, state roots and parent hashes at 355721, 355722 and
+355723 exactly matched two independent mainnet nodes. Cirrus subsequently
+durably indexed the formerly failing transaction, including its historical
+Approval and PostSkipped events.
+
+Before release: complete the Upquark replay and a clean Helium genesis replay
+with canonical hash/root comparisons and durable Cirrus coverage, then
+coordinate activation heights against actual validator deployment history.
+Full network sync is not yet verified. Do not skip validation or substitute a
+snapshot for the genesis replay.
 
 Historical rules cannot simply be deleted while retaining genesis replay. They
 can later be isolated in a versioned historical executor, provided the same
