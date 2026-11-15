@@ -66,10 +66,12 @@ export class AppTierStack extends Stack {
       : undefined;
 
     // --- ECS ---
-    // The deployment's one cluster (the API tier app creates it) when named, else this tier's own.
+    // The deployment's one cluster, ha-<env>: the API tier app's when named, else created here
+    // under the same name (a deployment without an API tier), so the tier map finds the tasks
+    // in the same log group either way.
     const cluster: ecs.ICluster = config.clusterName
       ? ecs.Cluster.fromClusterAttributes(this, "Cluster", { clusterName: config.clusterName, vpc })
-      : new ecs.Cluster(this, "Cluster", { vpc, clusterName: name, containerInsightsV2: ecs.ContainerInsights.ENABLED });
+      : new ecs.Cluster(this, "Cluster", { vpc, clusterName: deploymentPrefix(config.envName), containerInsightsV2: ecs.ContainerInsights.ENABLED });
     this.cluster = cluster;
     // DESTROY, not the CDK default of RETAIN: a retained group keeps its name,
     // and the next create of this stack then fails with "already exists".

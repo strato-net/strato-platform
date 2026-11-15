@@ -11,7 +11,7 @@ export interface AppTierConfig {
   envName: string;
   /** Existing VPC to deploy into; a new one is created when absent. */
   vpcId?: string;
-  /** An existing ECS cluster for this tier's services: the deployment's one cluster, which the API tier app creates (its ClusterName output). Without it the tier gets a cluster of its own. */
+  /** An existing ECS cluster for this tier's services: the deployment's one cluster, which the API tier app creates (its ClusterName output). Without it, in a deployment that has no API tier, this tier creates that cluster (ha-<env>) itself. */
   clusterName?: string;
   /** Image URIs for the app's nginx and backend, as strato-platform's autobuild publishes them: ghcr.io/strato-net/strato-platform/app-nginx:<VERSION>-<commit>-<hash>, app-backend likewise (public; an ECR URI is pulled with the task's ECR permissions). */
   nginxImage: string;

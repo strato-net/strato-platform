@@ -99,7 +99,9 @@ README), this tier is the origin for `/api/*`, `/api-docs*` and
   session secret and OAuth client as the API tier's nginx.
 - This tier's hostname can then point straight at the ALB (`AlbDnsName`).
 - `-c clusterName=<the API tier's ClusterName output>` runs the services in
-  the deployment's one ECS cluster instead of one of this tier's own.
+  the deployment's one ECS cluster, `ha-<env>`. Without it this tier creates
+  a cluster of that name itself, which is for a deployment that has no API
+  tier: beside one, the name is taken and the deploy fails.
 - `-c trustedProxyCidrs=<CloudFront's origin-facing ranges>` (the managed
   prefix list `com.amazonaws.global.cloudfront.origin-facing`,
   comma-separated): nginx trusts them and the VPC's range
