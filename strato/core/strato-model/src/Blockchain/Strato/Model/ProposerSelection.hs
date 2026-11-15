@@ -31,11 +31,13 @@ type StakeMap = M.Map Validator Integer
 
 -- | Helium ran stake-weighted selection under the first rule (@seed `mod` total@)
 -- from its staking fork, so its history only replays with that rule below this
--- height. Not scheduled yet: replace it with the agreed flag-day height when
--- the upgrade is coordinated. Every validator must run a build that knows the
+-- height. The height is a placeholder: helium's next flag day, shared with
+-- heliumRlpEncodeForkBlock and heliumConsensusFromStateForkBlock in
+-- Blockchain.Forks (vm-tools), so validators upgrade once. Move them together
+-- if the flag day moves. Every validator must run a build that knows the
 -- height before the chain reaches it.
 heliumProportionalSelectionBlock :: Integer
-heliumProportionalSelectionBlock = 2 ^ (62 :: Int)
+heliumProportionalSelectionBlock = 1200000
 
 -- | Is the proportional pick ('weightedPoint') in force for a block?
 --

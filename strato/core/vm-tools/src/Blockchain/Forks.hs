@@ -149,8 +149,14 @@ isFeeConsensusDeltaForkActive blockNum =
 -- Proposer and verifier must switch at the same block. Helium has blocks
 -- sealed under the event rule and needs a height of its own; upquark switches
 -- with staking, the flag day it already has.
+--
+-- Helium's height is a placeholder: the flag day helium already has ahead of
+-- it (heliumRlpEncodeForkBlock), so validators upgrade once for both, and the
+-- same height as the proportional proposer pick
+-- (heliumProportionalSelectionBlock in strato-model, which this must equal).
+-- Move all three together if the flag day moves.
 heliumConsensusFromStateForkBlock :: Integer
-heliumConsensusFromStateForkBlock = forkNotScheduled
+heliumConsensusFromStateForkBlock = 1200000
 
 forktestConsensusFromStateForkBlock :: Integer
 forktestConsensusFromStateForkBlock = forkNotScheduled
