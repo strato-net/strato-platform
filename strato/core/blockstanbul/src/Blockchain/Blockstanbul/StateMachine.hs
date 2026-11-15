@@ -89,6 +89,9 @@ data BlockstanbulContext = BlockstanbulContext
     _sentRoundChange :: Maybe OutEvent,
     -- Which peers have we received a notice for a round-change
     _roundChanged :: M.Map RoundNumber (S.Set Validator),
+    -- Each validator's latest round-change for a height we have not reached
+    -- yet, replayed when we get there
+    _futureRoundChanges :: M.Map Validator (View, OutEvent),
     -- The identity of this node
     _selfAddr :: Maybe Address,
     -- Block locking: a safety mechanism to prevent partial commits
@@ -174,6 +177,7 @@ newContext network' chainId' (Checkpoint v as mParent stakes' lastRound') addr v
           _pendingRound = Nothing,
           _sentRoundChange = Nothing,
           _roundChanged = M.empty,
+          _futureRoundChanges = M.empty,
           _selfAddr = addr,
           _blockLock = Nothing,
           _lockSender = Nothing,
