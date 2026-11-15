@@ -181,11 +181,15 @@ roundChange = do
   pendingRound .= Just target
   -- One signed ROUNDCHANGE per target round. Retransmitting with a new
   -- nonce breaks P2P rlpHash dedup and is what produced the floods.
-  when (already /= Just target) $
-    whenM mayVote $ do
+  if already /= Just target
+    then whenM mayVote $ do
       rawMsg <- createRoundChangeMessage nextView
       msg <- signMessage rawMsg
+      sentRoundChange ?= msg
       yieldR msg
+    -- Re-send the same signed bytes: P2P forwards them only to peers that
+    -- never got them, so a vote lost to a dropped link still arrives.
+    else use sentRoundChange >>= mapM_ yieldR
 
 -- | Stamp the consensus data this node is responsible for (the validator set,
 -- and — once staking is active — the round and the stake weights in force) and
@@ -282,6 +286,7 @@ nextRound nt = do
   hasCommitted .= False
   hasPrepared .= False
   pendingRound .= Nothing
+  sentRoundChange .= Nothing
 
   when (isJust self) $ isValidator .= (Validator (fromJust self) `elem` vals)
 
@@ -539,6 +544,7 @@ eventLoop ctx = execStateC ctx $
                   whenM mayVote $ do
                     rawMsg <- createRoundChangeMessage vn
                     msg <- signMessage rawMsg
+                    sentRoundChange ?= msg
                     yieldR msg
                 when (hasSupermajority weights voters) $ do
                   next <- use pendingRound
