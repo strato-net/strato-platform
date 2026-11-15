@@ -41,6 +41,10 @@ export interface Position {
   event: { address: string; blockHash: string; eventIndex: number; blockNumber: number } | null;
 }
 
+// Cirrus's own key of an event: the genesis block numbers each contract's events from 1, so the address is part of it
+const matches = (row: Pick<CirrusEventRow, "address" | "block_hash" | "event_index">, event: NonNullable<Position["event"]>): boolean =>
+  row.address === event.address && row.block_hash === event.blockHash && Number(row.event_index) === event.eventIndex;
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Cirrus renders block_timestamp as text, e.g. "2026-09-04 12:00:00 UTC" or
@@ -127,16 +131,19 @@ const loadPosition = async (): Promise<Position & { state: State }> => {
  * succeeds from the position the page was read at, so two instances polling
  * at once (a deployment replacing a task) cannot commit over each other.
  */
-export const commit = async (state: State, activities: Activity[], from: number, to: Position, asOf: Date): Promise<void> => {
+export const commit = async (state: State, activities: Activity[], from: Position, to: Position, asOf: Date): Promise<void> => {
+  // The event is compared along with the row id, which alone can be another event's on another node
+  const key = (p: Position) => [p.event?.address ?? null, p.event?.blockHash ?? null, p.event?.eventIndex ?? null];
   await withTransaction(async (client) => {
     const moved = await client.query(
       `INSERT INTO progress (name, cursor, as_of, address, block_hash, event_index, block_number) VALUES ('cirrus', $2, $3, $4, $5, $6, $7)
        ON CONFLICT (name) DO UPDATE SET cursor = EXCLUDED.cursor, as_of = EXCLUDED.as_of, address = EXCLUDED.address,
          block_hash = EXCLUDED.block_hash, event_index = EXCLUDED.event_index, block_number = EXCLUDED.block_number
-       WHERE progress.cursor = $1`,
-      [from, to.cursor, asOf, to.event?.address ?? null, to.event?.blockHash ?? null, to.event?.eventIndex ?? null, to.event?.blockNumber ?? null]
+       WHERE progress.cursor = $1
+         AND (progress.address, progress.block_hash, progress.event_index) IS NOT DISTINCT FROM ($8::text, $9::text, $10::int)`,
+      [from.cursor, to.cursor, asOf, ...key(to), to.event?.blockNumber ?? null, ...key(from)]
     );
-    if (moved.rowCount !== 1) throw new Error(`Position is no longer ${from}: another instance is polling`);
+    if (moved.rowCount !== 1) throw new Error(`Position is no longer ${from.cursor}: another instance is polling`);
     const assets = [...state.dirtyPrices];
     if (assets.length) {
       await client.query(
@@ -194,21 +201,30 @@ export const prune = async (): Promise<void> => {
  */
 const locate = async (event: NonNullable<Position["event"]>, stored: number): Promise<number> => {
   const url = `${config.cirrus.nodeUrl}/cirrus/search/event`;
-  const found = await axios.get<{ id: number | string }[]>(url, {
-    params: { select: "id", address: `eq.${event.address}`, block_hash: `eq.${event.blockHash}`, event_index: `eq.${event.eventIndex}` },
+  const select = "id,address,block_hash,block_number,event_index";
+  type Row = Pick<CirrusEventRow, "id" | "address" | "block_hash" | "block_number" | "event_index">;
+  const newest = await axios.get<Row[]>(url, { params: { select, order: "id.desc", limit: 1 }, timeout: 60000 });
+  const top = Array.isArray(newest.data) ? newest.data[0] : undefined;
+  if (!top) throw new Error(`The node has no events yet, behind the position's block ${event.blockNumber}`);
+  // The position's event is asked for together with the newest one. Two nodes behind a load balancer can
+  // answer in turn, one that lacks the event and one that is past its block: only an answer with the
+  // newest event and without the position's is one node that is both
+  const one = (address: string, blockHash: string, eventIndex: number | string) => `and(address.eq.${address},block_hash.eq.${blockHash},event_index.eq.${eventIndex})`;
+  const found = await axios.get<Row[]>(url, {
+    params: { select, or: `(${one(event.address, event.blockHash, event.eventIndex)},${one(top.address, top.block_hash, top.event_index)})` },
     timeout: 60000,
   });
-  if (Array.isArray(found.data) && found.data.length) return Number(found.data[0].id);
-  const newest = await axios.get<{ block_number: number | string }[]>(url, {
-    params: { select: "block_number", order: "id.desc", limit: 1 },
-    timeout: 60000,
-  });
-  const height = Array.isArray(newest.data) && newest.data.length ? Number(newest.data[0].block_number) : 0;
+  const rows = Array.isArray(found.data) ? found.data : [];
+  const at = rows.find((row) => matches(row, event));
+  if (at) return Number(at.id);
+  if (!rows.length) throw new Error(`The newest event, of block ${top.block_number}, is on one node and not on the next`);
+  const height = Number(top.block_number);
   if (height <= event.blockNumber) throw new Error(`The node is at block ${height}, behind the position's block ${event.blockNumber}`);
   await withTransaction(async (client) => {
     const reset = await client.query(
-      "UPDATE progress SET cursor = 0, address = NULL, block_hash = NULL, event_index = NULL, block_number = NULL WHERE name = 'cirrus' AND cursor = $1",
-      [stored]
+      `UPDATE progress SET cursor = 0, address = NULL, block_hash = NULL, event_index = NULL, block_number = NULL
+       WHERE name = 'cirrus' AND cursor = $1 AND address = $2 AND block_hash = $3 AND event_index = $4`,
+      [stored, event.address, event.blockHash, event.eventIndex]
     );
     if (reset.rowCount === 1) await client.query("TRUNCATE activity, prices, pools");
   });
@@ -229,7 +245,7 @@ export const pollFromStoredPosition = async (): Promise<never> => {
   const { state } = position;
   let { cursor, event } = position;
   // What progress holds, which a commit moves on from. cursor leaves it when the node numbers the event differently
-  let stored = cursor;
+  let stored: Position = { cursor, event };
   let prunedAt = 0;
   logInfo("Cirrus", `Polling ${cirrus.nodeUrl}/cirrus/search/event from id ${cursor}`);
   for (;;) {
@@ -248,8 +264,8 @@ export const pollFromStoredPosition = async (): Promise<never> => {
     let rows = Array.isArray(data) ? data : [];
     if (event) {
       const first = rows[0];
-      if (!first || first.block_hash !== event.blockHash || Number(first.event_index) !== event.eventIndex) {
-        const id = await locate(event, stored);
+      if (!first || !matches(first, event)) {
+        const id = await locate(event, stored.cursor);
         // Found where the page was just read from: two nodes answer in turn, so wait for one
         if (id === cursor) throw new Error(`The position's event is ${id} on one node and not on the next`);
         logInfo("Cirrus", `The node numbers the position's event ${id}, not ${cursor}: continuing from there`);
@@ -274,7 +290,7 @@ export const pollFromStoredPosition = async (): Promise<never> => {
       event = { address: last.address, blockHash: last.block_hash, eventIndex: Number(last.event_index), blockNumber: Number(last.block_number) };
     }
     await commit(state, activities, stored, { cursor, event }, caughtUp ? new Date() : parseCirrusTimestamp(String(last.block_timestamp)));
-    stored = cursor;
+    stored = { cursor, event };
     if (rows.length) logInfo("Cirrus", `read ${rows.length} rows through id ${cursor}`, { candidates: activities.length });
     if (caughtUp) {
       if (Date.now() - prunedAt > PRUNE_INTERVAL_MS) {

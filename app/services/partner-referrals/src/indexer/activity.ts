@@ -27,6 +27,8 @@ export interface State {
   dirtyPools: Set<string>;
 }
 
+// blockHash and eventIndex name the event: a block's events are numbered in one sequence. Only the
+// genesis block numbers them per contract, and no referral counts from that far back
 export interface Activity {
   blockHash: string;
   eventIndex: number;
