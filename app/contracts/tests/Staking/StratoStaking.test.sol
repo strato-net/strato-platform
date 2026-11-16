@@ -1649,6 +1649,40 @@ contract Describe_StratoStaking {
         operatorB.doExpectingFailure(address(staking), "unbondSelf(address,uint256)", "SS: cannot leave the set", VALIDATOR_B, 2000e18);
     }
 
+    // A handover releases the outgoing operator's bond, so it follows the same rule: a
+    // pinned seat changes hands with the link on or off, an unpinned one only where it
+    // can leave.
+    function it_hands_over_a_pinned_seat_with_the_governance_link_on_or_off() public {
+        GenesisGovernance pins = _pinningGovernance();
+        _bondBoth();
+        pins.voteToAddValidator(VALIDATOR_A);
+
+        registry.adminSetOperator(VALIDATOR_A, address(user1));
+        require(staking.operatorOf(VALIDATOR_A) == address(user1) && _selfBondOf(VALIDATOR_A) == 0, "handed over with the link on, the bond released");
+        require(pins.isValidator(VALIDATOR_A) && staking.isValidator(VALIDATOR_A), "the pin keeps the seat");
+
+        staking.setGovernance(address(pins), false);
+        registry.adminSetOperator(VALIDATOR_A, address(user2));
+        require(staking.operatorOf(VALIDATOR_A) == address(user2) && pins.isValidator(VALIDATOR_A), "and with the link off");
+
+        bool refused = false;
+        try registry.adminSetOperator(VALIDATOR_B, address(user1)) {
+        } catch {
+            refused = true;
+        }
+        require(refused, "an unpinned seat cannot leave with the link off, so its handover is refused");
+        require(staking.operatorOf(VALIDATOR_B) == address(operatorB) && _selfBondOf(VALIDATOR_B) == 2000e18, "operator and bond unchanged");
+    }
+
+    // No governance set is not a pin: the bond stays under the seat, as with any link
+    // that is off.
+    function it_keeps_a_seated_bond_in_while_no_governance_is_set() public {
+        _bondBoth();
+        staking.setGovernance(address(0), false);
+        operatorA.doExpectingFailure(address(staking), "unbondSelf(address,uint256)", "SS: cannot leave the set", VALIDATOR_A, 1000e18);
+        require(_selfBondOf(VALIDATOR_A) == 1000e18, "bond unchanged");
+    }
+
     // ---- the door check ----------------------------------------------------------------
 
     // Governance as a network has it before staking has seated anyone: validators listed by
