@@ -37,6 +37,8 @@ data TransactionFailureType
   | AdminFlushedError
   | InvalidEnvelopeError
   | FeeBoundExceededError
+  | GasLimitTooHighError
+  | SenderPoolFullError
   deriving (Eq, Read, Show, Generic, NFData)
 
 derivePersistField "TransactionResultStatus"

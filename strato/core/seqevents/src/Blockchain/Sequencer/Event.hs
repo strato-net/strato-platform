@@ -81,6 +81,8 @@ data IngestEvent
   | IEMPNodesReceived [TrieNode]
   | IEPreprepareResponse PBFT.PreprepareDecision
   | IEFlushMempool FlushMempoolRequest
+  -- | The VM's pool holds work the block at this height can take.
+  | IEPoolHasWork Integer
   deriving (Eq, Show, GHCG.Generic)
 
 instance Format IngestEvent where
@@ -96,6 +98,7 @@ instance Format IngestEvent where
   format (IEMPNodesReceived o) = show o
   format (IEPreprepareResponse d) = format d
   format (IEFlushMempool req) = format req
+  format (IEPoolHasWork height) = "pool has work for block #" ++ show height
 
 type Timestamp = Microtime
 

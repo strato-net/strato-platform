@@ -469,12 +469,24 @@ contract Describe_StratoStaking {
         require(staking.status(VALIDATOR_A) == 3, "Kicked");
     }
 
+    // Governance keeps its last validator, so that seat cannot be given up. Its operator's
+    // bond then stays in: a seat must not vote without it. A delegator is never held back.
     function it_never_removes_the_last_validator() public {
         _selfBond(operatorA, VALIDATOR_A, 1000e18);
         _activate(VALIDATOR_A);
-        operatorA.do(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 500e18);
+        _stake(user1, VALIDATOR_A, 400e18);
+        operatorA.doExpectingFailure(address(staking), "unbondSelf(address,uint256)", "SS: cannot leave the set", VALIDATOR_A, 500e18);
+        require(_selfBondOf(VALIDATOR_A) == 1000e18, "the bond stays behind the seat");
         require(gov.isValidator(VALIDATOR_A), "governance keeps its last validator");
-        require(staking.isValidator(VALIDATOR_A), "still tracked until it can be removed");
+        require(staking.isValidator(VALIDATOR_A), "still seated");
+        require(gov.validatorStake(VALIDATOR_A) == 1400e18, "its published weight is still backed");
+
+        // a withdrawal that leaves the seat qualified goes through
+        _selfBond(operatorA, VALIDATOR_A, 200e18);
+        operatorA.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 200e18);
+        // and so does a delegator's
+        user1.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 400e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "weight follows the stake");
     }
 
     function it_reconciles_the_set_when_governance_is_enabled_later() public {
@@ -763,8 +775,9 @@ contract Describe_StratoStaking {
         require(staking.totalEmitted() - paid == (rate * 11) / 31536000, "only the 11 seconds not yet paid");
     }
 
-    // Only a seated, listed, eligible producer is paid; anything else stays in the reserve.
-    function it_pays_only_seated_eligible_producers() public {
+    // Pay follows the seat: a seated, listed producer is paid; anything else stays in the
+    // reserve. The own-bond rule gates holding a seat, not being paid for a block.
+    function it_pays_only_seated_producers() public {
         _bondBoth();
         _registerSelf(validatorC);
         _selfBond(validatorC, address(validatorC), 1000e18); // listed and eligible, not seated
@@ -782,11 +795,12 @@ contract Describe_StratoStaking {
         _processBlockAfter(101, VALIDATOR_A); // its exit notice is up; nothing has synced it out yet
         require(staking.isValidator(VALIDATOR_A) && !staking.eligible(VALIDATOR_A), "seated, no longer eligible");
         _processBlockAfter(60, VALIDATOR_A);
-        require(staking.totalEmitted() == 0, "nor does a seat that is due to leave");
+        uint256 paidToA = staking.totalEmitted();
+        require(paidToA > 0 && _pendingOperatorRewards(VALIDATOR_A) == paidToA, "a seat that is due to leave is paid for the blocks it produces until it is synced out");
 
         _processBlockAfter(60, VALIDATOR_B);
         _processBlockAfter(60, VALIDATOR_B);
-        require(staking.totalEmitted() > 0 && _pendingOperatorRewards(VALIDATOR_B) == staking.totalEmitted(), "a seated producer is");
+        require(staking.totalEmitted() > paidToA && _pendingOperatorRewards(VALIDATOR_B) == staking.totalEmitted() - paidToA, "a seated producer is");
     }
 
     function it_keeps_the_emission_reserve_out_of_payouts_and_recovery() public {
@@ -1440,9 +1454,10 @@ contract Describe_StratoStaking {
         user1.doExpectingFailure(address(staking), "stake(address,uint256)", "SS: above operator stake cap", address(validatorC), 1000e18);
     }
 
-    // Leaving is never refused for lack of mutation budget: a validator that should leave
-    // keeps its seat until a later sync, and the call that got there goes through.
-    function it_defers_a_leave_when_the_mutation_budget_is_spent() public {
+    // A leave is never held back by the block's mutation budget and does not use it up: a
+    // validator that should leave does so in the transaction that got there, and a join in
+    // the same block still has the whole budget.
+    function it_never_holds_a_leave_back_for_the_mutation_budget() public {
         _bondBoth();
         _registerSelf(validatorC);
         _selfBond(validatorC, address(validatorC), 1000e18);
@@ -1452,13 +1467,14 @@ contract Describe_StratoStaking {
 
         // A and C (1000 each) both fall under the new minStake; one mutation is allowed
         staking.setValidatorParams(1500e18, 5000, 3, 100);
-        require(gov.validatorCount() == 2, "one left in this block");
-        require(staking.validatorCount() == 2, "the other keeps its seat for now");
+        require(gov.validatorCount() == 1 && gov.isValidator(VALIDATOR_B), "both left in this block");
+        require(staking.validatorCount() == 1, "and staking agrees");
 
-        fastForward(1, 1);
-        staking.syncValidator(VALIDATOR_A);
-        staking.syncValidator(address(validatorC));
-        require(gov.validatorCount() == 1 && gov.isValidator(VALIDATOR_B), "left on the next sync");
+        // the block's one mutation is still there for a join
+        _registerSelf(attacker);
+        _selfBond(attacker, address(attacker), 1500e18);
+        attacker.doSuccessfully(address(staking), "tryActivate(address)", address(attacker));
+        require(gov.isValidator(address(attacker)), "a leave does not spend the budget a join needs");
     }
 
     function it_gives_notice_before_a_commission_raise() public {
@@ -1556,5 +1572,390 @@ contract Describe_StratoStaking {
         StratoStaking fresh = new StratoStaking(address(this));
         fresh.processBlock();
         require(fresh.lastProcessedBlock() == 0, "nothing processed");
+    }
+
+    // ---- a seat and its bond -----------------------------------------------------------
+
+    function _firstRequest() internal pure returns (uint256[] memory ids) {
+        ids = new uint256[](1);
+        ids[0] = 0;
+    }
+
+    // A fresh key lists itself, bonds the minimum and takes a seat by right.
+    function _joinByRight(User key) internal {
+        _mintAndApprove(key, 10000e18);
+        _registerSelf(key);
+        _selfBond(key, address(key), 1000e18);
+        key.doSuccessfully(address(staking), "tryActivate(address)", address(key));
+    }
+
+    // Four joins use the block's four set changes; a fifth validator then takes its whole
+    // bond out in the same block. It leaves with the bond: nothing is left to a later sync
+    // that nobody is bound to make.
+    function it_gives_up_the_seat_with_the_bond_when_the_mutation_budget_is_spent() public {
+        _bondBoth();
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1000e18);
+        _activate(address(validatorC));
+        _stake(user1, address(validatorC), 400e18);
+        fastForward(1, 1);
+        staking.setSetParams(50, 50, 500, 4, 100, 100, 0);
+
+        _joinByRight(new User());
+        _joinByRight(new User());
+        _joinByRight(new User());
+        _joinByRight(new User());
+        User fifth = new User();
+        _mintAndApprove(fifth, 10000e18);
+        _registerSelf(fifth);
+        _selfBond(fifth, address(fifth), 1000e18);
+        fifth.doExpectingFailure(address(staking), "tryActivate(address)", "SS: mutation cap", address(fifth));
+
+        validatorC.doSuccessfully(address(staking), "unbondSelf(address,uint256)", address(validatorC), uint256(1000e18));
+        require(!gov.isValidator(address(validatorC)) && !staking.isValidator(address(validatorC)), "the seat went with the bond");
+        require(gov.validatorStake(address(validatorC)) == 0, "no weight left behind for the delegations to vote through");
+
+        fastForward(101, 5);
+        validatorC.doSuccessfully(address(staking), "withdrawUnbonded", _firstRequest());
+        require(strato.balanceOf(address(validatorC)) == 10000e18, "principal returned in full");
+    }
+
+    // With the governance link off no seat can be given up, so the operator's bond stays
+    // in until the link is back. A delegator is never held back.
+    function it_keeps_a_seated_bond_in_while_the_governance_link_is_off() public {
+        _bondBoth();
+        _stake(user1, VALIDATOR_A, 400e18);
+        staking.setGovernance(address(gov), false);
+
+        operatorA.doExpectingFailure(address(staking), "unbondSelf(address,uint256)", "SS: cannot leave the set", VALIDATOR_A, 1000e18);
+        require(_selfBondOf(VALIDATOR_A) == 1000e18 && gov.isValidator(VALIDATOR_A), "bond and seat unchanged");
+        user1.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 400e18);
+
+        staking.setGovernance(address(gov), true);
+        operatorA.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 1000e18);
+        require(!gov.isValidator(VALIDATOR_A), "with the link back the seat leaves with the bond");
+    }
+
+    // A seat the admins pinned is held by their vote, not by its bond, so its operator's
+    // bond is as free to leave with the link off as with it on.
+    function it_lets_a_pinned_seats_bond_out_while_the_governance_link_is_off() public {
+        GenesisGovernance pins = _pinningGovernance();
+        _bondBoth();
+        pins.voteToAddValidator(VALIDATOR_A);
+        staking.setGovernance(address(pins), false);
+
+        operatorA.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 1000e18);
+        require(_selfBondOf(VALIDATOR_A) == 0 && pins.isValidator(VALIDATOR_A), "the bond is out and the pin keeps the seat");
+        operatorB.doExpectingFailure(address(staking), "unbondSelf(address,uint256)", "SS: cannot leave the set", VALIDATOR_B, 2000e18);
+    }
+
+    // A handover releases the outgoing operator's bond, so it follows the same rule: a
+    // pinned seat changes hands with the link on or off, an unpinned one only where it
+    // can leave.
+    function it_hands_over_a_pinned_seat_with_the_governance_link_on_or_off() public {
+        GenesisGovernance pins = _pinningGovernance();
+        _bondBoth();
+        pins.voteToAddValidator(VALIDATOR_A);
+
+        registry.adminSetOperator(VALIDATOR_A, address(user1));
+        require(staking.operatorOf(VALIDATOR_A) == address(user1) && _selfBondOf(VALIDATOR_A) == 0, "handed over with the link on, the bond released");
+        require(pins.isValidator(VALIDATOR_A) && staking.isValidator(VALIDATOR_A), "the pin keeps the seat");
+
+        staking.setGovernance(address(pins), false);
+        registry.adminSetOperator(VALIDATOR_A, address(user2));
+        require(staking.operatorOf(VALIDATOR_A) == address(user2) && pins.isValidator(VALIDATOR_A), "and with the link off");
+
+        bool refused = false;
+        try registry.adminSetOperator(VALIDATOR_B, address(user1)) {
+        } catch {
+            refused = true;
+        }
+        require(refused, "an unpinned seat cannot leave with the link off, so its handover is refused");
+        require(staking.operatorOf(VALIDATOR_B) == address(operatorB) && _selfBondOf(VALIDATOR_B) == 2000e18, "operator and bond unchanged");
+    }
+
+    // No governance set is not a pin: the bond stays under the seat, as with any link
+    // that is off.
+    function it_keeps_a_seated_bond_in_while_no_governance_is_set() public {
+        _bondBoth();
+        staking.setGovernance(address(0), false);
+        operatorA.doExpectingFailure(address(staking), "unbondSelf(address,uint256)", "SS: cannot leave the set", VALIDATOR_A, 1000e18);
+        require(_selfBondOf(VALIDATOR_A) == 1000e18, "bond unchanged");
+    }
+
+    // ---- the door check ----------------------------------------------------------------
+
+    // Governance as a network has it before staking has seated anyone: validators listed by
+    // genesis or admin vote, with no weight on record. A newcomer seated beside them would
+    // publish the only weight in the set and hold the whole stake-weighted vote.
+    function it_seats_no_newcomer_beside_a_validator_without_a_weight() public {
+        GenesisGovernance pins = _pinningGovernance();
+        pins.seedValidator(VALIDATOR_A);
+        pins.seedValidator(VALIDATOR_B);
+
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1000e18);
+        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: validator without weight", address(validatorC));
+        require(!pins.isValidator(address(validatorC)) && pins.validatorStake(address(validatorC)) == 0, "not seated, nothing published");
+
+        // The admins pin the two in; the stake delegated to each then becomes its weight.
+        pins.voteToAddValidator(VALIDATOR_A);
+        _stake(user1, VALIDATOR_A, 5000e18);
+        require(pins.validatorStake(VALIDATOR_A) == 5000e18 && pins.validatorStake(VALIDATOR_B) == 0, "one of the two has its stake on record");
+        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: validator without weight", address(validatorC));
+        pins.voteToAddValidator(VALIDATOR_B);
+        _stake(user2, VALIDATOR_B, 5000e18);
+        require(pins.validatorStake(VALIDATOR_A) == 5000e18 && pins.validatorStake(VALIDATOR_B) == 5000e18, "every member has its stake on record");
+
+        validatorC.doSuccessfully(address(staking), "tryActivate(address)", address(validatorC));
+        require(pins.isValidator(address(validatorC)) && pins.validatorStake(address(validatorC)) == 1000e18, "the newcomer joins with 1000 of 11000");
+    }
+
+    // ---- pay follows the seat ----------------------------------------------------------
+
+    // A seat the admins pinned holds no bond of its operator's own. It is paid for the
+    // blocks it produces like any other seat, and its delegators take their share.
+    function it_pays_a_pinned_seat_that_holds_no_bond() public {
+        GenesisGovernance pins = _pinningGovernance();
+        _stake(user1, VALIDATOR_A, 4000e18);
+        pins.voteToAddValidator(VALIDATOR_A);
+        staking.syncValidator(VALIDATOR_A);
+        require(staking.isValidator(VALIDATOR_A) && !staking.eligible(VALIDATOR_A), "seated by the pin, not by a bond");
+
+        _fundReserve(10000e18);
+        staking.commitEmissionSchedule(31536e18, 3000e18, 10000e18, 0);
+        _processBlockAfter(1, VALIDATOR_A);
+        _processBlockAfter(60, VALIDATOR_A);
+        _processBlockAfter(60, VALIDATOR_A);
+        uint256 paid = staking.totalEmitted();
+        require(paid > 0, "the pinned seat is paid for its blocks");
+
+        uint256 before = strato.balanceOf(address(user1));
+        user1.do(address(staking), "claimRewards", _list(VALIDATOR_A));
+        require(strato.balanceOf(address(user1)) > before, "and its delegator takes a share");
+    }
+
+    // ---- the stake delay ---------------------------------------------------------------
+
+    // New stake earns from the moment it arrives but joins the validator's vote only after
+    // the wait: with a delay of 100 seconds, from the start of the window after next.
+    function it_counts_new_stake_toward_the_vote_only_after_the_delay() public {
+        _bondBoth();
+        staking.setStakeDelay(100);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "stake held before the delay was set counts");
+
+        _stake(user1, VALIDATOR_A, 400e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "a new delegation does not move the weight");
+        require(staking.unmaturedStake(VALIDATOR_A) == 400e18 && staking.votingWeight(VALIDATOR_A) == 1000e18, "it is waiting");
+
+        fastForward(100, 1);
+        staking.syncValidator(VALIDATOR_A);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "still waiting one window later");
+
+        fastForward(100, 1);
+        require(staking.votingWeight(VALIDATOR_A) == 1400e18 && staking.unmaturedStake(VALIDATOR_A) == 0, "its wait is over");
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "published at the validator's next sync");
+        attacker.do(address(staking), "syncValidator(address)", VALIDATOR_A);
+        require(gov.validatorStake(VALIDATOR_A) == 1400e18, "which anyone may make");
+    }
+
+    // Stake that leaves takes the leaver's waiting stake first, so taking back a stake that
+    // never counted takes nothing from the vote, and a stake that did count leaves at once.
+    function it_takes_the_leavers_waiting_stake_first() public {
+        _bondBoth();
+        _stake(user2, VALIDATOR_A, 300e18);
+        staking.setStakeDelay(100);
+        require(gov.validatorStake(VALIDATOR_A) == 1300e18, "user2's stake counts");
+
+        _stake(user1, VALIDATOR_A, 400e18);
+        user1.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 150e18);
+        require(staking.unmaturedStake(VALIDATOR_A) == 250e18 && gov.validatorStake(VALIDATOR_A) == 1300e18, "user1 took back part of what was waiting");
+
+        user2.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 300e18);
+        require(staking.unmaturedStake(VALIDATOR_A) == 250e18 && gov.validatorStake(VALIDATOR_A) == 1000e18, "user2's counted stake left the vote at once");
+
+        user1.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 250e18);
+        require(staking.unmaturedStake(VALIDATOR_A) == 0 && gov.validatorStake(VALIDATOR_A) == 1000e18, "nothing waiting, the vote untouched");
+    }
+
+    // The delay covers a new seat: a seat by right is taken with a bond that has already
+    // waited, or a join would go around the delay.
+    function it_seats_a_newcomer_only_once_its_bond_has_waited() public {
+        _bondBoth();
+        staking.setStakeDelay(100);
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1000e18);
+        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: bond not matured", address(validatorC));
+        require(!staking.isWaiter(address(validatorC)), "not promoted by reconcileSet either");
+
+        fastForward(200, 1);
+        require(staking.isWaiter(address(validatorC)), "a waiter once the bond has waited");
+        validatorC.doSuccessfully(address(staking), "tryActivate(address)", address(validatorC));
+        require(gov.isValidator(address(validatorC)) && gov.validatorStake(address(validatorC)) == 1000e18, "seated with its whole bond as its weight");
+    }
+
+    // Moved stake leaves the old validator's vote at once and waits where it lands.
+    function it_makes_moved_stake_wait_where_it_lands() public {
+        _bondBoth();
+        _stake(user1, VALIDATOR_A, 400e18);
+        staking.setStakeDelay(100);
+        require(gov.validatorStake(VALIDATOR_A) == 1400e18, "counted before the delay was set");
+
+        user1.doSuccessfully(address(staking), "moveStake(address,address,uint256)", VALIDATOR_A, VALIDATOR_B, 400e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "it leaves A's vote at once");
+        require(gov.validatorStake(VALIDATOR_B) == 2000e18 && staking.unmaturedStake(VALIDATOR_B) == 400e18, "and waits behind B");
+
+        fastForward(200, 1);
+        staking.syncValidator(VALIDATOR_B);
+        require(gov.validatorStake(VALIDATOR_B) == 2400e18, "then counts");
+    }
+
+    // Changing the delay starts a new generation of windows: what was waiting under the
+    // earlier setting counts at once, and with the delay off stake counts as it arrives.
+    function it_counts_waiting_stake_at_once_when_the_delay_changes() public {
+        _bondBoth();
+        staking.setStakeDelay(100);
+        _stake(user1, VALIDATOR_A, 400e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "waiting");
+
+        staking.setStakeDelay(50);
+        require(gov.validatorStake(VALIDATOR_A) == 1400e18 && staking.unmaturedStake(VALIDATOR_A) == 0, "counted when the delay changed");
+        _stake(user2, VALIDATOR_A, 100e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1400e18, "new stake waits under the new setting");
+
+        staking.setStakeDelay(0);
+        require(gov.validatorStake(VALIDATOR_A) == 1500e18, "off: everything counts");
+        _stake(user2, VALIDATOR_A, 100e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1600e18, "and new stake counts as it arrives");
+    }
+
+    // The one-third alert follows the weights governance holds, the ones consensus counts.
+    // Stake whose wait is over is not among them until its validator is synced.
+    function it_measures_one_third_on_the_weights_governance_holds() public {
+        _bondBoth();
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 2000e18);
+        _activate(address(validatorC));
+        _stake(user1, VALIDATOR_A, 1500e18);
+        staking.setStakeDelay(100);
+        require(staking.exceedsOneThird(VALIDATOR_A) && !staking.exceedsOneThird(VALIDATOR_B), "A holds 2500 of 6500");
+
+        _stake(user2, VALIDATOR_B, 4000e18);
+        fastForward(200, 1);
+        require(staking.votingWeight(VALIDATOR_B) == 6000e18 && gov.validatorStake(VALIDATOR_B) == 2000e18, "B's new stake has waited and is not published");
+        require(staking.exceedsOneThird(VALIDATOR_A) && !staking.exceedsOneThird(VALIDATOR_B), "consensus still counts 2500 of 6500 for A");
+
+        staking.syncValidator(VALIDATOR_B);
+        require(!staking.exceedsOneThird(VALIDATOR_A) && staking.exceedsOneThird(VALIDATOR_B), "once published, B holds 6000 of 10500");
+    }
+
+    // Stake that is waiting still earns: the delay is on the vote, not on income.
+    function it_pays_waiting_stake_its_share_of_income() public {
+        _bondBoth();
+        staking.setStakeDelay(100);
+        _stake(user1, VALIDATOR_A, 1000e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "waiting");
+        _reward(VALIDATOR_A, 100e18);
+        uint256 before = strato.balanceOf(address(user1));
+        user1.do(address(staking), "claimRewards", _list(VALIDATOR_A));
+        require(strato.balanceOf(address(user1)) > before, "a delegator whose stake is waiting is paid");
+    }
+
+    // ---- re-filing an operator's delegations onto its validators -----------------------
+
+    address constant NODE_1 = address(0xc1c1);
+    address constant NODE_2 = address(0xc2c2);
+
+    function _two(address a, address b) internal pure returns (address[] memory list) {
+        list = new address[](2);
+        list[0] = a;
+        list[1] = b;
+    }
+
+    // An operator's record from before the switch to validator-keyed records: keyed by the
+    // operator's own address, which is not a consensus validator, with two delegators behind
+    // it. The operator's two validators are listed beside it and have nothing.
+    function _operatorKeyedRecord() internal {
+        _registerSelf(validatorC);
+        staking.forgetOperatorField(address(validatorC));
+        _stake(user1, address(validatorC), 401e18 + 1);
+        _stake(user2, address(validatorC), 300e18);
+        registry.addValidator(NODE_1, address(validatorC), 0, "Node 1", "", "", "node-1");
+        registry.addValidator(NODE_2, address(validatorC), 0, "Node 2", "", "", "node-2");
+    }
+
+    function _refileFailure(address fromRecord, address[] memory toValidators, address[] memory delegators) internal returns (string) {
+        string reason = "";
+        try staking.refileStake(fromRecord, toValidators, delegators) {
+        } catch Error(string e) {
+            reason = e;
+        }
+        return reason;
+    }
+
+    function it_refiles_an_operators_delegations_onto_its_validators() public {
+        _operatorKeyedRecord();
+        _reward(address(validatorC), 70e18);
+        staking.setStakeDelay(100);
+        uint256 userStake = staking.totalUserStake();
+        uint256 rewardable = staking.totalRewardableStake();
+
+        staking.refileStake(address(validatorC), _two(NODE_1, NODE_2), _two(address(user1), address(user2)));
+
+        require(staking.delegatedStake(address(user1), address(validatorC)) == 0 && staking.delegatedStake(address(user2), address(validatorC)) == 0, "nothing left behind the old record");
+        require(staking.delegatedStake(address(user1), NODE_1) == 2005e17 + 1 && staking.delegatedStake(address(user1), NODE_2) == 2005e17, "an equal share each, the first takes the odd wei");
+        require(staking.delegatedStake(address(user2), NODE_1) == 150e18 && staking.delegatedStake(address(user2), NODE_2) == 150e18, "the second delegator likewise");
+        require(staking.totalUserStake() == userStake && staking.totalRewardableStake() == rewardable, "no stake created or lost");
+        require(staking.unmaturedStake(NODE_1) == 0 && staking.votingWeight(NODE_1) == 3505e17 + 1, "a re-filing is not new stake: it counts at once");
+
+        // what a delegator earned behind the old record is still claimable there
+        uint256 before = strato.balanceOf(address(user1));
+        user1.do(address(staking), "claimRewards", _list(address(validatorC)));
+        require(strato.balanceOf(address(user1)) > before, "rewards earned behind the old record are paid");
+
+        // and it keeps earning behind the new ones
+        _reward(NODE_1, 70e18);
+        before = strato.balanceOf(address(user1));
+        user1.do(address(staking), "claimRewards", _list(NODE_1));
+        require(strato.balanceOf(address(user1)) > before, "the re-filed stake earns");
+
+        // a batch sent again moves nothing
+        staking.refileStake(address(validatorC), _two(NODE_1, NODE_2), _two(address(user1), address(user2)));
+        require(staking.delegatedStake(address(user1), NODE_1) == 2005e17 + 1 && staking.delegatedStake(address(user2), NODE_2) == 150e18, "unchanged by the repeat");
+    }
+
+    // Stake moves only between records of one operator, and only the owner moves it.
+    function it_refiles_only_within_one_operator_and_only_for_the_owner() public {
+        _bondBoth();
+        _operatorKeyedRecord();
+        require(_refileFailure(address(validatorC), _two(NODE_1, VALIDATOR_A), _list(address(user1))) == "SS: another operator's validator", "a delegator is not put behind an operator it did not choose");
+        require(_refileFailure(address(validatorC), _two(NODE_1, NODE_1), _list(address(user1))) == "SS: duplicate validator", "each validator once");
+        require(_refileFailure(address(validatorC), _two(NODE_1, address(validatorC)), _list(address(user1))) == "SS: same validator", "not onto itself");
+        bool refused = false;
+        try attacker.do(address(staking), "refileStake", address(validatorC), _two(NODE_1, NODE_2), _list(address(user1))) {
+        } catch {
+            refused = true;
+        }
+        require(refused, "only the owner re-files");
+        require(staking.delegatedStake(address(user1), address(validatorC)) == 401e18 + 1, "nothing moved");
+    }
+
+    // The incumbents are in the consensus set with nothing on record. Pinned, they take the
+    // re-filed stake as their weight. Unpinned, the first sync would adopt them and drop
+    // them for having no bond, so the re-filing is refused until they are pinned.
+    function it_gives_refiled_stake_to_pinned_incumbents_as_their_weight() public {
+        GenesisGovernance pins = _pinningGovernance();
+        pins.seedValidator(NODE_1);
+        pins.seedValidator(NODE_2);
+        _operatorKeyedRecord();
+
+        require(_refileFailure(address(validatorC), _two(NODE_1, NODE_2), _two(address(user1), address(user2))) == "SS: pin the validator first", "refused while an incumbent is unpinned");
+        require(pins.isValidator(NODE_1) && pins.isValidator(NODE_2), "both still in the consensus set");
+
+        pins.voteToAddValidator(NODE_1);
+        pins.voteToAddValidator(NODE_2);
+        staking.refileStake(address(validatorC), _two(NODE_1, NODE_2), _two(address(user1), address(user2)));
+        require(pins.isValidator(NODE_1) && pins.isValidator(NODE_2) && staking.isValidator(NODE_1) && staking.isValidator(NODE_2), "seated in staking too");
+        require(pins.validatorStake(NODE_1) == 3505e17 + 1 && pins.validatorStake(NODE_2) == 3505e17, "each votes with the stake filed behind it");
     }
 }

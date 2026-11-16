@@ -30,6 +30,7 @@ import BlockApps.Logging
 import BlockApps.Solidity.ABI (decodeABIArgs, valueToArgText, funcArgTypes)
 import qualified Blockchain.Bagger as Bagger
 import Blockchain.Bagger.Transactions
+import Blockchain.DB.SolidStorageDB (HasSolidStorageDB)
 import qualified Blockchain.DB.AddressStateDB as NoCache
 import qualified Blockchain.DB.BlockSummaryDB as BSDB
 import Blockchain.DB.CodeDB ()
@@ -257,16 +258,19 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
 
 -- TODO: If we add more verifications, refactor tuple into a proper data type
 verifyBlock ::
-  (HasStateDB m, MonadIO m) =>
+  (HasStateDB m, HasSolidStorageDB m, MonadLogger m, MonadIO m) =>
   Block ->
   ([TxRunResult], Maybe MP.StateRoot) ->
   BlockSummary ->
   m [BlockVerificationFailureDetails]
 verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
   validity <- checkValidity parentBSum b
-  let vDelt = getDeltasFromResults trrs
-      sDelt = getStakeDeltasFromResults trrs
-      blockSR = Just $ stateRoot bh
+  -- The same derivation the proposer used: from the fork, what governance's storage
+  -- holds once the block's transactions have run (the state this node is on now),
+  -- against the set and weights the header says were in force for the block.
+  (vDelt, sDelt) <-
+    blockConsensusDeltas (number bh) (S.fromList $ getBlockValidators bh) (M.fromList $ getBlockStakes bh) trrs
+  let blockSR = Just $ stateRoot bh
       bVd = toDelta (getBlockNewValidators bh) (getBlockRemovedValidators bh)
       bSd = M.fromList $ getBlockStakeUpdates bh
       srCheck =  if derivedSR == blockSR

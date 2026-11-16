@@ -4,7 +4,6 @@ import "../../abstract/ERC20/access/Ownable.sol";
 interface IStratoStakingValidatorSync {
     function syncValidatorRecord(address validator, bool active, uint256 commissionBps, address operator) external;
     function syncValidatorOperator(address validator, address operator) external;
-    function exceedsOneThird(address validator) external view returns (bool);
 }
 
 // Human-facing validator metadata, keyed by the validator (consensus node) address. The
@@ -39,14 +38,12 @@ contract ValidatorRegistry is Ownable {
     event ValidatorDelisted(address indexed validator);
     event ValidatorProfileUpdated(address indexed validator);
     event OperatorChanged(address indexed validator, address indexed oldOperator, address indexed newOperator);
-    event EmergencyKickerSet(address indexed kicker);
-    event EmergencyKick(address indexed validator, address indexed kicker);
 
     IStratoStakingValidatorSync public staking;
-    // Under stake-weighted quorum a validator holding more than a third of the stake can
-    // stall the chain and cannot be jailed (no block commits without its seal). This key
-    // may delist such a validator without waiting for an owner vote.
-    address public emergencyKicker;
+    // There is no emergency kick. A validator holding a third of the stake decides whether
+    // any block commits, including one that would delist it, so no transaction can remove
+    // it; below a third the owner's vote (removeValidator) does the same job. The storage
+    // field an earlier version kept for the kicker's address (emergencyKicker) is unused.
 
     // Validators in listing order. Delisted validators stay so their records remain addressable.
     address[] public operatorList;
@@ -275,18 +272,6 @@ contract ValidatorRegistry is Ownable {
 
     function removeValidator(address validator) external onlyOwner {
         _delist(validator);
-    }
-
-    function setEmergencyKicker(address kicker) external onlyOwner {
-        emergencyKicker = kicker;
-        emit EmergencyKickerSet(kicker);
-    }
-
-    function emergencyKick(address validator) external {
-        require(emergencyKicker != address(0) && msg.sender == emergencyKicker, "VR: not the emergency kicker");
-        require(staking.exceedsOneThird(validator), "VR: validator below one third of stake");
-        _delist(validator);
-        emit EmergencyKick(validator, msg.sender);
     }
 
     function updateProfile(

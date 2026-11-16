@@ -55,6 +55,12 @@ data MiningCache = MiningCache
     -- here puts a receiptsRoot in the header that no one else can derive and
     -- the block is rejected at every round, forever. Carrying them until a
     -- transaction shows up keeps both sides attaching to the same receipt.
+    --
+    -- Carrying the events was not enough: the payment itself stayed in the
+    -- state under the timestamp of the run that made it, and the block is
+    -- sealed with a later one. makeNewBlock now throws such a run away whole
+    -- (see discardsRewardRun) and the next run pays the rewards again, so
+    -- nothing is carried here any more.
     pendingBlockRewards :: Maybe ExecResults
   }
   deriving (Show, Generic)
