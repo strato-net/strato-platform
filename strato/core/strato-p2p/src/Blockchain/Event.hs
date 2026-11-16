@@ -24,8 +24,8 @@ module Blockchain.Event
 where
 
 import           BlockApps.Logging
-import           Blockchain.Blockstanbul.Authentication (authenticate)
-import           Blockchain.Blockstanbul.Messages      (InEvent (IMsg), WireMessage (..))
+import           Blockchain.Blockstanbul.Authentication (authenticate, bodyMatchesHeader, verifyCommitmentSeal)
+import           Blockchain.Blockstanbul.Messages      (InEvent (IMsg), TrustedMessage (Commit, Preprepare), WireMessage (..))
 import           Blockchain.Blockstanbul               (blockstanbulSender)
 import           Blockchain.Context
 import           Blockchain.Data.Block
@@ -42,6 +42,7 @@ import           Blockchain.EventException
 import           Blockchain.EventModel
 import           Blockchain.HeaderCache
 import           Blockchain.Model.SyncState
+import           Blockchain.Strato.Model.Address        (Address)
 import           Blockchain.Strato.Model.Validator      (Validator (..))
 import           Blockchain.Model.SyncTask
 import           Blockchain.Model.WrappedBlock
@@ -304,42 +305,51 @@ handleEvents peer = awaitForever $ \case
 
   MsgEvt (Blockstanbul wm@(WireMessage auth tm)) -> do
     -- Only a message signed by a current validator goes further, and at most
-    -- maxPbftMessagesPerSecond per connection, counted before the signature is
-    -- recovered. Anyone can send one, and each would otherwise reach the
-    -- sequencer and push real messages out of the seen-message caches.
+    -- maxPbftMessagesPerSecond per connection, counted before anything is looked
+    -- up or recovered. Anyone can send one, and each would otherwise reach the
+    -- sequencer and push real messages out of the seen-message caches. What the
+    -- signature does not cover must check out as well, or copies altered there
+    -- would pass as new messages: a PREPREPARE's body against its header, and a
+    -- COMMIT's seal against its sender.
     admitted <- lift admitPbftMessage
-    validators <- lift $ bestSequencedBlockValidators <$> Mod.get (Proxy @BestSequencedBlock)
-    signed <- authenticate (Conf.networkID $ networkConfig ethConf) (IMsg auth tm)
     if not admitted
       then $logDebugS "handleEvents/Blockstanbul" . T.pack $ "Dropping a consensus message from " ++ peerString peer ++ ": over " ++ show maxPbftMessagesPerSecond ++ " this second"
-      else if not (signed && Validator (blockstanbulSender wm) `elem` validators)
-        then $logDebugS "handleEvents/Blockstanbul" . T.pack $ "Dropping a consensus message from " ++ peerString peer ++ " not signed by a current validator"
-        else do
-          lift $ do
-            stampActionTimestamp
-            setPeerAddrIfUnset $ blockstanbulSender wm
-            peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
-            $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
-          let msgHash = rlpHash wm
-          lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerHost peer, msgHash) Proxy
-          msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
-          if msgExists
-            then
-              $logInfoS "handleEvents/Blockstanbul" . T.pack $
-                concat
-                  [ "Already seen inbound wire message ",
-                    format msgHash,
-                    ". Not forwarding to Sequencer."
-                  ]
-            else do
-              $logInfoS "handleEvents/Blockstanbul" . T.pack $
-                concat
-                  [ "First time seeing inbound wire message ",
-                    format msgHash,
-                    ". Forwarding to Sequencer."
-                  ]
-              lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
-              yieldL $ ToUnseq [IEBlockstanbul wm]
+      else do
+        validators <- lift $ bestSequencedBlockValidators <$> Mod.get (Proxy @BestSequencedBlock)
+        signed <- authenticate (Conf.networkID $ networkConfig ethConf) (IMsg auth tm)
+        let sender' = blockstanbulSender wm
+            unsignedPartsHold = case tm of
+              Preprepare _ blk -> bodyMatchesHeader blk
+              Commit _ di seal -> (verifyCommitmentSeal di seal :: Either String Address) == Right sender'
+              _ -> True
+        if not (signed && unsignedPartsHold && Validator sender' `elem` validators)
+          then $logDebugS "handleEvents/Blockstanbul" . T.pack $ "Dropping a consensus message from " ++ peerString peer ++ " not signed by a current validator"
+          else do
+            lift $ do
+              stampActionTimestamp
+              setPeerAddrIfUnset $ blockstanbulSender wm
+              peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
+              $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
+            let msgHash = rlpHash wm
+            lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerHost peer, msgHash) Proxy
+            msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
+            if msgExists
+              then
+                $logInfoS "handleEvents/Blockstanbul" . T.pack $
+                  concat
+                    [ "Already seen inbound wire message ",
+                      format msgHash,
+                      ". Not forwarding to Sequencer."
+                    ]
+              else do
+                $logInfoS "handleEvents/Blockstanbul" . T.pack $
+                  concat
+                    [ "First time seeing inbound wire message ",
+                      format msgHash,
+                      ". Forwarding to Sequencer."
+                    ]
+                lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
+                yieldL $ ToUnseq [IEBlockstanbul wm]
 
   -- private chains
   MsgEvt (GetChainDetails _) -> return ()

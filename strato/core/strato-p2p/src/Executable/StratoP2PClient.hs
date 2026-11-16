@@ -198,8 +198,9 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
         let dialable p = pPeerActiveState p == 0 && isJust (pPeerPubkey p)
             (validatorPeers, others) = partition (isValidatorKey validators . pPeerPubkey) $ filter dialable peers
         -- Validators are dialed whatever the limit (a validator does not hold
-        -- another to it), and first; other peers fill the room that is left.
-        forM_ (validatorPeers ++ take (Conf.maxConnections (p2pConfig ethConf) - numActivePeers) others) $ \peer -> do
+        -- another to it), and first; other peers fill only the room left after them,
+        -- so only validators take the node past the limit.
+        forM_ (validatorPeers ++ take (Conf.maxConnections (p2pConfig ethConf) - numActivePeers - length validatorPeers) others) $ \peer -> do
           _ <- liftIO . forkIO . runner $ \_ -> do
               result <- try . liftIO . runner $ runPeerInList peer
               handleRunPeerResult peer result

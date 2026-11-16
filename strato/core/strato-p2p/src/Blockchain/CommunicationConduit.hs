@@ -152,12 +152,16 @@ handleMsgServerConduit myPubkey peer = do
   validators <- lift $ bestSequencedBlockValidators <$> Mod.get (Mod.Proxy @BestSequencedBlock)
 
   -- A validator is not held to the limit: full of other peers, a node would turn
-  -- away the validators it votes with.
-  when (numActivePeers > Conf.maxConnections (p2pConfig ethConf) && not (isValidatorKey validators $ pPeerPubkey peer)) $ do
+  -- away the validators it votes with. Its key is only claimed until the Hello
+  -- below authenticates it, so a claimed validator gets at most one slot per
+  -- validator past the limit, and must send that Hello within helloWaitSeconds.
+  let limit = Conf.maxConnections (p2pConfig ethConf)
+      claimsValidator = isValidatorKey validators $ pPeerPubkey peer
+  when (numActivePeers > limit && not (claimsValidator && numActivePeers <= limit + length validators)) $ do
     yield $ Right $ Disconnect TooManyPeers
     throwIO CurrentlyTooManyPeers
 
-  awaitMsg >>= \case
+  awaitMsgWithin helloWaitSeconds >>= \case
     Just Hello {} -> do
       $logInfoS "handshake/Hello{}" "received hello"
       -- The key from the RLPx handshake is only a claim until the first frame
@@ -217,6 +221,21 @@ awaitMsg =
     Just (MsgEvt msg) -> return (Just msg)
     Nothing           -> return Nothing
     _                 -> awaitMsg
+
+-- | 'awaitMsg', giving up after @n@ timer ticks (a second each) without one.
+awaitMsgWithin :: (MonadIO m) => Int -> ConduitM Event (Either P2PCNC Message) m (Maybe Message)
+awaitMsgWithin n =
+  await >>= \case
+    Just (MsgEvt msg) -> return (Just msg)
+    Just TimerEvt
+      | n <= 1        -> return Nothing
+      | otherwise     -> awaitMsgWithin (n - 1)
+    Nothing           -> return Nothing
+    _                 -> awaitMsgWithin n
+
+-- | How long an inbound peer has to send its Hello after the RLPx handshake.
+helloWaitSeconds :: Int
+helloWaitSeconds = 10
 
 -- | Take a new sync task for this peer and ask it for the task's headers, or
 -- mark the task 'NotReady' when they lie beyond the peer's (version-normalized) tip.
