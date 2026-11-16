@@ -1,6 +1,5 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 
 contract User {
@@ -10,7 +9,7 @@ contract User {
     }
 }
 
-contract Describe_CDPGeneral is Authorizable {
+contract Describe_CDPGeneral {
 
     // CDP struct definitions for accessing record types (must match CDPEngine exactly)
     struct Vault {
@@ -54,7 +53,6 @@ contract Describe_CDPGeneral is Authorizable {
     address ETHST;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
     }
@@ -92,15 +90,17 @@ contract Describe_CDPGeneral is Authorizable {
         require(address(user3) != address(0), "User3 not created");
 
         // Create USDST token
-        USDST = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        (bool executed, variadic ret) = adminRegistry.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        USDST = address(ret);
         require(address(USDST) != address(0), "Failed to create USDST token");
-        Token(USDST).setStatus(2); // Activate USDST
+        adminRegistry.castVoteOnIssue(USDST, "setStatus", 2); // Activate USDST
         require(Token(USDST).status() == TokenStatus.ACTIVE, "USDST token not activated");
 
         // Create ETHST token
-        ETHST = m.tokenFactory().createToken("ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
+        (executed, ret) = adminRegistry.castVoteOnIssue(address(m.tokenFactory()), "createToken", "ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
+        ETHST = address(ret);
         require(address(ETHST) != address(0), "Failed to create ETHST token");
-        Token(ETHST).setStatus(2); // Activate ETHST
+        adminRegistry.castVoteOnIssue(ETHST, "setStatus", 2); // Activate ETHST
         require(Token(ETHST).status() == TokenStatus.ACTIVE, "ETHST token not activated");
 
         // Grant CDPEngine mint/burn rights on USDST
@@ -108,20 +108,20 @@ contract Describe_CDPGeneral is Authorizable {
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(USDST), "burn", address(engine));
 
         // Set TokenFactory in CDPRegistry
-        registry.setTokenFactory(address(m.tokenFactory()));
+        adminRegistry.castVoteOnIssue(address(registry), "setTokenFactory", address(m.tokenFactory()));
 
         // Set USDST token in the registry
-        registry.setUSDST(address(USDST));
+        adminRegistry.castVoteOnIssue(address(registry), "setUSDST", address(USDST));
         require(address(registry.usdst()) == address(USDST), "USDST not set correctly in registry");
 
         // Set initial ETHST price in oracle
         PriceOracle oracle = m.priceOracle();
         uint ethstPrice = 3000e18; // $3,000 with 18 decimals
-        oracle.setAssetPrice(ETHST, ethstPrice);
+        adminRegistry.castVoteOnIssue(address(oracle), "setAssetPrice", ETHST, ethstPrice);
         require(oracle.getAssetPrice(ETHST) == ethstPrice, "ETHST price not set correctly");
 
         // Configure ETHST as collateral asset in CDPEngine
-        engine.setCollateralAssetParams(
+        adminRegistry.castVoteOnIssue(address(engine), "setCollateralAssetParams",
             ETHST,
             1500000000000000000, // 150% liquidation ratio (1.5e18)
             1600000000000000000, // 160% minCollateralRatio (1.6e18) - must be >= liquidationRatio
@@ -145,7 +145,7 @@ contract Describe_CDPGeneral is Authorizable {
         uint user1InitialBalance = IERC20(USDST).balanceOf(address(user1));
         uint user2InitialBalance = IERC20(USDST).balanceOf(address(user2));
 
-        Token(USDST).mint(address(this), 1000e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(this), 1000e18);
         IERC20(USDST).transfer(address(user1), 1000e18);
         require(IERC20(USDST).balanceOf(address(user1)) == user1InitialBalance + 1000e18, "User1 should have additional 1000 USDST after receipt");
         user1.do(USDST, "transfer", address(user2), 1000e18);
@@ -154,7 +154,7 @@ contract Describe_CDPGeneral is Authorizable {
         user2.do(USDST, "transfer", address(this), 1000e18);
         require(IERC20(USDST).balanceOf(address(user2)) == user2InitialBalance, "User2 should be back to initial balance after transfer out");
         require(IERC20(USDST).balanceOf(address(this)) == 1000e18, "Admin should have 1000 USDST after receipt");
-        Token(USDST).burn(address(this), 1000e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "burn", address(this), 1000e18);
     }
 
     // ========================================
@@ -203,7 +203,7 @@ contract Describe_CDPGeneral is Authorizable {
 
         // Test max uint256 price
         uint maxPrice = 115792089237316195423570985008687907853269984665640564039457584007913129639935; // max uint256
-        oracle.setAssetPrice(ETHST, maxPrice);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ETHST, maxPrice);
         require(oracle.getAssetPrice(ETHST) == maxPrice, "Max price not set correctly");
         log("✅ Max price value handled correctly");
 
@@ -218,7 +218,7 @@ contract Describe_CDPGeneral is Authorizable {
 
         // Test minimum liquidation ratio (150% = 1.5e18)
         uint minLiquidationRatio = 1500000000000000000; // 150%
-        engine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(engine), "setCollateralAssetParams",
             ETHST,
             minLiquidationRatio,
             1600000000000000000, // 160% minCollateralRatio - must be >= liquidationRatio
@@ -233,7 +233,7 @@ contract Describe_CDPGeneral is Authorizable {
 
         // Test high liquidation ratio (300% = 3e18)
         uint highLiquidationRatio = 3000000000000000000; // 300%
-        engine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(engine), "setCollateralAssetParams",
             ETHST,
             highLiquidationRatio,
             3200000000000000000, // 320% minCollateralRatio - must be >= liquidationRatio
@@ -256,14 +256,14 @@ contract Describe_CDPGeneral is Authorizable {
         PriceOracle oracle = m.priceOracle();
 
         // Test that non-admin cannot set prices
-        try oracle.setAssetPrice(ETHST, 1000e18) {
+        try m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ETHST, 1000e18) {
             log("⚠️  Non-admin was able to set prices (may be intended behavior)");
         } catch {
             log("✅ Non-admin correctly prevented from setting prices");
         }
 
         // Test that non-admin cannot configure collateral
-        try engine.setCollateralAssetParams(
+        try m.adminRegistry().castVoteOnIssue(address(engine), "setCollateralAssetParams",
             ETHST,
             1500000000000000000,
             1600000000000000000, // minCollateralRatio
@@ -287,10 +287,10 @@ contract Describe_CDPGeneral is Authorizable {
         User user4 = new User();
 
         // Ensure ETHST price is set to reasonable value
-        m.priceOracle().setAssetPrice(ETHST, 3000e18); // $3,000
+        m.adminRegistry().castVoteOnIssue(address(m.priceOracle()), "setAssetPrice", ETHST, 3000e18); // $3,000
 
         // Give fresh user ETHST for testing
-        Token(ETHST).mint(address(user4), 5e18);
+        m.adminRegistry().castVoteOnIssue(ETHST, "mint", address(user4), 5e18);
 
         // Test multiple rapid operations (reentrancy-like behavior)
         user4.do(ETHST, "approve", address(m.cdpVault()), 5e18);
@@ -323,15 +323,15 @@ contract Describe_CDPGeneral is Authorizable {
 
         // Test precision with small amounts
         uint smallAmount = 1; // 1 wei
-        oracle.setAssetPrice(ETHST, smallAmount);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ETHST, smallAmount);
         require(oracle.getAssetPrice(ETHST) == smallAmount, "Small price precision error");
         log("✅ Small amount precision handled correctly");
 
         // Reset ETHST price to reasonable value for testing
-        oracle.setAssetPrice(ETHST, 3000e18); // $3,000
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ETHST, 3000e18); // $3,000
 
         // Give user1 more ETHST for large amount testing
-        Token(ETHST).mint(address(user1), 1000e18);
+        m.adminRegistry().castVoteOnIssue(ETHST, "mint", address(user1), 1000e18);
         user1.do(ETHST, "approve", address(m.cdpVault()), 1000e18);
         user1.do(address(engine), "deposit", ETHST, 1000e18);
 
@@ -368,7 +368,7 @@ contract Describe_CDPGeneral is Authorizable {
         CDPEngine engine = m.cdpEngine();
 
         // Test pausing collateral asset
-        engine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(engine), "setCollateralAssetParams",
             ETHST,
             1500000000000000000,
             1600000000000000000, // minCollateralRatio
@@ -389,7 +389,7 @@ contract Describe_CDPGeneral is Authorizable {
         }
 
         // Test unpausing
-        engine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(engine), "setCollateralAssetParams",
             ETHST,
             1500000000000000000,
             1600000000000000000, // minCollateralRatio
@@ -408,7 +408,7 @@ contract Describe_CDPGeneral is Authorizable {
 
         // Test changing liquidation ratio
         uint newLiquidationRatio = 2000000000000000000; // 200%
-        engine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(engine), "setCollateralAssetParams",
             ETHST,
             newLiquidationRatio,
             2100000000000000000, // 210% minCollateralRatio - must be >= liquidationRatio
@@ -422,7 +422,7 @@ contract Describe_CDPGeneral is Authorizable {
         log("✅ Liquidation ratio changed successfully");
 
         // Test changing liquidation penalty
-        engine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(engine), "setCollateralAssetParams",
             ETHST,
             1500000000000000000,
             1600000000000000000, // minCollateralRatio
@@ -446,11 +446,12 @@ contract Describe_CDPGeneral is Authorizable {
         TokenFactory tokenFactory = m.tokenFactory();
 
         // Create additional test asset
-        address GOLDST = tokenFactory.createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
-        Token(GOLDST).setStatus(2); // Activate
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(tokenFactory), "createToken", "GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
+        address GOLDST = address(ret);
+        m.adminRegistry().castVoteOnIssue(GOLDST, "setStatus", 2); // Activate
 
         // Configure GOLDST as collateral
-        engine.setCollateralAssetParams(
+        m.adminRegistry().castVoteOnIssue(address(engine), "setCollateralAssetParams",
             GOLDST,
             1500000000000000000,
             1600000000000000000, // minCollateralRatio
@@ -463,10 +464,10 @@ contract Describe_CDPGeneral is Authorizable {
         );
 
         // Set GOLDST price
-        oracle.setAssetPrice(GOLDST, 2000e18); // $2,000
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", GOLDST, 2000e18); // $2,000
 
         // Mint GOLDST to user
-        Token(GOLDST).mint(address(user1), 10e18);
+        m.adminRegistry().castVoteOnIssue(GOLDST, "mint", address(user1), 10e18);
 
         // Deposit GOLDST collateral
         user1.do(GOLDST, "approve", address(m.cdpVault()), 10e18);
@@ -487,13 +488,13 @@ contract Describe_CDPGeneral is Authorizable {
         User user7 = new User();
 
         // Ensure ETHST price is set to reasonable value
-        oracle.setAssetPrice(ETHST, 3000e18); // $3,000
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ETHST, 3000e18); // $3,000
 
         // Give users ETHST and USDST
-        Token(ETHST).mint(address(user6), 5e18);
-        Token(USDST).mint(address(user6), 10000e18);
-        Token(ETHST).mint(address(user7), 5e18);
-        Token(USDST).mint(address(user7), 10000e18);
+        m.adminRegistry().castVoteOnIssue(ETHST, "mint", address(user6), 5e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(user6), 10000e18);
+        m.adminRegistry().castVoteOnIssue(ETHST, "mint", address(user7), 5e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(user7), 10000e18);
 
         // User6 opens position - safe amount: 5 ETHST * $3,000 / 1.5 = $10,000 max mint
         user6.do(ETHST, "approve", address(m.cdpVault()), 5e18);
@@ -506,11 +507,11 @@ contract Describe_CDPGeneral is Authorizable {
         user7.do(address(engine), "mint", ETHST, 9000e18); // Safe amount under liquidation ratio
 
         // Crash price
-        oracle.setAssetPrice(ETHST, 100e18);
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ETHST, 100e18);
 
         // Liquidate both positions (user2 liquidates user6 and user7)
         // Ensure user2 has enough USDST for liquidation
-        Token(USDST).mint(address(user2), 20000e18);
+        m.adminRegistry().castVoteOnIssue(USDST, "mint", address(user2), 20000e18);
         user2.do(USDST, "approve", address(engine), 20000e18);
         user2.do(address(engine), "liquidate", ETHST, address(user6), 9000e18);
         user2.do(address(engine), "liquidate", ETHST, address(user7), 9000e18);
@@ -540,7 +541,7 @@ contract Describe_CDPGeneral is Authorizable {
         }
 
         // Test invalid liquidation ratio (< 100%)
-        try engine.setCollateralAssetParams(
+        try m.adminRegistry().castVoteOnIssue(address(engine), "setCollateralAssetParams",
             ETHST,
             500000000000000000, // 50% (invalid - too low)
             600000000000000000, // 60% minCollateralRatio
@@ -588,11 +589,11 @@ contract Describe_CDPGeneral is Authorizable {
         PriceOracle oracle = m.priceOracle();
 
         // Ensure ETHST price is set to reasonable value
-        oracle.setAssetPrice(ETHST, 3000e18); // $3,000
+        m.adminRegistry().castVoteOnIssue(address(oracle), "setAssetPrice", ETHST, 3000e18); // $3,000
 
         // Test multiple rapid deposits
         for (uint j = 0; j < 5; j++) {
-            Token(ETHST).mint(address(user1), 1e18);
+            m.adminRegistry().castVoteOnIssue(ETHST, "mint", address(user1), 1e18);
             user1.do(ETHST, "approve", address(m.cdpVault()), 1e18);
             user1.do(address(engine), "deposit", ETHST, 1e18);
         }

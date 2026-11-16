@@ -56,6 +56,10 @@ require("dotenv").config();
   /* ---------- helpers ---------- */
   const headers = (tok) => ({ Authorization: `Bearer ${tok}`, "Content-Type": "application/json" });
   const buildCall = (name, addr, method, args = {}) => ({ payload: { contractName: name, contractAddress: addr, method, args }, type: "FUNCTION" });
+  // onlyOwner calls on AdminRegistry-owned contracts go through castVoteOnIssue with positional {type, value} args
+  const ADMIN_REGISTRY = (process.env.ADMIN_REGISTRY_ADDRESS || "000000000000000000000000000000000000100c").toLowerCase();
+  const governedCall = (addr, method, args) =>
+    buildCall("AdminRegistry", ADMIN_REGISTRY, "castVoteOnIssue", { _target: addr, _func: method, _args: args });
   const send = async (tok, txs) => {
     const body = { txs: Array.isArray(txs) ? txs : [txs], txParams: { gasPrice: 1, gasLimit: 32100000000 } };
     const { data } = await axios.post(txEndpoint, body, { headers: headers(tok) });
@@ -91,8 +95,8 @@ require("dotenv").config();
 
   /* ---------- baseline oracle prices ---------- */
   console.log("Resetting oracle prices (GOLD=$2000, USDST=$1)…");
-  await send(ADMIN_TOKEN, buildCall("PriceOracle", cfg.PRICE_ORACLE, "setAssetPrice", { asset: cfg.GOLDST, price: "2000000000000000000000" }));
-  await send(ADMIN_TOKEN, buildCall("PriceOracle", cfg.PRICE_ORACLE, "setAssetPrice", { asset: cfg.USDST,  price: "1000000000000000000" }));
+  await send(ADMIN_TOKEN, governedCall(cfg.PRICE_ORACLE, "setAssetPrice", [{ type: "address", value: cfg.GOLDST }, { type: "uint256", value: "2000000000000000000000" }]));
+  await send(ADMIN_TOKEN, governedCall(cfg.PRICE_ORACLE, "setAssetPrice", [{ type: "address", value: cfg.USDST }, { type: "uint256", value: "1000000000000000000" }]));
 
   /* ---------- STEP 2: create healthy loans ---------- */
   console.log("Creating loans for borrowers…");
@@ -114,6 +118,6 @@ require("dotenv").config();
 
   /* ---------- STEP 3: crash price to make loans unhealthy ---------- */
   console.log("Crashing GOLD price to $1000 to make loans liquidatable…");
-  await send(ADMIN_TOKEN, buildCall("PriceOracle", cfg.PRICE_ORACLE, "setAssetPrice", { asset: cfg.GOLDST, price: "1000000000000000000000" }));
+  await send(ADMIN_TOKEN, governedCall(cfg.PRICE_ORACLE, "setAssetPrice", [{ type: "address", value: cfg.GOLDST }, { type: "uint256", value: "1000000000000000000000" }]));
   console.log("All loans should now have health-factor < 1. Ready for UI testing.");
 })(); 

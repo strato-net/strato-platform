@@ -7,10 +7,29 @@ const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 /**
  * @openapi
+ * /cdp/metadata:
+ *   get:
+ *     summary: Canonical CDP contracts and supported collateral metadata
+ *     tags: [CDP]
+ *     responses:
+ *       200:
+ *         description: CDP registry, engine, vault, USDST, and collateral configuration
+ */
+router.get("/metadata", authHandler.authorizeRequest(true), CDPController.getMetadata);
+
+/**
+ * @openapi
  * /cdp/vaults:
  *   get:
  *     summary: List CDP vaults for the signed-in user
  *     tags: [CDP]
+ *     parameters:
+ *       - name: address
+ *         in: query
+ *         required: false
+ *         description: Account whose read-only vault positions should be returned
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: Vault collection

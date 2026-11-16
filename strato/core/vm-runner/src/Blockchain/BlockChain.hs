@@ -52,7 +52,8 @@ import Blockchain.Data.TransactionResultStatus
 import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
-import Blockchain.Forks (isReceiptsRootForkActive, isReplayProtectionForkActive, isStratoGasForkActive)
+import Blockchain.Forks (isFeeConsensusDeltaForkActive, isReceiptsRootForkActive, isReplayProtectionForkActive, isStratoGasForkActive)
+import Blockchain.HistoricalOutOfGas (isHistoricalOutOfGasTx)
 import qualified Blockchain.Verification as V
 import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
@@ -72,7 +73,7 @@ import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 import Blockchain.TheDAOFork
 import Blockchain.Timing
-import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, RevertError))
+import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, RevertError, TooMuchGas))
 import Blockchain.VMContext
 import Blockchain.VMOut
 import Blockchain.Wiring ()
@@ -447,7 +448,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
         | txSize >= sizeLimit = Left $ TFTXSizeLimitExceeded txSize sizeLimit t
         | otherwise = Right ()
 
-  let availableGas = 400_000
+  let availableGas = transactionGas
 
   case precheck of
     Left failure -> pure (Left failure)
@@ -455,7 +456,11 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       Left failure -> pure (Left failure)
       Right feeResult -> do
         let combineA f x y = liftA2 f x y <|> x <|> y
-            attachFeeResult er = er
+            -- the fee payment's validator and stake changes are this transaction's too
+            attachFeeDeltas
+              | isFeeConsensusDeltaForkActive (number b) = prependConsensusDeltas feeResult
+              | otherwise = id
+            attachFeeResult er = attachFeeDeltas er
               { erAction = combineA (\era ->
                     (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era))
                   . (events %~ (_events era Seq.><))
@@ -486,7 +491,13 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
               P.incCounter txTypeCounter
 
               started <- liftIO Tr.nowNanos
-              execResults <- runCodeForTransaction b availableGas tAddr t proposer
+              -- ONE-OFF BACKWARDS-COMPATIBILITY HACK: a transaction that ran out of
+              -- gas under the original gas schedule is failed the same way here
+              -- without being executed. See Blockchain.HistoricalOutOfGas.
+              execResults <-
+                if isHistoricalOutOfGasTx (otHash t)
+                  then pure . solidvmErrorResults $ TooMuchGas 400_000 400_001
+                  else runCodeForTransaction b availableGas tAddr t proposer
               P.incCounter vmTxsProcessed
               liftIO $ recordExecuteSpan started b t (fromIntegral availableGas) execResults
 

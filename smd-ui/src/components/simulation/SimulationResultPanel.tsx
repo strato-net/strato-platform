@@ -1,23 +1,19 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import {
-  decodeCastVoteOutcome,
   simulationChain,
   type SimulatedEvent,
   type SimulationResult,
   type TraceFrame,
 } from "@/services/simulation";
+import { voteExecuted } from "@/services/contracts";
 
 interface SimulationResultPanelProps {
   result: SimulationResult | null;
   error?: string;
   /** Optional heading, e.g. "Proposal tx" vs "Effect if executed". */
   title?: string;
-  /**
-   * Headings for the nested `effect` chain, outermost first (a vote wrapped
-   * through nested multisigs simulates as one panel per hop). Falls back to
-   * "Effect if executed" when absent or exhausted.
-   */
+  /** Headings for nested simulated effects, outermost first. */
   effectTitles?: string[];
   /** Internal: suppress the chain summary on nested panels. */
   isNested?: boolean;
@@ -42,11 +38,11 @@ export function SimulationResultPanel({
   const message = error || result?.error || "";
   // A castVoteOnIssue hop reports whether this vote itself crossed the
   // threshold; the server only attaches an effect to castVoteOnIssue sims, so
-  // gate on that to avoid misreading unrelated boolean returns.
-  const voteOutcome =
-    result?.effect != null && result.status === "Success"
-      ? decodeCastVoteOutcome(result.response)
-      : null;
+  // gate on that to avoid misreading unrelated boolean returns. A vote that
+  // passes under a timelock delay queues the issue instead of executing it.
+  const executed =
+    result?.effect != null && result.status === "Success" ? voteExecuted(result) : undefined;
+  const queued = result?.events?.some((e) => e.name === "IssueQueued");
   const returned = result?.data?.contents ?? result?.response;
   const traceRoots: TraceFrame[] = !result?.trace
     ? []
@@ -67,11 +63,13 @@ export function SimulationResultPanel({
         {failed ? "transaction would fail" : "transaction would succeed"}
       </div>
 
-      {voteOutcome != null ? (
+      {typeof executed === "boolean" ? (
         <div className="mt-1 text-xs text-muted-foreground">
-          {voteOutcome
+          {executed
             ? "Threshold met — this vote executes the next step immediately."
-            : "Vote recorded — the next step waits for more votes here."}
+            : queued
+              ? "Threshold met — the next step is queued until its timelock delay passes."
+              : "Vote recorded — the next step waits for more votes here."}
         </div>
       ) : null}
 
@@ -167,8 +165,10 @@ function ChainSummary({
       }
     >
       {ok
-        ? `All ${chain.length} steps would succeed.`
-        : `${failures.length} of ${chain.length} steps would fail: ${failures.join("; ")}`}
+        ? chain.length === 1 ? "The step would succeed." : `All ${chain.length} steps would succeed.`
+        : chain.length === 1
+          ? `The step would fail: ${failures.join("; ")}`
+          : `${failures.length} of ${chain.length} steps would fail: ${failures.join("; ")}`}
     </div>
   );
 }

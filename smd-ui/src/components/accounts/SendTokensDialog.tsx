@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { parseUnits, formatUnits, isAddress } from "viem";
 import { toast } from "sonner";
 import { Send } from "lucide-react";
@@ -41,11 +41,8 @@ export function SendTokensDialog({ disabled }: { disabled?: boolean }) {
   const sim = useSimulation();
 
   // Send-from wallet: "direct" (connected account) or a User wallet contract address.
-  // Multisig wallets are excluded — sending from one requires a signer vote, not a
-  // direct transfer.
   const [fromWallet, setFromWallet] = useState(DIRECT);
-  const { data: allWallets } = useMyUserWallets(userAddress);
-  const wallets = useMemo(() => (allWallets ?? []).filter((w) => !w.multisig), [allWallets]);
+  const { data: wallets } = useMyUserWallets(userAddress);
   const wallet = wallets?.find((w) => w.address === fromWallet);
   const holder = fromWallet === DIRECT ? userAddress : fromWallet;
   const walletUsername = fromWallet === DIRECT ? "" : wallet?.username ?? "";

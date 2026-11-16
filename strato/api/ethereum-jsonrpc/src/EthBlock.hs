@@ -19,10 +19,9 @@ module EthBlock
 
 import Blockchain.Data.Block (Block(..))
 import Blockchain.Data.RLP (rlpEncode, rlpSerialize)
-import Blockchain.EthConf (ethConf)
-import qualified Blockchain.EthConf.Model as EthConf
 import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.Gas (getGasValue, transactionGas)
 import Blockchain.Strato.Model.Keccak256 (Keccak256, keccak256ToHex)
 import Data.Aeson (ToJSON(..), Value, object, (.=))
 import Data.Aeson.Types (Pair)
@@ -67,7 +66,7 @@ headerPairs bloom baseFee blk@(Block bd _ uncles) =
   , "difficulty"       .= hexQuantity (blockHeaderDifficulty bd)
   , "extraData"        .= hexBytes (blockHeaderExtraData bd)
   , "size"             .= hexQuantity (blockSize blk)
-  , "gasLimit"         .= hexQuantity configGasLimit
+  , "gasLimit"         .= hexQuantity (getGasValue transactionGas)
   , "gasUsed"          .= hexQuantity (blockHeaderGasUsed bd)
   , "timestamp"        .= hexQuantity (round . utcTimeToPOSIXSeconds $ blockHeaderTimestamp bd :: Integer)
   , "mixHash"          .= hexHash (blockHeaderMixHash bd)
@@ -102,11 +101,6 @@ txToEthValue blkHash blkNum idx tx = object $
     envelopeType = txEnvelopeType tx
 
 -- Dummy values for fields STRATO does not maintain in an Ethereum-compatible form.
-
--- | The real network gas limit used to reject oversized txs. Sourced from
--- config, not from the meaningless 'getBlockGasLimit' V2 sentinel.
-configGasLimit :: Integer
-configGasLimit = EthConf.gasLimit (EthConf.networkConfig ethConf)
 
 blockSize :: Block -> Integer
 blockSize = fromIntegral . B.length . rlpSerialize . rlpEncode

@@ -664,7 +664,7 @@ contract record MercataBridge is Ownable {
      */
     function _burnFunds(address token, uint256 amount) internal returns (uint256 actualAmount) {
         uint256 balanceBefore = IERC20(token).balanceOf(address(this));
-        Token(token).burn(address(this), amount);
+        AdminRegistry(Ownable(token).owner()).castVoteOnIssue(token, "burn", address(this), amount);
         actualAmount = balanceBefore - IERC20(token).balanceOf(address(this));
         require(actualAmount > 0, "MB: no tokens burned");
     }
@@ -692,7 +692,7 @@ contract record MercataBridge is Ownable {
      */
     function _mintFunds(address token, address to, uint256 amount) internal returns (uint256 actualAmount) {
         uint256 balanceBefore = IERC20(token).balanceOf(to);
-        Token(token).mint(to, amount);
+        AdminRegistry(Ownable(token).owner()).castVoteOnIssue(token, "mint", to, amount);
         actualAmount = IERC20(token).balanceOf(to) - balanceBefore;
         require(actualAmount > 0, "MB: no tokens minted");
     }

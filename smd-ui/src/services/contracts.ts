@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { env } from "@/lib/env";
 import { runtime } from "@/lib/env";
+import { strip0x } from "@/services/userWallets";
 
 export interface XabiFunc {
   name: string;
@@ -92,6 +93,7 @@ export function useContractState(name: string | null, address: string | null) {
 export interface FuncArg {
   name: string;
   type: string;
+  abiType?: string;
 }
 export interface ContractFunction {
   name: string;
@@ -146,6 +148,17 @@ function argType(def: any): string {
   return solidityTypeName(def?.type);
 }
 
+function abiArgType(t: any): string {
+  if (!t) return "";
+  if (t.tag === "Contract") return "address";
+  if (t.tag === "UserDefined") return abiArgType(t.actual);
+  if (t.tag === "Array") {
+    const inner = abiArgType(t.entry ?? t.type);
+    return inner ? `${inner}[${t.length ?? ""}]` : "";
+  }
+  return solidityTypeName(t);
+}
+
 /** GET /bloc/v2.2/contracts/:name/:address — full contract info (function arg names/types live here). */
 export function useContractInfo(name: string | null, address: string | null) {
   return useQuery({
@@ -169,8 +182,62 @@ export function isFunctionValue(v: unknown): v is string {
 export function functionArgs(info: any, fnName: string): FuncArg[] {
   const args = info?._functions?.[fnName]?._funcArgs;
   if (!Array.isArray(args)) return [];
-  // _funcArgs is an array of [name, { type: { tag } }] tuples.
-  return args.map((entry: any) => ({ name: entry?.[0] ?? "", type: argType(entry?.[1]) }));
+  // _funcArgs is an array of [name, { index, type: { tag } }] tuples; keep declared order.
+  return [...args]
+    .sort((x: any, y: any) => (x?.[1]?.index ?? 0) - (y?.[1]?.index ?? 0))
+    .map((entry: any) => ({
+      name: entry?.[0] ?? "",
+      type: argType(entry?.[1]),
+      abiType: abiArgType(entry?.[1]?.type),
+    }));
+}
+
+export interface ResolvedContractFunction {
+  found: boolean;
+  args: FuncArg[];
+}
+
+/** Resolve a deployed contract function by address. */
+export async function fetchFunctionByAddress(
+  address: string,
+  fnName: string
+): Promise<ResolvedContractFunction> {
+  const normalized = address.replace(/^0x/i, "").toLowerCase();
+  const { data: groups } = await api.get(`${env.BLOC_URL}/contracts`, {
+    params: { name: normalized, limit: 20, ...chainParam() },
+  });
+  if (!groups || typeof groups !== "object") return { found: false, args: [] };
+
+  for (const [name, rawInstances] of Object.entries(groups as Record<string, any>)) {
+    const instances = Array.isArray(rawInstances) ? rawInstances : rawInstances?.instances ?? [];
+    const found = instances.some((instance: any) => {
+      const candidate = typeof instance === "string" ? instance : instance?.address;
+      return String(candidate ?? "").replace(/^0x/i, "").toLowerCase() === normalized;
+    });
+    if (!found) continue;
+    const { data: info } = await api.get(`${env.BLOC_URL}/contracts/${name}/${normalized}`, {
+      params: chainParam(),
+    });
+    if (info?._functions?.[fnName]) {
+      return { found: true, args: functionArgs(info, fnName) };
+    }
+  }
+  return { found: false, args: [] };
+}
+
+/** Resolve a deployed contract by address and return one function's declared arguments. */
+export async function fetchFunctionArgs(address: string, fnName: string): Promise<FuncArg[]> {
+  return (await fetchFunctionByAddress(address, fnName)).args;
+}
+
+/** Resolve whether a deployed contract exposes a function and its declared arguments. */
+export function useFunctionByAddress(address: string, fnName: string) {
+  return useQuery({
+    queryKey: ["contract-function", address, fnName],
+    enabled: !!address && !!fnName,
+    staleTime: 5 * 60_000,
+    queryFn: (): Promise<ResolvedContractFunction> => fetchFunctionByAddress(address, fnName),
+  });
 }
 
 /** Whether a function is payable (accepts value), from its state mutability. */
@@ -255,6 +322,42 @@ export async function queryCirrus(table: string, queryString: string) {
   return data;
 }
 
+/** The flat state (`data`) blob a contract's Cirrus storage row holds. */
+async function fetchStorageData(address: string): Promise<Record<string, any>> {
+  const rows = await queryCirrus("storage", `address=eq.${strip0x(address)}&select=data`);
+  const data = Array.isArray(rows) ? rows[0]?.data : undefined;
+  return data && typeof data === "object" ? data : {};
+}
+
+/**
+ * A contract's owner when that owner is a governance registry (one that keeps a
+ * voting threshold, like the AdminRegistry): the contract's owner-only methods must
+ * be voted through `owner.castVoteOnIssue`. "" otherwise.
+ */
+export function useGovernanceOwner(contractAddress?: string | null) {
+  const q = useQuery({
+    queryKey: ["governance-owner", contractAddress],
+    enabled: !!contractAddress,
+    staleTime: 60_000,
+    queryFn: async (): Promise<string> => {
+      const owner = strip0x(String((await fetchStorageData(contractAddress!))["_owner"] ?? ""));
+      if (/^0*$/.test(owner)) return "";
+      const ownerData = await fetchStorageData(owner);
+      return ownerData["defaultVotingThresholdBps"] !== undefined ? owner : "";
+    },
+  });
+  return { owner: q.data ?? "", ...q };
+}
+
+/** castVoteOnIssue's `executed` flag from a resolved or a polled receipt. */
+export function voteExecuted(result: any): unknown {
+  const contents = result?.data?.tag === "Call" ? result.data.contents : null;
+  if (Array.isArray(contents)) return contents[0];
+  const response = result?.txResult?.response ?? result?.response;
+  const first = response?.t === "tup" ? response.v?.[0] : undefined;
+  return first?.t === "bool" ? first.v : undefined;
+}
+
 async function pollTransactionResult(hash: string, maxAttempts = 30): Promise<any> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const { data } = await api.get(`${env.STRATO_URL}/transactionResult/${hash}`, {
@@ -294,10 +397,14 @@ export async function submitStratoTx(
     }
   );
   const result = Array.isArray(data) ? data[0] : data;
-  if (result?.status === "Pending" && result?.hash) {
+  if (!result) {
+    throw new Error("Transaction returned no result");
+  }
+  if (result.status === "Pending") {
+    if (!result.hash) throw new Error("Pending transaction returned no hash");
     return pollTransactionResult(result.hash);
   }
-  if (result?.status === "Failure") {
+  if (result.status === "Failure") {
     throw new Error(result.txResult?.message || "Transaction failed");
   }
   return result;

@@ -135,6 +135,8 @@ generateDockerCompose role = do
             , ("BA_PASSWORD", "${BA_PASSWORD:-}")
             , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT:-}")
             , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY:-}")
+            , ("PARTNER_REFERRALS_URL", "${PARTNER_REFERRALS_URL:-}")
+            , ("PARTNER_INTERNAL_KEY", "${PARTNER_INTERNAL_KEY:-}")
             , ("postgres_host", pgReaderHost)
             , ("postgres_port", "5432")
             , ("postgres_user", flags_pguser)

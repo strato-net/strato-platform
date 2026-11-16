@@ -3,9 +3,9 @@ license: Apache-2.0
 extra-source-files:
   - src/SolidVM/Compiler.inc
   - src/SolidVM/BuiltinActions.inc
+  - src/SolidVM/BuiltinCalls.inc
   - src/SolidVM/HelperActions.inc
   - src/SolidVM/ActionCode.inc
-  - src/SolidVM/IntegerActions.inc
 
 dependencies:
   - base
@@ -20,7 +20,6 @@ library:
     - SolidVM.SourceCode
     - SolidVM.Gas
     - SolidVM.Values
-    - SolidVM.Events
     - SolidVM.Storage
     - SolidVM.Builtins
     - SolidVM.Blockchain
@@ -28,9 +27,9 @@ library:
     - Blockchain.SolidVM
     - Blockchain.SolidVM.Simple
   reexported-modules:
-    - solid-vm:Blockchain.SolidVM.SM
-    - solid-vm:Blockchain.SolidVM.Environment
-    - solid-vm:Blockchain.SolidVM.GasInfo
+    - solid-vm-runtime:Blockchain.SolidVM.SM
+    - solid-vm-runtime:Blockchain.SolidVM.Environment
+    - solid-vm-runtime:Blockchain.SolidVM.GasInfo
   ghc-options: -O1
   dependencies:
     - Decimal
@@ -39,6 +38,7 @@ library:
     - containers
     - lens
     - mtl
+    - solid-vm-builtins
     - solid-vm-model
     - source-tools
     - strato-model
@@ -46,7 +46,7 @@ library:
     - blockapps-data
     - blockapps-mpdbs
     - evm-solidity
-    - solid-vm
+    - solid-vm-runtime
     - solid-vm-static-analysis
     - unliftio
     - vector
@@ -90,6 +90,25 @@ tests:
     - unliftio
     - vector
     - vm-tools
+
+  solid-vm-typed-builtins-check:
+    source-dirs: test/
+    other-modules: []
+    main: TypedBuiltinCheck.hs
+    dependencies:
+      - blockapps-data
+      - bytestring
+      - common-log
+      - composable-monads-base
+      - containers
+      - hflags
+      - lens
+      - solid-vm-compiler
+      - solid-vm-native
+      - solid-vm-model
+      - strato-model
+      - text
+      - vm-tools
 
 executables:
   solid-vm-source:

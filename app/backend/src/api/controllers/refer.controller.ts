@@ -3,6 +3,8 @@ import { depositToEscrow, DepositParams, getEscrowDeposit, EscrowDepositQuery, r
 import { TransactionResponse } from "@strato/shared-types";
 import { constants } from "../../config/constants";
 import { referralUrl } from "../../config/config";
+import { partnerClaim, claimPartnerReferral } from "../services/user.service";
+import { validatePartnerClaim } from "../validators/user.validator";
 
 class ReferController {
   static async deposit(
@@ -14,7 +16,7 @@ class ReferController {
       const { accessToken, address: userAddress, body } = req;
       
         // Validate required fields
-        const { tokens, amounts, ephemeralAddress, expiry, quantity } = body;
+        const { tokens, amounts, ephemeralAddress, expiry } = body;
         
         if (!tokens || !Array.isArray(tokens) || tokens.length === 0) {
           res.status(400).json({ error: "tokens array is required and must not be empty" });
@@ -41,17 +43,11 @@ class ReferController {
           return;
         }
 
-        if (quantity === undefined || typeof quantity !== "number" || quantity <= 0 || !Number.isInteger(quantity)) {
-          res.status(400).json({ error: "quantity is required and must be a positive integer" });
-          return;
-        }
-
         const params: DepositParams = {
           tokens,
           amounts,
           ephemeralAddress,
           expiry,
-          quantity,
         };
 
       const result: TransactionResponse = await depositToEscrow(
@@ -267,6 +263,37 @@ class ReferController {
         success: true,
         data: status,
       });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  // What a guest's external wallet signs to confirm the partner ref code it
+  // arrived with; message is null when there is nothing to confirm.
+  static async getPartnerClaim(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { address, code } = validatePartnerClaim({ address: req.headers["x-wallet-address"], code: req.query.code }, false);
+      res.json((await partnerClaim(code, address)) ?? { message: null });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  // The signed confirmation. The wallet header only names the address; the
+  // signature is what proves the caller owns it.
+  static async claimPartner(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { code, issuedAt, signature } = req.body ?? {};
+      const claim = validatePartnerClaim({ address: req.headers["x-wallet-address"], code, issuedAt, signature }, true);
+      res.json({ recorded: await claimPartnerReferral(claim.code, claim.address, claim.issuedAt, claim.signature) });
     } catch (error: any) {
       next(error);
     }

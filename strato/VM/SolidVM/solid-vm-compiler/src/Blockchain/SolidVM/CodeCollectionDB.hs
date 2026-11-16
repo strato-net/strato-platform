@@ -314,6 +314,9 @@ codeCollectionFromSourceWith opts isRunningTests typeCheck initCode = do
   case mcc of
     Just cc -> do
       recordCacheEvent CacheHit
+      -- The cache outlives sandboxes: a simulated creation fills it while its
+      -- addCode lands in a discarded overlay, so store the code on a hit too.
+      _ <- addCode canonicalInitCode
       return (hsh, cc)
     Nothing -> do
       recordCacheEvent StorageWrite

@@ -69,6 +69,7 @@ HASH_SMD := $(call dir_hash,smd-ui)
 HASH_BRIDGE := $(call dir_hash,app/services/bridge)
 HASH_BRIDGE_NGINX := $(call dir_hash,app/services/bridge/nginx)
 HASH_HISTORY := $(call dir_hash,app/services/history)
+HASH_PARTNER_REFERRALS := $(call dir_hash,app/services/partner-referrals)
 HASH_LOCAL_AUTH := $(call dir_hash,local-auth)
 
 # Check if image exists in Docker — rebuild if missing (hash in tag handles source changes)
@@ -105,7 +106,7 @@ HASH_SUBS = -e 's|<HASH_STRATO>|$(HASH_STRATO)|g' \
             -e 's|<HASH_BRIDGE>|$(HASH_BRIDGE)|g' \
             -e 's|<HASH_BRIDGE_NGINX>|$(HASH_BRIDGE_NGINX)|g'
 
-.PHONY: postgrest nginx apex app-backend app-ui app-nginx prometheus smd bridge bridge-nginx history local-auth
+.PHONY: postgrest nginx apex app-backend app-ui app-nginx prometheus smd bridge bridge-nginx history partner-referrals push-partner-referrals local-auth
 
 .PHONY: postgres
 postgres:
@@ -225,6 +226,21 @@ history:
 		docker tag $(REPO_GHCR_URL)history:$(VERSION)-$(HASH_HISTORY) history:$(VERSION)-$(HASH_HISTORY); \
 	fi
 
+# The partner referrals service (app/services/partner-referrals): BlockApps
+# runs it itself, next to a Postgres of its own, so its image goes to the
+# private ECR like the bridge's.
+partner-referrals:
+	@if $(call image_missing,$(REPO_AWS_ECR_URL)partner-referrals:$(VERSION)-$(HASH_PARTNER_REFERRALS)); then \
+		echo "Building partner-referrals ($(VERSION)-$(HASH_PARTNER_REFERRALS))..."; \
+		docker build -t $(REPO_AWS_ECR_URL)partner-referrals:$(VERSION)-$(HASH_PARTNER_REFERRALS) ./app/services/partner-referrals; \
+	else \
+		echo "partner-referrals up to date"; \
+	fi
+
+# It has no compose file to be pushed from, so it is pushed by name.
+push-partner-referrals:
+	./scripts/docker-push-ecr.sh $(REPO_AWS_ECR_URL)partner-referrals:$(VERSION)-$(HASH_PARTNER_REFERRALS)
+
 all: local
 
 local: build_common apex nginx postgres postgrest prometheus smd app-backend app-ui bridge bridge-nginx oracle local-auth
@@ -335,6 +351,7 @@ build_common: generate-version-file
 	@install -m 755 bin/strato-snapshot $(HOME)/.local/bin/
 	@install -m 755 bin/strato-pg-migrate $(HOME)/.local/bin/
 	@install -m 755 bin/strato-logrotate $(HOME)/.local/bin/
+	@install -m 755 bin/strato-authorize-operator $(HOME)/.local/bin/
 	@mkdir -p $(HOME)/.local/share/strato
 	@install -m 644 strato/tools/airlock/data/english.txt $(HOME)/.local/share/strato/bip39-english.txt
 	@case ":$$PATH:" in \
@@ -569,6 +586,7 @@ uninstall:
 	@rm -f $(HOME)/.local/bin/strato-pg-migrate
 	@rm -f $(HOME)/.local/bin/strato-snapshot
 	@rm -f $(HOME)/.local/bin/strato-logrotate
+	@rm -f $(HOME)/.local/bin/strato-authorize-operator
 	@rm -f $(HOME)/.local/bin/strato-setup
 	@rm -f $(HOME)/.local/bin/convoke
 	@echo "Done"

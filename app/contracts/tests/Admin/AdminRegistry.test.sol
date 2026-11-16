@@ -2,8 +2,8 @@
 pragma solidity ^0.8.30;
 
 import "../../concrete/Admin/AdminRegistry.sol";
+import "../../concrete/Proxy/Proxy.sol";
 import "../../abstract/ERC20/ERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
 contract TestERC20 is ERC20, Ownable {
@@ -26,7 +26,26 @@ contract User {
     }
 }
 
-contract Describe_AdminRegistry is Authorizable {
+// An admin that votes for a call to itself and, when that call runs, votes for it again
+contract ReentrantAdmin {
+    AdminRegistry registry;
+    uint public executions;
+
+    function setRegistry(AdminRegistry _registry) public {
+        registry = _registry;
+    }
+
+    function vote() public {
+        registry.castVoteOnIssue(address(this), "reenter");
+    }
+
+    function reenter() public {
+        executions++;
+        if (executions < 3) registry.castVoteOnIssue(address(this), "reenter");
+    }
+}
+
+contract Describe_AdminRegistry {
     AdminRegistry adminRegistry;
     TestERC20 token;
     User user1;
@@ -39,7 +58,6 @@ contract Describe_AdminRegistry is Authorizable {
     address zeroAddress;
 
     function beforeAll() {
-        bypassAuthorizations = true;
         admin1 = address(this);
         admin2 = address(0x2);
         admin3 = address(0x3);
@@ -54,9 +72,42 @@ contract Describe_AdminRegistry is Authorizable {
         address[] memory initialAdmins = new address[](2);
         initialAdmins[0] = admin1;
         initialAdmins[1] = address(user1);
-        adminRegistry = new AdminRegistry();
+        adminRegistry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
         adminRegistry.initialize(initialAdmins);
+        Ownable(address(adminRegistry)).transferOwnership(address(adminRegistry));
         token = new TestERC20("Test Token", "TEST", address(adminRegistry));
+    }
+
+    // Votes a 24h timelock in; with no delay set yet, the vote executes at once
+    function enableTimelock() internal {
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "setTimelockDelay", 86400);
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setTimelockDelay", 86400);
+        require(adminRegistry.timelockDelay() == 86400, "Timelock delay should be set");
+    }
+
+    function voteToQueue(address _target, string _func, variadic _args) internal returns (string) {
+        string memory issueId = adminRegistry.getIssueId(_target, _func, _args);
+        adminRegistry.castVoteOnIssue(_target, _func, _args);
+        user1.do(address(adminRegistry), "castVoteOnIssue", _target, _func, _args);
+        require(issueExecutableAt(issueId) != 0, "Issue should be queued");
+        return issueId;
+    }
+
+    function executeQueued(address _target, string _func, variadic _args) internal returns (variadic) {
+        fastForward(86400);
+        return adminRegistry.executeIssue(_target, _func, _args);
+    }
+
+    function issueExecutableAt(string _issueId) internal returns (uint) {
+        (, uint executableAt,) = adminRegistry.timelocks(_issueId);
+        return executableAt;
+    }
+
+    function assertTimelock(string _issueId, uint _queuedAt, uint _executableAt, uint _expiresAt) internal {
+        (uint queuedAt, uint executableAt, uint expiresAt) = adminRegistry.timelocks(_issueId);
+        require(queuedAt == _queuedAt, "Unexpected queuedAt");
+        require(executableAt == _executableAt, "Unexpected executableAt");
+        require(expiresAt == _expiresAt, "Unexpected expiresAt");
     }
 
     // ============ CONSTRUCTOR TESTS ============
@@ -70,16 +121,55 @@ contract Describe_AdminRegistry is Authorizable {
 
     function it_admin_registry_handles_empty_initial_admins() {
         address[] memory emptyAdmins = new address[](0);
-        AdminRegistry emptyRegistry = new AdminRegistry();
-        emptyRegistry.initialize(emptyAdmins);
+        AdminRegistry emptyRegistry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
+        bool reverted = false;
+        try {
+            emptyRegistry.initialize(emptyAdmins);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject an empty admin set");
         require(!emptyRegistry.isAdminAddress(admin1), "Should have no admins");
+    }
+
+    function it_admin_registry_rejects_duplicate_initial_admins() {
+        AdminRegistry dupRegistry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
+        bool reverted = false;
+        try {
+            dupRegistry.initialize([admin1, admin1]);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject duplicate admins");
+        require(!dupRegistry.isAdminAddress(admin1), "Should have no admins");
+    }
+
+    function it_admin_registry_cannot_be_initialized_by_non_owner() {
+        // A bare registry owns itself; a proxied one belongs to its proxy's owner
+        AdminRegistry bareRegistry = new AdminRegistry();
+        AdminRegistry foreignRegistry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(user2))));
+        bool bareReverted = false;
+        try {
+            bareRegistry.initialize([admin1]);
+        } catch {
+            bareReverted = true;
+        }
+        bool foreignReverted = false;
+        try {
+            foreignRegistry.initialize([admin1]);
+        } catch {
+            foreignReverted = true;
+        }
+        require(bareReverted && foreignReverted, "Only the owner should be able to initialize");
+        require(!bareRegistry.isAdminAddress(admin1) && !foreignRegistry.isAdminAddress(admin1), "Should have no admins");
     }
 
     function it_admin_registry_handles_single_initial_admin() {
         address[] memory singleAdmin = new address[](1);
         singleAdmin[0] = admin1;
-        AdminRegistry singleRegistry = new AdminRegistry();
+        AdminRegistry singleRegistry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
         singleRegistry.initialize(singleAdmin);
+        Ownable(address(singleRegistry)).transferOwnership(address(singleRegistry));
         require(singleRegistry.isAdminAddress(admin1), "Should have one admin");
         require(!singleRegistry.isAdminAddress(admin2), "Should not have second admin");
     }
@@ -374,20 +464,26 @@ contract Describe_AdminRegistry is Authorizable {
         require(adminRegistry.admins(2) != address(0) && adminRegistry.admins(3) == address(0), "New admin was not added correctly");
         require(adminRegistry.isAdminAddress(admin3), "Admin3 should be admin after voting");
 
+        // Add a fourth admin so removal can stay at MIN_ADMIN_COUNT
+        adminRegistry.addAdmin(address(user2));
+        user1.do(address(adminRegistry), "addAdmin", address(user2));
+        require(adminRegistry.admins(3) != address(0) && adminRegistry.admins(4) == address(0), "Fourth admin was not added correctly");
+
         // Remove admin using the proper removeAdmin function
         adminRegistry.removeAdmin(admin3);
-        require(adminRegistry.admins(2) != address(0) && adminRegistry.admins(3) == address(0), "Admin was removed before enough votes were cast");
-
         user1.do(address(adminRegistry), "removeAdmin", admin3);
-        require(adminRegistry.admins(1) != address(0) && adminRegistry.admins(2) == address(0), "Admin was not removed correctly");
+        require(adminRegistry.admins(3) != address(0) && adminRegistry.admins(4) == address(0), "Admin was removed before enough votes were cast");
+
+        user2.do(address(adminRegistry), "removeAdmin", admin3);
+        require(adminRegistry.admins(2) != address(0) && adminRegistry.admins(3) == address(0), "Admin was not removed correctly");
         require(!adminRegistry.isAdminAddress(admin3), "Admin3 should not be admin after removal");
 
         // Swap admin using the proper swapAdmin function
         adminRegistry.swapAdmin(admin1, admin3);
-        require(adminRegistry.admins(1) != address(0) && adminRegistry.admins(2) == address(0), "Admin was swapped before enough votes were cast");
+        require(adminRegistry.admins(2) != address(0) && adminRegistry.admins(3) == address(0), "Admin was swapped before enough votes were cast");
 
         user1.do(address(adminRegistry), "swapAdmin", admin1, admin3);
-        require(adminRegistry.admins(1) != address(0) && adminRegistry.admins(2) == address(0), "Admin swap should maintain same count");
+        require(adminRegistry.admins(2) != address(0) && adminRegistry.admins(3) == address(0), "Admin swap should maintain same count");
     }
 
     function it_admin_registry_handles_complex_issue_execution() {
@@ -471,15 +567,19 @@ contract Describe_AdminRegistry is Authorizable {
     }
 
     function it_admin_registry_executes_old_issue_when_admin_count_decreases() {
-        // Scenario: Issue created with 2 admins fails to reach quorum (1 vote out of 2 = 50% < 67%)
-        // Then an admin is removed, leaving 1 admin
-        // The same issue called again should now execute (1 vote out of 1 = 100%)
+        // Scenario: Issue created with 4 admins fails to reach quorum (2 votes out of 4 = 50% < 60%)
+        // Then an admin is removed, leaving 3 admins, which drops the votes cast before the removal
+        // The same two admins voting again should now execute it (2 votes out of 3 = 67%)
 
-        // Step 1: Admin1 votes to add admin3 (1 out of 2 admins = 50%, needs 67%)
+        adminRegistry.addAdmin(address(user2));
+        user1.do(address(adminRegistry), "addAdmin", address(user2));
+        adminRegistry.addAdmin(address(user3));
+        user1.do(address(adminRegistry), "addAdmin", address(user3));
+
+        // Step 1: Admin1 and user1 vote to add admin3 (2 out of 4 admins = 50%, needs 60%)
         string memory issueId = adminRegistry.getIssueId(address(adminRegistry), "_addAdmin", admin3);
         adminRegistry.addAdmin(admin3);
-        // Verify it did not execute yet (would need to check the return value if we used castVoteOnIssue)
-        // Instead we just verify admin3 is not added yet
+        user1.do(address(adminRegistry), "addAdmin", admin3);
 
         // Verify admin3 is not yet an admin
         require(!adminRegistry.isAdminAddress(admin3), "Admin3 should not be admin yet");
@@ -488,17 +588,20 @@ contract Describe_AdminRegistry is Authorizable {
         uint voteIndex1 = adminRegistry.votesMap(issueId, admin1);
         require(voteIndex1 > 0, "Admin1's vote should be recorded");
 
-        // Step 2: Vote to remove user1 (the second admin) - this requires both admins to vote
-        adminRegistry.removeAdmin(address(user1));
-        user1.do(address(adminRegistry), "removeAdmin", address(user1));
+        // Step 2: Vote to remove user3 (the fourth admin) - this takes three of the four admins
+        adminRegistry.removeAdmin(address(user3));
+        user1.do(address(adminRegistry), "removeAdmin", address(user3));
+        user2.do(address(adminRegistry), "removeAdmin", address(user3));
 
-        // Verify user1 is no longer an admin
-        require(!adminRegistry.isAdminAddress(address(user1)), "User1 should no longer be an admin");
+        // Verify user3 is no longer an admin
+        require(!adminRegistry.isAdminAddress(address(user3)), "User3 should no longer be an admin");
         require(adminRegistry.isAdminAddress(admin1), "Admin1 should still be an admin");
 
-        // Step 3: Admin1 calls the same issue again (adding admin3)
-        // Now with only 1 admin, 1 vote = 100% (exceeds 67% threshold)
+        // Step 3: Admin1 and user1 call the same issue again (adding admin3)
+        // Admin1's fresh vote alone is 1 of 3; with user1's, 2 votes = 67% (exceeds 60% threshold)
         adminRegistry.addAdmin(admin3);
+        require(!adminRegistry.isAdminAddress(admin3), "Votes cast before the removal should not count");
+        user1.do(address(adminRegistry), "addAdmin", admin3);
         // Should execute this time
 
         // Verify admin3 was added
@@ -530,6 +633,99 @@ contract Describe_AdminRegistry is Authorizable {
         require(reverted, "Should revert when non-admin non-whitelisted user tries to create issue");
     }
 
+    // Consents to any vote cast in this admin's name, as Authorizable used to
+    function isAuthorized(address _account) external returns (bool) {
+        return true;
+    }
+
+    function it_admin_registry_rejects_votes_cast_on_behalf_of_an_admin() {
+        // Scenario: A non-admin names a consenting admin (this contract) as the target.
+        // That used to be counted as the admin's vote; now it must pass the whitelist check.
+        require(!adminRegistry.isAdminAddress(address(user3)), "User3 should not be an admin");
+        require(adminRegistry.isAdminAddress(admin1), "admin1 should be an admin");
+
+        bool reverted = false;
+        try {
+            user3.do(address(adminRegistry), "castVoteOnIssue", admin1, "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "Should revert when a non-admin votes on behalf of an admin");
+    }
+
+    function it_admin_registry_moves_its_ownership_only_by_unanimous_vote() {
+        AdminRegistry registry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
+        registry.initialize([address(this), address(user1), address(user2)]);
+        Ownable(address(registry)).transferOwnership(address(registry));
+
+        // Renouncing is refused outright
+        bool renounceReverted = false;
+        try {
+            registry.castVoteOnIssue(address(registry), "renounceOwnership");
+        } catch {
+            renounceReverted = true;
+        }
+        require(renounceReverted, "Renouncing the registry's ownership should be rejected");
+
+        // A whitelist entry is no shortcut
+        registry.castVoteOnIssue(address(registry), "addWhitelist", address(registry), "transferOwnership", address(user3));
+        user1.do(address(registry), "castVoteOnIssue", address(registry), "addWhitelist", address(registry), "transferOwnership", address(user3));
+        require(registry.whitelist(address(registry), "transferOwnership", address(user3)), "user3 should be whitelisted");
+        bool whitelistReverted = false;
+        try {
+            user3.do(address(registry), "castVoteOnIssue", address(registry), "transferOwnership", address(user3));
+        } catch {
+            whitelistReverted = true;
+        }
+        require(whitelistReverted, "A whitelisted account should not transfer the registry's ownership");
+
+        // Two of three admins pass the default threshold, but a transfer needs all three
+        registry.castVoteOnIssue(address(registry), "transferOwnership", admin3);
+        user1.do(address(registry), "castVoteOnIssue", address(registry), "transferOwnership", admin3);
+        require(Ownable(address(registry)).owner() == address(registry), "Two of three votes should not transfer ownership");
+        user2.do(address(registry), "castVoteOnIssue", address(registry), "transferOwnership", admin3);
+        require(Ownable(address(registry)).owner() == admin3, "A unanimous vote should transfer ownership");
+    }
+
+    function it_admin_registry_remove_whitelist_requires_an_existing_entry() {
+        require(!adminRegistry.whitelist(address(token), "mint", address(user3)), "user3 should not be whitelisted");
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "removeWhitelist", address(token), "mint", address(user3));
+        bool reverted = false;
+        try {
+            user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "removeWhitelist", address(token), "mint", address(user3));
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Removing a missing whitelist entry should revert");
+    }
+
+    function it_admin_registry_executes_an_issue_once_when_the_target_reenters() {
+        ReentrantAdmin reentrant = new ReentrantAdmin();
+        AdminRegistry registry = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
+        registry.initialize([address(this), address(reentrant)]);
+        Ownable(address(registry)).transferOwnership(address(registry));
+        reentrant.setRegistry(registry);
+
+        // Both admins vote; when the call runs, the target votes again for the same issue
+        registry.castVoteOnIssue(address(reentrant), "reenter");
+        reentrant.vote();
+        require(reentrant.executions() == 1, "Issue should execute once even when its target re-enters");
+    }
+
+    function it_admin_registry_drops_votes_cast_before_an_admin_change() {
+        // admin1 votes to mint, then admin1 and user1 replace admin1 with user2
+        adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+        adminRegistry.swapAdmin(admin1, address(user2));
+        user1.do(address(adminRegistry), "swapAdmin", admin1, address(user2));
+        require(!adminRegistry.isAdminAddress(admin1), "admin1 should have been replaced");
+
+        (bool executed, variadic ret) = user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
+        require(!executed, "A vote cast before the admin change should not count");
+        (executed, ret) = user2.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
+        require(executed && ERC20(token).balanceOf(admin3) == 1000e18, "Fresh votes from current admins should execute");
+    }
+
     function it_cannot_execute_internal_functions() {
         adminRegistry.castVoteOnIssue(address(adminRegistry), "setVotingThreshold", address(adminRegistry), "_getIssueId", 5000);
         user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setVotingThreshold", address(adminRegistry), "_getIssueId", 5000);
@@ -543,36 +739,37 @@ contract Describe_AdminRegistry is Authorizable {
         require(reverted, "Should revert when delegatecalling into an internal function");
     }
 
-    function it_admin_registry_prevents_removal_of_last_admin() {
-        // Scenario: Start with 2 admins, remove one, then try to remove the last one
-        // Should revert with "Cannot remove the last admin"
+    function it_admin_registry_prevents_removal_below_min_admin_count() {
+        // Scenario: Start with 4 admins, remove one, then try to go below MIN_ADMIN_COUNT
+        // Should revert with "Below min admin count"
 
-        // Verify we start with 2 admins
-        require(adminRegistry.isAdminAddress(admin1), "Admin1 should be an admin");
-        require(adminRegistry.isAdminAddress(address(user1)), "User1 should be an admin");
+        adminRegistry.addAdmin(address(user2));
+        user1.do(address(adminRegistry), "addAdmin", address(user2));
+        adminRegistry.addAdmin(address(user3));
+        user1.do(address(adminRegistry), "addAdmin", address(user3));
 
-        // Step 1: Remove user1 (second admin) - this should succeed
-        adminRegistry.removeAdmin(address(user1));
-        user1.do(address(adminRegistry), "removeAdmin", address(user1));
+        // Step 1: Remove user3 (fourth admin) - this should succeed, leaving 3 admins
+        adminRegistry.removeAdmin(address(user3));
+        user1.do(address(adminRegistry), "removeAdmin", address(user3));
+        user2.do(address(adminRegistry), "removeAdmin", address(user3));
 
-        // Verify user1 is no longer an admin and only admin1 remains
-        require(!adminRegistry.isAdminAddress(address(user1)), "User1 should no longer be an admin");
-        require(adminRegistry.isAdminAddress(admin1), "Admin1 should still be an admin");
+        // Verify user3 is no longer an admin and 3 admins remain
+        require(!adminRegistry.isAdminAddress(address(user3)), "User3 should no longer be an admin");
+        require(adminRegistry.admins(2) != address(0) && adminRegistry.admins(3) == address(0), "Three admins should remain");
 
-        // Step 2: Try to remove the last admin (admin1) - this should revert
+        // Step 2: Try to remove user2 - this should revert once the vote passes
+        adminRegistry.removeAdmin(address(user2));
         bool reverted = false;
         try {
-            // Since we're now the only admin, our single vote would normally execute immediately
-            // But the _removeAdmin function should revert before execution
-            adminRegistry.removeAdmin(admin1);
+            user1.do(address(adminRegistry), "removeAdmin", address(user2));
         } catch {
             reverted = true;
         }
 
-        require(reverted, "Should revert when trying to remove the last admin");
+        require(reverted, "Should revert when trying to remove below the min admin count");
 
-        // Verify admin1 is still an admin
-        require(adminRegistry.isAdminAddress(admin1), "Admin1 should still be an admin after failed removal");
+        // Verify user2 is still an admin
+        require(adminRegistry.isAdminAddress(address(user2)), "User2 should still be an admin after failed removal");
     }
 
     function it_admin_registry_prevents_swapping_in_the_zero_address() {
@@ -593,6 +790,39 @@ contract Describe_AdminRegistry is Authorizable {
         require(adminRegistry.isAdminAddress(admin1), "Admin1 should still be an admin after the failed swap");
         require(!adminRegistry.isAdminAddress(zeroAddress), "Zero address should never become an admin");
         require(adminRegistry.admins(0) == admin1, "Admin slot should be unchanged");
+    }
+
+    // An Ownable whose onlyOwner falls back to a vote (the genesis Proxy at 0x100c) votes
+    // as the registry itself, so the registry as an admin would let anyone vote
+    function it_admin_registry_cannot_be_its_own_admin() {
+        address self = address(adminRegistry);
+        adminRegistry.addAdmin(self);
+        bool addReverted = false;
+        try {
+            user1.do(self, "addAdmin", self);
+        } catch {
+            addReverted = true;
+        }
+        require(addReverted, "Should revert when adding the registry as its own admin");
+
+        adminRegistry.swapAdmin(admin1, self);
+        bool swapReverted = false;
+        try {
+            user1.do(self, "swapAdmin", admin1, self);
+        } catch {
+            swapReverted = true;
+        }
+        require(swapReverted, "Should revert when swapping in the registry as its own admin");
+        require(!adminRegistry.isAdminAddress(self), "Registry should never be its own admin");
+
+        AdminRegistry fresh = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
+        bool initReverted = false;
+        try {
+            fresh.initialize([admin1, address(fresh)]);
+        } catch {
+            initReverted = true;
+        }
+        require(initReverted, "Should revert when initializing the registry as its own admin");
     }
 
     // ============ ISSUE DISMISSAL TESTS ============
@@ -663,6 +893,298 @@ contract Describe_AdminRegistry is Authorizable {
             reverted = true;
         }
         require(reverted, "Should revert when trying to dismiss non-existent issue");
+    }
+
+    // ============ TIMELOCK TESTS ============
+
+    function it_admin_registry_has_no_timelock_delay_by_default() {
+        require(adminRegistry.timelockDelay() == 0, "Timelock delay should start at 0");
+        string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
+        adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+        (bool executed, variadic result) = user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
+        require(executed && ERC20(token).balanceOf(admin3) == 1000e18, "Issue should execute once it passes");
+        assertTimelock(issueId, 0, 0, 0);
+    }
+
+    function it_admin_registry_rejects_timelock_delay_above_maximum() {
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "setTimelockDelay", 2592001);
+        bool reverted = false;
+        try {
+            user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setTimelockDelay", 2592001);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject a timelock delay above MAXIMUM_DELAY");
+        require(adminRegistry.timelockDelay() == 0, "Timelock delay should be unchanged");
+    }
+
+    function it_admin_registry_queues_passed_issue_when_timelock_delay_is_set() {
+        enableTimelock();
+        string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
+        adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+        assertTimelock(issueId, 0, 0, 0);
+
+        (bool executed, variadic result) = user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
+        require(!executed, "Passed issue should queue instead of executing");
+        require(ERC20(token).balanceOf(admin3) == 0, "Token should not be minted before the delay");
+        uint queuedAt = block.timestamp;
+        assertTimelock(issueId, queuedAt, queuedAt + 86400, queuedAt + 86400 + 604800);
+
+        string memory otherIssueId = adminRegistry.getIssueId(address(token), "mint", admin3, 2000e18);
+        assertTimelock(otherIssueId, 0, 0, 0);
+    }
+
+    function it_admin_registry_cannot_execute_before_timelock_delay() {
+        enableTimelock();
+        voteToQueue(address(token), "mint", admin3, 1000e18);
+
+        bool reverted = false;
+        try {
+            adminRegistry.executeIssue(address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should not execute before timelock delay");
+        require(ERC20(token).balanceOf(admin3) == 0, "Token should not be minted before delay");
+    }
+
+    function it_admin_registry_executes_queued_issue_after_timelock_delay() {
+        enableTimelock();
+        string memory issueId = voteToQueue(address(token), "mint", admin3, 1000e18);
+
+        executeQueued(address(token), "mint", admin3, 1000e18);
+
+        require(ERC20(token).balanceOf(admin3) == 1000e18, "Token should be minted after delay");
+        assertTimelock(issueId, 0, 0, 0);
+        require(!adminRegistry.currentIssues(issueId), "Issue should be cleared after execution");
+        require(adminRegistry.votesMap(issueId, admin1) == 0, "Admin1 vote should be cleared");
+        require(adminRegistry.votesMap(issueId, address(user1)) == 0, "User1 vote should be cleared");
+    }
+
+    function it_admin_registry_cannot_execute_after_timelock_grace_period_expires() {
+        enableTimelock();
+        string memory issueId = voteToQueue(address(token), "mint", admin3, 1000e18);
+        (uint queuedAt, uint executableAt, uint expiresAt) = adminRegistry.timelocks(issueId);
+
+        fastForward(86400 + 604800 + 1);
+
+        bool reverted = false;
+        try {
+            adminRegistry.executeIssue(address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should not execute after timelock grace period expires");
+        require(ERC20(token).balanceOf(admin3) == 0, "Token should not be minted after expiration");
+        assertTimelock(issueId, queuedAt, executableAt, expiresAt);
+    }
+
+    function it_admin_registry_cannot_vote_on_queued_issue() {
+        enableTimelock();
+        voteToQueue(address(token), "mint", admin3, 1000e18);
+
+        bool reverted = false;
+        try {
+            adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should not allow votes on queued issue");
+    }
+
+    function it_admin_registry_cannot_dismiss_queued_issue() {
+        // At 50%, one of two admins passes the issue
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "setVotingThreshold", address(token), "mint", 5000);
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setVotingThreshold", address(token), "mint", 5000);
+        enableTimelock();
+
+        string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
+        adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+        require(issueExecutableAt(issueId) != 0, "Issue should be queued");
+
+        bool reverted = false;
+        try {
+            adminRegistry.dismissIssue(issueId);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should not dismiss a queued issue");
+        require(adminRegistry.currentIssues(issueId), "Queued issue should remain active");
+    }
+
+    function it_admin_registry_can_withdraw_vote_from_queued_issue() {
+        enableTimelock();
+        string memory issueId = voteToQueue(address(token), "mint", admin3, 1000e18);
+        adminRegistry.withdrawVote(address(token), "mint", admin3, 1000e18);
+
+        require(adminRegistry.currentIssues(issueId), "Issue should remain active with one vote");
+        require(adminRegistry.votesMap(issueId, admin1) == 0, "Withdrawn vote should be cleared");
+        require(adminRegistry.votesMap(issueId, address(user1)) > 0, "Other vote should remain");
+        assertTimelock(issueId, 0, 0, 0);
+
+        fastForward(86400);
+        bool reverted = false;
+        try {
+            adminRegistry.executeIssue(address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Unqueued issue should not execute");
+        require(ERC20(token).balanceOf(admin3) == 0, "Token should not be minted after vote withdrawal");
+    }
+
+    function it_admin_registry_withdrawing_the_last_vote_clears_the_issue() {
+        string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
+        adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+        adminRegistry.withdrawVote(address(token), "mint", admin3, 1000e18);
+
+        require(!adminRegistry.currentIssues(issueId), "Issue should be cleared");
+        require(adminRegistry.votesMap(issueId, admin1) == 0, "Withdrawn vote should be cleared");
+
+        bool reverted = false;
+        try {
+            adminRegistry.withdrawVote(address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should not withdraw a vote twice");
+    }
+
+    function it_admin_registry_requeue_after_withdrawal_restarts_delay() {
+        enableTimelock();
+        string memory issueId = voteToQueue(address(token), "mint", admin3, 1000e18);
+        uint firstExecutableAt = issueExecutableAt(issueId);
+
+        adminRegistry.withdrawVote(address(token), "mint", admin3, 1000e18);
+        fastForward(1);
+        adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+
+        uint requeuedAt = block.timestamp;
+        assertTimelock(issueId, requeuedAt, requeuedAt + 86400, requeuedAt + 86400 + 604800);
+        require(issueExecutableAt(issueId) > firstExecutableAt, "Requeued issue should restart delay");
+    }
+
+    function it_admin_registry_executes_queued_issue_after_a_config_change() {
+        adminRegistry.addAdmin(address(user2));
+        user1.do(address(adminRegistry), "addAdmin", address(user2));
+        enableTimelock();
+
+        // Two of three admins queue the mint, then raise its threshold to 100%
+        string memory issueId = voteToQueue(address(token), "mint", admin3, 1000e18);
+        voteToQueue(address(adminRegistry), "setVotingThreshold", address(token), "mint", 10000);
+        executeQueued(address(adminRegistry), "setVotingThreshold", address(token), "mint", 10000);
+
+        bool reverted = false;
+        try {
+            user2.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted && issueExecutableAt(issueId) != 0, "A vote after the config change should not reset the queued issue");
+
+        adminRegistry.executeIssue(address(token), "mint", admin3, 1000e18);
+        require(ERC20(token).balanceOf(admin3) == 1000e18, "Queued issue should execute without a quorum re-check");
+    }
+
+    function it_admin_registry_new_admins_can_cancel_a_queued_issue_before_its_delay_ends() {
+        enableTimelock();
+        // The admin change is queued first, so it executes while the mint is still waiting
+        voteToQueue(address(adminRegistry), "_addAdmin", address(user2));
+        fastForward(43200);
+        string memory issueId = voteToQueue(address(token), "mint", admin3, 1000e18);
+        fastForward(43200);
+        adminRegistry.executeIssue(address(adminRegistry), "_addAdmin", address(user2));
+        require(adminRegistry.isAdminAddress(address(user2)), "User2 should be an admin");
+
+        (bool executed, variadic result) = user2.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "cancelIssue", issueId);
+        require(!executed && issueExecutableAt(issueId) != 0, "One of three votes should not cancel the issue");
+
+        (executed, result) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "cancelIssue", issueId);
+        require(executed, "The cancel should execute without waiting out the timelock");
+        require(!adminRegistry.currentIssues(issueId), "Cancelled issue should be cleared");
+        assertTimelock(issueId, 0, 0, 0);
+
+        fastForward(43200);
+        bool reverted = false;
+        try {
+            adminRegistry.executeIssue(address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted && ERC20(token).balanceOf(admin3) == 0, "A cancelled issue should not execute");
+    }
+
+    function it_admin_registry_cannot_cancel_an_issue_that_is_not_queued() {
+        string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
+        adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "cancelIssue", issueId);
+        bool reverted = false;
+        try {
+            user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "cancelIssue", issueId);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should not cancel an issue that is not queued");
+        require(adminRegistry.currentIssues(issueId), "Unqueued issue should remain active");
+    }
+
+    function it_admin_registry_cannot_whitelist_timelock_controls() {
+        string[] memory funcs = ["setTimelockDelay", "setInstantFunction", "executeIssue", "withdrawVote", "cancelIssue"];
+        for (uint i = 0; i < funcs.length; i++) {
+            adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(adminRegistry), funcs[i], address(user2));
+            bool reverted = false;
+            try {
+                user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "addWhitelist", address(adminRegistry), funcs[i], address(user2));
+            } catch {
+                reverted = true;
+            }
+            require(reverted, "Should not whitelist " + funcs[i]);
+        }
+    }
+
+    // ============ INSTANT FUNCTION TESTS ============
+
+    function it_admin_registry_executes_instant_function_without_vote_or_queue() {
+        enableTimelock();
+        voteToQueue(address(adminRegistry), "setInstantFunction", address(token), "mint", true);
+        executeQueued(address(adminRegistry), "setInstantFunction", address(token), "mint", true);
+        require(adminRegistry.instantFunctions(address(token), "mint"), "Instant function should be enabled");
+
+        string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
+        (bool executed, variadic result) = adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+
+        require(executed, "Instant function should execute immediately");
+        require(ERC20(token).balanceOf(admin3) == 1000e18, "Token should be minted immediately");
+        require(!adminRegistry.currentIssues(issueId), "Instant function should not leave an active issue");
+        require(adminRegistry.votesMap(issueId, admin1) == 0, "Instant function should not record a vote");
+        assertTimelock(issueId, 0, 0, 0);
+    }
+
+    function it_admin_registry_instant_functions_are_admin_only() {
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "setInstantFunction", address(token), "mint", true);
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setInstantFunction", address(token), "mint", true);
+
+        bool reverted = false;
+        try {
+            user3.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "A non-admin should not run an instant function");
+        require(ERC20(token).balanceOf(admin3) == 0, "Token should not be minted");
+    }
+
+    function it_admin_registry_rejects_instant_governance_functions() {
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "setInstantFunction", address(adminRegistry), "setVotingThreshold", true);
+        bool reverted = false;
+        try {
+            user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setInstantFunction", address(adminRegistry), "setVotingThreshold", true);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject instant governance functions");
+        require(!adminRegistry.instantFunctions(address(adminRegistry), "setVotingThreshold"), "Governance function should not become instant");
     }
 
 }

@@ -73,13 +73,14 @@ const withStubs = async (
   };
   const originals = {
     execute: stratoHelper.execute,
+    executeGoverned: stratoHelper.executeGoverned,
     create: safeService.createSafeTransactions,
     propose: safeService.proposeSafeTransactions,
     nonce: safeService.getSafeOnChainNonce,
     payouts: safeService.findWithdrawalPayouts,
     email: emailService.default,
   };
-  (stratoHelper as any).execute = async (input: FunctionInput) => {
+  (stratoHelper as any).execute = (stratoHelper as any).executeGoverned = async (input: FunctionInput) => {
     seen.executed.push(input);
     await stubs.execute(input);
     return { status: "Success", hash: "0xstrato" };
@@ -108,6 +109,7 @@ const withStubs = async (
     await run(seen);
   } finally {
     (stratoHelper as any).execute = originals.execute;
+    (stratoHelper as any).executeGoverned = originals.executeGoverned;
     (safeService as any).createSafeTransactions = originals.create;
     (safeService as any).proposeSafeTransactions = originals.propose;
     (safeService as any).getSafeOnChainNonce = originals.nonce;

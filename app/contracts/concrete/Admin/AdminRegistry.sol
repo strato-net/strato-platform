@@ -1,24 +1,43 @@
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record AdminRegistry is Ownable {
+    uint public constant MAXIMUM_DELAY = 2592000; // 30 days
+    uint public constant GRACE_PERIOD = 604800; // 7 days
+    uint public constant MIN_ADMIN_COUNT = 3;
+
+    struct Timelock {
+        uint queuedAt;
+        uint executableAt;
+        uint expiresAt;
+    }
+
     address[] public record admins;
     mapping (address => uint) public record adminMap;
 
     mapping (string => address[]) public record votes;
     mapping (string => mapping (address => uint)) public record votesMap;
     mapping (string => bool) public record currentIssues;
+    mapping (string => uint) public record issueConfigVersions;
+    mapping (string => Timelock) public record timelocks;
 
     mapping (address => mapping (string => mapping (address => bool))) public record whitelist;
+    mapping (address => mapping (string => bool)) public record instantFunctions;
 
     mapping (address => mapping (string => uint)) public record votingThresholds;
 
     uint public defaultVotingThresholdBps = 6000; // 3/5
+    uint public timelockDelay; // 0 executes an issue as soon as it passes
 
-    event IssueCreated(address sender, address creator, string issueId, address target, string func, variadic args);
-    event IssueVoted(address sender, address voter, string issueId, address target, string func, variadic args);
-    event IssueExecuted(address sender, address executor, string issueId, address target, string func, variadic args);
+    // Bumped by every admin or threshold change; votes cast under an older version never count
+    uint public configVersion;
+
+    event IssueCreated(address creator, string issueId, address target, string func, variadic args);
+    event IssueVoted(address voter, string issueId, address target, string func, variadic args);
+    event IssueQueued(address queuer, string issueId, address target, string func, uint executableAt, uint expiresAt, variadic args);
+    event IssueExecuted(address executor, string issueId, address target, string func, variadic args);
+    event IssueVoteWithdrawn(address voter, string issueId);
     event IssueDismissed(address sender, string issueId);
+    event IssueCancelled(string issueId);
 
     event AdminAdded(address indexed admin);
     event AdminRemoved(address indexed admin);
@@ -28,6 +47,8 @@ contract record AdminRegistry is Ownable {
     event WhitelistRevoked(address indexed target, string func, address indexed user);
     event VotingThresholdSet(address indexed target, string func, uint votingThresholdBps);
     event DefaultVotingThresholdSet(uint votingThresholdBps);
+    event InstantFunctionSet(address indexed target, string func, bool enabled);
+    event TimelockDelaySet(uint delay);
     event ContractCreated(address indexed contractAddress, string contractName);
 
     bool public initialized = false;
@@ -40,13 +61,18 @@ contract record AdminRegistry is Ownable {
 
     constructor() Ownable(this) { }
 
-    function initialize(address[] _initialAdmins) external onlyOnce {
+    function initialize(address[] _initialAdmins) external onlyOwner onlyOnce {
         defaultVotingThresholdBps = 6000; // 3/5
         require(admins.length == 0, "AdminRegistry is already initialized");
+        require(_initialAdmins.length > 0, "At least one admin is required");
+        configVersion = 1;
         for (uint i = 0; i < _initialAdmins.length; i++) {
             require(_initialAdmins[i] != address(0), "Invalid admin address");
+            require(_initialAdmins[i] != address(this), "AdminRegistry cannot be its own admin");
+            require(adminMap[_initialAdmins[i]] == 0, "Duplicate admin address");
             admins.push(_initialAdmins[i]);
             adminMap[_initialAdmins[i]] = admins.length;
+            emit AdminAdded(_initialAdmins[i]);
         }
     }
 
@@ -68,67 +94,72 @@ contract record AdminRegistry is Ownable {
 
     function dismissIssue(string _issueId) external {
         require(currentIssues[_issueId], "Issue does not exist or is not active");
+        require(timelocks[_issueId].executableAt == 0, "Cannot dismiss queued issue");
         require(votes[_issueId].length == 1, "Only issues with a single vote can be dismissed");
         require(votes[_issueId][0] == msg.sender, "Only the proposer can dismiss their issue");
-
-        for (uint i = 0; i < votes[_issueId].length; i++) {
-            votesMap[_issueId][votes[_issueId][i]] = 0;
-            votes[_issueId][i] = address(0);
-        }
-        votes[_issueId].length = 0;
-        delete currentIssues[_issueId];
+        _clearIssue(_issueId);
         emit IssueDismissed(msg.sender, _issueId);
     }
 
     function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
-        if (adminMap[msg.sender] != 0 || adminMap[_target] != 0) {
-            address sender = msg.sender;
-            if (adminMap[msg.sender] == 0) {
-                if (_target != tx.origin) {
-                    bool authorizationGranted = false;
-                    try {
-                        authorizationGranted = Authorizable(_target).isAuthorized(msg.sender);
-                    } catch {
-
-                    }
-                    require(authorizationGranted, "Cannot forge a vote on behalf of an admin without their consent");
-                }
-                sender = _target;
-                _target = msg.sender;
+        // Ownership lives on the registry's Proxy, so its only route to owner-only calls on itself is through here
+        if (_target == address(this)) {
+            require(_func != "renounceOwnership", "AdminRegistry cannot renounce its ownership");
+            require(_func != "transferOwnership" || adminMap[msg.sender] != 0, "Only admins can vote to transfer AdminRegistry ownership");
+        }
+        string issueId = _getIssueId(_target, _func, _args);
+        if (adminMap[msg.sender] != 0) {
+            // Instant functions skip the vote and the timelock
+            if (instantFunctions[_target][_func]) {
+                variadic ret = _executeIssue(issueId, _target, _func, _args);
+                return (true, ret);
             }
-            string issueId = _getIssueId(_target, _func, _args);
-            bool hasVoted = votesMap[issueId][sender] != 0;
+            // A queued issue already passed, so a later config change doesn't reset it
+            require(timelocks[issueId].executableAt == 0, "Cannot vote on queued issue");
+            // A registry upgraded from logic without config versions starts at version 0, so
+            // its older issues are stale
+            if (configVersion == 0) configVersion = 1;
+            if (issueConfigVersions[issueId] != configVersion) {
+                _clearIssue(issueId);
+                issueConfigVersions[issueId] = configVersion;
+            }
+            bool hasVoted = votesMap[issueId][msg.sender] != 0;
 
-            _createIssue(sender, issueId, _target, _func, _args);
+            _createIssue(issueId, _target, _func, _args);
 
             if (!hasVoted) {
-                votes[issueId].push(sender);
-                votesMap[issueId][sender] = votes[issueId].length;
-                emit IssueVoted(msg.sender, sender, issueId, _target, _func, _args);
+                votes[issueId].push(msg.sender);
+                votesMap[issueId][msg.sender] = votes[issueId].length;
+                emit IssueVoted(msg.sender, issueId, _target, _func, _args);
             }
 
             if (_shouldExecute(issueId, _target, _func, _args)) {
-                variadic ret = _executeIssue(sender, issueId, _target, _func, _args);
-                return (true, ret);
-            } else {
-                return (false, issueId);
+                // Cancelling a queued issue has to beat its timelock
+                if (timelockDelay == 0 || (_target == address(this) && _func == "cancelIssue")) {
+                    variadic ret = _executeIssue(issueId, _target, _func, _args);
+                    return (true, ret);
+                }
+                _queueIssue(issueId, _target, _func, _args);
             }
+            return (false, issueId);
         } else {
             // Non-admin path: only execute if whitelisted
-            address sender = msg.sender;
-            address target = _target;
-            require(whitelist[target][_func][sender] || whitelist[sender][_func][target], "Only an admin or a whitelisted account can call castVoteOnIssue");
-            if (!whitelist[target][_func][sender] && whitelist[sender][_func][target]) {
-                sender = _target;
-                target = msg.sender;
-            }
-            string issueId = _getIssueId(target, _func, _args);
-            variadic ret = _executeIssue(sender, issueId, target, _func, _args);
+            require(whitelist[_target][_func][msg.sender], "Only an admin or a whitelisted account can call castVoteOnIssue");
+            variadic ret = _executeIssue(issueId, _target, _func, _args);
             return (true, ret);
         }
     }
 
     function _shouldExecute(string _issueId, address _target, string _func, variadic _args) internal returns (bool) {
+        // Handing the registry's ownership away takes every current admin
+        if (_target == address(this) && _func == "transferOwnership") {
+            uint currentAdminVotes = 0;
+            for (uint i = 0; i < votes[_issueId].length; i++) {
+                if (adminMap[votes[_issueId][i]] != 0) currentAdminVotes++;
+            }
+            return currentAdminVotes == admins.length;
+        }
+
         uint issueVotes = votes[_issueId].length;
 
         uint votingThresholdBps = votingThresholds[_target][_func];
@@ -137,11 +168,41 @@ contract record AdminRegistry is Ownable {
         return 10000 * issueVotes >= votingThresholdBps * admins.length;
     }
 
-    function _createIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal {
+    function _createIssue(string _issueId, address _target, string _func, variadic _args) internal {
         if(votes[_issueId].length == 0) {
             currentIssues[_issueId] = true;
-            emit IssueCreated(msg.sender, _sender, _issueId, _target, _func, _args);
+            emit IssueCreated(msg.sender, _issueId, _target, _func, _args);
         }
+    }
+
+    function executeIssue(address _target, string _func, variadic _args) external returns (variadic) {
+        string issueId = _getIssueId(_target, _func, _args);
+        Timelock storage timelock = timelocks[issueId];
+        require(timelock.executableAt != 0, "Issue is not queued");
+        require(block.timestamp >= timelock.executableAt, "Timelock delay has not elapsed");
+        require(block.timestamp <= timelock.expiresAt, "Queued issue has expired");
+        return _executeIssue(issueId, _target, _func, _args);
+    }
+
+    function withdrawVote(address _target, string _func, variadic _args) external {
+        string issueId = _getIssueId(_target, _func, _args);
+        require(currentIssues[issueId], "Issue does not exist or is not active");
+        require(votesMap[issueId][msg.sender] != 0, "Caller has not voted on this issue");
+
+        _removeVote(issueId, msg.sender);
+        emit IssueVoteWithdrawn(msg.sender, issueId);
+
+        if (votes[issueId].length == 0) {
+            _clearIssue(issueId);
+        } else if (timelocks[issueId].executableAt != 0 && !_shouldExecute(issueId, _target, _func, _args)) {
+            _clearTimelock(issueId);
+        }
+    }
+
+    function cancelIssue(string _issueId) external onlyOwner {
+        require(timelocks[_issueId].executableAt != 0, "Issue is not queued");
+        _clearIssue(_issueId);
+        emit IssueCancelled(_issueId);
     }
 
     function getIssueId(address _target, string _func, variadic _args) external returns (string) {
@@ -152,28 +213,58 @@ contract record AdminRegistry is Ownable {
         return keccak256(_target, _func, _args);
     }
 
-    function _executeIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal returns (variadic) {
+    function _queueIssue(string _issueId, address _target, string _func, variadic _args) internal {
+        uint executableAt = block.timestamp + timelockDelay;
+        uint expiresAt = executableAt + GRACE_PERIOD;
+        timelocks[_issueId] = Timelock(block.timestamp, executableAt, expiresAt);
+        emit IssueQueued(msg.sender, _issueId, _target, _func, executableAt, expiresAt, _args);
+    }
+
+    function _executeIssue(string _issueId, address _target, string _func, variadic _args) internal returns (variadic) {
+        _clearIssue(_issueId);
         variadic ret = _target.call(_func, _args);
+        emit IssueExecuted(msg.sender, _issueId, _target, _func, _args);
+        return ret;
+    }
+
+    function _removeVote(string _issueId, address _voter) internal {
+        uint index = votesMap[_issueId][_voter];
+        address swap = votes[_issueId][votes[_issueId].length - 1];
+        votes[_issueId][index - 1] = swap;
+        votesMap[_issueId][swap] = index;
+        votesMap[_issueId][_voter] = 0;
+        votes[_issueId][votes[_issueId].length - 1] = address(0);
+        votes[_issueId].length -= 1;
+    }
+
+    function _clearIssue(string _issueId) internal {
         for (uint i = 0; i < votes[_issueId].length; i++) {
             votesMap[_issueId][votes[_issueId][i]] = 0;
             votes[_issueId][i] = address(0);
         }
         votes[_issueId].length = 0;
         delete currentIssues[_issueId];
-        emit IssueExecuted(msg.sender, _sender, _issueId, _target, _func, _args);
-        return ret;
+        _clearTimelock(_issueId);
+    }
+
+    function _clearTimelock(string _issueId) internal {
+        timelocks[_issueId].queuedAt = 0;
+        timelocks[_issueId].executableAt = 0;
+        timelocks[_issueId].expiresAt = 0;
     }
 
     function _addAdmin(address _admin) external onlyOwner {
         require(_admin != address(0), "Invalid admin address");
+        require(_admin != address(this), "AdminRegistry cannot be its own admin");
         require(adminMap[_admin] == 0, "Account is already an admin");
         admins.push(_admin);
         adminMap[_admin] = admins.length;
+        configVersion++;
         emit AdminAdded(_admin);
     }
 
     function _removeAdmin(address _admin) external onlyOwner {
-        require(admins.length > 1, "Cannot remove the last admin");
+        require(admins.length > MIN_ADMIN_COUNT, "Below min admin count");
         uint index = adminMap[_admin];
         require(index > 0, "Account is not an admin");
         address swap = admins[admins.length - 1];
@@ -182,11 +273,13 @@ contract record AdminRegistry is Ownable {
         adminMap[_admin] = 0;
         admins[admins.length - 1] = address(0);
         admins.length -= 1;
+        configVersion++;
         emit AdminRemoved(_admin);
     }
 
     function _swapAdmin(address _adminToReplace, address _admin) external onlyOwner {
         require(_admin != address(0), "Invalid admin address");
+        require(_admin != address(this), "AdminRegistry cannot be its own admin");
         uint index = adminMap[_admin];
         require(index == 0, "Account is already an admin");
         index = adminMap[_adminToReplace];
@@ -194,6 +287,7 @@ contract record AdminRegistry is Ownable {
         admins[index - 1] = _admin;
         adminMap[_admin] = index;
         adminMap[_adminToReplace] = 0;
+        configVersion++;
         emit AdminSwapped(_adminToReplace, _admin);
     }
 
@@ -203,13 +297,22 @@ contract record AdminRegistry is Ownable {
                 _func != "addWhitelist" &&
                 _func != "removeWhitelist" &&
                 _func != "_addAdmin" &&
+                _func != "_clearIssue" &&
+                _func != "_clearTimelock" &&
                 _func != "_createIssue" &&
                 _func != "_executeIssue" &&
+                _func != "_queueIssue" &&
                 _func != "_removeAdmin" &&
+                _func != "_removeVote" &&
                 _func != "_shouldExecute" &&
                 _func != "_swapAdmin" &&
+                _func != "cancelIssue" &&
+                _func != "executeIssue" &&
+                _func != "setInstantFunction" &&
+                _func != "setTimelockDelay" &&
                 _func != "setVotingThreshold" &&
                 _func != "setDefaultVotingThresholdBps" &&
+                _func != "withdrawVote" &&
                 _func != "createContract" &&
                 _func != "createSaltedContract",
                 "Cannot whitelist internal governance functions"
@@ -220,6 +323,7 @@ contract record AdminRegistry is Ownable {
     }
 
     function removeWhitelist(address _target, string _func, address _user) external onlyOwner {
+        require(whitelist[_target][_func][_user], "Whitelist entry does not exist");
         whitelist[_target][_func][_user] = false;
         emit WhitelistRevoked(_target, _func, _user);
     }
@@ -228,6 +332,7 @@ contract record AdminRegistry is Ownable {
         require(_votingThresholdBps > 0, "Voting threshold must be greater than 0");
         require(_votingThresholdBps <= 10000, "Voting threshold must be less than 100%");
         votingThresholds[_target][_func] = _votingThresholdBps;
+        configVersion++;
         emit VotingThresholdSet(_target, _func, _votingThresholdBps);
     }
 
@@ -235,7 +340,20 @@ contract record AdminRegistry is Ownable {
         require(_defaultVotingThresholdBps > 0, "Default voting threshold must be greater than 0");
         require(_defaultVotingThresholdBps <= 10000, "Default voting threshold must be less than 100%");
         defaultVotingThresholdBps = _defaultVotingThresholdBps;
+        configVersion++;
         emit DefaultVotingThresholdSet(_defaultVotingThresholdBps);
+    }
+
+    function setInstantFunction(address _target, string _func, bool _enabled) external onlyOwner {
+        require(_target != address(this), "Cannot add governance functions for instant execution");
+        instantFunctions[_target][_func] = _enabled;
+        emit InstantFunctionSet(_target, _func, _enabled);
+    }
+
+    function setTimelockDelay(uint _delay) external onlyOwner {
+        require(_delay <= MAXIMUM_DELAY, "Timelock delay exceeds the maximum");
+        timelockDelay = _delay;
+        emit TimelockDelaySet(_delay);
     }
 
     function createContract(string _contractName, string _contractSrc, variadic _args) external onlyOwner returns (address) {

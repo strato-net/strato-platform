@@ -19,12 +19,18 @@
 module Blockchain.Forks
   ( isReceiptsRootForkActive,
     isBlockRewardReceiptForkActive,
+    isFeeConsensusDeltaForkActive,
     isEmitArgForkActive,
     isOperatorPrecedenceForkActive,
+    isRlpEncodeForkActive,
     isReplayProtectionForkActive,
     replayProtectionForkBlock,
     isStratoGasForkActive,
-    forkNotScheduled
+    constructorPublicationForkBlock,
+    isConstructorPublicationForkActive,
+    forkNotScheduled,
+    heliumNetworkID,
+    upquarkNetworkID
   )
 where
 
@@ -50,13 +56,19 @@ forktestNetworkID = 7381244120123405172
 forktestForkBlock :: Integer
 forktestForkBlock = 10000
 
+-- | Upquark's flag day for its receipts-root and emit-arg forks (the
+-- block-reward receipt fork stays with staking at upquarkStakingForkBlock).
+-- Keep it equal to stratoGasForkBlock "upquark" in strato-conf.
+upquarkForkBlock :: Integer
+upquarkForkBlock = 1000000
+
 heliumReceiptsRootForkBlock :: Integer
 heliumReceiptsRootForkBlock = 250000
 
 isReceiptsRootForkActive :: Integer -> Bool
 isReceiptsRootForkActive blockNum =
   let net = Conf.networkID $ networkConfig ethConf
-   in not $ (net == upquarkNetworkID  && blockNum < upquarkStakingForkBlock)
+   in not $ (net == upquarkNetworkID  && blockNum < upquarkForkBlock)
          || (net == heliumNetworkID   && blockNum < heliumReceiptsRootForkBlock)
          || (net == forktestNetworkID && blockNum < forktestForkBlock)
 
@@ -88,6 +100,33 @@ isBlockRewardReceiptForkActive blockNum =
         | otherwise = maybe 0 id (Conf.stakingActivationBlock conf)
    in blockNum >= switchAt
 
+-- | Block from which validator-set and stake changes published while paying a
+-- transaction's fee, or by the block-reward call, reach the block header.
+--
+-- The fee payment runs as its own call ahead of the transaction, and only its
+-- events, logs and action were folded into the transaction's results. Its
+-- ValidatorAdded / ValidatorRemoved / ValidatorStakeUpdated deltas were dropped,
+-- so governance changed while the header, and with it the consensus layer,
+-- never heard of it. The block-reward call's results were folded into the
+-- block's first transaction the same way.
+--
+-- Proposer and verifier both derive the header's deltas from those results, so
+-- they have to start carrying these calls' at the same block. Helium has
+-- blocks sealed without them and needs a height of its own; upquark switches
+-- with staking, the flag day it already has.
+heliumFeeConsensusDeltaForkBlock :: Integer
+heliumFeeConsensusDeltaForkBlock = 1000000
+
+forktestFeeConsensusDeltaForkBlock :: Integer
+forktestFeeConsensusDeltaForkBlock = forkNotScheduled
+
+isFeeConsensusDeltaForkActive :: Integer -> Bool
+isFeeConsensusDeltaForkActive blockNum =
+  let net = Conf.networkID $ networkConfig ethConf
+   in not $ (net == upquarkNetworkID  && blockNum < upquarkStakingForkBlock)
+         || (net == heliumNetworkID   && blockNum < heliumFeeConsensusDeltaForkBlock)
+         || (net == forktestNetworkID && blockNum < forktestFeeConsensusDeltaForkBlock)
+
 -- | Block from which SolidVM emits fully evaluated event args, with an arg that
 -- was never written replaced by its declared type's default.
 --
@@ -95,14 +134,14 @@ isBlockRewardReceiptForkActive blockNum =
 -- unwritten args as SReference/SNULL. Those have no TypedArg, so the receipt
 -- log left them out; afterwards they are real values and appear in it. That
 -- moves the receipts root, so the change needs a height on any network that
--- already checks receipts roots. Upquark switches with its staking fork.
+-- already checks receipts roots. Upquark switches with its receipts-root fork.
 heliumEmitArgForkBlock :: Integer
 heliumEmitArgForkBlock = 750000
 
 isEmitArgForkActive :: Integer -> Bool
 isEmitArgForkActive blockNum =
   let net = Conf.networkID $ networkConfig ethConf
-   in not $ (net == upquarkNetworkID  && blockNum < upquarkStakingForkBlock)
+   in not $ (net == upquarkNetworkID  && blockNum < upquarkForkBlock)
          || (net == heliumNetworkID   && blockNum < heliumEmitArgForkBlock)
          || (net == forktestNetworkID && blockNum < forktestForkBlock)
 
@@ -140,6 +179,27 @@ isOperatorPrecedenceForkActive blockNum =
          || (net == heliumNetworkID   && blockNum < heliumOperatorPrecedenceForkBlock)
          || (net == forktestNetworkID && blockNum < forktestOperatorPrecedenceForkBlock)
 
+-- | Block from which SolidVM's RLP encoding of values gives every value its
+-- own encoding.
+--
+-- Before it, contracts, mappings, user-defined values, function references and
+-- the other non-data values all encoded as an empty list, so e.g. two different
+-- contracts passed to keccak256 hashed the same. The encoding feeds keccak256,
+-- sha256 and ripemd160 of non-bytes arguments and salted contract addresses, so
+-- it is consensus-visible through the state root.
+heliumRlpEncodeForkBlock :: Integer
+heliumRlpEncodeForkBlock = 1200000
+
+upquarkRlpEncodeForkBlock :: Integer
+upquarkRlpEncodeForkBlock = 1000000
+
+isRlpEncodeForkActive :: Integer -> Bool
+isRlpEncodeForkActive blockNum =
+  let net = Conf.networkID $ networkConfig ethConf
+   in not $ (net == upquarkNetworkID  && blockNum < upquarkRlpEncodeForkBlock)
+         || (net == heliumNetworkID   && blockNum < heliumRlpEncodeForkBlock)
+         || (net == forktestNetworkID && blockNum < forktestForkBlock)
+
 -- | Require signed chain binding from this height. Public networks
 -- remain unscheduled until the upgrade is coordinated.
 replayProtectionForkBlock :: Integer -> Integer
@@ -152,6 +212,18 @@ replayProtectionForkBlock net
 isReplayProtectionForkActive :: Integer -> Bool
 isReplayProtectionForkActive blockNum =
   blockNum >= replayProtectionForkBlock (Conf.networkID $ networkConfig ethConf)
+
+-- | Publish SolidVM runtime code only after construction succeeds.
+constructorPublicationForkBlock :: Integer -> Integer
+constructorPublicationForkBlock net
+  | net == heliumNetworkID = 76752
+  | net == upquarkNetworkID = 65607
+  | net == forktestNetworkID = forktestForkBlock
+  | otherwise = 0
+
+isConstructorPublicationForkActive :: Integer -> Bool
+isConstructorPublicationForkActive blockNum =
+  blockNum >= constructorPublicationForkBlock (Conf.networkID $ networkConfig ethConf)
 
 -- | STRATO is the native currency from this block, and a native-value
 -- transfer must arrive in a type-2 envelope (see envelopeRejection in
