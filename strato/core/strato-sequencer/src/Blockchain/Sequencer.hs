@@ -16,7 +16,9 @@
 
 module Blockchain.Sequencer (
   sequencer,
-  eventHandler
+  eventHandler,
+  SeqOutEvent (..),
+  transformFullTransactionsWith
   ) where
 
 import BlockApps.Logging
@@ -25,6 +27,8 @@ import Blockchain.EthConf (ethConf, urlConfig, vaultUrl)
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
+import Blockchain.Data.Transaction (transactionHash)
+import Blockchain.Data.TransactionIntake
 import Blockchain.DB.Witnessable
 import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
@@ -443,8 +447,28 @@ transformFullTransactions ::
     (Keccak256 `A.Alters` ()) m
   ) =>
   [(Timestamp, IngestTx)] -> ConduitT i SeqOutEvent m Int
-transformFullTransactions pairs = do
+transformFullTransactions = transformFullTransactionsWith nodeIntakeRules
+
+-- | 'transformFullTransactions' under explicit intake rules. Every loose
+-- transaction passes here whatever brought it (the HTTP API, strato-ingest or
+-- a peer), so this is where a malformed envelope is refused for good: before
+-- it is witnessed, gossiped, handed to the VM or indexed.
+transformFullTransactionsWith ::
+  ( MonadIO m,
+    MonadLogger m,
+    MonadMonitor m,
+    (Keccak256 `A.Alters` ()) m
+  ) =>
+  IntakeRules -> [(Timestamp, IngestTx)] -> ConduitT i SeqOutEvent m Int
+transformFullTransactionsWith intakeRules submitted = do
   let logF = logFF "transformEvents/emitTxs"
+  (pairs, refused) <- liftIO $ partitionIntake intakeRules (itTransaction . snd) submitted
+  lift . forM_ refused $ \((_, itx), reason) -> do
+    -- The hash and a fixed label, so the log line stays one line.
+    $logWarnS "transformEvents/intake" . T.pack $
+      "Refusing malformed transaction " ++ format (transactionHash (itTransaction itx))
+        ++ ": " ++ T.unpack (intakeRejectionLabel reason)
+    P.withLabel seqTxsRefused (intakeRejectionLabel reason) P.incCounter
   mOtxs <- lift . forM pairs $ \(ts, itx) ->
     wrapTransaction itx >>= \case
       Nothing -> return Nothing

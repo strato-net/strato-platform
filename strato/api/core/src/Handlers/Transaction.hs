@@ -23,6 +23,8 @@ module Handlers.Transaction
     getTransaction',
     postTransaction,
     postTransactionList,
+    postTransactionWith,
+    postTransactionListWith,
     server,
   )
 where
@@ -33,6 +35,7 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (Transaction, rawTX2TX, transactionHash)
+import Blockchain.Data.TransactionIntake (IntakeRules, checkIntake, describeIntakeRejection, nodeIntakeRules)
 import Blockchain.EthConf (ethConf, runStreamMPooled)
 import Blockchain.EthConf.Model (ingressUrls)
 import Data.Foldable (for_)
@@ -290,10 +293,19 @@ postIngest ctx url txs = do
 ingressManager :: Manager
 ingressManager = unsafePerformIO $ newManager defaultManagerSettings
 
-postTransactionC :: (MonadIO m, MonadLogger m) => Maybe Int -> RawTransaction' -> ConduitT a IngestEvent m Keccak256
-postTransactionC limit (RawTransaction' raw) = do
+-- | Refuses a submitted transaction whose envelope is malformed, with a 400
+-- that says why, instead of accepting it and letting it fail later.
+requireWellFormed :: MonadIO m => IntakeRules -> Transaction -> m ()
+requireWellFormed rules tx =
+  liftIO (checkIntake rules tx) >>= \verdict -> case verdict of
+    Right () -> pure ()
+    Left reason -> throwIO . UserError $ "Transaction rejected: " <> describeIntakeRejection reason
+
+postTransactionC :: (MonadIO m, MonadLogger m) => IntakeRules -> Maybe Int -> RawTransaction' -> ConduitT a IngestEvent m Keccak256
+postTransactionC rules limit (RawTransaction' raw) = do
   let tx' = rawTX2TX raw
-      h = transactionHash tx'
+  requireWellFormed rules tx'
+  let h = transactionHash tx'
   ts <- liftIO getCurrentMicrotime
   let ieTx = IETx ts $ IngestTx API tx'
       payloadSize = B.length $ BL.toStrict $ Bin.encode ieTx
@@ -308,17 +320,28 @@ postTransaction ::
   Maybe Int ->
   RawTransaction' ->
   m Keccak256
-postTransaction limit rt = runConduit $ postTransactionC limit rt `fuseUpstream` emitTransactions
+postTransaction = postTransactionWith nodeIntakeRules
 
-postTransactionListC :: (MonadIO m, MonadLogger m) => Maybe Int -> [RawTransaction'] -> ConduitT a IngestEvent m [Keccak256]
-postTransactionListC limit raws = do
+-- | 'postTransaction' under explicit intake rules.
+postTransactionWith ::
+  (MonadIO m, MonadLogger m, m `Mod.Outputs` [IngestEvent]) =>
+  IntakeRules ->
+  Maybe Int ->
+  RawTransaction' ->
+  m Keccak256
+postTransactionWith rules limit rt = runConduit $ postTransactionC rules limit rt `fuseUpstream` emitTransactions
+
+postTransactionListC :: (MonadIO m, MonadLogger m) => IntakeRules -> Maybe Int -> [RawTransaction'] -> ConduitT a IngestEvent m [Keccak256]
+postTransactionListC rules limit raws = do
   handlerStart <- liftIO $ getTime Realtime
 
   parserStart <- liftIO $ getTime Realtime
 
   txHashStart <- raws `deepseq` (liftIO $ getTime Realtime)
   let txs = fmap (\(RawTransaction' raw) -> rawTX2TX $ raw) raws
-      hs = fmap (toJSON . transactionHash) txs
+  -- All or nothing: one malformed transaction refuses the batch before any of it is published.
+  forM_ txs (requireWellFormed rules)
+  let hs = fmap (toJSON . transactionHash) txs
       txr = filter success $ zip hs txs
   let num = length txs
   $logDebug $ T.pack $ show num ++ " incoming transactions..."
@@ -362,7 +385,16 @@ postTransactionList ::
   Maybe Int ->
   [RawTransaction'] ->
   m [Keccak256]
-postTransactionList limit rts = runConduit $ postTransactionListC limit rts `fuseUpstream` emitTransactions
+postTransactionList = postTransactionListWith nodeIntakeRules
+
+-- | 'postTransactionList' under explicit intake rules.
+postTransactionListWith ::
+  (MonadIO m, MonadLogger m, m `Mod.Outputs` [IngestEvent]) =>
+  IntakeRules ->
+  Maybe Int ->
+  [RawTransaction'] ->
+  m [Keccak256]
+postTransactionListWith rules limit rts = runConduit $ postTransactionListC rules limit rts `fuseUpstream` emitTransactions
 
 getTransaction ::
   Selectable TxsFilterParams [RawTransaction] m =>
