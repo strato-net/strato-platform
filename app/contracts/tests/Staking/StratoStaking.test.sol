@@ -1264,6 +1264,9 @@ contract Describe_StratoStaking {
         require(staking.eligible(address(validatorC)) && pins.isValidator(address(validatorC)), "eligible, and still not taken");
         attacker.doExpectingFailure(address(staking), "tryActivate(address)", "SS: governance seat not handed to staking", address(validatorC));
         require(!staking.isValidator(address(validatorC)), "not taken by activation either");
+        require(!staking.isWaiter(address(validatorC)), "an admin seat is not waiting");
+        attacker.doSuccessfully(address(staking), "reconcileSet", _list(address(validatorC)));
+        require(!staking.isValidator(address(validatorC)) && !pins.stakingManaged(address(validatorC)), "nor taken by reconciliation");
     }
 
     // A kick overrides a pin: the validator leaves and the pin goes with it.
@@ -1505,6 +1508,27 @@ contract Describe_StratoStaking {
         user2.doSuccessfully(address(staking), "reconcileSet", _two(address(validatorC), address(fourth)));
         require(!gov.isValidator(address(validatorC)), "6000 of 9000 is over the cap: passed over");
         require(gov.isValidator(address(fourth)), "1000 of 4000 is under it: seated");
+    }
+
+    // Inbound stake is not capped while the set holds none, but a seat is: a newcomer to
+    // pinned seats whose stake has gone would hold all of it, so reconcileSet passes it over
+    // as tryActivate refuses it.
+    function it_holds_a_newcomer_to_the_cap_when_the_set_holds_no_stake() public {
+        GenesisGovernance pins = _pinningGovernance();
+        _bondBoth();
+        pins.voteToAddValidator(VALIDATOR_A);
+        pins.voteToAddValidator(VALIDATOR_B);
+        staking.setSetParams(50, 50, 500, 10, 100, 100, 3300);
+        operatorA.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 1000e18);
+        operatorB.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_B, 2000e18);
+        require(staking.consensusWeight() == 0, "pinned seats, no stake");
+
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1000e18); // inbound: no cap on an empty set
+        require(staking.isWaiter(address(validatorC)), "a waiter");
+        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: above operator stake cap", address(validatorC));
+        user2.doSuccessfully(address(staking), "reconcileSet", _list(address(validatorC)));
+        require(!pins.isValidator(address(validatorC)), "1000 of 1000 is over the cap: passed over");
     }
 
     // Stake behind a listed validator outside the set carries no vote, so it gives nobody

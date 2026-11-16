@@ -612,9 +612,10 @@ contract  StratoStaking is Ownable {
     }
 
     // A waiter is eligible but not in the set; promotion is explicit (tryActivate / reconcileSet).
-    // A validator the admins pinned out is never a waiter.
+    // A validator the admins pinned out is never a waiter, nor is a seat governance lists and
+    // never handed to staking (see _handedToStaking).
     function isWaiter(address validator) public view returns (bool) {
-        return eligible(validator) && !isValidator[validator] && !_pinnedOut(validator) && _bondMatured(validator);
+        return eligible(validator) && !isValidator[validator] && !_pinnedOut(validator) && !_heldByGovernance(validator) && _bondMatured(validator);
     }
 
     // Admin pins, read from governance (see MercataGovernance.pinnedIn / pinnedOut).
@@ -631,6 +632,10 @@ contract  StratoStaking is Ownable {
     // from before the pins) is left alone: taking it would let anyone's sync remove it.
     function _handedToStaking(address validator) internal view returns (bool) {
         return IStakingGovernance(governance).pinnedIn(validator) || IStakingGovernance(governance).stakingManaged(validator);
+    }
+
+    function _heldByGovernance(address validator) internal view returns (bool) {
+        return IStakingGovernance(governance).validatorMap(validator) > 0 && !_handedToStaking(validator);
     }
 
     // All the stake behind the consensus set, waiting or not: what the emission rate and
@@ -875,7 +880,7 @@ contract  StratoStaking is Ownable {
     function _bestWaiter(address[] memory candidates) internal view returns (address best, uint256 bestWeight) {
         for (uint256 i = 0; i < candidates.length; i++) {
             address validator = candidates[i];
-            if (!isWaiter(validator) || !_withinStakeCap(validator)) continue;
+            if (!isWaiter(validator) || !_admissibleUnderCap(validator)) continue;
             uint256 w = _votingWeight(validator);
             if (best == address(0) || w > bestWeight || (w == bestWeight && uint256(validator) < uint256(best))) {
                 best = validator;
@@ -945,6 +950,16 @@ contract  StratoStaking is Ownable {
         if (maxOperatorStakeBps == 0) return true;
         uint256 total = consensusWeight();
         if (total == 0) return true;
+        return _shareWithinCap(validator, total);
+    }
+
+    // A seat is held to the cap with no exemption: a newcomer to a set holding no stake would
+    // hold all of it. This is what tryActivate's check after seating applies.
+    function _admissibleUnderCap(address validator) internal view returns (bool) {
+        return maxOperatorStakeBps == 0 || _shareWithinCap(validator, consensusWeight());
+    }
+
+    function _shareWithinCap(address validator, uint256 total) internal view returns (bool) {
         uint256 weight = _validatorWeight(operators[validator]);
         if (!isValidator[validator]) total += weight;
         return weight * BPS_DIVISOR <= total * maxOperatorStakeBps;
