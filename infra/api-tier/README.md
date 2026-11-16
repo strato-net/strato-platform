@@ -133,6 +133,11 @@ buckets, as a single node does. It routes:
 | `/api/*`, `/api-docs*`, `/history-api/*` | the app tier's ALB |
 | `/strato/*`, `/strato-api*`, `/bloc/*`, `/cirrus/*`, `/apex-api*`, `/apex-ws/*`, `/rpc*`, `/docs*`, `/login*`, `/auth/*`, `/csrf-init`, `/health`, `/_ping` | this tier's ALB |
 
+Without `appOriginDomainName` the app tier's row is left out and its paths
+fall to the app UI bucket: the front door of an environment whose app tier
+does not exist yet, because the app backend only starts once this hostname
+answers. Deploy it again with `appOriginDomainName` once the app tier is up.
+
 CloudFront forwards the viewer's Host header to both ALBs, so each carries the
 front door's certificate: here through the stack reference, on the app tier
 with `-c extraCertificateArns=<FrontDoorCertificate's CertificateArn>` (the app

@@ -77,6 +77,12 @@ export interface ApiTierConfig {
   frontDoorDomainName?: string;
   /** An existing us-east-1 certificate for `frontDoorDomainName`; without one the app creates a DNS-validated one. */
   frontDoorCertificateArn?: string;
+  /**
+   * The app tier's ALB, for the app backend's paths. Left out for the first deployment of an
+   * environment: the app backend only starts once this hostname answers as a synced node, so
+   * the front door goes up without those paths, the hostname is pointed at it, the app tier is
+   * deployed, and the front door is deployed again with this set.
+   */
   appOriginDomainName?: string;
   /** Where the front door sends this tier's paths, when the tier has no public hostname of its own: its ALB's DNS name. Defaults to `domainName`. */
   apiOriginDomainName?: string;

@@ -45,6 +45,15 @@ then the cells), `api-tier` (Network and Tier), the front door
   answers `isSynced: true`, and cannot tell an unresolvable name from a lagging
   node: the service never turns healthy and CloudFormation rolls back after
   about three hours.
+- The front door in turn sends the app backend's paths to the app tier's ALB.
+  So an environment's first front door is deployed without
+  `appOriginDomainName` (those paths fall to the app UI), the hostname is
+  pointed at it, the app tier is deployed, and the front door is deployed
+  again with the app tier's ALB. `scripts/ha.sh <env> first-front-door` does
+  the first of these only where there is no app tier stack (and creates a
+  front door that is missing beside an app tier, with its paths), and
+  `wait-hostname` holds the app tier back until the name leads to the front
+  door and answers.
 - The deployment has one ECS cluster, `ha-<env>`. The API tier stack
   creates it and the app tier's services join it by name (`-c clusterName`),
   so the app tier is destroyed before the API tier.
@@ -61,8 +70,14 @@ Aurora endpoints, security groups, load balancer and instance names), so the
 same run builds the environment from nothing and updates it:
 
 1. The image set is what strato-platform's autobuild published for the
-   `STRATO_BRANCH` commit checked out (default `develop`), under
-   `ghcr.io/strato-net/strato-platform/<image>:<VERSION>-<commit>-<hash>`;
+   `STRATO_BRANCH` commit checked out, under
+   `ghcr.io/strato-net/strato-platform/<image>:<VERSION>-<commit>-<hash>`
+   (the node image under `strato:<VERSION>-<commit>`: a build regenerates
+   tracked `.cabal` files, so its hash is not always the one a clean checkout
+   computes). `STRATO_BRANCH` is a branch or one commit by its full id; its
+   default is pinned to `0b05b66bf80fae031c78aea12be06efd9c3589fe`
+   (19.10-0b05b66) while develop is not deployable, and goes back to
+   `develop` afterwards;
    the packages are public, so nothing logs in anywhere, and a commit not
    published yet fails the run before it deploys (`scripts/ha.sh testnet-app
    images` reads the names from strato-platform's Makefile and checks each
@@ -110,7 +125,17 @@ same run builds the environment from nothing and updates it:
    proxies, so they see the client's address. The app backend is pointed at
    the partner referrals service of the environment's network (`NETWORK`:
    helium's or upquark's, in `scripts/ha.sh`) with that service's internal
-   key. Then `app-tier`, the front door
+   key.
+7. The hostname. The app backend starts only once
+   `https://app.testnet.strato.nexus` answers as a synced node, so the run
+   waits before the app tier until the name leads to this front door (its
+   CNAME) and answers as one; a synced answer from anywhere else, such as a
+   node the environment replaces, does not count. In an environment that has
+   no app tier yet (the first run) it first deploys the front door without
+   the app tier's paths, then waits up to 12 hours (`HOSTNAME_WAIT_MINUTES`)
+   for the DNS record, which is set by hand; the build log names the
+   distribution the record has to point at, every minute.
+8. `app-tier`, the front door
    (with freshly built app UI and SMD) and `obs-alarms`, then smoke checks through CloudFront by name, and the
    image set and both commits are recorded (`/ha-testnet-app/deploy/*`).
    A run with neither repo changed since does nothing.
@@ -176,10 +201,11 @@ Before the first run:
   `Deployment=ha-testnet-app`, and describing the deployment's stacks,
   secrets and load balancers. What CloudFormation may create is bounded by
   the bootstrap's execution role, not by this policy.
-- After the first run, point `app.testnet.strato.nexus` (Cloudflare) at the
-  front door: a CNAME to the `ha-testnet-app-api-frontdoor` stack's
-  `DistributionDomainName`. Until then the app tier's backend talks to
-  whatever that name resolves to.
+
+During the first run, when the build log starts asking for it (the
+`Hostname` stage): point `app.testnet.strato.nexus` (Cloudflare, DNS only) at
+the front door, a CNAME to the `ha-testnet-app-api-frontdoor` stack's
+`DistributionDomainName`. The run goes on by itself once the name answers.
 
 ## Known gaps (TODO)
 
