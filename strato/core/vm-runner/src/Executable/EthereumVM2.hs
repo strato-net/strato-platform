@@ -52,6 +52,7 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Data.Foldable hiding (fold)
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Maybe
 import qualified Data.Text as T
 import Data.Traversable (for)
@@ -88,7 +89,14 @@ handleVmTasks InBatch {..} = do
   failures <- processBlocks blocks
   -- A sender with nothing to pay a fee with before this batch's blocks may be
   -- funded by one of them: its transactions are admitted now that they are in.
-  unless (null deferred) . void $ Bagger.addTransactionsToMempool deferred
+  -- One those blocks already mined is left out: the pool only knows the last
+  -- block's transactions, so it would publish a false NonceTooLow for it.
+  let applied = case failures of
+        f : _ -> takeWhile ((/= _bvfBlockHash f) . outputBlockHash) blocks
+        [] -> blocks
+      mined = S.fromList [otHash t | b <- applied, t <- obReceiptTransactions b]
+      retry = filter ((`S.notMember` mined) . otHash) deferred
+  unless (null retry) . void $ Bagger.addTransactionsToMempool retry
   -- The other validators expect a proposal only for work a block can take, so
   -- they arm their dead-proposer timers on this, not on any new transaction. New
   -- blocks change the height and can leave work they made executable, so the
