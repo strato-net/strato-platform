@@ -21,6 +21,7 @@ where
 
 import           BlockApps.Logging
 import           Blockchain.CommunicationConduit
+import           Blockchain.Model.SyncState (BestSequencedBlock (..))
 import           Blockchain.Context hiding (Inbound, Outbound)
 import           Blockchain.Data.PubKey (secPubKeyToPoint)
 import           Blockchain.Data.Wire (Message (..), TerminationReason (..))
@@ -44,6 +45,7 @@ import           Control.Exception.Base (ErrorCall (..))
 import           Control.Lens ((^.))
 import           Control.Monad (forever, forM_, when, void)
 import qualified Control.Monad.Change.Modify as Mod
+import           Data.List (partition)
 import           Control.Monad.Composable.Vault
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
@@ -190,10 +192,14 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
         liftIO $ threadDelay 1000000
       Right peers -> do
         numActivePeers <- liftIO $ fmap length getPeersByThreads
+        validators <- bestSequencedBlockValidators <$> Mod.get (Mod.Proxy @BestSequencedBlock)
         -- A peer's key comes from ethereum-discover bonding with it; one
         -- without a key yet is dialed once discovery has it.
         let dialable p = pPeerActiveState p == 0 && isJust (pPeerPubkey p)
-        forM_ (take (Conf.maxConnections (p2pConfig ethConf) - numActivePeers) $ filter dialable peers) $ \peer -> do
+            (validatorPeers, others) = partition (isValidatorKey validators . pPeerPubkey) $ filter dialable peers
+        -- Validators are dialed whatever the limit (a validator does not hold
+        -- another to it), and first; other peers fill the room that is left.
+        forM_ (validatorPeers ++ take (Conf.maxConnections (p2pConfig ethConf) - numActivePeers) others) $ \peer -> do
           _ <- liftIO . forkIO . runner $ \_ -> do
               result <- try . liftIO . runner $ runPeerInList peer
               handleRunPeerResult peer result

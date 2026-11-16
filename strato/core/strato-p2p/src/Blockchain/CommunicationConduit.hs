@@ -15,7 +15,8 @@ module Blockchain.CommunicationConduit
     messageToBytes,
     ethVersion,
     maxMessageItems,
-    rlpItemsAtMost
+    rlpItemsAtMost,
+    isValidatorKey
   )
 where
 
@@ -29,7 +30,11 @@ import           Blockchain.Event
 import           Blockchain.EventException
 import           Blockchain.Frame
 import           Blockchain.Metrics
+import           Blockchain.Data.PubKey                (pointToBytes)
 import           Blockchain.Model.SyncState
+import           Blockchain.Strato.Model.Address       (fromPublicKey)
+import qualified Blockchain.Strato.Model.Secp256k1     as Secp256k1
+import           Blockchain.Strato.Model.Validator     (Validator (..))
 import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -144,8 +149,11 @@ handleMsgServerConduit myPubkey peer = do
   -- This connection is past its handshake and counted, so the limit is the
   -- number of established peers.
   numActivePeers <- liftIO countEstablishedPeers
+  validators <- lift $ bestSequencedBlockValidators <$> Mod.get (Mod.Proxy @BestSequencedBlock)
 
-  when (numActivePeers > Conf.maxConnections (p2pConfig ethConf)) $ do
+  -- A validator is not held to the limit: full of other peers, a node would turn
+  -- away the validators it votes with.
+  when (numActivePeers > Conf.maxConnections (p2pConfig ethConf) && not (isValidatorKey validators $ pPeerPubkey peer)) $ do
     yield $ Right $ Disconnect TooManyPeers
     throwIO CurrentlyTooManyPeers
 
@@ -325,6 +333,14 @@ rlpItemsAtMost cap bs = go 0 [B.length bs] 0
 -- | How deep lists may nest in a message: real ones nest a few levels.
 maxRlpDepth :: Int
 maxRlpDepth = 64
+
+-- | Whether a peer's key is a current validator's. A stored key that is no public
+-- key (discovery once took any 64 bytes as a node ID) belongs to nobody, rather
+-- than throwing in the conversion.
+isValidatorKey :: [Validator] -> Maybe Point -> Bool
+isValidatorKey validators mKey = case mKey of
+  Just p@(Point _ _) | Just pub <- Secp256k1.importPublicKey (B.cons 0x04 $ pointToBytes p) -> Validator (fromPublicKey pub) `elem` validators
+  _ -> False
 
 maxMessageSize :: Int
 maxMessageSize = 1 `shiftL` 24
