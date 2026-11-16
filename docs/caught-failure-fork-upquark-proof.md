@@ -29,7 +29,10 @@ State-root validation stayed enabled throughout.
 - Block `994334` state root: `31c6f3c27b906e2c137cc1513428144b0a7bd1747dc9de8a725bd7c924994559`.
 - Both independent references were captured at `2026-11-16T02:25:19.079123+00:00`; the audit comparison was captured at `2026-11-16T02:27:10.769978+00:00`.
 
-PR commits after the execution commit only update documentation, evidence and build metadata.
+This proof covers execution commit `a559256501b1`. A subsequent review correction
+adds native internal-call storage/account isolation before activation and shared
+regression tests. That correction has not been deployed to the audit node or
+tested in a full genesis replay; the recorded evidence is unchanged.
 The API status `version` field identifies the unchanged Apex auxiliary image; use the core image and VM hash above to identify the tested execution code.
 
 ## Reproduce the read-only checks
@@ -55,4 +58,7 @@ Independent node operators can run the same SELECT through their read-only conne
 
 The progress log starts at block 0 and ends with VM, SQL and durable Cirrus caught up; its SHA256 is `eae80a870fe0f703f0158d4769e31114bff328fd799b29c70266de657f56c559`. A head query alone does not demonstrate genesis replay. These files are recorded operational evidence, not remote execution attestation.
 
-This verifies Upquark. Helium genesis replay remains pending, and both public-network activation heights remain unscheduled. The PR remains a draft and must not be merged yet.
+This verifies Upquark for the deployed commit above. A clean Upquark replay of the
+updated execution code and a clean Helium genesis replay remain pending. Both
+public-network activation heights remain unscheduled. The PR remains a draft
+and must not be merged yet.

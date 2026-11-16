@@ -51,8 +51,9 @@ The tests use the actual configured activation height minus one, exactly the
 height, and plus one, plus historical height 355722 on the public networks.
 The sentinel boundary is synthetic, not a scheduled public-network activation.
 They cover the approval/caught-failure pattern, protective
-writes preceding try, leaked events, sender restoration, failed callee storage,
-nested catches, and caught destruction of pending storage. These are reduced
+writes preceding try, leaked events, sender restoration, failed external and
+internal callee storage/account changes, nested catches, and caught destruction
+of pending storage. These are reduced
 behavioral fixtures, not a claim to have replayed the full historical block.
 The runner creates complete isolated configs and saves each process's output.
 
@@ -81,10 +82,27 @@ a fresh comparison at 994334 matched both independent nodes. The
 385 recorded progress samples starting at block 0, binary provenance and
 read-only reproduction commands. No validation failure was recorded.
 
-Before release: complete a clean Helium genesis replay with canonical hash/root
-comparisons and durable Cirrus coverage, then coordinate activation heights
-against actual validator deployment history. Both public-network heights
-remain unscheduled. Do not skip validation or substitute a snapshot for replay.
+A subsequent review found that native internal calls lacked the interpreter's
+storage/account frame before activation. The shared reproduction executes
+`try { keep(); fail(); } catch {}`: `keep()` writes 1, and `fail()` writes 2 then
+throws. Before the correction, the interpreter returned 1 and native returned 2.
+Native internal calls now use the shared call-frame primitive before activation,
+merging successful calls and discarding only failed callees. Historical events
+remain transaction-wide; post-activation atomic rollback is unchanged. A second
+fixture checks that a caught internal destruction preserves the account while
+retaining historical storage-purge behavior before activation.
+
+Validated on macOS on 2026-11-16: the focused repository-root build and all
+172 engine/network checks plus 28 TryCatch tests passed with both new fixtures.
+The storage fixture failed in the native pre-activation cases before the fix
+and passed in the interpreter. This correction has not been deployed or replayed;
+the full Upquark evidence above and the Linux results apply to `a559256501b1`.
+
+Before release: replay the updated execution code from genesis on Upquark and
+Helium with canonical hash/root comparisons and durable Cirrus coverage, then
+coordinate activation heights against actual validator deployment history.
+Both public-network heights remain unscheduled. Do not skip validation or
+substitute a snapshot for replay.
 
 Historical rules cannot simply be deleted while retaining genesis replay. They
 can later be isolated in a versioned historical executor, provided the same

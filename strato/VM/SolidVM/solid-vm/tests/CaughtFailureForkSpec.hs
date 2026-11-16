@@ -103,6 +103,23 @@ spec = describe "caught-failure activation" $ do
       value <- invoke height "value"
       liftIO $ returnedInteger value `shouldBe` Just 0
 
+    it (label ++ ": discards a failed internal call but keeps earlier successful calls before activation") $ runContext $ do
+      deploy height $ T.unlines
+        [ "contract Probe { uint public value; event Kept(); event Failed();"
+        , "  function keep() internal { value = 1; emit Kept(); }"
+        , "  function fail() internal { value = 2; emit Failed(); require(false, \"denied\"); }"
+        , "  function probe() returns (uint) {"
+        , "    try { keep(); fail(); } catch { }"
+        , "    return value;"
+        , "  }"
+        , "}"
+        ]
+      result <- invoke height "probe"
+      liftIO $ do
+        erException result `shouldBe` Nothing
+        returnedInteger result `shouldBe` Just (if atomic then 0 else 1)
+        map evName (erEvents result) `shouldBe` (if atomic then [] else ["Kept", "Failed"])
+
     it (label ++ ": keeps successful try effects and isolates a failed inner block") $ runContext $ do
       deploy height $ T.unlines
         [ "contract Probe { uint public value; event Kept(); event Inner();"
@@ -117,6 +134,23 @@ spec = describe "caught-failure activation" $ do
         erException result `shouldBe` Nothing
         returnedInteger result `shouldBe` Just (if atomic then 1 else 2)
         map evName (erEvents result) `shouldBe` (if atomic then ["Kept"] else ["Kept", "Inner"])
+
+    it (label ++ ": preserves the account after a caught internal destruction") $ runContext $ do
+      deploy height $ T.unlines
+        [ "contract Probe { uint public value;"
+        , "  function seed() { value = 7; }"
+        , "  function fail() internal { selfdestruct(address(0x1000)); require(false, \"after destroy\"); }"
+        , "  function probe() { try { fail(); } catch { } }"
+        , "}"
+        ]
+      seeded <- invoke height "seed"
+      liftIO $ erException seeded `shouldBe` Nothing
+      result <- invoke height "probe"
+      liftIO $ erException result `shouldBe` Nothing
+      value <- invoke height "value"
+      liftIO $ do
+        erException value `shouldBe` Nothing
+        returnedInteger value `shouldBe` Just (if atomic then 7 else 0)
 
     it (label ++ ": preserves pending storage when a destruction is caught after activation") $ runContext $ do
       deploy height $ T.unlines

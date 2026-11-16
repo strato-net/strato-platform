@@ -31,7 +31,7 @@ import qualified Data.Vector as V
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.Value
 import System.IO.Unsafe (unsafePerformIO)
-import UnliftIO (bracket, catch, liftIO, throwIO)
+import UnliftIO (bracket, catch, liftIO, onException, throwIO)
 import SolidVM.Values
 import SolidVM.Storage (forceValue, getVar, setVar)
 import SolidVM.Solidity.Parse.UnParser (unparseStatement)
@@ -144,7 +144,16 @@ internalFrame name sig fun = go sig fun []
     go (N.SigCons ty rest) action args = \value -> go rest (action value) (N.Dyn ty value : args)
     go (N.SigNil _) action args = do
       values <- traverse toValue (reverse args)
-      withCallArguments callName values action
+      forked <- caughtFailureForkActive
+      if forked then withCallArguments callName values action else do
+        -- Historical catches discard the failed callee, not earlier successful calls.
+        info <- getCurrentCallInfo
+        depth <- getCallStackDepth
+        withCallInfo (currentAddress info) (currentCodeAddress info)
+          (currentContract info) callName (collectionHash info) (codeCollection info)
+          M.empty (readOnly info) (isFreeFunction info)
+          (withCallArguments callName values action)
+          `onException` trimCallStackToDepth depth
 
 callContract :: N.CallKind -> Address -> T.Text -> [N.Dyn] -> Maybe N.SomeTy -> SM [N.Dyn]
 callContract kind address name args expected = unwindLegacy $ do
