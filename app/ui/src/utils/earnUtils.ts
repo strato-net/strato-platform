@@ -14,10 +14,6 @@ export interface EarnApyInfo {
   breakdown: EarnApyBreakdownItem[];
 }
 
-export interface EarnApyLookupOptions {
-  includeVaultSources?: boolean;
-}
-
 const normAddr = (value: string) => (value || "").toLowerCase().replace(/^0x/, "");
 
 const parsePositiveApy = (value?: string | number | null): number => {
@@ -105,20 +101,6 @@ const buildLendingInfo = (apys: ApySource[]): EarnApyInfo | null => {
   return total > 0 ? { total, source: "lending", breakdown } : null;
 };
 
-const buildVaultInfo = (apys: ApySource[]): EarnApyInfo | null => {
-  const vault = apys.find((item) => item.source === "vault" && !item.poolAddress);
-  const vaultWeighted = apys.find((item) => item.source === "vault_weighted" && !item.poolAddress);
-  const rewards = apys.find((item) => item.source === "rewards" && !item.poolAddress && item.meta === "vault");
-  const roundedRewards = rewards ? { ...rewards, apy: roundRewardsApy(rewards.apy) || rewards.apy } : undefined;
-  const breakdown = [
-    toBreakdownItem("Native APY", vault),
-    toBreakdownItem("Base APY", vaultWeighted),
-    toBreakdownItem("Rewards APY", roundedRewards),
-  ].filter((item): item is EarnApyBreakdownItem => item !== null);
-  const total = breakdown.reduce((sum, item) => sum + parsePositiveApy(item.apy), 0);
-  return total > 0 ? { total, source: "vault", breakdown } : null;
-};
-
 const buildPoolInfos = (apys: ApySource[]): EarnApyInfo[] => {
   const poolGroups = new Map<string, ApySource[]>();
   apys.forEach((item, index) => {
@@ -193,14 +175,8 @@ const pickBestEntry = (
   return best;
 };
 
-const buildTokenCompositeInfo = (
-  apys: ApySource[],
-  options?: EarnApyLookupOptions
-): EarnApyInfo | null => {
-  const includeVaultSources = options?.includeVaultSources !== false;
-  const usableApys = includeVaultSources
-    ? apys
-    : apys.filter((item) => item.source !== "vault" && item.source !== "vault_weighted" && !(item.source === "rewards" && item.meta === "vault"));
+const buildTokenCompositeInfo = (apys: ApySource[]): EarnApyInfo | null => {
+  const usableApys = apys;
 
   const native = pickBestEntry(
     usableApys.filter(
@@ -240,15 +216,11 @@ const buildTokenCompositeInfo = (
   };
 };
 
-export const buildEarnApyMap = (
-  tokenApys: TokenApyEntry[],
-  options?: EarnApyLookupOptions
-): Map<string, EarnApyInfo> => {
-  const includeVaultSources = options?.includeVaultSources !== false;
+export const buildEarnApyMap = (tokenApys: TokenApyEntry[]): Map<string, EarnApyInfo> => {
   const result = new Map<string, EarnApyInfo>();
 
   for (const entry of tokenApys) {
-    const composite = buildTokenCompositeInfo(entry.apys, { includeVaultSources });
+    const composite = buildTokenCompositeInfo(entry.apys);
     if (composite) {
       result.set(normAddr(entry.token), composite);
     }
@@ -273,19 +245,6 @@ export const buildActivityRewardsApyInfo = (
     source: "rewards",
     breakdown: [{ label: "Rewards APY", apy: rewards }],
   };
-};
-
-export const findBestNonVaultEarnApyInfo = (tokenApys: TokenApyEntry[], tokenAddress?: string | null): EarnApyInfo | null => {
-  if (!tokenAddress) return null;
-  return buildEarnApyMap(tokenApys, { includeVaultSources: false }).get(normAddr(tokenAddress)) || null;
-};
-
-export const findVaultEarnApyInfo = (tokenApys: TokenApyEntry[]): EarnApyInfo | null => {
-  for (const entry of tokenApys) {
-    const info = buildVaultInfo(entry.apys);
-    if (info) return info;
-  }
-  return null;
 };
 
 export const findPoolEarnApyInfo = (

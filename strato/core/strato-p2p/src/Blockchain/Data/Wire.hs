@@ -21,10 +21,10 @@ import Blockchain.Data.ChainInfo
 import Blockchain.Data.PubKey ()
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (Transaction)
-import Blockchain.Database.MerklePatricia.NodeData (NodeData)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.StateRoot
+import Control.Monad.Composable.StateDB (TrieNode)
 import Crypto.Types.PubKey.ECC
 import qualified Data.ByteString as B
 import Data.List
@@ -190,7 +190,7 @@ data Message
     GetChainDetails [Word256]
   | ChainDetails [(Word256, ChainInfo)]
   | GetMPNodes [StateRoot]
-  | MPNodes [NodeData]
+  | MPNodes [TrieNode]
   deriving (Eq, Show)
 
 instance Format Message where

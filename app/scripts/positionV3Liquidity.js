@@ -268,7 +268,7 @@ const fmtPrice = (n) => fmt(n, Number(n) >= 1000 ? 2 : Number(n) >= 1 ? 4 : 8);
     const hashes = [];
     for (const tx of unsignedTxs) {
       const d = { ...tx.data, network: tx.data.network || "STRATO" };
-      const sig = await wallet.signTypedData({ name: "STRATO", version: "1" }, STRATO_TX_TYPES, {
+      const sig = await wallet.signTypedData({ name: "STRATO", version: "1", chainId: BigInt(d.chainId) }, STRATO_TX_TYPES, {
         to: `0x${String(d.to).replace(/^0x/, "")}`,
         funcName: d.functionName ?? "",
         args: d.args ?? [],
@@ -284,6 +284,7 @@ const fmtPrice = (n) => fmt(n, Number(n) >= 1000 ? 2 : Number(n) >= 1 ? 4 : 8);
         funcName: d.functionName,
         args: d.args,
         network: d.network,
+        chainId: d.chainId,
         r: raw.slice(0, 64),
         s: raw.slice(64, 128),
         v: raw.slice(128, 130),

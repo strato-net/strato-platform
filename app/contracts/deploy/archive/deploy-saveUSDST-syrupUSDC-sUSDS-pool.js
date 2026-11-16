@@ -20,7 +20,7 @@
 require('dotenv').config();
 const config = require('../config');
 const auth = require('../auth');
-const { rest } = require('blockapps-rest');
+const { rest } = require('../strato');
 const { cirrusSearch } = require('../util');
 
 // ── Addresses (mainnet defaults, overridable via env) ──────────────────────

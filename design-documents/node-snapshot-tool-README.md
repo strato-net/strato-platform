@@ -65,7 +65,7 @@ You can restore directly from an explicit S3 URI when your AWS profile has acces
 
 ```bash
 bin/strato-snapshot restore "$NODE_DIR" \
-  --source s3://strato-snapshots/helium/v2/helium-20260601-130500Z.tar.zst \
+  --source s3://strato-snapshots/helium/helium-20260601-130500Z.tar.zst \
   --network helium
 ```
 
@@ -85,14 +85,6 @@ bin/strato-snapshot restore "$NODE_DIR" \
   --snapshot=20260601-13:05:00Z \
   --network helium
 ```
-
-Resolved keys are scoped by **snapshot version** (`SNAPSHOT_VERSION` in
-`bin/strato-snapshot`, currently `v2`):
-`s3://<bucket>/<network>/<version>/<key>`. The version is bumped whenever the
-captured state stops being readable by the previous version's nodes, so an
-older build keeps resolving its own `latest`. v1 (kafka streaming) is the bare
-`s3://<bucket>/<network>/` root — the original unversioned layout, frozen and
-no longer published to; v2 carries jlog streaming state.
 
 The bucket defaults to `strato-snapshots` and can be overridden with the
 `STRATO_SNAPSHOT_BUCKET` environment variable or `--bucket <name>`. The same
@@ -194,6 +186,46 @@ child service. If `strato-ps` says `Convoke: Not running` but Docker containers
 are healthy, also check metadata and host services before assuming the node is
 down.
 
+## Cells That Share a Database Cluster
+
+A core cell in a tiered deployment keeps `eth` and `cirrus` in a shared cluster
+(Aurora), not in a local `postgres/` data dir, and every cell on that cluster
+shares one copy of them. Two options cover that:
+
+```bash
+# Snapshot a synced cell: chain state from the node dir, eth/cirrus from the cluster.
+bin/strato-snapshot create "$NODE_DIR" --network helium \
+  --postgres-host strato-tiered.cluster-xxxx.us-east-1.rds.amazonaws.com \
+  --postgres-user postgres --postgres-password-file /etc/strato/pgpassword
+
+# Snapshot for replicas that join the same cluster: chain state only.
+bin/strato-snapshot create "$NODE_DIR" --network helium --state-only
+```
+
+Restoring follows the same split:
+
+- A **state-only** archive carries no dumps, so restore leaves the cluster's
+  databases untouched. This is what a second or third cell on one cluster needs:
+  it catches up on chain state and joins the databases the first cell writes.
+- An archive **with** dumps restores them into the node's local data dir as
+  usual, or into a cluster with `--postgres-host ... --replace-databases`. The
+  confirmation flag is required because that replaces `eth` and `cirrus` for
+  every node on that cluster, so it is for standing up a new deployment, not for
+  adding a cell to a running one. `--skip-databases` ignores the dumps instead.
+
+Loading into a cluster drops each database and rebuilds it from the dump rather
+than restoring over what is there. Restoring over a live `cirrus` cannot work:
+its generated views depend on one another, so the drops fail, the creates that
+follow collide with the objects still standing, and the rows land in the old
+table shape. Dropping is also what makes the cluster hold exactly the snapshot's
+contents and nothing left over. Connections are closed as each database goes,
+so the API tier and any other cell on the cluster see errors until the load
+finishes and they reconnect.
+
+The password is read from the file given by `--postgres-password-file`, inside
+the client container's environment only; it never reaches the payload or the
+logs.
+
 ## Create a Snapshot
 
 Start from a fully synced local node. By default, `create` requires metadata to
@@ -263,7 +295,7 @@ Publish an already-created artifact to a local directory or S3 destination:
 
 ```bash
 bin/strato-snapshot publish /tmp/helium-20260601-130500Z.tar.zst \
-  --destination s3://strato-snapshots/helium/v2/ \
+  --destination s3://strato-snapshots/helium/ \
   --alias latest
 ```
 
@@ -302,7 +334,7 @@ Included payload:
   format (`-Fc`) of the public blockchain databases only; restored in parallel
   with `pg_restore -j`
 - `redis/`
-- `jlog/` (segments and per-subscriber `cp.*` checkpoints; jlog is embedded, so this one dir is the whole streaming state)
+- `kafka/`
 - `prometheus/` only when requested
 
 Excluded payload:

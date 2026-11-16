@@ -1,6 +1,7 @@
 import "./LendingRegistry.sol";
 import "./LendingPool.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
+import "../Admin/AdminRegistry.sol";
 
 /**
  * @title PoolConfigurator
@@ -58,7 +59,7 @@ contract record PoolConfigurator is Ownable {
         uint safetyShareBps
     ) external onlyOwner {
         // Set all registry components
-        registry.setAllComponents(lendingPool, liquidityPool, collateralVault, rateStrategy, priceOracle);
+        AdminRegistry(registry.owner()).castVoteOnIssue(address(registry), "setAllComponents", lendingPool, liquidityPool, collateralVault, rateStrategy, priceOracle);
 
         // Set token factory
         LendingPool pool = LendingPool(registry.getLendingPool());
@@ -226,23 +227,23 @@ contract record PoolConfigurator is Ownable {
     // Individual setters for the LendingRegistry
     function setLendingPool(address _lendingPool) external onlyOwner {
         require(_lendingPool != address(0), "Invalid lendingPool address");
-        registry.setLendingPool(_lendingPool);
+        AdminRegistry(registry.owner()).castVoteOnIssue(address(registry), "setLendingPool", _lendingPool);
     }
     function setLiquidityPool(address _liquidityPool) external onlyOwner {
         require(_liquidityPool != address(0), "Invalid liquidityPool address");
-        registry.setLiquidityPool(_liquidityPool);
+        AdminRegistry(registry.owner()).castVoteOnIssue(address(registry), "setLiquidityPool", _liquidityPool);
     }
     function setCollateralVault(address _collateralVault) external onlyOwner {
         require(_collateralVault != address(0), "Invalid collateralVault address");
-        registry.setCollateralVault(_collateralVault);
+        AdminRegistry(registry.owner()).castVoteOnIssue(address(registry), "setCollateralVault", _collateralVault);
     }
     function setRateStrategy(address _rateStrategy) external onlyOwner {
         require(_rateStrategy != address(0), "Invalid rateStrategy address");
-        registry.setRateStrategy(_rateStrategy);
+        AdminRegistry(registry.owner()).castVoteOnIssue(address(registry), "setRateStrategy", _rateStrategy);
     }
     function setPriceOracle(address _priceOracle) external onlyOwner {
         require(_priceOracle != address(0), "Invalid priceOracle address");
-        registry.setPriceOracle(_priceOracle);
+        AdminRegistry(registry.owner()).castVoteOnIssue(address(registry), "setPriceOracle", _priceOracle);
     }
 
     /**

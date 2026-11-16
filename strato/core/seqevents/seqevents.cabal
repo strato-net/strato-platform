@@ -35,9 +35,9 @@ library
     , blockstanbul
     , bytestring
     , format
-    , merkle-patricia-db
     , monad-alter
     , prometheus-client
+    , statedb-monad
     , strato-model
     , streaming
     , text

@@ -38,6 +38,7 @@ import Blockchain.Slipstream.Data.Action
 import Blockchain.Slipstream.Data.CirrusTables
 import qualified Blockchain.Slipstream.Events as E
 import Blockchain.Slipstream.OutputData
+import Blockchain.Slipstream.QueryFormatHelper (sanitizeCreator)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
@@ -198,7 +199,7 @@ processTheMessages messages = do
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top
       -- level like this
       creates =
-        [(cc, cr, ch) | VME.CodeCollectionAdded cc cr ch <- messages]
+        [(cc, sanitizeCreator cr, ch) | VME.CodeCollectionAdded cc cr ch <- messages]
       delegatecalls = concatMap toList
         [Action._delegatecalls a | VME.NewAction a <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
@@ -229,9 +230,10 @@ processTheMessages messages = do
           $logWarnS "processTheMessages" $ "Failed to get inherited contracts for " <> labelToText (_contractName c) <> ": " <> T.pack (show err)
           pure []
         Right inheritedContracts -> pure $ map (labelToText . _contractName) inheritedContracts
-      indexFkeys <- createIndexTable c cc nameParts inherited
-      collectionFkeys <- concat <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
-      eventFkeys <- createExpandEventTables c cc nameParts inherited
+      insertInheritance cr' n'' inherited
+      indexFkeys <- createIndexTable c cc nameParts
+      collectionFkeys <- concat <$> traverse (createCollectionTable nameParts c cc) collectionNamesAndTypes
+      eventFkeys <- createExpandEventTables c cc nameParts
       pure $ indexFkeys ++ collectionFkeys ++ eventFkeys
 
   inserts <- fmap concat $ do

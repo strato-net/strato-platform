@@ -217,7 +217,7 @@ fuzzContract cName ctx f = local ((fuzzerContextArgs . fuzzerArgsContractName .~
   FuzzerContext FuzzerArgs{..} bhRef <- ask
   contractAddress <- liftIO $ generate arbitrary
   let svmErr (Left e) = e
-      svmErr (Right e) = InternalError "SolidVM for non-solidvm code" (show e)
+      svmErr (Right e) = InternalError ("SolidVM for non-solidvm code: " ++ show e)
       txArgs =
         def & createNewAddress .~ contractAddress
           & createCode .~ (Code $ T.decodeUtf8 $ BL.toStrict $ Aeson.encode _fuzzerArgsSrc)
@@ -225,7 +225,7 @@ fuzzContract cName ctx f = local ((fuzzerContextArgs . fuzzerArgsContractName .~
           & createArgs . argsArgs .~ _fuzzerArgsCreateArgs
           & createArgs . argsMetadata ?~ M.empty
       failure txs e = pure [FuzzerFailure (Just $ FuzzerFailureDetails contractAddress _fuzzerArgsContractName _fuzzerArgsCreateArgs txs) $ (labelToText cName <> " constructor", e) <$ ctx]
-      exception txs = failure txs . T.pack . show
+      exception txs = failure txs . T.pack . displayException
   (env, createResults) <- lift $ createReturnEnv txArgs
   case erException createResults of
     Just e -> exception [] $ svmErr e
@@ -246,7 +246,7 @@ fuzzFunction contractAddress ctx fName args = local ((fuzzerContextArgs . fuzzer
   (env, callResults) <- lift $ callReturnEnv txArgs'
   liftIO . writeIORef bhRef $ blockHeader env
   let failure txs e = pure . FuzzerFailure (Just $ FuzzerFailureDetails contractAddress _fuzzerArgsContractName _fuzzerArgsCreateArgs txs) $ e <$ ctx
-      exception txs = failure txs . T.pack . show
+      exception txs = failure txs . T.pack . either displayException displayException
       failure' = failure [FuzzerTx _fuzzerArgsFuncName _fuzzerArgsCallArgs]
       exception' = exception [FuzzerTx _fuzzerArgsFuncName _fuzzerArgsCallArgs]
   $logInfoS "runFuzzerOnce/callResults" (T.pack . maybe "No return value" show $ erReturnVal callResults)

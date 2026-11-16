@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Strato.Model.Code where
 
@@ -13,15 +13,16 @@ import Data.Binary
 import Data.Data
 import Data.OpenApi hiding (Format, format)
 import Data.Text (Text)
-import Database.Persist.TH
+import Database.Persist.Sql (PersistField, PersistFieldSql)
 import GHC.Generics
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 import Text.Format
 
-data Code
+newtype Code
   = Code {codeBytes :: Text}
-  deriving (Show, Eq, Read, Ord, Generic, Data)
+  deriving stock (Show, Eq, Read, Ord, Generic, Data)
+  deriving newtype (PersistField, PersistFieldSql)
 
 instance Format Code where
   format (Code c) = format c
@@ -32,8 +33,6 @@ instance NFData Code
 
 instance Arbitrary Code where
   arbitrary = Code <$> arbitrary
-
-derivePersistField "Code"
 
 instance RLPSerializable Code where
   rlpEncode (Code bytes) = rlpEncode bytes

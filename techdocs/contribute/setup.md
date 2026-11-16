@@ -33,7 +33,7 @@ You need:
 
 - **git**
 - **Docker** with the Compose plugin. On Linux, run Docker as your own user (member of the `docker` group), not as root.
-- **Haskell Stack**. The compiler version comes from `strato/stack.yaml`.
+- **Haskell Stack 2.15.1 or later**. Older versions can silently miss `BUILD_METADATA` changes with the project's GHC 9.8 compiler, leaving `strato-setup` with stale image tags. The minimum is enforced by `strato/stack.yaml`.
 - **System libraries**: LevelDB, secp256k1, libsodium, libpq, librdkafka, xz/lzma, GMP, zlib, and `logrotate`.
 - **Node.js 22.12 or later, below 23**, only if you run the app backend or UI outside Docker. Both `app/backend/package.json` and `app/ui/package.json` declare `"node": ">=22.12 <23.0"`.
 - **OAuth client credentials** to run a node against the shared Keycloak. Request them at [support.blockapps.net](https://support.blockapps.net/). You don't need them if you run the node with `--localAuth` (see [Log in](#4-log-in)).
@@ -126,7 +126,7 @@ The default target does the following:
 3. Installs the `bin/` scripts to `~/.local/bin`: `strato-login`, `strato-up`, `strato-down`, `strato-ps`, `strato-patch-app`, `strato-user-add`, `strato-snapshot` and `strato-logrotate`.
 4. Builds these Docker images: apex, nginx, postgrest, prometheus, smd, app-backend, app-ui, bridge, bridge-nginx, tracking, tracking-nginx, tracking-ui and local-auth.
 
-Each image is tagged with the version and a hash of its source directory. `make` skips any image whose tag already exists, so later builds only rebuild what changed. Local Haskell packages compile with `-Wall -Werror`, so any warning fails the build.
+Each image is tagged with the version and a hash of its source directory. Node images are built under their registry name, `ghcr.io/strato-net/strato-platform/<image>:<tag>`, plus a bare `<image>:<tag>` alias, which is the name a node's `docker-compose.yml` uses. `make` skips any image whose tag already exists, so later builds only rebuild what changed. Local Haskell packages compile with `-Wall -Werror`, so any warning fails the build.
 
 If `~/.local/bin` is not on your `PATH`, `make` prints a note. Run `source ~/.profile` or open a new terminal.
 
@@ -136,6 +136,9 @@ If `~/.local/bin` is not on your `PATH`, `make` prints a note. Run `source ~/.pr
 |--------|--------------|
 | `make` | Builds everything listed above (target `local`) |
 | `make app` | Builds only the `app-backend` and `app-ui` images, then prints a `strato-patch-app` command |
+| `make strato_docker` | Builds the `strato` image from the installed executables, needed to run `--dockerMode=all` without `--prebuilt` |
+| `make validator`, `make api-node` | Builds the executables and only the images that role runs |
+| `make push-node-images` | Pushes the node images to `ghcr.io` (what CI does; needs a `docker login ghcr.io`) |
 | `make nginx`, `make apex`, `make smd`, `make app-ui`, ... | Builds one image if its tag is missing |
 | `make nginx-force`, `make app-ui-force`, ... | Rebuilds one image unconditionally |
 | `make pretty` | Formats all tracked `.hs` files with ormolu (runs in Docker) |
@@ -318,6 +321,38 @@ Open [http://localhost](http://localhost).
 - `NODE_URL` must match the backend's `NODE_URL`, because nginx proxies `/rpc` to `NODE_URL/rpc`.
 - Port 80 must be free. Check with `lsof -i :80`.
 - `npm i` in either package also builds `app/packages/shared-types` through a `postinstall` hook.
+
+---
+
+## PostgreSQL permissions
+
+`postgres-packager/` installs the existing PostgreSQL configuration files into
+its image. Setup selects that image in Compose without generating or mounting
+separate PostgreSQL configuration files.
+
+`init-permissions.sql` preserves PostgreSQL's bootstrap administrator as
+`strato_admin` and creates a restricted application account named
+`strato` using the node's database password. The application account has no superuser,
+role-administration, replication or row-security-bypass privileges. Database creation and ownership rights remain
+available for startup and indexing. No Unix users or ownership are changed.
+
+`pg_hba.conf` requires password authentication over TCP and blocks the
+administrative role, `strato_admin`, from TCP entirely. That role has `NOLOGIN`
+and no password, so it cannot connect through the local socket either. It retains
+internal ownership for trusted extension installation; applications cannot assume
+its role. Privileged maintenance requires an operator-controlled offline procedure.
+No administrative credentials are supplied to services.
+
+Initialization SQL runs only when PostgreSQL creates a fresh data directory.
+Use the normal clean rebuild/resync workflow to apply it; regenerating config
+alone does not change an existing database's roles. Snapshot restore uses the
+node's PostgreSQL image when initializing its destination database. External clusters need
+equivalent permissions configured by their administrator.
+
+`strato/core/strato-init/test/postgres-permissions.sql` checks normal schema
+operations and rejection of command execution, server-file access and privilege
+escalation. Run it as the application role against a disposable database it owns;
+its test objects are rolled back.
 
 ---
 

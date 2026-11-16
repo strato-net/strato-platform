@@ -2,12 +2,14 @@ const {TRANSACTIONS_TYPE} = require('../rooms');
 const {emitter, ON_SOCKET_PUBLISH_EVENTS} = require('../eventBroker');
 const config = require('../../config/app.config');
 const Transaction = require('../../models/strato/eth/transaction');
+const { hasBlockIndex } = require('../../lib/strato-db-data/block-index');
 
 const noTransactionsResponse = [{val: 0, type: "No Transactions"}];
 let transactionTypes = noTransactionsResponse;
 let previousTransactionTypesJSON;
 
-function getTransactionsType() {
+async function getTransactionsType() {
+  if (!(await hasBlockIndex())) return;
   Transaction.findAll(
       {
         attributes: [

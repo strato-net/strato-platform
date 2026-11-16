@@ -5,6 +5,7 @@
 
 --import BlockApps.Tools.Checkpoints
 import BlockApps.Tools.Code as Code
+import BlockApps.Tools.BlockStream
 import BlockApps.Tools.DumpKafkaSequencer
 import BlockApps.Tools.DumpKafkaUnSequencer
 import BlockApps.Tools.DumpKafkaVMEvents
@@ -19,7 +20,7 @@ import BlockApps.Tools.Raw as Raw
 import BlockApps.Tools.RawMP as RawMP
 import BlockApps.Tools.Redis
 import BlockApps.Tools.State as State
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Participation
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Address
@@ -47,6 +48,8 @@ data Options
   | DumpKafkaSequencerP2P
   | DumpKafkaUnSequencer
   | SyncStats {}
+  | ExportBlocks {fileName :: String, lastBlock :: Maybe Integer}
+  | VerifyBlocks {fileName :: String}
   | FRawMP {stateRoot :: String, filename :: String}
   | Hash {hash :: String}
   | Migrate {tables :: String}
@@ -77,6 +80,20 @@ syncStatsOptions =
   record
     SyncStats {}
     [ ]
+
+exportBlocksOptions :: Annotate Ann
+exportBlocksOptions =
+  record
+    ExportBlocks {fileName = undefined, lastBlock = Nothing}
+    [ fileName := def += typ "FILENAME" += argPos 0,
+      lastBlock := Nothing += typ "NUMBER" += explicit += name "end-block" += help "Final block (default: indexed tip)"
+    ]
+
+verifyBlocksOptions :: Annotate Ann
+verifyBlocksOptions =
+  record
+    VerifyBlocks {fileName = undefined}
+    [ fileName := def += typ "FILENAME" += argPos 0 ]
 
 hashOptions :: Annotate Ann
 hashOptions =
@@ -280,6 +297,8 @@ options =
       dumpKafkaSequencerP2pOptions,
       dumpKafkaUnSequencerOptions,
       syncStatsOptions,
+      exportBlocksOptions,
+      verifyBlocksOptions,
       fRawMPOptions,
       hashOptions,
       rawMPOptions,
@@ -300,8 +319,10 @@ options =
 
 main :: IO ()
 main = do
-  changeToDefaultNodeDir
   opts <- cmdArgs_ options
+  case opts of
+    VerifyBlocks {} -> pure ()
+    _ -> changeToDefaultNodeDir
   run opts
 
 changeToDefaultNodeDir :: IO ()
@@ -338,6 +359,8 @@ run DumpKafkaSequencerP2P = dumpKafkaSequencerP2P
 run DumpKafkaUnSequencer = dumpKafkaUnSequencer
 run DumpKafkaVMEvents = dumpKafkaVMEvents
 run SyncStats = syncStats
+run ExportBlocks {..} = exportBlocks fileName lastBlock
+run VerifyBlocks {..} = verifyBlocks fileName
 run Hash {..} = Hash.doit hash
 run Raw {..} = Raw.doit filename
 run Redis {..} = redis $ BC.pack key

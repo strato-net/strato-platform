@@ -183,7 +183,7 @@ router.get("/depositActions", authHandler.authorizeRequest(), BridgeController.g
  *                   externalChainId:
  *                     type: string
  */
-router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getBridgeableTokens);
+router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(true), BridgeController.getBridgeableTokens);
 
 /**
  * @openapi
@@ -207,7 +207,7 @@ router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), Br
  *                     type: object
  *                     additionalProperties: true
  */
-router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeController.getNetworkConfigs);
+router.get("/networkConfigs", authHandler.authorizeRequest(true), BridgeController.getNetworkConfigs);
 
 /**
  * @openapi

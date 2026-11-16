@@ -1,9 +1,5 @@
-ifeq ($(BASIL_DOCKER_TAG),)
-  $(error BASIL_DOCKER_TAG is not set)
-endif
-
-ifeq ($(ECR_DOCKER_TAG),)
-  $(error ECR_DOCKER_TAG is not set)
+ifeq ($(DOCKER_TAG),)
+  $(error DOCKER_TAG is not set)
 endif
 
 ifeq ($(STRATO_VERSION),)
@@ -11,5 +7,5 @@ ifeq ($(STRATO_VERSION),)
 endif
 
 all:
-	docker build --target prod --build-arg STRATO_VERSION=$(STRATO_VERSION) -t $(BASIL_DOCKER_TAG) .
-	docker tag $(BASIL_DOCKER_TAG) $(ECR_DOCKER_TAG)
+	docker build --target prod --build-arg STRATO_VERSION=$(STRATO_VERSION) -t $(DOCKER_TAG) .
+	@if [ -n "$(DOCKER_TAG_ALIAS)" ]; then docker tag $(DOCKER_TAG) $(DOCKER_TAG_ALIAS); fi

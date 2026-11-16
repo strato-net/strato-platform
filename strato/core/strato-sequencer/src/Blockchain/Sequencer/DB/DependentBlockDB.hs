@@ -32,6 +32,7 @@ module Blockchain.Sequencer.DB.DependentBlockDB (
   deleteDependentBlockDB,
   commitDependentBlockDB,
   insertEmitted,
+  isMalformedBlock,
   isBlockReadyForEmission,
   cacheBlockUntilParentEmitted,
   claimBlockForEmission,
@@ -54,6 +55,7 @@ import Data.Binary
 import qualified Data.ByteString.Lazy as B
 import Data.IORef
 import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Database.LevelDB as LDB
 import qualified GHC.Generics as GHCG
@@ -124,6 +126,15 @@ commitDependentBlockDB = do
 bootstrapGenesisBlock :: (Keccak256 `Alters` DependentBlockEntry) m => Keccak256 -> m ()
 bootstrapGenesisBlock hash' = insert Proxy hash' Emitted
 
+malformedBlockHashes :: S.Set Keccak256
+malformedBlockHashes =
+  S.fromList
+    [ keccak256FromHex "f17e10761c9f5f66702038ea84e671be5e5257abca7abb8c45ed1e33e9991f08"
+    ]
+
+isMalformedBlock :: SequencedBlock -> Bool
+isMalformedBlock b = any (`S.member` malformedBlockHashes) [sbHash b, parentHash $ sbBlockData b]
+
 existingParent :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe DependentBlockEntry)
 existingParent = lookup Proxy . parentHash . sbBlockData
 
@@ -150,6 +161,7 @@ cacheBlockUntilParentEmitted b =
       return ()
 
 insertEmitted :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe OutputBlock)
+insertEmitted b | isMalformedBlock b = return Nothing
 insertEmitted b =
   existingParent b >>= \case
     Just Emitted -> do

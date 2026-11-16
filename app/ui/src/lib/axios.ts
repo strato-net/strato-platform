@@ -75,6 +75,7 @@ function buildSignedTx(unsignedData: any, sig: { r: string; s: string; v: string
     funcName: unsignedData.functionName,
     args: unsignedData.args,
     network: unsignedData.network,
+    chainId: unsignedData.chainId,
     r: sig.r,
     s: sig.s,
     v: sig.v,

@@ -10,7 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { SAFETY_STAKE_FEE, SAFETY_REDEEM_FEE, usdstAddress, safetyModuleAddress } from "@/lib/constants";
+import { SAFETY_STAKE_CALLS, SAFETY_REDEEM_CALLS, usdstAddress, safetyModuleAddress } from "@/lib/constants";
+import NetworkFee, { FeeNotices } from "@/components/NetworkFee";
+import { computeMaxTransferable } from "@/utils/transferValidation";
+import { feeCurrencySpend, feeShortfall } from "@/utils/feeUtils";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
@@ -21,7 +24,7 @@ import { EarnApyInfo } from "@/utils/earnUtils";
 const SafetyModuleSection = () => {
   const { isLoggedIn } = useUser();
   const { activeTokens: tokens, loading: tokensLoading, fetchTokens } = useUserTokens();
-  const { fetchUsdstBalance, usdstBalance, approveToken } = useTokenContext();
+  const { fetchUsdstBalance, usdstBalance, feeQuote, approveToken } = useTokenContext();
   const {
     safetyInfo,
     loading,
@@ -84,11 +87,10 @@ const SafetyModuleSection = () => {
     try {
       const amountWei = safeParseUnits(stakeAmount, 18);
       const availableWei = BigInt(usdstBalance);
-      const feeWei = safeParseUnits(SAFETY_STAKE_FEE, 18);
-      
+
       if (amountWei <= 0n) return false;
       if (amountWei > availableWei) return false;
-      if (amountWei + feeWei > availableWei) return false;
+      if (feeQuote && feeShortfall(feeQuote, SAFETY_STAKE_CALLS, feeCurrencySpend(feeQuote, usdstAddress, amountWei))) return false;
       return true;
     } catch {
       return false;
@@ -102,12 +104,10 @@ const SafetyModuleSection = () => {
     try {
       const amountWei = safeParseUnits(redeemAmount, 18);
       const availableSharesWei = BigInt(safetyInfo?.userShares || "0");
-      const usdstBalanceWei = BigInt(usdstBalance);
-      const feeWei = safeParseUnits(SAFETY_REDEEM_FEE, 18);
 
       if (amountWei <= 0n) return false;
       if (amountWei > availableSharesWei) return false; // Check against available sUSDST balance
-      if (usdstBalanceWei < feeWei) return false; // Must have USDST for fee
+      if (feeQuote && feeShortfall(feeQuote, SAFETY_REDEEM_CALLS)) return false;
       return true;
     } catch {
       return false;
@@ -278,10 +278,8 @@ const SafetyModuleSection = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        const availableWei = BigInt(usdstBalance);
-                        const feeWei = safeParseUnits(SAFETY_STAKE_FEE, 18);
-                        const maxStakeableWei = availableWei > feeWei ? availableWei - feeWei : 0n;
-                        const formatted = formatUnits(maxStakeableWei, 18);
+                        const maxStakeableWei = computeMaxTransferable(usdstBalance, usdstAddress, SAFETY_STAKE_CALLS, feeQuote, () => {});
+                        const formatted = formatUnits(BigInt(maxStakeableWei), 18);
 
                         // Clamp to 18 decimals
                         const [whole, frac = ""] = formatted.split(".");
@@ -304,7 +302,7 @@ const SafetyModuleSection = () => {
                   </div>
                   {/* Fee Display */}
                   <div className="text-sm text-muted-foreground mt-1">
-                    Transaction Fee: {SAFETY_STAKE_FEE} USDST
+                    Transaction Fee: <NetworkFee calls={SAFETY_STAKE_CALLS} />
                   </div>
                     </>
                   )}
@@ -316,33 +314,13 @@ const SafetyModuleSection = () => {
                     actionLabel="Stake"
                   />
                   {/* Fee Warning - only show when logged in */}
-                  {isLoggedIn && (() => {
-                    const availableWei = BigInt(usdstBalance);
-                    const feeWei = safeParseUnits(SAFETY_STAKE_FEE, 18);
-                    const stakeAmountWei = stakeAmount ? safeParseUnits(stakeAmount, 18) : 0n;
-                    
-                    const isInsufficientUsdstForFee = !tokensLoading && availableWei < feeWei;
-                    const isInsufficientBalanceForStakeAndFee = !tokensLoading && stakeAmountWei + feeWei > availableWei && stakeAmountWei <= availableWei;
-                    
-                    const lowBalanceThreshold = safeParseUnits("0.10", 18);
-                    const remainingBalance = availableWei - stakeAmountWei - feeWei;
-                    const isLowBalanceWarning = stakeAmountWei > 0n && remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
-                    
-                    return (
-                      <>
-                        {isInsufficientBalanceForStakeAndFee && (
-                          <p className="text-yellow-600 text-sm mt-1">
-                            Insufficient USDST balance for transaction fee ({SAFETY_STAKE_FEE} USDST)
-                          </p>
-                        )}
-                        {isLowBalanceWarning && !isInsufficientUsdstForFee && !isInsufficientBalanceForStakeAndFee && (
-                          <p className="text-yellow-600 text-sm mt-1">
-                            Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
-                          </p>
-                        )}
-                      </>
-                    );
-                  })()}
+                  {isLoggedIn && !tokensLoading && (
+                    <FeeNotices
+                      calls={SAFETY_STAKE_CALLS}
+                      spendingWei={stakeAmount ? safeParseUnits(stakeAmount, 18) : 0n}
+                      tokenAddress={usdstAddress}
+                    />
+                  )}
                   {/* Mobile Button */}
                   <Button
                     onClick={handleStakeAction}
@@ -518,7 +496,7 @@ const SafetyModuleSection = () => {
                     </div>
                     {/* Fee Display */}
                     <div className="text-sm text-muted-foreground mt-1">
-                      Transaction Fee: {SAFETY_REDEEM_FEE} USDST
+                      Transaction Fee: <NetworkFee calls={SAFETY_REDEEM_CALLS} />
                     </div>
                     {/* Mobile Button */}
                     <Button

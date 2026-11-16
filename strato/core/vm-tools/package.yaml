@@ -23,6 +23,7 @@ library:
     - Blockchain.DB.BlockSummaryDB
     - Blockchain.DB.ModifyStateDB
     - Blockchain.Forks
+    - Blockchain.HistoricalOutOfGas
     - Blockchain.StateRootMismatch
     - Blockchain.Stream.Action
     - Blockchain.Stream.VMEvent
@@ -64,22 +65,21 @@ library:
     - lens
     - leveldb-haskell
     - lrucache
-    - merkle-patricia-db
+    - accountdb-monad
+    - statedb-monad
     - monad-alter
-    - nodedb-monad
     - mtl
     - nibblestring
     - ordered-containers
-    - persistent-sqlite
     - prometheus-client
     - quickcheck-instances
+    - redis-monad
     - resourcet
     - seqevents
     - solid-vm-model
     - store
     - strato-conf
     - strato-model
-    - strato-redis-blockdb
     - strato-statediff
     - text
     - time
@@ -97,12 +97,14 @@ tests:
     dependencies:
       - hspec
       - QuickCheck
+      - aeson
       - blockapps-data
       - blockDB
       - containers
       - ethereum-rlp
       - strato-model
       - vm-tools
+      - strato-conf
       - base16-bytestring
       - blockapps-data
       - blockapps-datadefs
@@ -110,9 +112,10 @@ tests:
       - bytestring
       - containers
       - ethereum-rlp
-      - merkle-patricia-db
+      - statedb-monad
       - solid-vm-model
       - strato-model
+      - time
       - vector
       - Decimal
       - binary

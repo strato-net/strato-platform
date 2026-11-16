@@ -61,6 +61,7 @@ library
     , strato-conf
     , strato-model
     , strato-redis-blockdb
+    , strato-tracing
     , streaming
     , text
     , time
@@ -107,8 +108,45 @@ executable strato-sequencer
     , strato-model
     , strato-redis-blockdb
     , strato-sequencer
+    , strato-tracing
     , wai-middleware-prometheus
     , warp
+  default-language: Haskell2010
+
+test-suite transaction-intake-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Paths_strato_sequencer
+  hs-source-dirs:
+      test-intake
+  ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto -dynamic
+  build-depends:
+      aeson
+    , base
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
+    , bytestring
+    , common-log
+    , conduit
+    , containers
+    , core-api2
+    , data-default
+    , directory
+    , ethereum-discovery
+    , filepath
+    , hspec
+    , monad-alter
+    , mtl
+    , prometheus-client
+    , seqevents
+    , servant-server
+    , strato-model
+    , strato-p2p
+    , strato-sequencer
+    , text
+    , time
   default-language: Haskell2010
 
 test-suite dependent-block-db-test
@@ -120,7 +158,11 @@ test-suite dependent-block-db-test
       test-db
   ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto -dynamic
   build-depends:
-      base
+      QuickCheck
+    , base
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
     , composable-monads-base
     , hspec
     , strato-model

@@ -63,6 +63,7 @@ export interface ProtocolEvent {
   block_timestamp: string;
   event_index: number;
   transaction_sender: string;
+  recipient?: string; // share transfers: stake moves from transaction_sender to recipient
   amount: string;
 }
 
@@ -79,15 +80,18 @@ export interface PositionEventSource {
   events: Record<string, PositionEventRule>;
 }
 
+export type PositionActivityAction = PositionEventRule["action"] | "Transfer";
+
 export type PositionActivityRoutes = Map<
   string,
-  Partial<Record<PositionEventRule["action"], string>>
+  Partial<Record<PositionActivityAction, string>>
 >;
 
 export interface RewardsAction {
   sourceContract: string;
   eventName: string;
   user: string;
+  recipient?: string;
   amount: string;
   blockNumber: number;
   block_timestamp: string;

@@ -1,8 +1,10 @@
 import { defineChain, type Chain } from "viem";
 import { runtime } from "./env";
 
+// Absolute on purpose: WalletConnect's HTTP provider and wallet_addEthereumChain
+// both reject a relative URL such as "/rpc".
 export const rpcUrl =
-  typeof window !== "undefined" ? `${window.location.origin}/rpc` : "/rpc";
+  typeof window !== "undefined" ? new URL(runtime.rpcUrl(), window.location.origin).href : "/rpc";
 
 let _chainId: number | null = null;
 let _chain: Chain | null = null;
@@ -130,7 +132,7 @@ export function initStratoChain(): Chain | null {
     id: _chainId,
     name: chainLabel,
     nativeCurrency: { decimals: 18, name: "STRATO", symbol: "STRATO" },
-    rpcUrls: { default: { http: [runtime.rpcUrl() || rpcUrl] } },
+    rpcUrls: { default: { http: [rpcUrl] } },
     ...(explorerUrl
       ? { blockExplorers: { default: { name: "Stratoscan", url: explorerUrl } } }
       : {}),

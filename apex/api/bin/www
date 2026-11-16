@@ -8,7 +8,6 @@ var app = require('../app');
 var debug = require('debug')('auth-service:server');
 var http = require('http');
 
-const sockets = require('../sockets/init');
 
 
 /**
@@ -24,7 +23,11 @@ app.set('port', port);
 
 var server = http.createServer(app);
 
-sockets.init(server);
+// The socket rooms feed SMD from the SQL block index. A lite validator has
+// neither, so it loads none of the aggregators and their pollers.
+if (process.env.APEX_ROLE !== 'validator') {
+  require('../sockets/init').init(server);
+}
 server.on('error', onError);
 server.on('listening', onListening);
 server.listen(port);

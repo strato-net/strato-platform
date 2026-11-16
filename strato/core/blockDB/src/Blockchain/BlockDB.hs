@@ -14,7 +14,9 @@ module Blockchain.BlockDB
     getBlocks,
     getTransactions,
     getParent,
+    getCanonical,
     getCanonicalHeader,
+    getHashesByNumber,
     putHeader,
     putHeaders,
     insertHeader,
@@ -38,6 +40,7 @@ import           Blockchain.Strato.RedisBlockDB.Models as Models
 import           Control.Arrow                         ((&&&))
 import           Control.Monad
 import qualified Data.ByteString.Char8                 as S8
+import           Data.Char                             (isHexDigit)
 import           Data.Foldable                         (foldl')
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe                            (fromJust, fromMaybe,
@@ -135,6 +138,21 @@ getCanonical n =
     Left _ -> return Nothing
     Right Nothing -> return Nothing
     Right (Just sha) -> return . Just $ fromValue sha
+
+-- | The hashes recorded for a block number: the Numbers set, one entry per
+-- block seen at that height. 'insertBlock' stores them as hex and
+-- 'insertHeader' as RLP, so both forms are read.
+getHashesByNumber ::
+  Integer ->
+  Redis [Keccak256]
+getHashesByNumber n =
+  smembers (inNamespace Numbers n) >>= \case
+    Left _ -> return []
+    Right members -> return $ map decodeHash members
+  where
+    decodeHash m
+      | S8.length m == 64 && S8.all isHexDigit m = keccak256FromHex (S8.unpack m)
+      | otherwise = fromValue m
 
 getCanonicalHeader ::
   Integer ->

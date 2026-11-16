@@ -70,6 +70,7 @@ cp .env.example .env
 #### Balance Configuration
 - `GAS_FEE_USDST` - Gas fee in USDST, multiplied by 1e16 (default: `1` = 0.01 USDST)
 - `GAS_FEE_VOUCHER` - Gas fee in Voucher, multiplied by 1e16 (default: `100` = 1 Voucher)
+- `STRATO_TOKEN_ADDRESS` - STRATO token address, counted toward the gas balance once the fee router charges STRATO (USDST then counts at half, since it buys STRATO at up to twice the call's value)
 - `MIN_TRANSACTIONS_THRESHOLD` - Minimum transactions that can be processed with current balance (default: `1`)
 - `WARNING_TRANSACTIONS_THRESHOLD` - Threshold for low balance warning (default: `100`)
 
@@ -140,6 +141,14 @@ existing Position activity:
 The poller resolves the target activity and its configured event names from the
 event's `token` attribute. No token address, Rewards activity ID, or Rewards contract
 configuration change is required.
+
+A Position activity whose source contract is a transferable share token (SaveUSDST,
+YieldVault) opts in to share transfers by registering the token's `Transfer` event
+with the `Transfer` action type. The poller relays wallet-to-wallet transfers through
+`rewards.batchHandleTransfer`, which moves stake from sender to recipient under the
+source event's idempotency key. Mints and burns (the activity's Deposit/Withdraw
+events), transfers to or from the token itself (queued withdrawals) and native
+custody lock/unlock moves are excluded.
 
 ## Usage
 

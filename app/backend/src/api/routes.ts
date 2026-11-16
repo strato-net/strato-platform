@@ -5,10 +5,9 @@ import swaggerUi from "swagger-ui-express";
 import packageJson from "../../package.json";
 import { swaggerSpec } from "../config/swagger.config";
 
-import authHandler from "./middleware/authHandler";
-import TokensController from "./controllers/tokens.controller";
 import userRoutes from "./routes/user.routes";
 import tokensRoutes from "./routes/tokens.routes";
+import feesRoutes from "./routes/fees.routes";
 import tokensV2Routes from "./routes/tokens.v2.routes";
 import nftsRoutes from "./routes/nfts.routes";
 import configRoutes from "./routes/config.routes";
@@ -24,7 +23,6 @@ import rewardsRoutes from "./routes/rewards.routes";
 import protocolFeeRoutes from "./routes/protocolFee.routes";
 import rpcRoutes from "./routes/rpc.routes";
 import referRoutes from "./routes/refer.routes";
-import vaultRoutes from "./routes/vault.routes";
 import onrampRoutes from "./routes/onramp.routes";
 import metalForgeRoutes from "./routes/metalForge.routes";
 import earnRoutes from "./routes/earn.routes";
@@ -46,25 +44,11 @@ router.use("/tokens/v2", tokensV2Routes);
 // ----- Token Routes -----
 router.use("/tokens", tokensRoutes);
 
+// ----- Network fee quote -----
+router.use("/fees", feesRoutes);
+
 // ----- NFT Routes -----
 router.use("/nfts", nftsRoutes);
-
-// ----- Vouchers Route (separate path) -----
-/**
- * @openapi
- * /vouchers/balance:
- *   get:
- *     summary: Get voucher balance
- *     description: Retrieve the voucher balance for the authenticated user
- *     tags:
- *       - Tokens
- *     responses:
- *       200:
- *         description: Voucher balance retrieved successfully
- *       401:
- *         description: Unauthorized
- */
-router.get("/vouchers/balance", authHandler.authorizeRequest(), TokensController.getVoucherBalance);
 
 // ----- Configuration Routes -----
 router.use("/config", configRoutes);
@@ -108,7 +92,6 @@ router.use("/protocol-fees", protocolFeeRoutes);
 router.use("/refer", referRoutes);
 
 // ----- Vault Routes -----
-router.use("/vault", vaultRoutes);
 
 // ----- Onramp Routes -----
 router.use("/onramp", onrampRoutes);

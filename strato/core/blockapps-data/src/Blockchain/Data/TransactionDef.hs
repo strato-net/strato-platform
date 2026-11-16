@@ -79,7 +79,11 @@ data Transaction
         chainId :: Maybe Integer,
         r :: Integer,
         s :: Integer,
-        v :: Word8
+        v :: Word8,
+        -- | 0 for a legacy envelope; 2 for an EIP-1559 envelope, whose
+        -- 'gasPrice' is its maxFeePerGas and whose 'v' is its yParity.
+        txVersion :: Word8,
+        maxPriorityFeePerGas :: Integer
       }
   deriving (Show, Read, Eq, Ord, Generic, Data, NFData)
 
@@ -190,20 +194,32 @@ toEthV :: Word8 -> Maybe Integer -> Integer
 toEthV recId Nothing = 27 + toInteger recId
 toEthV recId (Just cid) = cid * 2 + 35 + toInteger recId
 
+nativeVToRecoveryId :: Integer -> Word8
+nativeVToRecoveryId rawV
+  | rawV >= 35 = ethVToRecoveryId rawV + 27
+  | otherwise = fromInteger rawV
+
+nativeV :: Transaction -> Integer
+nativeV t = case chainId t of
+  Nothing -> toInteger $ v t
+  Just cid -> toEthV (ethVToRecoveryId $ toInteger $ v t) (Just cid)
+
 instance RLPSerializable Transaction where
   -- 10 fields: STRATO legacy format (MessageTX or ContractCreationTX)
   rlpDecode (RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, vVal, rVal, sVal]) =
     case partial of
           p@MessageTX {} ->
             p
-              { v = fromInteger $ rlpDecode vVal,
+              { v = nativeVToRecoveryId $ rlpDecode vVal,
+                chainId = ethVToChainId $ rlpDecode vVal,
                 r = rlpDecode rVal,
                 s = rlpDecode sVal,
                 txVersion = 0
               }
           p@ContractCreationTX {} ->
             p
-              { v = fromInteger $ rlpDecode vVal,
+              { v = nativeVToRecoveryId $ rlpDecode vVal,
+                chainId = ethVToChainId $ rlpDecode vVal,
                 r = rlpDecode rVal,
                 s = rlpDecode sVal,
                 txVersion = 0
@@ -216,7 +232,8 @@ instance RLPSerializable Transaction where
     case partialRLPDecode $ RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, attr] of
           p@MessageTX {} ->
             p
-              { v = fromInteger $ rlpDecode vVal,
+              { v = nativeVToRecoveryId $ rlpDecode vVal,
+                chainId = ethVToChainId $ rlpDecode vVal,
                 r = rlpDecode rVal,
                 s = rlpDecode sVal,
                 txVersion = 0
@@ -237,7 +254,9 @@ instance RLPSerializable Transaction where
         chainId = ethVToChainId rawV,
         r = rlpDecode rVal,
         s = rlpDecode sVal,
-        v = ethVToRecoveryId rawV
+        v = ethVToRecoveryId rawV,
+        txVersion = 0,
+        maxPriorityFeePerGas = 0
       }
   -- EIP-2718 style typed transaction envelope: type_byte || rlp_payload
   rlpDecode (RLPString bytes)
@@ -245,17 +264,40 @@ instance RLPSerializable Transaction where
         let typeByte = B.head bytes
             inner = rlpDeserialize (B.tail bytes)
         in case inner of
+            -- EIP-1559 (type 2) Ethereum envelope; the access list must be empty.
+            RLPArray [cid, n, prio, fee, gl, toAddr, val, dat, RLPArray [], yParity, rVal, sVal]
+              | typeByte == 2, parity <- rlpDecode yParity :: Integer, parity == 0 || parity == 1 ->
+                  EthereumTX
+                    { nonce = rlpDecode n,
+                      gasPrice = rlpDecode fee,
+                      gasLimit = rlpDecode gl,
+                      ethTo = case toAddr of
+                        RLPString "" -> Nothing
+                        _ -> Just (rlpDecode toAddr),
+                      value = rlpDecode val,
+                      txData = rlpDecode dat,
+                      chainId = Just (rlpDecode cid),
+                      r = rlpDecode rVal,
+                      s = rlpDecode sVal,
+                      v = fromInteger parity,
+                      txVersion = 2,
+                      maxPriorityFeePerGas = rlpDecode prio
+                    }
+            RLPArray [_, _, _, _, _, _, _, _, RLPArray [], _, _, _]
+              | typeByte == 2 -> error "rlpDecode Transaction: type-2 yParity must be 0 or 1"
             RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, vVal, rVal, sVal] ->
               let partial = partialRLPDecode $ RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7]
               in case partial of
                   p@MessageTX {} ->
-                    p { v = fromInteger $ rlpDecode vVal,
+                    p { v = nativeVToRecoveryId $ rlpDecode vVal,
+                        chainId = ethVToChainId $ rlpDecode vVal,
                         r = rlpDecode rVal,
                         s = rlpDecode sVal,
                         txVersion = typeByte
                       }
                   p@ContractCreationTX {} ->
-                    p { v = fromInteger $ rlpDecode vVal,
+                    p { v = nativeVToRecoveryId $ rlpDecode vVal,
+                        chainId = ethVToChainId $ rlpDecode vVal,
                         r = rlpDecode rVal,
                         s = rlpDecode sVal,
                         txVersion = typeByte
@@ -265,7 +307,8 @@ instance RLPSerializable Transaction where
             RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, attr, vVal, rVal, sVal] ->
               case partialRLPDecode $ RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, attr] of
                   p@MessageTX {} ->
-                    p { v = fromInteger $ rlpDecode vVal,
+                    p { v = nativeVToRecoveryId $ rlpDecode vVal,
+                        chainId = ethVToChainId $ rlpDecode vVal,
                         r = rlpDecode rVal,
                         s = rlpDecode sVal,
                         txVersion = typeByte
@@ -276,12 +319,11 @@ instance RLPSerializable Transaction where
 
   rlpEncode t@EthereumTX{..} =
     case partialRLPEncode t of
-      RLPArray items ->
-        RLPArray $ items ++
-        [ rlpEncode (toEthV v chainId),
-          rlpEncode r,
-          rlpEncode s
-        ]
+      RLPArray items
+        | txVersion == 2 ->
+            RLPString $ B.cons 2 $ rlpSerialize $ RLPArray $ items ++ [rlpEncode (toInteger v), rlpEncode r, rlpEncode s]
+        | otherwise ->
+            RLPArray $ items ++ [rlpEncode (toEthV v chainId), rlpEncode r, rlpEncode s]
       x -> error $ "rlpEncode Transaction: Expected RLPArray, but got: " ++ show x
   -- Version > 0: EIP-2718 style typed envelope (type_byte || rlp_payload)
   rlpEncode t
@@ -289,13 +331,13 @@ instance RLPSerializable Transaction where
         let innerItems = case partialRLPEncode t of
               RLPArray items -> items
               x -> error $ "rlpEncode Transaction: Expected RLPArray, but got: " ++ show x
-            innerRLP = RLPArray $ innerItems ++ [rlpEncode $ toInteger (v t), rlpEncode (r t), rlpEncode (s t)]
+            innerRLP = RLPArray $ innerItems ++ [rlpEncode $ nativeV t, rlpEncode (r t), rlpEncode (s t)]
         in RLPString (B.singleton (txVersion t) <> rlpSerialize innerRLP)
     | otherwise =
         case partialRLPEncode t of
           RLPArray items ->
             RLPArray $ items ++
-            [ rlpEncode $ toInteger (v t),
+            [ rlpEncode $ nativeV t,
               rlpEncode (r t),
               rlpEncode (s t)
             ]
@@ -388,12 +430,25 @@ partialRLPEncode ContractCreationTX {..} =
       rlpEncode network,
       rlpEncode code
     ]
-partialRLPEncode EthereumTX {..} =
-  RLPArray $
-    [ rlpEncode nonce,
-      rlpEncode gasPrice,
-      rlpEncode gasLimit,
-      maybe (RLPString "") rlpEncode ethTo,
-      rlpEncode value,
-      rlpEncode txData
-    ]
+partialRLPEncode EthereumTX {..}
+  | txVersion == 2 =
+      RLPArray
+        [ rlpEncode (maybe 0 id chainId),
+          rlpEncode nonce,
+          rlpEncode maxPriorityFeePerGas,
+          rlpEncode gasPrice,
+          rlpEncode gasLimit,
+          maybe (RLPString "") rlpEncode ethTo,
+          rlpEncode value,
+          rlpEncode txData,
+          RLPArray []
+        ]
+  | otherwise =
+      RLPArray
+        [ rlpEncode nonce,
+          rlpEncode gasPrice,
+          rlpEncode gasLimit,
+          maybe (RLPString "") rlpEncode ethTo,
+          rlpEncode value,
+          rlpEncode txData
+        ]

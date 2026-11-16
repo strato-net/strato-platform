@@ -5,6 +5,7 @@
 module Blockchain.Strato.Discovery.UDPSpec where
 
 import Blockchain.Data.RLP
+import Blockchain.Strato.Discovery.Data.Peer (TCPPort (..))
 import Blockchain.Strato.Discovery.UDP
 import Data.Bits
 import Network.Socket (tupleToHostAddress, tupleToHostAddress6)
@@ -33,6 +34,13 @@ spec = do
 
     it "converts hostnames" $ do
       stringToIAddr "hotdogs.com" `shouldBe` HostName "hotdogs.com"
+
+  describe "pongSenderTcpPort" $ do
+    it "takes a port" $
+      pongSenderTcpPort (rlpEncode (30303 :: Integer)) `shouldBe` Just (TCPPort 30303)
+
+    it "ignores ENR sequence numbers" $
+      map (pongSenderTcpPort . rlpEncode) [1794679825, 1791519288486, 3 :: Integer] `shouldBe` [Nothing, Nothing, Nothing]
 
   describe "IAddr RLP Serialization" $ do
     it "parses ipv6 addresses" $ do

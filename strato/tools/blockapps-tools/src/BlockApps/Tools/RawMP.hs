@@ -3,10 +3,8 @@
 module BlockApps.Tools.RawMP (doit) where
 
 import Blockchain.Data.RLP
-import qualified Blockchain.Database.MerklePatricia as MP
-import qualified Blockchain.Database.MerklePatricia.Internal as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader
 import qualified Data.NibbleString as N
 import qualified Database.LevelDB as DB
 import SolidVM.Model.Storable
@@ -22,7 +20,7 @@ formatKV (key, val) =
 
 showVals :: MonadIO m => DB.DB -> MP.StateRoot -> m ()
 showVals sdb sr = do
-  kvs <- runReaderT (MP.unsafeGetKeyVals sr "") sdb
+  kvs <- MP.runStateDBOn sdb (MP.unsafeGetKeyVals sr "")
   liftIO . putStrLn $ unlines $ formatKV <$> kvs
 
 

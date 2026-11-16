@@ -12,7 +12,7 @@ import BlockApps.Logging (LoggingT, runNoLoggingT)
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.EventLoop
 import Blockchain.Blockstanbul.Messages
-import Blockchain.Blockstanbul.Model.Authentication (proposalMessage)
+import Blockchain.Blockstanbul.Model.Authentication (commitmentMessage, proposalMessage)
 import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
@@ -22,15 +22,18 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.ProposerSelection
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
+import Blockchain.Verification (transactionsVerificationValue)
 import Control.Lens hiding (view)
 import Conduit (runConduit, sinkNull, yieldMany, (.|))
 import Control.Monad (forM_)
 import Control.Monad.Composable.Vault
 import Control.Monad.State.Strict
+import Control.Monad.Trans.Except (runExceptT)
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Set as S
+import Data.Time.Clock (addUTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import qualified LabeledError
 import Test.Hspec
@@ -59,7 +62,7 @@ instance {-# OVERLAPPING #-} Monad m => HasVault (StateT BlockstanbulContext m) 
 -- validators and no signature checks.
 mkContext :: Maybe Integer -> BlockstanbulContext
 mkContext activation =
-  (newContext "test" 1 ckpt (Just me) True activation) {_productionAuth = False}
+  (newContext "test" 1 ckpt (Just me) True activation 15) {_productionAuth = False}
   where
     ckpt = Checkpoint (View 0 10) [Validator me, Validator other] (Just zeroHash) [] 0
 
@@ -98,6 +101,14 @@ v3 vals stakes' rnd removed updates =
 
 spec :: Spec
 spec = describe "stake-weighted consensus" $ do
+  describe "body against header" $ do
+    let hdr = (v3 [] [] 5 [] []) {transactionsRoot = transactionsVerificationValue []}
+    it "accepts a body whose transactions and uncles hash to the header" $
+      bodyMatchesHeader (Block hdr [] []) `shouldBe` True
+    it "rejects a body with extra uncles under the same header" $
+      bodyMatchesHeader (Block hdr [] [hdr]) `shouldBe` False
+    it "rejects a header whose transactions root is not the body's" $
+      bodyMatchesHeader (Block (v3 [] [] 5 [] []) [] []) `shouldBe` False
   describe "rounds and timers" $ do
     it "keeps the round across heights and re-arms the timer per height" $
       forM_ [activeCtx, legacyCtx] $ \ctx0 -> do
@@ -181,6 +192,56 @@ spec = describe "stake-weighted consensus" $ do
         pure (commitsOut o1, commitsOut o2)
       legacy `shouldBe` (0, 1)
 
+  describe "commit seals" $ do
+    let attackerPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "attackerPriv" $ C8.pack "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318"))
+        attacker = fromPrivateKey attackerPriv
+        offDigest = hash "not the proposal"
+        sealOver priv di = signMsg priv (commitmentMessage di)
+
+    it "embeds only the seals for the committed block, not a validator's commit for another digest" $ do
+      let vals = [Validator me, Validator attacker]
+          weights = [(Validator me, 1000), (Validator attacker, 1)]
+          blk = Block (v3 vals weights 0 [] []) [] []
+          commitFrom priv di = IMsg (MsgAuth (fromPrivateKey priv) dummySig) (Commit (View 0 10) di (sealOver priv di))
+      out <- runWith activeCtx {_validators = S.fromList vals, _stakes = M.fromList weights} $ do
+        proposal .= Just blk
+        sendMessages [commitFrom attackerPriv offDigest, commitFrom myPriv (blockHash blk)]
+      [traverse (verifyCommitmentSeal (blockHash b)) . signatures $ blockBlockData b | ToCommit b <- out]
+        `shouldBe` [Right [me]]
+
+    -- Seals are outside the block hash, so whoever relays a block can add to them:
+    -- replay must neither reject an honest block for it nor count an outsider's seal.
+    describe "on replay" $ do
+      let sealed = let b = Block (v3 [Validator me] [(Validator me, 7)] 0 [] []) [] [] in addProposerSeal (signMsg myPriv (proposalMessage b)) b
+          unrecoverable = either error id . importSignature $ C8.replicate 65 '\0'
+          replayWith seals = runNoLoggingT . runExceptT $
+            replayHistoricBlock (S.singleton $ Validator me) (M.fromList [(Validator me, 7)]) Nothing 1 0 10 (addCommitmentSeals seals sealed)
+
+      it "accepts a supermajority alongside seals from outsiders, over another digest, or unrecoverable" $
+        replayWith [sealOver attackerPriv (blockHash sealed), sealOver myPriv offDigest, unrecoverable, sealOver myPriv (blockHash sealed)]
+          `shouldReturn` Right (11, Validator me)
+
+      it "does not count an outsider's seal toward the supermajority" $
+        replayWith [sealOver attackerPriv (blockHash sealed)] >>= (`shouldSatisfy` either (const True) (const False))
+
+  -- Votes are kept per validator for the current view only, so one from another
+  -- view must neither count toward it nor replace the sender's vote in it.
+  describe "vote views" $ do
+    let blk = Block (v3 [Validator me, Validator other] [] 0 [] []) [] []
+        commitAt who vw di = IMsg (MsgAuth who dummySig) (Commit vw di dummySig)
+        commitsFrom evs = runWith legacyCtx $ do
+          proposal .= Just blk
+          out <- sendMessages evs
+          pure $ length [() | ToCommit _ <- out]
+
+    it "does not count a commit from a later round, even for the same block" $
+      commitsFrom [commitAt other (View 1 10) (blockHash blk), commitAt me (View 0 10) (blockHash blk)]
+        `shouldReturn` 0
+
+    it "keeps a validator's commit when it also sends one for a later height" $
+      commitsFrom [commitAt other (View 0 10) (blockHash blk), commitAt other (View 0 11) (hash "next block"), commitAt me (View 0 10) (blockHash blk)]
+        `shouldReturn` 1
+
   describe "proposal checks" $ do
     let solo = activeCtx {_validators = S.singleton (Validator me), _stakes = M.fromList [(Validator me, 7)]}
         vw = View 0 10
@@ -209,3 +270,30 @@ spec = describe "stake-weighted consensus" $ do
 
     it "does not apply the extra checks before activation" $
       checkProposalHeader legacyCtx vw (Block (v3 [] [] 5 [] []) [] []) `shouldBe` Right ()
+
+  describe "proposal timestamps" $ do
+    let now = posixSecondsToUTCTime 1700000000
+        stampedAt t = Block ((v3 [Validator me] [(Validator me, 7)] 0 [] []) {timestamp = t}) [] []
+        rejected = either (const True) (const False)
+
+    it "accepts stamps up to maxTimestampDrift ahead of the local clock, and any stamp behind it" $ do
+      checkProposalTimestamp 15 now (stampedAt now) `shouldBe` Right ()
+      checkProposalTimestamp 15 now (stampedAt $ addUTCTime 15 now) `shouldBe` Right ()
+      checkProposalTimestamp 15 now (stampedAt $ addUTCTime (-86400) now) `shouldBe` Right ()
+
+    it "rejects stamps further ahead than maxTimestampDrift" $ do
+      checkProposalTimestamp 15 now (stampedAt $ addUTCTime 16 now) `shouldSatisfy` rejected
+      checkProposalTimestamp 0 now (stampedAt $ addUTCTime 1 now) `shouldSatisfy` rejected
+
+    -- The check composes with checkProposalHeader from the outside, so unlike
+    -- the staking checks it must fire before activation too.
+    it "round-changes instead of running a far-future proposal, staking active or not" $
+      forM_ [activeCtx, legacyCtx] $ \base -> do
+        let ctx = base {_validators = S.singleton (Validator me), _stakes = M.fromList [(Validator me, 7)], _proposer = Validator me}
+            sealed blk = addProposerSeal (signMsg myPriv (proposalMessage blk)) blk
+            propose t = IMsg (MsgAuth me dummySig) (Preprepare (View 0 10) (sealed $ stampedAt t))
+        farFuture <- runWith ctx $ sendMessages [propose $ posixSecondsToUTCTime 4000000000]
+        [() | RunPreprepare _ <- farFuture] `shouldBe` []
+        [rn | OMsg _ (RoundChange (View rn _) _) <- farFuture] `shouldBe` [1]
+        past <- runWith ctx $ sendMessages [propose $ posixSecondsToUTCTime 0]
+        length [() | RunPreprepare _ <- past] `shouldBe` 1

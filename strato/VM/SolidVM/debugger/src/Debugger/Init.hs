@@ -35,7 +35,7 @@ initializeDebugger restServer =
     then pure Nothing
     else do
       dSettings <- atomically newDebugSettings
-      let rest = run flags_debugPort $ restServer dSettings
+      let rest = runSettings (setHost "127.0.0.1" $ setPort flags_debugPort defaultSettings) $ restServer dSettings
           debuggerRunner = race_ rest $ wsDebugger flags_debugWSHost flags_debugWSPort dSettings
       pure $ Just (dSettings, debuggerRunner)
 

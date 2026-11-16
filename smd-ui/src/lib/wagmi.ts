@@ -7,7 +7,7 @@ import {
   walletConnectWallet,
 } from "@rainbow-me/rainbowkit/wallets";
 import { stratoWallet } from "@/lib/stratoWallet";
-import { initStratoChain, getStratoChain } from "@/lib/stratoChain";
+import { initStratoChain, getStratoChain, rpcUrl } from "@/lib/stratoChain";
 import { runtime } from "@/lib/env";
 
 const baseChains = [mainnet, polygon, sepolia, base] as const;
@@ -22,7 +22,7 @@ export function buildWagmiConfig() {
   const transports: Record<number, Transport> = Object.fromEntries(
     chains.map((chain: any) => [
       chain.id,
-      chain === stratoChain ? http(runtime.rpcUrl()) : http(),
+      chain === stratoChain ? http(rpcUrl) : http(),
     ])
   );
 

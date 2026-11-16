@@ -192,6 +192,11 @@ contract record PoolV3 is Ownable {
     /// @notice Pauses flash() only; swaps and liquidity operations are unaffected
     bool public isFlashPaused = false;
 
+    /// @notice A nonzero router restricts this pool to gas settlement and disables flash loans.
+    address public gasSwapRouter;
+
+    event GasSwapRouterChanged(address oldRouter, address newRouter);
+
     /// @notice Whether the pool is unlocked (canonical slot0.unlocked). Pools are born locked —
     ///         false in fresh (proxied) storage — and unlock at the end of initialize, so no
     ///         lock-guarded call works before initialization, as canonical
@@ -230,6 +235,12 @@ contract record PoolV3 is Ownable {
 
     modifier whenFlashNotPaused() {
         require(!isFlashPaused, "Flash is paused");
+        require(gasSwapRouter == address(0), "Gas-only pool");
+        _;
+    }
+
+    modifier onlySwapRouter() {
+        require(gasSwapRouter == address(0) || msg.sender == gasSwapRouter, "Gas swaps only");
         _;
     }
 
@@ -254,6 +265,12 @@ contract record PoolV3 is Ownable {
     /// @notice Pause or resume flash() without touching the pool-wide pause
     function setFlashPaused(bool _isFlashPaused) external onlyOwner {
         isFlashPaused = _isFlashPaused;
+    }
+
+    /// @notice Restrict swaps to a gas router; zero restores ordinary trading.
+    function setGasSwapRouter(address router) external onlyOwner {
+        emit GasSwapRouterChanged(gasSwapRouter, router);
+        gasSwapRouter = router;
     }
 
     /// @notice Set the denominator of the protocol's share of the swap fee (canonical setFeeProtocol)
@@ -839,6 +856,55 @@ contract record PoolV3 is Ownable {
     /// @param deadline Timestamp after which the call reverts (platform extension)
     /// @return amount0 Signed token0 delta of the pool (positive = pool received)
     /// @return amount1 Signed token1 delta of the pool
+    // Read-only replay of the exact-output arithmetic. The rounding allowance is
+    // the difference from the continuous curve (including the pool fee), rounded
+    // up once per step. It excludes price impact and does not write oracle/LP state.
+    function quoteGasExactOutput(bool zeroForOne, uint output) external view returns (uint input, uint rounding, bool complete) {
+        require(output > 0, "AS");
+        uint limit = zeroForOne ? TickMath.MIN_SQRT_RATIO + 1 : TickMath.MAX_SQRT_RATIO - 1;
+        SwapState memory state;
+        state.amountSpecifiedRemaining = -int(output);
+        state.sqrtPriceX96 = sqrtPriceX96;
+        state.tick = currentTick;
+        state.liquidity = liquidity;
+        while (state.amountSpecifiedRemaining != 0 && state.sqrtPriceX96 != limit) {
+            StepComputations memory step;
+            step.sqrtPriceStartX96 = state.sqrtPriceX96;
+            (step.tickNext, step.initialized) = TickBitmap.nextInitializedTickWithinOneWord(tickBitmap, state.tick, tickSpacing, zeroForOne);
+            if (step.tickNext < TickMath.MIN_TICK) step.tickNext = TickMath.MIN_TICK;
+            if (step.tickNext > TickMath.MAX_TICK) step.tickNext = TickMath.MAX_TICK;
+            step.sqrtPriceNextX96 = TickMath.getSqrtRatioAtTick(step.tickNext);
+            uint target = (zeroForOne ? step.sqrtPriceNextX96 < limit : step.sqrtPriceNextX96 > limit) ? limit : step.sqrtPriceNextX96;
+            (state.sqrtPriceX96, step.amountIn, step.amountOut, step.feeAmount) = SwapMath.computeSwapStep(state.sqrtPriceX96, target, state.liquidity, state.amountSpecifiedRemaining, fee);
+            uint cost = step.amountIn + step.feeAmount;
+            uint ideal = 0;
+            if (step.amountOut > 0) {
+                uint q = FixedPoint96.Q96;
+                uint p = step.sqrtPriceStartX96;
+                uint l = state.liquidity;
+                // Exact rational integrals for the constant-liquidity curve,
+                // evaluated at the integer output actually delivered by this step.
+                uint numerator = zeroForOne ? step.amountOut * l * q * q : step.amountOut * l * p * p;
+                uint denominator = zeroForOne ? p * (l * p - step.amountOut * q) : q * (l * q - step.amountOut * p);
+                ideal = FullMath.mulDivRoundingUp(numerator, 1e6, denominator * (1e6 - fee));
+            }
+            require(cost >= ideal, "Invalid gas rounding quote");
+            input += cost;
+            rounding += cost - ideal;
+            state.amountSpecifiedRemaining += int(step.amountOut);
+            if (state.sqrtPriceX96 == step.sqrtPriceNextX96) {
+                if (step.initialized) {
+                    int net = ticks[step.tickNext].liquidityNet;
+                    state.liquidity = LiquidityMath.addDelta(state.liquidity, zeroForOne ? -net : net);
+                }
+                state.tick = zeroForOne ? step.tickNext - 1 : step.tickNext;
+            } else if (state.sqrtPriceX96 != step.sqrtPriceStartX96) {
+                state.tick = TickMath.getTickAtSqrtRatio(state.sqrtPriceX96);
+            }
+        }
+        return (input, rounding, state.amountSpecifiedRemaining == 0);
+    }
+
     function swap(
         address recipient,
         bool zeroForOne,
@@ -846,7 +912,7 @@ contract record PoolV3 is Ownable {
         uint sqrtPriceLimitX96,
         uint amountLimit,
         uint deadline
-    ) external lock whenNotPaused onlyActiveTokens returns (int amount0, int amount1) {
+    ) external onlySwapRouter lock whenNotPaused onlyActiveTokens returns (int amount0, int amount1) {
         require(amountSpecified != 0, "AS");
         require(amountLimit > 0, "Invalid amount limit");
         require(block.timestamp <= deadline, "EXPIRED");

@@ -118,15 +118,18 @@ Run the checks that apply to the code you changed:
 
 ## Continuous Integration
 
-CI runs on Jenkins, using the pipeline definitions in `pipelines/`. `Jenkinsfile.autobuild` does the following:
+CI runs on Jenkins, using the pipeline definitions in `pipelines/`. `Jenkinsfile.autobuild` builds every branch, pull request and release tag (the job leaves out `master`) and does the following:
 
-1. Skips branches (other than `develop`) that have no changes compared to `develop`.
-2. Runs `make`, deploys a node, and checks that the node is healthy and receiving blocks.
-3. Runs contract tests: `solid-vm-cli test` on every `app/contracts/tests/**/*.test.sol`, except `*V2.test.sol`. Failures mark the build **unstable**.
-4. Runs the SMD tests (`docker build --target test` in `smd-ui/`).
-5. Runs the tracking service tests: the UI build plus `docker-compose.test.yml`.
+1. Skips branches (other than `develop`) that have no changes compared to `develop`. Tag builds are never skipped.
+2. Runs `make`, then builds the images `make` leaves out (`strato`, `app-nginx`, `history`, and the vault, highway, bridge and oracle images) and the compose files.
+3. Deploys a node and checks that it is healthy and receiving blocks.
+4. Publishes the images, in two parallel stages. The node images go to `ghcr.io/strato-net/strato-platform/<image>:<VERSION>-<commit>-<hash>` with `make push-node-images`, plus the `strato:<VERSION>-<commit>` alias that `strato-up --prebuilt` resolves; a tag build adds `strato:<tag>` with `make push-release-alias`. The vault, highway and bridge images go to AWS ECR with `scripts/docker-push-ecr.sh`, and their compose files to S3. Tags that already exist in a registry are skipped, so a rebuild never overwrites a published image.
+5. Runs contract tests: `solid-vm-cli test` on every `app/contracts/tests/**/*.test.sol`. Failures mark the build **unstable**.
+6. Runs the SMD tests (`docker build --target test` in `smd-ui/`).
 
-Other pipelines cover app-only builds (`Jenkinsfile.buildtestapp`), sync and snapshot tests (`Jenkinsfile.synctest`), releases (`Jenkinsfile.release`) and publishing this documentation site (`Jenkinsfile.mkdocs`).
+The published node images are what `strato-up --prebuilt` runs; see [Run from prebuilt images](../node/prebuilt.md). A release is a tag build of the same pipeline.
+
+Other pipelines cover app-only builds (`Jenkinsfile.buildtestapp`), sync and snapshot tests (`Jenkinsfile.synctest`) and publishing this documentation site (`Jenkinsfile.mkdocs`).
 
 ---
 

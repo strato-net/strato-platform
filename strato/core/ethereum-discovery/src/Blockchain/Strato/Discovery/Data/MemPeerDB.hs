@@ -83,6 +83,8 @@ instance {-# OVERLAPPING #-} (MemPeerDBEnv :> es) => HasPeerDB (Eff es) where
     peerMap <- readIORef . stringPPeerMap =<< accessEnv
     return . filter f $ M.elems peerMap
 
+  getAnyBondedPeersForUDP = getBondedPeersForUDP
+
   getUnbondedPeers = do
     currentTime <- liftIO getCurrentTime
     host <- accessEnvVar p2pMyIPAddress
@@ -109,7 +111,7 @@ instance {-# OVERLAPPING #-} (MemPeerDBEnv :> es) => HasPeerDB (Eff es) where
     atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerTcpPort = pn}))
   updateTcpEnableTime peer' enableTime = do
     peerMap <- fmap stringPPeerMap accessEnv
-    atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerEnableTime = enableTime}))
+    atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerEnableTime = max enableTime (pPeerEnableTime p)}))
   updateUdpPort peer' (UDPPort pn) = do
     peerMap <- fmap stringPPeerMap accessEnv
     atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerUdpPort = pn}))
@@ -117,10 +119,12 @@ instance {-# OVERLAPPING #-} (MemPeerDBEnv :> es) => HasPeerDB (Eff es) where
   updatePeerDisable peer' d = do
     peerMap <- fmap stringPPeerMap accessEnv
     case d of
-      ExtendPeerDisableTime (TcpEnableTime enableTime) nextDisableWindowFactor ->
-        atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = pPeerNextDisableWindowSeconds p * nextDisableWindowFactor}))
-      SetPeerDisableTime (TcpEnableTime enableTime) nextDisableWindow disableExpiration ->
-        atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration}))
+      ExtendPeerDisableTime (TcpEnableTime enableTime) nextDisableWindowFactor -> do
+        atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerNextDisableWindowSeconds = pPeerNextDisableWindowSeconds p * nextDisableWindowFactor}))
+        updateTcpEnableTime peer' enableTime
+      SetPeerDisableTime (TcpEnableTime enableTime) nextDisableWindow disableExpiration -> do
+        atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerNextDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration}))
+        updateTcpEnableTime peer' enableTime
 
   updatePeerLastBestBlockHash p (PeerLastBestBlockHash h) = do
     peerMap <- fmap stringPPeerMap accessEnv
@@ -165,6 +169,7 @@ instance (MonadTrans t, Monad m, HasPeerDB m) => HasPeerDB (t m) where
   getPeerBondingState a b = lift $ getPeerBondingState a b
   getBondedPeers = lift getBondedPeers
   getBondedPeersForUDP = lift getBondedPeersForUDP
+  getAnyBondedPeersForUDP = lift getAnyBondedPeersForUDP
   getUnbondedPeers = lift getUnbondedPeers
   getClosestPeers a b = lift $ getClosestPeers a b
   updateUdpEnableTime a b = lift $ updateUdpEnableTime a b

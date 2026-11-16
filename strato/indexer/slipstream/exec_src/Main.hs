@@ -10,7 +10,7 @@
 
 import BlockApps.Init
 import BlockApps.Logging
-import Blockchain.EthConf (cirrusConnStr, ethConf, runStreamMConfigured)
+import Blockchain.EthConf (cirrusConnStr, currentCellId, ethConf, runStreamMConfigured)
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Slipstream.Data.CirrusTables
 import Blockchain.Slipstream.MessageConsumer
@@ -39,6 +39,7 @@ main = do
   _ <- $initHFlags "Setup Slipstream Variables"
   blockappsInit "slipstream_main"
   runInstrumentation "slipstream"
+  cell <- T.pack <$> currentCellId
 
   runEff
     . runLogging
@@ -54,7 +55,7 @@ main = do
 
       -- Create cirrus database if it doesn't exist
       let cirrusConf = EC.cirrusConfig ethConf
-          rawConn = EC.postgreSQLConnectionString cirrusConf {EC.database = ""}
+          rawConn = EC.postgreSQLConnectionString cirrusConf {EC.database = "postgres"}
           cirrusDb = EC.database cirrusConf
           query = T.pack $ "CREATE DATABASE " ++ show cirrusDb ++ ";"
       $logInfoS "main" $ T.pack $ "Ensuring cirrus database exists: " ++ cirrusDb
@@ -71,5 +72,6 @@ main = do
       -- 1. `conn` connects slipstream to the cirrus database
       -- 2. The `pool` in the BlocEnv connects slipstream to the eth database
 
+      $logInfoS "main" . T.pack $ "cell " ++ T.unpack cell ++ ": writing only while this cell holds the writer lease"
       runSQLM $
-        getAndProcessMessages conn
+        getAndProcessMessages cell conn

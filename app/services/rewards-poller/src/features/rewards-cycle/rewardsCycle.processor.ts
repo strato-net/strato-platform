@@ -4,15 +4,14 @@ import {
   getEventsBatch,
   getEventQueryParams,
 } from "../events-read/cirrusEvents.client";
-import { batchHandleAction } from "../rewards-cycle/rewardsBatch.writer";
+import { batchHandleAction, batchHandleTransfer } from "../rewards-cycle/rewardsBatch.writer";
 import { checkBalances } from "../rewards-cycle/rewardsBalance.guard";
 import {
   RewardsAction,
-  NonEmptyArray,
   PositionEventSource,
 } from "../../shared/types";
 import { blockTrackingService } from "../../infra/state/blockTracking.repo";
-import { nextCursorAfter } from "../events-read/eventRecord.mapper";
+import { nextCursorAfter, splitIntoBatches } from "../events-read/eventRecord.mapper";
 import { isContractExecutionFailure } from "../../shared/core/errors";
 
 export const processRewardsCycle = async (
@@ -47,6 +46,7 @@ export const processRewardsCycle = async (
       sourceContract: event.address,
       eventName: event.event_name,
       user: event.transaction_sender,
+      recipient: event.recipient,
       amount: event.amount,
       blockNumber: event.block_number,
       block_timestamp: event.block_timestamp,
@@ -57,13 +57,11 @@ export const processRewardsCycle = async (
       return;
     }
 
-    const maxBatchSize = config.polling.maxBatchSize;
-    for (let i = 0; i < allActions.length; i += maxBatchSize) {
-      const batch = allActions.slice(i, i + maxBatchSize) as NonEmptyArray<RewardsAction>;
+    for (const batch of splitIntoBatches(allActions, config.polling.maxBatchSize)) {
       const last = batch[batch.length - 1];
 
       try {
-        await batchHandleAction(batch);
+        await (batch[0].recipient ? batchHandleTransfer(batch) : batchHandleAction(batch));
         await blockTrackingService.updateCursor(nextCursorAfter(last));
       } catch (error) {
         if (isContractExecutionFailure(error)) {

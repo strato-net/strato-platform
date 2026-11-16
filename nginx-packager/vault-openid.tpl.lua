@@ -1,7 +1,22 @@
 local openidc = require("resty.openidc")
 
+-- Local auth: Hydra advertises jwks_uri under the node's public URL, which
+-- nginx cannot resolve from inside the container when that name is only
+-- known from /etc/hosts (the resolver directive does pure DNS). The keys are
+-- fetched from the local-auth container instead, which serves them at the
+-- root of what nginx proxies under /auth/; the issuer stays public.
+local discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>"
+local local_auth = discovery:match("^(https?://local%-auth[^/]*)")
+if local_auth then
+  local doc = openidc.get_discovery_doc({ discovery = discovery })
+  if doc then
+    doc.jwks_uri = local_auth .. doc.jwks_uri:sub(#doc.issuer + 1)
+    discovery = doc
+  end
+end
+
 local verify_opts = {
-  discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
+  discovery = discovery,
   ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
   accept_none_alg = false,
   accept_unsupported_alg = false

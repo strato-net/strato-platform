@@ -6,6 +6,7 @@
 import { cirrus } from "../../utils/appApiHelper";
 import { isMissingTableError } from "../../utils/cirrusErrors";
 import { buildFunctionTx } from "../../utils/txBuilder";
+import { governedInput } from "./user.service";
 import { executeTransaction } from "../../utils/txHelper";
 import * as config from "../../config/config";
 import {
@@ -537,7 +538,8 @@ export const getPoolByAddress = async (accessToken: string, poolAddress: string)
   return pools[0] ?? null;
 };
 
-/** All V3 pools (any fee tier, either token order) for a token pair, deepest liquidity first */
+/** All V3 pools (any fee tier, either token order) for a token pair, deepest liquidity
+ *  first; disabled pools and config.hiddenSwapPools are excluded */
 export const getPoolsByPair = async (accessToken: string, tokenA: string, tokenB: string): Promise<PoolV3[]> => {
   const a = normalizeAddress(tokenA);
   const b = normalizeAddress(tokenB);
@@ -546,7 +548,7 @@ export const getPoolsByPair = async (accessToken: string, tokenA: string, tokenB
   });
   const pools = await attachPrices(accessToken, rawPools);
   return pools
-    .filter((p) => !p.isDisabled)
+    .filter((p) => !p.isDisabled && !config.hiddenSwapPools.has(p.address))
     .sort((x, y) => y.totalLiquidityUSD - x.totalLiquidityUSD);
 };
 
@@ -1314,6 +1316,10 @@ const requirePositionManager = (): string => {
   return config.positionManagerV3;
 };
 
+export const getPositionManagerMetadata = () => ({
+  positionManagerAddress: normalizeAddress(requirePositionManager()),
+});
+
 /** The position NFT for a tokenId, resolved against the network's singleton manager —
  *  lets the UI address a position as /v3-liquidity/:tokenId with no manager in the URL */
 export const getPositionNFTItem = async (accessToken: string, tokenId: string) => {
@@ -1643,7 +1649,7 @@ export const createPool = async (
 
   const tx = await buildFunctionTx(
     [
-      {
+      await governedInput(accessToken, {
         contractName: "PoolV3Factory",
         contractAddress: config.poolV3Factory,
         method: "createPoolV3",
@@ -1653,7 +1659,7 @@ export const createPool = async (
           fee: params.fee,
           initialSqrtPriceX96,
         },
-      },
+      }),
     ],
     userAddress,
     accessToken

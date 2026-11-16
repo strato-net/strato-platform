@@ -23,6 +23,11 @@ newtype Gas = Gas Integer
 getGasValue :: Gas -> Integer
 getGasValue (Gas n) = n
 
+-- | The gas every transaction gets to run with. This is a network rule: every
+-- node must use the same number, so changing it is a hard fork.
+transactionGas :: Gas
+transactionGas = Gas 600000
+
 instance Arbitrary Gas where arbitrary = Gas <$> arbitrary
 
 instance ToJSON Gas where

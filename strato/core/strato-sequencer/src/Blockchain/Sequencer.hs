@@ -16,7 +16,9 @@
 
 module Blockchain.Sequencer (
   sequencer,
-  eventHandler
+  eventHandler,
+  SeqOutEvent (..),
+  transformFullTransactionsWith
   ) where
 
 import BlockApps.Logging
@@ -25,6 +27,8 @@ import Blockchain.EthConf (ethConf, urlConfig, vaultUrl)
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
+import Blockchain.Data.Transaction (transactionHash)
+import Blockchain.Data.TransactionIntake
 import Blockchain.DB.Witnessable
 import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
@@ -40,7 +44,7 @@ import Blockchain.Strato.Model.Keccak256
 import Conduit
 import Control.Concurrent hiding (yield)
 import qualified Control.Exception as E
-import Control.Monad (forever, forM, void, when)
+import Control.Monad (forever, forM, unless, void, when)
 import qualified Data.ByteString as B
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -53,6 +57,8 @@ import Data.Proxy
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Blockchain.Strato.Model.MicroTime (Microtime (..))
+import qualified Strato.Tracing as Tr
 import Data.Time.Clock
 import Prometheus as P
 import Text.Format
@@ -306,7 +312,11 @@ unseqEventHandler events = do
   let transactions = [(ts, tx) | IETx ts tx <- events]
 
   when (not $ null transactions) $ record "inevent_type_transaction" "IngestTransactions" (length transactions)
-  transformFullTransactions transactions
+  newTxs <- transformFullTransactions transactions
+  -- Only the proposer's VM builds blocks, so a new transaction is what tells
+  -- the other validators to expect a proposal. Re-gossip of a transaction we
+  -- already witnessed does not count: it may be committed already.
+  unless (newTxs == 0) $ lift createNewViewTimer
 
   forM_ events $ \event ->
     case event of
@@ -364,13 +374,10 @@ blockstanbulSend' ::
   InEvent -> ConduitT i SeqOutEvent m [OutputBlock]
 blockstanbulSend' msg = do
   (p2pevs, vmevs, committedBlocks) <- lift $ do
-    case msg of
-      UnannouncedBlock blk -> createNewViewTimer blk
-      _ -> pure ()
     resp <- sendAllMessages [msg]
     let blocks = [b | ToCommit b <- resp]
     for_ resp $ \case
-      ResetTimer vw -> createNewTimer vw
+      ResetTimer vw -> createNewTimer vw >> carryViewTimer vw
       FailedHistoric blk -> A.delete (Proxy @DependentBlockEntry) (blockHash blk) -- First time using `delete`
       _ -> pure ()
     updateViewTimer
@@ -386,6 +393,7 @@ blockstanbulSend' msg = do
       $logWarnS "seq/pbft/send" . T.pack $
         "Rejected " ++ show droppedCount ++ " committed block(s) with unrecoverable transaction signatures"
     committedBlocks <- catMaybes <$> traverse insertEmitted rBlocks
+    liftIO $ recordSequencedSpans committedBlocks
     let (vms, p2ps) = vmEvenP2pCheckptFilterHelper resp
 
     let vmevs =
@@ -433,13 +441,34 @@ blockstanbulSend' msg = do
     vmEvenP2pCheckptFilterHelper [] = ([], [])
 
 transformFullTransactions ::
-  ( MonadLogger m,
+  ( MonadIO m,
+    MonadLogger m,
     MonadMonitor m,
     (Keccak256 `A.Alters` ()) m
   ) =>
-  [(Timestamp, IngestTx)] -> ConduitT i SeqOutEvent m ()
-transformFullTransactions pairs = do
+  [(Timestamp, IngestTx)] -> ConduitT i SeqOutEvent m Int
+transformFullTransactions = transformFullTransactionsWith nodeIntakeRules
+
+-- | 'transformFullTransactions' under explicit intake rules. Every loose
+-- transaction passes here whatever brought it (the HTTP API, strato-ingest or
+-- a peer), so this is where a malformed envelope is refused for good: before
+-- it is witnessed, gossiped, handed to the VM or indexed.
+transformFullTransactionsWith ::
+  ( MonadIO m,
+    MonadLogger m,
+    MonadMonitor m,
+    (Keccak256 `A.Alters` ()) m
+  ) =>
+  IntakeRules -> [(Timestamp, IngestTx)] -> ConduitT i SeqOutEvent m Int
+transformFullTransactionsWith intakeRules submitted = do
   let logF = logFF "transformEvents/emitTxs"
+  (pairs, refused) <- liftIO $ partitionIntake intakeRules (itTransaction . snd) submitted
+  lift . forM_ refused $ \((_, itx), reason) -> do
+    -- The hash and a fixed label, so the log line stays one line.
+    $logWarnS "transformEvents/intake" . T.pack $
+      "Refusing malformed transaction " ++ format (transactionHash (itTransaction itx))
+        ++ ": " ++ T.unpack (intakeRejectionLabel reason)
+    P.withLabel seqTxsRefused (intakeRejectionLabel reason) P.incCounter
   mOtxs <- lift . forM pairs $ \(ts, itx) ->
     wrapTransaction itx >>= \case
       Nothing -> return Nothing
@@ -458,9 +487,11 @@ transformFullTransactions pairs = do
 
 
   let txs = catMaybes mOtxs
+  lift . liftIO $ recordReceivedSpans txs
   lift . logF $ "Sending " ++ show (length txs) ++ " public transactions to P2P and the VM"
   yieldToVm $ map pairToVmTx txs
   yieldToP2p $ map (P2pTx . snd) txs
+  pure $ length txs
 
 emitOrCacheHistoricBlock ::
   ( MonadLogger m,
@@ -519,7 +550,13 @@ runConsensus sb = do
     then emitOrCacheHistoricBlock sb
     -- Blockstanbul will check that the seals and validators match up before
     -- announcing it to the network or forwarding to the EVM.
-    else void . blockstanbulSend' $ UnannouncedBlock blk
+    else case sbOrigin sb of
+      TO.Quarry -> void . blockstanbulSend' $ UnannouncedBlock blk
+      -- Only this node's own VM builds candidates. An unsealed block from anywhere
+      -- else would be stamped, sealed and proposed as ours.
+      origin ->
+        $logWarnS "runConsensus" . T.pack $
+          "Ignoring unsealed " ++ shortDescription sb ++ " from " ++ format origin ++ ": not a candidate built by this node"
 
 transformBlocks ::
   ( MonadLogger m,
@@ -539,8 +576,9 @@ transformBlocks ibs = do
           "Rejecting " ++ prettyIBlock ib
           ++ " - could not recover signer for tx(s): " ++ unwords failedTxHashes
         lift $ P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
-      Just sb -> do
-        runConsensus sb
+      Just sb
+        | not (isMalformedBlock sb) -> runConsensus sb
+        | otherwise -> pure ()
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock {ibOrigin = o, ibBlockData = bd, ibReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
@@ -557,3 +595,42 @@ prettyTx IngestTx {itOrigin = o, itTransaction = t} = prefix t ++ " via " ++ sho
 
     shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
     shortOrigin x = format x
+
+-- | Transaction-trace spans (see Strato.Tracing: the trace id derives from
+-- the hash, so these land in the same trace as the API's submit span and
+-- the VM's execute span with nothing propagated).
+--
+-- "tx.received": from the API's submit timestamp (carried on the ingest
+-- event) to the sequencer taking the transaction, so the span's length is
+-- the submit-to-sequencer latency itself.
+recordReceivedSpans :: [(Timestamp, OutputTx)] -> IO ()
+recordReceivedSpans txs = do
+  enabled <- Tr.tracingEnabled
+  when enabled $ do
+    now <- Tr.nowNanos
+    forM_ txs $ \(Microtime micros, otx) ->
+      Tr.recordSpan (Tr.traceIdFromHash (keccak256ToByteString (otHash otx))) Nothing "tx.received" Tr.Consumer (micros * 1000) now
+        [ Tr.attrText "strato.tx_hash" (T.pack (keccak256ToHex (otHash otx))),
+          Tr.attrText "strato.stage" "sequencer",
+          Tr.attrText "strato.origin" (T.pack (show (otOrigin otx)))
+        ]
+        []
+        Nothing
+
+-- | "tx.sequenced": the instant a committed block carrying the transaction
+-- leaves the sequencer for the VM and the peers.
+recordSequencedSpans :: [OutputBlock] -> IO ()
+recordSequencedSpans blocks = do
+  enabled <- Tr.tracingEnabled
+  when enabled $ do
+    now <- Tr.nowNanos
+    forM_ blocks $ \ob ->
+      forM_ (obReceiptTransactions ob) $ \otx ->
+        Tr.recordSpan (Tr.traceIdFromHash (keccak256ToByteString (otHash otx))) Nothing "tx.sequenced" Tr.Internal now now
+          [ Tr.attrText "strato.tx_hash" (T.pack (keccak256ToHex (otHash otx))),
+            Tr.attrText "strato.stage" "sequencer",
+            Tr.attrInt "strato.block_number" (number (obBlockData ob)),
+            Tr.attrText "strato.block_hash" (T.pack (keccak256ToHex (blockHeaderHash (obBlockData ob))))
+          ]
+          []
+          Nothing

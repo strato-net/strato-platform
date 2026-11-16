@@ -11,7 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE, mUsdstAddress } from "@/lib/constants";
+import { LENDING_DEPOSIT_CALLS, LENDING_WITHDRAW_CALLS, mUsdstAddress, usdstAddress } from "@/lib/constants";
+import NetworkFee, { FeeNotices } from "@/components/NetworkFee";
+import { computeMaxTransferable } from "@/utils/transferValidation";
+import { feeCurrencySpend, feeShortfall } from "@/utils/feeUtils";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
@@ -22,7 +25,7 @@ import { findBestEarnApyInfo } from "@/utils/earnUtils";
 const LendingPoolSection = () => {
   const { isLoggedIn } = useUser();
   const { activeTokens: tokens, loading, fetchTokens } = useUserTokens();
-  const { fetchUsdstBalance } = useTokenContext();
+  const { fetchUsdstBalance, feeQuote } = useTokenContext();
   const {
     liquidityInfo,
     loadingLiquidity,
@@ -71,11 +74,10 @@ const LendingPoolSection = () => {
     try {
       const amountWei = safeParseUnits(depositAmount, 18);
       const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
-      const feeWei = safeParseUnits(LENDING_DEPOSIT_FEE, 18);
 
       if (amountWei <= 0n) return false;
       if (amountWei > availableWei) return false;
-      if (amountWei + feeWei > availableWei) return false;
+      if (feeQuote && feeShortfall(feeQuote, LENDING_DEPOSIT_CALLS, feeCurrencySpend(feeQuote, usdstAddress, amountWei))) return false;
       return true;
     } catch {
       return false;
@@ -88,12 +90,10 @@ const LendingPoolSection = () => {
     try {
       const amountWei = safeParseUnits(withdrawAmount, 18);
       const maxWithdrawableWei = getMaxWithdrawableAmount();
-      const feeWei = safeParseUnits(LENDING_WITHDRAW_FEE, 18);
-      const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
 
       if (amountWei <= 0n) return false;
       if (amountWei > maxWithdrawableWei) return false;
-      if (usdstBalanceWei < feeWei) return false;
+      if (feeQuote && feeShortfall(feeQuote, LENDING_WITHDRAW_CALLS)) return false;
       return true;
     } catch {
       return false;
@@ -195,10 +195,9 @@ const LendingPoolSection = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
-                        const feeWei = safeParseUnits(LENDING_DEPOSIT_FEE, 18);
-                        const maxDepositableWei = availableWei > feeWei ? availableWei - feeWei : 0n;
-                        const formatted = formatUnits(maxDepositableWei, 18);
+                        const availableWei = liquidityInfo?.supplyable?.userBalance || "0";
+                        const maxDepositableWei = computeMaxTransferable(availableWei, usdstAddress, LENDING_DEPOSIT_CALLS, feeQuote, () => {});
+                        const formatted = formatUnits(BigInt(maxDepositableWei), 18);
 
                         // Clamp to 18 decimals
                         const [whole, frac = ""] = formatted.split(".");
@@ -221,7 +220,7 @@ const LendingPoolSection = () => {
                   </div>
                   {/* Fee Display */}
                   <div className="text-sm text-muted-foreground mt-1">
-                    Transaction Fee: {LENDING_DEPOSIT_FEE} USDST
+                    Transaction Fee: <NetworkFee calls={LENDING_DEPOSIT_CALLS} />
                   </div>
                   {/* Estimated Rewards */}
                   <RewardsWidget
@@ -231,37 +230,13 @@ const LendingPoolSection = () => {
                     actionLabel="Deposit"
                   />
                   {/* Fee Warning */}
-                  {(() => {
-                    const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
-                    const feeWei = safeParseUnits(LENDING_DEPOSIT_FEE, 18);
-                    const depositAmountWei = depositAmount ? safeParseUnits(depositAmount, 18) : 0n;
-
-                    // Check if user has enough USDST for fee
-                    const isInsufficientUsdstForFee = !loadingLiquidity && availableWei < feeWei;
-
-                    // Check if deposit amount + fee exceeds available balance
-                    const isInsufficientBalanceForDepositAndFee = !loadingLiquidity && depositAmountWei + feeWei > availableWei && depositAmountWei <= availableWei;
-
-                    // Check if remaining balance after deposit and fee is low
-                    const lowBalanceThreshold = safeParseUnits("0.10", 18);
-                    const remainingBalance = availableWei - depositAmountWei - feeWei;
-                    const isLowBalanceWarning = depositAmountWei > 0n && remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
-
-                    return (
-                      <>
-                        {isInsufficientBalanceForDepositAndFee && (
-                          <p className="text-yellow-600 text-sm mt-1">
-                            Insufficient USDST balance for transaction fee ({LENDING_DEPOSIT_FEE} USDST)
-                          </p>
-                        )}
-                        {isLowBalanceWarning && !isInsufficientUsdstForFee && !isInsufficientBalanceForDepositAndFee && (
-                          <p className="text-yellow-600 text-sm mt-1">
-                            Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
-                          </p>
-                        )}
-                      </>
-                    );
-                  })()}
+                  {!loadingLiquidity && (
+                    <FeeNotices
+                      calls={LENDING_DEPOSIT_CALLS}
+                      spendingWei={depositAmount ? safeParseUnits(depositAmount, 18) : 0n}
+                      tokenAddress={usdstAddress}
+                    />
+                  )}
                   {/* Mobile Button */}
                   <Button
                     onClick={() => handleLiquidityAction("deposit")}
@@ -334,10 +309,7 @@ const LendingPoolSection = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
-                        const feeWei = safeParseUnits(LENDING_WITHDRAW_FEE, 18);
-
-                        if (usdstBalanceWei < feeWei) return;
+                        if (feeQuote && feeShortfall(feeQuote, LENDING_WITHDRAW_CALLS)) return;
 
                         const maxWithdrawableWei = getMaxWithdrawableAmount();
 
@@ -366,7 +338,7 @@ const LendingPoolSection = () => {
                   </div>
                   {/* Fee Display */}
                   <div className="text-sm text-muted-foreground mt-1">
-                    Transaction Fee: {LENDING_WITHDRAW_FEE} USDST
+                    Transaction Fee: <NetworkFee calls={LENDING_WITHDRAW_CALLS} />
                   </div>
                   {/* Estimated Rewards Display */}
                   <RewardsWidget
@@ -391,33 +363,7 @@ const LendingPoolSection = () => {
                     ) : null;
                   })()}
                   {/* Fee Warning */}
-                  {(() => {
-                    const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
-                    const feeWei = safeParseUnits(LENDING_WITHDRAW_FEE, 18);
-
-                    // Check if user has enough USDST for fee
-                    const isInsufficientUsdstForFee = !loadingLiquidity && usdstBalanceWei < feeWei;
-
-                    // Check if remaining balance after fee is low
-                    const lowBalanceThreshold = safeParseUnits("0.10", 18);
-                    const remainingBalance = usdstBalanceWei - feeWei;
-                    const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
-
-                    return (
-                      <>
-                        {isInsufficientUsdstForFee && (
-                          <p className="text-yellow-600 text-sm mt-1">
-                            Insufficient USDST balance for transaction fee ({LENDING_WITHDRAW_FEE} USDST)
-                          </p>
-                        )}
-                        {isLowBalanceWarning && !isInsufficientUsdstForFee && (
-                          <p className="text-yellow-600 text-sm mt-1">
-                            Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
-                          </p>
-                        )}
-                      </>
-                    );
-                  })()}
+                  {!loadingLiquidity && <FeeNotices calls={LENDING_WITHDRAW_CALLS} />}
                   {/* Mobile Button */}
                   <Tooltip>
                     <TooltipTrigger asChild>

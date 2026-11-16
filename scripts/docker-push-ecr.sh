@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-# Push locally built images to AWS ECR, tolerating immutable tags.
+# Push locally built images to a registry (AWS ECR by default, any registry
+# with --registry-glob, e.g. 'ghcr.io/strato-net/strato-platform/*'), tolerating immutable tags.
 #
 # ECR repositories with tag immutability reject a push of a tag that already
 # exists ("... cannot be overwritten because the repository is immutable").
@@ -8,11 +9,12 @@
 # re-runs of a build whose tags are already in ECR. This script:
 #
 #   1. Collects image refs from compose files (-f) and/or positional args, and
-#      keeps only those living in an ECR registry (see --registry-glob). For our
-#      *.push.ecr.yml files this is exactly the set of services with a `build:`
+#      keeps only those living in the target registry (see --registry-glob). For
+#      our *.push.yml files this is exactly the set of services with a `build:`
 #      section - the third-party images (postgres, redis, ...) are not ours to push.
-#   2. Skips any image whose tag already exists in the registry
-#      (checked with `docker manifest inspect`, which reuses the `docker login`).
+#   2. Skips any image that was not built locally, and any image whose tag
+#      already exists in the registry (checked with `docker manifest inspect`,
+#      which reuses the `docker login`).
 #   3. Pushes the rest one by one. If a push still fails with the immutable-tag
 #      error (e.g. a race with a parallel build), it is logged and tolerated.
 #      Any other push failure fails the script.
@@ -21,7 +23,8 @@
 #   scripts/docker-push-ecr.sh [-f compose.yml]... [--dry-run] [--registry-glob GLOB] [IMAGE]...
 #
 # Examples:
-#   scripts/docker-push-ecr.sh -f docker-compose.push.ecr.yml -f docker-compose.vault.push.ecr.yml
+#   scripts/docker-push-ecr.sh -f docker-compose.vault.push.yml -f docker-compose.highway.push.yml
+#   scripts/docker-push-ecr.sh --registry-glob 'ghcr.io/strato-net/strato-platform/*' ghcr.io/strato-net/strato-platform/strato:19.5-abc1234-0123456789ab
 #   scripts/docker-push-ecr.sh 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/bridge:19.0-abc1234-0123456789ab
 #
 # Requires an authenticated docker CLI (run `aws ecr get-login-password | docker login ...` first).
@@ -105,6 +108,14 @@ push_log="$(mktemp)"
 trap 'rm -f "$push_log"' EXIT
 
 for img in "${TARGETS[@]}"; do
+  # Not every build makes every image (make local skips the app tier's
+  # app-nginx and history, for example): push what this build produced.
+  if ! docker image inspect "$img" >/dev/null 2>&1; then
+    log "SKIP  $img (not built locally)"
+    skipped=$((skipped + 1))
+    continue
+  fi
+
   if docker manifest inspect "$img" >/dev/null 2>&1; then
     log "SKIP  $img (tag already exists in registry)"
     skipped=$((skipped + 1))

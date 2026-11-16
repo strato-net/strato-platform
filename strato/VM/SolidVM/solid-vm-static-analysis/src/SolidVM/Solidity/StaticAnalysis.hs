@@ -14,6 +14,7 @@ import qualified SolidVM.Solidity.StaticAnalysis.Expressions.DivideBeforeMultipl
 import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions as ConstantFunctions
 import qualified SolidVM.Solidity.StaticAnalysis.Pragmas.IncorrectSolidityVersion as IncorrectSolidityVersion
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.StateVariableShadowing as StateVariableShadowing
+import qualified SolidVM.Solidity.StaticAnalysis.Statements.Unchecked as Unchecked
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.UninitializedLocalVariables as UninitializedLocalVariables
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite as WriteAfterWrite
 import qualified SolidVM.Solidity.StaticAnalysis.Trivial as Trivial
@@ -33,6 +34,7 @@ compilerWarningDetectors =
     DivideBeforeMultiply.detector,
     StateVariableShadowing.detector,
     UninitializedLocalVariables.detector,
+    Unchecked.detector,
     WriteAfterWrite.detector,
     ConstantFunctions.detector,
     StateVariables.detector

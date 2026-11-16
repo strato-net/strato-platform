@@ -6,14 +6,21 @@ import { initDbPool } from "./utils/dbService";
 import { errorHandler, notFoundHandler } from "./api/middleware/errorHandler";
 import { requestContext } from "./utils/requestContext";
 import { requestLogger, getRequestStats, resetRequestStats } from "./api/middleware/requestLogger";
+import { tracingMiddleware } from "./utils/tracing";
 
 const PORT = process.env.PORT || 3001;
 
 const app = express();
 
+// Request tracing first, so every later middleware and handler runs inside
+// the request's trace context.
+app.use(tracingMiddleware);
+
 app.use(
   cors(),
   express.json({
+    // nginx's limit on /api/: an admin issue's args can carry a whole contract source
+    limit: "1mb",
     verify: (req: any, _res, buf) => {
       req.rawBody = buf;
     },

@@ -16,7 +16,7 @@ async function singleCheck() {
     if (MONITOR_URL) {
       await queryNetworkHealthStatus();
     } else {
-      updateNetworkHealthStatus(
+      await updateNetworkHealthStatus(
         {
           healthPublicInfo: {
             latestHealthStatus: false,
@@ -29,14 +29,16 @@ async function singleCheck() {
     winston.info("Network health status queried at " + moment().format());
   } catch (err) {
     winston.error("Network health status error: " + err.message);
-    updateNetworkHealthStatus(
+    await updateNetworkHealthStatus(
       {
         healthPublicInfo: {
           latestHealthStatus: false,
         }
       },
       "UNKNOWN"
-    );
+    ).catch((error) => {
+      winston.error("Could not store network health status: " + error.message);
+    });
   }
 }
 

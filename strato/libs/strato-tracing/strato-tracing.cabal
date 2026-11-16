@@ -1,0 +1,56 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           strato-tracing
+version:        0.1.0.0
+synopsis:       Minimal OpenTelemetry tracing for STRATO processes
+description:    W3C trace context propagation, request spans for WAI apps, and after-the-fact spans for transaction stages, exported as OTLP/JSON to a local collector (the ADOT sidecar or a cell collector). No-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set.
+build-type:     Simple
+
+library
+  exposed-modules:
+      Strato.Tracing
+      Strato.Tracing.Wai
+  other-modules:
+      Paths_strato_tracing
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Werror
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , base16-bytestring
+    , bytestring
+    , containers
+    , http-client
+    , http-types
+    , random
+    , stm
+    , text
+    , time
+    , wai
+  default-language: Haskell2010
+
+benchmark tracing-bench
+  type: exitcode-stdio-1.0
+  main-is: TracingBench.hs
+  other-modules:
+      Paths_strato_tracing
+  hs-source-dirs:
+      bench
+  ghc-options: -O2 -threaded -rtsopts "-with-rtsopts=-N2"
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , bytestring
+    , criterion
+    , http-types
+    , stm
+    , strato-tracing
+    , text
+    , wai
+    , warp
+  default-language: Haskell2010

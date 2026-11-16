@@ -27,6 +27,7 @@ interface UnsignedTx {
     functionName?: string;
     args?: string[];
     network?: string;
+    chainId: number | string;
   };
 }
 
@@ -76,9 +77,13 @@ async function fetchUnsignedTxs(
 
 async function signOne(walletClient: WalletClient, tx: UnsignedTx): Promise<string> {
   const d = tx.data;
+  const chainId = Number(d.chainId);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+    throw new Error("Invalid STRATO transaction chain ID");
+  }
   return walletClient.signTypedData({
     account: walletClient.account!,
-    domain: { name: "STRATO", version: "1" },
+    domain: { name: "STRATO", version: "1", chainId },
     types: {
       Transaction: [
         { name: "to", type: "address" },
@@ -113,6 +118,7 @@ async function submitSigned(
     funcName: tx.data.functionName,
     args: tx.data.args,
     network: tx.data.network ?? SIGNING_NETWORK,
+    chainId: tx.data.chainId,
     r: sig.r,
     s: sig.s,
     v: sig.v,
@@ -126,7 +132,7 @@ async function submitSigned(
   return typeof data === "string" ? data : data?.hash ?? tx.hash ?? "";
 }
 
-async function pollResults(
+export async function pollResults(
   hashes: string[],
   userAddress: string,
   timeout = 60000,
@@ -139,8 +145,11 @@ async function pollResults(
       skipErrorToast: true,
     });
     const list = Array.isArray(results) ? results : [];
-    if (list.every((r: any) => r?.status !== "Pending")) return list;
-    if (Date.now() - start >= timeout) return list;
+    if (hashes.length > 0 && hashes.every((hash) => list.some((r: any) =>
+      r?.hash?.replace(/^0x/, "") === hash.replace(/^0x/, "") &&
+      (r.status === "Success" || r.status === "Failure")
+    ))) return list;
+    if (Date.now() - start >= timeout) throw new Error("Transaction confirmation timed out; check its status before retrying");
     await new Promise((r) => setTimeout(r, interval));
   }
 }
@@ -166,5 +175,5 @@ export async function signAndSubmitViaWallet(
   const results = await pollResults(hashes, userAddress);
   const failed = results.find((r: any) => r?.status === "Failure");
   if (failed) throw new Error(failed.txResult?.message || failed.message || "Transaction failed");
-  return results[0] ?? { status: "Success", hash: hashes[0] };
+  return results[0];
 }

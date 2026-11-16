@@ -2,7 +2,7 @@
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
-const { rest, util } = require('blockapps-rest');
+const { rest, util } = require('./strato');
 const STAKING = 'd6726e06c3c71a3bad80b5eb6925707a31729b81';
 const TOKEN = '8ee9a3391e38176feebf5d43cb2c1d6c4f728b04';
 const VALIDATORS = [

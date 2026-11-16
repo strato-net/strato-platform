@@ -8,11 +8,12 @@ const si = require("systeminformation");
 const config = require("../config/app.config");
 const getPbftData = require("../controllers/health")["getPbftData"];
 const findView = require("../controllers/health")["findView"];
+const redisBlockDB = require("../lib/redis-block-db");
 const os = require('os');
 
 // TODO: do the mass-refactoring of the daemon. Use the OOP! Really, don't even try refactoring this without the main Object (SingleCheck object with methods and shared params). Don't change any db data formats.
 
-const neededJobs = {
+const defaultNeededJobs = {
   slipstream_main: "slipstream",
   strato_p2p: "strato-p2p",
   vm_main: "vm-runner",
@@ -21,9 +22,22 @@ const neededJobs = {
   "core-api": "core-api",
 };
 
-const maxStalledIntervals = config.healthCheck.maxStalledIntervals;
+// HEALTH_CHECK_JOBS ("location=job,...") replaces the set above where some of
+// those processes are not in this Prometheus: an API tier's apex reading a core
+// cell's Prometheus has no core-api there (strato-api runs next to apex).
+function parseNeededJobs(spec) {
+  const jobs = {};
+  for (const pair of spec.split(",")) {
+    const [location, job] = pair.split("=").map((x) => (x || "").trim());
+    if (location && job) jobs[location] = job;
+  }
+  return Object.keys(jobs).length ? jobs : defaultNeededJobs;
+}
+const neededJobs = process.env.HEALTH_CHECK_JOBS
+  ? parseNeededJobs(process.env.HEALTH_CHECK_JOBS)
+  : defaultNeededJobs;
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+const maxStalledIntervals = config.healthCheck.maxStalledIntervals;
 
 async function singleCheck() {
   try {
@@ -60,6 +74,18 @@ function queryHealthStatus() {
   }).timeout(config.healthCheck.requestTimeout - 80);
 }
 
+// health_check is a gauge each process sets to 1 once at startup, so a
+// process that is gone shows only through its scrape failing. Prometheus
+// marks the series stale on a failed scrape, but not series it only replayed
+// from its WAL: after a restart (a host reboot that brought the containers
+// back without convoke) the last pre-restart samples stay visible for the
+// query lookback (5 minutes), and an instant query's timestamp is the
+// evaluation time, not the sample time, so the age check below cannot tell.
+// up is written on every scrape attempt, so keeping only the series whose
+// target is up now is right within one scrape interval. Matched on job alone:
+// metric_relabel_configs rewrite instance on scraped series, not on up.
+const healthCheckQuery = "health_check and on(job) (up == 1)";
+
 function getPrometheusMetrics() {
   if (!process.env["PROMETHEUS_HOST"]) {
     throw Error(
@@ -68,7 +94,8 @@ function getPrometheusMetrics() {
   }
   return axios({
     method: "GET",
-    url: `http://${process.env["PROMETHEUS_HOST"]}/prometheus/api/v1/query?query=health_check`,
+    url: `http://${process.env["PROMETHEUS_HOST"]}/prometheus/api/v1/query`,
+    params: { query: healthCheckQuery },
     maxRedirects: 0,
     timeout: config.healthCheck.requestTimeout - 100,
   }).then((res) => res.data);
@@ -85,20 +112,12 @@ async function checkNodeSyncStallStatus(syncStat) {
 
   let isStalled = false;
 
-  const { number: currVmBlockNum = 0 } = await BlockDataRef.findOne({
-    where: {
-      pow_verified: true,
-      is_confirmed: true,
-    },
-    order: [["number", "DESC"]],
-    attributes: ["number"],
-    raw: true,
-  });
+  const currVmBlockNum = await getIndexedBlockNumber();
 
   const pbftInfo = await getPbftData();
   const { sequence_number: currSeqBlockNum = 0 } = findView(pbftInfo);
 
-  const { isSynced = false} = await getStratoMetadata();
+  const isSynced = await getIsSynced();
 
   try {
     if (isSynced) {
@@ -158,6 +177,52 @@ async function checkNodeSyncStallStatus(syncStat) {
   };
 
   return [isSynced, additionalSyncInfo];
+}
+
+// The last indexed block number: Redis first (the block cache strato-indexer
+// keeps, the same source as /health), block_data_ref as the fallback where
+// there is no Redis block cache. A lite validator has no block_data_ref.
+async function getIndexedBlockNumber() {
+  try {
+    const number = await redisBlockDB.getBestBlockNumber();
+    if (number !== null) return number;
+  } catch (err) {
+    winston.debug(`No Redis block cache here, reading the indexed block number from SQL: ${err.message}`);
+  }
+  try {
+    const row = await BlockDataRef.findOne({
+      where: {
+        pow_verified: true,
+        is_confirmed: true,
+      },
+      order: [["number", "DESC"]],
+      attributes: ["number"],
+      raw: true,
+    });
+    return row ? row.number : 0;
+  } catch (err) {
+    winston.warn(`Unable to read the indexed block number: ${err.message}`);
+    return 0;
+  }
+}
+
+// Whether the node considers itself synced. /eth/v1.2/metadata's isSynced is
+// the verdict wherever strato-api runs: it is the Redis sync flag AND Cirrus
+// caught up to the node's best block, and health must not report synced
+// while slipstream is still behind. A lite validator runs no strato-api and
+// no slipstream, so there the Redis flag alone is the answer.
+async function getIsSynced() {
+  if (process.env.APEX_ROLE === "validator") {
+    try {
+      const status = await redisBlockDB.getSyncStatus();
+      if (status !== null) return status;
+    } catch (err) {
+      winston.debug(`No Redis sync status here: ${err.message}`);
+    }
+    return false;
+  }
+  const { isSynced = false } = await getStratoMetadata();
+  return isSynced;
 }
 
 async function getStratoMetadata() {
@@ -254,7 +319,7 @@ async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics) {
   let currentTime = Date.now();
   let failedChecks = [];
 
-  Object.keys(prometheusHealthMetrics).forEach(async (keyProcess) => {
+  for (const keyProcess of Object.keys(prometheusHealthMetrics)) {
     if (!prometheusHealthMetrics[keyProcess]) {
       failedChecks.push(`${keyProcess} is unavailable`);
     }
@@ -264,7 +329,7 @@ async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics) {
       HealthStatus: prometheusHealthMetrics[keyProcess],
       timestamp: currentTime,
     });
-  });
+  }
 
   if (!process.env.vaultUrl) {
     winston.error('Vault URL not configured!');

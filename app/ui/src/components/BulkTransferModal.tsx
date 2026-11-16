@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Token } from "@/interface";
-import { TRANSFER_FEE } from "@/lib/constants";
+import NetworkFee from "@/components/NetworkFee";
 import { Upload, AlertCircle, CheckCircle2, XCircle, Download, Loader2, Clock } from "lucide-react";
 import {
   Dialog,
@@ -270,8 +270,6 @@ const BulkTransferModal = ({
   });
 
   const hasInsufficientBalance = insufficientBalanceTokens.length > 0;
-
-  const totalFee = BigInt(validTransfers.length) * safeParseUnits(TRANSFER_FEE, 18);
 
   const handleConfirmTransfer = async () => {
     if (validTransfers.length === 0) return;
@@ -581,9 +579,9 @@ const BulkTransferModal = ({
             <span className="font-medium">{Object.keys(transfersByToken).length}</span>
           </div>
           <div className="flex justify-between text-sm flex-wrap gap-1">
-            <span className="text-muted-foreground text-xs sm:text-sm">Total Fee ({validTransfers.length} x {TRANSFER_FEE} USDST)</span>
+            <span className="text-muted-foreground text-xs sm:text-sm">Total Fee ({validTransfers.length} calls)</span>
             <span className="font-medium">
-              {formatBalance(totalFee, "USDST", 18, 2, 2)}
+              <NetworkFee calls={validTransfers.length} />
             </span>
           </div>
         </div>

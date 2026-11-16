@@ -23,6 +23,7 @@ module Blockchain.DB.MemAddressStateDB
     deleteBlockMap,
     dirtyBlockMap,
     getAddressStateMaybe,
+    getAddressStateMaybeWith,
     putAddressState,
     putAddressStates,
     resetAddressStateTxDBMap,
@@ -137,16 +138,26 @@ getAddressStateMaybe ::
   (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
   Address ->
   m (Maybe AddressState)
-getAddressStateMaybe address = do
+getAddressStateMaybe = getAddressStateMaybeWith DB.getAddressStateMaybe
+
+-- | The block map first; on a miss, ask @onMiss@ (the trie, or whatever else
+-- holds the state) and remember an account it finds in the block map.
+getAddressStateMaybeWith ::
+  (Monad m, HasMemAddressStateDB m) =>
+  (Address -> m (Maybe AddressState)) ->
+  Address ->
+  m (Maybe AddressState)
+getAddressStateMaybeWith onMiss address = do
   theBMap <- getAddressStateBlockDBMap
   case lookupBlockMap address theBMap of
     Just (Just (ASModification addressState)) -> return $ Just addressState
     Just (Just ASDeleted) -> return $ Just blankAddressState
     _ -> do
-      result <- DB.getAddressStateMaybe address
+      result <- onMiss address
       forM_ result $ \addressState ->
         putAddressStateBlockDBMap $ insertReadBlockMap address (Just (ASModification addressState)) theBMap
       return result
+{-# INLINE getAddressStateMaybeWith #-}
 
 putAddressStateModification ::
   (Monad m, HasMemAddressStateDB m) =>

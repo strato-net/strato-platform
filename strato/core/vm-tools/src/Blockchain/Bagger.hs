@@ -25,7 +25,7 @@ import qualified Blockchain.Data.DataDefs as DD
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResult ()
-import Blockchain.Database.MerklePatricia (StateRoot (..))
+import Blockchain.Strato.Model.StateRoot (StateRoot (..))
 import Blockchain.Model.WrappedBlock (OutputBlock (..), OutputTx (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
@@ -39,10 +39,10 @@ import Blockchain.Wiring ()
 import Blockchain.VMMetrics
 import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
 import qualified Blockchain.EthConf.Model as Conf
-import Blockchain.Data.ExecResults (ExecResults, erEvents, erLogs)
+import Blockchain.Data.ExecResults (ExecResults, erEvents, erLogs, prependConsensusDeltas)
 import Blockchain.Data.LogsBloom (bloomFromItems, emptyLogsBloom)
 import SolidVM.Model.Event (evContractAddress, evTopics)
-import Blockchain.Forks (isBlockRewardReceiptForkActive, isReceiptsRootForkActive)
+import Blockchain.Forks (isBlockRewardReceiptForkActive, isFeeConsensusDeltaForkActive, isReceiptsRootForkActive, isReplayProtectionForkActive, isStratoGasForkActive)
 import qualified Blockchain.Verification as V
 import Blockchain.Data.Receipt (Receipt)
 import Control.Monad
@@ -119,9 +119,13 @@ attachBlockRewards' ::
 attachBlockRewards' bd (Just rewardResult) (trr : rest)
   | isBlockRewardReceiptForkActive (number bd),
     Right er <- trrResult trr =
-      let merged = er { erEvents = erEvents rewardResult ++ erEvents er,
-                        erLogs = erLogs rewardResult ++ erLogs er
-                      }
+      let withEvents = er { erEvents = erEvents rewardResult ++ erEvents er,
+                            erLogs = erLogs rewardResult ++ erLogs er
+                          }
+          -- the reward call's validator and stake changes travel with its events
+          merged
+            | isFeeConsensusDeltaForkActive (number bd) = prependConsensusDeltas rewardResult withEvents
+            | otherwise = withEvents
        in (trr {trrResult = Right merged} : rest, Nothing)
 -- A run that produced transactions owns the block's first receipt, so nothing is
 -- owed onward: either the merge above happened, or this is a pre-fork block (or
@@ -152,6 +156,9 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress p
     Just f@TFIntrinsicGasExceedsTxLimit {} -> recoverable f
     Just f@TFNonceMismatch {} -> error $ "mineTransactions' we messed up: " ++ format f
     Just f@TFTXSizeLimitExceeded {} -> recoverable f
+    Just f@TFIncorrectChainId {} -> recoverable f
+    Just f@TFInvalidEnvelope {} -> recoverable f
+    Just f@TFFeeBoundExceeded {} -> recoverable f
 
 
 -- todo batch insert results
@@ -222,8 +229,14 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
     (p s q ++ formatKeccak256WithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
   TXSizeLimitExceeded s q e l OutputTx {otHash = hsh} ->
     (p s q ++ "tx size limit exceeded. Limit: " ++ show l ++ " Actual: " ++ show e, hsh)
+  ChainIdMismatch s q expected OutputTx {otHash = hsh, otBaseTx = bt} ->
+    (p s q ++ "incorrect chain ID (expected: " ++ show expected ++ ", actual: " ++ show (TD.chainId bt) ++ ")", hsh)
   AdminFlushed s q scope OutputTx {otHash = hsh} ->
     (p s q ++ "administratively flushed from mempool with scope " ++ show scope, hsh)
+  InvalidEnvelope s q why OutputTx {otHash = hsh} ->
+    (p s q ++ "an invalid envelope: " ++ why, hsh)
+  FeeBoundExceeded s q quote bound OutputTx {otHash = hsh} ->
+    (p s q ++ "the quoted fee (" ++ show quote ++ ") exceeding the signed fee bound (" ++ show bound ++ "); requote and resubmit", hsh)
   where
     p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
     p' s q = p s q ++ "low "
@@ -589,16 +602,21 @@ isValidForPool :: MonadBagger m => OutputTx -> m (Either TxRejection ())
 isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = do
   -- todo: is this everything that can be checked? be more pedantic and check for neg. balance, etc?
   state <- getBaggerState
-  let intrinsicGas = B.calculateIntrinsicGasAtNextBlock state t
-      txn = TD.nonce bt
+  let txn = TD.nonce bt
       txFee = B.calculateIntrinsicTxFee state t
       txSize = toInteger $ BS.length $ BL.toStrict $ Bin.encode bt
-      gLimit = Conf.gasLimit (networkConfig ethConf)
       sizeLimit = toInteger (Conf.txSizeLimit (networkConfig ethConf))
+      nextBlock = number (B.bestBlockHeader $ B.miningCache state) + 1
+      expectedChainId = Conf.chainId $ networkConfig ethConf
   (addressNonce, addressBalance) <- getAddressNonceAndBalance address
+  -- The best block's quote: the block being built requotes when it starts, so
+  -- this is a first filter and execution has the final say.
+  quote <- if isStratoGasForkActive nextBlock then quotedStratoFee else return 0
   return $
     if
-      | intrinsicGas >= gLimit -> Left $ GasLimitTooLow Validation Incoming intrinsicGas gLimit t
+      | chainIdRequired (isReplayProtectionForkActive nextBlock) bt && not (transactionChainIdValid expectedChainId bt) -> Left $ ChainIdMismatch Validation Incoming expectedChainId t
+      | Just why <- envelopeRejection (isStratoGasForkActive nextBlock) bt -> Left $ InvalidEnvelope Validation Incoming why t
+      | Just (q, bound) <- feeBoundRejection quote bt -> Left $ FeeBoundExceeded Validation Incoming q bound t
       | addressNonce > txn -> Left $ NonceTooLow Validation Incoming addressNonce t
       | addressBalance < txFee -> Left $ BalanceTooLow Validation Incoming txFee addressBalance t
       | txSize >= sizeLimit -> Left $ TXSizeLimitExceeded Validation Incoming txSize sizeLimit t
@@ -680,6 +698,13 @@ buildNextBlockHeader ::
 buildNextBlockHeader parentHeader parentHash stateRoot txs receipts bloom time vd sd =
   let parentNum = number parentHeader
       blockNum = parentNum + 1
+      -- Never stamp a child before its parent. The parent's proposer may have
+      -- run a little ahead of our clock, and verifiers reject a backwards stamp
+      -- (checkTimestampMonotonic).
+      -- Both the header the block's transactions execute against and the
+      -- sealed header are built here, so block.timestamp during execution and
+      -- in the proposed header agree.
+      time' = max time (timestamp parentHeader)
       (newV, remV) = fromDelta vd
       (curValidators, curStakes) = case parentHeader of
         BlockHeader{} -> (S.toList $ getValidatorSet parentHeader, [])
@@ -696,7 +721,7 @@ buildNextBlockHeader parentHeader parentHash stateRoot txs receipts bloom time v
             receiptsRoot = rcptRoot,
             logsBloom = bloom,
             number = parentNum + 1,
-            timestamp = time,
+            timestamp = time',
             extraData = extra,
             currentValidators = curValidators,
             newValidators = newV,
@@ -714,7 +739,7 @@ buildNextBlockHeader parentHeader parentHash stateRoot txs receipts bloom time v
             receiptsRoot = rcptRoot,
             logsBloom = bloom,
             number = parentNum + 1,
-            timestamp = time,
+            timestamp = time',
             extraData = extra,
             currentValidators = curValidators,
             newValidators = newV,

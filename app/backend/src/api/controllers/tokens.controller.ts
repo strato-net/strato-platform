@@ -9,7 +9,6 @@ import {
   approveToken,
   transferFromToken,
   setTokenStatus,
-  getVoucherBalance,
   getTransferableTokens,
   getTokenStats,
   getAccountNonce,
@@ -184,21 +183,6 @@ class TokensController {
       return next();
     } catch (e) {
       return next(e);
-    }
-  }
-
-  static async getVoucherBalance(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, address: userAddress } = req;
-
-      const balance = await getVoucherBalance(accessToken, userAddress);
-      res.status(RestStatus.OK).json({ balance });
-    } catch (error) {
-      next(error);
     }
   }
 

@@ -18,7 +18,7 @@ library:
     - bytestring
     - format
     - streaming
-    - merkle-patricia-db
+    - statedb-monad
     - monad-alter
     - prometheus-client
     - strato-model

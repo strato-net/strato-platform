@@ -45,7 +45,32 @@ redisConnection r =
 
 data EthConf = EthConf
   { sqlConfig :: SqlConf,
+    -- | Optional read endpoint for the eth database (a replica); the API
+    -- tier reads it and keeps 'sqlConfig' for writes and the few reads that
+    -- must see the latest commit.
+    sqlReaderConfig :: Maybe SqlConf,
     cirrusConfig :: SqlConf,
+    -- | The core cells' transaction ingress endpoints (strato-ingest), for
+    -- an API tier that runs no sequencer of its own: a submitted batch is
+    -- posted to every one of them. Empty on a node, which writes its own
+    -- stream directly.
+    ingressUrls :: [String],
+    -- | This core's name among the cores that share one Postgres cluster:
+    -- the writer lease is held by a cell, and cell-local consumer groups
+    -- carry the name. Missing means the hostname.
+    cellId :: Maybe String,
+    -- | Where strato-p2p and ethereum-discover keep peers and sync tasks.
+    -- strato-p2p resets every peer's active state at startup, so cores that
+    -- share a cluster each need their own; missing means the eth database,
+    -- as on a monolith.
+    peerDbConfig :: Maybe SqlConf,
+    -- | Keep the peer store in this SQLite file (relative to the node
+    -- directory) instead of Postgres. Peers and sync tasks are per-node
+    -- operational state, so a core whose Postgres is elsewhere keeps them
+    -- on its own disk and its networking no longer depends on the
+    -- database being reachable. Takes precedence over 'peerDbConfig'.
+    -- Missing means Postgres, as on a monolith.
+    peerSqlitePath :: Maybe FilePath,
     redisBlockDBConfig :: RedisBlockDBConf,
     streamingConfig :: StreamingConf,
     levelDBConfig :: LevelDBConf,
@@ -69,7 +94,12 @@ kafkaConfig = streamingConfig
 instance FromJSON EthConf where
   parseJSON = withObject "EthConf" $ \v -> EthConf
     <$> v .: "sqlConfig"
+    <*> v .:? "sqlReaderConfig"
     <*> v .: "cirrusConfig"
+    <*> v .:? "ingressUrls" .!= []
+    <*> v .:? "cellId"
+    <*> v .:? "peerDbConfig"
+    <*> v .:? "peerSqlitePath"
     <*> v .: "redisBlockDBConfig"
     <*> (v .:? "streamingConfig" .!= def <|> v .: "kafkaConfig")
     <*> v .:? "levelDBConfig" .!= def
@@ -116,8 +146,21 @@ data P2PConf = P2PConf
   , maxReturnedHeaders :: Int
   , averageTxsPerBlock :: Int
   , maxHeadersTxsLens :: Int
+  , listenPort :: Int
   }
-  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+  deriving (Show, Eq, Generic, ToJSON)
+
+-- listenPort (the TCP port strato-p2p listens on and ethereum-discover
+-- advertises) is optional so ethconf.yaml files written before it existed
+-- still parse.
+instance FromJSON P2PConf where
+  parseJSON = withObject "P2PConf" $ \v -> P2PConf
+    <$> v .: "maxConnections"
+    <*> v .: "connectionTimeout"
+    <*> v .: "maxReturnedHeaders"
+    <*> v .: "averageTxsPerBlock"
+    <*> v .: "maxHeadersTxsLens"
+    <*> v .:? "listenPort" .!= 30303
 
 data SqlConf = SqlConf
   { user :: String,
@@ -181,7 +224,13 @@ data QuarryConf = QuarryConf
 
 data ContractsConf = ContractsConf
   { railgunProxy :: Maybe Address  -- ^ RailgunSmartWallet proxy contract address
-  , nativeTokenAddress :: Address  -- ^ ERC20 treated as native token (e.g. USDST)
+  , nativeTokenAddress :: Address
+    -- ^ ERC20 treated as native token (USDST on the live networks) until the
+    -- STRATO-gas fork; see 'nativeTokenAt'.
+  , nativeTokenBalancesField :: Maybe String
+    -- ^ Name of the native token's balances mapping in SolidVM storage, so
+    -- eth_getBalance can be answered from the SQL state mirror instead of a
+    -- vm-runner round trip. Missing means "_balances" (OpenZeppelin ERC20).
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -215,13 +264,27 @@ instance FromJSON UrlConfig where
 
 data NetworkConf = NetworkConf
   { network :: String
+  -- | What strato-setup set this directory up as (its @--role@: node, core,
+  -- api, api-node or validator). Written for every directory and only read
+  -- back, by strato-ps; no process acts on it. Absent from files written
+  -- before it existed, which reads as node.
+  , role :: String
   , networkID :: Integer
   , chainId :: Integer
   , httpPort :: Int
   , txSizeLimit :: Int
-  , gasLimit :: Integer
   , blockPeriodMs :: Int
   , roundPeriodS :: Int
+  -- | Seconds a proposed block's header timestamp may run ahead of this node's
+  -- clock before the node refuses to vote for it (a rejected proposal triggers
+  -- a round change). Local policy, not consensus: it is consulted only while
+  -- voting, never when replaying or syncing committed blocks, so nodes with
+  -- different values do not fork, they only differ on which proposals they
+  -- vote for. Must be positive: stamps are rounded to the nearest second, so
+  -- an honest proposer can legitimately run up to half a second ahead, plus
+  -- whatever clock skew separates the validators. The default matches the
+  -- tolerance common Ethereum clients use.
+  , maxTimestampDriftS :: Int
   -- | Block number from which stake-weighted proposer selection (BlockHeaderV3)
   -- is in force. 'Nothing' means "from genesis". Every node of a network must
   -- agree on this value.
@@ -243,13 +306,14 @@ instance FromJSON NetworkConf where
   parseJSON = withObject "NetworkConf" $ \v -> do
     net <- v .:? "network" .!= "upquark"
     NetworkConf net
-      <$> v .:? "networkID" .!= (-1)
+      <$> v .:? "role" .!= "node"
+      <*> v .:? "networkID" .!= (-1)
       <*> v .:? "chainId" .!= computeChainId net
       <*> v .:? "httpPort" .!= 8081
       <*> v .:? "txSizeLimit" .!= 2097152
-      <*> v .:? "gasLimit" .!= 1000000
       <*> v .:? "blockPeriodMs" .!= 1000
       <*> v .:? "roundPeriodS" .!= 3600
+      <*> v .:? "maxTimestampDriftS" .!= defaultMaxTimestampDriftS
       <*> v .:? "stakingActivationBlock" .!= defaultStakingActivationBlock net
       <*> v .:? "stakingContractAddress" .!= defaultStakingContractAddress net
       <*> v .:? "stakingEventsFromGovernanceBlock" .!= defaultStakingEventsFromGovernanceBlock net
@@ -260,11 +324,15 @@ instance FromJSON NetworkConf where
 stakingNotScheduled :: Integer
 stakingNotScheduled = 2 ^ (62 :: Int)
 
+-- | Default for 'maxTimestampDriftS'.
+defaultMaxTimestampDriftS :: Int
+defaultMaxTimestampDriftS = 15
+
 -- | Existing live networks default to "not scheduled"; anything else (fresh
 -- dev/test networks) activates from genesis.
 defaultStakingActivationBlock :: String -> Maybe Integer
 defaultStakingActivationBlock net
-  | net == "upquark" = Just 1000000
+  | net == "upquark" = Just 2000000
   | net `elem` ["lithium", "mercata", "mercata-hydrogen", "uranium"] = Just stakingNotScheduled
   | take 6 net == "helium" = Just 250000
   | otherwise = Nothing
@@ -305,6 +373,40 @@ stakeEventSourceAt conf height
   | maybe False (height >=) (stakingEventsFromGovernanceBlock conf) = Just governanceAddress
   | otherwise = stakingContractAddress conf
 
+-- | The STRATO token on the networks whose native currency migrates to it.
+stratoTokenAddress :: String -> Maybe Address
+stratoTokenAddress net
+  | take 6 net == "helium" = Just 0x8ee9a3391e38176feebf5d43cb2c1d6c4f728b04
+  | net == "upquark" = Just 0x2ca3e170e6714282da77815f7864b17f612f5f83
+  | net == "forktest" = Just 0xac621a150f49198036f84ffe90b4f2286b623583
+  | otherwise = Nothing
+
+-- | Block from which STRATO is the native currency: what eth_getBalance
+-- reports and what a native-value transfer moves. Fees already burn STRATO
+-- wherever DeciderState points at a FeeRouter; the native-token switch is
+-- consensus-visible, so a live network keeps the configured token until its
+-- flag day (helium: 2026-10-19 tip 804099 + 50000, rounded up to 900000;
+-- upquark: 1000000, ahead of its staking activation at 2000000;
+-- forktest: the mainnet-activation rehearsal, far enough past its idle tip
+-- that the lazy-block network only reaches it when driven there).
+-- A network without a STRATO token never leaves it.
+stratoGasForkBlock :: String -> Integer
+stratoGasForkBlock net
+  | take 6 net == "helium" = 900000
+  | net == "upquark" = 1000000
+  | net == "forktest" = 1000
+  | otherwise = 0
+
+-- | The token native balances and native-value transfers refer to at this
+-- height. Proposer, verifier and the RPC all go through this, so every side
+-- switches at the same block.
+nativeTokenAt :: EthConf -> Integer -> Address
+nativeTokenAt conf height
+  | height >= stratoGasForkBlock net, Just strato <- stratoTokenAddress net = strato
+  | otherwise = nativeTokenAddress (contractsConfig conf)
+  where
+    net = network (networkConfig conf)
+
 -- EIP-155 chain ID: keccak256(networkName), first 6 bytes (48 bits).
 -- Fits in JS Number.MAX_SAFE_INTEGER with room for v = chainId * 2 + 35.
 computeChainId :: String -> Integer
@@ -320,9 +422,23 @@ data DebugConfig = DebugConfig
 data VmConf = VmConf
   { sqlDiff :: Bool
   , diffPublish :: Bool
+  -- | Publish transaction results, actions and code collections on the
+  -- @vmevents@ stream for slipstream. Off on a node that runs no slipstream
+  -- (a lite validator): JLog only trims a topic as its readers advance, so a
+  -- stream nobody reads would grow for good.
+  , publishVmEvents :: Bool
   -- | Ceiling on concurrent in-flight simulations; excess are shed (503) so
   -- simulations can't starve block processing on the shared VM. Default 8.
   , simMaxConcurrent :: Int
+  -- | Base URLs of vm-query services (phase 5), tried in order. Set,
+  -- ethereum-jsonrpc sends latest-state calls, simulations and call traces
+  -- there, against the SQL state mirror. Empty, everything goes to
+  -- vm-runner as before.
+  , vmQueryUrls :: [String]
+  -- | True on a tier with no consensus VM of its own (the API tier): what
+  -- vm-query cannot serve, or cannot be reached for, is answered with an
+  -- error instead of being sent to vm-runner.
+  , vmQueryOnly :: Bool
   }
   deriving (Show, Eq, Generic, ToJSON)
 
@@ -332,7 +448,10 @@ instance FromJSON VmConf where
   parseJSON = withObject "VmConf" $ \v -> VmConf
     <$> v .:? "sqlDiff" .!= True
     <*> v .:? "diffPublish" .!= True
+    <*> v .:? "publishVmEvents" .!= True
     <*> v .:? "simMaxConcurrent" .!= 8
+    <*> ((\single many -> maybe [] pure single ++ many) <$> v .:? "vmQueryUrl" <*> v .:? "vmQueryUrls" .!= [])
+    <*> v .:? "vmQueryOnly" .!= False
 
 -- Default instances
 
@@ -390,6 +509,7 @@ instance Default P2PConf where
     , maxReturnedHeaders = 500
     , averageTxsPerBlock = 40
     , maxHeadersTxsLens = 2500
+    , listenPort = 30303
     }
 
 instance Default ApiConfig where
@@ -407,13 +527,17 @@ instance Default VmConf where
   def = VmConf
     { sqlDiff = True
     , diffPublish = True
+    , publishVmEvents = True
     , simMaxConcurrent = 8
+    , vmQueryUrls = []
+    , vmQueryOnly = False
     }
 
 instance Default ContractsConf where
   def = ContractsConf
     { railgunProxy = Nothing
     , nativeTokenAddress = 0
+    , nativeTokenBalancesField = Nothing
     }
 
 instance Default UrlConfig where
@@ -430,13 +554,14 @@ instance Default UrlConfig where
 instance Default NetworkConf where
   def = NetworkConf
     { network = "upquark"
+    , role = "node"
     , networkID = -1  -- will be computed from network name
     , chainId = computeChainId "upquark"
     , httpPort = 8081
     , txSizeLimit = 2097152  -- 2 MiB
-    , gasLimit = 1000000
     , blockPeriodMs = 1000   -- minimum delay between blocks
     , roundPeriodS = 3600    -- backstop: seconds without progress before a forced round change
+    , maxTimestampDriftS = defaultMaxTimestampDriftS
     , stakingActivationBlock = defaultStakingActivationBlock "upquark"
     , stakingContractAddress = defaultStakingContractAddress "upquark"
     , stakingEventsFromGovernanceBlock = defaultStakingEventsFromGovernanceBlock "upquark"
@@ -445,7 +570,12 @@ instance Default NetworkConf where
 instance Default EthConf where
   def = EthConf
     { sqlConfig = def
+    , sqlReaderConfig = Nothing
     , cirrusConfig = def { database = "cirrus" }
+    , ingressUrls = []
+    , cellId = Nothing
+    , peerDbConfig = Nothing
+    , peerSqlitePath = Nothing
     , redisBlockDBConfig = def
     , streamingConfig = def
     , levelDBConfig = def

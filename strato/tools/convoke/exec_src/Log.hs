@@ -5,6 +5,7 @@ module Log
   , sayBlock
   ) where
 
+import Control.Exception (IOException, handle)
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
 import System.IO
@@ -55,11 +56,23 @@ stamp = do
 say :: String -> IO ()
 say msg = do
   p <- stamp
-  hPutStrLn stderr $ p ++ msg
+  ignoreWriteErrors $ hPutStrLn stderr $ p ++ msg
 
 -- | Log a titled, indented block (a process table dump, a tail of a log) in one
 -- write, so it cannot be interleaved with other lines part-way through.
 sayBlock :: String -> [String] -> IO ()
 sayBlock title ls = do
   p <- stamp
-  hPutStr stderr $ unlines $ (p ++ title) : map ("    " ++) ls
+  ignoreWriteErrors $ hPutStr stderr $ unlines $ (p ++ title) : map ("    " ++) ls
+
+-- | A line that cannot be written is dropped; it must never be fatal. stderr
+-- is a pipe into "tee" (see 'setupLogging'), and when the terminal that ran
+-- strato-up goes away the tee can go with it, so the next write here fails
+-- with "resource vanished (Broken pipe)". Letting that escape 'supervise' took
+-- convoke down without 'killAllProcesses' or "docker compose down": every
+-- child kept running with no supervisor, and strato-down had nothing to stop.
+ignoreWriteErrors :: IO () -> IO ()
+ignoreWriteErrors = handle ignore
+  where
+    ignore :: IOException -> IO ()
+    ignore _ = return ()

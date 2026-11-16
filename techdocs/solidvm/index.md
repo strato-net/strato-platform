@@ -25,7 +25,7 @@ The parser accepts any `pragma <name> <value>;` line. None of them change behavi
 
 ## Gas and limits
 
-- Every transaction gets a fixed budget of **400,000 gas**, whatever `gasLimit` it carries. A node's `gasLimit` setting can lower this cap but not raise it.
+- Every transaction gets a fixed budget of **600,000 gas**, whatever `gasLimit` it carries. The budget is the same on every node and is not configurable.
 - Gas measures interpreter work. Most statements and expressions cost one unit. Arithmetic on large numbers and string concatenation cost more, and the cryptographic builtins have their own prices (see [Cryptography](language.md#cryptography)).
 - A transaction that runs out fails with `TooMuchGas`.
 - Gas is only a work limit. It is not bought with tokens, and transaction fees are charged separately (see [Transactions and Fees](../platform/transactions-and-fees.md)).
@@ -55,7 +55,6 @@ A few earlier helium-only switches, all below block 33,918, only matter when rep
 ## Tools
 
 - `solid-vm-cli` parses, typechecks, analyzes and tests contracts locally. See [Testing with solid-vm-cli](testing.md).
-- The VS Code extension in `strato-vscode/` uses `solid-vm-cli` for diagnostics and debugging.
 
 ## In this section
 

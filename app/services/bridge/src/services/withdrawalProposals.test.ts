@@ -9,7 +9,6 @@ import * as stratoHelper from "../utils/stratoHelper";
 import { proposeTransactions } from "../utils/safeHelper";
 import { buildWithdrawalOrigin, parseWithdrawalOrigin } from "../utils/withdrawalOrigin";
 import * as safeService from "./safeService";
-import * as cirrusService from "./cirrusService";
 import * as emailService from "./emailService";
 import { confirmWithdrawalBatch, proposeRecordedCustodyTxs } from "./bridgeService";
 import { withdrawalProposalJournal } from "./withdrawalProposalJournal";
@@ -74,16 +73,14 @@ const withStubs = async (
   };
   const originals = {
     execute: stratoHelper.execute,
+    executeGoverned: stratoHelper.executeGoverned,
     create: safeService.createSafeTransactions,
     propose: safeService.proposeSafeTransactions,
     nonce: safeService.getSafeOnChainNonce,
     payouts: safeService.findWithdrawalPayouts,
-    feeTerms: cirrusService.getWithdrawalFeeTerms,
     email: emailService.default,
   };
-  // No withdrawal here committed a solver fee schedule, so every payout is a direct transfer
-  (cirrusService as any).getWithdrawalFeeTerms = async () => new Map();
-  (stratoHelper as any).execute = async (input: FunctionInput) => {
+  (stratoHelper as any).execute = (stratoHelper as any).executeGoverned = async (input: FunctionInput) => {
     seen.executed.push(input);
     await stubs.execute(input);
     return { status: "Success", hash: "0xstrato" };
@@ -112,11 +109,11 @@ const withStubs = async (
     await run(seen);
   } finally {
     (stratoHelper as any).execute = originals.execute;
+    (stratoHelper as any).executeGoverned = originals.executeGoverned;
     (safeService as any).createSafeTransactions = originals.create;
     (safeService as any).proposeSafeTransactions = originals.propose;
     (safeService as any).getSafeOnChainNonce = originals.nonce;
     (safeService as any).findWithdrawalPayouts = originals.payouts;
-    (cirrusService as any).getWithdrawalFeeTerms = originals.feeTerms;
     (emailService as any).default = originals.email;
   }
 };

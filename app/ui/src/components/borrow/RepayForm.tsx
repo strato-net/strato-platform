@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { REPAY_FEE } from "@/lib/constants";
+import { REPAY_CALLS, usdstAddress } from "@/lib/constants";
+import NetworkFee from "@/components/NetworkFee";
+import { useTokenContext } from "@/context/TokenContext";
 import { safeParseUnits, addCommasToInput, formatUnits, formatBalance } from "@/utils/numberUtils";
 import { NewLoanData } from "@/interface";
 import { calculateRepayHealthImpact } from "@/utils/lendingUtils";
@@ -16,7 +18,6 @@ interface RepayFormProps {
   repayLoading: boolean;
   onRepay: (amount: string) => void;
   usdstBalance: string;
-  voucherBalance: string;
   guestMode?: boolean;
 }
 
@@ -60,7 +61,8 @@ const FormattedAmount = ({
   );
 };
 
-const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance, guestMode = false }: RepayFormProps) => {
+const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, guestMode = false }: RepayFormProps) => {
+  const { feeQuote } = useTokenContext();
   const [repayAmount, setRepayAmount] = useState<string>("");
   const [repayAmountError, setRepayAmountError] = useState<string>("");
   const [feeError, setFeeError] = useState<string>("");
@@ -73,18 +75,11 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance,
   });
   const maxAmount = useMemo(() => {
     const availableBalance = (BigInt(usdstBalance) - 1n).toString();
-    const maxTransferable = computeMaxTransferable(
-      availableBalance,
-      true,
-      voucherBalance,
-      availableBalance,
-      safeParseUnits(REPAY_FEE).toString(),
-      setFeeError
-    );
-    
+    const maxTransferable = computeMaxTransferable(availableBalance, usdstAddress, REPAY_CALLS, feeQuote, setFeeError);
+
     const totalOwed = BigInt(loans?.totalAmountOwed || 0);
     return BigInt(maxTransferable) < totalOwed ? maxTransferable : totalOwed.toString();
-  }, [voucherBalance, usdstBalance, loans?.totalAmountOwed]);
+  }, [feeQuote, usdstBalance, loans?.totalAmountOwed]);
 
   // Calculate risk level when repay amount changes
   useEffect(() => {
@@ -290,7 +285,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance,
       <div className="px-4 py-3 bg-muted/50 rounded-md">
         <div className="flex justify-between text-sm mb-2">
           <span className="text-muted-foreground">Transaction Fee</span>
-          <span className="font-medium">{REPAY_FEE} USDST ({parseFloat(REPAY_FEE) * 100} voucher)</span>
+          <span className="font-medium"><NetworkFee calls={REPAY_CALLS} /></span>
         </div>
         { feeError && (
           <p className="text-yellow-600 dark:text-yellow-500 text-sm mt-1">{feeError}</p>

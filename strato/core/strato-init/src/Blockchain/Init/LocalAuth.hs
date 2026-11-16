@@ -2,12 +2,12 @@ module Blockchain.Init.LocalAuth
   ( setupLocalAuthSecrets
   ) where
 
-import Control.Monad (unless, void)
+import Control.Monad (unless)
 import qualified Data.ByteString as BS
 import System.Environment (lookupEnv)
 import System.Entropy (getEntropy)
 import System.FilePath ((</>))
-import Turtle (chmod, roo)
+import System.Posix.Files (setFileMode, ownerReadMode)
 import UnliftIO.Directory (doesFileExist)
 
 setupLocalAuthSecrets :: IO ()
@@ -27,12 +27,8 @@ setupGeneratedSecret fileName label envName len = do
       Just value | not (null value) -> return value
       _ -> generatePassword len
     putStrLn $ "  Creating " ++ label ++ " file: " ++ path
-    writeSecret path secret
-
-writeSecret :: FilePath -> String -> IO ()
-writeSecret path value = do
-  writeFile path value
-  void $ chmod roo path
+    writeFile path secret
+  setFileMode path ownerReadMode
 
 generatePassword :: Int -> IO String
 generatePassword len = do

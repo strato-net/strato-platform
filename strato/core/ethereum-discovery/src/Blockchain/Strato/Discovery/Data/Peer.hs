@@ -37,6 +37,7 @@ module Blockchain.Strato.Discovery.Data.Peer
     resetPeerUdp,
     getPeersClosestTo,
     disableUDPPeerForSeconds,
+    disableTCPPeerForSeconds,
     jamshidBirth,
     lengthenPeerDisableBy,
     pPeerString,
@@ -136,12 +137,17 @@ class HasPeerDB m where
   getPeerBondingState :: Host -> Point -> m (Maybe Int)
   getBondedPeers :: m (Either SomeException [PPeer])
   getBondedPeersForUDP :: m (Either SomeException [PPeer])
+  -- | Bonded peers with UDP enabled, whether or not an ETH handshake has
+  -- proven them to be on this network: what a joining node has to ask.
+  getAnyBondedPeersForUDP :: m (Either SomeException [PPeer])
   getUnbondedPeers :: m [PPeer]
   getClosestPeers :: Point -> Natural -> m [PPeer]
 
   updateUdpEnableTime :: PPeer -> UTCTime -> m ()
   updateIP :: PPeer -> IP -> m ()
   updateTcpPort :: PPeer -> TCPPort -> m ()
+  -- Never moves the deadline closer: a fixed ban (disableTCPPeerForSeconds)
+  -- outlives the shorter disables of later failures and courtesy waits.
   updateTcpEnableTime :: PPeer -> UTCTime -> m ()
   updateUdpPort :: PPeer -> UDPPort -> m ()
   updatePeerDisable :: PPeer -> PeerDisable -> m ()
@@ -232,6 +238,21 @@ disableUDPPeerForSeconds peer seconds = try $ do
       let seconds' = thisOr100Years seconds
           enableTime = fromIntegral seconds' `addUTCTime` currentTime
        in updateUdpEnableTime peer enableTime
+
+-- | Keep a peer from being dialed for a fixed time. Unlike
+-- 'lengthenPeerDisableBy', which starts a fresh peer's exponential backoff at
+-- five seconds, the deadline is the full duration, and 'updateTcpEnableTime'
+-- never moves it closer. The UDP deadline is left alone: discovery resets it
+-- on every reply, so it cannot hold a fixed ban.
+disableTCPPeerForSeconds ::
+  (MonadUnliftIO m, HasPeerDB m) =>
+  PPeer ->
+  Int ->
+  m (Either SomeException ())
+disableTCPPeerForSeconds peer seconds = try $ do
+  currentTime <- liftIO getCurrentTime
+  let enableTime = fromIntegral (thisOr100Years seconds) `addUTCTime` currentTime
+  updateTcpEnableTime peer enableTime
 
 resetPeers :: IO ()
 resetPeers = withGlobalSQLPool $ runSqlPool (SQL.updateWhere [] [PPeerActiveState SQL.=. 0])

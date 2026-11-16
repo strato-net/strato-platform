@@ -13,7 +13,7 @@ import Blockchain.Data.BlockHeader
 import Blockchain.Data.RLP
 import Blockchain.Data.Receipt
 import Blockchain.Data.Transaction
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Strato.Model.Keccak256
 import Data.Functor.Identity
 import Prelude.Unicode

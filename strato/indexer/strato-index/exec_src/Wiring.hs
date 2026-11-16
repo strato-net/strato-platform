@@ -9,10 +9,9 @@
 
 module Wiring where
 
-import Blockchain.BlockDB
 import Blockchain.DBM
 import Blockchain.Data.BlockDB
-import Blockchain.Data.Transaction (insertTX)
+import Blockchain.Data.Transaction (insertTXWithSigners)
 import Blockchain.DB.SQLDB
 import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
@@ -30,17 +29,20 @@ import qualified Data.Map.Strict as M
 instance HasSQLDB m => (Keccak256 `A.Alters` API OutputTx) m where
   lookup _ _ = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputTx"
   delete _ _ = liftIO . throwIO $ Delete "API" "Keccak256" "OutputTx"
-  insert _ _ (API OutputTx {..}) = void $ insertTX Log otOrigin Nothing [otBaseTx]
+  insert _ _ (API OutputTx {..}) = insertTXWithSigners Log otOrigin Nothing [(otSigner, otBaseTx)]
 
 instance HasSQLDB m => (Keccak256 `A.Alters` API OutputBlock) m where
   lookup _ _ = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputBlock"
   delete _ _ = liftIO . throwIO $ Delete "API" "Keccak256" "OutputBlock"
-  insert _ _ (API ob) = void $ putBlocks [outputBlockToBlockRetainPayloads ob] False
+  insert _ _ (API ob) = putOutputBlocks [ob]
   insertMany _ =
-    void
-      . flip putBlocks False
-      . map (outputBlockToBlockRetainPayloads . unAPI)
-      . M.elems
+    putOutputBlocks . map unAPI . M.elems
+
+putOutputBlocks :: HasSQLDB m => [OutputBlock] -> m ()
+putOutputBlocks blocks =
+  void $ putBlocks
+    (M.fromList [(otHash tx, otSigner tx) | block <- blocks, tx <- obReceiptTransactions block])
+    (map outputBlockToBlockRetainPayloads blocks) False
 
 instance (MonadIO m, HasRedis m) => Mod.Modifiable (P2P BestBlock) m where
   get _ = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
@@ -49,13 +51,3 @@ instance (MonadIO m, HasRedis m) => Mod.Modifiable (P2P BestBlock) m where
     case result of
       Right _ -> pure ()
       Left err -> error $ "Failed to update best block in Redis: " ++ show err
-
-instance (MonadIO m, HasRedis m) => (Keccak256 `A.Alters` P2P OutputBlock) m where
-  lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "OutputBlock"
-  delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "OutputBlock"
-  insert _ _ =
-    void
-      . execRedis
-      . putBlock
-      . unP2P
-

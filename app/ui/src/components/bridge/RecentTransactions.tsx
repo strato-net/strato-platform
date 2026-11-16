@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { ArrowDown, ArrowUp, Gem, Frown } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
+import { metalPurchasesEnabled } from '@/lib/constants';
 import { useBridgeContext } from '@/context/BridgeContext';
 import { formatBalance } from '@/utils/numberUtils';
 import { mergePendingDeposits } from '@/lib/bridge/utils';
@@ -33,8 +34,6 @@ const STATUS_LABELS: Record<number, { text: string; color: string }> = {
   1: { text: "Initiated", color: "bg-blue-500/15 text-blue-500" },
   // Deposit received but held: the requested route cannot be minted
   6: { text: "On Hold", color: "bg-orange-500/15 text-orange-500" },
-  // Posted by a solver against a bond; the relayer has not observed the deposit yet
-  7: { text: "Announced", color: "bg-sky-500/15 text-sky-500" },
 };
 const UNKNOWN_STATUS = { text: "Unknown", color: "bg-muted text-muted-foreground" };
 const METAL_STATUS = STATUS_LABELS[3];
@@ -271,6 +270,13 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
               ? emptyState
               : renderTxRows(activeTxs)
         }
+        {!metalPurchasesEnabled && isBridge && isLoggedIn && (
+          <div className="border-t border-border/70 px-4 py-3">
+            <Link to="/metal-transactions?from=deposits" className={linkClass}>
+              Metal purchase history {"\u2192"}
+            </Link>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

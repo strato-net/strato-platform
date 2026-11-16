@@ -13,6 +13,7 @@ module Control.Monad.Composable.CodeDB
   ( CodeDBM,
     HasCodeDBAccess,
     runCodeDBM,
+    lookupCode,
     lookupCodeCollection,
     lookupCodeHash,
     lookupDelegatecallCodeHashes,
@@ -24,7 +25,7 @@ where
 
 import BlockApps.Logging (runNoLoggingT)
 import Blockchain.DB.CodeDB (DBCode)
-import Blockchain.DB.SQLDB (SQLDB (..), CirrusDB (..))
+import Blockchain.DB.SQLDB (SQLDB (..), CirrusDB (..), sqlDB, unSQLDB)
 import Blockchain.Data.AddressStateDB (AddressState)
 import Blockchain.Data.DataDefs (AddressStateRef (..), CodeRef (..), EntityField (..))
 import Blockchain.EthConf (connStr, cirrusConnStr)
@@ -76,7 +77,7 @@ globalCodeDBEnv :: IORef CodeDBEnv
 globalCodeDBEnv = unsafePerformIO $ do
   sPool <- runNoLoggingT $ PSQL.createPostgresqlPool connStr 5
   cPool <- runNoLoggingT $ PSQL.createPostgresqlPool cirrusConnStr 5
-  newIORef $ CodeDBEnv (SQLDB sPool) (CirrusDB cPool)
+  newIORef $ CodeDBEnv (sqlDB sPool) (CirrusDB cPool)
 {-# NOINLINE globalCodeDBEnv #-}
 
 runCodeDBM :: MonadIO m => CodeDBM '[] a -> m a
@@ -143,31 +144,33 @@ data EventRow = EventRow
 -- | The Cirrus @event@ table stores @address@ without a @0x@ prefix, so any
 -- prefix on the address filter is stripped before comparison (mirroring
 -- 'queryEventsByTxHash').
-queryEvents :: Maybe Text -> Integer -> Integer -> Maybe Text -> Int -> CodeDBM '[] [EventRow]
-queryEvents mAddr0 fromBlock toBlock mEventName limit = do
-  let mAddr = fmap (\a -> if T.isPrefixOf "0x" a then T.drop 2 a else a) mAddr0
-      addressFilter = case mAddr of
-        Just _addr -> ["LOWER(address) = LOWER(?)"]
-        Nothing -> []
+queryEvents :: Maybe [Text] -> Maybe Text -> Integer -> Integer -> Maybe Text -> Int -> CodeDBM '[] [EventRow]
+queryEvents mAddr0 mBlockHash fromBlock toBlock mEventName limit = do
+  let addresses = maybe [] (map (\a -> if T.isPrefixOf "0x" a || T.isPrefixOf "0X" a then T.drop 2 a else a)) mAddr0
+      addressFilter = if null addresses
+        then []
+        else ["(" ++ intercalate " OR " (replicate (length addresses) "LOWER(address) = LOWER(?)") ++ ")"]
       eventNameFilter = case mEventName of
         Just _eventName -> ["event_name = ?"]
         Nothing -> []
-      blockFilters =
-        [ "CAST(block_number AS numeric) >= ?",
-          "CAST(block_number AS numeric) <= ?"
-        ]
+      blockFilters = case mBlockHash of
+        Just _ -> ["LOWER(block_hash) = LOWER(?)"]
+        Nothing ->
+          [ "CAST(block_number AS numeric) >= ?",
+            "CAST(block_number AS numeric) <= ?"
+          ]
       baseQuery =
         "SELECT address, block_hash, transaction_hash, block_number, transaction_sender, event_index::int, event_name, attributes::text, contract_name \
         \FROM \"event\" WHERE "
           ++ intercalate " AND " (addressFilter ++ eventNameFilter ++ blockFilters)
           ++ " ORDER BY CAST(block_number AS numeric), event_index LIMIT ?"
       params =
-        maybe [] (pure . SQL.PersistText) mAddr
+        map SQL.PersistText addresses
           ++ maybe [] (pure . SQL.PersistText) mEventName
-          ++ [ SQL.PersistInt64 (fromIntegral fromBlock),
-               SQL.PersistInt64 (fromIntegral toBlock),
-               SQL.PersistInt64 (fromIntegral limit)
-             ]
+          ++ (case mBlockHash of
+                Just blockHash -> [SQL.PersistText $ if T.isPrefixOf "0x" blockHash || T.isPrefixOf "0X" blockHash then T.drop 2 blockHash else blockHash]
+                Nothing -> [SQL.PersistInt64 (fromIntegral fromBlock), SQL.PersistInt64 (fromIntegral toBlock)])
+          ++ [SQL.PersistInt64 (fromIntegral limit)]
   rows <- cirrusQuery $ SQL.rawSql (T.pack baseQuery) params
   return $ map toEventRow rows
 

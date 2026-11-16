@@ -54,7 +54,7 @@ Check before you subtract: `require(a >= b, "...")`.
 
 - `block.chainid` is the **network ID**: `33056204878082667` on upquark, `114784819836269` on helium. The EIP-155 chain ID that `eth_chainId` returns, and that wallets use, is different: `0x7030addddcf2` on upquark and `0xb165855668ca` on helium.
 - `msg.value`, `gasleft()` and `tx.gasprice` are not available.
-- Gas is a fixed work budget of 400,000 per transaction, not a fee. See [Gas and limits](index.md#gas-and-limits).
+- Gas is a fixed work budget of 600,000 per transaction, not a fee. See [Gas and limits](index.md#gas-and-limits).
 
 ## Calls
 

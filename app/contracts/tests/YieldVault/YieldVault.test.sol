@@ -1,7 +1,6 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/ERC20.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/Proxy/Proxy.sol";
 import "../../concrete/YieldVault/YieldVault.sol";
@@ -54,7 +53,7 @@ contract FailingAccrualToken is ERC20 {
     }
 }
 
-contract Describe_YieldVault is Authorizable {
+contract Describe_YieldVault {
     uint public INFINITY = 2 ** 256 - 1;
     uint public WAD = 1e18;
     uint public MAX_RATE = 1000000021979553151239153027;
@@ -65,20 +64,20 @@ contract Describe_YieldVault is Authorizable {
     address asset;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
     }
 
     function beforeEach() public {
         vault = new YieldVault(address(this));
-        asset = m.tokenFactory().createToken("ETH", "Wrapped ETH", [], [], [], "ETH", 0, 18);
-        Token(asset).setStatus(2);
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken", "ETH", "Wrapped ETH", [], [], [], "ETH", 0, 18);
+        asset = address(ret);
+        m.adminRegistry().castVoteOnIssue(asset, "setStatus", 2);
         vault.initialize(asset, "ETH Carry Vault", "carryETH");
     }
 
     function _mintAndDeposit(User user, uint amount) internal {
-        Token(asset).mint(address(user), amount);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(user), amount);
         user.do(asset, "approve", address(vault), INFINITY);
         user.do(address(vault), "deposit(uint256,address)", amount, address(user));
     }
@@ -181,7 +180,7 @@ contract Describe_YieldVault is Authorizable {
         _approveStrategy(address(strategy));
         vault.deployCapital(address(strategy), 80e18);
 
-        Token(asset).mint(address(strategy), 85e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(strategy), 85e18);
         strategy.do(asset, "approve", address(vault), INFINITY);
         vault.returnCapital(address(strategy), 85e18);
 
@@ -254,7 +253,7 @@ contract Describe_YieldVault is Authorizable {
         }
         require(reverted, "loss write-down should revert when paused");
 
-        Token(asset).mint(address(strategy), 60e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(strategy), 60e18);
         strategy.do(asset, "approve", address(vault), INFINITY);
         vault.returnCapital(address(strategy), 60e18);
         require(vault.deployedAssets() == 0, "capital return should still work while paused");
@@ -335,7 +334,7 @@ contract Describe_YieldVault is Authorizable {
     function it_cancelRequest_returns_head_request_shares() public {
         User strategy = new User();
 
-        Token(asset).mint(address(this), 100e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(this), 100e18);
         IERC20(asset).approve(address(vault), INFINITY);
         vault.deposit(100e18, address(this));
         _approveStrategy(address(strategy));
@@ -413,7 +412,7 @@ contract Describe_YieldVault is Authorizable {
         _approveStrategy(address(strategy));
         vault.deployCapital(address(strategy), 5e18);
 
-        Token(asset).mint(address(strategy), 6e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(strategy), 6e18);
         strategy.do(asset, "approve", address(vault), INFINITY);
         vault.returnCapital(address(strategy), 6e18);
 
@@ -446,7 +445,7 @@ contract Describe_YieldVault is Authorizable {
         alice.do(address(vault), "requestRedeem(uint256,address,address)", 100e18, address(alice), address(alice));
         bob.do(address(vault), "requestRedeem(uint256,address,address)", 100e18, address(bob), address(bob));
 
-        Token(asset).mint(address(strategy), 100e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(strategy), 100e18);
         strategy.do(asset, "approve", address(vault), INFINITY);
         vault.returnCapital(address(strategy), 100e18);
 
@@ -491,7 +490,7 @@ contract Describe_YieldVault is Authorizable {
         vault.deployCapital(address(strategy), 80e18);
         incumbent.do(address(vault), "redeemOrQueue(uint256,address,address)", 100e18, address(incumbent), address(incumbent));
 
-        Token(asset).mint(address(newcomer), 10e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(newcomer), 10e18);
         newcomer.do(asset, "approve", address(vault), INFINITY);
         newcomer.do(address(vault), "deposit(uint256,address)", 10e18, address(newcomer));
 
@@ -511,7 +510,7 @@ contract Describe_YieldVault is Authorizable {
         _approveStrategy(address(strategy));
         vault.deployCapital(address(strategy), 150e18);
 
-        Token(asset).mint(address(strategy), 200e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(strategy), 200e18);
         strategy.do(asset, "approve", address(vault), INFINITY);
         vault.returnCapital(address(strategy), 200e18);
 
@@ -521,7 +520,7 @@ contract Describe_YieldVault is Authorizable {
         require(vault.totalSupply() == 200e18, "queued shares should remain in total supply before processing");
         require(vault.previewDeposit(125e18) == 100e18, "deposit pricing should still include queued unprocessed shares");
 
-        Token(asset).mint(address(newcomer), 125e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(newcomer), 125e18);
         newcomer.do(asset, "approve", address(vault), INFINITY);
         newcomer.do(address(vault), "deposit(uint256,address)", 125e18, address(newcomer));
 
@@ -557,7 +556,7 @@ contract Describe_YieldVault is Authorizable {
 
         alice.do(address(vault), "requestRedeem(uint256,address,address)", 100e18, address(alice), address(alice));
 
-        Token(asset).mint(address(strategy), 100e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(strategy), 100e18);
         strategy.do(asset, "approve", address(vault), INFINITY);
         vault.returnCapital(address(strategy), 100e18);
 
@@ -604,7 +603,7 @@ contract Describe_YieldVault is Authorizable {
         vault.deployCapital(address(strategy), 80e18);
         alice.do(address(vault), "requestRedeem(uint256,address,address)", 100e18, address(alice), address(alice));
 
-        Token(asset).mint(address(strategy), 80e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(strategy), 80e18);
         strategy.do(asset, "approve", address(vault), INFINITY);
         vault.returnCapital(address(strategy), 80e18);
 
@@ -627,7 +626,7 @@ contract Describe_YieldVault is Authorizable {
         User distributor = new User();
 
         _mintAndDeposit(alice, 100e18);
-        Token(asset).mint(address(distributor), 10e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(distributor), 10e18);
         distributor.do(asset, "approve", address(vault), INFINITY);
         _configureFundedAccrual(distributor, MAX_RATE);
 
@@ -644,12 +643,12 @@ contract Describe_YieldVault is Authorizable {
         User distributor = new User();
 
         _mintAndDeposit(alice, 100e18);
-        Token(asset).mint(address(distributor), 100e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(distributor), 100e18);
         distributor.do(asset, "approve", address(vault), INFINITY);
         _configureFundedAccrual(distributor, MAX_RATE);
 
         fastForward(MONTH);
-        Token(asset).mint(address(alice), 900e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(alice), 900e18);
         alice.do(asset, "transfer", address(vault), 900e18);
 
         (uint target, uint funded) = vault.pendingAccrual();
@@ -673,14 +672,14 @@ contract Describe_YieldVault is Authorizable {
         _approveStrategy(address(strategy));
         vault.deployCapital(address(strategy), 50e18);
 
-        Token(asset).mint(address(distributor), 20e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(distributor), 20e18);
         distributor.do(asset, "approve", address(vault), INFINITY);
         _configureFundedAccrual(distributor, MAX_RATE);
 
         vault.pause();
         fastForward(MONTH);
 
-        Token(asset).mint(address(strategy), 5e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(strategy), 5e18);
         strategy.do(asset, "approve", address(vault), INFINITY);
         vault.returnCapital(address(strategy), 55e18);
 
@@ -709,7 +708,7 @@ contract Describe_YieldVault is Authorizable {
         vault.setPerSecondSavingsRate(MAX_RATE);
         fastForward(MONTH);
 
-        Token(asset).mint(address(distributor), 20e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(distributor), 20e18);
         distributor.do(asset, "approve", address(vault), INFINITY);
         uint beforeBalance = IERC20(asset).balanceOf(address(distributor));
         uint credited = vault.setRewardDistributor(address(distributor));
@@ -768,7 +767,7 @@ contract Describe_YieldVault is Authorizable {
         User distributor = new User();
 
         _mintAndDeposit(alice, 100e18);
-        Token(asset).mint(address(distributor), 1e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(distributor), 1e18);
         distributor.do(asset, "approve", address(vault), INFINITY);
         _configureFundedAccrual(distributor, MAX_RATE);
 
@@ -776,7 +775,7 @@ contract Describe_YieldVault is Authorizable {
         uint credited = vault.accrue();
         require(credited == 1e18, "accrual should cap at available funding");
 
-        Token(asset).mint(address(distributor), 10e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(distributor), 10e18);
         credited = vault.accrue();
         require(credited == 0, "underfunded amount should not become backlog");
         require(vault.totalAssets() == 101e18, "only funded reward should be credited");
@@ -787,7 +786,7 @@ contract Describe_YieldVault is Authorizable {
         User distributor = new User();
 
         _mintAndDeposit(alice, 100e18);
-        Token(asset).mint(address(distributor), 10e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(distributor), 10e18);
         distributor.do(asset, "approve", address(vault), 1e18);
         _configureFundedAccrual(distributor, MAX_RATE);
 
@@ -803,7 +802,7 @@ contract Describe_YieldVault is Authorizable {
         User distributor = new User();
 
         _mintAndDeposit(alice, 100e18);
-        Token(asset).mint(address(distributor), 20e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(distributor), 20e18);
         distributor.do(asset, "approve", address(vault), INFINITY);
         _configureFundedAccrual(distributor, MAX_RATE);
 
@@ -821,8 +820,8 @@ contract Describe_YieldVault is Authorizable {
         User newDistributor = new User();
 
         _mintAndDeposit(alice, 100e18);
-        Token(asset).mint(address(oldDistributor), 20e18);
-        Token(asset).mint(address(newDistributor), 20e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(oldDistributor), 20e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(newDistributor), 20e18);
         oldDistributor.do(asset, "approve", address(vault), INFINITY);
         newDistributor.do(asset, "approve", address(vault), INFINITY);
         _configureFundedAccrual(oldDistributor, MAX_RATE);
@@ -857,7 +856,7 @@ contract Describe_YieldVault is Authorizable {
         require(vault.totalClaimableAssets() == 100e18, "claim should be reserved");
         require(vault.accrualBaseAssets() == 100e18, "claim should leave only active assets in base");
 
-        Token(asset).mint(address(distributor), 20e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(distributor), 20e18);
         distributor.do(asset, "approve", address(vault), INFINITY);
         _configureFundedAccrual(distributor, MAX_RATE);
         fastForward(MONTH);
@@ -872,7 +871,7 @@ contract Describe_YieldVault is Authorizable {
         User distributor = new User();
 
         _mintAndDeposit(alice, 100e18);
-        Token(asset).mint(address(distributor), 10e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(distributor), 10e18);
         distributor.do(asset, "approve", address(vault), INFINITY);
         _configureFundedAccrual(distributor, MAX_RATE);
 
@@ -880,7 +879,7 @@ contract Describe_YieldVault is Authorizable {
         (, uint funded) = vault.pendingAccrual();
         require(vault.previewDeposit(100e18) == 100e18, "realized preview behavior should remain unchanged");
 
-        Token(asset).mint(address(bob), 100e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(bob), 100e18);
         bob.do(asset, "approve", address(vault), INFINITY);
         bob.do(address(vault), "deposit(uint256,address)", 100e18, address(bob));
 
@@ -896,7 +895,7 @@ contract Describe_YieldVault is Authorizable {
         User distributor = new User();
 
         _mintAndDeposit(alice, 100e18);
-        Token(asset).mint(address(distributor), 10e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(distributor), 10e18);
         distributor.do(asset, "approve", address(vault), INFINITY);
         _configureFundedAccrual(distributor, MAX_RATE);
 
@@ -979,7 +978,7 @@ contract Describe_YieldVault is Authorizable {
         User distributor = new User();
 
         _mintAndDeposit(alice, 100e18);
-        Token(asset).mint(address(distributor), 10e18);
+        m.adminRegistry().castVoteOnIssue(asset, "mint", address(distributor), 10e18);
         distributor.do(asset, "approve", address(vault), INFINITY);
         _configureFundedAccrual(distributor, MAX_RATE);
         fastForward(MONTH);

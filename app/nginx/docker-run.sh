@@ -8,6 +8,11 @@ OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 NODE_URL=${NODE_URL:-NULL}
 HOST_IP=${HOST_IP:-host.docker.internal}
 DOCKERIZED_APP=${DOCKERIZED_APP:-true}
+# Session cookie secret: from the mounted secret file unless given directly.
+if [[ -z "${SESSION_SECRET:-}" && -f /run/secrets/session_secret ]]; then
+    SESSION_SECRET=$(tr -d '[:space:]' < /run/secrets/session_secret)
+fi
+SESSION_SECRET=${SESSION_SECRET:-}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -27,14 +32,52 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ### Generate nginx.conf from template according to configuration provided
   ########
   cp /tmp/nginx.tpl.conf /tmp/nginx.conf
+  # Nameservers for the resolver directive: whatever this container was given.
+  RESOLVER=$(awk '/^nameserver/ && $2 !~ /:/ {printf "%s ", $2}' /etc/resolv.conf)
+  RESOLVER=${RESOLVER:-127.0.0.11}
+  sed -i "s/__RESOLVER__/${RESOLVER% }/g" /tmp/nginx.conf
 
   # Remove SSL lines if deployment is not SSL-enabled
   if [ "$ssl" != true ]; then
     sed -i '/#TEMPLATE_MARK_SSL/d' /tmp/nginx.conf
   fi
   
+  if [[ -z "$SESSION_SECRET" ]]; then
+    sed -i '/#TEMPLATE_MARK_SESSION_SECRET/d' /tmp/nginx.conf
+  else
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_SESSION_SECRET//g' /tmp/nginx.conf
+  fi
+  sed -i "s|__HISTORY_HOST__|${HISTORY_HOST:-}|g" /tmp/nginx.conf
+  sed -i "s|__PARTNER_REFERRALS_HOST__|${PARTNER_REFERRALS_HOST:-}|g" /tmp/nginx.conf
+  # sed replacement: escape the characters that would otherwise be read as
+  # syntax (backreference, delimiter, escape) in a generated secret
+  SESSION_SECRET_SED=$(printf '%s' "$SESSION_SECRET" | sed -e 's/[\\&|]/\\&/g')
+  sed -i "s|__SESSION_SECRET__|$SESSION_SECRET_SED|g" /tmp/nginx.conf
+  # Behind CloudFront or a TLS-terminating load balancer nginx itself sees
+  # plain HTTP, so the session cookie's Secure flag follows PUBLIC_SCHEME
+  # (ssl=true already implies it through $https); otherwise the library's
+  # own default (Secure when the request came over TLS) stays.
+  if [ "${PUBLIC_SCHEME:-}" = "https" ]; then
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_COOKIE_SECURE//g' /tmp/nginx.conf
+  else
+    sed -i '/#TEMPLATE_MARK_COOKIE_SECURE/d' /tmp/nginx.conf
+  fi
+
   DOCKER_NETWORK_CIDR=$(ip route | awk '/src/ {print $1}')
   sed -i "s|__DOCKER_NETWORK_CIDR__|$DOCKER_NETWORK_CIDR|g" /tmp/nginx.conf
+
+  # Generate set_real_ip_from directives for trusted proxy IPs
+  TRUST_PROXY_LINES=""
+  if [ -n "${NGINX_TRUST_PROXY_CIDRS:-}" ]; then
+    IFS=',' read -ra CIDRS <<< "$NGINX_TRUST_PROXY_CIDRS"
+    for cidr in "${CIDRS[@]}"; do
+      cidr=$(echo "$cidr" | xargs) # trim whitespace
+      if [ -n "$cidr" ]; then
+        TRUST_PROXY_LINES="${TRUST_PROXY_LINES}    set_real_ip_from ${cidr};\n"
+      fi
+    done
+  fi
+  sed -i "s|__TRUST_PROXY_CIDRS__|${TRUST_PROXY_LINES%\\\\n}|g" /tmp/nginx.conf
 
   if [ "$DOCKERIZED_APP" = true ]; then
     sed -i "s|__BACKEND_HOST__|backend|g" /tmp/nginx.conf
@@ -57,12 +100,14 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid.lua
   sed -i 's*<OAUTH_SCOPE_PLACEHOLDER>*openid profile*g' /tmp/openid.lua
 
+  # PUBLIC_SCHEME: the scheme browsers use to reach this nginx (https behind
+  # CloudFront or a TLS-terminating load balancer); defaults follow ssl.
   if [ "$ssl" = true ] ; then
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua
-    sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid.lua
+    sed -i "s/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/${PUBLIC_SCHEME:-https}/g" /tmp/openid.lua
   else
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid.lua
-    sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/openid.lua
+    sed -i "s/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/${PUBLIC_SCHEME:-http}/g" /tmp/openid.lua
   fi
 
   ########
@@ -71,6 +116,8 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   mv /tmp/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 
   mv /tmp/openid.lua /usr/local/openresty/nginx/lua/openid.lua
+  cp /tmp/csrf.lua /usr/local/openresty/nginx/lua/csrf.lua
+  cp /tmp/tracing.lua /usr/local/openresty/nginx/lua/tracing.lua
 
   if [ "$ssl" = true ] ; then
     cp -r /tmp/ssl/server.pem /etc/ssl/certs/server.pem

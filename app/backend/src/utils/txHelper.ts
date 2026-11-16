@@ -32,16 +32,6 @@ export const until = async (
   }
 };
 
-// Helper function to extract error message from SString format
-const extractErrorMessage = (errorData: string): string => {
-  const sStringMatch = errorData.match(/^\s*SString "((?:\\.|[^"])*)"\s*$/);
-  if (sStringMatch) {
-    return sStringMatch[1];
-  }
-  // If no SString format found, return the original error message
-  return errorData;
-};
-
 const withSequentialUnsignedNonces = (results: any[]): any[] => {
   const firstNonce = results[0]?.data?.nonce;
   if (firstNonce === undefined || firstNonce === null) return results;
@@ -198,11 +188,6 @@ const txQueueKey = (accessToken: string): string =>
 const failedTx = (results: any[]): any | undefined =>
   results.find((result) => result?.status === "Failure");
 
-const txFailureMessage = (result: any): string => {
-  const errorMessage = result?.txResult?.message || result?.error || result?.message || "Transaction failed";
-  return extractErrorMessage(errorMessage);
-};
-
 const isTerminalResult = (results: any[]): boolean =>
   !!failedTx(results) || results.every((result) => result?.status !== "Pending");
 
@@ -260,7 +245,7 @@ const postAndWaitForTxUnlocked = async (
 
       const failed = failedTx(finalResults);
       if (failed) {
-        const message = failed.txResult?.message || failed.error || failed.message || failed;
+        const message = failed.txResult.message;
         const retryNonce = attempt < maxResultRetries ? lowNonceExpected(message) : null;
         const nextConfig = retryNonce !== null
           ? requestConfigWithNonce(response.config, retryNonce)
@@ -273,7 +258,7 @@ const postAndWaitForTxUnlocked = async (
           continue;
         }
 
-        throw new StratoError(txFailureMessage(failed), 400);
+        throw new StratoError(message, 400);
       }
 
       return {
@@ -290,8 +275,7 @@ const postAndWaitForTxUnlocked = async (
     
     // Check if this is an Axios error with response data
     if (error.response?.data && typeof error.response.data === 'string') {
-      const extractedMessage = extractErrorMessage(error.response.data);
-      throw new StratoError(extractedMessage, 400);
+      throw new StratoError(error.response.data, 400);
     }
     
     // Re-throw the original error if it doesn't match the expected format

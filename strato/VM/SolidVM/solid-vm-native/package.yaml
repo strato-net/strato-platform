@@ -1,0 +1,147 @@
+name: solid-vm-native
+license: Apache-2.0
+extra-source-files:
+  - src/SolidVM/Compiler.inc
+  - src/SolidVM/BuiltinActions.inc
+  - src/SolidVM/BuiltinCalls.inc
+  - src/SolidVM/HelperActions.inc
+  - src/SolidVM/ActionCode.inc
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - SolidVM.Core
+    - SolidVM.Code
+    - SolidVM.Compile
+    - SolidVM.Source
+    - SolidVM.SourceCode
+    - SolidVM.Gas
+    - SolidVM.Values
+    - SolidVM.Storage
+    - SolidVM.Builtins
+    - SolidVM.Blockchain
+    - SolidVM.Runtime
+    - Blockchain.SolidVM
+    - Blockchain.SolidVM.Simple
+  reexported-modules:
+    - solid-vm-runtime:Blockchain.SolidVM.SM
+    - solid-vm-runtime:Blockchain.SolidVM.Environment
+    - solid-vm-runtime:Blockchain.SolidVM.GasInfo
+  ghc-options: -O1
+  dependencies:
+    - Decimal
+    - base16-bytestring
+    - bytestring
+    - containers
+    - lens
+    - mtl
+    - solid-vm-builtins
+    - solid-vm-model
+    - source-tools
+    - strato-model
+    - text
+    - blockapps-data
+    - blockapps-mpdbs
+    - evm-solidity
+    - solid-vm-runtime
+    - solid-vm-static-analysis
+    - unliftio
+    - vector
+    - solid-vm-parser
+    - monad-alter
+    - vm-tools
+    - common-log
+    - ethereum-rlp
+    - strato-conf
+    - utf8-string
+    - lrucache
+    - time
+    - transformers
+    - template-haskell
+    - haskell-src-exts
+    - blockapps-datadefs
+    - data-default
+    - format
+    - statedb-monad
+    - solid-vm-compiler
+
+tests:
+  solid-vm-native-check:
+    source-dirs: ../solid-vm/tests/native
+    other-modules: []
+    main: NativeCheck.hs
+    ghc-options: -O2 -threaded -rtsopts
+    dependencies:
+    - blockapps-data
+    - common-log
+    - composable-monads-base
+    - hflags
+    - lens
+    - monad-alter
+    - prometheus-client
+    - solid-vm-native
+    - solid-vm-model
+    - strato-model
+    - text
+    - time
+    - unliftio
+    - vector
+    - vm-tools
+
+  solid-vm-typed-builtins-check:
+    source-dirs: test/
+    other-modules: []
+    main: TypedBuiltinCheck.hs
+    dependencies:
+      - blockapps-data
+      - bytestring
+      - common-log
+      - composable-monads-base
+      - containers
+      - hflags
+      - lens
+      - solid-vm-compiler
+      - solid-vm-native
+      - solid-vm-model
+      - strato-model
+      - text
+      - vm-tools
+
+  caught-failure-fork-check:
+    source-dirs: [../solid-vm/fork-test, ../solid-vm/tests]
+    main: ForkMain.hs
+    other-modules: [CaughtFailureForkSpec]
+    ghc-options: -O2 -threaded -rtsopts
+    dependencies:
+      - blockapps-data
+      - common-log
+      - composable-monads-base
+      - hflags
+      - hspec
+      - lens
+      - solid-vm-native
+      - solid-vm-model
+      - strato-conf
+      - strato-model
+      - text
+      - vm-tools
+
+executables:
+  solid-vm-source:
+    source-dirs: app
+    main: Source.hs
+    ghc-options: -O2 -threaded -rtsopts
+    dependencies:
+      - solid-vm-native
+      - solid-vm-compiler
+      - strato-model
+      - vm-tools
+      - common-log
+      - composable-monads-base
+      - hflags
+      - bytestring
+      - text
+      - unliftio

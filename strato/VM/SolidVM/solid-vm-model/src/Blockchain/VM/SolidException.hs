@@ -4,62 +4,29 @@
 module Blockchain.VM.SolidException
   ( SolidException (..),
     showSolidException,
-    typeError,
-    todo,
-    arithmeticException,
-    indexOutOfBounds,
     checkArity,
-    arityMismatch,
-    internalError,
-    invalidArguments,
-    missingField,
-    customError,
-    missingType,
-    duplicateDefinition,
-    duplicateContract,
-    parseError,
     require,
-    assert,
-    modifierError,
-    unknownFunction,
-    unknownConstant,
-    unknownVariable,
-    unknownStatement,
-    divideByZero,
-    missingCodeCollection,
-    inaccessibleChain,
-    invalidChain,
-    invalidWrite,
-    malformedData,
-    tooMuchGas,
-    paymentError,
-    reservedWordError,
-    revertError,
-    immutableError,
-    getRunTimeCodeError,
-    tooManyResultsError,
-    tooManyCooks,
-    generalMetaProgrammingError,
-    oldForeignPragmaError,
-    userDefinedError
+    assert
   )
 where
 
 import Control.DeepSeq
-import Control.Exception (Exception, throw, throwIO)
+import Control.Exception (Exception (displayException), throwIO)
 import Control.Monad (unless, when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.List (intercalate)
+import qualified Data.Text as T
 import GHC.Generics
 import qualified SolidVM.Model.Storable as B
 import Text.Printf (printf)
 
 data SolidException
   = TypeError String String
-  | InternalError String String
+  | InternalError String
   | ArithmeticException String String
   | InvalidArguments String String
   | IndexOutOfBounds String String
-  | TODO String String
+  | UnsupportedFeature String String
   | MissingField String String
   | RevertError String String
   | CustomError String String [B.BasicValue]
@@ -91,14 +58,20 @@ data SolidException
   | GeneralMetaProgrammingError String String
   | OldForeignPragmaError String String
   | UserDefinedError String String
-  deriving (Eq, Exception, Generic, NFData)
+  deriving (Eq, Generic, NFData)
+
+instance Exception SolidException where
+  displayException (RevertError "REVERT" message) = if null message then "transaction reverted" else message
+  displayException (RevertError context message) = printf "revert: %s: %s" context message
+  displayException (CustomError _ name args) = name ++ "(" ++ intercalate ", " (map (T.unpack . B.formatBasicValueForSQL) args) ++ ")"
+  displayException exception = showSolidException exception
 
 instance Show SolidException where
   show = showSolidException
 
 showSolidException :: SolidException -> String
 showSolidException (ArityMismatch m got want) = printf "arity mismatch: %s: got %d, want %d" m got want
-showSolidException (InternalError m v) = printf "internal error: %s: %s" m v
+showSolidException (InternalError message) = "internal error: " ++ message
 showSolidException (ArithmeticException a b) = printf "integer out of bounds: %s: %s" a b
 showSolidException (InvalidArguments m v) = printf "invalid arguments: %s: %s" m v
 showSolidException (IndexOutOfBounds a b) = printf "index out of bounds: %s: %s" a b
@@ -113,7 +86,7 @@ showSolidException (Require Nothing) = printf "solidity require failed"
 showSolidException (Require (Just m)) = printf "solidity require failed: %s" m
 showSolidException Assert = printf "solidity assert failed"
 showSolidException (CustomError m v p) = printf "custom user error: %s %s %s" m v $ show p
-showSolidException (TODO m v) = printf "Unimplemented feature in SolidVM: %s: %s" m v
+showSolidException (UnsupportedFeature m v) = printf "unsupported SolidVM feature: %s: %s" m v
 showSolidException (TypeError a b) = printf "type error: %s: %s" a b
 showSolidException (UnknownConstant a b) = printf "unknown constant: %s: %s" a b
 showSolidException (UnknownFunction a b) = printf "unknown function: %s: %s" a b
@@ -136,119 +109,11 @@ showSolidException (GeneralMetaProgrammingError a b) = printf "There was a probl
 showSolidException (OldForeignPragmaError a b) = printf "The foreign contract (%s) being called needs an newer pragma in order to use metaprogramming. Foreign contract running: %s" a b
 showSolidException (UserDefinedError a b) = printf "%s is an user defined error in line '%s'" a b
 
-toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
-toThrower cont msg = throw . cont msg . show
-
-typeError :: String -> String -> a
-typeError msg detail = throw $ TypeError msg detail
-
-todo :: (Show v) => String -> v -> a
-todo = toThrower TODO
-
-internalError :: (Show v) => String -> v -> a
-internalError = toThrower InternalError
-
-arithmeticException :: (Show v) => String -> v -> a
-arithmeticException = toThrower ArithmeticException
-
-invalidArguments :: (Show v) => String -> v -> a
-invalidArguments = toThrower InvalidArguments
-
-indexOutOfBounds :: (Show v) => String -> v -> a
-indexOutOfBounds = toThrower IndexOutOfBounds
-
-missingField :: (Show v) => String -> v -> a
-missingField = toThrower MissingField
-
-revertError :: (Show v) => String -> v -> a
-revertError = toThrower RevertError
-
-customError :: String -> String -> [B.BasicValue] -> a
-customError msg nm vals = throw $ CustomError msg nm vals
-
-missingType :: (Show v) => String -> v -> a
-missingType = toThrower MissingType
-
-duplicateDefinition :: (Show v) => String -> v -> a
-duplicateDefinition = toThrower DuplicateDefinition
-
-duplicateContract :: (Show v) => v -> a
-duplicateContract x = throw $ DuplicateContract (show x)
-
 checkArity :: (MonadIO m) => String -> Int -> Int -> m ()
 checkArity msg got want = when (got /= want) . liftIO . throwIO $ ArityMismatch msg got want
-
-arityMismatch :: String -> Int -> Int -> a
-arityMismatch msg got want = throw $ ArityMismatch msg got want
-
-parseError :: (Show v) => String -> v -> a
-parseError = toThrower ParseError
 
 require :: MonadIO m => Bool -> Maybe String -> m ()
 require c = unless c . liftIO . throwIO . Require
 
 assert :: MonadIO m => Bool -> m ()
 assert c = unless c . liftIO $ throwIO Assert
-
-unknownFunction :: (Show v) => String -> v -> a
-unknownFunction = toThrower UnknownFunction
-
-unknownConstant :: (Show v) => String -> v -> a
-unknownConstant = toThrower UnknownConstant
-
-unknownVariable :: (Show v) => String -> v -> a
-unknownVariable = toThrower UnknownVariable
-
-unknownStatement :: (Show v) => String -> v -> a
-unknownStatement = toThrower UnknownStatement
-
-divideByZero :: (Show v) => v -> a
-divideByZero x = throw $ DivideByZero (show x)
-
-modifierError :: (Show v) => String -> v -> a
-modifierError = toThrower ModifierError
-
-missingCodeCollection :: (Show v) => String -> v -> a
-missingCodeCollection = toThrower MissingCodeCollection
-
-inaccessibleChain :: (Show v) => String -> v -> a
-inaccessibleChain = toThrower InaccessibleChain
-
-invalidChain :: (Show v) => String -> v -> a
-invalidChain = toThrower InvalidChain
-
-invalidWrite :: (Show v) => String -> v -> a
-invalidWrite = toThrower InvalidWrite
-
-malformedData :: (Show v) => String -> v -> a
-malformedData = toThrower MalformedData
-
-tooMuchGas :: Integer -> Integer -> a
-tooMuchGas limit actual = throw $ TooMuchGas limit actual
-
-paymentError :: Integer -> (String, Integer) -> a
-paymentError limit actual = throw $ PaymentError limit actual
-
-reservedWordError :: (Show v) => String -> v -> a
-reservedWordError = toThrower ReservedWordError
-
-immutableError :: (Show v) => String -> v -> a
-immutableError = toThrower ImmutableError
-
-getRunTimeCodeError :: (Show v) => String -> v -> a
-getRunTimeCodeError = toThrower FailedToAttainRunTimCode
-
-tooManyResultsError :: String -> Int -> a
-tooManyResultsError word got = throw $ TooManyResultsError word got
-
-tooManyCooks :: Int -> Int -> a
-tooManyCooks expected got = throw $ TooManyCooks expected got
-
-generalMetaProgrammingError :: (Show v) => String -> v -> a
-generalMetaProgrammingError = toThrower GeneralMetaProgrammingError
-
-oldForeignPragmaError :: (Show v) => String -> v -> a
-oldForeignPragmaError = toThrower OldForeignPragmaError
-
-userDefinedError :: (Show v) => String -> v -> a
-userDefinedError = toThrower UserDefinedError

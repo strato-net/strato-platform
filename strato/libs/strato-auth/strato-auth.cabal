@@ -39,6 +39,7 @@ library
     , servant-client-core
     , text
     , time
+    , unix
     , yaml
   default-language: Haskell2010
 

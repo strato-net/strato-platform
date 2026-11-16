@@ -5,7 +5,6 @@ import { getCDPStats } from "./cdp.service";
 import { getPool, getPublicLiquidityInfo } from "./lending.service";
 import { getSaveUsdstInfo } from "./saveUsdst.service";
 import { getPublicSafetyModuleInfo, getSafetyModuleConfig } from "./safety.service";
-import { getVaultInfo } from "./vault.service";
 import { getPools } from "./swapping.service";
 import { getBridgeableTokens } from "./bridge.service";
 import {
@@ -81,7 +80,6 @@ interface TvlMetrics {
       amount: string;
       priceUsd: string;
     };
-    vaults: MetricBucketSummary & { assets: TvlAssetSummary[] };
   };
 }
 
@@ -161,17 +159,9 @@ const buildClassificationContext = async (
     getBridgeableTokens(accessToken).catch(() => []),
   ]);
 
-  let vaultInfo;
-  try {
-    vaultInfo = await getVaultInfo(accessToken);
-  } catch {
-    vaultInfo = { shareTokenAddress: "" };
-  }
-
   const classificationContext = buildTokenClassificationContext({
     lendingReceiptTokenAddresses: [lendingInfo?.withdrawable?.address],
     safetyReceiptTokenAddresses: [getSafetyModuleConfig().sToken.address],
-    vaultShareTokenAddresses: [vaultInfo.shareTokenAddress],
     lpTokenAddresses: (pools || []).map((pool: any) => pool.lpToken?.address).filter(Boolean),
     receiptTokenSymbols: [saveInfo.shareSymbol],
     bridgeStablecoinAddresses: (bridgeTokens || [])
@@ -322,17 +312,6 @@ export const getTvlMetrics = async (accessToken: string): Promise<TvlMetrics> =>
     pools,
   }));
 
-  let vaultInfo;
-  try {
-    vaultInfo = await getVaultInfo(accessToken);
-  } catch {
-    vaultInfo = {
-      totalEquity: "0",
-      assets: [],
-      shareTokenAddress: "",
-    };
-  }
-
   const lendingCollateralAssets = await getLendingCollateralAssets(accessToken, tokenMap);
 
   const cdpAssets: TvlAssetSummary[] = (cdpStats.assets || []).map((asset) =>
@@ -425,18 +404,6 @@ export const getTvlMetrics = async (accessToken: string): Promise<TvlMetrics> =>
     pow10(safetyDecimals)
   );
 
-  const vaultAssets: TvlAssetSummary[] = (vaultInfo.assets || []).map((asset: any) =>
-    buildAssetSummary(tokenMap, {
-      address: asset.address,
-      symbol: asset.symbol,
-      amount: asset.balance,
-      priceUsd: asset.priceUsd,
-      totalUsd: asset.valueUsd,
-      fallbackDecimals: toDecimals(tokenMap.get(normalizeAddress(asset.address))?.customDecimals, 18),
-    })
-  );
-  const vaultTotalUsd = vaultInfo.totalEquity || "0";
-
   const allPositions = buildPositions([
     ...cdpAssets.map((asset) => ({ sourceBucket: "cdp", sourceKey: asset.address, asset })),
     {
@@ -483,7 +450,6 @@ export const getTvlMetrics = async (accessToken: string): Promise<TvlMetrics> =>
         fallbackDecimals: safetyDecimals,
       }),
     },
-    ...vaultAssets.map((asset) => ({ sourceBucket: "vaults", sourceKey: asset.address, asset })),
   ]);
   const aggregatedAssets = aggregateAssets(allPositions.map((position) => ({
     address: position.address,
@@ -501,7 +467,6 @@ export const getTvlMetrics = async (accessToken: string): Promise<TvlMetrics> =>
     poolsTotalUsd,
     saveUsd,
     safetyUsd,
-    vaultTotalUsd,
   ]);
 
   return {
@@ -546,10 +511,6 @@ export const getTvlMetrics = async (accessToken: string): Promise<TvlMetrics> =>
         decimals: safetyDecimals,
         amount: safetyInfo.totalAssets || "0",
         priceUsd: safetyPrice,
-      },
-      vaults: {
-        totalUsd: vaultTotalUsd,
-        assets: vaultAssets,
       },
     },
   };

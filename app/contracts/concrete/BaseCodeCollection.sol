@@ -1,5 +1,4 @@
 //ERC20
-import "../abstract/ERC20/access/Authorizable.sol";
 import "../abstract/ERC20/ERC20.sol";
 //import "ERC20/extensions/ERC20Burnable.sol";
 
@@ -14,6 +13,8 @@ import "./NFTs/NFTFactory.sol";
 
 //Admin Registry
 import "Admin/AdminRegistry.sol";
+import "Admin/MultisigFactory.sol";
+import "Admin/MultisigLogic.sol";
 
 //Swap
 import "./Pools/Pool.sol";
@@ -79,7 +80,7 @@ import "./Pools/DirectMintPSM.sol";
 //Flash mint
 import "./Flash/FlashMint.sol";
 
-contract record Mercata is Authorizable {
+contract record Mercata {
     RateStrategy public rateStrategy;
     PriceOracle public priceOracle;
     CollateralVault public collateralVault;
@@ -179,8 +180,7 @@ contract record Mercata is Authorizable {
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setRateStrategy", address(poolConfigurator));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setPriceOracle", address(poolConfigurator));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setAllComponents", address(poolConfigurator));
-        authorizations[address(adminRegistry)][address(poolConfigurator)] = 1;
-        poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0,1000);
+        adminRegistry.castVoteOnIssue(address(poolConfigurator), "initializeProtocol", address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0,1000);
 
         // Create Services
         address mercataBridgeImpl = address(new MercataBridge(implOwnerIgnored));

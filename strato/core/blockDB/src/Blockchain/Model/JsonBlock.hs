@@ -15,6 +15,8 @@ module Blockchain.Model.JsonBlock (
   rtToRtPrime,
   rtToRtPrime',
   blockDataRefToBlock,
+  getBlocksSql,
+  getBlockSql,
   asrToAsrPrime
   ) where
 
@@ -23,6 +25,7 @@ import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
+import           Control.Monad.IO.Class (MonadIO)
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class        (blockHeaderHash)
 import           Blockchain.Strato.Model.ExtendedWord (word256ToBytes)
@@ -31,11 +34,14 @@ import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Validator
 import           Control.Applicative                   ((<|>))
 import           Control.DeepSeq
-import           Control.Monad                        (join)
+import           Control.Monad                        (join, when)
 import           Data.Aeson
 import           Data.Aeson.Types                     (Parser)
 import qualified Data.ByteString                      as B
 import           Data.Maybe
+import qualified Data.Map.Strict as M
+import qualified Database.Esqueleto.Legacy as E
+import qualified Database.Persist.Sql as SQL
 import           Control.Lens.Operators ((&), (.~), (?~))
 import           Data.OpenApi                         hiding (format)
 import           Data.Proxy
@@ -86,7 +92,8 @@ instance ToJSON RawTransaction' where
         "gasPrice" .= rawTransactionGasPrice,
         "value" .= rawTransactionValue,
         "txData" .= fmap B.unpack rawTransactionTxData,
-        "attribution" .= fmap B.unpack rawTransactionAttribution
+        "attribution" .= fmap B.unpack rawTransactionAttribution,
+        "maxPriorityFeePerGas" .= rawTransactionMaxPriorityFeePerGas
       ] ++ ["txVersion" .= rawTransactionTxVersion | rawTransactionTxVersion > 0]
 
 parseHexStr :: (Integral a) => Parser String -> Parser a
@@ -127,6 +134,7 @@ instance FromJSON RawTransaction' where
     td <- fmap (fmap B.pack) (t .:? "txData")
     txVer <- t .:? "txVersion" .!= (0 :: Word8)
     attr <- fmap (fmap B.pack) (t .:? "attribution")
+    prio <- t .:? "maxPriorityFeePerGas"
 
     return
       ( RawTransaction'
@@ -153,6 +161,7 @@ instance FromJSON RawTransaction' where
               td
               txVer
               attr
+              prio
           )
       )
   parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
@@ -225,6 +234,7 @@ instance FromJSON UnsignedRawTransaction' where
               Nothing
               0
               Nothing
+              Nothing
           )
       )
   parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
@@ -278,7 +288,7 @@ instance ToJSON Transaction' where
         "transactionType" .= show (transactionSemantics tx),
         "txVersion" .= txVer
       ]
-  toJSON (Transaction' tx@(EthereumTX n gp gl eto val d cid tr ts tv)) =
+  toJSON (Transaction' tx@(EthereumTX n gp gl eto val d cid tr ts tv ver prio)) =
     object $
       [ "kind" .= ("Transaction" :: String),
         "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
@@ -288,11 +298,15 @@ instance ToJSON Transaction' where
         "to" .= eto,
         "value" .= val,
         "txData" .= B.unpack d,
+        "chainId" .= cid,
         "r" .= showHex tr "",
         "s" .= showHex ts "",
-        "v" .= showHex (toEthV tv cid) "",
+        -- A type-2 envelope carries its yParity; a legacy one its EIP-155 v.
+        "v" .= showHex (if ver == 2 then toInteger tv else toEthV tv cid) "",
         "hash" .= transactionHash tx,
-        "transactionType" .= ("EthereumTX" :: String)
+        "transactionType" .= ("EthereumTX" :: String),
+        "txVersion" .= ver,
+        "maxPriorityFeePerGas" .= prio
       ]
 
 instance FromJSON Transaction' where
@@ -339,8 +353,13 @@ instance FromJSON Transaction' where
             tr <- parseHexStr (t .: "r")
             ts <- parseHexStr (t .: "s")
             txData <- fmap (maybe B.empty B.pack) (t .:? "txData")
-            return . Transaction' $ EthereumTX n gp gl eto val txData
-              (ethVToChainId rawV) tr ts (ethVToRecoveryId rawV)
+            ver <- t .:? "txVersion" .!= 0
+            prio <- t .:? "maxPriorityFeePerGas" .!= 0
+            cid <- t .:? "chainId"
+            when (ver == 2 && rawV > 1) $ fail "type-2 transaction 'v' is a yParity and must be 0 or 1"
+            return . Transaction' $ if ver == 2
+              then EthereumTX n gp gl eto val txData cid tr ts (fromInteger rawV) ver prio
+              else EthereumTX n gp gl eto val txData (ethVToChainId rawV) tr ts (ethVToRecoveryId rawV) 0 0
   parseJSON _ = fail "expected a Transaction object with 'init' (contract deploy), 'funcName' (SolidVM call), or neither (Ethereum transaction)"
 
 
@@ -740,3 +759,33 @@ transactionSemantics _ = Contract
 rawTransactionSemantics :: RawTransaction -> TransactionType
 rawTransactionSemantics RawTransaction{..} | isJust rawTransactionCode = Contract
 rawTransactionSemantics _ = FunctionCall
+
+getBlockSql :: MonadIO m => Keccak256 -> SQL.SqlPersistT m (Maybe Block)
+getBlockSql sha = listToMaybe <$> getBlocksSql [BlockDataRefHash SQL.==. sha]
+
+getBlocksSql :: MonadIO m => [SQL.Filter BlockDataRef] -> SQL.SqlPersistT m [Block]
+getBlocksSql filters = do
+  blocks <- SQL.selectList filters [SQL.Asc BlockDataRefNumber, SQL.Asc BlockDataRefId]
+  let ids = map SQL.entityKey blocks
+      groupByBlock key = M.fromListWith (flip (++)) . map (\row -> (key (SQL.entityVal row), [SQL.entityVal row]))
+      rowsFor key rows = M.findWithDefault [] key rows
+  if null blocks then return [] else do
+    validators <- groupByBlock blockValidatorRefBlockDataRefId <$> SQL.selectList
+      [BlockValidatorRefBlockDataRefId SQL.<-. ids] [SQL.Asc BlockValidatorRefId]
+    deltas <- groupByBlock validatorDeltaRefBlockDataRefId <$> SQL.selectList
+      [ValidatorDeltaRefBlockDataRefId SQL.<-. ids] [SQL.Asc ValidatorDeltaRefId]
+    proposals <- groupByBlock proposalSignatureRefBlockDataRefId <$> SQL.selectList
+      [ProposalSignatureRefBlockDataRefId SQL.<-. ids] [SQL.Asc ProposalSignatureRefId]
+    signatures <- groupByBlock commitmentSignatureRefBlockDataRefId <$> SQL.selectList
+      [CommitmentSignatureRefBlockDataRefId SQL.<-. ids] [SQL.Asc CommitmentSignatureRefId]
+    stakes <- groupByBlock blockStakeRefBlockDataRefId <$> SQL.selectList
+      [BlockStakeRefBlockDataRefId SQL.<-. ids] [SQL.Asc BlockStakeRefId]
+    txRows <- E.select $ E.from $ \(btx `E.InnerJoin` tx) -> do
+      E.on (tx E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction)
+      E.where_ $ btx E.^. BlockTransactionBlockDataRefId `E.in_` E.valList ids
+      E.orderBy [E.asc (btx E.^. BlockTransactionId)]
+      return (btx E.^. BlockTransactionBlockDataRefId, tx)
+    let txs = M.fromListWith (flip (++)) [(E.unValue key, [rawTX2TX (SQL.entityVal tx)]) | (key, tx) <- txRows]
+    return [blockDataRefToBlock (SQL.entityVal row) (rowsFor key validators) (rowsFor key deltas)
+              (rowsFor key proposals) (rowsFor key signatures) (rowsFor key stakes) (rowsFor key txs)
+           | row <- blocks, let key = SQL.entityKey row]
