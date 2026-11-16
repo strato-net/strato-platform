@@ -74,11 +74,17 @@ head was 368798; hashes, state roots and parent hashes at 355721, 355722 and
 durably indexed the formerly failing transaction, including its historical
 Approval and PostSkipped events.
 
-Before release: complete the Upquark replay and a clean Helium genesis replay
-with canonical hash/root comparisons and durable Cirrus coverage, then
-coordinate activation heights against actual validator deployment history.
-Full network sync is not yet verified. Do not skip validation or substitute a
-snapshot for the genesis replay.
+Full Upquark sync was verified at 2026-11-16 02:27 UTC: accepted VM, SQL and
+durable Cirrus all reached 994340, all 108 recorded checkpoints matched, and
+a fresh comparison at 994334 matched both independent nodes. The
+[replay proof](caught-failure-fork-upquark-proof.md) includes exact hashes/roots,
+385 recorded progress samples starting at block 0, binary provenance and
+read-only reproduction commands. No validation failure was recorded.
+
+Before release: complete a clean Helium genesis replay with canonical hash/root
+comparisons and durable Cirrus coverage, then coordinate activation heights
+against actual validator deployment history. Both public-network heights
+remain unscheduled. Do not skip validation or substitute a snapshot for replay.
 
 Historical rules cannot simply be deleted while retaining genesis replay. They
 can later be isolated in a versioned historical executor, provided the same
