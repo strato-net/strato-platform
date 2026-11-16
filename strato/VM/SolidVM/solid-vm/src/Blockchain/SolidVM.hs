@@ -168,7 +168,9 @@ runExpr exprText = withoutDebugging . withStaticCallInfo $ do
         case (force str) of -- stupid code to get lazy exceptions to be thrown within the try block
           [] -> pure []
           xs -> pure xs
-      pure $ bimap (T.pack . displayException) T.pack eRes
+      case eRes of
+        Left e@InternalError{} -> throwIO e
+        _ -> pure $ bimap (T.pack . displayException) T.pack eRes
 
 solidVMBreakpoint :: MonadSM m => SourceAnnotation () -> m ()
 solidVMBreakpoint ann = do

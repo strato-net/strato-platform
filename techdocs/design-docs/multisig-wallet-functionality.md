@@ -35,6 +35,8 @@ Nuances:
 - The multisig wallet address exists only after the last confirmation. SMD does not show
   an address before then. Funds sent to a predicted address are lost if the invitation
   is cancelled or expires.
+- SMD always uses the latest approved rules version. The contracts accept any approved
+  version, so someone calling them directly can still choose an older one.
 - If the chosen rules version is deprecated before the last confirmation, creation is
   refused and a new invitation is needed.
 - A multisig wallet cannot be one of its own signers.
@@ -61,6 +63,7 @@ signer changes, upgrades.
 | The action fails when executed | The whole transaction is undone; the proposal can be retried until it expires |
 
 Only signers can propose, approve, and execute.
+Proposal function names must be plain names; signature-style names containing `(` are rejected.
 
 ## Changing signers, approvals, or the waiting period
 
@@ -74,13 +77,29 @@ Nuances:
 
 - All of these wait out the **current** waiting period. Shortening the waiting period
   still takes the old one.
-- A nomination can add exactly one new signer and may remove others in the same step.
+- A nomination adds exactly one new signer, keeps every current signer, and cannot change
+  the approvals needed. To replace a signer, add and activate the replacement first, then
+  remove the old signer with a separate proposal.
 - Only one nomination is open at a time. A new one replaces it.
 - Withdrawing a nomination is a normal proposal and waits the waiting period, so the
   nominee can still accept in the meantime.
 - **Any** of these changes invalidates every open proposal, the open nomination, and a
   pending upgrade. Signers must propose them again. This prevents approvals collected
   under the old signer set from being used under the new one.
+
+### When a signer is another multisig wallet
+
+The inner multisig must collect its own approvals and wait out its own waiting period
+before it can confirm an outer wallet's invitation, accept a nomination, approve an
+outer proposal, or execute one. Invitations, nominations, and proposal approvals each
+have a 30-day window. If the inner wallet waits `D` days, at most `30 − D` days remain
+to collect its approvals and act. A 30-day inner waiting period leaves only the
+same-second boundary and is unusable in practice.
+
+An outer proposal has a separate 7-day execution window. A nested signer that starts
+its execution proposal only after that window opens has at most `7 − D` days to act;
+preparing the inner proposal earlier may help when the outer action is already known.
+A quorum that depends on a slow nested signer may be unable to act in time.
 
 ## Upgrading a multisig wallet's rules
 
@@ -108,6 +127,10 @@ Nuances:
 - An upgrade may include one migration step. Its name must start with `migrate`, it
   takes no input, and it can only run as part of the upgrade. If it fails, the whole
   upgrade is undone.
+- Before new rules take effect, the multisig wallet checks that they can still read its
+  signers, approvals needed and waiting period. If the check fails, the upgrade is undone
+  and the old rules stay. This stops an upgrade to a wrong address or an incompatible
+  version; it does not catch every possible fault in new rules.
 - Signers can **freeze upgrades** permanently. A frozen multisig wallet can never
   receive fixes; the only remedy is moving funds to a new multisig wallet.
 

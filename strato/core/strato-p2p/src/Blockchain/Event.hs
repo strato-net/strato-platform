@@ -16,6 +16,7 @@
 module Blockchain.Event
   ( module Blockchain.EventModel,
     handleEvents,
+    handleGossipedTransactions,
     getNewSyncFetch,
     syncFetchTask,
   )
@@ -29,6 +30,8 @@ import           Blockchain.Data.Block
 import qualified Blockchain.Data.BlockHeader           as BlockHeader
 import           Blockchain.Data.Control               (P2PCNC (..))
 import           Blockchain.Data.PubKey
+import           Blockchain.Data.Transaction           (Transaction)
+import           Blockchain.Data.TransactionIntake
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.EthConf (ethConf, p2pConfig)
@@ -50,7 +53,7 @@ import           Control.Monad.Composable.BlockDB (getBlockBodies, getBlockHeade
 import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify           hiding (awaitForever,
                                                         get, put, yield)
-import qualified Control.Monad.Change.Modify           as Mod (get, put)
+import qualified Control.Monad.Change.Modify           as Mod (get)
 import           Control.Monad.IO.Class
 import           Control.Monad.State
 import qualified Data.ByteString.Base16                as BC16
@@ -95,26 +98,46 @@ yieldR = yield . Right
 yieldL :: Monad m => e -> ConduitT i (Either e a) m ()
 yieldL = yield . Left
 
+-- | Transactions gossiped by a peer. One with a malformed envelope is dropped
+-- here, before it is published to this node's stream or passed on.
+handleGossipedTransactions ::
+  ( MonadIO m,
+    MonadLogger m,
+    Modifiable ActionTimestamp m,
+    HasPeerClaims m,
+    Modifiable BestSequencedBlock m
+  ) =>
+  IntakeRules -> PPeer -> [Transaction] -> ConduitM i (Either P2PCNC Message) m ()
+handleGossipedTransactions intakeRules peer gossiped = do
+    lift stampActionTimestamp
+    worldNumber <- lift worldBestNumber
+    BestSequencedBlock _ myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
+    if worldNumber - myNumber > txGossipCatchupWindow
+      then
+        $logDebugS "handleEvents/Transactions" . T.pack $
+          "Ignoring " ++ show (length gossiped) ++ " gossiped transaction(s) from " ++ peerString peer
+            ++ "; still " ++ show (worldNumber - myNumber) ++ " blocks behind the tip"
+      else do
+        (txs, refused) <- liftIO $ partitionIntake intakeRules id gossiped
+        -- Counts and fixed labels only, so the log line stays one line.
+        unless (null refused) $
+          $logWarnS "handleEvents/Transactions" . T.pack $
+            "Dropping " ++ show (length refused) ++ " malformed transaction(s) from " ++ peerString peer
+              ++ ": " ++ intercalate ", " (T.unpack . intakeRejectionLabel . snd <$> refused)
+        $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s) from" ++ peerString peer ++ ", they are " ++ intercalate "\n" (format <$> txs)
+        let txo = Origin.PeerString (peerString peer)
+        ts <- liftIO getCurrentMicrotime
+        let ingestTxs = IETx ts . IngestTx txo <$> txs
+        -- As before when nothing was refused; nothing to publish when everything was.
+        unless (null txs && not (null refused)) $
+          yieldL $ ToUnseq ingestTxs
+
 handleEvents :: MonadP2P m => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
 handleEvents peer = awaitForever $ \case
   MsgEvt Hello {} -> error "A hello message appeared after the handshake"
   MsgEvt Status {} -> error "A status message appeared after the handshake"
   MsgEvt Ping -> yieldR Pong
-  MsgEvt (Transactions txs) -> do
-    lift stampActionTimestamp
-    WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
-    BestSequencedBlock _ myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
-    if worldNumber - myNumber > txGossipCatchupWindow
-      then
-        $logDebugS "handleEvents/Transactions" . T.pack $
-          "Ignoring " ++ show (length txs) ++ " gossiped transaction(s) from " ++ peerString peer
-            ++ "; still " ++ show (worldNumber - myNumber) ++ " blocks behind the tip"
-      else do
-        $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s) from" ++ peerString peer ++ ", they are " ++ intercalate "\n" (format <$> txs)
-        let txo = Origin.PeerString (peerString peer)
-        ts <- liftIO getCurrentMicrotime
-        let ingestTxs = IETx ts . IngestTx txo <$> txs
-        yieldL $ ToUnseq ingestTxs
+  MsgEvt (Transactions txs) -> handleGossipedTransactions nodeIntakeRules peer txs
   MsgEvt (NewBlock block' _) -> do
     lift stampActionTimestamp
     $logInfoS "handleEvents/NewBlock" "newBlock"
@@ -122,8 +145,8 @@ handleEvents peer = awaitForever $ \case
     let header = blockHeader block'
     let num = blockHeaderBlockNumber header
     let parentHash' = blockHeaderParentHash header
-    lift . Mod.put (Proxy @WorldBestBlock) . WorldBestBlock $
-      BestBlock sha num
+    claimed <- lift peerBestNumber
+    when (num > claimed) . lift . claimPeerBest (pPeerHost peer) $ BestBlock sha num
     parentHeader <- lift $ getBlockHeader parentHash'
     case parentHeader of
       Nothing -> do
@@ -189,6 +212,13 @@ handleEvents peer = awaitForever $ \case
 
     let headers = morphBlockHeader <$> bHeaders
 
+    -- Asked for headers and sent none: whatever height this peer claimed, it has
+    -- nothing for us, so stop treating it as ahead until it announces a block.
+    when (null headers) $ do
+      BestSequencedBlock myHash myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
+      claimed <- lift peerBestNumber
+      when (claimed > myNumber) . lift . claimPeerBest (pPeerHost peer) $ BestBlock myHash myNumber
+
     bodyRequestAlreadyActive <- lift isBodyRequestActive
 
     lift $ addToHeaderCache headers
@@ -237,7 +267,7 @@ handleEvents peer = awaitForever $ \case
     let maxBlockNumber :: Integer
         maxBlockNumber = maximum . (0:) $ map (BlockHeader.number . blockBlockData) blocks'
 
-    WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+    peerNumber <- lift peerBestNumber
 
     maybeFetchNumber <- case mCurrentSyncTask of
       -- Requested while holding no task (tip-following recovery, or the task
@@ -249,10 +279,10 @@ handleEvents peer = awaitForever $ \case
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block header " ++ show maxBlockNumber ++ ", we have finished loading chiliad #" ++ show (syncTaskChiliad currentSyncTask)
             lift $ setSyncTaskFinished currentSyncTask
 
-            $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
+            $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show peerNumber
 
             BestSequencedBlock _ myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
-            newSyncFetch <- lift $ getNewSyncFetch peer myNumber worldNumber
+            newSyncFetch <- lift $ getNewSyncFetch peer myNumber peerNumber
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "new SyncTask: " ++ show (fst <$> newSyncFetch)
             return newSyncFetch
           else do
@@ -268,7 +298,7 @@ handleEvents peer = awaitForever $ \case
       case maybeFetchNumber of
         Nothing ->
           $logInfoS "handleEvents/BlockBodies" $ T.pack $ "No new sync tasks available, done downloading"
-        Just (task, fetchNumber) | fetchNumber <= worldNumber -> syncFetchTask task fetchNumber
+        Just (task, fetchNumber) | fetchNumber <= peerNumber -> syncFetchTask task fetchNumber
         Just (task, _) -> do
           $logInfoS "handleEvents/BlockBodies" $ T.pack $ "remaining blocks in chiliad #" ++ show (syncTaskChiliad task) ++ " are higher than the world best block, marking that chiliad as 'NotReady'"
           lift setSyncTaskNotReady
@@ -318,7 +348,7 @@ handleEvents peer = awaitForever $ \case
   NewSeqEvent oe -> case oe of
     P2pBlock b -> do
       when (shouldSend peer $ obOrigin b) $ do
-        WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+        worldNumber <- lift worldBestNumber
         -- Debug: this fires once per (committed block x peer connection); a
         -- from-genesis sync logged 594k of these lines.
         $logDebugS "handleEvents/P2pBlock" . T.pack $ "World Number: " ++ show worldNumber
@@ -410,16 +440,16 @@ handleEvents peer = awaitForever $ \case
     P2pGetMPNodes srs -> yieldR $ GetMPNodes srs
     P2pMPNodesResponse o nds -> when (shouldRespond peer o) . yieldR $ MPNodes nds
   TimerEvt -> do
-    WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+    peerNumber <- lift peerBestNumber
     BestSequencedBlock _ myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
-    let syncDone = if worldNumber >= 0 then Just (myNumber >= worldNumber) else Nothing
+    let syncDone = if peerNumber >= 0 then Just (myNumber >= peerNumber) else Nothing
     unless (syncDone == Just True) $ do
       maybeSyncTask <- lift getCurrentSyncTask
       case maybeSyncTask of
         Just _ -> return () -- Already have a task, do nothing
         Nothing -> do
-          $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
-          maybeNewSyncFetch <- lift $ getNewSyncFetch peer myNumber worldNumber
+          $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show peerNumber
+          maybeNewSyncFetch <- lift $ getNewSyncFetch peer myNumber peerNumber
           $logInfoS "TimerEvt" $ T.pack $ "I've grabbed a new syncTask: " ++ show (fst <$> maybeNewSyncFetch)
           case maybeNewSyncFetch of
             Nothing -> return ()
@@ -481,9 +511,9 @@ alignFetchNumber n = (max 0 n `div` step) * step
 
 assignTaskAndRequestBlocks :: MonadP2P m => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
 assignTaskAndRequestBlocks peer = do
-  WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+  peerNumber <- lift peerBestNumber
   BestSequencedBlock _ myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
-  syncFetch' <- lift $ getNewSyncFetch peer myNumber worldNumber
+  syncFetch' <- lift $ getNewSyncFetch peer myNumber peerNumber
   $logInfoS "assignTaskAndRequestBlocks" $ T.pack $ "new SyncTask: " ++ show (fst <$> syncFetch')
   forM_ syncFetch' $ \(task, fetchNumber) -> syncFetchTask task fetchNumber
 
@@ -507,13 +537,13 @@ getNewSyncFetch ::
   Integer ->
   Integer ->
   m (Maybe (SyncTask, Integer))
-getNewSyncFetch peer myBest worldNumber =
-  getNewSyncTask (pPeerHost peer) worldNumber >>= \case
+getNewSyncFetch peer myBest peerNumber =
+  getNewSyncTask (pPeerHost peer) peerNumber >>= \case
     Nothing -> pure Nothing
     Just task
       | myBest >= chiliadStart + 999 -> do
           setSyncTaskFinished task
-          getNewSyncFetch peer myBest worldNumber
+          getNewSyncFetch peer myBest peerNumber
       | otherwise -> pure $ Just (task, max chiliadStart (myBest + 1))
       where
         chiliadStart = 1000 * fromIntegral (syncTaskChiliad task)

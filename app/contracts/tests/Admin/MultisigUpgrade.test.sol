@@ -9,6 +9,8 @@ contract UpgradeSigner {
 }
 
 contract MultisigLogicV2 is MultisigLogic {
+    address public logicContract;
+    bool public multisigUpgradesFrozen;
     uint public migrationMarker;
 
     function migrate() external {
@@ -22,6 +24,30 @@ contract MultisigLogicV2 is MultisigLogic {
     function ordinaryFunction() external returns (uint) {
         return 9;
     }
+
+    function migrateBreak() external {
+        requiredApprovals = 1;
+    }
+
+    function migrateRepoint() external {
+        logicContract = address(0x9999);
+    }
+
+    function migrateFactory() external {
+        multisigFactory = address(0x7777);
+    }
+
+    function migrateFreeze() external {
+        multisigUpgradesFrozen = true;
+    }
+}
+
+contract NotMultisigLogic {
+    uint public value;
+}
+
+contract HollowLogic {
+    function initialize(address[] _signers, uint _requiredApprovals, uint _transactionTimelock) external {}
 }
 
 contract Describe_MultisigUpgrade {
@@ -124,6 +150,18 @@ contract Describe_MultisigUpgrade {
         require(MultisigLogicV2(wallet).migrationMarker() == 7, "Committed no-argument migration did not run");
     }
 
+    function it_rejects_signature_style_migration_names() {
+        address wallet = deploy(0);
+        schedule(wallet, "migrate");
+        fastForward(604800);
+        outsider.invoke(wallet, "executeUpgrade");
+        require(
+            rejects(outsider, wallet, " migrate()"),
+            "Signature-style migration bypassed the fallback guard"
+        );
+        require(MultisigLogicV2(wallet).ordinaryFunction() == 9, "Ordinary fallback call was blocked");
+    }
+
     function it_rechecks_revocation_at_execution() {
         address wallet = deploy(0);
         schedule(wallet, "");
@@ -214,6 +252,35 @@ contract Describe_MultisigUpgrade {
         );
     }
 
+    function it_rejects_a_signature_style_migration_name() {
+        address wallet = deploy(0);
+        string issueId = a.invoke(
+            wallet,
+            "proposeIssue",
+            wallet,
+            "scheduleUpgrade",
+            ["address", "string", "string"],
+            address(v2),
+            "2",
+            "migrate()"
+        );
+        require(
+            rejects(
+                b,
+                wallet,
+                "approveIssue",
+                issueId,
+                wallet,
+                "scheduleUpgrade",
+                ["address", "string", "string"],
+                address(v2),
+                "2",
+                "migrate()"
+            ),
+            "Signature-style migration function was scheduled"
+        );
+    }
+
     function it_freezes_upgrades_irreversibly_and_clears_pending_state() {
         address wallet = deploy(0);
         schedule(wallet, "");
@@ -223,6 +290,133 @@ contract Describe_MultisigUpgrade {
         (,,,,,,, bool exists) = MultisigWallet(wallet).multisigPendingUpgrade();
         require(!exists, "Freeze did not clear pending upgrade");
         require(rejects(a, wallet, "freezeUpgrades"), "Freeze was reversible or repeatable");
+    }
+
+    function freeze(address _wallet) internal {
+        string freezeIssue = a.invoke(_wallet, "proposeIssueNoArgs", _wallet, "freezeUpgrades");
+        b.invoke(_wallet, "approveIssueNoArgs", freezeIssue, _wallet, "freezeUpgrades");
+        require(MultisigWallet(_wallet).multisigUpgradesFrozen(), "Upgrades were not frozen");
+    }
+
+    function it_refuses_to_schedule_an_upgrade_on_a_frozen_wallet() {
+        address wallet = deploy(0);
+        freeze(wallet);
+        string[] argumentTypes = ["address", "string", "string"];
+        string issueId = a.invoke(
+            wallet, "proposeIssue", wallet, "scheduleUpgrade", argumentTypes, address(v2), "2", ""
+        );
+        require(
+            rejects(b, wallet, "approveIssue", issueId, wallet, "scheduleUpgrade", argumentTypes, address(v2), "2", ""),
+            "Frozen wallet scheduled an upgrade"
+        );
+        (,,,,,,, bool exists) = MultisigWallet(wallet).multisigPendingUpgrade();
+        require(!exists, "Frozen wallet has a pending upgrade");
+    }
+
+    function it_refuses_to_execute_a_ready_upgrade_after_a_freeze() {
+        address wallet = deploy(0);
+        schedule(wallet, "migrate");
+        fastForward(604800);
+        freeze(wallet);
+        require(rejects(outsider, wallet, "executeUpgrade"), "Upgrade executed after a freeze");
+        require(rejects(a, wallet, "executeUpgrade"), "Signer executed an upgrade after a freeze");
+        require(MultisigWallet(wallet).logicContract() == address(v1), "Logic changed after a freeze");
+    }
+
+    function it_keeps_a_freeze_through_later_changes() {
+        address wallet = deploy(0);
+        freeze(wallet);
+        string repeat = a.invoke(wallet, "proposeIssueNoArgs", wallet, "freezeUpgrades");
+        require(rejects(b, wallet, "approveIssueNoArgs", repeat, wallet, "freezeUpgrades"), "Freeze was repeated");
+        string timelockIssue = a.invoke(wallet, "proposeIssue", wallet, "setTransactionTimelock", ["uint256"], 3600);
+        b.invoke(wallet, "approveIssue", timelockIssue, wallet, "setTransactionTimelock", ["uint256"], 3600);
+        fastForward(31536000);
+        require(MultisigWallet(wallet).multisigUpgradesFrozen(), "Freeze was lost");
+    }
+
+    function scheduleVersion(address _wallet, address _logic, string _version, string _migrationFunction) internal {
+        string[] argumentTypes = ["address", "string", "string"];
+        string issueId = a.invoke(
+            _wallet, "proposeIssue", _wallet, "scheduleUpgrade", argumentTypes, _logic, _version, _migrationFunction
+        );
+        b.invoke(
+            _wallet, "approveIssue", issueId, _wallet, "scheduleUpgrade", argumentTypes, _logic, _version, _migrationFunction
+        );
+    }
+
+    function requireStillOperational(address _wallet) internal {
+        require(MultisigWallet(_wallet).logicContract() == address(v1), "Failed upgrade changed logic");
+        require(MultisigWallet(_wallet).multisigCurrentVersion() == "1", "Failed upgrade changed version");
+        require(MultisigWallet(_wallet).multisigEpoch() == 1, "Failed upgrade changed epoch");
+        string cancelIssue = a.invoke(_wallet, "proposeIssueNoArgs", _wallet, "cancelUpgrade");
+        b.invoke(_wallet, "approveIssueNoArgs", cancelIssue, _wallet, "cancelUpgrade");
+        (,,,,,,, bool exists) = MultisigWallet(_wallet).multisigPendingUpgrade();
+        require(!exists, "Wallet could not act after a failed upgrade");
+    }
+
+    function it_refuses_an_upgrade_to_an_address_without_code() {
+        factory.publishLogicVersion("3", address(0x1234));
+        factory.setUpgradePath("1", "3", true);
+        address wallet = deploy(0);
+        scheduleVersion(wallet, address(0x1234), "3", "");
+        fastForward(604800);
+        require(rejects(outsider, wallet, "executeUpgrade"), "Upgrade to an address without code succeeded");
+        requireStillOperational(wallet);
+    }
+
+    function it_refuses_an_upgrade_to_a_contract_that_is_not_multisig_logic() {
+        NotMultisigLogic other = new NotMultisigLogic();
+        factory.publishLogicVersion("3", address(other));
+        factory.setUpgradePath("1", "3", true);
+        address wallet = deploy(0);
+        scheduleVersion(wallet, address(other), "3", "");
+        fastForward(604800);
+        require(rejects(outsider, wallet, "executeUpgrade"), "Upgrade to a non-multisig contract succeeded");
+        requireStillOperational(wallet);
+    }
+
+    function it_refuses_an_upgrade_whose_migration_breaks_the_configuration() {
+        address wallet = deploy(0);
+        schedule(wallet, "migrateBreak");
+        fastForward(604800);
+        require(rejects(outsider, wallet, "executeUpgrade"), "Upgrade left an invalid configuration");
+        require(MultisigLogic(wallet).requiredApprovals() == 2, "Failed upgrade changed required approvals");
+        requireStillOperational(wallet);
+    }
+
+    function it_refuses_an_upgrade_whose_migration_changes_shell_state() {
+        address wallet = deploy(0);
+        schedule(wallet, "migrateRepoint");
+        fastForward(604800);
+        require(rejects(outsider, wallet, "executeUpgrade"), "Migration repointed the logic");
+        requireStillOperational(wallet);
+
+        schedule(wallet, "migrateFactory");
+        fastForward(604800);
+        require(rejects(outsider, wallet, "executeUpgrade"), "Migration replaced the factory");
+        require(MultisigWallet(wallet).multisigFactory() == address(factory), "Factory changed");
+        requireStillOperational(wallet);
+
+        schedule(wallet, "migrateFreeze");
+        fastForward(604800);
+        require(rejects(outsider, wallet, "executeUpgrade"), "Migration froze upgrades");
+        require(!MultisigWallet(wallet).multisigUpgradesFrozen(), "Upgrades were frozen");
+    }
+
+    function it_refuses_to_create_a_wallet_on_logic_that_fails_the_health_check() {
+        HollowLogic hollow = new HollowLogic();
+        factory.publishLogicVersion("3", address(hollow));
+        string setupHash = factory.registerSetup([address(a), address(b), address(c)], 2, 0, "3", "hollow");
+        a.invoke(address(factory), "confirmSetup", setupHash);
+        b.invoke(address(factory), "confirmSetup", setupHash);
+        require(rejects(c, address(factory), "confirmSetup", setupHash), "Wallet was created on unusable logic");
+    }
+
+    function it_exposes_a_read_only_health_check() {
+        address wallet = deploy(0);
+        bool healthy = outsider.invoke(wallet, "multisigHealthCheck");
+        require(healthy, "Healthy wallet failed its check");
+        require(MultisigWallet(wallet).multisigEpoch() == 1, "Health check changed state");
     }
 
     function it_executes_an_upgrade_without_a_migration_payload() {

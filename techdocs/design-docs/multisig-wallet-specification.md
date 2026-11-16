@@ -149,6 +149,9 @@ The number of supplied arguments must exactly equal the number of declared argum
 types. Missing or additional variadic values are rejected before the commitment is
 created or checked.
 
+Issue function names containing `(` are rejected so SolidVM cannot normalize a
+signature-style name into a different dispatched function after approval.
+
 STRATO has no separate ETH-like asset. USDST, STRATO, and other asset movements are represented as token contract calls, so issues do not carry a separate native-value field.
 
 ### Issue lifecycle
@@ -178,13 +181,16 @@ Signer or threshold changes:
 - Clear any pending upgrade.
 - Void all other open nominations.
 
-New and replacement signers use two-phase activation:
+New signers use two-phase activation:
 
-1. The current quorum executes an issue that nominates the signer and records the complete resulting configuration—signer set and M.
+1. The current quorum executes an issue that nominates exactly one signer. The resulting configuration must contain every current signer plus the nominee, with M unchanged.
 2. The nominee proves control by confirming from the nominated address.
 3. Confirmation applies the recorded configuration immediately, after rechecking `2 <= M < N`; no second quorum vote is required.
 
 Nominations are bound to the epoch in which they were created. They expire, can be revoked by quorum, and are voided by any epoch increment.
+
+Replacing a signer requires two proposals: add and activate the replacement first, then
+remove the old signer through a separate configuration proposal.
 
 Removals that add no new signer need no nomination and apply when the issue executes.
 
@@ -227,8 +233,11 @@ in it must be one of:
 - **Guarded:** restricted to signers (`onlySigner`) or to the wallet itself (`onlyWallet`).
 - **Migration:** named with the `migrate` prefix, so the shell fallback refuses it.
 - **Reviewed as open:** listed explicitly, with a reason, as safe for any caller. For
-  version 1 this list is `acceptNomination`, `dismissIssue`, `initialize`, and the
-  generated storage getters.
+  version 1 this list is `acceptNomination`, `dismissIssue`, `initialize`,
+  `multisigHealthCheck`, and the generated storage getters.
+
+Every logic version must implement a read-only `multisigHealthCheck`. The shell refuses
+to adopt a version without it.
 
 A version containing any other externally callable function must not be published. The
 review also confirms that no function uses `msg.sender` after making a wallet self-call,
@@ -266,7 +275,9 @@ Executors cannot supply a migration function or arguments. This prevents permiss
 execution from substituting values that collide under SolidVM's raw variadic hashing.
 
 Every migration function name must begin with `migrate`. The permanent wallet shell
-rejects that prefix in its fallback, so migration functions can be reached only by
+rejects signature-style fallback names containing `(` before rejecting that prefix.
+This prevents SolidVM from normalizing a whitespace-prefixed signature into a migration
+function after the guard. Migration functions can therefore be reached only by
 `executeUpgrade` during the atomic upgrade. State-changing setup or initialization
 functions outside the `migrate` prefix are rejected by the logic version publication
 review described above.
@@ -286,8 +297,17 @@ Execution:
 7. Updates the logic address and version and clears the pending upgrade.
 8. Increments the shell-owned epoch.
 9. Executes the stored no-argument migration function atomically through the new logic.
+10. Calls `multisigHealthCheck` through the new logic and requires it to return `true`.
 
-If any step fails, including migration, the entire upgrade reverts: the logic address, version, epoch, and pending upgrade are all unchanged.
+The health check confirms the wallet is initialized, the signer set and M satisfy
+`N >= 3` and `2 <= M < N`, every signer is indexed consistently, and the transaction
+timelock is within its maximum. It rejects a target with no code, a contract that is not
+multisig logic, and logic that cannot read the existing configuration. It does not
+detect defects elsewhere in the logic. After the check, the shell also requires that its
+own logic address, version, factory address and freeze status are what it set; a
+migration that alters them is refused. The same checks run when a wallet is created.
+
+If any step fails, including migration or the health check, the entire upgrade reverts: the logic address, version, epoch, and pending upgrade are all unchanged.
 
 A separately callable or unprotected initializer is prohibited.
 
@@ -413,7 +433,9 @@ The upgrade controls reduce accidental and look-alike upgrades. They do not prot
 ## Accepted risks
 
 - **No recovery authority:** No party outside the wallet's own quorum can move funds, change signers, or upgrade the wallet.
-- **Logic liveness failure:** Upgrades are approved through the current logic. If that logic becomes unable to vote or execute, the wallet cannot upgrade and its assets may be permanently stuck.
+- **Nested signer timing:** A multisig acting as a signer must complete its own quorum and waiting period inside the outer wallet's invitation, nomination, approval, or execution window. Long waiting periods can make that signer unusable for time-limited actions.
+- **False-returning targets:** An external call that returns `false` without reverting is recorded as executed. The wallet does not interpret arbitrary return values; callers must review target-specific outcomes.
+- **Logic liveness failure:** Upgrades are approved through the current logic. If that logic becomes unable to vote or execute, the wallet cannot upgrade and its assets may be permanently stuck. The upgrade health check refuses logic that cannot read the wallet's configuration, but not logic that passes the check and fails elsewhere.
 - **Key loss:** The wallet tolerates the loss of at most `N - M` signer keys. Beyond that, it cannot act.
 - **Frozen wallets:** A wallet with frozen upgrades can never receive fixes.
 - **Unguarded logic functions:** The shell cannot detect a logic function published

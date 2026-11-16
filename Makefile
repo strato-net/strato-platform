@@ -351,6 +351,7 @@ build_common: generate-version-file
 	@install -m 755 bin/strato-snapshot $(HOME)/.local/bin/
 	@install -m 755 bin/strato-pg-migrate $(HOME)/.local/bin/
 	@install -m 755 bin/strato-logrotate $(HOME)/.local/bin/
+	@install -m 755 bin/strato-authorize-operator $(HOME)/.local/bin/
 	@mkdir -p $(HOME)/.local/share/strato
 	@install -m 644 strato/tools/airlock/data/english.txt $(HOME)/.local/share/strato/bip39-english.txt
 	@case ":$$PATH:" in \
@@ -381,7 +382,7 @@ build_common_with_tests: generate-version-file
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	cd strato && stack install ${NIX_FLAG} \
-	  --test --no-run-tests
+	  --test --no-run-tests $(BUILD_TEST_TARGETS)
 
 build_common_profiled: generate-version-file
 	@echo building haskell libraries and creating directories (profiled)
@@ -585,6 +586,7 @@ uninstall:
 	@rm -f $(HOME)/.local/bin/strato-pg-migrate
 	@rm -f $(HOME)/.local/bin/strato-snapshot
 	@rm -f $(HOME)/.local/bin/strato-logrotate
+	@rm -f $(HOME)/.local/bin/strato-authorize-operator
 	@rm -f $(HOME)/.local/bin/strato-setup
 	@rm -f $(HOME)/.local/bin/convoke
 	@echo "Done"

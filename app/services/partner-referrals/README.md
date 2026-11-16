@@ -31,6 +31,11 @@ timestamps in ISO 8601 UTC, USD amounts as decimal strings. Errors are
   service has a load balancer of its own, the path is reachable there and
   the key is what guards it.
 - `GET /health`
+- `GET /status` returns `{status, data_as_of, lag_seconds}`, for a monitor
+  outside; no key. `status` is `ok`, `behind` (the indexed data is older
+  than `PARTNER_STALE_AFTER_SECONDS`, or nothing is indexed yet) or
+  `unavailable` (the database cannot be read). Always `200`: the state is in
+  the body, so a monitor matches the text `"status":"ok"`.
 
 | Field | Meaning |
 |---|---|
@@ -122,6 +127,7 @@ detected.
 | `PARTNER_REFERRALS_DB_NAME` | `partner_referrals` | Created on first start unless `PARTNER_REFERRALS_DB_CREATE=false` |
 | `postgres_host`, `postgres_port`, `postgres_user`, `postgres_password` | | As in the history service |
 | `postgres_ssl`, `postgres_ssl_ca` | | `require` encrypts without checking the server; `verify-full` checks it against the CA bundle at `postgres_ssl_ca`. For AWS RDS the image carries that bundle at `/app/rds-global-bundle.pem` |
+| `PARTNER_STALE_AFTER_SECONDS` | `120` | How old the indexed data may be before `/status` reports `behind` |
 | `PORT` | `3040` | |
 
 The app backend needs `PARTNER_REFERRALS_URL` and `PARTNER_INTERNAL_KEY`; the
@@ -130,6 +136,15 @@ app nginx needs `PARTNER_REFERRALS_HOST` to serve `/partner-api/`.
 One instance is enough. A second one polling at the same time (a deployment
 replacing the first) is safe: a page is only committed from the position it
 was read at, so the slower of the two is refused and starts over.
+
+`NODE_URL` can be a load balancer in front of several nodes. Each node
+numbers its Cirrus event rows itself, so the poller also remembers what its
+last event is on the chain (block hash and event index) and finds it on
+whichever node answers: after a switch to another node, or a rebuild of the
+node, it carries on where it was. A node that is behind is waited for. If
+the chain was rolled back past the poller's position, everything read from
+the chain is read again from the start (minutes); codes and referrals are
+not touched.
 
 ## Tests
 

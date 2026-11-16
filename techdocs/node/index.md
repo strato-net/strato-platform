@@ -69,7 +69,7 @@ The processes stream data to each other through JLog, an embedded log stored in 
 
 A node is a validator when its address is in the validator set stored in `MercataGovernance` (the genesis contract at `0x100`). The address gets into that set in one of two ways:
 
-- **Admin vote.** Registered network admins vote with `voteToAddValidator` / `voteToRemoveValidator`. A change passes with more than two thirds of the admins.
+- **Admin vote.** Registered network admins vote with `voteToAddValidator` / `voteToRemoveValidator`. A change passes with more than two thirds of the admins, and pins the validator in or out of the set until the admins clear the pin, whatever its stake.
 - **Staking.** An operator registers in `ValidatorRegistry`, which anyone may do, and binds the node's address. It bonds at least the minimum stake, a governance parameter. It then activates, subject to the set's size limits. The staking contract adds the validator to `MercataGovernance`, and removes it automatically when it stops being eligible.
 
 `/health` reports `pbftData.is_validator` for the local node. Validators need at least 8 GB of RAM.

@@ -5,7 +5,13 @@ interface IStakingGovernance {
     function addValidatorFromStaking(address validator, uint256 stake) external;
     function updateValidatorStake(address validator, uint256 stake) external;
     function removeValidatorFromStaking(address validator) external returns (bool);
+    function removeKickedValidator(address validator) external returns (bool);
+    function pinnedIn(address validator) external view returns (bool);
+    function pinnedOut(address validator) external view returns (bool);
     function validatorMap(address validator) external view returns (uint256);
+    function validatorStake(address validator) external view returns (uint256);
+    function validators(uint256 index) external view returns (address);
+    function validatorCount() external view returns (uint256);
     function stakingContract() external view returns (address);
 }
 

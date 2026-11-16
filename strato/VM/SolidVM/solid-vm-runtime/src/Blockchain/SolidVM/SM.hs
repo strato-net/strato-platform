@@ -40,6 +40,8 @@ module Blockchain.SolidVM.SM
     getCodeHashForDerivation,
     withStaticCallInfo,
     attempt,
+    caughtFailureForkActive,
+    trimCallStackToDepth,
     purgeStorageOnCommit,
     withLocalVars,
     getCurrentCallInfo,
@@ -84,6 +86,7 @@ import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB ()
+import Blockchain.DB.StorageDB (HasMemStorageDB)
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
 import qualified Control.Monad.Composable.StateDB as MP
@@ -91,7 +94,7 @@ import Blockchain.EthConf (ethConf)
 import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
-import Blockchain.Forks (isOperatorPrecedenceForkActive, isConstructorPublicationForkActive, isRlpEncodeForkActive)
+import Blockchain.Forks (isOperatorPrecedenceForkActive, isConstructorPublicationForkActive, isRlpEncodeForkActive, isCaughtFailureForkActive)
 import Blockchain.SolidVM.Exception
 import Blockchain.Data.VmTrace
 import Blockchain.SolidVM.GasInfo
@@ -161,6 +164,8 @@ data CallInfo = CallInfo
     -- caller adopts it only if the call succeeds, so whatever a failed call
     -- produced is dropped with its frame.
     frameAction :: !Action,
+    -- Cached per frame: historical execution uses transaction-wide action/sender.
+    frameRollback :: !Bool,
     -- | @msg.sender@ as this call sees it. A call starts with its caller's;
     -- nothing a call sets reaches its caller.
     frameSender :: !Address,
@@ -409,8 +414,8 @@ instance (N.NibbleString `A.Alters` N.NibbleString) SM where
 -- | The environment of the running call. See 'frameSender'.
 currentEnv :: SState -> Env.Environment
 currentEnv ss = case callStack ss of
-  [] -> env ss
-  ci : _ -> (env ss) {Env.sender = frameSender ci}
+  ci : _ | frameRollback ci -> (env ss) {Env.sender = frameSender ci}
+  _ -> env ss
 
 instance Mod.Accessible Env.Environment SM where
   access _ = gets currentEnv
@@ -443,8 +448,8 @@ instance MonadCallStack SM where
 instance Mod.Modifiable Env.Sender SM where
   get _ = Env.Sender . Env.sender <$> gets currentEnv
   put _ (Env.Sender s) = modify $ \ss@SState {env = e} -> case callStack ss of
-    [] -> ss {env = e {Env.sender = s}}
-    ci : rest -> ss {callStack = ci {frameSender = s} : rest}
+    ci : rest | frameRollback ci -> ss {callStack = ci {frameSender = s} : rest}
+    _ -> ss {env = e {Env.sender = s}}
 
 instance Mod.Modifiable [CallInfo] SM where
   get _ = gets callStack
@@ -476,8 +481,8 @@ instance MonadBuiltinGas SM where
 -- | The action of the running call. See 'frameAction'.
 currentAction :: Lens' SState Action
 currentAction f ss = case callStack ss of
-  [] -> (\a -> ss {_action = a}) <$> f (_action ss)
-  ci : rest -> (\a -> ss {callStack = ci {frameAction = a} : rest}) <$> f (frameAction ci)
+  ci : rest | frameRollback ci -> (\a -> ss {callStack = ci {frameAction = a} : rest}) <$> f (frameAction ci)
+  _ -> (\a -> ss {_action = a}) <$> f (_action ss)
 
 instance Mod.Modifiable Action SM where
   get _ = gets (^. currentAction)
@@ -859,6 +864,7 @@ addCallInfo ::
   Bool ->
   m ()
 addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
+  rollback <- caughtFailureForkActive
   callerAction <- Mod.get (Mod.Proxy @Action)
   Env.Sender callerSender <- Mod.get (Mod.Proxy @Env.Sender)
   let newCallInfo =
@@ -875,6 +881,7 @@ addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
             stateMap = M.empty,
             storageMap = M.empty,
             frameAction = callerAction,
+            frameRollback = rollback,
             frameSender = callerSender,
             framePurges = [],
             readOnly = ro,
@@ -898,7 +905,7 @@ popCallInfo reverted = do
           (deletes, inserts) = M.mapEither fromASM $ stateMap ci
       A.insertMany (A.Proxy @AddressState) $ inserts
       A.deleteMany (A.Proxy @AddressState) $ M.keys deletes
-      Mod.put (Mod.Proxy @Action) $ frameAction ci
+      when (frameRollback ci) $ Mod.put (Mod.Proxy @Action) $ frameAction ci
 
 withLocalVars :: MonadSM m => m a -> m a
 withLocalVars = bracket_ pushLocalVars popLocalVars
@@ -960,7 +967,7 @@ withStaticCallInfo f = do
         Left (e :: SomeException) -> throwIO e
         Right result -> result <$ Mod.put (Mod.Proxy @Action) produced
 
--- | The one way to recover from a contract failure. The code runs in a frame
+-- | Recover using the rules at this block height. After activation the code runs in a frame
 -- of its own, so what it did is kept only if it finishes; if it fails, that
 -- frame and any frame a failed call left above it are dropped before the
 -- failure is handed back. Everything a call can change lives in its frame, so
@@ -968,6 +975,27 @@ withStaticCallInfo f = do
 -- never handed back.
 attempt :: MonadSM m => m a -> m (Either SolidException a)
 attempt f = do
+  forked <- caughtFailureForkActive
+  if forked then attemptAtomic f else do
+    -- Before activation a try block shares its caller's frame. Drop only
+    -- unfinished calls; successful earlier calls and their events survive.
+    depth <- getCallStackDepth
+    result <- try f
+    case result of
+      Left (_ :: SolidException) -> trimCallStackToDepth depth
+      Right _ -> pure ()
+    pure result
+
+caughtFailureForkActive :: MonadSM m => m Bool
+caughtFailureForkActive =
+  isCaughtFailureForkActive . blockHeaderBlockNumber . Env.blockHeader <$> getEnv
+
+trimCallStackToDepth :: MonadSM m => Int -> m ()
+trimCallStackToDepth depth = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \stack ->
+  pure $ drop (max 0 $ length stack - depth) stack
+
+attemptAtomic :: MonadSM m => m a -> m (Either SolidException a)
+attemptAtomic f = do
   depth <- getCallStackDepth
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
     [] -> throw (InternalError "attempt was called on an already empty stack")
@@ -983,10 +1011,14 @@ attempt f = do
         Nothing -> throwIO e
 
 -- | Record that the running call destroyed a contract. See 'framePurges'.
-purgeStorageOnCommit :: Mod.Modifiable [CallInfo] m => Address -> m ()
-purgeStorageOnCommit address = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-  [] -> throw (InternalError "purgeStorageOnCommit was called on an already empty stack")
-  (ci : rest) -> pure $ ci {framePurges = address : framePurges ci} : rest
+purgeStorageOnCommit :: (Mod.Modifiable [CallInfo] m, HasMemStorageDB m) => Address -> m ()
+purgeStorageOnCommit address = do
+  frames <- Mod.get (Mod.Proxy @[CallInfo])
+  case frames of
+    [] -> throw (InternalError "purgeStorageOnCommit was called on an already empty stack")
+    ci : rest
+      | frameRollback ci -> Mod.put (Mod.Proxy @[CallInfo]) $ ci {framePurges = address : framePurges ci} : rest
+      | otherwise -> purgeStorageMap address
 
 getCurrentCallInfo :: MonadSM m => m CallInfo
 getCurrentCallInfo = do

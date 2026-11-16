@@ -17,8 +17,9 @@ import { AddressInfo } from "net";
 import { bootstrapDb } from "../src/db/bootstrap";
 import { pool, query } from "../src/db/pool";
 import { router } from "../src/api/routes";
-import { commit, prune } from "../src/indexer/cirrus";
+import { commit, pollFromStoredPosition, Position, prune } from "../src/indexer/cirrus";
 import { State } from "../src/indexer/activity";
+import { config } from "../src/config";
 
 const alice = "11".repeat(20);
 const bob = "22".repeat(20);
@@ -98,22 +99,26 @@ const carol = "44".repeat(20);
 
   // --- Commit: activity of referred accounts, and of anyone inside the grace period, once ---
   const ago = (days: number) => new Date(Date.now() - days * 86_400_000);
-  const stored = async () => (await query("SELECT event_id::int FROM activity ORDER BY 1")).rows.map((r) => r.event_id);
+  const stored = async () => (await query("SELECT event_index FROM activity ORDER BY 1")).rows.map((r) => r.event_index);
+  const at = (n: number): Position => ({ cursor: n, event: { address: "ee".repeat(20), blockHash: "b", eventIndex: n, blockNumber: n } });
   const state: State = { prices: new Map([["aa".repeat(20), 10n ** 18n]]), decimals: new Map(), pools: new Map(), dirtyPrices: new Set(["aa".repeat(20)]), dirtyPools: new Set() };
   const activities = [
-    { eventId: 1, account: alice, blockTs: new Date("2026-11-10T00:00:00Z"), usdWad: 100555n * 10n ** 15n },
-    { eventId: 2, account: alice, blockTs: new Date("2026-12-01T00:00:00Z"), usdWad: 7n * 10n ** 18n },
-    { eventId: 3, account: bob, blockTs: ago(30), usdWad: 999n * 10n ** 18n },
-    { eventId: 4, account: carol, blockTs: ago(0.01), usdWad: 5n * 10n ** 18n },
-    { eventId: 5, account: bob, blockTs: ago(0.01), usdWad: 999n * 10n ** 18n },
+    { blockHash: "b", eventIndex: 1, account: alice, blockTs: new Date("2026-11-10T00:00:00Z"), usdWad: 100555n * 10n ** 15n },
+    { blockHash: "b", eventIndex: 2, account: alice, blockTs: new Date("2026-12-01T00:00:00Z"), usdWad: 7n * 10n ** 18n },
+    { blockHash: "b", eventIndex: 3, account: bob, blockTs: ago(30), usdWad: 999n * 10n ** 18n },
+    { blockHash: "b", eventIndex: 4, account: carol, blockTs: ago(0.01), usdWad: 5n * 10n ** 18n },
+    { blockHash: "b", eventIndex: 5, account: bob, blockTs: ago(0.01), usdWad: 999n * 10n ** 18n },
   ];
   const asOf = new Date("2026-11-11T12:00:00Z");
-  await commit(state, activities, 0, 5, asOf);
+  const start: Position = { cursor: 0, event: null };
+  await commit(state, activities, start, at(5), asOf);
   assert.strictEqual(state.dirtyPrices.size, 0);
   // The position only moves from where the page was read: a second instance's page is refused whole
-  await assert.rejects(commit(state, activities, 0, 9, asOf), /another instance/);
+  await assert.rejects(commit(state, activities, start, at(9), asOf), /another instance/);
+  // So is a page read from another event that has the position's row id on another node
+  await assert.rejects(commit(state, activities, { cursor: 5, event: { ...at(5).event!, blockHash: "c" } }, at(9), asOf), /another instance/);
   assert.deepStrictEqual((await query("SELECT cursor::int FROM progress")).rows, [{ cursor: 5 }]);
-  await commit(state, activities, 5, 5, asOf); // replay
+  await commit(state, activities, at(5), at(5), asOf); // replay
   assert.deepStrictEqual(await stored(), [1, 2, 4, 5]);
   assert.deepStrictEqual((await query("SELECT price::text FROM prices")).rows, [{ price: "1000000000000000000" }]);
 
@@ -150,7 +155,7 @@ const carol = "44".repeat(20);
   const lateCode = late.codes.find((c: any) => c.code === quiet);
   assert.deepStrictEqual([lateCode.referrals, lateCode.traders, lateCode.volume_usd], [1, 1, "5.00"]);
   // Past the grace period, only referred accounts' activity is kept
-  await query("UPDATE activity SET block_ts = now() - interval '8 days' WHERE event_id IN (4, 5)");
+  await query("UPDATE activity SET block_ts = now() - interval '8 days' WHERE event_index IN (4, 5)");
   await prune();
   assert.deepStrictEqual(await stored(), [1, 2, 4]);
 
@@ -174,13 +179,92 @@ const carol = "44".repeat(20);
     return [c.referrals, c.traders, c.volume_usd];
   };
   // What the wallet did before it confirmed does not count, and until it does something after, it is not a referral
-  await commit(state, [{ eventId: 6, account: dave, blockTs: ago(1), usdWad: 50n * 10n ** 18n }], 5, 6, asOf);
+  await commit(state, [{ blockHash: "b", eventIndex: 6, account: dave, blockTs: ago(1), usdWad: 50n * 10n ** 18n }], at(5), at(6), asOf);
   assert.deepStrictEqual(await walletMetrics(), [0, 0, "0.00"]);
-  await commit(state, [{ eventId: 7, account: dave, blockTs: ago(0.25), usdWad: 9n * 10n ** 18n }], 6, 7, asOf);
+  await commit(state, [{ blockHash: "b", eventIndex: 7, account: dave, blockTs: ago(0.25), usdWad: 9n * 10n ** 18n }], at(6), at(7), asOf);
   assert.deepStrictEqual(await walletMetrics(), [1, 1, "9.00"]);
 
-  server.close();
+  // --- Status, for a monitor: no key, always 200, the state in the body ---
+  const status = () => call("GET", "/status");
+  await query("UPDATE progress SET as_of = now() - interval '10 minutes'");
+  const behind = await status();
+  assert.deepStrictEqual([behind.status, behind.body.status, behind.body.lag_seconds >= 600], [200, "behind", true]);
+  // An answer is reused for a while, so the database is not read for every ask
+  await query("UPDATE progress SET as_of = now()");
+  assert.deepStrictEqual(await status(), behind);
+  config.status.cacheMs = 0;
+  const current = await status();
+  assert.deepStrictEqual([current.status, current.body.status, current.body.lag_seconds <= 5, typeof current.body.data_as_of], [200, "ok", true, "string"]);
+
+  // --- The poller keeps its place when another node answers ---
+  // A node as its Cirrus serves it: the chain's events under row ids that
+  // start at the node's own offset. An ask with nothing new fails, which
+  // ends the poll and hands control back here.
+  const [oracle, lendingPool, token] = ["0000000000000000000000000000000000001002", "0000000000000000000000000000000000001005", "aa".repeat(20)];
+  const event = (block: number, hash: string, event_name: string, address: string, attributes: object) => ({
+    address, block_hash: hash, block_number: String(block), event_index: 1, block_timestamp: ago(0.1).toISOString(), transaction_sender: alice, event_name, attributes,
+  });
+  const deposit = (block: number, hash = `h${block}`) => event(block, hash, "Deposited", lendingPool, { user: alice, asset: token, amount: "1000000000000000000" });
+  let chain = [event(1, "h1", "PriceUpdated", oracle, { asset: token, price: "2000000000000000000" }), deposit(2), deposit(3)];
+  let offset = 0;
+  // A second node behind the same address, which answers every other ask
+  let second: typeof chain | null = null;
+  let asks = 0;
+  const node = express()
+    .get("/cirrus/search/BlockApps-Token", (_req, res) => res.json([{ address: token, customDecimals: 18 }]))
+    .get("/cirrus/search/event", (req, res) => {
+      // Each parameter as one string, however it was sent
+      const q = Object.fromEntries(Object.entries(req.query).map(([name, value]) => [name, String(value)]));
+      const rows = (second && asks++ % 2 ? second : chain).map((e, i) => ({ ...e, id: offset + i + 1 }));
+      if (q.or) return res.json(rows.filter((r) => q.or.includes(`and(address.eq.${r.address},block_hash.eq.${r.block_hash},event_index.eq.${r.event_index})`)));
+      if (q.order === "id.desc") return res.json(rows.slice(-1));
+      const [op, from] = q.id.split(".");
+      const page = rows.filter((r) => (op === "gte" ? r.id >= Number(from) : r.id > Number(from))).slice(0, Number(q.limit));
+      if (op === "gte" && page.length === 1 && page[0].id === Number(from)) return res.status(503).json({});
+      res.json(page);
+    })
+    .listen(0);
+  Object.assign(config.cirrus, { nodeUrl: `http://127.0.0.1:${(node.address() as AddressInfo).port}`, pageSize: 2, intervalMs: 1 });
+  const position = async () => (await query("SELECT cursor::int, block_hash FROM progress")).rows[0];
+  const counted = async () => (await query("SELECT block_hash FROM activity ORDER BY block_hash")).rows.map((r) => r.block_hash);
+  await query("TRUNCATE activity, prices, pools, progress");
+  await assert.rejects(pollFromStoredPosition(), /503/);
+  assert.deepStrictEqual([await position(), await counted()], [{ cursor: 3, block_hash: "h3" }, ["h2", "h3"]]);
+  // Another node, where the same events have other row ids, and one more event: nothing is skipped or counted twice
+  [chain, offset] = [[...chain, deposit(4)], 100];
+  await assert.rejects(pollFromStoredPosition(), /503/);
+  assert.deepStrictEqual([await position(), await counted()], [{ cursor: 104, block_hash: "h4" }, ["h2", "h3", "h4"]]);
+  // A node that has not reached the position's block yet is waited for
+  [chain, offset] = [chain.slice(0, 3), 7];
+  await assert.rejects(pollFromStoredPosition(), /behind the position's block 4/);
+  assert.deepStrictEqual([await position(), await counted()], [{ cursor: 104, block_hash: "h4" }, ["h2", "h3", "h4"]]);
+  // Two nodes that answer in turn, one before the position's block and one past it, are not a rollback
+  [chain, second, offset] = [[...chain, deposit(4), deposit(5)], chain, 0];
+  await assert.rejects(pollFromStoredPosition(), /newest event, of block 5, is on one node and not on the next/);
+  assert.deepStrictEqual([await position(), await counted()], [{ cursor: 104, block_hash: "h4" }, ["h2", "h3", "h4"]]);
+  // A chain that was rolled back and went on without the position's event is read again from the start
+  [chain, second, offset] = [[...chain.slice(0, 2), deposit(3, "x3"), deposit(4, "x4"), deposit(5, "x5")], null, 0];
+  await assert.rejects(pollFromStoredPosition(), /again from the start/);
+  assert.deepStrictEqual([await position(), await counted()], [{ cursor: 0, block_hash: null }, []]);
+  await assert.rejects(pollFromStoredPosition(), /503/);
+  assert.deepStrictEqual([await position(), await counted()], [{ cursor: 5, block_hash: "x5" }, ["h2", "x3", "x4", "x5"]]);
+  // Another contract's event with the position's block and index (the genesis block numbers each contract's events from 1) is not the position's
+  chain = [...chain, event(6, "h6", "PriceUpdated", oracle, { asset: token, price: "2000000000000000000" })];
+  await assert.rejects(pollFromStoredPosition(), /503/);
+  [chain, offset] = [[...chain, deposit(6), deposit(7)], -1];
+  await assert.rejects(pollFromStoredPosition(), /503/);
+  assert.deepStrictEqual([await position(), await counted()], [{ cursor: 7, block_hash: "h7" }, ["h2", "h6", "h7", "x3", "x4", "x5"]]);
+  node.close();
+
   await pool.end();
+  // Without its database the service still answers, and says so
+  const unavailable = { status: 200, body: { status: "unavailable", data_as_of: null, lag_seconds: null } };
+  assert.deepStrictEqual(await status(), unavailable);
+  // Nor does a database that never answers hold the answer back
+  (pool as any).query = () => new Promise(() => undefined);
+  config.status.timeoutMs = 50;
+  assert.deepStrictEqual(await status(), unavailable);
+  server.close();
   console.log("db.test: OK");
 })().catch((error) => {
   console.error(error);

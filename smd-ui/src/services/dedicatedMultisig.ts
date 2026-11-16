@@ -118,6 +118,28 @@ export interface DedicatedWalletState {
   verificationErrors: string[];
 }
 
+/** Cirrus returns the stored struct as a JSON string and an empty string as a zero address. */
+export const parseDedicatedPendingUpgrade = (raw: unknown): DedicatedWalletState["pendingUpgrade"] => {
+  let value: any = raw;
+  if (typeof raw === "string") {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return undefined;
+    }
+  }
+  if (value?.exists !== true && value?.exists !== "true") return undefined;
+  const migrationFunction = String(value.migrationFunction ?? "");
+  return {
+    targetLogic: strip0x(String(value.targetLogic ?? "")),
+    fromVersion: String(value.fromVersion ?? ""),
+    targetVersion: String(value.targetVersion ?? ""),
+    migrationFunction: migrationFunction === ZERO_ADDRESS ? "" : migrationFunction,
+    executableAt: Number(value.executableAt ?? 0),
+    expiresAt: Number(value.expiresAt ?? 0),
+  };
+};
+
 export interface DedicatedIssue {
   issueId: string;
   creator: string;
@@ -609,18 +631,7 @@ export function useDedicatedWalletState(walletAddress?: string | null) {
         signers: signerRows
           .map((row) => strip0x(String(row?.key?.key ?? "")))
           .filter((signer) => signer.length === 40),
-        ...(data.multisigPendingUpgrade?.exists === true || data.multisigPendingUpgrade?.exists === "true"
-          ? {
-              pendingUpgrade: {
-                targetLogic: strip0x(String(data.multisigPendingUpgrade.targetLogic ?? "")),
-                fromVersion: String(data.multisigPendingUpgrade.fromVersion ?? ""),
-                targetVersion: String(data.multisigPendingUpgrade.targetVersion ?? ""),
-                migrationFunction: String(data.multisigPendingUpgrade.migrationFunction ?? ""),
-                executableAt: Number(data.multisigPendingUpgrade.executableAt ?? 0),
-                expiresAt: Number(data.multisigPendingUpgrade.expiresAt ?? 0),
-              },
-            }
-          : {}),
+        pendingUpgrade: parseDedicatedPendingUpgrade(data.multisigPendingUpgrade),
         verified: verificationErrors.length === 0,
         verificationErrors,
       };
