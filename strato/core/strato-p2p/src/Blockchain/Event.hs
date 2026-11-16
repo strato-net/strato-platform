@@ -137,9 +137,9 @@ handleEvents peer = awaitForever $ \case
   MsgEvt Hello {} -> error "A hello message appeared after the handshake"
   MsgEvt Status {} -> error "A status message appeared after the handshake"
   MsgEvt Ping -> do
-    lift stampActionTimestamp
+    lift keepAlive
     yieldR Pong
-  MsgEvt Pong -> lift stampActionTimestamp
+  MsgEvt Pong -> lift keepAlive
   MsgEvt (Transactions txs) -> handleGossipedTransactions nodeIntakeRules peer txs
   MsgEvt (NewBlock block' _) -> do
     lift stampActionTimestamp
@@ -322,6 +322,8 @@ handleEvents peer = awaitForever $ \case
               Preprepare _ blk -> bodyMatchesHeader blk
               Commit _ di seal -> (verifyCommitmentSeal di seal :: Either String Address) == Right sender'
               _ -> True
+        -- Cheapest test first: a sender outside the set costs no signature
+        -- recovery, and no trie rebuild or seal recovery for the unsigned parts.
         if not (Validator sender' `elem` validators && signed && unsignedPartsHold)
           then $logDebugS "handleEvents/Blockstanbul" . T.pack $ "Dropping a consensus message from " ++ peerString peer ++ " not signed by a current validator"
           else do
@@ -496,6 +498,12 @@ handleEvents peer = awaitForever $ \case
   AbortEvt reason -> do
     $logInfoS "handleEvents/AbortEvt" . T.pack $ "Received AbortEvt: " ++ reason
     yieldR $ Disconnect AlreadyConnected
+
+-- | A Ping or Pong keeps an idle link open, but not one holding a sync task:
+-- that link has to deliver headers or bodies, or time out so the task can go to
+-- another peer. A caught-up link holds none (its last chiliad is marked NotReady).
+keepAlive :: (MonadIO m, Modifiable ActionTimestamp m, HasSyncDB m) => m ()
+keepAlive = getCurrentSyncTask >>= maybe stampActionTimestamp (const $ pure ())
 
 -- | How close to the tip we have to be before gossiped transactions are worth
 -- forwarding to the sequencer.
