@@ -99,9 +99,12 @@ tests:
       - QuickCheck
       - aeson
       - blockapps-data
+      - blockapps-mpdbs
       - blockDB
+      - composable-monads-base
       - containers
       - ethereum-rlp
+      - monad-alter
       - strato-model
       - vm-tools
       - strato-conf
@@ -116,6 +119,7 @@ tests:
       - solid-vm-model
       - strato-model
       - time
+      - unliftio
       - vector
       - Decimal
       - binary
