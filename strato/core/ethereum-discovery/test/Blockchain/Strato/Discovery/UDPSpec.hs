@@ -12,6 +12,7 @@ import Blockchain.Strato.Discovery.UDPServer (keepsHeldKey)
 import Blockchain.Strato.Model.Address (fromPublicKey)
 import Blockchain.Strato.Model.Secp256k1 (derivePublicKey, newPrivateKey)
 import Blockchain.Strato.Model.Validator (Validator (..))
+import Crypto.Types.PubKey.ECC (Point (..))
 import Data.Bits
 import Network.Socket (tupleToHostAddress, tupleToHostAddress6)
 import Test.Hspec
@@ -19,17 +20,25 @@ import Text.Format
 
 spec :: Spec
 spec = do
-  describe "keepsHeldKey" $
+  describe "keepsHeldKey" $ do
     it "keeps a validator's key against a packet signed with another key, and only then" $ do
       validator <- derivePublicKey <$> newPrivateKey
       other <- derivePublicKey <$> newPrivateKey
       let point = secPubKeyToPoint
-          validators = [Validator $ fromPublicKey validator]
+          validators = Just [Validator $ fromPublicKey validator]
       keepsHeldKey validators (Just $ point validator) (point other) `shouldBe` True
       keepsHeldKey validators (Just $ point validator) (point validator) `shouldBe` False
-      keepsHeldKey [] (Just $ point validator) (point other) `shouldBe` False
+      keepsHeldKey (Just []) (Just $ point validator) (point other) `shouldBe` False
       keepsHeldKey validators Nothing (point other) `shouldBe` False
       keepsHeldKey validators (Just $ point other) (point validator) `shouldBe` False
+
+    it "keeps any held key while the validator set cannot be read, but not an invalid one" $ do
+      held <- secPubKeyToPoint . derivePublicKey <$> newPrivateKey
+      other <- secPubKeyToPoint . derivePublicKey <$> newPrivateKey
+      keepsHeldKey Nothing (Just held) other `shouldBe` True
+      keepsHeldKey Nothing Nothing other `shouldBe` False
+      -- off the curve: a Neighbors packet could store it, and a real packet must replace it
+      keepsHeldKey Nothing (Just $ Point 0 0) other `shouldBe` False
 
   describe "IAddr Format instance" $ do
     it "formats an IPv4 address" $ do

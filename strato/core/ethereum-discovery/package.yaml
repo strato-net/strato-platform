@@ -107,6 +107,7 @@ tests:
     main: Spec.hs
     ghc-options: -Wall -Werror -dynamic
     dependencies:
+      - crypto-pubkey-types
       - ethereum-discovery
       - ethereum-encryption
       - ethereum-rlp

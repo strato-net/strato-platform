@@ -282,30 +282,33 @@ maxMessageItems = 4000000
 
 -- | Whether an RLP encoding holds at most @cap@ items, counted from the item
 -- headers without decoding anything. A list's payload is its items laid end to
--- end, so one pass over the headers sees every item at every depth. An encoding
--- that runs past its end stops the count; decoding then reports it.
+-- end, so one pass over the headers sees every item at every depth. An item
+-- whose declared length runs past the end of the encoding is refused too: the
+-- decoder narrows such a length to an Int, and the wrapped value can read as an
+-- empty string that hides the items after it from this count.
 rlpItemsAtMost :: Int -> B.ByteString -> Bool
 rlpItemsAtMost cap bs = go 0 0
   where
     n = B.length bs
     byteAt i = fromIntegral (B.index bs i) :: Integer
     lengthAt i k = foldl' (\acc j -> acc * 256 + byteAt (i + j)) 0 [0 .. k - 1]
+    -- a payload of @len@ bytes after a header of @h@ bytes at @i@ fits
+    fits i h len = toInteger i + toInteger h + len <= toInteger n
     go :: Int -> Int -> Bool
     go i items
       | items > cap = False
       | i >= n = True
       | otherwise = case byteAt i of
           b | b < 0x80 -> go (i + 1) (items + 1)
-            | b <= 0xB7 -> go (i + 1 + fromInteger (b - 0x80)) (items + 1)
-            | b <= 0xBF -> skipLong i (fromInteger $ b - 0xB7) (items + 1)
-            | b <= 0xF7 -> go (i + 1) (items + 1)
-            | otherwise -> go (i + 1 + fromInteger (b - 0xF7)) (items + 1)
-    -- a long string: its payload is skipped, its length bytes read first
-    skipLong i k items
-      | i + 1 + k > n = True
-      | otherwise =
-          let len = lengthAt (i + 1) k
-           in if len > toInteger n then True else go (i + 1 + k + fromInteger len) items
+            | b <= 0xB7 -> fits i 1 (b - 0x80) && go (i + 1 + fromInteger (b - 0x80)) (items + 1)
+            | b <= 0xBF -> long i (fromInteger $ b - 0xB7) $ \len -> go (i + 1 + fromInteger (b - 0xB7) + fromInteger len) (items + 1)
+            | b <= 0xF7 -> fits i 1 (b - 0xC0) && go (i + 1) (items + 1)
+            | otherwise -> long i (fromInteger $ b - 0xF7) $ \_ -> go (i + 1 + fromInteger (b - 0xF7)) (items + 1)
+    -- a long item: @k@ length bytes after its first byte, then a payload that must
+    -- fit; a string's payload is skipped, a list's items are counted in turn
+    long i k next
+      | i + 1 + k > n = False
+      | otherwise = let len = lengthAt (i + 1) k in fits i (1 + k) len && next len
 
 maxMessageSize :: Int
 maxMessageSize = 1 `shiftL` 24
