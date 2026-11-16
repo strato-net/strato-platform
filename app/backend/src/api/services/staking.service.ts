@@ -738,6 +738,33 @@ const isSelfBondRuleActive = (state: Record<string, any>, now: bigint): boolean 
   return graceUntil > 0n && now >= graceUntil;
 };
 
+// _window: the stake-delay window the chain is in, or null while no delay is set. Stake
+// waits through the window it arrived in and the one after.
+const stakeDelayWindow = (state: Record<string, any>, now: bigint): bigint | null => {
+  const delay = parseBigIntLike(state.stakeDelaySeconds);
+  return delay > 0n ? (parseBigIntLike(state.stakeDelayGeneration) << 64n) + now / delay : null;
+};
+
+// _unmatured: the stake behind a validator that does not count toward its vote yet, from
+// its row of pendingWeight (window => amount).
+const unmaturedStake = (pendingByWindow: unknown, delayWindow: bigint | null): bigint => {
+  if (delayWindow === null || !pendingByWindow || typeof pendingByWindow !== "object") return 0n;
+  return Object.entries(pendingByWindow as Record<string, any>)
+    .filter(([arrived]) => parseBigIntLike(arrived) === delayWindow || parseBigIntLike(arrived) + 1n === delayWindow)
+    .reduce((sum, [, amount]) => sum + parseBigIntLike(amount), 0n);
+};
+
+// _waiting: how much of an operator's own bond is still waiting, from its pendingSelfBond record.
+const waitingSelfBond = (pending: Record<string, any> | undefined, delayWindow: bigint | null): bigint => {
+  if (delayWindow === null || !pending) return 0n;
+  const newWindow = parseBigIntLike(pending.newWindow);
+  const newAmount = parseBigIntLike(pending.newAmount);
+  if (newWindow === delayWindow) {
+    return parseBigIntLike(pending.oldWindow) + 1n === delayWindow ? newAmount + parseBigIntLike(pending.oldAmount) : newAmount;
+  }
+  return newWindow + 1n === delayWindow ? newAmount : 0n;
+};
+
 // _requireJoinsOpen, with the last processed block (the last block with a transaction)
 // standing in for the head.
 const isJoinsOpen = (state: Record<string, any>): boolean => {
@@ -761,15 +788,22 @@ type V2ValidatorRecord = {
   requiredStake: bigint;
   requiredStakeCountsDelegations: boolean;
   eligible: boolean;
+  // What the validator votes with: its stake less what is still waiting out the stake delay.
+  votingWeight: bigint;
+  // Can take a seat by right now: eligible, not seated, and its bond has waited out the delay.
+  isWaiter: boolean;
 };
 
-// Every listed record with the lifecycle facts StratoStaking derives (status, eligible),
-// ordered by validator address like the v1 Cirrus read.
+// Every listed record with the lifecycle facts StratoStaking derives (status, eligible,
+// isWaiter), ordered by validator address like the v1 Cirrus read.
 const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => {
   const now = BigInt(Math.floor(Date.now() / 1000));
   const minStake = parseBigIntLike(state.minStake);
   const selfBondMinimum = selfBondMinimumOf(state);
   const selfBondRuleActive = isSelfBondRuleActive(state, now);
+  const delayWindow = stakeDelayWindow(state, now);
+  const pendingWeightMap = addressKeyed(state.pendingWeight);
+  const pendingSelfBondMap = addressKeyed(state.pendingSelfBond);
   const isValidatorMap = addressKeyed(state.isValidator);
   const selfBondRuleSeatMap = addressKeyed(state.seatedUnderSelfBondRule);
   const jailedUntilMap = addressKeyed(state.jailedUntil);
@@ -793,6 +827,11 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
       const requiredStake = selfBondSeat ? selfBondMinimum : minStake;
       const requiredStakeCountsDelegations = !selfBondSeat && !selfBondRuleActive;
       const meetsMinStake = (requiredStakeCountsDelegations ? totalStake : selfBond) >= requiredStake;
+      const eligible = active && meetsMinStake && now >= jailedUntil && (exitReadyTime === 0n || now < exitReadyTime);
+      // _votingWeight and _bondMatured.
+      const unmatured = unmaturedStake(pendingWeightMap.get(validator), delayWindow);
+      const waitingBond = waitingSelfBond(pendingSelfBondMap.get(validator), delayWindow);
+      const bondMatured = selfBond >= waitingBond && selfBond - waitingBond >= selfBondMinimum;
 
       return {
         validator,
@@ -809,7 +848,9 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
         status: !active ? 3 : isValidator ? 2 : 1,
         requiredStake,
         requiredStakeCountsDelegations,
-        eligible: active && meetsMinStake && now >= jailedUntil && (exitReadyTime === 0n || now < exitReadyTime),
+        eligible,
+        votingWeight: unmatured >= totalStake ? 0n : totalStake - unmatured,
+        isWaiter: eligible && !isValidator && bondMatured,
       };
     });
 };
@@ -1487,7 +1528,7 @@ const getV2StakingInfo = async (
       status: record.status,
       isValidator: record.isValidator,
       eligible: record.eligible,
-      isWaiter: record.eligible && !record.isValidator,
+      isWaiter: record.isWaiter,
       requiredStake: record.requiredStake.toString(),
       requiredStakeCountsDelegations: record.requiredStakeCountsDelegations,
       jailedUntil: record.jailedUntil.toString(),
@@ -2020,7 +2061,8 @@ export const activateStratoOperator = async (
 };
 
 // Fill free set slots from the waiters, best first. reconcileSet only considers the
-// candidates it is handed (at most maxBatchSize), so the backend does the indexing.
+// candidates it is handed (at most maxBatchSize), so the backend does the indexing: the
+// same waiters, in the same order (voting weight, then address), as the contract picks from.
 export const reconcileStratoValidatorSet = async (
   accessToken: string,
   userAddress: string
@@ -2029,10 +2071,10 @@ export const reconcileStratoValidatorSet = async (
 
   const state = await getStakingBlocState(accessToken, true);
   const candidates = v2ValidatorRecords(state)
-    .filter((record) => record.eligible && !record.isValidator)
+    .filter((record) => record.isWaiter)
     .sort((a, b) =>
-      a.totalStake !== b.totalStake
-        ? (b.totalStake > a.totalStake ? 1 : -1)
+      a.votingWeight !== b.votingWeight
+        ? (b.votingWeight > a.votingWeight ? 1 : -1)
         : (a.validator < b.validator ? -1 : 1))
     .slice(0, batchSizeFromValue(state.maxBatchSize))
     .map((record) => record.validator);
