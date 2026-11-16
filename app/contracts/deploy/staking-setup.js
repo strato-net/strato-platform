@@ -9,12 +9,19 @@
 //   node staking-setup.js selfbondmin <amountWei>          own bond a new seat needs (10,000 until set)
 //   node staking-setup.js fundreserve <amountWei>          (direct) fund the emission reserve
 //   node staking-setup.js emission <e0Wei> <s0Wei> <r0Wei> <startUnix>   commit the emission schedule, once
+//   node staking-setup.js migraterecords <reviewed-plan.json>  (vote, once)
+//   node staking-setup.js migrateprofiles <reviewed-plan.json> (vote, once)
+//   node staking-setup.js bootstrapincumbents              (vote, once)
+//   node staking-setup.js validatorparams <minStake> <feeBps> <misses> <cooldown> (vote)
+//   node staking-setup.js setparamsvalues <max> <hardCap> <marginBps> <mutations> <exitSeconds> <unkickSeconds> <stakeCapBps> (vote)
+//   node staking-setup.js whitelisttoken <transfer|transferFrom> (vote, if token is paused)
 // Addresses default to helium; set STAKING_PROXY, VALIDATOR_REGISTRY_PROXY and STRATO_TOKEN
 // for another network.
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
 const { rest, util } = require('./strato');
+const fs = require('fs');
 
 const REGISTRY = '000000000000000000000000000000000000100c';
 const GOVERNANCE = '0000000000000000000000000000000000000100';
@@ -52,8 +59,20 @@ const STEPS = {
   // selfbondmin and setSelfBondGraceUntil), proposerFeeBps, maxConsecutiveMisses, jailCooldown
   params:    { target: STAKING, func: 'setValidatorParams',
                args: [TEN_K, 1000, 100, 3600] },
+  validatorparams: (args) => {
+    if (args.length !== 4 || !args.every((v) => /^[0-9]+$/.test(v))) {
+      throw new Error('usage: validatorparams <minStakeWei> <feeBps> <misses> <cooldown>');
+    }
+    return { target: STAKING, func: 'setValidatorParams', args };
+  },
   setparams: { target: STAKING, func: 'setSetParams',
                args: ['50', '50', '500', '4', '86400', '86400', '10000'] },
+  setparamsvalues: (args) => {
+    if (args.length !== 7 || !args.every((v) => /^[0-9]+$/.test(v))) {
+      throw new Error('usage: setparamsvalues <max> <hardCap> <marginBps> <mutations> <exitSeconds> <unkickSeconds> <stakeCapBps>');
+    }
+    return { target: STAKING, func: 'setSetParams', args };
+  },
   // Genesis validators, each listed as its own operator (admin listing needs no key signature).
   validators: { target: VREG, func: 'addValidators',
                 args: [VALIDATORS, VALIDATORS, [0,0,0,0],
@@ -118,6 +137,29 @@ const STEPS = {
       throw new Error('usage: emission <e0Wei> <s0Wei> <r0Wei> <startUnix>');
     }
     return { target: STAKING, func: 'commitEmissionSchedule', args: [e0, s0, r0, start] };
+  },
+  migraterecords: ([file]) => {
+    if (!file) throw new Error('usage: migraterecords <reviewed-plan.json>');
+    const data = JSON.parse(fs.readFileSync(file, 'utf8'))['StratoStakingMigration.migrateRecords'];
+    if (!data || data.operatorKeys.length !== data.validators.length || data.operatorKeys.length !== data.positionCounts.length) {
+      throw new Error('invalid staking migration plan');
+    }
+    return { target: STAKING, func: 'migrateRecords', args: [data.operatorKeys, data.validators, data.positionCounts, data.delegators] };
+  },
+  migrateprofiles: ([file]) => {
+    if (!file) throw new Error('usage: migrateprofiles <reviewed-plan.json>');
+    const data = JSON.parse(fs.readFileSync(file, 'utf8'))['ValidatorRegistryMigration.migrateProfiles'];
+    if (!data || data.operatorKeys.length !== data.validators.length) {
+      throw new Error('invalid registry migration plan');
+    }
+    return { target: VREG, func: 'migrateProfiles', args: [data.operatorKeys, data.validators] };
+  },
+  bootstrapincumbents: { target: STAKING, func: 'bootstrapIncumbents', args: [] },
+  whitelisttoken: ([func]) => {
+    if (func !== 'transfer' && func !== 'transferFrom') {
+      throw new Error('usage: whitelisttoken <transfer|transferFrom>');
+    }
+    return { target: REGISTRY, func: 'addWhitelist', args: [TOKEN, func, STAKING] };
   },
   mint:      { target: TOKEN, func: 'mint', args: [FUNDER, FORTY_K] },
   // Fund the fee router so it can pay the flat per-block reward. It pays 0.01

@@ -1,5 +1,7 @@
 # Upquark: permissionless admission and the emission schedule
 
+First complete [the legacy migration and incumbent bootstrap](./RUNBOOK-upquark-legacy-migration.md), then resume at step 4.
+
 Swaps the `StratoStaking` logic behind the Upquark staking proxy (`f30a022c…3988`) for this
 branch's and turns on two things. `MercataGovernance` gains `publishValidatorStakeSnapshot()`
 (step 5); `ValidatorRegistry`, `FeeRouter` and the node are unchanged. Rehearse every step on
