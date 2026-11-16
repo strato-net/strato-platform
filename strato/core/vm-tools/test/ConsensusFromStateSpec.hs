@@ -6,11 +6,12 @@
 module ConsensusFromStateSpec (spec) where
 
 import Blockchain.Bagger (discardsRewardRun)
-import Blockchain.Bagger.Transactions (consensusDeltasFromHeld)
+import Blockchain.Bagger.Transactions (consensusDeltasFromHeld, consensusOutcome, shadowMismatch)
 import Blockchain.Strato.Model.Validator
 import qualified Data.Map as M
 import qualified Data.Set as S
-import SolidVM.Model.Delta (applyStakeDelta, fromDelta)
+import Data.Maybe (isJust)
+import SolidVM.Model.Delta (applyStakeDelta, fromDelta, toDelta)
 import Test.Hspec
 import Test.QuickCheck
 
@@ -87,6 +88,31 @@ spec = do
             if firstWeightsPartial
               then all (<= 0) [M.findWithDefault 0 k stakes'' | (k, _) <- held] `shouldBe` True
               else [M.findWithDefault 0 k stakes'' | (k, _) <- held] `shouldBe` map snd held
+
+  describe "the shadow comparison before the fork" $ do
+    let inForce = S.fromList [a, b, c]
+        stakes = M.fromList [(a, 10), (b, 20), (c, 30)]
+        fromState held = consensusDeltasFromHeld inForce stakes held
+
+    it "agrees when events and state leave the same set and weights, however the changes are written" $ do
+      -- events re-publish an unchanged weight and add then remove a validator; state shows neither
+      let fromEvents = (toDelta [d] [d], M.fromList [(a, 10), (c, 31)])
+      shadowMismatch inForce stakes fromEvents (fromState [(a, 10), (b, 20), (c, 31)]) `shouldBe` Nothing
+      consensusOutcome inForce stakes fromEvents `shouldBe` (inForce, M.fromList [(a, 10), (b, 20), (c, 31)])
+
+    it "reports a validator that events add and state does not hold" $ do
+      -- the rolled-back call: its ValidatorAdded and ValidatorStakeUpdated events, nothing in storage
+      let fromEvents = (toDelta [d] [], M.fromList [(d, 1000)])
+      shadowMismatch inForce stakes fromEvents (fromState [(a, 10), (b, 20), (c, 30)]) `shouldSatisfy` isJust
+
+    it "reports a weight that state holds and no event carried" $ do
+      let fromEvents = (toDelta [] [], M.empty)
+      shadowMismatch inForce stakes fromEvents (fromState [(a, 10), (b, 25), (c, 30)]) `shouldSatisfy` isJust
+
+    it "treats a weight of zero and no weight at all as the same" $ do
+      let fromEvents = (toDelta [] [], M.fromList [(b, 0)])
+      shadowMismatch inForce stakes fromEvents (fromState [(a, 10), (b, 0), (c, 30)]) `shouldBe` Nothing
+      snd (consensusOutcome inForce stakes fromEvents) `shouldBe` M.fromList [(a, 10), (c, 30)]
 
   describe "a run that was to pay the block rewards" $ do
     it "is thrown away when it failed without running a transaction" $

@@ -258,7 +258,7 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
 
 -- TODO: If we add more verifications, refactor tuple into a proper data type
 verifyBlock ::
-  (HasStateDB m, HasSolidStorageDB m, MonadIO m) =>
+  (HasStateDB m, HasSolidStorageDB m, MonadLogger m, MonadIO m) =>
   Block ->
   ([TxRunResult], Maybe MP.StateRoot) ->
   BlockSummary ->

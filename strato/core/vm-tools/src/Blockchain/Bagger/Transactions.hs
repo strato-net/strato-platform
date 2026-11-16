@@ -5,6 +5,7 @@
 
 module Blockchain.Bagger.Transactions where
 
+import BlockApps.Logging (MonadLogger, logWarnNS)
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.SolidStorageDB (HasSolidStorageDB, getSolidStorageKeyVal')
 import Blockchain.Data.ExecResults
@@ -33,6 +34,7 @@ import Data.Maybe (catMaybes)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.List (foldl')
+import qualified Data.Text as T
 import Data.Time.Clock
 import GHC.Generics
 import SolidVM.Model.TypedArg (valueToTypedArg)
@@ -364,17 +366,58 @@ consensusDeltasFromHeld inForce inForceStakes held =
 -- root, so the caller must be positioned on that state. Before it they are
 -- added up from the transactions' events. Proposer and verifier both come
 -- through here, which is what keeps them on the same rule at the same block.
+--
+-- Before the fork, once staking is active, the state is read as well and
+-- compared: a block where the two derivations would leave the consensus layer
+-- with a different set or different weights is logged (see 'shadowMismatch').
+-- Nothing else changes, so a node can run this for as long as it likes ahead of
+-- the fork and report every block the fork would have decided differently.
 blockConsensusDeltas ::
-  HasSolidStorageDB m =>
+  (HasSolidStorageDB m, MonadLogger m) =>
   Integer ->
   S.Set Validator ->
   M.Map Validator Integer ->
   [TxRunResult] ->
   m (ValidatorDelta, StakeDelta)
 blockConsensusDeltas blockNum inForce inForceStakes trrs
-  | isConsensusFromStateForkActive blockNum && Conf.stakingActiveAt (Conf.networkConfig ethConf) blockNum =
-      consensusDeltasFromHeld inForce inForceStakes <$> governanceValidatorsAndStakes
-  | otherwise = pure (getDeltasFromResults trrs, getStakeDeltasFromResults trrs)
+  | not (Conf.stakingActiveAt (Conf.networkConfig ethConf) blockNum) = pure fromEvents
+  | isConsensusFromStateForkActive blockNum = fromState
+  | otherwise = do
+      shadow <- fromState
+      mapM_ (logWarnNS "consensusFromState/shadow" . T.pack . (("block " ++ show blockNum ++ ": ") ++)) $
+        shadowMismatch inForce inForceStakes fromEvents shadow
+      pure fromEvents
+  where
+    fromEvents = (getDeltasFromResults trrs, getStakeDeltasFromResults trrs)
+    fromState = consensusDeltasFromHeld inForce inForceStakes <$> governanceValidatorsAndStakes
+
+-- | What the consensus layer holds once a block's changes are applied to the
+-- set and weights in force for it: the set, and each member's weight where it
+-- has one. Two derivations that write their changes differently (a weight
+-- re-published unchanged, a validator added and removed in one block) but end
+-- here agree.
+consensusOutcome :: S.Set Validator -> M.Map Validator Integer -> (ValidatorDelta, StakeDelta) -> (S.Set Validator, M.Map Validator Integer)
+consensusOutcome inForce inForceStakes (vd, sd) =
+  (set', M.filter (> 0) $ applyStakeDelta removed sd inForceStakes `M.restrictKeys` set')
+  where
+    (added, removed) = fromDelta vd
+    set' = (inForce `S.union` S.fromList added) S.\\ S.fromList removed
+
+-- | The shadow comparison: 'Nothing' when the changes derived from events and
+-- the changes read from state leave the consensus layer with the same set and
+-- weights, otherwise a line saying what each would leave.
+shadowMismatch :: S.Set Validator -> M.Map Validator Integer -> (ValidatorDelta, StakeDelta) -> (ValidatorDelta, StakeDelta) -> Maybe String
+shadowMismatch inForce inForceStakes fromEvents fromState
+  | byEvents == byState = Nothing
+  | otherwise =
+      Just $
+        "events and state disagree. From events: " ++ describe byEvents ++ ". From state: " ++ describe byState
+  where
+    byEvents = consensusOutcome inForce inForceStakes fromEvents
+    byState = consensusOutcome inForce inForceStakes fromState
+    describe (set', stakes') =
+      show (S.size set') ++ " validators " ++ show (map format $ S.toAscList set')
+        ++ ", weights " ++ show [(format v, w) | (v, w) <- M.toAscList stakes']
 
 -- | Convert a 'TxRunResult' to its canonical 'Receipt' for inclusion in the
 -- receipts trie (Phase 0 spec §6.2). Mirrors the gas/status accounting in
