@@ -137,6 +137,36 @@ spec = describe "stake-weighted consensus" $ do
         get
       M.keys (_roundChanged ctx') `shouldBe` [2]
 
+    it "clears round-change votes on a height change, so none carry to the next height" $ do
+      -- a vote for a future round arrives at the current height (sequence 10)
+      voted <- runWith activeCtx $ do
+        _ <- sendMessages [IMsg (MsgAuth other dummySig) (RoundChange (View 2 10) 0)]
+        get
+      M.keys (_roundChanged voted) `shouldBe` [2]
+      -- committing the next block (height 11) must not carry that vote forward: the
+      -- votes held no height, so without clearing them a vote cast at height 10 would
+      -- still count toward a round change at height 11.
+      let commit = runConduit $ yieldMany ([] :: [InEvent]) .| commitBlock (Block (v3 [Validator me, Validator other] [] 0 [] []) [] []) .| sinkNull
+      afterCommit <- runWith voted $ commit >> get
+      _sequence (_view afterCommit) `shouldBe` 11
+      _roundChanged afterCommit `shouldBe` M.empty
+
+    it "catches up to a higher round on a more-than-a-third PREPARE/COMMIT certificate" $ do
+      -- three validators, each weight 1: more than a third needs two of them.
+      let third = Address 0xdef
+          ckpt3 = Checkpoint (View 0 10) [Validator me, Validator other, Validator third] (Just zeroHash) [] 0
+          ctx3 = (newContext "test" 1 ckpt3 (Just me) True Nothing 15) {_productionAuth = False}
+      -- one higher-round PREPARE is not enough: the node stays on its round
+      one <- runWith ctx3 $ sendMessages [IMsg (MsgAuth other dummySig) (Prepare (View 5 10) zeroHash)] >> get
+      _round (_view one) `shouldBe` 0
+      -- a second, from a different validator, crosses a third: catch up to round 5
+      two <- runWith ctx3 $ do
+        _ <- sendMessages [IMsg (MsgAuth other dummySig) (Prepare (View 5 10) zeroHash)]
+        _ <- sendMessages [IMsg (MsgAuth third dummySig) (Commit (View 5 10) zeroHash dummySig)]
+        get
+      _round (_view two) `shouldBe` 5
+      _sequence (_view two) `shouldBe` 10
+
   describe "stake bookkeeping" $ do
     it "applies stake updates and drops removed validators on commit" $ do
       let hdr = v3 [] [] 0 [Validator other] [(Validator me, 5), (Validator other, 9)]
