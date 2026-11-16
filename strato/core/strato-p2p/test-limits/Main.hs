@@ -37,6 +37,16 @@ main = hspec $ do
       rlpItemsAtMost 10 (B.pack (0xC9 : 0xBF : replicate 8 0xFF) <> ones 20) `shouldBe` False
       rlpItemsAtMost 10 (B.pack [0xF9, 0xFF, 0xFF, 1]) `shouldBe` False
 
+    it "refuses an item that runs past the list holding it" $
+      -- the inner list holds two bytes, but its string's length bytes cross into
+      -- the outer list, where the decoder reads the twenty 1s as twenty items
+      rlpItemsAtMost 10 (B.pack ([0xD8, 0xC2, 0xB9, 0x00, 0x14] ++ replicate 20 1)) `shouldBe` False
+
+    it "refuses lists nested deeper than any real message" $ do
+      let nest d = foldr (\_ o -> RLPArray [o]) (RLPScalar 1) [1 .. d :: Int]
+      rlpItemsAtMost maxMessageItems (rlpSerialize $ nest 10) `shouldBe` True
+      rlpItemsAtMost maxMessageItems (rlpSerialize $ nest 100) `shouldBe` False
+
   describe "requestedHeaderNumbers" $ do
     it "asks for consecutive numbers when nothing is skipped" $
       requestedHeaderNumbers 500 10 3 0 `shouldBe` [10, 11, 12]
