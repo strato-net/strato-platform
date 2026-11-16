@@ -55,6 +55,7 @@ module Blockchain.Context
     , withActivePeer
     ) where
 
+import           Blockchain.EventException               (EventException (PeerNonResponsive))
 import           Conduit
 import           Control.Applicative
 import           Control.Exception                       hiding (bracket, catch, throwIO)
@@ -222,7 +223,7 @@ instance RunsClient ContextM where
     let peerAddress = BC.pack $ hostToString host'
     runGeneralTCPClient (clientSettings p peerAddress) $ \app -> do
       let pSource = appSource app
-          pSink = appSink app
+          pSink = timedPeerSink app
           conduits = P2pConduits pSource pSink sSource
       -- Logged here, where the address is known, and rethrown so the client
       -- loop's handler can disable the peer: swallowed, every failure was
@@ -238,13 +239,22 @@ instance RunsServer ContextM where
     let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort' "*"
     runGeneralTCPServer settings $ \app -> runner $ \sSource -> do
       let pSource = appSource app
-          pSink = appSink app
+          pSink = timedPeerSink app
           conduits = P2pConduits pSource pSink sSource
           ip = fromString . sockAddrToIP $ appSockAddr app
           pn = TCPPort . fromMaybe 30303 . sockAddrToPort $ appSockAddr app
       catch
         (handler conduits ip pn)
         (\(e :: SomeException) -> $logErrorS "runServer/Exception" . T.pack $ show e)
+
+-- | Writes to the peer, giving up once one write has waited connectionTimeout
+-- seconds. A peer that stops reading would otherwise block the connection's loop
+-- on its socket: the sequencer events it has not been sent pile up unread, and
+-- the idle timer, which runs in that same loop, cannot fire.
+timedPeerSink :: MonadIO m => AppData -> ConduitM B.ByteString Void m ()
+timedPeerSink app = awaitForever $ \bs -> liftIO $
+  timeout (Conf.connectionTimeout (p2pConfig ethConf) * 1000000) (runConduit $ yield bs .| appSink app)
+    >>= maybe (throwIO PeerNonResponsive) pure
 
 -- | What peers say the chain's height is (see "Blockchain.PeerClaims"). A height
 -- is -1 while nobody has claimed one.

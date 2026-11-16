@@ -19,6 +19,7 @@ module Blockchain.Event
     handleGossipedTransactions,
     getNewSyncFetch,
     syncFetchTask,
+    requestedHeaderNumbers,
   )
 where
 
@@ -72,18 +73,14 @@ import           Text.Printf
 import           Text.Tools
 import           UnliftIO.Exception
 
--- drop every n-th element from the list
--- e.g. skipEntries 0 [1..20] => [1..20]
---      skipEntries 1 [1..20] => [13,5,7,9,11,13,15,17,19]
---      skipEntries 2 [1..20] => [14,7,10,13,16,19]
---      skipEntries 3 [1..20] => [15,9,13,17]
-skipEntries :: Int -> [a] -> [a]
-skipEntries _ []     = []
-skipEntries n (x:xs) = x : helper xs
-  where
-    helper xs' = case drop n xs' of
-      (y : ys) -> y : helper ys
-      []       -> []
+-- | The block numbers a GetBlockHeaders request is answered with: up to the
+-- request's maximum (capped at @cap@, maxReturnedHeaders) from @start@, @skip@
+-- apart. Only these are looked up. The skip is the peer's to choose, and
+-- expanding all (1 + skip) * maximum numbers first let one request allocate
+-- without bound.
+requestedHeaderNumbers :: Int -> Integer -> Int -> Int -> [Integer]
+requestedHeaderNumbers cap start max' skip' =
+  take (min cap max') [start, start + 1 + toInteger skip' ..]
 
 peerString :: PPeer -> String
 peerString peer = key ++ "@" ++ format (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer)
@@ -176,11 +173,7 @@ handleEvents peer = awaitForever $ \case
     start' <- case dir of
       Reverse -> return $ if start > fromIntegral max' then start - fromIntegral max' else 1
       Forward -> return start
-    -- When the skip is 0, none of the blocks are skipped but when the skip is 3,
-    -- 3/4s of the blocks will be dropped when creating the blockheaders
-    -- so we overcompensate here.
-    let count = (1 + skip') * min (Conf.maxReturnedHeaders (p2pConfig ethConf)) max'
-    chain <- fmap M.toList . lift . getCanonicalBlockHeaders $ take count [start' ..]
+    chain <- fmap M.toList . lift . getCanonicalBlockHeaders $ requestedHeaderNumbers (Conf.maxReturnedHeaders (p2pConfig ethConf)) start' max' skip'
     when (null chain) $
       $logInfoS "handleEvents/GetBlockHeaders" $
         T.concat
@@ -190,7 +183,7 @@ handleEvents peer = awaitForever $ \case
             " I don't know what to do, so I am returning a blank response.",
             " This may indicate something unhealthy in the network."
           ]
-    yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . snd <$> chain
+    yieldR . BlockHeaders $ morphBlockHeader . snd <$> chain
   MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
     lift stampActionTimestamp
     maybeHeader <- lift $ getBlockHeader start
@@ -204,9 +197,8 @@ handleEvents peer = awaitForever $ \case
                 if num > fromIntegral max'
                   then num - fromIntegral max'
                   else 1
-        let count = (1 + skip') * min (Conf.maxReturnedHeaders (p2pConfig ethConf)) (fromIntegral max')
-        chain <- fmap M.toList . lift . getCanonicalBlockHeaders $ take count [start' ..]
-        yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . snd <$> chain
+        chain <- fmap M.toList . lift . getCanonicalBlockHeaders $ requestedHeaderNumbers (Conf.maxReturnedHeaders (p2pConfig ethConf)) start' max' skip'
+        yieldR . BlockHeaders $ morphBlockHeader . snd <$> chain
   MsgEvt (BlockHeaders bHeaders) -> do
     lift stampActionTimestamp
 
