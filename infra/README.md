@@ -45,6 +45,13 @@ then the cells), `api-tier` (Network and Tier), the front door
   answers `isSynced: true`, and cannot tell an unresolvable name from a lagging
   node: the service never turns healthy and CloudFormation rolls back after
   about three hours.
+- The front door in turn sends the app backend's paths to the app tier's ALB.
+  So an environment's first front door is deployed without
+  `appOriginDomainName` (those paths fall to the app UI), the hostname is
+  pointed at it, the app tier is deployed, and the front door is deployed
+  again with the app tier's ALB. `scripts/ha.sh <env> first-front-door` does
+  the first of these only where there is no app tier stack, and
+  `wait-hostname` holds the app tier back until the name answers.
 - The deployment has one ECS cluster, `ha-<env>`. The API tier stack
   creates it and the app tier's services join it by name (`-c clusterName`),
   so the app tier is destroyed before the API tier.
@@ -110,7 +117,15 @@ same run builds the environment from nothing and updates it:
    proxies, so they see the client's address. The app backend is pointed at
    the partner referrals service of the environment's network (`NETWORK`:
    helium's or upquark's, in `scripts/ha.sh`) with that service's internal
-   key. Then `app-tier`, the front door
+   key.
+7. The hostname. The app backend starts only once
+   `https://app.testnet.strato.nexus` answers as a synced node, so the run
+   waits for that before the app tier. In an environment that has no app tier
+   yet (the first run) it first deploys the front door without the app
+   tier's paths, then waits up to 12 hours (`HOSTNAME_WAIT_MINUTES`) for the
+   DNS record, which is set by hand; the build log names the distribution
+   the record has to point at, every minute.
+8. `app-tier`, the front door
    (with freshly built app UI and SMD) and `obs-alarms`, then smoke checks through CloudFront by name, and the
    image set and both commits are recorded (`/ha-testnet-app/deploy/*`).
    A run with neither repo changed since does nothing.
@@ -176,10 +191,11 @@ Before the first run:
   `Deployment=ha-testnet-app`, and describing the deployment's stacks,
   secrets and load balancers. What CloudFormation may create is bounded by
   the bootstrap's execution role, not by this policy.
-- After the first run, point `app.testnet.strato.nexus` (Cloudflare) at the
-  front door: a CNAME to the `ha-testnet-app-api-frontdoor` stack's
-  `DistributionDomainName`. Until then the app tier's backend talks to
-  whatever that name resolves to.
+
+During the first run, when the build log starts asking for it (the
+`Hostname` stage): point `app.testnet.strato.nexus` (Cloudflare, DNS only) at
+the front door, a CNAME to the `ha-testnet-app-api-frontdoor` stack's
+`DistributionDomainName`. The run goes on by itself once the name answers.
 
 ## Known gaps (TODO)
 

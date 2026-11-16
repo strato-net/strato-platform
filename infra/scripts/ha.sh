@@ -20,6 +20,8 @@
 #   scripts/ha.sh <env> install                   npm ci in every app
 #   scripts/ha.sh <env> build-ui                  build app/ui and smd-ui for the front door
 #   scripts/ha.sh <env> publish-scripts           node scripts and the cell upgrade and health scripts to the core tier's bucket
+#   scripts/ha.sh <env> first-front-door          an environment without an app tier yet: the front door without the app tier's routes
+#   scripts/ha.sh <env> wait-hostname             wait until the environment's hostname answers as a synced node (HOSTNAME_WAIT_MINUTES, 720, for its DNS record)
 #   scripts/ha.sh <env> smoke                     check the deployment through its front door
 #   scripts/ha.sh <env> record <strato> <infra>   record the deployed image set and commits
 #   scripts/ha.sh <env> state                     the commits last deployed
@@ -118,6 +120,17 @@ stack_status() { aws cloudformation describe-stacks --stack-name "$1" --query 'S
 exists() {
   local s; s=$(stack_status "$1")
   [[ -n $s && $s != None && $s != ROLLBACK_COMPLETE && $s != DELETE_COMPLETE ]]
+}
+# True only when CloudFormation says the stack is not there (or holds nothing:
+# its creation was rolled back or never started). exists cannot tell that from
+# a failed call, which is not enough where the answer decides what is deployed.
+absent() {
+  local s
+  if s=$(aws cloudformation describe-stacks --stack-name "$1" --query 'Stacks[0].StackStatus' --output text 2>&1); then
+    [[ $s == ROLLBACK_COMPLETE || $s == DELETE_COMPLETE || $s == REVIEW_IN_PROGRESS ]]
+    return
+  fi
+  [[ $s == *"does not exist"* ]] || die "cannot tell whether $1 exists: $s"
 }
 out() {
   local v
@@ -414,14 +427,17 @@ ctx_app() {
   otel_ecs
 }
 
+# without-app-tier: the front door of an environment whose app tier does not
+# exist yet (first_front_door); every other deployment names the app tier.
 ctx_front_door() {
   ctx_api
   local api_origin app_origin
   api_origin=$(need "$P-api-tier" AlbDnsName)
-  app_origin=$(need "$P-app-tier" AlbDnsName)
   ctx+=(-c frontDoorDomainName="$NODE_HOSTNAME" -c frontDoorCertificateArn="$CERTIFICATE_ARN"
-    -c apiOriginDomainName="$api_origin" -c appOriginDomainName="$app_origin"
-    -c deployAppUi=true -c deploySmdUi=true)
+    -c apiOriginDomainName="$api_origin" -c deployAppUi=true -c deploySmdUi=true)
+  [[ ${1:-} == without-app-tier ]] && return 0
+  app_origin=$(need "$P-app-tier" AlbDnsName)
+  ctx+=(-c appOriginDomainName="$app_origin")
 }
 
 # target -> app directory, stacks to act on, context; skip names why a
@@ -634,6 +650,53 @@ cells_replace() {
   cells_wait_ready "$id"
 }
 
+# --- The first deployment of an environment: the hostname before the app tier ---
+# The app backend starts only once https://NODE_HOSTNAME answers as a synced
+# node, and the front door that serves that name sends the backend's paths to
+# the app tier: each needs the other. So where there is no app tier yet, the
+# front door goes up without its paths, and wait_hostname holds the app tier
+# back until the name answers (its DNS record is set by hand). The front door
+# is deployed again, with the app tier, after it. With an app tier in place
+# nothing is deployed here: its front door must never lose those paths.
+first_front_door() {
+  local ctx
+  if ! absent "$P-app-tier"; then
+    log "the app tier exists: the front door is deployed after it, as on every run"
+    return 0
+  fi
+  ctx_front_door without-app-tier
+  log "no app tier yet: deploying the front door without the app tier's paths, for the hostname to be pointed at"
+  cdk_in api-tier deploy "$P-api-frontdoor" --exclusively --require-approval never --progress events "${ctx[@]}"
+}
+
+# Through the name as the app backend resolves it, not through CloudFront by
+# name as smoke does. The front door itself gets 30 tries a minute apart to
+# serve a synced node (the cells follow the chain and the API tier is up by
+# now); the DNS record, which a person sets, HOSTNAME_WAIT_MINUTES (720).
+wait_hostname() {
+  local url=https://$NODE_HOSTNAME/strato-api/eth/v1.2/metadata dist limit=${HOSTNAME_WAIT_MINUTES:-720} deadline down=0 seen
+  [[ $limit =~ ^[0-9]+$ ]] || die "HOSTNAME_WAIT_MINUTES has to be a whole number, not '$limit'"
+  dist=$(need "$P-api-frontdoor" DistributionDomainName)
+  synced() {
+    curl -fsS -m 20 -A strato-ha-smoke/1.0 "$@" "$url" 2>/dev/null \
+      | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("isSynced") is True else 1)' 2>/dev/null
+  }
+  deadline=$(( $(date +%s) + limit * 60 ))
+  until synced; do
+    if synced --connect-to "$NODE_HOSTNAME:443:$dist:443"; then
+      down=0
+      (( $(date +%s) < deadline )) || die "$NODE_HOSTNAME did not reach the front door in $limit minutes: its DNS record has to be a CNAME to $dist"
+      seen=$(dig +short "$NODE_HOSTNAME" 2>/dev/null | head -1) || true
+      log "waiting for the DNS record of $NODE_HOSTNAME: it has to be a CNAME to $dist (the name resolves to ${seen:-nothing})"
+    else
+      (( ++down <= 30 )) || die "the front door $dist does not serve a synced node at /strato-api/eth/v1.2/metadata"
+      log "waiting: the front door $dist does not serve a synced node yet"
+    fi
+    sleep 60
+  done
+  log "https://$NODE_HOSTNAME answers as a synced node"
+}
+
 # --- Front door checks: through CloudFront by name, whatever the hostname's DNS says ---
 smoke() {
   local dist url=https://$NODE_HOSTNAME
@@ -680,6 +743,8 @@ case $cmd in
     cp "$ROOT/core-cell/bootstrap/strato-cell-upgrade" "$ROOT/core-cell/bootstrap/strato-cell-health" "$staging/"
     aws s3 sync --delete --only-show-errors "$staging/" "$scripts"
     log "published $(ls "$staging" | wc -l | tr -d ' ') scripts to $scripts" ;;
+  first-front-door) first_front_door ;;
+  wait-hostname) wait_hostname ;;
   smoke) smoke ;;
   record)
     load_images

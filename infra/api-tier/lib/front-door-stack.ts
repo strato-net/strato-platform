@@ -84,7 +84,6 @@ export class FrontDoorStack extends Stack {
     if (!config.frontDoorDomainName) throw new Error("FrontDoorStack needs frontDoorDomainName");
     const apiOrigin = config.apiOriginDomainName ?? config.domainName;
     if (!apiOrigin) throw new Error("FrontDoorStack reaches this tier over https: set domainName, or apiOriginDomainName for its ALB");
-    if (!config.appOriginDomainName) throw new Error("FrontDoorStack needs appOriginDomainName (the app tier ALB's DNS name or hostname, serving https)");
     const certificate =
       props.certificate ??
       (config.frontDoorCertificateArn
@@ -112,7 +111,9 @@ export class FrontDoorStack extends Stack {
       originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER,
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
     });
-    const appTier = tierBehavior(config.appOriginDomainName);
+    // Without an app tier yet (the first deployment of an environment), its
+    // paths are left out: they fall to the app UI until the tier exists.
+    const appTier = config.appOriginDomainName ? tierBehavior(config.appOriginDomainName) : undefined;
     const apiTier = tierBehavior(apiOrigin);
 
     const prefix = deploymentPrefix(config.envName);
@@ -136,7 +137,7 @@ export class FrontDoorStack extends Stack {
       additionalBehaviors: {
         "/smd": smdBehavior,
         "/smd/*": smdBehavior,
-        ...Object.fromEntries(APP_PATHS.map((p) => [p, appTier])),
+        ...(appTier ? Object.fromEntries(APP_PATHS.map((p) => [p, appTier])) : {}),
         ...Object.fromEntries(API_PATHS.map((p) => [p, apiTier])),
       },
       domainNames: [config.frontDoorDomainName],
