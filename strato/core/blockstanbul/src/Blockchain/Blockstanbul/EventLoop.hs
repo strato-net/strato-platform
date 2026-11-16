@@ -284,7 +284,19 @@ nextRound nt = do
 
   prepared .= M.empty
   committed .= M.empty
-  roundChanged %= M.dropWhileAntitone (<= thisR)
+  -- Round-change votes are scoped to a single height. Within a height, drop only the
+  -- rounds now behind us and keep votes for a still-higher pending round. On a height
+  -- change, clear them all: 'roundChanged' holds only the voters, not the height they
+  -- voted at, so a vote cast for the height just left would otherwise count toward a
+  -- round change at the next one, where one stale vote plus one fresh vote could cross
+  -- the threshold the set never actually met.
+  case nt of
+    Round _ -> do
+      roundChanged %= M.dropWhileAntitone (<= thisR)
+      catchUpVotes %= M.dropWhileAntitone (<= thisR)
+    Sequence _ -> do
+      roundChanged .= M.empty
+      catchUpVotes .= M.empty
 
   hasPreprepared .= False
   hasCommitted .= False
@@ -302,6 +314,30 @@ applyValidatorChanges hdr = do
   validators %= (S.union . S.fromList $ getBlockNewValidators hdr)
   validators %= (flip S.difference $ S.fromList removed)
   stakes %= applyStakeDelta removed (M.fromList $ getBlockStakeUpdates hdr)
+
+-- | A PREPARE or COMMIT for a higher round of the current sequence is a round-change
+-- certificate: evidence the network moved on. Buffer the sender, keep the message
+-- moving through the mesh, and once more than a third of the weight has shown at that
+-- round, catch up to it (see '_catchUpVotes'). A node only prepares or commits at the
+-- round it is on, so more than a third there means at least one honest validator
+-- reached it; catching up only lets this node take part, since a commit still needs a
+-- supermajority. This is what unsticks a node whose round fell behind the live one (a
+-- restart or replay lands it at the committed header's round) without waiting for its
+-- own view timer.
+noteCatchUp :: StateMachineM m => MsgAuth -> View -> TrustedMessage -> ConduitM InEvent EOutEvent m ()
+noteCatchUp auth v' msg = do
+  let rn = _round v'
+  -- Every such message is passed on, a validator's COMMIT after its PREPARE
+  -- included: peers may need it for their quorum, and p2p never resends a
+  -- message it has seen. The sender set only counts weight toward catching up.
+  yieldL $ OMsg auth msg
+  votes <- catchUpVotes <%= M.alter (Just . S.insert (Validator $ sender auth) . fromMaybe S.empty) rn
+  weights <- gets currentVoteWeights
+  let voters = fromMaybe S.empty $ M.lookup rn votes
+  chainId' <- use chainId
+  when (toInteger (_sequence v') + 1 >= wholeMessageSigningBlock chainId' && hasMinority weights voters) $ do
+    $logInfoS "blockstanbul/roundchange" . T.pack $ printf "Catching up to round %s on a certificate" (show rn)
+    nextRound (Round rn)
 
 commitBlock :: StateMachineM m =>
                Block -> ConduitM InEvent EOutEvent m ()
@@ -503,7 +539,9 @@ eventLoop ctx = execStateC ctx $
                       proposal .= Just pp
                       -- run in vm before sending prepare
                       whenM mayVote . yieldR $ RunPreprepare pp
-        IMsg auth ppp@(Prepare v' di) -> when (v == v') $ do
+        IMsg auth ppp@(Prepare v' di) -> do
+         when (_sequence v == _sequence v' && _round v < _round v') $ noteCatchUp auth v' ppp
+         when (v == v') $ do
           preparers <- use prepared
           unless (M.member (Validator $ sender auth) preparers) . yieldL $ OMsg auth ppp
           ps <- prepared <%= M.insert (Validator $ sender auth) di
@@ -518,7 +556,9 @@ eventLoop ctx = execStateC ctx $
             whenM mayVote $ do
               msg <- signMessage (Commit v di seal)
               yieldR msg
-        IMsg auth ccc@(Commit v' di seal) -> when (v == v') $ do
+        IMsg auth ccc@(Commit v' di seal) -> do
+         when (_sequence v == _sequence v' && _round v < _round v') $ noteCatchUp auth v' ccc
+         when (v == v') $ do
           committors <- use committed
           unless (M.member (Validator $ sender auth) committors) . yieldL $ OMsg auth ccc
           cs <- committed <%= M.insert (Validator $ sender auth) (di, seal)
