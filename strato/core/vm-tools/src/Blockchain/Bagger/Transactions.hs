@@ -102,6 +102,7 @@ data TxRejection
   | InvalidEnvelope BaggerStage BaggerTxQueue String OutputTx -- why
   | FeeBoundExceeded BaggerStage BaggerTxQueue Integer Integer OutputTx -- quotedFee, signedBound
   | GasLimitTooHigh BaggerStage BaggerTxQueue Integer Integer OutputTx -- most a block admits, tx gas limit
+  | SenderPoolFull BaggerStage BaggerTxQueue Integer OutputTx -- most one sender may hold
   deriving (Eq, Read, Show)
 
 rejectedTx :: TxRejection -> OutputTx
@@ -115,6 +116,7 @@ rejectedTx (AdminFlushed _ _ _ t) = t
 rejectedTx (InvalidEnvelope _ _ _ t) = t
 rejectedTx (FeeBoundExceeded _ _ _ _ t) = t
 rejectedTx (GasLimitTooHigh _ _ _ _ t) = t
+rejectedTx (SenderPoolFull _ _ _ t) = t
 
 data BaggerStage = Insertion | Validation | Promotion | Demotion | Execution deriving (Read, Eq, Show)
 
@@ -184,6 +186,9 @@ instance Format TxRejection where
   format (GasLimitTooHigh stage queue cap limit OutputTx {otHash = hash}) =
     "Gas limit too high at stage " ++ show stage ++ " in queue " ++ show queue
       ++ ": gas limit " ++ show limit ++ " > most a block admits " ++ show cap ++ "\n\ttx hash " ++ format hash
+  format (SenderPoolFull stage queue cap OutputTx {otHash = hash, otSigner = signer}) =
+    "Sender pool full at stage " ++ show stage ++ " in queue " ++ show queue
+      ++ ": " ++ format signer ++ " already holds " ++ show cap ++ " transactions\n\ttx hash " ++ format hash
 
 txRejectionToAPIFailureCause :: TxRejection -> TransactionResultStatus
 txRejectionToAPIFailureCause (NonceTooLow stage queue needed tx) =
@@ -206,6 +211,8 @@ txRejectionToAPIFailureCause (FeeBoundExceeded stage queue quote bound _) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.FeeBoundExceededError (Just quote) (Just bound) (Just feeBoundAdvice)
 txRejectionToAPIFailureCause (GasLimitTooHigh stage queue cap limit _) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.GasLimitTooHighError (Just cap) (Just limit) (Just "No block can hold this gas limit")
+txRejectionToAPIFailureCause (SenderPoolFull stage queue cap _) =
+  Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.SenderPoolFullError (Just cap) Nothing (Just "The sender already has the most transactions the pool holds for one account; wait for some to be mined")
 
 tfToBaggerTxRejection :: TransactionFailureCause -> TxRejection
 tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = BalanceTooLow Execution Queued cost balance tx
@@ -243,6 +250,36 @@ quotedStratoFee = do
     quoteOf router = do
       quote <- getSolidStorageKeyVal' router (StoragePath [Field "quotedFee"])
       return $ case quote of
+        BInteger n -> n
+        _ -> 0
+
+-- | The most transactions the pool holds for one sender, pending and queued
+-- together. A sender at the limit can still replace one of its own nonces.
+maxTxsPerSender :: Int
+maxTxsPerSender = 64
+
+-- | The fee per transaction before the STRATO-gas fork and the legacy fee: one
+-- cent of USDST (FeeRouter USD_FEE, DeciderState payFees).
+legacyUsdFee :: Integer
+legacyUsdFee = 10000000000000000
+
+-- | Whether @address@ holds nothing any fee route takes: less than a whole
+-- voucher, and no USDST or STRATO at all. The fee implementation (DeciderState's
+-- payFees, or FeeRouter.payFees) burns a voucher (0x100e), else charges USDST
+-- (0x937efa…1010) before the router's activation, or STRATO after it, buying a
+-- STRATO shortfall with USDST. Its activation height and pool prices are the
+-- contract's, so the pool refuses only a sender none of these can serve; one
+-- holding too little is left for execution to refuse.
+holdsNoFeeToken :: HasSolidStorageDB m => Address -> m Bool
+holdsNoFeeToken address = do
+  vouchers <- balanceIn 0x100e
+  usdst <- balanceIn 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010
+  strato <- maybe (pure 0) balanceIn . Conf.stratoTokenAddress . Conf.network $ Conf.networkConfig ethConf
+  pure $ vouchers < 1000000000000000000 && usdst <= 0 && strato <= 0
+  where
+    balanceIn token = do
+      held <- getSolidStorageKeyVal' token (StoragePath [Field "_balances", Index (BC.pack $ show address)])
+      pure $ case held of
         BInteger n -> n
         _ -> 0
 

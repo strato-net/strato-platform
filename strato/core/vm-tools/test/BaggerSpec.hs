@@ -9,6 +9,7 @@ module BaggerSpec (spec) where
 import Blockchain.Bagger
 import qualified Blockchain.Bagger.BaggerState as B
 import Blockchain.Bagger.Transactions
+import Blockchain.DB.SolidStorageDB (putSolidStorageKeyVal')
 import Blockchain.Data.AddressStateDB (AddressState (..), blankAddressState)
 import Blockchain.Data.BlockHeader (BlockHeader (BlockHeaderV2), getBlockGasLimit, stateRoot, timestamp)
 import Blockchain.Data.ExecResults
@@ -21,17 +22,19 @@ import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Keccak256 (hash, zeroHash)
 import Blockchain.Strato.Model.Validator
-import Blockchain.VMContext (ContextM, evalMemContextM, withCurrentBlockHash)
+import Blockchain.VMContext (ContextM, evalMemContextM, flushMemDBs, startFromStateRoot, withCurrentBlockHash)
 import Blockchain.Wiring ()
 import Control.Concurrent (threadDelay)
-import Control.Monad (when)
+import Control.Monad (forM_, when)
 import Control.Monad.Composable.Base (runEff, withNoLogger)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.StateDB (StateRoot)
 import Control.Monad.IO.Class (liftIO)
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime, utcTimeToPOSIXSeconds)
+import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
 import Test.Hspec
 import UnliftIO.Directory (withCurrentDirectory)
 import UnliftIO.Temporary (withSystemTempDirectory)
@@ -114,11 +117,35 @@ inContext f = withSystemTempDirectory "bagger-spec" $ \dir -> withCurrentDirecto
 
 -- | Make a block at the blank state root the best block, and return that root.
 startOnParent :: ContextM StateRoot
-startOnParent = do
-  parentRoot <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
+startOnParent = startOnRoot =<< A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
+
+-- | Make a block at @parentRoot@ the best block, and return that root.
+startOnRoot :: StateRoot -> ContextM StateRoot
+startOnRoot parentRoot = do
   let parent = (BlockHeaderV2 zeroHash "" "" "" "" 11 (posixSecondsToUTCTime 1000) "" [Validator proposer] [] [] Nothing []) {stateRoot = parentRoot}
   processNewBestBlock (hash "parent") parent []
   pure parentRoot
+
+-- | 'startOnParent' with each of @holders@ holding a cent of USDST, which any fee
+-- route takes.
+startFunded :: [Address] -> ContextM StateRoot
+startFunded holders = do
+  -- the root is read under the block hash it was written under
+  root <- withCurrentBlockHash (hash "funding") $ do
+    startFromStateRoot =<< A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
+    forM_ holders $ \a ->
+      putSolidStorageKeyVal' 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010 (StoragePath [Field "_balances", Index (BC.pack $ show a)]) (BInteger legacyUsdFee)
+    flushMemDBs
+    A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
+  startOnRoot root
+
+-- | A transaction from @signer@, signed for this chain.
+signed :: Address -> OutputTx
+signed = withGas 21000 . tx
+
+-- | @t@ at nonce @n@.
+atNonce :: Integer -> OutputTx -> OutputTx
+atNonce n t = t {otHash = hash (BC.pack $ "nonce " ++ show n), otBaseTx = (otBaseTx t) {nonce = n}}
 
 -- | Queue @t@ for the next build, as the mempool does once it has seen it.
 promote :: OutputTx -> ContextM ()
@@ -153,12 +180,37 @@ spec = do
       map otSigner (obReceiptTransactions built) `shouldBe` [funded]
       replayed `shouldBe` Right (stateRoot (obBlockData built))
 
-  describe "Bagger.isValidForPool" $
+  describe "Bagger.isValidForPool" $ do
     it "refuses a gas limit no block can hold" $ do
       let cap = toInteger (maxBound :: Int)
           tooBig = withGas (cap + 1) (tx unfunded)
       (atCap, aboveCap) <- inContext $ do
-        _ <- startOnParent
-        (,) <$> isValidForPool (withGas cap (tx funded)) <*> isValidForPool tooBig
+        _ <- startFunded [funded]
+        withBagger $ (,) <$> isValidForPool (withGas cap (tx funded)) <*> isValidForPool tooBig
       atCap `shouldBe` Right ()
       aboveCap `shouldBe` Left (GasLimitTooHigh Validation Incoming cap (cap + 1) tooBig)
+
+    it "refuses a sender that holds nothing a fee can be paid with" $ do
+      (broke, paying) <- inContext $ do
+        _ <- startFunded [funded]
+        withBagger $ (,) <$> isValidForPool (signed unfunded) <*> isValidForPool (signed funded)
+      broke `shouldBe` Left (BalanceTooLow Validation Incoming legacyUsdFee 0 (signed unfunded))
+      paying `shouldBe` Right ()
+
+    it "holds at most maxTxsPerSender for one sender, who can still replace a nonce" $ do
+      let most = toInteger maxTxsPerSender
+      (next, replacing) <- inContext $ do
+        _ <- startFunded [funded]
+        updateBaggerState $ \st -> st {B.queued = M.singleton funded $ M.fromList [(n, atNonce n $ signed funded) | n <- [0 .. most - 1]]}
+        withBagger $ (,) <$> isValidForPool (atNonce most $ signed funded) <*> isValidForPool (atNonce 5 $ signed funded)
+      next `shouldBe` Left (SenderPoolFull Validation Incoming most (atNonce most $ signed funded))
+      replacing `shouldBe` Right ()
+
+  describe "Bagger.addTransactionsToMempool" $
+    it "reports work only for a transaction the next block can take" $ do
+      (broke, gapped, paying) <- inContext $ do
+        _ <- startFunded [funded]
+        (,,) <$> addTransactionsToMempool [signed unfunded] <*> addTransactionsToMempool [atNonce 3 $ signed funded] <*> addTransactionsToMempool [signed funded]
+      broke `shouldBe` False
+      gapped `shouldBe` False
+      paying `shouldBe` True

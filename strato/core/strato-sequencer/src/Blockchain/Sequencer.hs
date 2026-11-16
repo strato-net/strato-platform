@@ -312,11 +312,7 @@ unseqEventHandler events = do
   let transactions = [(ts, tx) | IETx ts tx <- events]
 
   when (not $ null transactions) $ record "inevent_type_transaction" "IngestTransactions" (length transactions)
-  newTxs <- transformFullTransactions transactions
-  -- Only the proposer's VM builds blocks, so a new transaction is what tells
-  -- the other validators to expect a proposal. Re-gossip of a transaction we
-  -- already witnessed does not count: it may be committed already.
-  unless (newTxs == 0) $ lift createNewViewTimer
+  void $ transformFullTransactions transactions
 
   forM_ events $ \event ->
     case event of
@@ -349,6 +345,11 @@ unseqEventHandler events = do
         (IEPreprepareResponse decis) -> do
           record "inevent_type_preprepare_response" "PreprepareResponse" 1
           blockstanbulSend [PreprepareResponse decis]
+        -- Only the proposer's VM builds blocks, so the local VM taking work a block
+        -- can include is what tells the other validators to expect a proposal.
+        -- A transaction it refused (one that cannot pay, a nonce gap) never
+        -- starts the dead-proposer timer, so it cannot force a round change.
+        IEPoolHasWork -> lift createNewViewTimer
         (IEFlushMempool req) -> do
           record "inevent_type_flush_mempool" "FlushMempool" 1
           yieldToVm [VmFlushMempool req]

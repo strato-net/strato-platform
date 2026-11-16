@@ -81,6 +81,8 @@ data IngestEvent
   | IEMPNodesReceived [TrieNode]
   | IEPreprepareResponse PBFT.PreprepareDecision
   | IEFlushMempool FlushMempoolRequest
+  -- | The VM's pool took a transaction the next block can include.
+  | IEPoolHasWork
   deriving (Eq, Show, GHCG.Generic)
 
 instance Format IngestEvent where
@@ -96,6 +98,7 @@ instance Format IngestEvent where
   format (IEMPNodesReceived o) = show o
   format (IEPreprepareResponse d) = format d
   format (IEFlushMempool req) = format req
+  format IEPoolHasWork = "pool has work"
 
 type Timestamp = Microtime
 

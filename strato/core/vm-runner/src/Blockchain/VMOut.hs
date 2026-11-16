@@ -40,3 +40,4 @@ emitOut (OutBlockVerificationFailure _) = pure ()
 emitOut (OutGetMPNodes mpNodes) = void $ writeUnseqEvents [IEGetMPNodes mpNodes]
 emitOut (OutMPNodesResponse o nds) = void $ writeUnseqEvents [IEMPNodesResponse o nds]
 emitOut (OutPreprepareResponse dec) = void $ writeUnseqEvents [IEPreprepareResponse dec]
+emitOut OutPoolHasWork = void $ writeUnseqEvents [IEPoolHasWork]

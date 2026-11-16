@@ -239,7 +239,11 @@ getNumPoolable txPairs = do
     $logInfoS "evm/getNumPoolable/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
   let !poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
   $logInfoS "evm/loop" (T.pack ("adding " ++ show (length poolableNewTxs) ++ "/" ++ show (length allNewTxs) ++ " txs to mempool"))
-  unless (null poolableNewTxs) $ Bagger.addTransactionsToMempool poolableNewTxs
+  unless (null poolableNewTxs) $ do
+    -- The other validators expect a proposal only for work a block can take,
+    -- so they arm their dead-proposer timers on this, not on any new transaction.
+    hasWork <- Bagger.addTransactionsToMempool poolableNewTxs
+    when hasWork $ emitOut OutPoolHasWork
   return $ length poolableNewTxs
 
 outputTransactions :: [(Timestamp, OutputTx)] -> [VmOutEvent]

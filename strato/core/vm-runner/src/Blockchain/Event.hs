@@ -106,6 +106,8 @@ data VmOutEvent
   | OutGetMPNodes [StateRoot]
   | OutMPNodesResponse TXOrigin [TrieNode]
   | OutPreprepareResponse PreprepareDecision
+  -- | The pool took a transaction the next block can include.
+  | OutPoolHasWork
 
 data VmOutEventBatch = OutBatch
   { outVMEvents :: DL.DList [VMEvent],
@@ -148,3 +150,5 @@ insertOutBatch e b = case e of
   OutGetMPNodes srs -> b {outGetMPNodes = outGetMPNodes b `DL.snoc` srs}
   OutMPNodesResponse o nds -> b {outMPNodesResponses = outMPNodesResponses b `DL.snoc` (o, nds)}
   OutPreprepareResponse p -> b {outPreprepareResponses = outPreprepareResponses b `DL.snoc` p}
+  -- emitted straight to the sequencer, never batched
+  OutPoolHasWork -> b
