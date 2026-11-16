@@ -1,6 +1,7 @@
-import { CfnOutput, Duration, Stack, StackProps } from "aws-cdk-lib";
+import { CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import { Construct } from "constructs";
 import { CoreNlbConfig } from "./config";
 import { deploymentPrefix, elbName } from "./naming";
@@ -45,6 +46,10 @@ const GRAFANA_PORT = 3001;
  *
  * The API tier app admits its tasks on this load balancer's security group
  * (its coreLoadBalancerSecurityGroupId).
+ *
+ * The stack also owns the bucket the cells take their node scripts from
+ * (each cell's extraBinariesS3), for the same reason: it has to exist before
+ * the first cell.
  */
 export class CoreNlbStack extends Stack {
   constructor(scope: Construct, id: string, props: CoreNlbStackProps) {
@@ -114,10 +119,31 @@ export class CoreNlbStack extends Stack {
       deregistrationDelay: Duration.seconds(30),
     });
 
+    // The node scripts: a cell installs every file under node-scripts/ into
+    // /usr/local/bin as root, at its first boot and on each upgrade, so who
+    // may write here decides what the cells run. A bucket of the
+    // environment's own, with no grant in it: the deployment's pipeline
+    // writes it through its own IAM policy and the cells read it through
+    // their instance roles, while what may write a shared artifacts bucket
+    // (other builds) has no way in. Versions are kept, so an overwrite leaves
+    // what it replaced. The content is published again on every run, hence
+    // nothing to keep when the stack goes.
+    const nodeScripts = new s3.Bucket(this, "NodeScripts", {
+      bucketName: `${deploymentPrefix(config.envName)}-node-scripts-${this.account}`,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
+      versioned: true,
+      lifecycleRules: [{ noncurrentVersionExpiration: Duration.days(90) }],
+      removalPolicy: RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+    });
+
     new CfnOutput(this, "DnsName", { value: lb.loadBalancerDnsName, description: `The core tier's name: the api-tier app's ingressUrls (http://<name>:${INGRESS_PORT}) and prometheusHost (<name>:${PROMETHEUS_PORT})` });
     new CfnOutput(this, "SecurityGroupId", { value: lbSg.securityGroupId, description: "The api-tier app's and every cell's coreLoadBalancerSecurityGroupId" });
     new CfnOutput(this, "IngressTargetGroupArn", { value: ingress.targetGroupArn, description: "Every cell's ingressTargetGroupArn" });
     new CfnOutput(this, "PrometheusTargetGroupArn", { value: prometheus.targetGroupArn, description: "prometheusTargetGroupArn of the one cell whose Prometheus apex reads" });
+    new CfnOutput(this, "NodeScriptsBucketName", { value: nodeScripts.bucketName, description: "Every cell's extraBinariesS3 is s3://<name>/node-scripts/; scripts/ha.sh publish-scripts fills it" });
     new CfnOutput(this, "GrafanaTargetGroupArn", { value: grafana.targetGroupArn, description: "grafanaTargetGroupArn of the cell running Grafana, and of the api-tier app" });
   }
 }

@@ -118,6 +118,17 @@ npx cdk deploy -c coreNlb=true -c envName=testnet -c vpcId=vpc-0123
 - The **Grafana** target group has no listener here: the API tier's load
   balancer forwards `/grafana` to it, and the cell running Grafana registers
   in it.
+- The **node scripts bucket** (`ha-<env>-node-scripts-<account>`, private,
+  versioned) is here because it too has to exist before the first cell. A
+  cell installs every file under `node-scripts/` into `/usr/local/bin` as
+  root, at first boot and on each upgrade, so the bucket holds nothing else
+  and grants nothing: the pipeline writes it through its own IAM policy
+  (`scripts/ha.sh <env> publish-scripts`), the cells read it through their
+  instance roles (`extraBinariesS3=s3://<NodeScriptsBucketName>/node-scripts/`).
+  It is emptied and deleted with the stack. A cell keeps the location it was
+  given at its first boot (`/etc/strato/cell.env`), while its role follows
+  the stack: a cell created with another location is replaced (`cells
+  replace`), not upgraded.
 
 Give its outputs to the cells: `SecurityGroupId` as
 `coreLoadBalancerSecurityGroupId` (the cell admits the load balancer on its
