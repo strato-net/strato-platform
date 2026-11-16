@@ -16,6 +16,7 @@
 module Blockchain.Event
   ( module Blockchain.EventModel,
     handleEvents,
+    handleGossipedTransactions,
     getNewSyncFetch,
     syncFetchTask,
   )
@@ -29,6 +30,8 @@ import           Blockchain.Data.Block
 import qualified Blockchain.Data.BlockHeader           as BlockHeader
 import           Blockchain.Data.Control               (P2PCNC (..))
 import           Blockchain.Data.PubKey
+import           Blockchain.Data.Transaction           (Transaction)
+import           Blockchain.Data.TransactionIntake
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.EthConf (ethConf, p2pConfig)
@@ -95,26 +98,46 @@ yieldR = yield . Right
 yieldL :: Monad m => e -> ConduitT i (Either e a) m ()
 yieldL = yield . Left
 
-handleEvents :: MonadP2P m => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
-handleEvents peer = awaitForever $ \case
-  MsgEvt Hello {} -> error "A hello message appeared after the handshake"
-  MsgEvt Status {} -> error "A status message appeared after the handshake"
-  MsgEvt Ping -> yieldR Pong
-  MsgEvt (Transactions txs) -> do
+-- | Transactions gossiped by a peer. One with a malformed envelope is dropped
+-- here, before it is published to this node's stream or passed on.
+handleGossipedTransactions ::
+  ( MonadIO m,
+    MonadLogger m,
+    Modifiable ActionTimestamp m,
+    HasPeerClaims m,
+    Modifiable BestSequencedBlock m
+  ) =>
+  IntakeRules -> PPeer -> [Transaction] -> ConduitM i (Either P2PCNC Message) m ()
+handleGossipedTransactions intakeRules peer gossiped = do
     lift stampActionTimestamp
     worldNumber <- lift worldBestNumber
     BestSequencedBlock _ myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
     if worldNumber - myNumber > txGossipCatchupWindow
       then
         $logDebugS "handleEvents/Transactions" . T.pack $
-          "Ignoring " ++ show (length txs) ++ " gossiped transaction(s) from " ++ peerString peer
+          "Ignoring " ++ show (length gossiped) ++ " gossiped transaction(s) from " ++ peerString peer
             ++ "; still " ++ show (worldNumber - myNumber) ++ " blocks behind the tip"
       else do
+        (txs, refused) <- liftIO $ partitionIntake intakeRules id gossiped
+        -- Counts and fixed labels only, so the log line stays one line.
+        unless (null refused) $
+          $logWarnS "handleEvents/Transactions" . T.pack $
+            "Dropping " ++ show (length refused) ++ " malformed transaction(s) from " ++ peerString peer
+              ++ ": " ++ intercalate ", " (T.unpack . intakeRejectionLabel . snd <$> refused)
         $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s) from" ++ peerString peer ++ ", they are " ++ intercalate "\n" (format <$> txs)
         let txo = Origin.PeerString (peerString peer)
         ts <- liftIO getCurrentMicrotime
         let ingestTxs = IETx ts . IngestTx txo <$> txs
-        yieldL $ ToUnseq ingestTxs
+        -- As before when nothing was refused; nothing to publish when everything was.
+        unless (null txs && not (null refused)) $
+          yieldL $ ToUnseq ingestTxs
+
+handleEvents :: MonadP2P m => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
+handleEvents peer = awaitForever $ \case
+  MsgEvt Hello {} -> error "A hello message appeared after the handshake"
+  MsgEvt Status {} -> error "A status message appeared after the handshake"
+  MsgEvt Ping -> yieldR Pong
+  MsgEvt (Transactions txs) -> handleGossipedTransactions nodeIntakeRules peer txs
   MsgEvt (NewBlock block' _) -> do
     lift stampActionTimestamp
     $logInfoS "handleEvents/NewBlock" "newBlock"

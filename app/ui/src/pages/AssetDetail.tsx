@@ -15,6 +15,7 @@ import { formatUnits } from 'ethers';
 import { api } from '@/lib/axios';
 import ConsolidatedPriceChart from '@/components/charts/ConsolidatedPriceChart';
 import CopyButton from '@/components/ui/copy';
+import AssetDescription from '@/components/AssetDescription';
 import { addCommasToInput, formatWeiAmount, formatHash } from '@/utils/numberUtils';
 import { buildFundBuyPath, fetchBridgeBuyableAddresses, normBridgeAddr } from '@/lib/bridgeLinks';
 
@@ -510,9 +511,9 @@ const AssetDetail = () => {
 
                 <CardContent>
                   <div className="space-y-4">
-                    <div
+                    <AssetDescription
                       className="prose dark:prose-invert max-w-none text-sm"
-                      dangerouslySetInnerHTML={{ __html: asset?.token?.description || asset?.description }}
+                      html={asset?.token?.description || asset?.description}
                     />
                   </div>
                 </CardContent>

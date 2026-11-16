@@ -1,0 +1,12 @@
+[
+ {
+  "hash": "11ffce5da676aeba84b25f627ca42c9ab1f8e5fcd29daaca80e4b260b3223456",
+  "reason": "function_name",
+  "note": "Mined on upquark at block 179598 as a failed call (no contract at the target): an empty function name sent to the zero address."
+ },
+ {
+  "hash": "d1b87728b753e5b5c72e03d9fe9ad02612034ead0261947252525a28249f07dd",
+  "reason": "function_name",
+  "note": "Mined on upquark at block 179599 as a failed call (no contract at the target): an empty function name sent to the zero address."
+ }
+]

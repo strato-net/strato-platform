@@ -25,6 +25,7 @@ module Blockchain.Sequencer.Metrics (
   seqLoopEvents,
   seqLoopTiming,
   seqSplitEventsTiming,
+  seqTxsRefused,
   seqTxsUnwitnessed,
   seqTxsWitnessed,
   timeAction,
@@ -47,6 +48,10 @@ seqLdbBatchSize = unsafeRegister $ gauge (Info "seq_ldb_batch_size" "Sequencer g
 
 seqTxsWitnessed :: Counter
 seqTxsWitnessed = unsafeRegister $ counter (Info "seq_txs_witnessed" "Sequencer counter for transactions witnessed")
+
+-- | Loose transactions refused at intake for a malformed envelope, by reason.
+seqTxsRefused :: Vector Label1 Counter
+seqTxsRefused = unsafeRegister $ vector "reason" $ counter (Info "seq_txs_refused" "Sequencer counter for transactions refused at intake")
 
 seqTxsUnwitnessed :: Counter
 seqTxsUnwitnessed = unsafeRegister $ counter (Info "seq_txs_unwitnessed" "Sequencer counter for transactions unwitnessed")

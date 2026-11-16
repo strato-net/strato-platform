@@ -6,7 +6,7 @@ each code brought in and how much they traded.
 | | |
 |---|---|
 | Base URL | `https://partner-api.strato.nexus` |
-| Authentication | `Authorization: Bearer <your API key>` on every call |
+| Authentication | `Authorization: Bearer <your API key>` on every call, except status and health |
 | Format | JSON in, JSON out |
 
 Keep the API key on your servers. Do not put it in a browser or a mobile app.
@@ -117,8 +117,21 @@ Errors come as `{"error": {"code": "...", "message": "..."}}`.
 |---|---|---|
 | 400 | `BAD_REQUEST` | A field or parameter is missing or malformed; the message says which |
 | 401 | `UNAUTHORIZED` | The key is missing or not known |
-| 404 | | The path is not one of the two above; paths are case-sensitive, with no trailing slash |
+| 404 | | The path is not one of this API's paths; paths are case-sensitive, with no trailing slash |
 
-## Health check
+## Status and health
 
-`GET /partner-api/health` returns `{"status": "ok"}` and needs no key.
+Neither needs a key.
+
+`GET /partner-api/status` tells whether the numbers are current:
+
+```json
+{"status": "ok", "data_as_of": "2026-11-15T17:49:17.832Z", "lag_seconds": 4}
+```
+
+`status` is `ok`, `behind` (the latest activity is not included yet) or
+`unavailable` (then the other two fields are `null`). The answer is always
+`200`; the state is in the body.
+
+`GET /partner-api/health` returns `{"status": "ok"}` whenever the service
+answers.
