@@ -130,6 +130,30 @@ attachBlockRewards' bd (Just rewardResult) (trr : rest)
 attachBlockRewards' _ _ trrs@(_ : _) = (trrs, Nothing)
 attachBlockRewards' _ mRewards [] = ([], mRewards)
 
+-- | Whether an incremental run is thrown away whole: it was the run that pays
+-- the block's rewards, it failed, and it ran no transaction.
+--
+-- The rewards are paid before the run's transactions, against the header the
+-- block has at that moment. Until a block has its first transaction its
+-- timestamp keeps moving (see getCacheWithUpdatedTimestamp), so a paying run
+-- that ends with nothing run leaves the reward payment in the state under a
+-- timestamp the block will not be sealed with. Emission is paid per second of
+-- block time, so that payment is for the wrong interval. Marked as paid, the
+-- block would be sealed later, with a later stamp, on top of it. Every verifier
+-- pays the rewards in the same run as the transactions, under the sealed
+-- stamp, and reaches a different state root. The block is rejected, the round
+-- changes, and the next validator in line takes the slot.
+--
+-- A transaction from an account that cannot pay the fee is enough to end a
+-- paying run that way, and anyone can send one for free.
+--
+-- Throwing the run away puts the cache back where it started: the same state
+-- root and gas, rewards still to be paid, nothing carried. The next run pays
+-- them from that root under its own header, as a verifier does. Arguments:
+-- this run was to pay the rewards; it failed; it ran no transaction.
+discardsRewardRun :: Bool -> Bool -> Bool -> Bool
+discardsRewardRun payRewards failed ranNothing = payRewards && failed && ranNothing
+
 -- | Run @txs@ from @theBlockHeader@'s state root. The first component of the
 -- result is the block-reward results this run paid but could not attach to a
 -- receipt, which an incremental build must carry forward; it is returned
@@ -349,34 +373,44 @@ makeNewBlock mineTransactions mSelfAddress = do
           let payRewards = not $ B.blockRewardsPaid cache
           withBagger $ do
             (!mUnattached, !run) <- runFromStateRoot mineTransactions remGas tempBlockHeader promoted mSelfAddress payRewards
-            (newSR, newGas, newExec, newUnexec) <- case run of
-              Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [])
+            (ranSR, ranGas, newRan, newUnexec) <- case run of
+              Right (newSR', newRR', newGas') -> return (newSR', newGas', newRR', [])
               Left e -> do
                 logRAE e
                 case e of
-                  (GasLimitReached rtx urtx nsr nbg) -> return (nsr, nbg, lastExec ++ rtx, urtx)
+                  (GasLimitReached rtx urtx nsr nbg) -> return (nsr, nbg, rtx, urtx)
                   (RecoverableFailure f rtx urtx nsr nbg) -> do
                     txsDroppedCallback [f] []
                     let theRejectedTx = rejectedTx f
                     purgeFromPending theRejectedTx
-                    return (nsr, nbg, lastExec ++ rtx, filter (on (/=) otSigner theRejectedTx) urtx)
+                    return (nsr, nbg, rtx, filter (on (/=) otSigner theRejectedTx) urtx)
                   x -> error (show x)
+
+            let discarded = discardsRewardRun payRewards (either (const True) (const False) run) (null newRan)
+                (newSR, newGas)
+                  | discarded = (lastSR, remGas)
+                  | otherwise = (ranSR, ranGas)
+            when discarded $
+              $logInfoS "Bagger.makeNewBlock" "the run that was to pay the block rewards ran no transaction; discarding it, the next run pays them"
 
             -- Rewards owed from an earlier run that ran no transactions, or
             -- from this one. Both can never be set at once: carrying any means
-            -- the rewards were already paid, which makes payRewards False.
-            let owedRewards = case B.pendingBlockRewards cache of
-                  Just carried -> Just carried
-                  Nothing -> mUnattached
+            -- the rewards were already paid, which makes payRewards False. A
+            -- discarded run owes nothing: its rewards are paid again.
+            let owedRewards
+                  | discarded = Nothing
+                  | otherwise = case B.pendingBlockRewards cache of
+                      Just carried -> Just carried
+                      Nothing -> mUnattached
                 (newExec', stillOwedRewards) =
-                  attachBlockRewards' tempBlockHeader owedRewards newExec
+                  attachBlockRewards' tempBlockHeader owedRewards (lastExec ++ newRan)
             let !newMiningCache =
                   cache
                     { B.lastExecutedStateRoot = newSR,
                       B.remainingGas = newGas,
                       B.lastExecutedTxs = newExec',
                       B.promotedTransactions = newUnexec,
-                      B.blockRewardsPaid = B.blockRewardsPaid cache || payRewards,
+                      B.blockRewardsPaid = B.blockRewardsPaid cache || (payRewards && not discarded),
                       B.pendingBlockRewards = stillOwedRewards
                     }
             $logDebugS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
@@ -648,6 +682,12 @@ buildFromMiningCache = do
   let parentHash = B.bestBlockSHA cache
   let parentHeader = B.bestBlockHeader cache
   let stateRoot = B.lastExecutedStateRoot cache
+  -- Stand on the state the cached transactions left. A caller that ran nothing
+  -- new stands somewhere else: on the parent's state (makeNewBlock with nothing
+  -- promoted) or on a discarded run's. The block is sealed with the root the node
+  -- stands on (buildRewardedBlockHeader), so a candidate built from anywhere else
+  -- carries the transactions without their state and is rejected.
+  startFromStateRoot stateRoot
   let vDelt = getDeltasFromResults $ B.lastExecutedTxs cache
   let sDelt = getStakeDeltasFromResults $ B.lastExecutedTxs cache
   let txs = (trrTransaction <$> B.lastExecutedTxs cache) ++ (DL.toList $ B.privateHashes cache)
