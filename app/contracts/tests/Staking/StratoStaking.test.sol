@@ -87,6 +87,15 @@ contract GenesisGovernance is MercataGovernance {
     }
 }
 
+// The test runner runs on no network, so the registry is given one: helium's network ID.
+contract NetworkValidatorRegistry is ValidatorRegistry {
+    constructor(address initialOwner) ValidatorRegistry(initialOwner) { }
+
+    function _chainId() internal view override returns (uint256) {
+        return 114784819836269;
+    }
+}
+
 contract Describe_StratoStaking {
     uint256 public INFINITY = 2 ** 256 - 1;
     address constant VALIDATOR_A = address(0xaaaa);
@@ -96,7 +105,7 @@ contract Describe_StratoStaking {
     Token strato;
     Token usdst;
     UpgradedInPlaceStaking staking;
-    ValidatorRegistry registry;
+    NetworkValidatorRegistry registry;
     MercataGovernance gov;
 
     User user1;
@@ -128,7 +137,7 @@ contract Describe_StratoStaking {
         staking = new UpgradedInPlaceStaking(address(this));
         staking.initialize(address(strato), address(usdst), 100, 1000, 16);
 
-        registry = new ValidatorRegistry(address(this));
+        registry = new NetworkValidatorRegistry(address(this));
         registry.initialize(address(staking));
         staking.setValidatorRegistry(address(registry));
 
@@ -361,6 +370,7 @@ contract Describe_StratoStaking {
         fastForward(101, 1);
         staking.syncValidator(VALIDATOR_A);
         require(!gov.isValidator(VALIDATOR_A), "left after its notice");
+        operatorA.doSuccessfully(address(staking), "cancelExit(address)", VALIDATOR_A);
         operatorA.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 1000e18);
         require(!staking.eligible(VALIDATOR_A), "returning: delegations no longer qualify it");
         _selfBond(operatorA, VALIDATOR_A, 1000e18);
@@ -1237,6 +1247,28 @@ contract Describe_StratoStaking {
         require(staking.isValidator(address(validatorC)) && staking.validatorCount() == 3, "adopted");
     }
 
+    // A seat the admins gave before pins existed is listed, unpinned and was never handed to
+    // staking. Staking leaves it alone: adopting it would let anyone's sync drop it for its bond.
+    function it_leaves_a_seat_governance_never_handed_over_alone() public {
+        GenesisGovernance pins = _pinningGovernance();
+        _bondBoth();
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 100e18);
+        pins.seedValidator(address(validatorC));
+
+        attacker.do(address(staking), "syncValidator(address)", address(validatorC));
+        require(pins.isValidator(address(validatorC)) && !staking.isValidator(address(validatorC)), "neither adopted nor removed");
+        require(staking.validatorCount() == 2, "counts unchanged");
+
+        _selfBond(validatorC, address(validatorC), 900e18);
+        require(staking.eligible(address(validatorC)) && pins.isValidator(address(validatorC)), "eligible, and still not taken");
+        attacker.doExpectingFailure(address(staking), "tryActivate(address)", "SS: governance seat not handed to staking", address(validatorC));
+        require(!staking.isValidator(address(validatorC)), "not taken by activation either");
+        require(!staking.isWaiter(address(validatorC)), "an admin seat is not waiting");
+        attacker.doSuccessfully(address(staking), "reconcileSet", _list(address(validatorC)));
+        require(!staking.isValidator(address(validatorC)) && !pins.stakingManaged(address(validatorC)), "nor taken by reconciliation");
+    }
+
     // A kick overrides a pin: the validator leaves and the pin goes with it.
     function it_kicks_a_pinned_validator() public {
         GenesisGovernance pins = _pinningGovernance();
@@ -1395,7 +1427,29 @@ contract Describe_StratoStaking {
         require(!gov.isValidator(VALIDATOR_A), "left the set after the notice");
         require(staking.status(VALIDATOR_A) == 1, "Registered");
         require(_selfBondOf(VALIDATOR_A) == 1000e18, "self-bond stays bonded");
-        require(staking.exitReadyTime(VALIDATOR_A) == 0, "exit cleared");
+        require(staking.exitReadyTime(VALIDATOR_A) != 0, "the exit stands until cancelled");
+    }
+
+    // A validator that left on an exit stays out until its operator cancels the exit. Without
+    // that, anyone's tryActivate or reconcileSet would put it back, bond and all, after its
+    // operator has stopped the node.
+    function it_keeps_an_exited_validator_out_until_its_operator_cancels() public {
+        _bondBoth();
+        operatorA.doSuccessfully(address(staking), "requestExit(address)", VALIDATOR_A);
+        fastForward(101, 1);
+        staking.syncValidator(VALIDATOR_A);
+        fastForward(1, 1);
+        require(!gov.isValidator(VALIDATOR_A) && !staking.isWaiter(VALIDATOR_A), "out, and not a waiter");
+
+        attacker.doExpectingFailure(address(staking), "tryActivate(address)", "SS: not eligible", VALIDATOR_A);
+        attacker.doSuccessfully(address(staking), "reconcileSet", _list(VALIDATOR_A));
+        require(!gov.isValidator(VALIDATOR_A), "reconciling passes it over");
+        attacker.doExpectingFailure(address(staking), "cancelExit(address)", "SS: not operator", VALIDATOR_A);
+
+        operatorA.doSuccessfully(address(staking), "cancelExit(address)", VALIDATOR_A);
+        require(staking.isWaiter(VALIDATOR_A), "a waiter again");
+        _activate(VALIDATOR_A);
+        require(gov.isValidator(VALIDATOR_A), "and back in the set");
     }
 
     function it_enforces_the_unkick_cooldown() public {
@@ -1435,6 +1489,46 @@ contract Describe_StratoStaking {
         operatorA.doExpectingFailure(address(staking), "selfBond(address,uint256)", "SS: above operator stake cap", VALIDATOR_A, 2000e18);
         user1.do(address(staking), "unstake(address,uint256)", VALIDATOR_A, 500e18);
         require(staking.delegatedStake(address(user1), VALIDATOR_A) == 1000e18, "unstaking is never capped");
+    }
+
+    // A waiter can be over the cap without taking any stake in: it bonded before the cap was
+    // switched on, or others have left since. reconcileSet holds each seat it fills to the
+    // cap tryActivate applies, and passes over such a waiter rather than failing the batch.
+    function it_reconciles_only_waiters_within_the_stake_cap() public {
+        _bondBoth();
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 6000e18);
+        User fourth = new User();
+        _mintAndApprove(fourth, 10000e18);
+        _registerSelf(fourth);
+        _selfBond(fourth, address(fourth), 1000e18);
+        staking.setSetParams(50, 50, 500, 10, 100, 100, 3300);
+
+        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: above operator stake cap", address(validatorC));
+        user2.doSuccessfully(address(staking), "reconcileSet", _two(address(validatorC), address(fourth)));
+        require(!gov.isValidator(address(validatorC)), "6000 of 9000 is over the cap: passed over");
+        require(gov.isValidator(address(fourth)), "1000 of 4000 is under it: seated");
+    }
+
+    // Inbound stake is not capped while the set holds none, but a seat is: a newcomer to
+    // pinned seats whose stake has gone would hold all of it, so reconcileSet passes it over
+    // as tryActivate refuses it.
+    function it_holds_a_newcomer_to_the_cap_when_the_set_holds_no_stake() public {
+        GenesisGovernance pins = _pinningGovernance();
+        _bondBoth();
+        pins.voteToAddValidator(VALIDATOR_A);
+        pins.voteToAddValidator(VALIDATOR_B);
+        staking.setSetParams(50, 50, 500, 10, 100, 100, 3300);
+        operatorA.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 1000e18);
+        operatorB.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_B, 2000e18);
+        require(staking.consensusWeight() == 0, "pinned seats, no stake");
+
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1000e18); // inbound: no cap on an empty set
+        require(staking.isWaiter(address(validatorC)), "a waiter");
+        validatorC.doExpectingFailure(address(staking), "tryActivate(address)", "SS: above operator stake cap", address(validatorC));
+        user2.doSuccessfully(address(staking), "reconcileSet", _list(address(validatorC)));
+        require(!pins.isValidator(address(validatorC)), "1000 of 1000 is over the cap: passed over");
     }
 
     // Stake behind a listed validator outside the set carries no vote, so it gives nobody
@@ -1709,6 +1803,21 @@ contract Describe_StratoStaking {
 
         validatorC.doSuccessfully(address(staking), "tryActivate(address)", address(validatorC));
         require(pins.isValidator(address(validatorC)) && pins.validatorStake(address(validatorC)) == 1000e18, "the newcomer joins with 1000 of 11000");
+    }
+
+    // A pinned seat stays whatever its stake, so one whose stake has run out holds a weight of
+    // zero for as long as the pin lasts. It does not keep newcomers out meanwhile.
+    function it_seats_a_newcomer_beside_a_pinned_seat_without_stake() public {
+        GenesisGovernance pins = _pinningGovernance();
+        _bondBoth();
+        pins.voteToAddValidator(VALIDATOR_A);
+        operatorA.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 1000e18);
+        require(pins.isValidator(VALIDATOR_A) && pins.validatorStake(VALIDATOR_A) == 0, "pinned, with no weight");
+
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1000e18);
+        validatorC.doSuccessfully(address(staking), "tryActivate(address)", address(validatorC));
+        require(pins.isValidator(address(validatorC)) && pins.validatorStake(address(validatorC)) == 1000e18, "the newcomer joins");
     }
 
     // ---- pay follows the seat ----------------------------------------------------------

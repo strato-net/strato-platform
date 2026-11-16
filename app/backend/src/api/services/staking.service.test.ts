@@ -5,22 +5,25 @@ import { authorizationDigest, findOperatedValidator, mapRegistryRevert, profileT
 
 // Pinned by tests/Staking/ValidatorRegistry.test.sol (it_matches_off_chain_digests_and_recovers_real_signatures).
 const VECTOR = {
+  chainId: 114784819836269n, // helium's network ID
   registry: "0x1111111111111111111111111111111111111111",
   validator: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
   operator: "0x2222222222222222222222222222222222222222",
   nonce: 7n,
-  digest: "0xb40f7746740b70994c96fae88ae656ddfaf42a06872675fdde41dbee73e79bd3",
+  digest: "0xba7b553d0f1ae8dada79984723ddf311b90c9d0e84c6eb16a19445aa557d0d27",
 };
 
 test("authorization digest matches the contract's packed encoding", () => {
-  assert.equal(authorizationDigest(VECTOR.registry, VECTOR.validator, VECTOR.operator, VECTOR.nonce), VECTOR.digest);
+  assert.equal(authorizationDigest(VECTOR.chainId, VECTOR.registry, VECTOR.validator, VECTOR.operator, VECTOR.nonce), VECTOR.digest);
   // Prefix-less lowercase addresses (the service's normalised form) hash the same.
   assert.equal(
-    authorizationDigest(VECTOR.registry.slice(2), VECTOR.validator.slice(2).toLowerCase(), VECTOR.operator.slice(2), VECTOR.nonce),
+    authorizationDigest(VECTOR.chainId, VECTOR.registry.slice(2), VECTOR.validator.slice(2).toLowerCase(), VECTOR.operator.slice(2), VECTOR.nonce),
     VECTOR.digest
   );
   // The nonce is 32 bytes of the preimage: changing it changes the digest.
-  assert.notEqual(authorizationDigest(VECTOR.registry, VECTOR.validator, VECTOR.operator, 0n), VECTOR.digest);
+  assert.notEqual(authorizationDigest(VECTOR.chainId, VECTOR.registry, VECTOR.validator, VECTOR.operator, 0n), VECTOR.digest);
+  // So is the chain id: a consent signed for one network does not verify on another.
+  assert.notEqual(authorizationDigest(33056204878082667n, VECTOR.registry, VECTOR.validator, VECTOR.operator, VECTOR.nonce), VECTOR.digest);
 });
 
 const R = "b5eefa7d20ec97007bd0fb457ac8da3140d90a4f163337c3de9778650b83d121";

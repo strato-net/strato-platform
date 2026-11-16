@@ -4,6 +4,7 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { authorizationDigest, findOperatedValidator, mapRegistryRevert, profileText, splitSignature } from "./stakingAuthorization";
 import { StratoError } from "../../errors/StratoError";
 import { StratoPaths, constants } from "../../config/constants";
+import { networkId } from "../../config/config";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import { castVoteOnIssue } from "./user.service";
@@ -197,6 +198,7 @@ export type ValidatorProfileInput = {
 };
 
 export type StratoAuthorizationDigest = {
+  chainId: string;
   registry: string;
   validator: string;
   operator: string;
@@ -389,15 +391,22 @@ const getBlocState = (
 const getStakingBlocState = (accessToken: string, fresh = false): Promise<Record<string, any>> =>
   getBlocState(accessToken, extractContractName(StratoStaking), requireStakingAddress(), fresh);
 
-// _pinnedOut: the validators the admins voted out of the set, from governance's state.
-// Staking reads the pin only while its governance link is on. A read that fails leaves
-// the pins unknown; the contract still applies them.
+// Governance's part of the waiter test, from its state: _pinnedOut, the validators the
+// admins voted out of the set, and _heldByGovernance, seats it lists that were never handed
+// to staking (neither pinned in nor staking-managed). Staking reads the pin only while its
+// governance link is on. A read that fails leaves them unknown; the contract still applies them.
 const getPinnedOut = async (accessToken: string, state: Record<string, any>, fresh = false): Promise<Set<string>> => {
   const governance = normalizeAddress(state.governance);
   if (!parseBoolLike(state.governanceSyncEnabled) || !governance || /^0+$/.test(governance)) return new Set();
   try {
     const governanceState = await getBlocState(accessToken, extractContractName(MercataGovernance), governance, fresh);
-    return new Set([...addressKeyed(governanceState.pinnedOut)].filter(([, pinned]) => parseBoolLike(pinned)).map(([validator]) => validator));
+    const flagged = (map: unknown) => new Set([...addressKeyed(map)].filter(([, on]) => parseBoolLike(on)).map(([validator]) => validator));
+    const pinnedIn = flagged(governanceState.pinnedIn);
+    const stakingManaged = flagged(governanceState.stakingManaged);
+    const held = [...addressKeyed(governanceState.validatorMap)]
+      .filter(([validator, index]) => parseBigIntLike(index) > 0n && !pinnedIn.has(validator) && !stakingManaged.has(validator))
+      .map(([validator]) => validator);
+    return new Set([...flagged(governanceState.pinnedOut), ...held]);
   } catch {
     return new Set();
   }
@@ -804,8 +813,8 @@ type V2ValidatorRecord = {
   eligible: boolean;
   // What the validator votes with: its stake less what is still waiting out the stake delay.
   votingWeight: bigint;
-  // Can take a seat by right now: eligible, not seated, not pinned out by the admins, and
-  // its bond has waited out the delay (StratoStaking.isWaiter).
+  // Can take a seat by right now: eligible, not seated, not pinned out or held by the admins,
+  // and its bond has waited out the delay (StratoStaking.isWaiter).
   isWaiter: boolean;
 };
 
@@ -1895,8 +1904,8 @@ export const claimStratoOperatorFeeRewards = async (
 // ---- validator lifecycle (operator / permissionless) ----
 
 // The registry's operator-authorization message: keccak256 over the packed encoding of the
-// prefix, registry, validator, operator and uint256 nonce, with no signed-message prefix
-// (ValidatorRegistry.authorizationDigest); see stakingAuthorization.ts.
+// prefix, uint256 chain id, registry, validator, operator and uint256 nonce, with no
+// signed-message prefix (ValidatorRegistry.authorizationDigest); see stakingAuthorization.ts.
 
 export const getStratoAuthorizationDigest = async (
   accessToken: string,
@@ -1907,6 +1916,8 @@ export const getStratoAuthorizationDigest = async (
   const validatorAddress = requireValidatorArg(validator);
   const operatorAddress = normalizeAddress(operator);
   if (!isNormalizedAddress(operatorAddress)) throw badRequest("operator is required");
+  if (!networkId) throw new Error("Network ID is not configured");
+  const chainId = BigInt(networkId);
   await requireV2(accessToken);
 
   // Read fresh: every register/setOperator spends the nonce, and a digest over a spent
@@ -1915,11 +1926,12 @@ export const getStratoAuthorizationDigest = async (
   const nonce = parseBigIntLike(addressKeyed(registryState.authorizationNonce).get(validatorAddress));
 
   return {
+    chainId: chainId.toString(),
     registry,
     validator: validatorAddress,
     operator: operatorAddress,
     nonce: nonce.toString(),
-    digest: authorizationDigest(registry, validatorAddress, operatorAddress, nonce),
+    digest: authorizationDigest(chainId, registry, validatorAddress, operatorAddress, nonce),
   };
 };
 
@@ -2089,8 +2101,14 @@ export const reconcileStratoValidatorSet = async (
   await requireV2(accessToken);
 
   const state = await getStakingBlocState(accessToken, true);
-  const candidates = v2ValidatorRecords(state, await getPinnedOut(accessToken, state, true))
-    .filter((record) => record.isWaiter)
+  // reconcileSet passes over a waiter that would hold more than maxOperatorStakeBps of the
+  // set once seated (_admissibleUnderCap), so those are left out before the batch is cut.
+  const records = v2ValidatorRecords(state, await getPinnedOut(accessToken, state, true));
+  const capBps = parseBigIntLike(state.maxOperatorStakeBps);
+  const consensusWeight = records.reduce((sum, record) => (record.isValidator ? sum + record.totalStake : sum), 0n);
+  const candidates = records
+    .filter((record) => record.isWaiter
+      && (capBps === 0n || record.totalStake * BPS_DIVISOR <= (consensusWeight + record.totalStake) * capBps))
     .sort((a, b) =>
       a.votingWeight !== b.votingWeight
         ? (b.votingWeight > a.votingWeight ? 1 : -1)

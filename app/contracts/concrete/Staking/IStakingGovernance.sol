@@ -8,6 +8,7 @@ interface IStakingGovernance {
     function removeKickedValidator(address validator) external returns (bool);
     function pinnedIn(address validator) external view returns (bool);
     function pinnedOut(address validator) external view returns (bool);
+    function stakingManaged(address validator) external view returns (bool);
     function validatorMap(address validator) external view returns (uint256);
     function validatorStake(address validator) external view returns (uint256);
     function validators(uint256 index) external view returns (address);

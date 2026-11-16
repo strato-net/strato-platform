@@ -612,9 +612,10 @@ contract  StratoStaking is Ownable {
     }
 
     // A waiter is eligible but not in the set; promotion is explicit (tryActivate / reconcileSet).
-    // A validator the admins pinned out is never a waiter.
+    // A validator the admins pinned out is never a waiter, nor is a seat governance lists and
+    // never handed to staking (see _handedToStaking).
     function isWaiter(address validator) public view returns (bool) {
-        return eligible(validator) && !isValidator[validator] && !_pinnedOut(validator) && _bondMatured(validator);
+        return eligible(validator) && !isValidator[validator] && !_pinnedOut(validator) && !_heldByGovernance(validator) && _bondMatured(validator);
     }
 
     // Admin pins, read from governance (see MercataGovernance.pinnedIn / pinnedOut).
@@ -624,6 +625,17 @@ contract  StratoStaking is Ownable {
 
     function _pinnedOut(address validator) internal view returns (bool) {
         return governanceSyncEnabled && IStakingGovernance(governance).pinnedOut(validator);
+    }
+
+    // A seat governance lists and staking does not hold is staking's to take only when the
+    // admins pinned it in or a vote clearing the pin handed it back. Any other (an admin seat
+    // from before the pins) is left alone: taking it would let anyone's sync remove it.
+    function _handedToStaking(address validator) internal view returns (bool) {
+        return IStakingGovernance(governance).pinnedIn(validator) || IStakingGovernance(governance).stakingManaged(validator);
+    }
+
+    function _heldByGovernance(address validator) internal view returns (bool) {
+        return IStakingGovernance(governance).validatorMap(validator) > 0 && !_handedToStaking(validator);
     }
 
     // All the stake behind the consensus set, waiting or not: what the emission rate and
@@ -690,11 +702,12 @@ contract  StratoStaking is Ownable {
         }
     }
 
+    // An exit notice outlives the seat: until its operator cancels it, the validator is not
+    // eligible, so nobody's tryActivate or reconcileSet can put it back in the set.
     function _unseat(address validator) internal {
         isValidator[validator] = false;
         lastSyncedWeight[validator] = 0;
         validatorCount -= 1;
-        exitReadyTime[validator] = 0;
 
         uint256 j = activeValidatorIndex[validator];
         if (j == 0) return;
@@ -743,11 +756,16 @@ contract  StratoStaking is Ownable {
         // stake was never put on record, as before the weight snapshot), the newcomer's
         // would be the only vote that counts, so nobody new is seated until every member
         // has a weight. A validator governance already lists (a genesis seat, an admin
-        // pin) adds no member and is not held to this.
+        // pin) adds no member and is not held to this. A pinned member staking holds is not
+        // counted: it stays whatever its stake, so one whose stake has run out would close the
+        // door to everyone. One staking has not taken yet still counts until its first sync,
+        // so a pin cannot open the door before its seat's weight is known.
         if (IStakingGovernance(governance).validatorMap(validator) == 0) {
             uint256 members = IStakingGovernance(governance).validatorCount();
             for (uint256 i = 0; i < members; i++) {
-                require(IStakingGovernance(governance).validatorStake(IStakingGovernance(governance).validators(i)) > 0, "SS: validator without weight");
+                address member = IStakingGovernance(governance).validators(i);
+                if (_pinnedIn(member) && isValidator[member]) continue;
+                require(IStakingGovernance(governance).validatorStake(member) > 0, "SS: validator without weight");
             }
         }
         // Straight to governance: it is the staking contract's own call (the
@@ -780,12 +798,12 @@ contract  StratoStaking is Ownable {
     function _syncValidator(address validator) internal {
         if (!governanceSyncEnabled) return;
         if (!isValidator[validator]) {
-            // Governance lists it but staking never seated it: the admins pinned it in, and
-            // may have cleared the pin since. Take the seat here too, whatever its
+            // Governance lists it but staking never seated it. A seat handed to staking (pinned
+            // in, or handed back by a vote clearing the pin) is taken here too, whatever its
             // eligibility, so its stake is published as its weight and, without a pin, the
             // rules below decide whether it stays. Not a mutation: governance has already
             // changed the set.
-            if (!operators[validator].active || IStakingGovernance(governance).validatorMap(validator) == 0) return;
+            if (!operators[validator].active || IStakingGovernance(governance).validatorMap(validator) == 0 || !_handedToStaking(validator)) return;
             _activate(validator);
         }
         // Governance decides who is in the consensus set. A validator it no longer
@@ -858,10 +876,11 @@ contract  StratoStaking is Ownable {
     }
 
     // Best waiter among `candidates` by (weight desc, address asc): the promotion candidate.
+    // A waiter the stake cap would refuse a seat is passed over, as tryActivate refuses it.
     function _bestWaiter(address[] memory candidates) internal view returns (address best, uint256 bestWeight) {
         for (uint256 i = 0; i < candidates.length; i++) {
             address validator = candidates[i];
-            if (!isWaiter(validator)) continue;
+            if (!isWaiter(validator) || !_admissibleUnderCap(validator)) continue;
             uint256 w = _votingWeight(validator);
             if (best == address(0) || w > bestWeight || (w == bestWeight && uint256(validator) < uint256(best))) {
                 best = validator;
@@ -885,7 +904,9 @@ contract  StratoStaking is Ownable {
         require(eligible(validator), "SS: not eligible");
         require(!_pinnedOut(validator), "SS: pinned out by governance");
         if (IStakingGovernance(governance).validatorMap(validator) > 0) {
-            // Already in governance's set (an admin pin): no slot to find and nobody to evict.
+            // Already in governance's set: no slot to find and nobody to evict, but only a
+            // seat handed to staking is staking's to take.
+            require(_handedToStaking(validator), "SS: governance seat not handed to staking");
             _activate(validator);
             return;
         }
@@ -925,17 +946,32 @@ contract  StratoStaking is Ownable {
     // Inbound stake may not push a validator above maxOperatorStakeBps of the consensus
     // set's weight (grandfathered validators simply cannot receive more). A validator
     // outside the set is measured as if it had joined. No cap while the set is empty.
-    function _requireWithinStakeCap(address validator) internal view {
-        if (maxOperatorStakeBps == 0) return;
+    function _withinStakeCap(address validator) internal view returns (bool) {
+        if (maxOperatorStakeBps == 0) return true;
         uint256 total = consensusWeight();
-        if (total == 0) return;
+        if (total == 0) return true;
+        return _shareWithinCap(validator, total);
+    }
+
+    // A seat is held to the cap with no exemption: a newcomer to a set holding no stake would
+    // hold all of it. This is what tryActivate's check after seating applies.
+    function _admissibleUnderCap(address validator) internal view returns (bool) {
+        return maxOperatorStakeBps == 0 || _shareWithinCap(validator, consensusWeight());
+    }
+
+    function _shareWithinCap(address validator, uint256 total) internal view returns (bool) {
         uint256 weight = _validatorWeight(operators[validator]);
         if (!isValidator[validator]) total += weight;
-        require(weight * BPS_DIVISOR <= total * maxOperatorStakeBps, "SS: above operator stake cap");
+        return weight * BPS_DIVISOR <= total * maxOperatorStakeBps;
+    }
+
+    function _requireWithinStakeCap(address validator) internal view {
+        require(_withinStakeCap(validator), "SS: above operator stake cap");
     }
 
     // An active validator announces it will leave; it keeps serving for exitNoticeSeconds,
-    // after which any sync (or syncValidator) takes it out of the set. Self-bond stays bonded.
+    // after which any sync (or syncValidator) takes it out of the set. Self-bond stays bonded,
+    // and the validator stays out until its operator cancels the exit.
     function requestExit(address validator) external onlyInitialized onlyOperatorOf(validator) {
         require(isValidator[validator], "SS: not active");
         require(exitReadyTime[validator] == 0, "SS: exit pending");
@@ -943,6 +979,7 @@ contract  StratoStaking is Ownable {
         emit ExitRequested(msg.sender, validator, exitReadyTime[validator]);
     }
 
+    // Withdraws a pending notice, or, once the validator has left, makes it eligible again.
     function cancelExit(address validator) external onlyInitialized onlyOperatorOf(validator) {
         require(exitReadyTime[validator] != 0, "SS: no exit pending");
         exitReadyTime[validator] = 0;
@@ -1312,9 +1349,10 @@ contract  StratoStaking is Ownable {
     //   operator it did not choose. What a delegator earned behind the old record stays
     //   claimable there.
     // - It is a re-filing, not new stake: it counts at once and sets no move lock.
-    // - A validator governance lists and staking has not seated is adopted at its first
-    //   sync, and leaves in the same sync if nothing holds it there. So such a validator
-    //   must be pinned before stake is filed behind it.
+    // - A validator governance lists and staking has not seated is taken into staking's set
+    //   only once pinned in or handed back, and a handed-back one leaves at its first sync if
+    //   nothing holds it there. So such a validator must be pinned before stake is filed
+    //   behind it.
     function refileStake(address fromRecord, address[] calldata toValidators, address[] calldata delegators) external onlyOwner onlyInitialized onlyListed(fromRecord) {
         require(toValidators.length > 0 && toValidators.length <= maxBatchSize, "SS: bad validators");
         require(delegators.length > 0 && delegators.length <= maxBatchSize, "SS: bad batch");

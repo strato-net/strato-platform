@@ -75,7 +75,7 @@ A passed vote also **pins** the validator, which overrides staking:
 - **Pinned in** (`voteToAddValidator`): the validator joins at once if it is not in the set, and staking can't remove it, however low its stake. Staking takes it into its own set at the next sync, so its stake still sets its weight. A validator with no stake has weight 0 and can't vote or propose.
 - **Pinned out** (`voteToRemoveValidator`): the validator leaves at once if it is in the set, and staking can't add it back. A validator outside the set can be pinned out before it joins.
 
-`voteToClearValidatorPin(address)` removes a pin. The validator keeps its membership until staking next syncs or activates it. A kick from `ValidatorRegistry` removes a pinned-in validator and clears its pin.
+`voteToClearValidatorPin(address)` removes a pin. Clearing a pin in hands the validator to staking: it keeps its membership until staking next syncs or activates it, and from then on the stake rules decide whether it stays. Staking takes over no other seat it does not already hold, so one voted in before pins existed stays until the admins vote on it. A kick from `ValidatorRegistry` removes a pinned-in validator and clears its pin.
 
 At genesis, `MercataGovernance` is owned by `AdminRegistry` (`0x100c`), which is also its only admin. Votes are therefore carried out through `AdminRegistry` governance.
 
@@ -99,7 +99,7 @@ An active operator leaves automatically, in the same transaction, as soon as it 
 
 - falling below its minimum stake
 - being jailed
-- reaching the end of an exit notice
+- reaching the end of an exit notice (it stays out until its operator calls `cancelExit`)
 - being removed by the owner
 
 A validator leaves in the same transaction that makes it ineligible; a leave is never held back by the per-block limit on set changes.

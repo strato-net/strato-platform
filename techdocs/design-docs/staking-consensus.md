@@ -194,9 +194,10 @@ changes (`governanceSyncEnabled` is the ops kill switch). Both `StratoStaking` a
 sets commission and collects the operator share) is a field of the record. Binding a validator to
 an operator needs the validator key's consent: `ValidatorRegistry.register(validator, …, v, r, s)`
 / `setOperator` verify a secp256k1 signature by the validator key over
-`keccak256(abi.encodePacked("STRATO validator operator authorization", registry, validator,
-operator, authorizationNonce[validator]))` (raw digest, since node vaults sign raw hashes; the
-nonce makes each consent single use), or the validator key sends the transaction itself. Admin
+`keccak256(abi.encodePacked("STRATO validator operator authorization", chainId, registry,
+validator, operator, authorizationNonce[validator]))` (raw digest, since node vaults sign raw
+hashes; `chainId` is SolidVM's `block.chainid`, the network ID, so a consent never verifies on a
+network started from a copy of this one's state; the nonce makes each consent single use), or the validator key sends the transaction itself. Admin
 listing (`addValidator(s)`) and `adminSetOperator` are the only unsigned paths.
 `deploy/sign-validator-authorization.js` produces the signature from a node's vault.
 
@@ -234,7 +235,7 @@ consent, admin `addValidator` still works) → **Active** (in the consensus set)
   that no longer qualifies leaves in the transaction that got there. The operator's own bond
   cannot be taken out from under a seat that cannot leave (governance's last validator, or any
   seat while the governance link is off), unless the admins pinned the seat. Nobody new is seated while a validator governance lists
-  has no weight on record.
+  has no weight on record, unless that validator is pinned in.
 * **Stake delay** (`setStakeDelay`, 0 = off): new stake earns at once but counts toward the
   validator's vote only from the start of the window after next (between one and two delays),
   and `tryActivate` / `reconcileSet` need a bond that has already waited. The published weight
@@ -242,11 +243,14 @@ consent, admin `addValidator` still works) → **Active** (in the consensus set)
 * **Re-filing** (`refileStake`, owner): where an operator's record is keyed by its own address
   and its consensus validators are other addresses, the owner moves each named delegator's stake
   from that record onto the operator's validators in equal shares. Pin the validators first:
-  one that governance lists and staking has not seated is adopted at its first sync and leaves
-  in the same sync if it is neither pinned nor bonded. `requestExit(v)` keeps the validator serving for
-  `exitNoticeSeconds`, then any sync removes it; `cancelExit(v)` undoes it.
+  staking takes a seat governance lists and it has not seated only once the seat is pinned in or
+  handed back by a vote clearing the pin, and a handed-back seat leaves at its first sync if it is
+  not bonded. `requestExit(v)` keeps the validator serving for
+  `exitNoticeSeconds`, then any sync removes it, and it stays ineligible until `cancelExit(v)`,
+  which also withdraws a notice still running.
 * `maxOperatorStakeBps` caps **inbound** stake (stake / selfBond / moveStake target) at that share
   of `totalRewardableStake`; unstaking is never capped; 0 = off (switch it on after bootstrap).
+  `tryActivate` refuses a seat above it and `reconcileSet` passes such a waiter over.
 * Params: `setValidatorParams(minStake, proposerFeeBps, maxConsecutiveMisses, jailCooldown)`,
   `setSelfBondGraceUntil(t)`, `setSelfBondMinimum(m)` (re-checks the set), `setSetParams(maxActiveValidators, hardCapActiveValidators [only lowers],
   evictionMarginBps, maxSetMutationsPerBlock, exitNoticeSeconds, unkickCooldown,
