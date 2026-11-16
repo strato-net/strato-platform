@@ -28,6 +28,9 @@ module Blockchain.Context
     , RunsServer(..)
     , ActionTimestamp(..)
     , emptyActionTimestamp
+    , PbftWindow(..)
+    , admitPbftMessage
+    , maxPbftMessagesPerSecond
     , PeerAddress(..)
     , GenesisBlockHash(..)
     , PeerRunner
@@ -77,6 +80,7 @@ import qualified Data.Set.Ordered                        as S
 import           Data.String
 import qualified Data.Text                               as T
 import           Data.Time.Clock
+import           Data.Time.Clock.POSIX                   (getPOSIXTime)
 import           Data.Unique                             (Unique, newUnique)
 import           GHC.Exts                                (Constraint)
 
@@ -171,6 +175,25 @@ newtype ActionTimestamp = ActionTimestamp {unActionTimestamp :: Maybe UTCTime}
 emptyActionTimestamp :: ActionTimestamp
 emptyActionTimestamp = ActionTimestamp Nothing
 
+-- | This connection's consensus messages in the current second: (second, count).
+newtype PbftWindow = PbftWindow (Integer, Int)
+
+-- | The most consensus messages one connection may hand this node in a second:
+-- far above what a validator set sends in a round, and a bound on a peer that
+-- floods.
+maxPbftMessagesPerSecond :: Int
+maxPbftMessagesPerSecond = 500
+
+-- | Count a consensus message against this connection's second; False once
+-- the second is full.
+admitPbftMessage :: (MonadIO m, Mod.Modifiable PbftWindow m) => m Bool
+admitPbftMessage = do
+  now <- liftIO $ floor <$> getPOSIXTime
+  PbftWindow (second, n) <- Mod.get (Proxy @PbftWindow)
+  let n' = if second == now then n + 1 else 1
+  Mod.put (Proxy @PbftWindow) $ PbftWindow (now, n')
+  pure $ n' <= maxPbftMessagesPerSecond
+
 newtype RemainingBlockHeaders = RemainingBlockHeaders {unRemainingBlockHeaders :: [BlockHeader]}
 
 -- | Last missing-parent resync this connection asked for: (fetch number, when).
@@ -185,6 +208,7 @@ data Context = Context
   { blockHeaders          :: ([BlockHeader], UTCTime) -- keep track when last updated global headers cache
   , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp       :: ActionTimestamp
+  , pbftWindow            :: PbftWindow
   , _blockstanbulPeerAddr :: PeerAddress
   , _outboundWireMessages :: S.OSet (Host, Keccak256)
   }
@@ -381,6 +405,10 @@ instance Mod.Modifiable ActionTimestamp ContextM where
   get _ = actionTimestamp <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {actionTimestamp = k}, ()))
 
+instance Mod.Modifiable PbftWindow ContextM where
+  get _ = pbftWindow <$> Mod.get (Proxy @Context)
+  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {pbftWindow = k}, ()))
+
 instance Mod.Accessible ActionTimestamp ContextM where
   access _ = Mod.get (Proxy @ActionTimestamp)
 
@@ -527,7 +555,8 @@ type MonadP2P m =
     All
       '[Mod.Modifiable]
       '[ BestBlock,
-         BestSequencedBlock
+         BestSequencedBlock,
+         PbftWindow
        ]
       m,
     All2
@@ -644,6 +673,7 @@ initContext :: MonadIO m => m Context
 initContext =
   return $
     Context { actionTimestamp = emptyActionTimestamp
+            , pbftWindow = PbftWindow (0, 0)
             , blockHeaders = ([], jamshidBirth)
             , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
             , _blockstanbulPeerAddr = PeerAddress Nothing

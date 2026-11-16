@@ -24,8 +24,9 @@ module Blockchain.Event
 where
 
 import           BlockApps.Logging
-import           Blockchain.Blockstanbul               (WireMessage,
-                                                        blockstanbulSender)
+import           Blockchain.Blockstanbul.Authentication (authenticate)
+import           Blockchain.Blockstanbul.Messages      (InEvent (IMsg), WireMessage (..))
+import           Blockchain.Blockstanbul               (blockstanbulSender)
 import           Blockchain.Context
 import           Blockchain.Data.Block
 import qualified Blockchain.Data.BlockHeader           as BlockHeader
@@ -35,12 +36,13 @@ import           Blockchain.Data.Transaction           (Transaction)
 import           Blockchain.Data.TransactionIntake
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
-import           Blockchain.EthConf (ethConf, p2pConfig)
+import           Blockchain.EthConf (ethConf, networkConfig, p2pConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import           Blockchain.EventException
 import           Blockchain.EventModel
 import           Blockchain.HeaderCache
 import           Blockchain.Model.SyncState
+import           Blockchain.Strato.Model.Validator      (Validator (..))
 import           Blockchain.Model.SyncTask
 import           Blockchain.Model.WrappedBlock
 import           Blockchain.Sequencer.Event
@@ -300,32 +302,44 @@ handleEvents peer = awaitForever $ \case
       else do
         yieldR $ GetBlockBodies bodyHashes'
 
-  MsgEvt (Blockstanbul wm) -> do
-    lift $ do
-      stampActionTimestamp
-      setPeerAddrIfUnset $ blockstanbulSender wm
-      peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
-      $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
-    let msgHash = rlpHash wm
-    lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerHost peer, msgHash) Proxy
-    msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
-    if msgExists
-      then
-        $logInfoS "handleEvents/Blockstanbul" . T.pack $
-          concat
-            [ "Already seen inbound wire message ",
-              format msgHash,
-              ". Not forwarding to Sequencer."
-            ]
-      else do
-        $logInfoS "handleEvents/Blockstanbul" . T.pack $
-          concat
-            [ "First time seeing inbound wire message ",
-              format msgHash,
-              ". Forwarding to Sequencer."
-            ]
-        lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
-        yieldL $ ToUnseq [IEBlockstanbul wm]
+  MsgEvt (Blockstanbul wm@(WireMessage auth tm)) -> do
+    -- Only a message signed by a current validator goes further, and at most
+    -- maxPbftMessagesPerSecond per connection, counted before the signature is
+    -- recovered. Anyone can send one, and each would otherwise reach the
+    -- sequencer and push real messages out of the seen-message caches.
+    admitted <- lift admitPbftMessage
+    validators <- lift $ bestSequencedBlockValidators <$> Mod.get (Proxy @BestSequencedBlock)
+    signed <- authenticate (Conf.networkID $ networkConfig ethConf) (IMsg auth tm)
+    if not admitted
+      then $logDebugS "handleEvents/Blockstanbul" . T.pack $ "Dropping a consensus message from " ++ peerString peer ++ ": over " ++ show maxPbftMessagesPerSecond ++ " this second"
+      else if not (signed && Validator (blockstanbulSender wm) `elem` validators)
+        then $logDebugS "handleEvents/Blockstanbul" . T.pack $ "Dropping a consensus message from " ++ peerString peer ++ " not signed by a current validator"
+        else do
+          lift $ do
+            stampActionTimestamp
+            setPeerAddrIfUnset $ blockstanbulSender wm
+            peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
+            $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
+          let msgHash = rlpHash wm
+          lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerHost peer, msgHash) Proxy
+          msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
+          if msgExists
+            then
+              $logInfoS "handleEvents/Blockstanbul" . T.pack $
+                concat
+                  [ "Already seen inbound wire message ",
+                    format msgHash,
+                    ". Not forwarding to Sequencer."
+                  ]
+            else do
+              $logInfoS "handleEvents/Blockstanbul" . T.pack $
+                concat
+                  [ "First time seeing inbound wire message ",
+                    format msgHash,
+                    ". Forwarding to Sequencer."
+                  ]
+              lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
+              yieldL $ ToUnseq [IEBlockstanbul wm]
 
   -- private chains
   MsgEvt (GetChainDetails _) -> return ()
