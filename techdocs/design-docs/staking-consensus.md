@@ -88,7 +88,8 @@ cannot be jailed (nothing commits without its seal) — the tool is the inbound 
 under a third. There is no emergency kick: a holder of a third decides whether the block carrying
 its own removal commits, so recovery from one is off chain (the operators agree a validator set and
 run a release that applies it from an agreed height). `StratoStaking.exceedsOneThird` remains as a
-read-only check to alert on. The validator-set size is bounded on-chain (`MercataGovernance.hardCapValidators`, applied to
+read-only check to alert on, measured on the weights governance holds (the ones consensus counts)
+and not on stake that has finished its delay but is not published yet. The validator-set size is bounded on-chain (`MercataGovernance.hardCapValidators`, applied to
 both the staking and the admin-vote path, in addition to `StratoStaking.effectiveCap`); consensus
 itself never rejects a committed membership change, so a cap violation is a reverted transaction,
 not a stalled chain.
@@ -232,7 +233,7 @@ consent, admin `addValidator` still works) → **Active** (in the consensus set)
   unaffordable. Kicks and leaves bypass the mutation budget and do not use it up: a validator
   that no longer qualifies leaves in the transaction that got there. The operator's own bond
   cannot be taken out from under a seat that cannot leave (governance's last validator, or any
-  seat while the governance link is off). Nobody new is seated while a validator governance lists
+  seat while the governance link is off), unless the admins pinned the seat. Nobody new is seated while a validator governance lists
   has no weight on record.
 * **Stake delay** (`setStakeDelay`, 0 = off): new stake earns at once but counts toward the
   validator's vote only from the start of the window after next (between one and two delays),

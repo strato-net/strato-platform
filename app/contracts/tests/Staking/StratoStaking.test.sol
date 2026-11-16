@@ -1636,6 +1636,19 @@ contract Describe_StratoStaking {
         require(!gov.isValidator(VALIDATOR_A), "with the link back the seat leaves with the bond");
     }
 
+    // A seat the admins pinned is held by their vote, not by its bond, so its operator's
+    // bond is as free to leave with the link off as with it on.
+    function it_lets_a_pinned_seats_bond_out_while_the_governance_link_is_off() public {
+        GenesisGovernance pins = _pinningGovernance();
+        _bondBoth();
+        pins.voteToAddValidator(VALIDATOR_A);
+        staking.setGovernance(address(pins), false);
+
+        operatorA.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 1000e18);
+        require(_selfBondOf(VALIDATOR_A) == 0 && pins.isValidator(VALIDATOR_A), "the bond is out and the pin keeps the seat");
+        operatorB.doExpectingFailure(address(staking), "unbondSelf(address,uint256)", "SS: cannot leave the set", VALIDATOR_B, 2000e18);
+    }
+
     // ---- the door check ----------------------------------------------------------------
 
     // Governance as a network has it before staking has seated anyone: validators listed by
@@ -1780,6 +1793,26 @@ contract Describe_StratoStaking {
         require(gov.validatorStake(VALIDATOR_A) == 1500e18, "off: everything counts");
         _stake(user2, VALIDATOR_A, 100e18);
         require(gov.validatorStake(VALIDATOR_A) == 1600e18, "and new stake counts as it arrives");
+    }
+
+    // The one-third alert follows the weights governance holds, the ones consensus counts.
+    // Stake whose wait is over is not among them until its validator is synced.
+    function it_measures_one_third_on_the_weights_governance_holds() public {
+        _bondBoth();
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 2000e18);
+        _activate(address(validatorC));
+        _stake(user1, VALIDATOR_A, 1500e18);
+        staking.setStakeDelay(100);
+        require(staking.exceedsOneThird(VALIDATOR_A) && !staking.exceedsOneThird(VALIDATOR_B), "A holds 2500 of 6500");
+
+        _stake(user2, VALIDATOR_B, 4000e18);
+        fastForward(200, 1);
+        require(staking.votingWeight(VALIDATOR_B) == 6000e18 && gov.validatorStake(VALIDATOR_B) == 2000e18, "B's new stake has waited and is not published");
+        require(staking.exceedsOneThird(VALIDATOR_A) && !staking.exceedsOneThird(VALIDATOR_B), "consensus still counts 2500 of 6500 for A");
+
+        staking.syncValidator(VALIDATOR_B);
+        require(!staking.exceedsOneThird(VALIDATOR_A) && staking.exceedsOneThird(VALIDATOR_B), "once published, B holds 6000 of 10500");
     }
 
     // Stake that is waiting still earns: the delay is on the vote, not on income.

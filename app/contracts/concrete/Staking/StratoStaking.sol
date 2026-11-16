@@ -137,6 +137,8 @@ contract  StratoStaking is Ownable {
 
     // Consensus integration. Governance (MercataGovernance, genesis address 0x100)
     // is only called while governanceSyncEnabled; the flag is the ops kill switch.
+    // Two reads of governance's own state do not wait for it: the pin that excuses a
+    // seat from the bond rule, and the published weights exceedsOneThird measures.
     // Staking calls governance directly — governance authorises this contract
     // through its stakingContract / onlyStaking pair — and governance is what
     // republishes weights as ValidatorStakeUpdated for consensus to read.
@@ -626,25 +628,25 @@ contract  StratoStaking is Ownable {
 
     // All the stake behind the consensus set, waiting or not: what the emission rate and
     // the stake cap measure. Stake behind listed validators outside the set carries no
-    // vote, so it is left out. The set's vote, without stake that is still waiting, is
-    // consensusVotingWeight.
+    // vote, so it is left out.
     function consensusWeight() public view returns (uint256 total) {
         for (uint256 i = 0; i < activeValidators.length; i++) {
             total += _validatorWeight(operators[activeValidators[i]]);
         }
     }
 
-    // The vote of the consensus set: what its members' weights published to governance
-    // add up to once every one of them is synced.
-    function consensusVotingWeight() public view returns (uint256 total) {
-        for (uint256 i = 0; i < activeValidators.length; i++) {
-            total += _votingWeight(activeValidators[i]);
-        }
-    }
-
-    // More than a third of the consensus set's vote: can stall a stake-weighted quorum.
+    // More than a third of the vote: can stall a stake-weighted quorum. Measured on the
+    // weights governance holds, which are the ones consensus counts. This contract's own
+    // figures can run ahead of them: stake that has finished waiting counts here at once
+    // and in consensus from the validator's next sync.
     function exceedsOneThird(address validator) external view returns (bool) {
-        return isValidator[validator] && _votingWeight(validator) * 3 > consensusVotingWeight();
+        if (governance == address(0)) return false;
+        uint256 total = 0;
+        uint256 members = IStakingGovernance(governance).validatorCount();
+        for (uint256 i = 0; i < members; i++) {
+            total += IStakingGovernance(governance).validatorStake(IStakingGovernance(governance).validators(i));
+        }
+        return IStakingGovernance(governance).validatorStake(validator) * 3 > total;
     }
 
     function effectiveCap() public view returns (uint256) {
@@ -832,14 +834,13 @@ contract  StratoStaking is Ownable {
     // validator synced. A seat that no longer qualifies has left in that sync, with two
     // exceptions where it cannot: governance will not drop its last validator, and with
     // the governance link off no seat can be given up. In both the bond stays in, so a
-    // seat never votes without it. A seat the admins pinned stays by their vote, and one
-    // that predates the index backfill has no weight published by this contract to outlive
-    // its bond. A delegator's unstake is never refused.
+    // seat never votes without it. A seat that predates the index backfill has no weight
+    // published by this contract to outlive its bond. A seat the admins pinned stays by
+    // their vote, not by its bond, so the pin is read from governance whether or not the
+    // link is on. A delegator's unstake is never refused.
     function _requireNoSeatWithoutBond(address validator) internal view {
-        require(
-            !isValidator[validator] || eligible(validator) || _pinnedIn(validator) || activeValidatorIndex[validator] == 0,
-            "SS: cannot leave the set"
-        );
+        if (!isValidator[validator] || eligible(validator) || activeValidatorIndex[validator] == 0) return;
+        require(governance != address(0) && IStakingGovernance(governance).pinnedIn(validator), "SS: cannot leave the set");
     }
 
     // Lowest validator by (weight asc, address asc): the eviction candidate. A pinned seat
