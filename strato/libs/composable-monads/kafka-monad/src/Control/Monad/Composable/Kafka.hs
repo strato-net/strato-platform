@@ -330,12 +330,13 @@ runConsume consumerGroup topicName f = consumeOnce
           setKafkaCheckpoint consumerGroup topicName earliest
           fetchItems topicName earliest
       mReturnVal <- f items
-      base <- getKafkaCheckpoint consumerGroup topicName
-      let nextOffset' = base + fromIntegral (length items)
-      setKafkaCheckpoint consumerGroup topicName nextOffset'
+      -- A batch that stops the loop is left uncommitted, as if f had thrown.
       case mReturnVal of
         Just returnVal -> pure returnVal
-        Nothing -> consumeOnce
+        Nothing -> do
+          base <- getKafkaCheckpoint consumerGroup topicName
+          setKafkaCheckpoint consumerGroup topicName (base + fromIntegral (length items))
+          consumeOnce
 
 consumeFromLatest :: (Binary a, HasStreaming m) =>
                      TopicName -> m () -> ([a] -> m (Maybe b)) -> m b
