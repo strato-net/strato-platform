@@ -128,7 +128,7 @@ interface RecentTransactionsProps {
 }
 
 const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: RecentTransactionsProps) => {
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn, userAddress } = useUser();
   const {
     fetchDepositTransactions, fetchWithdrawTransactions,
     availableNetworks, depositRefreshKey, withdrawalRefreshKey,
@@ -166,7 +166,7 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
       fetchWithdrawTransactions(params, "deposits"),
     ]).then(([depositResult, withdrawalResult]) => {
       const apiDeposits = (depositResult.data || []) as unknown as Record<string, unknown>[];
-      const { remaining } = mergePendingDeposits(apiDeposits);
+      const { remaining } = mergePendingDeposits(apiDeposits, userAddress);
       const all = [
         ...remaining.map((p: Record<string, unknown>) => mapDeposit(p, 'pending')),
         ...apiDeposits.map((tx) => mapDeposit(tx, 'api')),
@@ -177,7 +177,7 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
       setBridgeLoading(false);
       bridgeLoadedRef.current = true;
     }).catch(() => { setBridgeTxs([]); setBridgeLoading(false); bridgeLoadedRef.current = true; });
-  }, [isLoggedIn, fundingMode, fetchDepositTransactions, fetchWithdrawTransactions, depositRefreshKey, withdrawalRefreshKey, recentLimit]);
+  }, [isLoggedIn, userAddress, fundingMode, fetchDepositTransactions, fetchWithdrawTransactions, depositRefreshKey, withdrawalRefreshKey, recentLimit]);
 
   if (fundingMode === "metals" && isLoggedIn && lastMetalRefreshKey !== metalRefreshKey) {
     setLastMetalRefreshKey(metalRefreshKey);

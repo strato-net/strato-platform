@@ -3,6 +3,7 @@ import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { Table, Select, Space, Card } from "antd";
 import { FrownOutlined, CopyOutlined } from "@ant-design/icons";
 import { useBridgeContext } from "@/context/BridgeContext";
+import { useUser } from "@/context/UserContext";
 import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, handleCopyToClipboard, getExplorerUrl, mergePendingDeposits } from "@/lib/bridge/utils";
 import { renderTruncatedAddressWithCopy } from "@/lib/bridge/components";
 import { DepositTransaction } from "@/lib/bridge/types";
@@ -32,6 +33,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
     depositRefreshKey,
     bridgeableTokens,
   } = useBridgeContext();
+  const { userAddress } = useUser();
 
   const rebaseFactorMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -63,7 +65,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         const result = await fetchDepositTransactions(params, context);
         const apiTransactions = result.data;
         
-        const { remaining: remainingPending } = mergePendingDeposits(apiTransactions as any[]);
+        const { remaining: remainingPending } = mergePendingDeposits(apiTransactions as any[], userAddress);
         
         const typeFilter = (outcome: string | undefined, pendingType?: string) => {
           if (!selectedType) return true;
@@ -92,7 +94,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
     };
 
     loadTransactions();
-  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, selectedType, depositRefreshKey]);
+  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, selectedType, depositRefreshKey, userAddress]);
 
   
 
