@@ -167,6 +167,18 @@ spec = describe "stake-weighted consensus" $ do
       _round (_view two) `shouldBe` 5
       _sequence (_view two) `shouldBe` 10
 
+    it "passes on a validator's higher-round COMMIT after its PREPARE, below the catch-up line" $ do
+      let third = Address 0xdef
+          ckpt3 = Checkpoint (View 0 10) [Validator me, Validator other, Validator third] (Just zeroHash) [] 0
+          ctx3 = (newContext "test" 1 ckpt3 (Just me) True Nothing 15) {_productionAuth = False}
+      (out, ctx) <- runWith ctx3 $ do
+        a <- sendMessages [IMsg (MsgAuth other dummySig) (Prepare (View 5 10) zeroHash)]
+        b <- sendMessages [IMsg (MsgAuth other dummySig) (Commit (View 5 10) zeroHash dummySig)]
+        (,) (a ++ b) <$> get
+      _round (_view ctx) `shouldBe` 0
+      [() | OMsg _ (Prepare (View 5 10) _) <- out] `shouldBe` [()]
+      [() | OMsg _ (Commit (View 5 10) _ _) <- out] `shouldBe` [()]
+
   describe "stake bookkeeping" $ do
     it "applies stake updates and drops removed validators on commit" $ do
       let hdr = v3 [] [] 0 [Validator other] [(Validator me, 5), (Validator other, 9)]

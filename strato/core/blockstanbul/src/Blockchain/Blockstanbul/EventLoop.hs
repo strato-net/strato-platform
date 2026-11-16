@@ -327,17 +327,16 @@ applyValidatorChanges hdr = do
 noteCatchUp :: StateMachineM m => MsgAuth -> View -> TrustedMessage -> ConduitM InEvent EOutEvent m ()
 noteCatchUp auth v' msg = do
   let rn = _round v'
-  seen <- use $ catchUpVotes . at rn
-  case S.member (Validator $ sender auth) <$> seen of
-    Just True -> pure ()
-    _ -> do
-      yieldL $ OMsg auth msg
-      votes <- catchUpVotes <%= M.alter (Just . S.insert (Validator $ sender auth) . fromMaybe S.empty) rn
-      weights <- gets currentVoteWeights
-      let voters = fromMaybe S.empty $ M.lookup rn votes
-      when (hasMinority weights voters) $ do
-        $logInfoS "blockstanbul/roundchange" . T.pack $ printf "Catching up to round %s on a certificate" (show rn)
-        nextRound (Round rn)
+  -- Every such message is passed on, a validator's COMMIT after its PREPARE
+  -- included: peers may need it for their quorum, and p2p never resends a
+  -- message it has seen. The sender set only counts weight toward catching up.
+  yieldL $ OMsg auth msg
+  votes <- catchUpVotes <%= M.alter (Just . S.insert (Validator $ sender auth) . fromMaybe S.empty) rn
+  weights <- gets currentVoteWeights
+  let voters = fromMaybe S.empty $ M.lookup rn votes
+  when (hasMinority weights voters) $ do
+    $logInfoS "blockstanbul/roundchange" . T.pack $ printf "Catching up to round %s on a certificate" (show rn)
+    nextRound (Round rn)
 
 commitBlock :: StateMachineM m =>
                Block -> ConduitM InEvent EOutEvent m ()
