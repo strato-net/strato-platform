@@ -688,10 +688,16 @@ buildFromMiningCache = do
   let parentHash = B.bestBlockSHA cache
   let parentHeader = B.bestBlockHeader cache
   let stateRoot = B.lastExecutedStateRoot cache
+  -- Stand on the state the cached transactions left. A caller that ran nothing
+  -- new stands somewhere else: on the parent's state (makeNewBlock with nothing
+  -- promoted) or on a discarded run's. The block is sealed with the root the node
+  -- stands on (buildRewardedBlockHeader), and from the fork its set and weight
+  -- changes are read there too, so a candidate built from anywhere else carries
+  -- the transactions without their state and is rejected.
+  startFromStateRoot stateRoot
   -- The set and weights in force for the block being built are the parent's with
   -- its changes applied. From the fork the block's own changes are read from
-  -- governance's storage as the last run left it, which is the state root this
-  -- block is sealed with (see buildRewardedBlockHeader).
+  -- governance's storage as the last run left it.
   let (inForce, inForceStakes) = validatorsAndStakesInForceAfter parentHeader
   (vDelt, sDelt) <- blockConsensusDeltas (number parentHeader + 1) inForce inForceStakes (B.lastExecutedTxs cache)
   let txs = (trrTransaction <$> B.lastExecutedTxs cache) ++ (DL.toList $ B.privateHashes cache)
