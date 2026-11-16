@@ -113,11 +113,19 @@ isBlockRewardReceiptForkActive blockNum =
 -- block's first transaction the same way.
 --
 -- Proposer and verifier both derive the header's deltas from those results, so
--- they have to start carrying these calls' at the same block. Helium has
--- blocks sealed without them and needs a height of its own; upquark switches
+-- they have to start carrying these calls' at the same block. Upquark switches
 -- with staking, the flag day it already has.
+--
+-- Helium switches where it starts reading the set and weights from state
+-- (heliumConsensusFromStateForkBlock): the first block every validator can
+-- apply a new rule at. The height here was 1,000,000, but helium passed that
+-- block on builds without this rule and has sealed blocks without it since.
+-- Block 1,000,587 jailed and removed a validator while paying a fee, and its
+-- header carries no removal, so a node holding the rule from 1,000,000 cannot
+-- verify it. From the state read on, the header's changes no longer come from
+-- events, and this rule has nothing left to decide on helium.
 heliumFeeConsensusDeltaForkBlock :: Integer
-heliumFeeConsensusDeltaForkBlock = 1000000
+heliumFeeConsensusDeltaForkBlock = heliumConsensusFromStateForkBlock
 
 forktestFeeConsensusDeltaForkBlock :: Integer
 forktestFeeConsensusDeltaForkBlock = forkNotScheduled
