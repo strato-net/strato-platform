@@ -190,6 +190,10 @@ contract  StratoStaking is Ownable {
     uint256 public stakeDelayGeneration;
     // validator => window => stake that arrived behind it in that window
     mapping(address => mapping(uint256 => uint256)) public pendingWeight;
+    // validator => window => matured DELEGATED stake that LEFT it in that window, kept in
+    // the published weight for the delay (symmetric with pendingWeight on arrivals), so a
+    // withdrawal cannot drop a validator's vote in the same block it is made.
+    mapping(address => mapping(uint256 => uint256)) public pendingRemoval;
     // delegator => validator => the delegator's two most recent windows of arrivals
     mapping(address => mapping(address => PendingStake)) public pendingStakeOf;
     // validator => the same for its operator's bond
@@ -499,12 +503,36 @@ contract  StratoStaking is Ownable {
         return waiting;
     }
 
-    // What a validator votes with: its stake less what is still waiting. This is the
-    // weight published to governance and the one seats are compared by.
+    // Matured delegated stake that left a validator in the current window or the one
+    // before it, still counted in its published weight until it ages out (symmetric with
+    // _unmatured on arrivals). Keeps a withdrawal from dropping the vote in the same block.
+    function _pendingRemoval(address validator) internal view returns (uint256) {
+        if (stakeDelaySeconds == 0) return 0;
+        uint256 w = _window();
+        uint256 lingering = pendingRemoval[validator][w];
+        if (w > 0) lingering += pendingRemoval[validator][w - 1];
+        return lingering;
+    }
+
+    // What a validator votes with: its stake less what is still waiting, plus matured
+    // stake that has recently left and has not yet aged out. This is the weight published
+    // to governance and the one seats are compared by. Arrivals wait to count and
+    // departures wait to stop counting, so a block's withdrawals cannot move the vote.
     function _votingWeight(address validator) internal view returns (uint256) {
         uint256 weight = _validatorWeight(operators[validator]);
         uint256 waiting = _unmatured(validator);
-        return waiting >= weight ? 0 : weight - waiting;
+        uint256 base = waiting >= weight ? 0 : weight - waiting;
+        return base + _pendingRemoval(validator);
+    }
+
+    // How much matured delegated stake leaving `validator` should linger in the vote: the
+    // part of `amount` that was not itself still waiting (waiting stake never counted, so
+    // removing it costs the vote nothing). Call after the pending drop.
+    function _creditRemoval(address validator, uint256 amount, uint256 waitingBefore, uint256 waitingAfter) internal {
+        if (stakeDelaySeconds == 0) return;
+        uint256 consumedWaiting = waitingBefore - waitingAfter;
+        uint256 maturedLeaving = amount - consumedWaiting;
+        if (maturedLeaving > 0) pendingRemoval[validator][_window()] += maturedLeaving;
     }
 
     function votingWeight(address validator) external view returns (uint256) {
@@ -639,14 +667,47 @@ contract  StratoStaking is Ownable {
     // weights governance holds, which are the ones consensus counts. This contract's own
     // figures can run ahead of them: stake that has finished waiting counts here at once
     // and in consensus from the validator's next sync.
+    // The weight consensus would actually count for a validator: the greater of what
+    // governance has published and what it votes with now (matured stake, including any
+    // lingering departure). Published weight can lag, and anyone can republish it with
+    // syncValidator, so reading only it lets a holder hide stake it already controls.
+    function _alarmWeight(address validator) internal view returns (uint256) {
+        uint256 published = governance == address(0) ? 0 : IStakingGovernance(governance).validatorStake(validator);
+        uint256 voting = _votingWeight(validator);
+        return voting > published ? voting : published;
+    }
+
+    // Sum of the published weights of the current consensus set.
+    function _publishedSetWeight() internal view returns (uint256 total) {
+        if (governance != address(0)) {
+            uint256 members = IStakingGovernance(governance).validatorCount();
+            for (uint256 i = 0; i < members; i++) {
+                total += IStakingGovernance(governance).validatorStake(IStakingGovernance(governance).validators(i));
+            }
+        }
+    }
+
+    // More than a third of the vote: can stall a stake-weighted quorum. Measured on the
+    // greater of each validator's published and actual voting weight, so matured stake that
+    // has not been republished, or a waiter's weight, still trips it instead of the alarm
+    // firing only once the jump is already published.
     function exceedsOneThird(address validator) external view returns (bool) {
         if (governance == address(0)) return false;
-        uint256 total = 0;
-        uint256 members = IStakingGovernance(governance).validatorCount();
-        for (uint256 i = 0; i < members; i++) {
-            total += IStakingGovernance(governance).validatorStake(IStakingGovernance(governance).validators(i));
-        }
-        return IStakingGovernance(governance).validatorStake(validator) * 3 > total;
+        uint256 total = _publishedSetWeight();
+        uint256 published = IStakingGovernance(governance).validatorStake(validator);
+        uint256 weight = _alarmWeight(validator);
+        // total already holds `published` for a seated validator; if the real weight is
+        // higher (or the validator is a waiter, published 0), count the higher figure.
+        uint256 denom = total + (weight > published ? weight - published : 0);
+        return weight * 3 > denom;
+    }
+
+    // Would seating `candidate` (a waiter not yet in the set) give it more than a third of
+    // the resulting set's vote? Lets a caller check before reconcileSet / tryActivate.
+    function wouldSeatingCrossOneThird(address candidate) external view returns (bool) {
+        uint256 weight = _alarmWeight(candidate);
+        if (weight == 0) return false;
+        return weight * 3 > _publishedSetWeight() + weight;
     }
 
     function effectiveCap() public view returns (uint256) {
@@ -1286,7 +1347,11 @@ contract  StratoStaking is Ownable {
         delegatedStake[delegator][fromValidator] -= amount;
         operators[fromValidator].delegatedStake -= amount;
         if (operators[fromValidator].active) totalRewardableStake -= amount;
+        uint256 waitingBefore = _waiting(pendingStakeOf[delegator][fromValidator]);
         _dropPending(pendingStakeOf[delegator][fromValidator], fromValidator, amount);
+        // Mirror the arrival's wait: when the arrival counts only after a delay, the
+        // departure keeps counting for the same delay, so a move cannot move the vote now.
+        if (waits) _creditRemoval(fromValidator, amount, waitingBefore, _waiting(pendingStakeOf[delegator][fromValidator]));
 
         delegatedStake[delegator][toValidator] += amount;
         operators[toValidator].delegatedStake += amount;
@@ -1363,7 +1428,9 @@ contract  StratoStaking is Ownable {
         operators[validator].delegatedStake -= amount;
         totalUserStake -= amount;
         if (operators[validator].active) totalRewardableStake -= amount;
+        uint256 waitingBefore = _waiting(pendingStakeOf[msg.sender][validator]);
         _dropPending(pendingStakeOf[msg.sender][validator], validator, amount);
+        _creditRemoval(validator, amount, waitingBefore, _waiting(pendingStakeOf[msg.sender][validator]));
 
         uint256 requestId = _createUnbondRequest(msg.sender, amount);
 
