@@ -4,6 +4,7 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { authorizationDigest, findOperatedValidator, mapRegistryRevert, profileText, splitSignature } from "./stakingAuthorization";
 import { StratoError } from "../../errors/StratoError";
 import { StratoPaths, constants } from "../../config/constants";
+import { networkId } from "../../config/config";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import { castVoteOnIssue } from "./user.service";
@@ -197,6 +198,7 @@ export type ValidatorProfileInput = {
 };
 
 export type StratoAuthorizationDigest = {
+  chainId: string;
   registry: string;
   validator: string;
   operator: string;
@@ -1895,8 +1897,8 @@ export const claimStratoOperatorFeeRewards = async (
 // ---- validator lifecycle (operator / permissionless) ----
 
 // The registry's operator-authorization message: keccak256 over the packed encoding of the
-// prefix, registry, validator, operator and uint256 nonce, with no signed-message prefix
-// (ValidatorRegistry.authorizationDigest); see stakingAuthorization.ts.
+// prefix, uint256 chain id, registry, validator, operator and uint256 nonce, with no
+// signed-message prefix (ValidatorRegistry.authorizationDigest); see stakingAuthorization.ts.
 
 export const getStratoAuthorizationDigest = async (
   accessToken: string,
@@ -1907,6 +1909,8 @@ export const getStratoAuthorizationDigest = async (
   const validatorAddress = requireValidatorArg(validator);
   const operatorAddress = normalizeAddress(operator);
   if (!isNormalizedAddress(operatorAddress)) throw badRequest("operator is required");
+  if (!networkId) throw new Error("Network ID is not configured");
+  const chainId = BigInt(networkId);
   await requireV2(accessToken);
 
   // Read fresh: every register/setOperator spends the nonce, and a digest over a spent
@@ -1915,11 +1919,12 @@ export const getStratoAuthorizationDigest = async (
   const nonce = parseBigIntLike(addressKeyed(registryState.authorizationNonce).get(validatorAddress));
 
   return {
+    chainId: chainId.toString(),
     registry,
     validator: validatorAddress,
     operator: operatorAddress,
     nonce: nonce.toString(),
-    digest: authorizationDigest(registry, validatorAddress, operatorAddress, nonce),
+    digest: authorizationDigest(chainId, registry, validatorAddress, operatorAddress, nonce),
   };
 };
 

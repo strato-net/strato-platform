@@ -13,8 +13,9 @@ router.get("/info/public", authHandler.authorizeRequest(true), StakingController
  *   get:
  *     summary: Digest a validator key must sign to authorize an operator
  *     description: >
- *       keccak256(abi.encodePacked("STRATO validator operator authorization", registry, validator,
- *       operator, authorizationNonce[validator])). Read fresh on every call: the nonce moves each time
+ *       keccak256(abi.encodePacked("STRATO validator operator authorization", chainId, registry,
+ *       validator, operator, authorizationNonce[validator])), where chainId is the network ID
+ *       (SolidVM's block.chainid). Read fresh on every call: the nonce moves each time
  *       a consent is consumed, and a signature over a stale digest is rejected by the registry.
  *       Validator hosts normally produce the signature with `strato-authorize-operator`, which
  *       computes the same digest locally.
@@ -38,6 +39,7 @@ router.get("/info/public", authHandler.authorizeRequest(true), StakingController
  *             schema:
  *               type: object
  *               properties:
+ *                 chainId:   { type: string, description: Network ID (block.chainid), decimal string }
  *                 registry:  { type: string, description: ValidatorRegistry proxy address }
  *                 validator: { type: string }
  *                 operator:  { type: string }

@@ -33,14 +33,15 @@ NETWORKS = {
     "helium": {"api": "https://app.testnet.strato.nexus"},
     "upquark": {"api": "https://app.strato.nexus"},
 }
-# Pinned by tests/Staking/ValidatorRegistry.test.sol: digest for registry 0x11..11,
-# validator 0xf39F..2266, operator 0x22..22, nonce 7.
+# Pinned by tests/Staking/ValidatorRegistry.test.sol: digest for chain id 114784819836269
+# (helium), registry 0x11..11, validator 0xf39F..2266, operator 0x22..22, nonce 7.
 SELF_TEST = (
+    114784819836269,
     "1111111111111111111111111111111111111111",
     "f39fd6e51aad88f6f4ce6ab8827279cfffb92266",
     "2222222222222222222222222222222222222222",
     7,
-    "b40f7746740b70994c96fae88ae656ddfaf42a06872675fdde41dbee73e79bd3",
+    "ba7b553d0f1ae8dada79984723ddf311b90c9d0e84c6eb16a19445aa557d0d27",
 )
 TIMEOUT = 30
 
@@ -92,11 +93,11 @@ def keccak256(data: bytes) -> bytes:
     return b"".join(state[i % 5][i // 5].to_bytes(8, "little") for i in range(4))
 
 
-def authorization_digest(registry: str, validator: str, operator: str, nonce: int) -> bytes:
-    """keccak256(abi.encodePacked(PREFIX, registry, validator, operator, uint256 nonce))."""
-    preimage = PREFIX + bytes.fromhex(registry) + bytes.fromhex(validator) + bytes.fromhex(operator) \
-        + nonce.to_bytes(32, "big")
-    assert len(preimage) == 131
+def authorization_digest(chain_id: int, registry: str, validator: str, operator: str, nonce: int) -> bytes:
+    """keccak256(abi.encodePacked(PREFIX, uint256 chain_id, registry, validator, operator, uint256 nonce))."""
+    preimage = PREFIX + chain_id.to_bytes(32, "big") + bytes.fromhex(registry) + bytes.fromhex(validator) \
+        + bytes.fromhex(operator) + nonce.to_bytes(32, "big")
+    assert len(preimage) == 163
     return keccak256(preimage)
 
 
@@ -216,6 +217,11 @@ def step1_read_node_files(args):
     network = ethconf.get("networkConfig", {}).get("network", "")
     if not vault_url:
         die(3, f"{ethconf_path} has no urlConfig.vaultUrl")
+    # The digest carries the chain id the registry reads (SolidVM's block.chainid), which is
+    # this node's network ID.
+    network_id = ethconf.get("networkConfig", {}).get("networkID", "")
+    if not re.fullmatch(r"\d+", network_id):
+        die(3, f"{ethconf_path} has no networkConfig.networkID")
     if not vault_url.endswith(VAULT_API_PATH):
         vault_url += VAULT_API_PATH
     if not network and not (args.api_url and args.registry):
@@ -227,7 +233,7 @@ def step1_read_node_files(args):
     return {
         "node_dir": node_dir, "creds_path": creds_path, "discovery_url": creds["discoveryUrl"],
         "client_id": creds["clientId"], "client_secret": creds["clientSecret"],
-        "vault_url": vault_url, "network": network or "(custom)", "api": api,
+        "vault_url": vault_url, "network": network or "(custom)", "chain_id": int(network_id), "api": api,
     }
 
 
@@ -303,7 +309,7 @@ def step4_registry_state(ctx):
 
 
 def step5_digest(ctx):
-    ctx["digest"] = authorization_digest(ctx["registry"], ctx["validator"], ctx["operator"], ctx["nonce"]).hex()
+    ctx["digest"] = authorization_digest(ctx["chain_id"], ctx["registry"], ctx["validator"], ctx["operator"], ctx["nonce"]).hex()
 
 
 def step6a_chain_check(ctx):
@@ -328,7 +334,8 @@ def step6a_chain_check(ctx):
     if chain != ctx["digest"]:
         die(7, "the deployed registry computes a different digest than this script "
                f"(chain {chain[:16]}…, local {ctx['digest'][:16]}…). Most likely its logic predates the "
-               "nonce fix (design-documents/handoff-registry-digest-drops-unwritten-nonce.md); ask the admins "
+               "chain id in the digest, or the nonce fix before it "
+               "(design-documents/handoff-registry-digest-drops-unwritten-nonce.md); ask the admins "
                "to swap the registry logic before using signed authorizations.")
 
 
@@ -430,8 +437,8 @@ def step8_print(ctx):
 
 
 def self_test():
-    reg, val, op, nonce, expect = SELF_TEST
-    if authorization_digest(reg, val, op, nonce).hex() != expect:
+    chain_id, reg, val, op, nonce, expect = SELF_TEST
+    if authorization_digest(chain_id, reg, val, op, nonce).hex() != expect:
         die(9, "Keccak self-test failed; refusing to sign anything")
 
 

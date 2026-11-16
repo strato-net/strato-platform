@@ -302,6 +302,24 @@ contract Describe_MercataGovernance {
         require(gov.isValidator(v1), "staking can add it once the pin is cleared");
     }
 
+    // Clearing a pin in hands the seat to staking, even one staking never managed, so staking
+    // may take it over and remove it. A validator outside the set is handed nothing.
+    function it_hands_a_cleared_seat_to_staking() public {
+        gov.seedAdmin(address(this));
+        _add(staking, v1, 5);
+        gov.voteToAddValidator(v2);
+        require(gov.isValidator(v2) && !gov.stakingManaged(v2), "seated by the pin alone");
+
+        gov.voteToClearValidatorPin(v2);
+        require(gov.isValidator(v2) && gov.stakingManaged(v2), "still seated, now staking's");
+        bool removed = staking.doSuccessfully(address(gov), "removeValidatorFromStaking(address)", v2);
+        require(removed, "staking can remove it");
+
+        gov.voteToRemoveValidator(v3);
+        gov.voteToClearValidatorPin(v3);
+        require(!gov.stakingManaged(v3), "clearing a pin out hands over nothing");
+    }
+
     // A kick removes a validator whatever its pin or staking say, and drops a pin in.
     function it_removes_kicked_validators_over_a_pin() public {
         gov.seedAdmin(address(this));

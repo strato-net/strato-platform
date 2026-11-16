@@ -271,6 +271,11 @@ contract record MercataGovernance is Ownable {
             } else if (direction == VOTE_OUT) {
                 pinOut(proposedValidator);
             } else {
+                // A seat held by a pin in goes to staking, which applies its rules from its
+                // next sync. Staking takes no listed seat it was not handed.
+                if (pinnedIn[proposedValidator] && validatorMap[proposedValidator] > 0) {
+                    stakingManaged[proposedValidator] = true;
+                }
                 pinnedIn[proposedValidator] = false;
                 pinnedOut[proposedValidator] = false;
                 emit ValidatorPinCleared(proposedValidator);

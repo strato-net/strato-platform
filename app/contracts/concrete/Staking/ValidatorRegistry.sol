@@ -82,10 +82,12 @@ contract ValidatorRegistry is Ownable {
 
     // What a validator key signs to make `operator` its operator. Plain keccak256 over the
     // packed encoding with no message prefix, because a node's vault signs a raw 32-byte
-    // hash. The registry address scopes a signature to one network's registry and the nonce
-    // makes it single use.
-    function authorizationDigest(address registry, address validator, address operator, uint256 nonce) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked("STRATO validator operator authorization", registry, validator, operator, nonce));
+    // hash. The chain id and registry address scope a signature to one network's registry
+    // (a network started from a copy of another's state has the same registry address and
+    // validator keys) and the nonce makes it single use. SolidVM's block.chainid is the
+    // network ID, the networkID that /eth/v1.2/metadata reports, not the EIP-155 chain id.
+    function authorizationDigest(uint256 chainId, address registry, address validator, address operator, uint256 nonce) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked("STRATO validator operator authorization", chainId, registry, validator, operator, nonce));
     }
 
     function operatorAuthorizationDigest(address validator, address operator) public view returns (bytes32) {
@@ -93,7 +95,13 @@ contract ValidatorRegistry is Ownable {
         // abi.encodePacked as zero bytes, not as uint256(0), which dropped the nonce from the
         // digest of every validator that had not yet consented, so no first signature could
         // verify. Not redundant.
-        return authorizationDigest(address(this), validator, operator, authorizationNonce[validator] + 0);
+        return authorizationDigest(_chainId(), address(this), validator, operator, authorizationNonce[validator] + 0);
+    }
+
+    // Virtual for the contract test runner: it runs on no network and reports a chain id of
+    // -1, which no uint256 holds.
+    function _chainId() internal view virtual returns (uint256) {
+        return block.chainid;
     }
 
     // Accepts v as a recovery id (0/1) or in the 27/28 form.
