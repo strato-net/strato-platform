@@ -52,6 +52,23 @@ segments :: FilePath -> IO [FilePath]
 segments dir = filter isSegment <$> listDirectory (dir </> "events")
   where isSegment f = length f == 8 && not (".idx" `isSuffixOf` f)
 
+-- | Consume a group's first batch and stop on the second, which runConsume
+-- leaves unconsumed; the size of the first batch. The topic must hold more
+-- than one batch, or this waits for one.
+consumeFirstBatch :: ConsumerGroup -> StreamM '[] Int
+consumeFirstBatch group = do
+  first <- liftIO $ newIORef Nothing
+  runConsume group topic $ \xs -> liftIO . atomicModifyIORef' first $ \seen -> case seen of
+    Nothing -> (Just (length (xs :: [(Int, BS.ByteString)])), Nothing)
+    Just n -> (Just n, Just n)
+
+-- | Consume everything on the topic: runConsume creates the group and stops
+-- on its first batch without consuming it, then the drain consumes it all.
+consumeAll :: ConsumerGroup -> StreamM '[] ()
+consumeAll group = do
+  runConsume group topic $ \(_ :: [(Int, BS.ByteString)]) -> return (Just ())
+  void $ drainConsumerGroup group topic (\(_ :: [(Int, BS.ByteString)]) -> return ())
+
 main :: IO ()
 main = hspec $ do
   describe "drainConsumerGroup" $ do
@@ -60,16 +77,13 @@ main = hspec $ do
         inStream dir $ do
           createTopicAndWait topic
           void $ produceItems topic (map message [1 .. total])
-          -- lag stops after its first batch, in the first segment; lead then
+          -- lag consumes its first batch, in the first segment; lead then
           -- consumes everything. lag's checkpoint is what keeps the first
           -- segment on disk once lead has passed it, as the old SQL group's
           -- did on a 19.6 node.
-          lagFirst <- runConsume "lag" topic $ \xs -> return (Just (length (xs :: [(Int, BS.ByteString)])))
+          lagFirst <- consumeFirstBatch "lag"
           liftIO $ lagFirst `shouldSatisfy` (\n -> n > 0 && n < total)
-          seen <- liftIO $ newIORef (0 :: Int)
-          runConsume "lead" topic $ \xs -> do
-            n <- liftIO $ atomicModifyIORef' seen (\k -> (k + length (xs :: [(Int, BS.ByteString)]), k + length xs))
-            return $ if n >= total then Just () else Nothing
+          consumeAll "lead"
         segsBefore <- segments dir
         length segsBefore `shouldSatisfy` (>= 2)
         inStream dir $ do
@@ -98,11 +112,8 @@ main = hspec $ do
         inStream dir $ do
           createTopicAndWait topic
           void $ produceItems topic (map message [1 .. total])
-          lagFirst <- runConsume "lag" topic $ \xs -> return (Just (length (xs :: [(Int, BS.ByteString)])))
-          seen <- liftIO $ newIORef (0 :: Int)
-          runConsume "lead" topic $ \xs -> do
-            n <- liftIO $ atomicModifyIORef' seen (\k -> (k + length (xs :: [(Int, BS.ByteString)]), k + length xs))
-            return $ if n >= total then Just () else Nothing
+          lagFirst <- consumeFirstBatch "lag"
+          consumeAll "lead"
           -- lag exists: untouched, its backlog is still there.
           copied <- seedConsumerGroupFrom "lag" "lead" topic
           liftIO $ copied `shouldBe` False
@@ -118,11 +129,8 @@ main = hspec $ do
         firstSeg <- inStream dir $ do
           createTopicAndWait topic
           void $ produceItems topic (map message [1 .. total])
-          void $ runConsume "lag" topic $ \xs -> return (Just (length (xs :: [(Int, BS.ByteString)])))
-          seen <- liftIO $ newIORef (0 :: Int)
-          runConsume "lead" topic $ \xs -> do
-            n <- liftIO $ atomicModifyIORef' seen (\k -> (k + length (xs :: [(Int, BS.ByteString)]), k + length xs))
-            return $ if n >= total then Just () else Nothing
+          void $ consumeFirstBatch "lag"
+          consumeAll "lead"
           segs <- liftIO $ segments dir
           return $ dir </> "events" </> minimum segs
         -- The segment lag's backlog starts in becomes unreadable.
