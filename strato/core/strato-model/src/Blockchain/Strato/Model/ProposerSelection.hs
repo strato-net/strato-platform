@@ -15,6 +15,7 @@ module Blockchain.Strato.Model.ProposerSelection
     selectionSeed,
     proportionalSelectionActive,
     heliumProportionalSelectionBlock,
+    forktestProportionalSelectionBlock,
     weightedPoint,
   )
 where
@@ -39,16 +40,27 @@ type StakeMap = M.Map Validator Integer
 heliumProportionalSelectionBlock :: Integer
 heliumProportionalSelectionBlock = 1200000
 
+-- | Forktest, the rehearsal network, also has blocks sealed under the first
+-- rule, so it switches at a height too. A placeholder just past its idle tip
+-- (block 1196 on 16 November 2026): the network only makes blocks when driven,
+-- so it reaches the height when a rehearsal takes it there. Shared with
+-- forktestConsensusFromStateForkBlock in Blockchain.Forks (vm-tools).
+forktestProportionalSelectionBlock :: Integer
+forktestProportionalSelectionBlock = 1500
+
 -- | Is the proportional pick ('weightedPoint') in force for a block?
 --
--- It is everywhere except on helium below its switch height. Upquark needs no
+-- It is everywhere except on helium and forktest below their switch heights:
+-- the two networks with blocks sealed under the first rule. Upquark needs no
 -- height of its own: stake-weighted selection starts there with the staking
 -- fork, so the first rule never produces a block on it.
 proportionalSelectionActive :: Integer -> Integer -> Bool
 proportionalSelectionActive chainId height =
-  not (chainId == heliumNetworkID && height < heliumProportionalSelectionBlock)
+  not $ (chainId == heliumNetworkID && height < heliumProportionalSelectionBlock)
+         || (chainId == forktestNetworkID && height < forktestProportionalSelectionBlock)
   where
     heliumNetworkID = 114784819836269
+    forktestNetworkID = 7381244120123405172
 
 -- | The point on the line of cumulative stake, in @[0, total)@, that a seed
 -- picks. @total@ must be positive.

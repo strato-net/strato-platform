@@ -158,8 +158,10 @@ isFeeConsensusDeltaForkActive blockNum =
 heliumConsensusFromStateForkBlock :: Integer
 heliumConsensusFromStateForkBlock = 1200000
 
+-- A placeholder for the rehearsal network: just past its idle tip, and the same
+-- height as forktestProportionalSelectionBlock in strato-model.
 forktestConsensusFromStateForkBlock :: Integer
-forktestConsensusFromStateForkBlock = forkNotScheduled
+forktestConsensusFromStateForkBlock = 1500
 
 isConsensusFromStateForkActive :: Integer -> Bool
 isConsensusFromStateForkActive blockNum =

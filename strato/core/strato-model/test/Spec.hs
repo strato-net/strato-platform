@@ -122,10 +122,20 @@ spec = do
       weightedPoint False heliumSeed heliumTotal `shouldBe` 54863233632135708174857
       run helium 1172041 heliumVals heliumStakes 27818 27818 `shouldBe` Validator 0xf1e4082464ff5c399e43f2c9177904db9547d6a2
 
+    it "keeps the first rule on forktest below its switch height too" $ do
+      -- forktest block 1196: round 1, no round change, sealed by 0c4cecae...
+      let forktest = 7381244120123405172 :: Integer
+          fvals = [0x0c4cecae296c33f71f9a6e6fb57f418f9d5f7e82, 0xbdd3fe1b9a87a88cff8259528c0a4d6464625713, 0xebcd85c4212e53a2546cbcea765c1de531b14fb1, 0xf1e4082464ff5c399e43f2c9177904db9547d6a2] :: [Address]
+          fstakes = zip fvals [10998000000000000000000, 10500000000000000000000, 10500000000000000000000, 10500000000000000000000]
+      proportionalSelectionActive forktest 1196 `shouldBe` False
+      run forktest 1196 fvals fstakes 1 1 `shouldBe` Validator 0x0c4cecae296c33f71f9a6e6fb57f418f9d5f7e82
+
     it "switches helium at its height and is in force everywhere else from the start" $ do
       proportionalSelectionActive helium (heliumProportionalSelectionBlock - 1) `shouldBe` False
       proportionalSelectionActive helium heliumProportionalSelectionBlock `shouldBe` True
       proportionalSelectionActive 33056204878082667 2000000 `shouldBe` True
+      proportionalSelectionActive 7381244120123405172 (forktestProportionalSelectionBlock - 1) `shouldBe` False
+      proportionalSelectionActive 7381244120123405172 forktestProportionalSelectionBlock `shouldBe` True
       proportionalSelectionActive 1 0 `shouldBe` True
 
     it "takes the seed's fraction of the total" $ do
