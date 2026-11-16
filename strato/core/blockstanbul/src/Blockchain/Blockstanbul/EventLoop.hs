@@ -334,7 +334,8 @@ noteCatchUp auth v' msg = do
   votes <- catchUpVotes <%= M.alter (Just . S.insert (Validator $ sender auth) . fromMaybe S.empty) rn
   weights <- gets currentVoteWeights
   let voters = fromMaybe S.empty $ M.lookup rn votes
-  when (hasMinority weights voters) $ do
+  chainId' <- use chainId
+  when (toInteger (_sequence v') + 1 >= wholeMessageSigningBlock chainId' && hasMinority weights voters) $ do
     $logInfoS "blockstanbul/roundchange" . T.pack $ printf "Catching up to round %s on a certificate" (show rn)
     nextRound (Round rn)
 
