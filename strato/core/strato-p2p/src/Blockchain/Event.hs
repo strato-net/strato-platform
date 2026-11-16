@@ -24,8 +24,9 @@ module Blockchain.Event
 where
 
 import           BlockApps.Logging
-import           Blockchain.Blockstanbul               (WireMessage,
-                                                        blockstanbulSender)
+import           Blockchain.Blockstanbul.Authentication (authenticate, bodyMatchesHeader, verifyCommitmentSeal)
+import           Blockchain.Blockstanbul.Messages      (InEvent (IMsg), TrustedMessage (Commit, Preprepare), WireMessage (..))
+import           Blockchain.Blockstanbul               (blockstanbulSender)
 import           Blockchain.Context
 import           Blockchain.Data.Block
 import qualified Blockchain.Data.BlockHeader           as BlockHeader
@@ -35,12 +36,14 @@ import           Blockchain.Data.Transaction           (Transaction)
 import           Blockchain.Data.TransactionIntake
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
-import           Blockchain.EthConf (ethConf, p2pConfig)
+import           Blockchain.EthConf (ethConf, networkConfig, p2pConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import           Blockchain.EventException
 import           Blockchain.EventModel
 import           Blockchain.HeaderCache
 import           Blockchain.Model.SyncState
+import           Blockchain.Strato.Model.Address        (Address)
+import           Blockchain.Strato.Model.Validator      (Validator (..))
 import           Blockchain.Model.SyncTask
 import           Blockchain.Model.WrappedBlock
 import           Blockchain.Sequencer.Event
@@ -133,7 +136,10 @@ handleEvents :: MonadP2P m => PPeer -> ConduitM Event (Either P2PCNC Message) m 
 handleEvents peer = awaitForever $ \case
   MsgEvt Hello {} -> error "A hello message appeared after the handshake"
   MsgEvt Status {} -> error "A status message appeared after the handshake"
-  MsgEvt Ping -> yieldR Pong
+  MsgEvt Ping -> do
+    lift keepAlive
+    yieldR Pong
+  MsgEvt Pong -> lift keepAlive
   MsgEvt (Transactions txs) -> handleGossipedTransactions nodeIntakeRules peer txs
   MsgEvt (NewBlock block' _) -> do
     lift stampActionTimestamp
@@ -297,32 +303,55 @@ handleEvents peer = awaitForever $ \case
       else do
         yieldR $ GetBlockBodies bodyHashes'
 
-  MsgEvt (Blockstanbul wm) -> do
-    lift $ do
-      stampActionTimestamp
-      setPeerAddrIfUnset $ blockstanbulSender wm
-      peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
-      $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
-    let msgHash = rlpHash wm
-    lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerHost peer, msgHash) Proxy
-    msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
-    if msgExists
-      then
-        $logInfoS "handleEvents/Blockstanbul" . T.pack $
-          concat
-            [ "Already seen inbound wire message ",
-              format msgHash,
-              ". Not forwarding to Sequencer."
-            ]
+  MsgEvt (Blockstanbul wm@(WireMessage auth tm)) -> do
+    -- Only a message signed by a current validator goes further, and at most
+    -- maxPbftMessagesPerSecond per connection, counted before anything is looked
+    -- up or recovered. Anyone can send one, and each would otherwise reach the
+    -- sequencer and push real messages out of the seen-message caches. What the
+    -- signature does not cover must check out as well, or copies altered there
+    -- would pass as new messages: a PREPREPARE's body against its header, and a
+    -- COMMIT's seal against its sender.
+    admitted <- lift admitPbftMessage
+    if not admitted
+      then $logDebugS "handleEvents/Blockstanbul" . T.pack $ "Dropping a consensus message from " ++ peerString peer ++ ": over " ++ show maxPbftMessagesPerSecond ++ " this second"
       else do
-        $logInfoS "handleEvents/Blockstanbul" . T.pack $
-          concat
-            [ "First time seeing inbound wire message ",
-              format msgHash,
-              ". Forwarding to Sequencer."
-            ]
-        lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
-        yieldL $ ToUnseq [IEBlockstanbul wm]
+        validators <- lift $ bestSequencedBlockValidators <$> Mod.get (Proxy @BestSequencedBlock)
+        signed <- authenticate (Conf.networkID $ networkConfig ethConf) (IMsg auth tm)
+        let sender' = blockstanbulSender wm
+            unsignedPartsHold = case tm of
+              Preprepare _ blk -> bodyMatchesHeader blk
+              Commit _ di seal -> (verifyCommitmentSeal di seal :: Either String Address) == Right sender'
+              _ -> True
+        -- Cheapest test first: a sender outside the set costs no signature
+        -- recovery, and no trie rebuild or seal recovery for the unsigned parts.
+        if not (Validator sender' `elem` validators && signed && unsignedPartsHold)
+          then $logDebugS "handleEvents/Blockstanbul" . T.pack $ "Dropping a consensus message from " ++ peerString peer ++ " not signed by a current validator"
+          else do
+            lift $ do
+              stampActionTimestamp
+              setPeerAddrIfUnset $ blockstanbulSender wm
+              peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
+              $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
+            let msgHash = rlpHash wm
+            lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerHost peer, msgHash) Proxy
+            msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
+            if msgExists
+              then
+                $logInfoS "handleEvents/Blockstanbul" . T.pack $
+                  concat
+                    [ "Already seen inbound wire message ",
+                      format msgHash,
+                      ". Not forwarding to Sequencer."
+                    ]
+              else do
+                $logInfoS "handleEvents/Blockstanbul" . T.pack $
+                  concat
+                    [ "First time seeing inbound wire message ",
+                      format msgHash,
+                      ". Forwarding to Sequencer."
+                    ]
+                lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
+                yieldL $ ToUnseq [IEBlockstanbul wm]
 
   -- private chains
   MsgEvt (GetChainDetails _) -> return ()
@@ -453,6 +482,11 @@ handleEvents peer = awaitForever $ \case
         ts <- liftIO getCurrentTime
         let diffTime = ts `diffUTCTime` oldTS
         liftIO $ setTitle $ "timer: " ++ show (fromIntegral (Conf.connectionTimeout (p2pConfig ethConf)) - diffTime)
+        -- An idle chain sends nothing for minutes. Ping a quiet peer from half
+        -- the timeout on, so a live link is kept by its Pong instead of being
+        -- dropped as UselessPeer and backed off for hours.
+        when (diffTime > fromIntegral (Conf.connectionTimeout (p2pConfig ethConf)) / 2) $
+          yieldR Ping
         when (diffTime > fromIntegral (Conf.connectionTimeout (p2pConfig ethConf))) $ do
           yieldR $ Disconnect UselessPeer
           liftIO $ setTitle "timer timed out!"
@@ -464,7 +498,12 @@ handleEvents peer = awaitForever $ \case
   AbortEvt reason -> do
     $logInfoS "handleEvents/AbortEvt" . T.pack $ "Received AbortEvt: " ++ reason
     yieldR $ Disconnect AlreadyConnected
-  event -> liftIO . error $ "unrecognized event: " ++ show event
+
+-- | A Ping or Pong keeps an idle link open, but not one holding a sync task:
+-- that link has to deliver headers or bodies, or time out so the task can go to
+-- another peer. A caught-up link holds none (its last chiliad is marked NotReady).
+keepAlive :: (MonadIO m, Modifiable ActionTimestamp m, HasSyncDB m) => m ()
+keepAlive = getCurrentSyncTask >>= maybe stampActionTimestamp (const $ pure ())
 
 -- | How close to the tip we have to be before gossiped transactions are worth
 -- forwarding to the sequencer.

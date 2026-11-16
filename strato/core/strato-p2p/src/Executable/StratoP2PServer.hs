@@ -71,7 +71,9 @@ ethServerHandler ::
   TCPPort ->
   m ()
 ethServerHandler pSource pSink seqSrc host (TCPPort port) = do
-  let peerStr = "<" ++ hostToString host
+  -- One label per connection: several from one host would otherwise share a
+  -- label and count once against maxConnections.
+  let peerStr = "<" ++ hostToString host ++ ":" ++ show port
   ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow peerStr
   void $ register ender
   p <- getPeerByIP host >>= \case
@@ -108,9 +110,11 @@ ethServerHandler pSource pSink seqSrc host (TCPPort port) = do
           whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
           logAndLengthenPeerDisableBy (fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) p
         e' | Just CurrentlyTooManyPeers <- fromException e' -> do
+          -- Turned away because this node was full: not the peer's doing, so it
+          -- is not backed off.
           disErr <- storeDisableException p (T.pack "CurrentlyTooManyPeers")
           whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-          logAndLengthenPeerDisableBy (fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) p
+          return $ Right ()
         e' | Just NoPeerCertificate <- fromException e' -> do
           disErr <- storeDisableException p (T.pack "NoPeerCertificate")
           whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
