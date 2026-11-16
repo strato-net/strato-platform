@@ -121,11 +121,14 @@ test-suite contextm-test
     , blockDB
     , blockapps-data
     , blockapps-datadefs
+    , blockapps-mpdbs
     , bytestring
+    , composable-monads-base
     , containers
     , ethereum-rlp
     , hflags
     , hspec
+    , monad-alter
     , ordered-containers
     , quickcheck-instances
     , solid-vm-model

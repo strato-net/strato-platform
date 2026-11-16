@@ -122,3 +122,6 @@ tests:
       - ordered-containers
       - quickcheck-instances
       - text
+      - blockapps-mpdbs
+      - composable-monads-base
+      - monad-alter
