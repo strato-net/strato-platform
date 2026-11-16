@@ -108,7 +108,9 @@ tests:
     ghc-options: -Wall -Werror -dynamic
     dependencies:
       - ethereum-discovery
+      - ethereum-encryption
       - ethereum-rlp
       - format
       - hspec
+      - network
       - strato-model

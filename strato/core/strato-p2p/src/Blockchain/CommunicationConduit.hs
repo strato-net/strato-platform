@@ -13,7 +13,9 @@ module Blockchain.CommunicationConduit
     bytesToMessages,
     debounceTxSendsAndUnseq,
     messageToBytes,
-    ethVersion
+    ethVersion,
+    maxMessageItems,
+    rlpItemsAtMost
   )
 where
 
@@ -37,13 +39,14 @@ import           Blockchain.Strato.Model.Util
 import           Blockchain.SyncDB
 import           Blockchain.Threads
 import           Conduit
-import           Control.Monad                         (forever, when)
+import           Control.Monad                         (forever, unless, when)
 import qualified Control.Monad.Change.Modify           as Mod
 import           Crypto.Types.PubKey.ECC
 import           Data.Bits                             (shiftL)
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
 import qualified Data.Conduit.Binary                   as CB
+import           Data.List                             (foldl')
 import           Data.List.Split
 import           Data.Maybe
 import qualified Data.Text                             as T
@@ -253,7 +256,12 @@ getRLPData =
       return $ x `B.cons` rest
     x | x >= 0xF8 && x <= 0xFF -> do
       length' <- cbSafeTake' $ fromIntegral x - 0xF7
-      rest <- cbSafeTake' . fromIntegral . bytes2Integer $ B.unpack length'
+      -- The length is the peer's word, up to eight bytes of it: read no message
+      -- larger than a peer may send.
+      let size = bytes2Integer $ B.unpack length'
+      when (size > toInteger maxMessageSize) . error $
+        "RLP message declares " ++ show size ++ " bytes, over the " ++ show maxMessageSize ++ " byte limit"
+      rest <- cbSafeTake' $ fromInteger size
       return $ x `B.cons` length' `B.append` rest
     x -> error $ "missing case in getRLPData: " ++ show x
 
@@ -262,7 +270,42 @@ bytesToMessages = forever $ do
   msgTypeData <- cbSafeTake' 1
   let word = fromInteger (rlpDecode $ rlpDeserialize msgTypeData :: Integer)
   objBytes <- getRLPData
+  unless (rlpItemsAtMost maxMessageItems objBytes) . error $
+    "RLP message holds more than " ++ show maxMessageItems ++ " items"
   yield $ obj2WireMessage word $ rlpDeserialize objBytes
+
+-- | The most RLP items one inbound message may hold. Decoding builds a heap
+-- object per item, so a message of one-byte items costs many times its size in
+-- memory; within maxMessageSize, real messages hold far fewer items than this.
+maxMessageItems :: Int
+maxMessageItems = 4000000
+
+-- | Whether an RLP encoding holds at most @cap@ items, counted from the item
+-- headers without decoding anything. A list's payload is its items laid end to
+-- end, so one pass over the headers sees every item at every depth. An encoding
+-- that runs past its end stops the count; decoding then reports it.
+rlpItemsAtMost :: Int -> B.ByteString -> Bool
+rlpItemsAtMost cap bs = go 0 0
+  where
+    n = B.length bs
+    byteAt i = fromIntegral (B.index bs i) :: Integer
+    lengthAt i k = foldl' (\acc j -> acc * 256 + byteAt (i + j)) 0 [0 .. k - 1]
+    go :: Int -> Int -> Bool
+    go i items
+      | items > cap = False
+      | i >= n = True
+      | otherwise = case byteAt i of
+          b | b < 0x80 -> go (i + 1) (items + 1)
+            | b <= 0xB7 -> go (i + 1 + fromInteger (b - 0x80)) (items + 1)
+            | b <= 0xBF -> skipLong i (fromInteger $ b - 0xB7) (items + 1)
+            | b <= 0xF7 -> go (i + 1) (items + 1)
+            | otherwise -> go (i + 1 + fromInteger (b - 0xF7)) (items + 1)
+    -- a long string: its payload is skipped, its length bytes read first
+    skipLong i k items
+      | i + 1 + k > n = True
+      | otherwise =
+          let len = lengthAt (i + 1) k
+           in if len > toInteger n then True else go (i + 1 + k + fromInteger len) items
 
 maxMessageSize :: Int
 maxMessageSize = 1 `shiftL` 24

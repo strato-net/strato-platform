@@ -4,9 +4,14 @@
 
 module Blockchain.Strato.Discovery.UDPSpec where
 
+import Blockchain.Data.PubKey (secPubKeyToPoint)
 import Blockchain.Data.RLP
 import Blockchain.Strato.Discovery.Data.Peer (TCPPort (..))
 import Blockchain.Strato.Discovery.UDP
+import Blockchain.Strato.Discovery.UDPServer (keepsHeldKey)
+import Blockchain.Strato.Model.Address (fromPublicKey)
+import Blockchain.Strato.Model.Secp256k1 (derivePublicKey, newPrivateKey)
+import Blockchain.Strato.Model.Validator (Validator (..))
 import Data.Bits
 import Network.Socket (tupleToHostAddress, tupleToHostAddress6)
 import Test.Hspec
@@ -14,6 +19,18 @@ import Text.Format
 
 spec :: Spec
 spec = do
+  describe "keepsHeldKey" $
+    it "keeps a validator's key against a packet signed with another key, and only then" $ do
+      validator <- derivePublicKey <$> newPrivateKey
+      other <- derivePublicKey <$> newPrivateKey
+      let point = secPubKeyToPoint
+          validators = [Validator $ fromPublicKey validator]
+      keepsHeldKey validators (Just $ point validator) (point other) `shouldBe` True
+      keepsHeldKey validators (Just $ point validator) (point validator) `shouldBe` False
+      keepsHeldKey [] (Just $ point validator) (point other) `shouldBe` False
+      keepsHeldKey validators Nothing (point other) `shouldBe` False
+      keepsHeldKey validators (Just $ point other) (point validator) `shouldBe` False
+
   describe "IAddr Format instance" $ do
     it "formats an IPv4 address" $ do
       let addr = tupleToHostAddress (127, 0, 0, 1)

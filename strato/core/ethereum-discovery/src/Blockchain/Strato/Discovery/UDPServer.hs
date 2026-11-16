@@ -11,6 +11,7 @@
 module Blockchain.Strato.Discovery.UDPServer
   ( runEthUDPServer,
     connectMe,
+    keepsHeldKey,
   )
 where
 
@@ -22,8 +23,10 @@ import           Blockchain.Strato.Discovery.P2PUtil
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Host
+import           Blockchain.Strato.Model.Validator          (Validator (..))
 import           Control.Concurrent                       (threadDelay)
-import           Control.Monad                           (forM_, when, unless)
+import           Control.Exception                       (evaluate)
+import           Control.Monad                           (filterM, forM_, when, unless)
 import           Control.Monad.Catch
 import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.Change.Modify             as Mod
@@ -182,7 +185,7 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
           addPeer' otherUdpPort otherTcpPort
           getPeerByIP' ip
         Just p' -> do
-          setPeerPubkey p' otherPubKey
+          adoptPeerKey p' otherPubKey
           updateUdpPort p' otherUdpPort
           updateTcpPort p' otherTcpPort
           return $ Just p'
@@ -204,11 +207,11 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
           addPeer' otherUdpPort (fromMaybe (TCPPort 30303) mOtherTcpPort)
           getPeerByIP' ip
         Just p' -> do
-          setPeerPubkey p' otherPubKey
+          adoptPeerKey p' otherPubKey
           for_ mOtherTcpPort $ updateTcpPort p'
           return $ Just p'
     for_ mPeer' $ \peer -> do
-      setPeerPubkey peer otherPubKey
+      adoptPeerKey peer otherPubKey
       eErr <- resetPeerUdp peer
       whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Pong" . T.pack $ "Unable to reset peer disable: " ++ show err
       eErr' <- setPeerBondingState (pPeerHost peer) otherPubKey 2
@@ -226,10 +229,13 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
       mkEndpoint PPeer {..} = Endpoint (stringToIAddr $ hostToString pPeerHost) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
       mkNodeId = fmap pointToNodeID . pPeerPubkey
   Neighbors neighbors _ -> do
-    let neighborIPs = (\(Neighbor (Endpoint addr' _ _) _) -> format addr') <$> neighbors
     thePeer <- getPeerByIP' ip
-    neighborsExist <- doPeersExist $ map read neighborIPs
-    if neighborsExist
+    -- Neighbors only ever adds peers this node has not heard of. Anyone can send
+    -- the packet, unasked, naming any IP with any node ID: if it could update a
+    -- known peer, one packet would swap a validator's key for a made-up one, and
+    -- the node would dial that validator with the wrong key until a restart.
+    new <- filterM (\(Neighbor (Endpoint addr' _ _) _) -> not <$> doPeersExist [read $ format addr']) neighbors
+    if null new
       then do
         $logInfoS "handleValidPacket/Neighbors" . T.pack $ "Got duplicate neighbors from " ++ show addr ++ ", lengthening peer UDP disable." ++ "\n"
         case thePeer of
@@ -240,8 +246,8 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
             eErr <- lengthenPeerDisable' thePeer'
             whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to disable peer: " ++ show err
       else do
-        forM_ neighbors $ \(Neighbor (Endpoint addr' (UDPPort udpPort) (TCPPort tcpPort)) nodeID) -> do
-          $logDebugS "handleValidPacket/Neighbors" . T.pack $ "Got new neighbors: " ++ show neighbors
+        forM_ new $ \(Neighbor (Endpoint addr' (UDPPort udpPort) (TCPPort tcpPort)) nodeID) -> do
+          $logDebugS "handleValidPacket/Neighbors" . T.pack $ "Got new neighbors: " ++ show new
           peer <- mkPeer (Just $ nodeIDToPoint nodeID) (Host $ T.pack $ format addr') Nothing (UDPPort udpPort) (TCPPort tcpPort)
           addPeer peer
         case thePeer of
@@ -255,6 +261,34 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
     addPeer' udpPort tcpPort = do
       peer <- mkPeer (Just otherPubKey) host (Just ip) udpPort tcpPort
       addPeer peer
+
+-- | Store the key a peer signed a discovery packet with, unless the row holds a
+-- current validator's key and this one differs. A validator's key is its
+-- identity in the set, and a discovery packet proves only that its sender holds
+-- the key it signed with, not that it is the validator at that address: the
+-- source IP of a UDP packet can be forged.
+adoptPeerKey :: MonadDiscovery m => PPeer -> ECC.Point -> m ()
+adoptPeerKey peer key
+  | pPeerPubkey peer == Just key = pure ()
+  | otherwise = do
+      validators <- knownValidators
+      if keepsHeldKey validators (pPeerPubkey peer) key
+        then $logWarnS "adoptPeerKey" . T.pack $ "Keeping validator key for " ++ show (pPeerHost peer) ++ "; a packet signed with another key claimed it"
+        else setPeerPubkey peer key
+
+-- | Whether a peer row keeps the key it holds when a packet arrives signed with
+-- @key@: it does when the held key is a current validator's and @key@ differs.
+keepsHeldKey :: [Validator] -> Maybe ECC.Point -> ECC.Point -> Bool
+keepsHeldKey validators held key = case held of
+  Just h -> h /= key && (Validator . fromPublicKey $ pointToSecPubKey h) `elem` validators
+  Nothing -> False
+
+-- | The validators in force, or none while this node does not know them yet
+-- (no best sequenced block in redis).
+knownValidators :: MonadDiscovery m => m [Validator]
+knownValidators =
+  (Mod.access (Mod.Proxy @[Validator]) >>= \vs -> liftIO (evaluate (length vs)) >> pure vs)
+    `catch` \(_ :: SomeException) -> pure []
 
 getAddrPort :: SockAddr -> Either DiscoverException PortNumber
 getAddrPort (SockAddrInet portNumber _) = Right portNumber

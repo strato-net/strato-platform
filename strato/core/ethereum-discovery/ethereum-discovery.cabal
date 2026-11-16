@@ -135,8 +135,10 @@ test-suite ethereum-discover-test
   build-depends:
       base
     , ethereum-discovery
+    , ethereum-encryption
     , ethereum-rlp
     , format
     , hspec
+    , network
     , strato-model
   default-language: Haskell2010
