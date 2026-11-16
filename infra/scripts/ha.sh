@@ -20,8 +20,8 @@
 #   scripts/ha.sh <env> install                   npm ci in every app
 #   scripts/ha.sh <env> build-ui                  build app/ui and smd-ui for the front door
 #   scripts/ha.sh <env> publish-scripts           node scripts and the cell upgrade and health scripts to the core tier's bucket
-#   scripts/ha.sh <env> first-front-door          an environment without an app tier yet: the front door without the app tier's routes
-#   scripts/ha.sh <env> wait-hostname             wait until the environment's hostname answers as a synced node (HOSTNAME_WAIT_MINUTES, 720, for its DNS record)
+#   scripts/ha.sh <env> first-front-door          the front door where there is no app tier yet (without the app tier's routes) or no front door
+#   scripts/ha.sh <env> wait-hostname             wait until the environment's hostname leads to the front door and answers as a synced node (HOSTNAME_WAIT_MINUTES, 720, for its DNS record)
 #   scripts/ha.sh <env> smoke                     check the deployment through its front door
 #   scripts/ha.sh <env> record <strato> <infra>   record the deployed image set and commits
 #   scripts/ha.sh <env> state                     the commits last deployed
@@ -209,20 +209,26 @@ load_images() {
 
 # The image set strato-platform's autobuild published for the commit checked
 # out at STRATO_PLATFORM_DIR, under the names its Makefile computes (a
-# print-<VAR> rule added from a second makefile); nothing is built. Prints
-# KEY=image lines. A variable the Makefile no longer defines, or an image not
+# print-<VAR> rule added from a second makefile; the node image by its commit
+# alone); nothing is built. Prints KEY=image lines. A variable the Makefile no
+# longer defines, or an image not
 # published, stops here, before anything is deployed. The packages are public,
 # so nothing logs in.
 images() {
   local mk vars registry version entry key name hash image
-  # <KEY>=<image name>:<the Makefile variable holding its content hash>
-  local map="STRATO_IMAGE=strato:HASH_STRATO NGINX_IMAGE=nginx:HASH_NGINX POSTGREST_IMAGE=postgrest:HASH_POSTGREST APEX_IMAGE=apex:HASH_APEX
+  # <KEY>=<image name>:<the Makefile variable holding its content hash>. The
+  # node image has none: it is taken by the tag the autobuild also gives it,
+  # strato:<VERSION> (the Makefile's VERSION names the commit; what strato-up
+  # --prebuilt resolves). Its hash covers tracked .cabal files that a build
+  # regenerates, so the hash the autobuild tagged it with is not always the
+  # one a clean checkout computes.
+  local map="STRATO_IMAGE=strato: NGINX_IMAGE=nginx:HASH_NGINX POSTGREST_IMAGE=postgrest:HASH_POSTGREST APEX_IMAGE=apex:HASH_APEX
     APP_NGINX_IMAGE=app-nginx:HASH_APP_NGINX APP_BACKEND_IMAGE=app-backend:HASH_APP_BACKEND PROMETHEUS_IMAGE=prometheus:HASH_PROMETHEUS"
   [[ -f $STRATO_PLATFORM_DIR/Makefile ]] || die "$STRATO_PLATFORM_DIR has no Makefile; set STRATO_PLATFORM_DIR"
   mk=$(mktemp)
   printf 'print-%%:\n\t@echo $*=$($*)\n' > "$mk"
   vars=$(make -s --no-print-directory -C "$STRATO_PLATFORM_DIR" -f Makefile -f "$mk" print-REPO_GHCR_URL print-VERSION \
-    $(for entry in $map; do echo "print-${entry##*:}"; done)) || { rm -f "$mk"; die "cannot read the image names from $STRATO_PLATFORM_DIR/Makefile"; }
+    $(for entry in $map; do [[ -z ${entry##*:} ]] || echo "print-${entry##*:}"; done)) || { rm -f "$mk"; die "cannot read the image names from $STRATO_PLATFORM_DIR/Makefile"; }
   rm -f "$mk"
   makefile_var() { sed -n "s/^$1=//p" <<<"$vars" | head -1; }
   registry=$(makefile_var REPO_GHCR_URL)
@@ -232,9 +238,12 @@ images() {
   for entry in $map; do
     key=${entry%%=*}
     name=${entry#*=}
-    hash=$(makefile_var "${name##*:}")
-    [[ -n $hash ]] || die "strato-platform's Makefile no longer defines ${name##*:} (for $key)"
-    image=$registry${name%%:*}:$version-$hash
+    image=$registry${name%%:*}:$version
+    if [[ -n ${name##*:} ]]; then
+      hash=$(makefile_var "${name##*:}")
+      [[ -n $hash ]] || die "strato-platform's Makefile no longer defines ${name##*:} (for $key)"
+      image+=-$hash
+    fi
     docker manifest inspect "$image" >/dev/null 2>&1 || die "$image is not published: wait for strato-platform's autobuild of this commit"
     echo "$key=$image"
   done
@@ -656,45 +665,59 @@ cells_replace() {
 # the app tier: each needs the other. So where there is no app tier yet, the
 # front door goes up without its paths, and wait_hostname holds the app tier
 # back until the name answers (its DNS record is set by hand). The front door
-# is deployed again, with the app tier, after it. With an app tier in place
-# nothing is deployed here: its front door must never lose those paths.
+# is deployed again, with the app tier, after it. A front door that is
+# missing beside an app tier (a run that stopped between the two) is created
+# with the app tier's paths, or no later run would get past wait_hostname.
+# With both in place nothing is deployed here: a front door must never lose
+# those paths.
 first_front_door() {
-  local ctx
-  if ! absent "$P-app-tier"; then
-    log "the app tier exists: the front door is deployed after it, as on every run"
+  local ctx mode=""
+  if absent "$P-app-tier"; then
+    mode=without-app-tier
+    log "no app tier yet: deploying the front door without the app tier's paths, for the hostname to be pointed at"
+  elif absent "$P-api-frontdoor"; then
+    log "the app tier exists and the front door does not: deploying the front door"
+  else
+    log "the app tier and the front door exist: the front door is deployed after the app tier, as on every run"
     return 0
   fi
-  ctx_front_door without-app-tier
-  log "no app tier yet: deploying the front door without the app tier's paths, for the hostname to be pointed at"
+  ctx_front_door "$mode"
   cdk_in api-tier deploy "$P-api-frontdoor" --exclusively --require-approval never --progress events "${ctx[@]}"
 }
 
 # Through the name as the app backend resolves it, not through CloudFront by
-# name as smoke does. The front door itself gets 30 tries a minute apart to
-# serve a synced node (the cells follow the chain and the API tier is up by
-# now); the DNS record, which a person sets, HOSTNAME_WAIT_MINUTES (720).
+# name as smoke does, and only once the name leads to this front door: where
+# the environment takes over the name of a running node, that node answers as
+# synced until the record is changed. The front door itself gets 30 tries a
+# minute apart to serve a synced node (the cells follow the chain and the API
+# tier is up by now); the DNS record, which a person sets,
+# HOSTNAME_WAIT_MINUTES (720).
 wait_hostname() {
-  local url=https://$NODE_HOSTNAME/strato-api/eth/v1.2/metadata dist limit=${HOSTNAME_WAIT_MINUTES:-720} deadline down=0 seen
+  local url=https://$NODE_HOSTNAME/strato-api/eth/v1.2/metadata dist target limit=${HOSTNAME_WAIT_MINUTES:-720} deadline down=0 seen
   [[ $limit =~ ^[0-9]+$ ]] || die "HOSTNAME_WAIT_MINUTES has to be a whole number, not '$limit'"
+  command -v dig >/dev/null || die "wait-hostname needs dig, to see where $NODE_HOSTNAME leads"
   dist=$(need "$P-api-frontdoor" DistributionDomainName)
+  target=$(tr 'A-Z' 'a-z' <<<"$dist")
   synced() {
     curl -fsS -m 20 -A strato-ha-smoke/1.0 "$@" "$url" 2>/dev/null \
       | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("isSynced") is True else 1)' 2>/dev/null
   }
   deadline=$(( $(date +%s) + limit * 60 ))
-  until synced; do
+  while :; do
+    # The name's CNAME chain and addresses, on one line, in lower case.
+    seen=$(dig +short "$NODE_HOSTNAME" 2>/dev/null | tr 'A-Z\n' 'a-z ' | sed 's/ *$//') || true
+    if [[ " $seen " == *" $target. "* ]] && synced; then break; fi
     if synced --connect-to "$NODE_HOSTNAME:443:$dist:443"; then
       down=0
-      (( $(date +%s) < deadline )) || die "$NODE_HOSTNAME did not reach the front door in $limit minutes: its DNS record has to be a CNAME to $dist"
-      seen=$(dig +short "$NODE_HOSTNAME" 2>/dev/null | head -1) || true
-      log "waiting for the DNS record of $NODE_HOSTNAME: it has to be a CNAME to $dist (the name resolves to ${seen:-nothing})"
+      (( $(date +%s) < deadline )) || die "$NODE_HOSTNAME did not reach the front door in $limit minutes: its DNS record has to be a CNAME to $dist (the name leads to ${seen:-nothing})"
+      log "waiting for the DNS record of $NODE_HOSTNAME: it has to be a CNAME to $dist (the name leads to ${seen:-nothing})"
     else
       (( ++down <= 30 )) || die "the front door $dist does not serve a synced node at /strato-api/eth/v1.2/metadata"
       log "waiting: the front door $dist does not serve a synced node yet"
     fi
     sleep 60
   done
-  log "https://$NODE_HOSTNAME answers as a synced node"
+  log "https://$NODE_HOSTNAME leads to the front door and answers as a synced node"
 }
 
 # --- Front door checks: through CloudFront by name, whatever the hostname's DNS says ---
