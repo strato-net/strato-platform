@@ -240,6 +240,18 @@ contract Describe_MercataGovernance {
         require(gov.validatorCount() == 1 && gov.isValidator(v3), "v2 voted out once v3 joined");
     }
 
+    // address(0) reads back from storage as no validator, so it never joins the list.
+    function it_refuses_the_zero_address_as_a_validator() public {
+        gov.seedAdmin(address(this));
+        staking.doExpectingFailure(address(gov), "addValidatorFromStaking(address,uint256)", "The zero address cannot be a validator", address(0), uint256(1));
+        bool rejected = false;
+        try gov.voteToAddValidator(address(0)) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected && gov.validatorCount() == 0, "no vote can pin it in");
+    }
+
     // A pin in holds a validator against staking; clearing it hands the validator back.
     function it_pins_validators_in_against_staking() public {
         gov.seedAdmin(address(this));
