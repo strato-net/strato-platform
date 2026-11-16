@@ -186,6 +186,12 @@ export class ApiTierStack extends Stack {
             // apex would otherwise call strato-api at the node URL's host (the front door).
             APEX_STRATO_API_HOST: "127.0.0.1",
             APEX_STRATO_API_PORT: "3000",
+            // No Redis in this task: the block cache lives on the core cells and is not
+            // published. Told so, apex reads the last block and validators from the Aurora
+            // mirror (block_data_ref, node_status) at once, instead of waiting out a 2 s Redis
+            // connect timeout on every /health and /status (strato-platform apex honours
+            // redis_host=none; older images ignore it and behave as before).
+            redis_host: "none",
             ...(config.prometheusHost
               ? { HEALTH_CHECK_JOBS: "slipstream_main=slipstream,strato_p2p=strato-p2p,vm_main=vm-runner,seq_main=strato-sequencer" }
               : {}),
