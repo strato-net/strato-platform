@@ -9,7 +9,7 @@ import { FunctionInput } from "../../types/types";
 import { castVoteOnIssue } from "./user.service";
 import { getOraclePrices } from "./oracle.service";
 
-const { Token, StratoStaking, ValidatorRegistry } = constants;
+const { Token, StratoStaking, ValidatorRegistry, MercataGovernance } = constants;
 const WAD = 10n ** 18n;
 const BPS_DIVISOR = 10000n;
 // StratoStaking.DEFAULT_SELF_BOND_MINIMUM: the operator's own bond a new seat needs until
@@ -388,6 +388,20 @@ const getBlocState = (
 
 const getStakingBlocState = (accessToken: string, fresh = false): Promise<Record<string, any>> =>
   getBlocState(accessToken, extractContractName(StratoStaking), requireStakingAddress(), fresh);
+
+// _pinnedOut: the validators the admins voted out of the set, from governance's state.
+// Staking reads the pin only while its governance link is on. A read that fails leaves
+// the pins unknown; the contract still applies them.
+const getPinnedOut = async (accessToken: string, state: Record<string, any>, fresh = false): Promise<Set<string>> => {
+  const governance = normalizeAddress(state.governance);
+  if (!parseBoolLike(state.governanceSyncEnabled) || !governance || /^0+$/.test(governance)) return new Set();
+  try {
+    const governanceState = await getBlocState(accessToken, extractContractName(MercataGovernance), governance, fresh);
+    return new Set([...addressKeyed(governanceState.pinnedOut)].filter(([, pinned]) => parseBoolLike(pinned)).map(([validator]) => validator));
+  } catch {
+    return new Set();
+  }
+};
 
 // A committed write makes every cached snapshot stale; drop them so the next /info read
 // (from this user or anyone else) sees the new state instead of waiting out the TTL.
@@ -790,13 +804,16 @@ type V2ValidatorRecord = {
   eligible: boolean;
   // What the validator votes with: its stake less what is still waiting out the stake delay.
   votingWeight: bigint;
-  // Can take a seat by right now: eligible, not seated, and its bond has waited out the delay.
+  // Can take a seat by right now: eligible, not seated, not pinned out by the admins, and
+  // its bond has waited out the delay (StratoStaking.isWaiter).
   isWaiter: boolean;
 };
 
 // Every listed record with the lifecycle facts StratoStaking derives (status, eligible,
-// isWaiter), ordered by validator address like the v1 Cirrus read.
-const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => {
+// isWaiter), ordered by validator address like the v1 Cirrus read. pinnedOut is
+// governance's part of the waiter test (getPinnedOut); callers that do not use isWaiter
+// leave it out.
+const v2ValidatorRecords = (state: Record<string, any>, pinnedOut: Set<string> = new Set()): V2ValidatorRecord[] => {
   const now = BigInt(Math.floor(Date.now() / 1000));
   const minStake = parseBigIntLike(state.minStake);
   const selfBondMinimum = selfBondMinimumOf(state);
@@ -850,7 +867,7 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
         requiredStakeCountsDelegations,
         eligible,
         votingWeight: unmatured >= totalStake ? 0n : totalStake - unmatured,
-        isWaiter: eligible && !isValidator && bondMatured,
+        isWaiter: eligible && !isValidator && !pinnedOut.has(validator) && bondMatured,
       };
     });
 };
@@ -1448,6 +1465,7 @@ const getV2StakingInfo = async (
     lifetimeClaimedRewards,
     stratoPriceWad,
     recentRewards,
+    pinnedOut,
   ] = await Promise.all([
     getTokenInfo(accessToken, tokenAddress),
     getTokenBalance(accessToken, tokenAddress, user),
@@ -1455,6 +1473,7 @@ const getV2StakingInfo = async (
     getLifetimeClaimedRewards(accessToken, user),
     getStratoTokenPriceWad(accessToken),
     getRecentBlockRewards(accessToken),
+    getPinnedOut(accessToken, state),
   ] as const);
 
   const now = BigInt(Math.floor(Date.now() / 1000));
@@ -1475,7 +1494,7 @@ const getV2StakingInfo = async (
   let operatorClaimableTotal = 0n;
   const operated: Array<{ record: V2ValidatorRecord; rewards: bigint; fees: bigint }> = [];
 
-  const records = v2ValidatorRecords(state);
+  const records = v2ValidatorRecords(state, pinnedOut);
   const validators = records.map((record): StratoOperatorInfo => {
     const { validator, value } = record;
     const profile = validatorProfiles.get(validator) || {};
@@ -2070,7 +2089,7 @@ export const reconcileStratoValidatorSet = async (
   await requireV2(accessToken);
 
   const state = await getStakingBlocState(accessToken, true);
-  const candidates = v2ValidatorRecords(state)
+  const candidates = v2ValidatorRecords(state, await getPinnedOut(accessToken, state, true))
     .filter((record) => record.isWaiter)
     .sort((a, b) =>
       a.votingWeight !== b.votingWeight
