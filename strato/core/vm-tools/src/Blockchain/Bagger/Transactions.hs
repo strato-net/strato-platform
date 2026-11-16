@@ -27,6 +27,7 @@ import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import qualified Blockchain.Stream.Action as Action
 import Control.DeepSeq
 import Control.Lens.Setter (set)
+import Control.Monad (unless)
 import Control.Monad.IO.Class (MonadIO)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -320,18 +321,23 @@ getStakeDeltasFromResults = foldl' go M.empty
           Right ExecResults{..} -> M.union erStakeUpdates acc
 
 -- | The validators MercataGovernance (0x100) lists and the weight it holds for
--- each, read from the state the block leaves behind.
+-- each, read from the state the block leaves behind, and the positions of any
+-- entries that do not read as an address.
 --
--- An empty result means "nothing to go by", never "no validators": governance
+-- An empty list means "nothing to go by", never "no validators": governance
 -- does not drop its last validator, so an empty list is a network without the
--- contract, and an entry that does not read as an address is storage this node
--- cannot interpret. In both cases the caller leaves the set as it is.
-governanceValidatorsAndStakes :: HasSolidStorageDB m => m [(Validator, Integer)]
+-- contract, and the caller leaves the set as it is. An entry that does not read
+-- as an address (address(0) is stored as a default) is left out on its own:
+-- giving up the whole list for it would leave the set frozen from then on,
+-- removals included.
+governanceValidatorsAndStakes :: HasSolidStorageDB m => m ([(Validator, Integer)], [Integer])
 governanceValidatorsAndStakes = do
   len <- at [Field "validators", Field "length"]
   case len of
-    BInteger n | n > 0 -> maybe [] id . sequence <$> mapM member [0 .. n - 1]
-    _ -> pure []
+    BInteger n | n > 0 -> do
+      entries <- mapM (\i -> (,) i <$> member i) [0 .. n - 1]
+      pure ([v | (_, Just v) <- entries], [i | (i, Nothing) <- entries])
+    _ -> pure ([], [])
   where
     governance = Address 0x100
     at path = getSolidStorageKeyVal' governance (StoragePath path)
@@ -408,7 +414,11 @@ blockConsensusDeltas blockNum inForce inForceStakes trrs
       pure fromEvents
   where
     fromEvents = (getDeltasFromResults trrs, getStakeDeltasFromResults trrs)
-    fromState = consensusDeltasFromHeld inForce inForceStakes <$> governanceValidatorsAndStakes
+    fromState = do
+      (held, unreadable) <- governanceValidatorsAndStakes
+      unless (null unreadable) . logWarnNS "consensusFromState" . T.pack $
+        "block " ++ show blockNum ++ ": governance validators at " ++ show unreadable ++ " do not read as an address; left out"
+      pure $ consensusDeltasFromHeld inForce inForceStakes held
 
 -- | What the consensus layer holds once a block's changes are applied to the
 -- set and weights in force for it: the set, and each member's weight where it

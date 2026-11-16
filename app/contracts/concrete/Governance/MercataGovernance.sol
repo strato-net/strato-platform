@@ -153,7 +153,10 @@ contract record MercataGovernance is Ownable {
         return true;
     }
 
+    // The node reads this list from storage, where address(0) is stored as a default
+    // and reads as no validator at all.
     function addValidator(address validator) internal {
+        require(validator != address(0), "The zero address cannot be a validator");
         require(hardCapValidators == 0 || validators.length < hardCapValidators, "Validator set is at its hard cap");
         require(block.number >= readdableFromBlock[validator], "Validator was removed in this block");
         validators.push(validator);
@@ -217,6 +220,7 @@ contract record MercataGovernance is Ownable {
     function voteToAddValidator(address proposedValidator) external onlyOwner {
         uint a = adminMap[msg.sender];
         require(a > 0, "Only registered network admins can vote for validators");
+        require(proposedValidator != address(0), "The zero address cannot be a validator");
         require(!pinnedIn[proposedValidator], "Validator is already pinned in");
 
         voteForValidator(msg.sender, proposedValidator, VOTE_IN);

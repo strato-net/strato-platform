@@ -166,6 +166,18 @@ spec = do
       -- once weights are in force, a validator without one is written as state has it
       snd (consensusDeltasFromHeld set (M.fromList [(a, 5), (b, 6), (c, 7)]) [(a, 5), (b, 0), (c, 7)]) `shouldBe` M.fromList [(b, 0)]
 
+    it "leaves out an entry that does not read as an address, and reads the rest" $ do
+      -- address(0) is stored as a default: the entry at 1 reads as nothing
+      read' <- runEff . withNoLogger . evalMemContextM (const $ pure Nothing) Nothing $ do
+        let put :: [StoragePathPiece] -> BasicValue -> ContextM ()
+            put path = putSolidStorageKeyVal' (Address 0x100) (StoragePath path)
+        put [Field "validators", Field "length"] (BInteger 3)
+        forM_ [(0 :: Int, a, 10), (2, c, 30)] $ \(i, Validator v, w) -> do
+          put [Field "validators", Index (BC.pack $ show i)] (BAddress v)
+          put [Field "validatorStake", Index (BC.pack $ show v)] (BInteger w)
+        governanceValidatorsAndStakes
+      read' `shouldBe` ([(a, 10), (c, 30)], [1])
+
     it "changes nothing when state gives it nothing to go by" $ do
       let (vd, sd) = consensusDeltasFromHeld inForce stakes []
       fromDelta vd `shouldBe` ([], [])
@@ -243,7 +255,7 @@ spec = do
       (parentRoot, built, held) <- onParent $ \root -> do
         block <- makeNewBlock runFailingWithNothingRun (Address 0x5e1f)
         startFromStateRoot (stateRoot $ obBlockData block)
-        (,,) root block <$> governanceValidatorsAndStakes
+        (,,) root block . fst <$> governanceValidatorsAndStakes
       obReceiptTransactions built `shouldBe` []
       stateRoot (obBlockData built) `shouldBe` parentRoot
       getBlockStakeUpdates (obBlockData built) `shouldBe` []
