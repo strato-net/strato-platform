@@ -30,8 +30,22 @@ main = hspec $ do
       -- 16 MiB of 32-byte strings, more bytes per item than a one-byte flood
       rlpItemsAtMost maxMessageItems (rlpSerialize . RLPArray $ replicate (2 ^ (24 :: Int) `div` 33) (RLPString $ B.replicate 32 9)) `shouldBe` True
 
-    it "stops at an encoding that runs past its end, for the decoder to report" $
-      rlpItemsAtMost 10 (B.pack [0xB9, 0xFF, 0xFF, 1, 2]) `shouldBe` True
+    it "refuses an item whose declared length runs past the end" $ do
+      rlpItemsAtMost 10 (B.pack [0xB9, 0xFF, 0xFF, 1, 2]) `shouldBe` False
+      -- a length past maxBound Int, which the decoder would narrow to an empty
+      -- string while the items after it went uncounted
+      rlpItemsAtMost 10 (B.pack (0xC9 : 0xBF : replicate 8 0xFF) <> ones 20) `shouldBe` False
+      rlpItemsAtMost 10 (B.pack [0xF9, 0xFF, 0xFF, 1]) `shouldBe` False
+
+    it "refuses an item that runs past the list holding it" $
+      -- the inner list holds two bytes, but its string's length bytes cross into
+      -- the outer list, where the decoder reads the twenty 1s as twenty items
+      rlpItemsAtMost 10 (B.pack ([0xD8, 0xC2, 0xB9, 0x00, 0x14] ++ replicate 20 1)) `shouldBe` False
+
+    it "refuses lists nested deeper than any real message" $ do
+      let nest d = foldr (\_ o -> RLPArray [o]) (RLPScalar 1) [1 .. d :: Int]
+      rlpItemsAtMost maxMessageItems (rlpSerialize $ nest 10) `shouldBe` True
+      rlpItemsAtMost maxMessageItems (rlpSerialize $ nest 100) `shouldBe` False
 
   describe "requestedHeaderNumbers" $ do
     it "asks for consecutive numbers when nothing is skipped" $

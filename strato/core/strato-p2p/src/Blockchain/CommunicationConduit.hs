@@ -282,30 +282,49 @@ maxMessageItems = 4000000
 
 -- | Whether an RLP encoding holds at most @cap@ items, counted from the item
 -- headers without decoding anything. A list's payload is its items laid end to
--- end, so one pass over the headers sees every item at every depth. An encoding
--- that runs past its end stops the count; decoding then reports it.
+-- end, so one pass over the headers sees every item at every depth. Each item's
+-- header and payload must fit inside its innermost enclosing list, as the
+-- decoder parses them; one that runs past it is refused, since the decoder would
+-- read it differently (narrowing an oversized length to an Int, or splitting the
+-- bytes it overran into siblings this count never saw). Lists nest at most
+-- maxRlpDepth deep.
 rlpItemsAtMost :: Int -> B.ByteString -> Bool
-rlpItemsAtMost cap bs = go 0 0
+rlpItemsAtMost cap bs = go 0 [B.length bs] 0
   where
-    n = B.length bs
     byteAt i = fromIntegral (B.index bs i) :: Integer
     lengthAt i k = foldl' (\acc j -> acc * 256 + byteAt (i + j)) 0 [0 .. k - 1]
-    go :: Int -> Int -> Bool
-    go i items
+    -- @ends@: where each enclosing payload stops, innermost first
+    go :: Int -> [Int] -> Int -> Bool
+    go _ [] _ = True
+    go i ends@(end : outer) items
       | items > cap = False
-      | i >= n = True
-      | otherwise = case byteAt i of
-          b | b < 0x80 -> go (i + 1) (items + 1)
-            | b <= 0xB7 -> go (i + 1 + fromInteger (b - 0x80)) (items + 1)
-            | b <= 0xBF -> skipLong i (fromInteger $ b - 0xB7) (items + 1)
-            | b <= 0xF7 -> go (i + 1) (items + 1)
-            | otherwise -> go (i + 1 + fromInteger (b - 0xF7)) (items + 1)
-    -- a long string: its payload is skipped, its length bytes read first
-    skipLong i k items
-      | i + 1 + k > n = True
+      | i == end = go i outer items
       | otherwise =
-          let len = lengthAt (i + 1) k
-           in if len > toInteger n then True else go (i + 1 + k + fromInteger len) items
+          let b = byteAt i
+           in if b < 0x80
+                then go (i + 1) ends (items + 1)
+                else withPayload i end b $ \start len ->
+                  if b <= 0xBF
+                    then go (start + len) ends (items + 1)
+                    else length ends <= maxRlpDepth && go start (start + len : ends) (items + 1)
+    -- the payload (start, length) of the item at @i@ with first byte @b@, if its
+    -- header and payload both end by @end@
+    withPayload i end b k
+      | i + header > end || len < 0 || toInteger (i + header) + len > toInteger end = False
+      | otherwise = k (i + header) (fromInteger len)
+      where
+        (base, longBase) = if b <= 0xBF then (0x80, 0xB7) else (0xC0, 0xF7)
+        short = b <= longBase
+        ll = fromInteger (b - longBase)
+        header = if short then 1 else 1 + ll
+        len
+          | short = b - base
+          | i + header > end = -1
+          | otherwise = lengthAt (i + 1) ll
+
+-- | How deep lists may nest in a message: real ones nest a few levels.
+maxRlpDepth :: Int
+maxRlpDepth = 64
 
 maxMessageSize :: Int
 maxMessageSize = 1 `shiftL` 24
