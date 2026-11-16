@@ -70,14 +70,15 @@ env_check() {
   done
   is() { [[ -z ${!1:-} || ${!1} =~ $2 ]] || problems+=("$1=${!1}: $3"); }
   [[ -z ${ENV_NAME:-} || $ENV_NAME == "$env_name" ]] || problems+=("ENV_NAME=$ENV_NAME, but the file is $env_name.env")
-  is ENV_NAME '^[a-z0-9][a-z0-9-]{1,15}$' "2 to 16 lowercase letters, digits or hyphens"
+  # The same rules as the CDK apps (deploymentPrefix in lib/naming.ts, cellId in core-cell/lib/config.ts).
+  is ENV_NAME '^[a-z][a-z0-9-]{0,14}[a-z0-9]$' "2 to 16 lowercase letters, digits or hyphens, starting with a letter and not ending with a hyphen"
   is NODE_HOSTNAME '^[a-z0-9.-]+$' "a hostname, without scheme or path"
   is CERTIFICATE_ARN '^arn:aws:acm:' "an ACM certificate ARN"
   is VAULT_URL '^https?://' "a URL"
   is OBSERVABILITY '^(true|false)$' "true or false"
   for name in CHAIN_ID PG_READERS CELL_DATA_GIB API_DESIRED_COUNT APP_DESIRED_COUNT READY_TIMEOUT_MINUTES; do is "$name" '^[0-9]+$' "a whole number"; done
   for cell in ${CELLS:-}; do
-    [[ $cell =~ ^[a-z0-9]+:[a-z]{2}-[a-z]+-[0-9][a-z]$ ]] || problems+=("CELLS: $cell is not <cellId>:<zone>")
+    [[ $cell =~ ^[a-z][a-z0-9-]{0,30}:[a-z]{2}(-[a-z]+)+-[0-9][a-z]$ ]] || problems+=("CELLS: $cell is not <cellId>:<zone>, the id a short lowercase name starting with a letter")
     [[ " $ids " != *" ${cell%%:*} "* ]] || problems+=("CELLS: cell ${cell%%:*} is listed twice")
     ids+=" ${cell%%:*}"
   done

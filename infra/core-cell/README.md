@@ -125,7 +125,10 @@ npx cdk deploy -c coreNlb=true -c envName=testnet -c vpcId=vpc-0123
   and grants nothing: the pipeline writes it through its own IAM policy
   (`scripts/ha.sh <env> publish-scripts`), the cells read it through their
   instance roles (`extraBinariesS3=s3://<NodeScriptsBucketName>/node-scripts/`).
-  It is emptied and deleted with the stack.
+  It is emptied and deleted with the stack. A cell keeps the location it was
+  given at its first boot (`/etc/strato/cell.env`), while its role follows
+  the stack: a cell created with another location is replaced (`cells
+  replace`), not upgraded.
 
 Give its outputs to the cells: `SecurityGroupId` as
 `coreLoadBalancerSecurityGroupId` (the cell admits the load balancer on its
