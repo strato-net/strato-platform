@@ -23,5 +23,5 @@ export function elbName(name: string): string {
 /** The Deployment and ManagedBy tags on every taggable resource of the app. */
 export function tagDeployment(app: App, envName: string): void {
   Tags.of(app).add("Deployment", deploymentPrefix(envName));
-  Tags.of(app).add("ManagedBy", "ha-infra");
+  Tags.of(app).add("ManagedBy", "strato-platform/infra");
 }

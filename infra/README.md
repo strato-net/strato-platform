@@ -27,16 +27,11 @@ target groups, ECS clusters and task families, the Aurora cluster,
 CloudFront functions and origin access controls, the cell's launch template)
 and the secrets, SSM parameters and log groups under `ha-<envName>/...`.
 Every taggable resource also carries
-the tags `Deployment=ha-<envName>` and `ManagedBy=ha-infra`, which reach what
+the tags `Deployment=ha-<envName>` and `ManagedBy=strato-platform/infra`, which reach what
 has no name (subnets, EBS volumes, KMS keys) and filter cost reports.
 `lib/naming.ts` in each app holds the rule; `envName` is 2 to 16 lowercase
 letters, digits or hyphens, so load balancer and target group names stay
 within their 32 characters.
-
-The `tiered` environment predates this naming (`Strato*-tiered-*` stacks,
-`strato-*-tiered` resources) and is deployed only from the `tiered` branch,
-which keeps the code it was created with; deploying it from this branch would
-create a second set of resources beside it.
 
 ## Deploy order
 
@@ -69,9 +64,11 @@ same run builds the environment from nothing and updates it:
    `STRATO_BRANCH` commit checked out (default `develop`), under
    `ghcr.io/strato-net/strato-platform/<image>:<VERSION>-<commit>-<hash>`;
    the packages are public, so nothing logs in anywhere, and a commit not
-   published yet fails the run before it deploys. strato-platform's
+   published yet fails the run before it deploys (`scripts/ha.sh testnet-app
+   images` reads the names from strato-platform's Makefile and checks each
+   image). strato-platform's
    `bin/strato-*`, `core-cell/bootstrap/strato-cell-upgrade` and
-   `strato-cell-health` go to `NODE_SCRIPTS_S3`.
+   `strato-cell-health` go to the node scripts bucket of step 3.
 2. `data-plane` and `obs-core`. The data plane also generates the password
    of the node's own database login (`strato`, secret
    `ha-testnet-app/postgres/node`); the first cell to boot creates that
@@ -80,7 +77,10 @@ same run builds the environment from nothing and updates it:
    target groups a cell's instance registers in. Port 8600 hands a
    transaction batch to one healthy cell (the cell's own health check on 8601
    decides); port 9090 is the first cell's Prometheus, for apex; the Grafana
-   target group is for the API tier's load balancer.
+   target group is for the API tier's load balancer. The same stack owns the
+   node scripts bucket (`ha-testnet-app-node-scripts-<account>`, versioned):
+   a cell installs what is under `node-scripts/` there as root, so the bucket
+   is the environment's own and only this pipeline writes it.
 4. Every cell's stack is deployed (`cells deploy`). A cell is one instance in
    an Auto Scaling group; a missing cell is created, one at a time, from the
    latest snapshot, and the run waits until it follows the chain. An instance
@@ -143,9 +143,17 @@ core process answers and the node is within 5 blocks of the network's best
 block (`strato-cell-upgrade --check`, the check the pipeline waits on);
 `strato-cell-health` answers the same over HTTP on port 8601.
 
+`scripts/ha.sh` checks `environments/testnet-app.env` before it asks anything
+of AWS: a setting that is missing, misspelt or of the wrong shape stops every
+command at once. A command that needs the image set takes it from the
+environment (what `images` printed) and never falls back to the set last
+deployed by itself; by hand, between deployments, name that set with
+`HA_IMAGES=recorded`.
+
 By hand, from a workstation with AWS credentials:
 
 ```sh
+export HA_IMAGES=recorded
 scripts/ha.sh testnet-app context api-tier
 scripts/ha.sh testnet-app cdk api-tier diff
 scripts/ha.sh testnet-app cells lease
@@ -163,7 +171,7 @@ Before the first run:
   `ha-deployer.example` holding the access key of an IAM
   user of the same name with `environments/testnet-app-deployer-policy.json`:
   the account's CDK bootstrap roles (`cdk-hnb659fds-*`), push to the
-  `strato/*` ECR repositories, `NODE_SCRIPTS_S3`, SSM parameters under
+  `strato/*` ECR repositories, the node scripts bucket, SSM parameters under
   `/ha-testnet-app/`, `AWS-RunShellScript` on instances tagged
   `Deployment=ha-testnet-app`, and describing the deployment's stacks,
   secrets and load balancers. What CloudFormation may create is bounded by
@@ -190,16 +198,7 @@ Before the first run:
   tier stay empty: the ECS tasks' nginx metrics only reach a workspace, and
   Grafana on the first cell reads that cell's Prometheus alone.
 
-## Environments
-
-`environments/<env>.sh` records the context a live environment was deployed
-with and runs `cdk` with it:
-
-```sh
-export STRATO_PLATFORM_DIR=~/src/strato-platform   # if not at ../strato-platform
-environments/tiered.sh api-tier diff --no-change-set
-environments/tiered.sh front-door diff --no-change-set StratoApi-tiered-FrontDoor
-```
+## Cells and the writer lease
 
 The environment runs two core cells so that either can be lost or rebuilt
 without an outage: `cell-a` (us-east-1a) and `cell-b` (us-east-1b), each a
@@ -211,65 +210,14 @@ the Aurora cluster.
   a minute of silence from its holder; every claim is counted in CloudWatch
   (`STRATO/Cell` `WriterLeaseClaimed`). A restarted cell logs "standby" at
   startup even while it holds the lease: read the lease
-  (`strato-promote --status`), not that line. So "writer" in
-  `environments/tiered.sh` only says which cell claims the lease when both
-  start cold; the lease has moved between the cells since, and either may
-  hold it.
-- **Transactions from the API tier** are posted to every cell's ingress
-  (`strato-ingest` on port 8600; the cells are listed in the API tier's
-  `ingressUrls`), so both mempools hold every batch and a standby promoted
-  later already has what the writer had. A submit succeeds once one cell has
-  accepted it: a cell that is down costs nothing but its own timeout, and
-  when it returns its sequencer catches up from the other cell's gossip.
-  Each cell admits the tier's task security group on 8600
-  (`clientSecurityGroupIds`); there is no load balancer in between.
+  (`strato-promote --status`, or `scripts/ha.sh <env> cells lease`), not that
+  line. The first cell in `CELLS` is the writer only when the environment is
+  created; the lease moves between the cells afterwards, and either may hold
+  it.
 - **Reads that need a VM** never reach a cell. Each API task runs vm-query
   over the SQL mirror and the copies share theirs through ECS Service Connect
   (`vm-query:8546`); what the mirror cannot answer (a non-latest block tag,
   `eth_getProof`, a block replay) is an error from the tier.
-
-Adding a cell: deploy it with `clientSecurityGroupIds` naming the API tier's
-task security group, add `http://<PrivateDnsName>:8600` to `INGRESS_URLS` in
-`environments/tiered.sh`, then deploy `api-tier`. Removing one is the same in
-reverse.
-
-The live environment is behind this code (the JLog and ingress change of
-2026-10-09), and is deployed from the `tiered` branch (see Naming), which
-needs this change merged for the rollout: its cells run a Kafka build and its API tier submits through
-`StratoCell-tiered-Frontend`, the load balancer on the cells' Kafka port,
-which is no longer in the `core-cell` app. The order that keeps submits
-flowing: both cells take `clientSecurityGroupIds` (a security group change
-only); each cell in turn, standby first, is rebuilt on a `scaling` image with
-JLog and `strato-ingest` from a v2 snapshot, since the Kafka topics in the
-node directory do not carry over; `CELL_B_PRIVATE_DNS` is recorded and
-`api-tier` deployed, which moves submits to the ingress and adds Service
-Connect (new resources, the service updates in place); then the load balancer
-goes, by hand: `aws cloudformation delete-stack --stack-name
-StratoCell-tiered-Frontend`, which also removes the rules it added to the
-cells' security groups.
-
-`tiered` is account 406773134706, us-east-1, serving
-https://app2.testnet.example.invalid. As of 2026-09-18 every stack diffs clean
-except `StratoCell-tiered-cell-a-Host`, whose template is behind the instance
-in three known ways:
-
-- the Grafana ingress rule on 3001 from 0.0.0.0/0 is still in the template but
-  already gone from the live security group; `grafanaCidrs` is empty, so a
-  deploy removes it from the template too;
-- the `Bootstrap` and `NodeScripts` assets follow `cell-bootstrap.sh` here and
-  `bin/` in strato-platform, both changed since the cell was deployed;
-- the Grafana Keycloak login (`grafanaPublicUrl`, `grafanaAdminGroups`,
-  `grafanaViewerGroups`) and the newer strato image were applied to the
-  running instance by hand, because cloud-init does not run again.
-
-All of these change UserData, so CDK reports the instance as "may be
-replaced". For this cell that means rebuilding a synced node: read the diff
-and never accept it casually.
-
-`observability` runs in traces-only mode here (no IAM Identity Center for
-Managed Grafana, so Grafana and Prometheus stay on the cell). Its two SNS
-topics, `strato-tiered-pages` and `strato-tiered-warnings`, have no
-subscribers yet: alarms change state but notify nobody until one is added.
 
 ## The strato-platform checkout
 

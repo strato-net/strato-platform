@@ -16,9 +16,10 @@
 #   scripts/ha.sh <env> cells instance <id>       the cell's current instance id
 #   scripts/ha.sh <env> cells wait-ready [<id>]   wait until cells follow the chain
 #   scripts/ha.sh <env> cells lease               who holds the writer lease
+#   scripts/ha.sh <env> images                    the image set of the strato-platform commit checked out, each image checked
 #   scripts/ha.sh <env> install                   npm ci in every app
 #   scripts/ha.sh <env> build-ui                  build app/ui and smd-ui for the front door
-#   scripts/ha.sh <env> publish-scripts           node scripts and the cell upgrade and health scripts to NODE_SCRIPTS_S3
+#   scripts/ha.sh <env> publish-scripts           node scripts and the cell upgrade and health scripts to the core tier's bucket
 #   scripts/ha.sh <env> smoke                     check the deployment through its front door
 #   scripts/ha.sh <env> record <strato> <infra>   record the deployed image set and commits
 #   scripts/ha.sh <env> state                     the commits last deployed
@@ -26,17 +27,69 @@
 # Targets, in deploy order: data-plane, obs-core, core-nlb, the cells (the
 # cells command), api-tier, app-tier, front-door, obs-alarms. Images come
 # from STRATO_IMAGE, NGINX_IMAGE, POSTGREST_IMAGE, APEX_IMAGE, APP_NGINX_IMAGE
-# and APP_BACKEND_IMAGE when set (the pipeline sets them), else from the set
-# last deployed. strato-platform is read from STRATO_PLATFORM_DIR, default
-# ../strato-platform beside this repo.
+# and APP_BACKEND_IMAGE (the pipeline sources what the images command
+# printed), or, only with HA_IMAGES=recorded, from the set last deployed.
+# strato-platform is read from STRATO_PLATFORM_DIR, default ../strato-platform
+# beside this repo.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-envfile="$ROOT/environments/${1:?usage: scripts/ha.sh <env> <command> ...}.env"
+env_name=${1:?usage: scripts/ha.sh <env> <command> ...}
+envfile="$ROOT/environments/$env_name.env"
 shift
 [[ -f $envfile ]] || { echo "ha.sh: no $envfile" >&2; exit 2; }
+
+# --- The environment file, checked before anything is asked of AWS ---
+# A setting missing from the file, a name this script does not read (a
+# misspelt one would otherwise be ignored) or a value of the wrong shape stops
+# every command here, not a deployment halfway through.
+ENV_REQUIRED=(ENV_NAME AWS_REGION NETWORK CHAIN_ID NODE_HOSTNAME CERTIFICATE_ARN PG_ENGINE_VERSION PG_INSTANCE_CLASS PG_READERS
+  CELLS CELL_INSTANCE_TYPE CELL_DATA_GIB SNAPSHOT_BUCKET SNAPSHOT_SOURCE VAULT_URL OAUTH_SECRET
+  API_DESIRED_COUNT APP_DESIRED_COUNT OBSERVABILITY)
+# Present in the file, but may be left empty: without a snapshot a cell syncs from the genesis block.
+ENV_MAY_BE_EMPTY=(SNAPSHOT_BUCKET SNAPSHOT_SOURCE)
+ENV_OPTIONAL=(BACKEND_SECRET BACKEND_SECRET_KEYS GRAFANA_ADMIN_GROUPS GRAFANA_VIEWER_GROUPS PARTNER_REFERRALS_URL PARTNER_INTERNAL_KEY_SECRET
+  READY_TIMEOUT_MINUTES)
+# Only the file sets them: a value inherited from the caller's shell (the
+# pipeline exports ENV_NAME and AWS_REGION) would hide a missing line.
+# READY_TIMEOUT_MINUTES alone may also come from the caller.
+for name in "${ENV_REQUIRED[@]}" "${ENV_OPTIONAL[@]}"; do [[ $name == READY_TIMEOUT_MINUTES ]] || unset "$name"; done
 # shellcheck source=/dev/null
 source "$envfile"
+env_check() {
+  local name known k cell ids="" assigned problems=()
+  assigned=$(sed -nE 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=.*/\2/p' "$envfile")
+  for name in $assigned; do
+    known=false
+    for k in "${ENV_REQUIRED[@]}" "${ENV_OPTIONAL[@]}"; do [[ $k == "$name" ]] && known=true; done
+    [[ $known == true ]] || problems+=("$name is not a setting this script reads")
+  done
+  for name in "${ENV_REQUIRED[@]}"; do
+    if ! grep -qx "$name" <<<"$assigned"; then problems+=("$name is missing"); continue; fi
+    [[ -n ${!name:-} || " ${ENV_MAY_BE_EMPTY[*]} " == *" $name "* ]] || problems+=("$name is empty")
+  done
+  is() { [[ -z ${!1:-} || ${!1} =~ $2 ]] || problems+=("$1=${!1}: $3"); }
+  [[ -z ${ENV_NAME:-} || $ENV_NAME == "$env_name" ]] || problems+=("ENV_NAME=$ENV_NAME, but the file is $env_name.env")
+  is ENV_NAME '^[a-z0-9][a-z0-9-]{1,15}$' "2 to 16 lowercase letters, digits or hyphens"
+  is NODE_HOSTNAME '^[a-z0-9.-]+$' "a hostname, without scheme or path"
+  is CERTIFICATE_ARN '^arn:aws:acm:' "an ACM certificate ARN"
+  is VAULT_URL '^https?://' "a URL"
+  is OBSERVABILITY '^(true|false)$' "true or false"
+  for name in CHAIN_ID PG_READERS CELL_DATA_GIB API_DESIRED_COUNT APP_DESIRED_COUNT READY_TIMEOUT_MINUTES; do is "$name" '^[0-9]+$' "a whole number"; done
+  for cell in ${CELLS:-}; do
+    [[ $cell =~ ^[a-z0-9]+:[a-z]{2}-[a-z]+-[0-9][a-z]$ ]] || problems+=("CELLS: $cell is not <cellId>:<zone>")
+    [[ " $ids " != *" ${cell%%:*} "* ]] || problems+=("CELLS: cell ${cell%%:*} is listed twice")
+    ids+=" ${cell%%:*}"
+  done
+  [[ ${PARTNER_REFERRALS_URL:+set} == "${PARTNER_INTERNAL_KEY_SECRET:+set}" ]] \
+    || problems+=("PARTNER_REFERRALS_URL and PARTNER_INTERNAL_KEY_SECRET go together: set both or neither")
+  ((${#problems[@]} == 0)) && return 0
+  echo "ha.sh: $envfile:" >&2
+  printf '  %s\n' "${problems[@]}" >&2
+  exit 2
+}
+env_check
+: "${GRAFANA_ADMIN_GROUPS:=}" "${GRAFANA_VIEWER_GROUPS:=}"
 cmd=${1:?usage: scripts/ha.sh <env> <command> ...}
 shift
 export AWS_REGION AWS_DEFAULT_REGION=$AWS_REGION AWS_PAGER=""
@@ -96,6 +149,15 @@ ssm_get() { aws ssm get-parameter --name "$1" --query Parameter.Value --output t
 # --value=: a value starting with "-" (a recorded cell context) would otherwise read as an option.
 ssm_put() { aws ssm put-parameter --name "$1" --type String --tier Intelligent-Tiering --overwrite --value="$2" >/dev/null; }
 
+# Where the node scripts are published and the cells read them: the bucket
+# the core tier's stack owns, which nothing but this deployment writes.
+node_scripts_s3() {
+  local bucket
+  # || exit: this runs inside $(...), where a failed lookup does not stop the function by itself.
+  bucket=$(need "$P-core-nlb" NodeScriptsBucketName) || exit 1
+  printf 's3://%s/node-scripts/' "$bucket"
+}
+
 cell_ids() { local c; for c in $CELLS; do echo "${c%%:*}"; done; }
 cell_zone() { local c; for c in $CELLS; do [[ ${c%%:*} == "$1" ]] && echo "${c#*:}"; done; return 0; }
 host_stack() { echo "$P-cell-$1-host"; }
@@ -103,15 +165,55 @@ FIRST_CELL=${CELLS%% *}
 FIRST_CELL=${FIRST_CELL%%:*}
 existing_cells() { local id; for id in $(cell_ids); do exists "$(host_stack "$id")" && echo "$id"; done; return 0; }
 
-# The image set: from the environment when the pipeline resolved one, else the one last deployed.
+# The image set: from the environment (the pipeline sources what the images
+# command printed) or, only when asked with HA_IMAGES=recorded, the one last
+# deployed: for a diff, or a command by hand between deployments. Nothing
+# falls back to the recorded set by itself: a deployment whose set went
+# missing would bring the stacks to the previous images, pass, and be recorded
+# under the new commit.
 load_images() {
-  local saved="" k v
-  for k in $IMAGE_KEYS; do
-    [[ -n ${!k:-} ]] && continue
-    [[ -n $saved ]] || saved=$(ssm_get "$STATE/images")
+  local saved k v missing=""
+  for k in $IMAGE_KEYS; do [[ -n ${!k:-} ]] || missing+=" $k"; done
+  [[ -n $missing ]] || return 0
+  [[ ${HA_IMAGES:-} == recorded ]] || die "no image set ($(echo $missing) unset): source what '$0 $ENV_NAME images' prints, or set HA_IMAGES=recorded for the set last deployed"
+  saved=$(ssm_get "$STATE/images")
+  for k in $missing; do
     v=$(sed -n "s/^$k=//p" <<<"$saved")
     [[ -n $v ]] || die "$k is not set and no image set has been deployed to $ENV_NAME yet"
     printf -v "$k" '%s' "$v"
+  done
+}
+
+# The image set strato-platform's autobuild published for the commit checked
+# out at STRATO_PLATFORM_DIR, under the names its Makefile computes (a
+# print-<VAR> rule added from a second makefile); nothing is built. Prints
+# KEY=image lines. A variable the Makefile no longer defines, or an image not
+# published, stops here, before anything is deployed. The packages are public,
+# so nothing logs in.
+images() {
+  local mk vars registry version entry key name hash image
+  # <KEY>=<image name>:<the Makefile variable holding its content hash>
+  local map="STRATO_IMAGE=strato:HASH_STRATO NGINX_IMAGE=nginx:HASH_NGINX POSTGREST_IMAGE=postgrest:HASH_POSTGREST APEX_IMAGE=apex:HASH_APEX
+    APP_NGINX_IMAGE=app-nginx:HASH_APP_NGINX APP_BACKEND_IMAGE=app-backend:HASH_APP_BACKEND PROMETHEUS_IMAGE=prometheus:HASH_PROMETHEUS"
+  [[ -f $STRATO_PLATFORM_DIR/Makefile ]] || die "$STRATO_PLATFORM_DIR has no Makefile; set STRATO_PLATFORM_DIR"
+  mk=$(mktemp)
+  printf 'print-%%:\n\t@echo $*=$($*)\n' > "$mk"
+  vars=$(make -s --no-print-directory -C "$STRATO_PLATFORM_DIR" -f Makefile -f "$mk" print-REPO_GHCR_URL print-VERSION \
+    $(for entry in $map; do echo "print-${entry##*:}"; done)) || { rm -f "$mk"; die "cannot read the image names from $STRATO_PLATFORM_DIR/Makefile"; }
+  rm -f "$mk"
+  makefile_var() { sed -n "s/^$1=//p" <<<"$vars" | head -1; }
+  registry=$(makefile_var REPO_GHCR_URL)
+  version=$(makefile_var VERSION)
+  [[ -n $registry && -n $version ]] || die "strato-platform's Makefile gave no REPO_GHCR_URL or VERSION"
+  log "image set of strato-platform $(git -C "$STRATO_PLATFORM_DIR" rev-parse --short=10 HEAD 2>/dev/null || echo '?') ($version)"
+  for entry in $map; do
+    key=${entry%%=*}
+    name=${entry#*=}
+    hash=$(makefile_var "${name##*:}")
+    [[ -n $hash ]] || die "strato-platform's Makefile no longer defines ${name##*:} (for $key)"
+    image=$registry${name%%:*}:$version-$hash
+    docker manifest inspect "$image" >/dev/null 2>&1 || die "$image is not published: wait for strato-platform's autobuild of this commit"
+    echo "$key=$image"
   done
 }
 
@@ -161,7 +263,7 @@ ctx_obs() {
 # start as the writer (an empty cluster) or to join as a standby.
 ctx_cell() {
   local id=$1 pg="$P-data-postgres" core="$P-core-nlb" login login_secret admin_secret
-  local vpc writer reader pg_sg nlb_sg ingress_tg prometheus_tg grafana_tg
+  local vpc writer reader pg_sg nlb_sg ingress_tg prometheus_tg grafana_tg scripts
   load_images
   # Each on its own line: a failed lookup inside the array below would not stop the script.
   login=$(need "$pg" NodeLogin)
@@ -173,6 +275,7 @@ ctx_cell() {
   pg_sg=$(need "$pg" ClusterSecurityGroupId)
   nlb_sg=$(need "$core" SecurityGroupId)
   ingress_tg=$(need "$core" IngressTargetGroupArn)
+  scripts=$(node_scripts_s3)
   ctx=(-c envName="$ENV_NAME" -c cellId="$id" -c role=core -c network="$NETWORK"
     -c vpcId="$vpc" -c subnetType=public -c availabilityZone="$(cell_zone "$id")"
     -c instanceType="$CELL_INSTANCE_TYPE" -c dataVolumeGiB="$CELL_DATA_GIB"
@@ -183,7 +286,7 @@ ctx_cell() {
     -c peerStore=sqlite -c validatorBehavior=false -c autoPromote=true -c seedEmptyCluster=true
     -c oauthSecretName="$OAUTH_SECRET" -c extraSetupFlags="--vaultUrl=$VAULT_URL"
     -c snapshotBucket="$SNAPSHOT_BUCKET" -c snapshotSource="$SNAPSHOT_SOURCE"
-    -c extraBinariesS3="$NODE_SCRIPTS_S3" -c exposePrometheus=true
+    -c extraBinariesS3="$scripts" -c exposePrometheus=true
     -c coreLoadBalancerSecurityGroupId="$nlb_sg" -c ingressTargetGroupArn="$ingress_tg")
   # The first cell publishes the node config for the API tier, runs Grafana and is the one whose Prometheus apex reads.
   if [[ $id == "$FIRST_CELL" ]]; then
@@ -213,7 +316,7 @@ refuse_plain_instances() {
   done
 }
 
-# The core tier's load balancer and target groups: deployed before the cells, which register in them.
+# The core tier's load balancer, target groups and node scripts bucket: deployed before the cells, which register in them and read it.
 ctx_core_nlb() {
   refuse_plain_instances
   local vpc
@@ -525,7 +628,7 @@ cells_replace() {
 smoke() {
   local dist url=https://$NODE_HOSTNAME
   dist=$(need "$P-api-frontdoor" DistributionDomainName)
-  c() { curl -fsS -m 30 -A ha-infra-smoke/1.0 --connect-to "$NODE_HOSTNAME:443:$dist:443" "$@"; }
+  c() { curl -fsS -m 30 -A strato-ha-smoke/1.0 --connect-to "$NODE_HOSTNAME:443:$dist:443" "$@"; }
   c "$url/strato-api/eth/v1.2/metadata" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("isSynced") is True, f"not synced: {d}"; print("metadata: synced,", d.get("networkName"))'
   c -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' "$url/rpc" \
     | python3 -c 'import json,sys; d=json.load(sys.stdin); print("rpc: block", int(d["result"], 16))'
@@ -555,16 +658,18 @@ case $cmd in
       lease) echo "${P}: writer lease held by $(lease_holder)" ;;
       *) die "unknown cells command $1" ;;
     esac ;;
+  images) images ;;
   install) for d in data-plane core-cell api-tier app-tier observability; do node_run "$ROOT/$d" npm ci --no-audit --no-fund --loglevel=error; done ;;
   build-ui) for d in app/ui smd-ui; do log "build $d"; node_run "$STRATO_PLATFORM_DIR/$d" bash -c 'npm ci --no-audit --no-fund --loglevel=error && npm run build'; done ;;
   publish-scripts)
     # What cell-bootstrap.sh installs from the NodeScripts asset, plus this repo's upgrade and health scripts.
+    scripts=$(node_scripts_s3)
     staging=$(mktemp -d)
     trap 'rm -rf "$staging"' EXIT
     find "$STRATO_PLATFORM_DIR/bin" -maxdepth 1 -type f -name 'strato-*' ! -name '*.md' ! -name strato-pg-migrate ! -name strato-patch-app -exec cp {} "$staging/" \;
     cp "$ROOT/core-cell/bootstrap/strato-cell-upgrade" "$ROOT/core-cell/bootstrap/strato-cell-health" "$staging/"
-    aws s3 sync --delete --only-show-errors "$staging/" "$NODE_SCRIPTS_S3"
-    log "published $(ls "$staging" | wc -l | tr -d ' ') scripts to $NODE_SCRIPTS_S3" ;;
+    aws s3 sync --delete --only-show-errors "$staging/" "$scripts"
+    log "published $(ls "$staging" | wc -l | tr -d ' ') scripts to $scripts" ;;
   smoke) smoke ;;
   record)
     load_images
