@@ -240,6 +240,81 @@ contract Describe_MercataGovernance {
         require(gov.validatorCount() == 1 && gov.isValidator(v3), "v2 voted out once v3 joined");
     }
 
+    // A pin in holds a validator against staking; clearing it hands the validator back.
+    function it_pins_validators_in_against_staking() public {
+        gov.seedAdmin(address(this));
+        _add(staking, v1, 5);
+        _add(staking, v2, 5);
+        gov.voteToAddValidator(v1);
+        require(gov.pinnedIn(v1) && gov.isValidator(v1), "a seated validator can be pinned");
+
+        staking.doSuccessfully(address(gov), "removeValidatorFromStaking(address)", v1);
+        require(gov.isValidator(v1), "staking cannot remove it");
+        _add(staking, v1, 7);
+        require(gov.validatorStake(v1) == 7, "its weight still follows staking");
+
+        gov.voteToAddValidator(v3);
+        require(gov.isValidator(v3) && gov.validatorStake(v3) == 0, "an outsider joins at once, with no weight yet");
+
+        bool rejected = false;
+        try gov.voteToClearValidatorPin(v2) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "nothing to clear on an unpinned validator");
+
+        gov.voteToClearValidatorPin(v1);
+        require(!gov.pinnedIn(v1) && gov.isValidator(v1), "clearing changes no membership");
+        staking.doSuccessfully(address(gov), "removeValidatorFromStaking(address)", v1);
+        require(!gov.isValidator(v1), "staking manages it again");
+    }
+
+    // A pin out holds a validator out against staking, seated or not.
+    function it_pins_validators_out_against_staking() public {
+        gov.seedAdmin(address(this));
+        _add(staking, v1, 5);
+        _add(staking, v2, 5);
+        gov.voteToRemoveValidator(v3);
+        require(gov.pinnedOut(v3), "an outsider can be pinned out before it joins");
+        staking.doExpectingFailure(address(gov), "addValidatorFromStaking(address,uint256)", "Validator is pinned out by the admins", v3, uint256(5));
+
+        gov.voteToRemoveValidator(v1);
+        require(!gov.isValidator(v1) && gov.pinnedOut(v1), "a seated validator leaves at once");
+
+        gov.voteToAddValidator(v3);
+        require(gov.pinnedIn(v3) && !gov.pinnedOut(v3) && gov.isValidator(v3), "a pin in replaces the pin out");
+
+        gov.voteToClearValidatorPin(v1);
+        fastForward(1, 1);
+        _add(staking, v1, 5);
+        require(gov.isValidator(v1), "staking can add it once the pin is cleared");
+    }
+
+    // A kick removes a validator whatever its pin or staking say, and drops a pin in.
+    function it_removes_kicked_validators_over_a_pin() public {
+        gov.seedAdmin(address(this));
+        _add(staking, v1, 5);
+        gov.voteToAddValidator(v2); // pinned in, never staking-managed
+        staking.doSuccessfully(address(gov), "removeKickedValidator(address)", v2);
+        require(!gov.isValidator(v2) && !gov.pinnedIn(v2), "out, pin dropped");
+        staking.doSuccessfully(address(gov), "removeKickedValidator(address)", v1);
+        require(gov.isValidator(v1), "never the last validator");
+        stranger.doExpectingFailure(address(gov), "removeKickedValidator(address)", "Only the staking contract can manage staked validators", v1);
+    }
+
+    // A vote in another direction restarts the tally instead of counting toward it.
+    function it_restarts_the_tally_when_the_direction_changes() public {
+        User a1 = new User();
+        User a2 = new User();
+        gov.seedAdmin(address(a1));
+        gov.seedAdmin(address(a2)); // quorum is 2 of 2
+        a1.doSuccessfully(address(gov), "voteToAddValidator(address)", v1);
+        a2.doSuccessfully(address(gov), "voteToRemoveValidator(address)", v1);
+        require(!gov.pinnedIn(v1) && !gov.pinnedOut(v1), "one vote each way pins nothing");
+        a1.doSuccessfully(address(gov), "voteToRemoveValidator(address)", v1);
+        require(gov.pinnedOut(v1), "two votes out pin it out");
+    }
+
     // At genesis the admin list holds exactly one entry (the AdminRegistry), so
     // a single executed vote could empty it and strand the contract: every
     // voteTo* entry point then fails its admin check and nothing can re-seed one.
