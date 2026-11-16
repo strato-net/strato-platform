@@ -358,19 +358,13 @@ bootstrapBlockstanbul :: (MonadBlockstanbul m, Mod.Accessible View m) =>
 bootstrapBlockstanbul = lift createFirstTimer
 
 blockstanbulSend ::
-  ( MonadLogger m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
-  ) =>
+  MonadSequencer m =>
   [InEvent] -> ConduitT i SeqOutEvent m ()
 blockstanbulSend = mapM_ $ \ie -> do
       void $ blockstanbulSend' ie
 
 blockstanbulSend' ::
-  ( MonadLogger m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
-  ) =>
+  MonadSequencer m =>
   InEvent -> ConduitT i SeqOutEvent m [OutputBlock]
 blockstanbulSend' msg = do
   (p2pevs, vmevs, committedBlocks) <- lift $ do
@@ -393,6 +387,12 @@ blockstanbulSend' msg = do
       $logWarnS "seq/pbft/send" . T.pack $
         "Rejected " ++ show droppedCount ++ " committed block(s) with unrecoverable transaction signatures"
     committedBlocks <- catMaybes <$> traverse insertEmitted rBlocks
+    -- Gossip can deliver a transaction after its block commits. Marking it seen
+    -- here drops that copy instead of taking it for new work, which would arm
+    -- the dead-proposer timer.
+    for_ (concatMap obReceiptTransactions committedBlocks) $ \t -> do
+      known <- wasTransactionWitnessed t
+      unless known $ witnessTransaction t
     liftIO $ recordSequencedSpans committedBlocks
     let (vms, p2ps) = vmEvenP2pCheckptFilterHelper resp
 
@@ -494,11 +494,7 @@ transformFullTransactionsWith intakeRules submitted = do
   pure $ length txs
 
 emitOrCacheHistoricBlock ::
-  ( MonadLogger m,
-    MonadMonitor m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
-  ) =>
+  MonadSequencer m =>
   SequencedBlock -> ConduitT i SeqOutEvent m ()
 emitOrCacheHistoricBlock sb = do
   ready <- lift $ isBlockReadyForEmission sb
@@ -512,21 +508,14 @@ emitOrCacheHistoricBlock sb = do
       P.incCounter seqBlocksEnqueued
 
 emitSequencedBlock ::
-  ( MonadLogger m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
-  ) =>
+  MonadSequencer m =>
   SequencedBlock -> ConduitT i SeqOutEvent m Bool
 emitSequencedBlock sb = do
   committedBlocks <- blockstanbulSend' . PreviousBlock $ sequencedBlockToBlock sb
   return $ any ((== sbHash sb) . outputBlockHash) committedBlocks
 
 emitBlockAndCachedChildren ::
-  ( MonadLogger m,
-    MonadMonitor m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
-  ) =>
+  MonadSequencer m =>
   SequencedBlock -> ConduitT i SeqOutEvent m ()
 emitBlockAndCachedChildren sb =
   lift (claimBlockForEmission sb) >>= \case
@@ -538,11 +527,7 @@ emitBlockAndCachedChildren sb =
         mapM_ emitBlockAndCachedChildren children
 
 runConsensus ::
-  ( MonadLogger m,
-    MonadMonitor m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
-  ) =>
+  MonadSequencer m =>
   SequencedBlock -> ConduitT i SeqOutEvent m ()
 runConsensus sb = do
   let blk = sequencedBlockToBlock sb
@@ -559,11 +544,7 @@ runConsensus sb = do
           "Ignoring unsealed " ++ shortDescription sb ++ " from " ++ format origin ++ ": not a candidate built by this node"
 
 transformBlocks ::
-  ( MonadLogger m,
-    MonadMonitor m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
-  ) =>
+  MonadSequencer m =>
   [IngestBlock] -> ConduitT i SeqOutEvent m ()
 transformBlocks ibs = do
   forM_ ibs $ \ib ->

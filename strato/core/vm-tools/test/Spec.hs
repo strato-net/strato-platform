@@ -48,6 +48,7 @@ import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Executable.EVMFlags ()
 import HFlags
 import qualified ActionEncodeSpec
+import qualified BaggerSpec
 import qualified ConsensusFromStateSpec
 import qualified CrossLangFixtureSpec
 import qualified ReplayProtectionSpec
@@ -87,6 +88,7 @@ spec :: Spec
 spec = do
   describe "VMContext" $ pure ()
   ActionEncodeSpec.spec
+  BaggerSpec.spec
   ConsensusFromStateSpec.spec
   ReplayProtectionSpec.spec
   ReceiptSpec.spec

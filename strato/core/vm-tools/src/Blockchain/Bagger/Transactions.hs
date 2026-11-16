@@ -100,6 +100,7 @@ data TxRejection
   | AdminFlushed BaggerStage BaggerTxQueue FlushScope OutputTx
   | InvalidEnvelope BaggerStage BaggerTxQueue String OutputTx -- why
   | FeeBoundExceeded BaggerStage BaggerTxQueue Integer Integer OutputTx -- quotedFee, signedBound
+  | GasLimitTooHigh BaggerStage BaggerTxQueue Integer Integer OutputTx -- most a block admits, tx gas limit
   deriving (Eq, Read, Show)
 
 rejectedTx :: TxRejection -> OutputTx
@@ -112,6 +113,7 @@ rejectedTx (ChainIdMismatch _ _ _ t) = t
 rejectedTx (AdminFlushed _ _ _ t) = t
 rejectedTx (InvalidEnvelope _ _ _ t) = t
 rejectedTx (FeeBoundExceeded _ _ _ _ t) = t
+rejectedTx (GasLimitTooHigh _ _ _ _ t) = t
 
 data BaggerStage = Insertion | Validation | Promotion | Demotion | Execution deriving (Read, Eq, Show)
 
@@ -178,6 +180,9 @@ instance Format TxRejection where
   format (FeeBoundExceeded stage queue quote bound OutputTx {otHash = hash}) =
     "Fee bound exceeded at stage " ++ show stage ++ " in queue " ++ show queue
       ++ ": quoted fee " ++ show quote ++ " > signed bound " ++ show bound ++ "\n\ttx hash " ++ format hash
+  format (GasLimitTooHigh stage queue cap limit OutputTx {otHash = hash}) =
+    "Gas limit too high at stage " ++ show stage ++ " in queue " ++ show queue
+      ++ ": gas limit " ++ show limit ++ " > most a block admits " ++ show cap ++ "\n\ttx hash " ++ format hash
 
 txRejectionToAPIFailureCause :: TxRejection -> TransactionResultStatus
 txRejectionToAPIFailureCause (NonceTooLow stage queue needed tx) =
@@ -198,6 +203,8 @@ txRejectionToAPIFailureCause (InvalidEnvelope stage queue why _) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.InvalidEnvelopeError Nothing Nothing (Just why)
 txRejectionToAPIFailureCause (FeeBoundExceeded stage queue quote bound _) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.FeeBoundExceededError (Just quote) (Just bound) (Just feeBoundAdvice)
+txRejectionToAPIFailureCause (GasLimitTooHigh stage queue cap limit _) =
+  Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.GasLimitTooHighError (Just cap) (Just limit) (Just "No block can hold this gas limit")
 
 tfToBaggerTxRejection :: TransactionFailureCause -> TxRejection
 tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = BalanceTooLow Execution Queued cost balance tx
@@ -247,6 +254,18 @@ feeBoundRejection :: Integer -> TD.Transaction -> Maybe (Integer, Integer)
 feeBoundRejection quote tx = case signedFeeBound tx of
   Just bound | quote > bound -> Just (quote, bound)
   _ -> Nothing
+
+-- | The most gas a block holding @blockGas@ admits for one transaction, when
+-- the transaction asks for more. Execution takes such a transaction for one
+-- the block has no room left for (TFBlockGasLimitExceeded in addTransaction)
+-- and keeps it for the next block, which has no more room, so it is never
+-- mined and never dropped.
+gasLimitRejection :: Integer -> TD.Transaction -> Maybe Integer
+gasLimitRejection blockGas tx
+  | TD.gasLimit tx > cap = Just cap
+  | otherwise = Nothing
+  where
+    cap = min blockGas (toInteger (maxBound :: Int))
 
 transactionChainIdValid :: Integer -> TD.Transaction -> Bool
 transactionChainIdValid expected tx = TD.chainId tx == Just expected

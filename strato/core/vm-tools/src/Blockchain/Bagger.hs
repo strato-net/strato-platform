@@ -263,6 +263,8 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
     (p s q ++ "an invalid envelope: " ++ why, hsh)
   FeeBoundExceeded s q quote bound OutputTx {otHash = hsh} ->
     (p s q ++ "the quoted fee (" ++ show quote ++ ") exceeding the signed fee bound (" ++ show bound ++ "); requote and resubmit", hsh)
+  GasLimitTooHigh s q cap limit OutputTx {otHash = hsh} ->
+    (p s q ++ "a gas limit (" ++ show limit ++ ") above the most a block admits (" ++ show cap ++ ")", hsh)
   where
     p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
     p' s q = p s q ++ "low "
@@ -644,6 +646,7 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = do
       sizeLimit = toInteger (Conf.txSizeLimit (networkConfig ethConf))
       nextBlock = number (B.bestBlockHeader $ B.miningCache state) + 1
       expectedChainId = Conf.chainId $ networkConfig ethConf
+      blockGas = nextGasLimit . getBlockGasLimit . B.bestBlockHeader $ B.miningCache state
   (addressNonce, addressBalance) <- getAddressNonceAndBalance address
   -- The best block's quote: the block being built requotes when it starts, so
   -- this is a first filter and execution has the final say.
@@ -653,6 +656,7 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = do
       | chainIdRequired (isReplayProtectionForkActive nextBlock) bt && not (transactionChainIdValid expectedChainId bt) -> Left $ ChainIdMismatch Validation Incoming expectedChainId t
       | Just why <- envelopeRejection (isStratoGasForkActive nextBlock) bt -> Left $ InvalidEnvelope Validation Incoming why t
       | Just (q, bound) <- feeBoundRejection quote bt -> Left $ FeeBoundExceeded Validation Incoming q bound t
+      | Just cap <- gasLimitRejection blockGas bt -> Left $ GasLimitTooHigh Validation Incoming cap (TD.gasLimit bt) t
       | addressNonce > txn -> Left $ NonceTooLow Validation Incoming addressNonce t
       | addressBalance < txFee -> Left $ BalanceTooLow Validation Incoming txFee addressBalance t
       | txSize >= sizeLimit -> Left $ TXSizeLimitExceeded Validation Incoming txSize sizeLimit t
