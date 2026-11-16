@@ -254,7 +254,8 @@ quotedStratoFee = do
         _ -> 0
 
 -- | The most transactions the pool holds for one sender, pending and queued
--- together. A sender at the limit can still replace one of its own nonces.
+-- together. A sender at the limit can still replace a queued nonce, and send its
+-- next executable nonce, which is what lets its queue drain.
 maxTxsPerSender :: Int
 maxTxsPerSender = 64
 
@@ -281,6 +282,24 @@ holdsNoFeeToken address = do
       held <- getSolidStorageKeyVal' token (StoragePath [Field "_balances", Index (BC.pack $ show address)])
       pure $ case held of
         BInteger n -> n
+        _ -> 0
+
+-- | Whether @address@ clearly holds enough for one fee route: a whole voucher, a
+-- cent of USDST (the legacy fee, and more than any STRATO shortfall costs), or
+-- STRATO covering @quote@ when one is set. Weaker than execution's own check,
+-- which can also combine STRATO with a USDST purchase, so it only decides what
+-- counts as work a block can take, never admission.
+canClearlyPayFee :: HasSolidStorageDB m => Integer -> Address -> m Bool
+canClearlyPayFee quote address = do
+  vouchers <- balanceIn 0x100e
+  usdst <- balanceIn 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010
+  strato <- maybe (pure 0) balanceIn . Conf.stratoTokenAddress . Conf.network $ Conf.networkConfig ethConf
+  pure $ vouchers >= 1000000000000000000 || usdst >= legacyUsdFee || (quote > 0 && strato >= quote)
+  where
+    balanceIn token = do
+      held <- getSolidStorageKeyVal' token (StoragePath [Field "_balances", Index (BC.pack $ show address)])
+      pure $ case held of
+        BInteger v -> v
         _ -> 0
 
 -- | Why a transaction cannot pay the block's fee: the fee it signed for does

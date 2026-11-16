@@ -39,9 +39,10 @@ import Test.Hspec
 import UnliftIO.Directory (withCurrentDirectory)
 import UnliftIO.Temporary (withSystemTempDirectory)
 
-unfunded, funded, rewardSink, proposer :: Address
+unfunded, funded, dust, rewardSink, proposer :: Address
 unfunded = 0x94cd
 funded = 0xf00d
+dust = 0xd057
 rewardSink = 0xdec1de
 proposer = 0x1
 
@@ -49,7 +50,7 @@ tx :: Address -> OutputTx
 tx signer =
   OutputTx
     { otOrigin = TO.Direct,
-      otHash = hash (if signer == unfunded then "unfunded" else "funded"),
+      otHash = hash (BC.pack $ "tx from " ++ show signer),
       otSigner = signer,
       otBaseTx =
         MessageTX
@@ -129,12 +130,16 @@ startOnRoot parentRoot = do
 -- | 'startOnParent' with each of @holders@ holding a cent of USDST, which any fee
 -- route takes.
 startFunded :: [Address] -> ContextM StateRoot
-startFunded holders = do
+startFunded holders = startHolding [(a, legacyUsdFee) | a <- holders]
+
+-- | 'startOnParent' with each address holding the given USDST.
+startHolding :: [(Address, Integer)] -> ContextM StateRoot
+startHolding holders = do
   -- the root is read under the block hash it was written under
   root <- withCurrentBlockHash (hash "funding") $ do
     startFromStateRoot =<< A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
-    forM_ holders $ \a ->
-      putSolidStorageKeyVal' 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010 (StoragePath [Field "_balances", Index (BC.pack $ show a)]) (BInteger legacyUsdFee)
+    forM_ holders $ \(a, amount) ->
+      putSolidStorageKeyVal' 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010 (StoragePath [Field "_balances", Index (BC.pack $ show a)]) (BInteger amount)
     flushMemDBs
     A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
   startOnRoot root
@@ -197,7 +202,7 @@ spec = do
       broke `shouldBe` Left (BalanceTooLow Validation Incoming legacyUsdFee 0 (signed unfunded))
       paying `shouldBe` Right ()
 
-    it "holds at most maxTxsPerSender for one sender, who can still replace a nonce" $ do
+    it "holds at most maxTxsPerSender for one sender, who can still replace a queued nonce" $ do
       let most = toInteger maxTxsPerSender
       (next, replacing) <- inContext $ do
         _ <- startFunded [funded]
@@ -206,7 +211,15 @@ spec = do
       next `shouldBe` Left (SenderPoolFull Validation Incoming most (atNonce most $ signed funded))
       replacing `shouldBe` Right ()
 
-  describe "Bagger.addTransactionsToMempool" $
+    it "lets a full sender send its next executable nonce, which drains its queue" $ do
+      let most = toInteger maxTxsPerSender
+      gapFiller <- inContext $ do
+        _ <- startFunded [funded]
+        updateBaggerState $ \st -> st {B.queued = M.singleton funded $ M.fromList [(n, atNonce n $ signed funded) | n <- [1 .. most]]}
+        withBagger $ isValidForPool (atNonce 0 $ signed funded)
+      gapFiller `shouldBe` Right ()
+
+  describe "Bagger.addTransactionsToMempool" $ do
     it "reports work only for a transaction the next block can take" $ do
       (broke, gapped, paying) <- inContext $ do
         _ <- startFunded [funded]
@@ -214,3 +227,30 @@ spec = do
       broke `shouldBe` False
       gapped `shouldBe` False
       paying `shouldBe` True
+
+    it "counts as work only a sender that clearly can pay" $ do
+      (dusty, paying) <- inContext $ do
+        _ <- startHolding [(funded, legacyUsdFee), (dust, 1)]
+        (,) <$> addTransactionsToMempool [signed dust] <*> addTransactionsToMempool [signed funded]
+      dusty `shouldBe` False
+      paying `shouldBe` True
+
+  describe "Bagger.hasPendingWork" $
+    it "sees payable work left pending, and none from a sender that cannot clearly pay" $ do
+      (dustOnly, withPaying) <- inContext $ do
+        _ <- startHolding [(funded, legacyUsdFee), (dust, 1)]
+        _ <- addTransactionsToMempool [signed dust]
+        a <- hasPendingWork
+        _ <- addTransactionsToMempool [signed funded]
+        (,) a <$> hasPendingWork
+      dustOnly `shouldBe` False
+      withPaying `shouldBe` True
+
+  describe "Bagger.splitHoldingNothing" $
+    it "holds back only the transactions of senders that hold nothing" $ do
+      (ready, deferred) <- inContext $ do
+        _ <- startFunded [funded]
+        splitHoldingNothing [signed funded, signed unfunded]
+      map otSigner ready `shouldBe` [funded]
+      map otSigner deferred `shouldBe` [unfunded]
+
