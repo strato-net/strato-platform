@@ -80,7 +80,7 @@ env_check() {
   is OBSERVABILITY '^(true|false)$' "true or false"
   is AWS_REGION '^[a-z]{2}(-[a-z]+)+-[0-9]$' "an AWS region, like us-east-1"
   is NETWORK '^[a-z][a-z0-9-]*$' "a network name, like helium"
-  for name in CELL_INSTANCE_TYPE PG_INSTANCE_CLASS; do is "$name" '^[a-z][a-z0-9-]*\.[a-z0-9]+$' "an instance type, like m6i.xlarge"; done
+  for name in CELL_INSTANCE_TYPE PG_INSTANCE_CLASS; do is "$name" '^[a-z][a-z0-9-]*\.[a-z0-9-]+$' "an instance type, like m6i.xlarge"; done
   is PG_ENGINE_VERSION '^[0-9]+\.[0-9]+$' "an Aurora PostgreSQL version, like 14.18"
   is SNAPSHOT_BUCKET '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$' "a bucket name"
   for name in OAUTH_SECRET BACKEND_SECRET PARTNER_INTERNAL_KEY_SECRET; do is "$name" '^[A-Za-z0-9/_+=.@:-]+$' "a Secrets Manager name or ARN"; done
