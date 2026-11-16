@@ -135,6 +135,37 @@ spec = describe "caught-failure activation" $ do
         returnedInteger result `shouldBe` Just (if atomic then 1 else 2)
         map evName (erEvents result) `shouldBe` (if atomic then ["Kept"] else ["Kept", "Inner"])
 
+    it (label ++ ": commits internal storage when forwarding an external return") $ runContext $ do
+      deploy height $ T.unlines
+        [ "contract Target { function answer() returns (uint) { return 42; } }"
+        , "contract Probe { Target target; uint public value;"
+        , "  constructor() { target = new Target(); }"
+        , "  function forward() internal returns (variadic) { value = 7; return address(target).call(\"answer\"); }"
+        , "  function probe() returns (variadic) { return forward(); }"
+        , "}"
+        ]
+      result <- invoke height "probe"
+      persisted <- invoke height "value"
+      liftIO $ do
+        erException result `shouldBe` Nothing
+        returnedInteger result `shouldBe` Just 42
+        erException persisted `shouldBe` Nothing
+        returnedInteger persisted `shouldBe` Just 7
+
+    it (label ++ ": returns and persists caller storage after a failed internal call") $ runContext $ do
+      deploy height $ T.unlines
+        [ "contract Probe { uint public value;"
+        , "  function fail() internal { value = 7; require(false, \"internal failure\"); }"
+        , "  function probe() returns (uint) { value = 3; try { fail(); } catch { } return value; }"
+        , "}"
+        ]
+      result <- invoke height "probe"
+      persisted <- invoke height "value"
+      liftIO $ do
+        erException result `shouldBe` Nothing
+        erException persisted `shouldBe` Nothing
+        (returnedInteger result, returnedInteger persisted) `shouldBe` (Just 3, Just 3)
+
     it (label ++ ": preserves the account after a caught internal destruction") $ runContext $ do
       deploy height $ T.unlines
         [ "contract Probe { uint public value;"

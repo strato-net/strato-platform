@@ -92,10 +92,20 @@ remain transaction-wide; post-activation atomic rollback is unchanged. A second
 fixture checks that a caught internal destruction preserves the account while
 retaining historical storage-purge behavior before activation.
 
+Re-review of that correction found that `ForwardReturn`, the native control-flow
+signal for a successful dynamic return, escaped the new frame and discarded its
+writes. The regression forwards an external result of 42 after writing 7;
+before the fix, both engines returned 42 but native persisted 0 before activation.
+The existing typed-return decoder now runs inside the legacy internal frame,
+so successful forwarding commits normally and actual exceptions still discard
+the frame. The independent failed-call reproduction also checks a separate
+getter: both engines return and persist the caller's original value of 3.
+
 Validated on macOS on 2026-11-16: the focused repository-root build and all
-172 engine/network checks plus 28 TryCatch tests passed with both new fixtures.
-The storage fixture failed in the native pre-activation cases before the fix
-and passed in the interpreter. This correction has not been deployed or replayed;
+224 engine/network checks plus 28 TryCatch tests passed. The failed-call and
+forwarding fixtures each reproduced five native pre-activation failures before
+their respective fixes and passed in the interpreter.
+These corrections have not been deployed or replayed;
 the full Upquark evidence above and the Linux results apply to `a559256501b1`.
 
 Before release: replay the updated execution code from genesis on Upquark and

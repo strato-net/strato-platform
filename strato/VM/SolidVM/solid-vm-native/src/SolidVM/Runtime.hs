@@ -142,7 +142,7 @@ internalFrame name sig fun = go sig fun []
     callName = maybe name id (T.stripPrefix "super." name)
     go :: N.Sig as result -> N.Fn as result -> [N.Dyn] -> N.Fn as result
     go (N.SigCons ty rest) action args = \value -> go rest (action value) (N.Dyn ty value : args)
-    go (N.SigNil _) action args = do
+    go signature@(N.SigNil _) action args = do
       values <- traverse toValue (reverse args)
       forked <- caughtFailureForkActive
       if forked then withCallArguments callName values action else do
@@ -152,7 +152,8 @@ internalFrame name sig fun = go sig fun []
         withCallInfo (currentAddress info) (currentCodeAddress info)
           (currentContract info) callName (collectionHash info) (codeCollection info)
           M.empty (readOnly info) (isFreeFunction info)
-          (withCallArguments callName values action)
+          -- ForwardReturn carries a successful result; decode it before committing.
+          (withCallArguments callName values (N.typedReturns signature action))
           `onException` trimCallStackToDepth depth
 
 callContract :: N.CallKind -> Address -> T.Text -> [N.Dyn] -> Maybe N.SomeTy -> SM [N.Dyn]
