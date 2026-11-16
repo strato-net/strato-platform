@@ -72,9 +72,11 @@ env_check() {
   [[ -z ${ENV_NAME:-} || $ENV_NAME == "$env_name" ]] || problems+=("ENV_NAME=$ENV_NAME, but the file is $env_name.env")
   # The same rules as the CDK apps (deploymentPrefix in lib/naming.ts, cellId in core-cell/lib/config.ts).
   is ENV_NAME '^[a-z][a-z0-9-]{0,14}[a-z0-9]$' "2 to 16 lowercase letters, digits or hyphens, starting with a letter and not ending with a hyphen"
-  is NODE_HOSTNAME '^[a-z0-9.-]+$' "a hostname, without scheme or path"
-  is CERTIFICATE_ARN '^arn:aws:acm:' "an ACM certificate ARN"
-  is VAULT_URL '^https?://' "a URL"
+  local label='[a-z0-9]([a-z0-9-]*[a-z0-9])?' url='^https?://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]+)?(/.*)?$'
+  is NODE_HOSTNAME "^$label(\\.$label)+\$" "a full hostname, without scheme or path"
+  is CERTIFICATE_ARN '^arn:aws[a-z-]*:acm:[a-z0-9-]+:[0-9]{12}:certificate/[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$' "arn:aws:acm:<region>:<account>:certificate/<id>"
+  is VAULT_URL "$url" "a URL with a host"
+  is PARTNER_REFERRALS_URL "$url" "a URL with a host"
   is OBSERVABILITY '^(true|false)$' "true or false"
   for name in CHAIN_ID PG_READERS CELL_DATA_GIB API_DESIRED_COUNT APP_DESIRED_COUNT READY_TIMEOUT_MINUTES; do is "$name" '^[0-9]+$' "a whole number"; done
   for cell in ${CELLS:-}; do
