@@ -120,6 +120,28 @@ executables:
     ghc-options: -Wall -O2 -threaded -rtsopts -flate-specialise
 
 tests:
+  rpc-isolation-check:
+    source-dirs: rpc-isolation-test
+    main: Main.hs
+    other-modules: []
+    dependencies:
+      - blockapps-data
+      - blockapps-mpdbs
+      - bytestring
+      - common-log
+      - composable-monads-base
+      - hflags
+      - hspec
+      - monad-alter
+      - seqevents
+      - solid-vm-compiler
+      - solid-vm-model
+      - strato-model
+      - text
+      - time
+      - vm-runner
+      - vm-tools
+    ghc-options: -Wall -Werror -threaded -rtsopts
   ethereum-vm-test:
     source-dirs: test/
     main: Spec.hs

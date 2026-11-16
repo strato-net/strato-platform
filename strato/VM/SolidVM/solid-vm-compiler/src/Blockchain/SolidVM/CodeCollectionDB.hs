@@ -314,7 +314,11 @@ codeCollectionFromSourceWith opts isRunningTests typeCheck initCode = do
   case mcc of
     Just cc -> do
       recordCacheEvent CacheHit
-      return (hsh, cc)
+      -- The process-wide cache may have been filled by a discarded sandbox.
+      -- A compiled entry does not imply source exists in this context's store.
+      recordCacheEvent StorageWrite
+      hsh' <- addCode canonicalInitCode
+      return $ assert (hsh == hsh') (hsh, cc)
     Nothing -> do
       recordCacheEvent StorageWrite
       hsh' <- addCode canonicalInitCode

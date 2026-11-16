@@ -45,18 +45,30 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Maybe (mapMaybe)
 import qualified Data.Text as T
 import Prelude hiding (id)
-import Prometheus (MonadMonitor)
 import Text.Format (format)
+import UnliftIO (displayException, evaluate, tryAny)
 
 -- | Like runJsonRpcCommandSandboxed, but additionally handles the
 -- block-replay trace command, which needs the block-processing machinery.
 runJsonRpcCommandTraced :: JsonRpcCommand -> ContextM JsonRpcResponse
-runJsonRpcCommandTraced (JRCTraceBlockTxs header txs mTarget opts id) =
-  evalSandboxedContextM (traceBlockTxs header txs mTarget opts id)
-runJsonRpcCommandTraced c = runJsonRpcCommandSandboxed c
+runJsonRpcCommandTraced c = do
+  -- RPC execution is sandboxed: an internal failure must fail this request,
+  -- not the shared block-processing worker. tryAny preserves cancellation.
+  result <- tryAny $ do
+    response <- case c of
+      JRCTraceBlockTxs header txs mTarget opts id ->
+        evalSandboxedContextM (traceBlockTxs header txs mTarget opts id)
+      _ -> runJsonRpcCommandSandboxed c
+    evaluate response
+  case result of
+    Right response -> pure response
+    Left err -> do
+      $logErrorS "runJsonRpcCommandTraced" . T.pack $
+        "RPC " ++ jrcId c ++ " failed: " ++ displayException err
+      pure $ Error (jrcId c) "internal error while executing RPC request"
 
 traceBlockTxs ::
-  (VMBase m, MonadMonitor m) =>
+  VMBase m =>
   BlockHeader ->
   [Transaction] ->
   Maybe Keccak256 ->
