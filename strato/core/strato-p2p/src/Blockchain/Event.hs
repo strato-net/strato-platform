@@ -322,7 +322,7 @@ handleEvents peer = awaitForever $ \case
               Preprepare _ blk -> bodyMatchesHeader blk
               Commit _ di seal -> (verifyCommitmentSeal di seal :: Either String Address) == Right sender'
               _ -> True
-        if not (signed && unsignedPartsHold && Validator sender' `elem` validators)
+        if not (Validator sender' `elem` validators && signed && unsignedPartsHold)
           then $logDebugS "handleEvents/Blockstanbul" . T.pack $ "Dropping a consensus message from " ++ peerString peer ++ " not signed by a current validator"
           else do
             lift $ do
