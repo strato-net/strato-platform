@@ -1235,10 +1235,24 @@ parseOptionsForCurrentBlock = do
 
 -- | Values as 'rlpEncodeValue' should see them at the current block: before
 -- 'isRlpEncodeForkActive', every non-data value encoded as an empty list.
-rlpForkValues :: (Monad m, Mod.Accessible Env.Environment m) => [Value] -> m [Value]
+-- Elements held in cells are read first, so that a value encodes by its contents.
+rlpForkValues :: (MonadIO m, Mod.Accessible Env.Environment m) => [Value] -> m [Value]
 rlpForkValues vs = do
   forked <- isRlpEncodeForkActive . blockHeaderBlockNumber . Env.blockHeader <$> Mod.access (Mod.Proxy @Env.Environment)
-  pure $ if forked then vs else rlpLegacyValue <$> vs
+  vs' <- traverse readCells vs
+  pure $ if forked then vs' else rlpLegacyValue <$> vs'
+  where
+    readCells value = case value of
+      SArray cells -> SArray <$> traverse readCell cells
+      STuple cells -> STuple <$> traverse readCell cells
+      SStruct name fields -> SStruct name <$> traverse readCell fields
+      SMap entries -> SMap <$> traverse readCell entries
+      SVariadic values -> SVariadic <$> traverse readCells values
+      _ -> pure value
+    readCell cell = case cell of
+      Variable ref -> fmap Constant . readCells =<< liftIO (readIORef ref)
+      Constant plain -> Constant <$> readCells plain
+      TypedVariable t inner -> TypedVariable t <$> readCell inner
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection = getCodeAndCollectionWithTypeCheck True
