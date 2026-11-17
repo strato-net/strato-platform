@@ -360,6 +360,36 @@ WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
 systemctl enable --now strato-cell.service
+# The node stops whole when any one of its processes exits, and nothing starts
+# it again before it has followed the chain once (the watchdog arms only
+# then). A first start can end that way within seconds: strato-p2p and
+# ethereum-discover both open the new peer store, and the one that finds it
+# locked exits. So see that the node stays up, and start it again when it did
+# not; that also starts the node of a bootstrap that is run again.
+for attempt in 1 2 3 4 5; do
+  sleep 45
+  pgrep -x convoke >/dev/null && break
+  log "the node is not running after its start (attempt $attempt of 5): $(grep 'ERROR: Process' "$NODE_DIR/logs/convoke.log" 2>/dev/null | tail -1 || true) Starting it again"
+  systemctl restart strato-cell.service
+done
+pgrep -x convoke >/dev/null || { log "the node does not stay up: see $NODE_DIR/logs/convoke.log"; exit 1; }
+
+# Runs a container on the node's compose network: on_node_network <name>
+# <docker run arguments>. That network comes and goes with the node (a node
+# that stops takes it away, a start brings it back), so this tries for ten
+# minutes. A container that still cannot be started is reported and the
+# bootstrap goes on: the node does not depend on it, and what follows here
+# (the lease watch, the health endpoint, the watchdog) must not be left out.
+on_node_network() {
+  local name=$1 i; shift
+  for i in $(seq 1 60); do
+    docker rm -f "$name" >/dev/null 2>&1 || true
+    if docker network inspect strato_default >/dev/null 2>&1 \
+      && docker run -d --name "$name" --restart unless-stopped --network strato_default "$@" >/dev/null 2>&1; then return 0; fi
+    sleep 10
+  done
+  log "warning: $name was not started: it could not be put on the node's network (strato_default)"
+}
 
 # --- 6. Observability, when the observability app has published configs ---
 if [[ -n "$OTEL_CONFIG_PARAMETER" ]]; then
@@ -550,10 +580,7 @@ PY
   fi
   # Grafana runs as uid 472 inside its container and reads the file itself.
   chown 472:472 /etc/strato/grafana-admin-password; chmod 0400 /etc/strato/grafana-admin-password
-  # The node's containers share the compose network; wait for it to exist.
-  for i in $(seq 1 60); do docker network inspect strato_default >/dev/null 2>&1 && break; sleep 10; done
-  docker rm -f strato-grafana >/dev/null 2>&1 || true
-  docker run -d --name strato-grafana --restart unless-stopped --network strato_default -p 3001:3000 \
+  on_node_network strato-grafana -p 3001:3000 \
     -e GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana-admin-password \
     "${grafana_access[@]}" \
     -e GF_SERVER_ROOT_URL="${GRAFANA_PUBLIC_URL:-http://${node_host:-localhost}:3001/}" \
@@ -562,7 +589,7 @@ PY
     "${grafana_oauth[@]}" "${grafana_plugins[@]}" \
     -v /etc/strato/grafana-admin-password:/run/secrets/grafana-admin-password:ro \
     -v $G/provisioning:/etc/grafana/provisioning:ro -v $G/dashboards:/var/lib/grafana/dashboards:ro \
-    grafana/grafana-oss:11.2.0 >/dev/null
+    grafana/grafana-oss:11.2.0
 fi
 
 # --- 7a. The node's Prometheus on the private address (for the API tier's apex) ---
@@ -570,12 +597,10 @@ fi
 # on the cell's private IP, where the security group admits the API tier's tasks.
 if [[ "${PROMETHEUS_EXPOSE:-false}" == "true" ]]; then
   log "prometheus on the private address"
-  for i in $(seq 1 60); do docker network inspect strato_default >/dev/null 2>&1 && break; sleep 10; done
   token=$(curl -s -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' http://169.254.169.254/latest/api/token)
   private_ip=$(curl -s -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/local-ipv4)
-  docker rm -f strato-prometheus-expose >/dev/null 2>&1 || true
-  docker run -d --name strato-prometheus-expose --restart unless-stopped --network strato_default -p "$private_ip:9090:9090" \
-    alpine/socat:1.8.1.1 tcp-listen:9090,fork,reuseaddr tcp-connect:prometheus:9090 >/dev/null
+  on_node_network strato-prometheus-expose -p "$private_ip:9090:9090" \
+    alpine/socat:1.8.1.1 tcp-listen:9090,fork,reuseaddr tcp-connect:prometheus:9090
 fi
 
 # --- 7b. Container states to CloudWatch (for the tier map) ---
