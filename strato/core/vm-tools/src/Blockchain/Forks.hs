@@ -305,7 +305,9 @@ isArgReferenceForkActive blockNum =
 -- | A creation whose source imports an address without SolidVM code fails.
 -- Such an import used to be dropped, and resolved once code was deployed at
 -- the address: the importing contract then changed behaviour on whichever
--- nodes recompiled it.
+-- nodes recompiled it. From the same height a cached compile is reused only
+-- while its imported addresses hold what they held when it was compiled, so
+-- every node runs the same code whatever its cache history.
 codelessImportForkBlock :: Integer -> Integer
 codelessImportForkBlock net
   | net == heliumNetworkID = 1200000

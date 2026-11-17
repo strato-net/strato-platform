@@ -1245,7 +1245,10 @@ getContractNameAndHash address' = do
 parseOptionsForCurrentBlock :: MonadSM m => m ParseOptions
 parseOptionsForCurrentBlock = do
   blockNum <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
-  pure defaultParseOptions {parseLegacyOperatorPrecedence = not (isOperatorPrecedenceForkActive blockNum)}
+  pure defaultParseOptions
+    { parseLegacyOperatorPrecedence = not (isOperatorPrecedenceForkActive blockNum),
+      parseCheckImportTargets = isCodelessImportForkActive blockNum
+    }
 
 -- | Values as 'rlpEncodeValue' should see them at the current block: before
 -- 'isRlpEncodeForkActive', every non-data value encoded as an empty list.

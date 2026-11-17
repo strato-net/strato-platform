@@ -30,6 +30,10 @@ deploy height address name source = do
     & createCode .~ Code source & createArgs %~ atHeight height
   pure . isNothing $ erException result
 
+invoke :: Integer -> Address -> T.Text -> ContextM ExecResults
+invoke height address name = call $ def & callCodeAddress .~ address & callFuncName .~ name
+  & callArgs %~ atHeight height & callArgs . argsSender .~ (0x1000 :: Address)
+
 spec :: Spec
 spec = describe "codeless-import activation" $ do
   it "schedules the public networks and activates new networks at genesis" $ do
@@ -64,6 +68,16 @@ spec = describe "codeless-import activation" $ do
         , "}"
         ]
       liftIO $ created `shouldBe` not rejected
+
+    it (label ++ ": a contract whose imported contract is destroyed afterwards") $ runContext $ do
+      library <- deploy height 0xdead "Library" "contract Library { function kill() public { selfdestruct(msg.sender); } }"
+      created <- deploy height 0x2000 "Probe" "import <dead>; contract Probe is Library { function probe() public returns (uint) { return 1; } }"
+      destroyed <- invoke height 0xdead "kill"
+      result <- invoke height 0x2000 "probe"
+      liftIO $ do
+        (library, created, erException destroyed) `shouldBe` (True, True, Nothing)
+        -- Before activation the answer is whatever this node has cached.
+        isNothing (erException result) `shouldBe` not rejected
 
   it "rejects a source that an earlier creation left in the cache" $ runContext $ do
     library <- deploy activation 0xdead "Library" "contract Library {}"
