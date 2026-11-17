@@ -61,7 +61,6 @@ import Strato.Strato23.Database.Tables as TS
 import Strato.Strato23.Server.Password (getKeyFromPasswordAndSalt, superSecretVaultWrapperMessage)
 import Blockchain.Strato.Model.Address (formatAddressWithoutColor, fromPrivateKey, stringAddress)
 import Blockchain.Strato.Model.Secp256k1 (exportPrivateKey, importPrivateKey)
-import System.Environment (lookupEnv)
 import System.Exit (ExitCode (..), exitWith)
 import System.IO
   ( BufferMode (..),
@@ -103,53 +102,6 @@ main = do
     (False, True) -> runExport outPath
     (True, False) -> runImport inPath flags_force
 
--- | Resolve Postgres connection settings using the following precedence:
---
---   1. CLI flag, if the operator passed a value different from the built-in
---      HFlags default (i.e. explicitly overrode it).
---   2. Environment variable (same names the vault-wrapper daemon reads from
---      docker-compose: @postgres_host@, @postgres_port@, @postgres_user@,
---      @postgres_password@, @postgres_vault_wrapper_db@), if set and non-empty.
---   3. @PGPASSFILE@ for the password, if set and non-empty. An empty password
---      lets libpq read the matching entry from that file.
---   4. The built-in HFlags default from 'Options'.
---
--- This follows CLI > env > passfile > default precedence while still
--- letting operators run the tool inside an existing vault-wrapper container
--- without re-typing connection settings that are already in its environment.
-connectInfo :: IO ConnectInfo
-connectInfo = do
-  host <- resolve "postgres_host" Options.flags_pghost "postgres"
-  portStr <- resolve "postgres_port" Options.flags_pgport "5432"
-  user <- resolve "postgres_user" Options.flags_pguser "postgres"
-  passwordEnv <- lookupEnv "postgres_password"
-  passfile <- lookupEnv "PGPASSFILE"
-  let pw = case (Options.flags_password, passwordEnv, passfile) of
-        (s, _, _) | s /= "api" -> s
-        (_, Just s, _) | not (null s) -> s
-        (_, _, Just s) | not (null s) -> ""
-        _ -> "api"
-  db <- resolve "postgres_vault_wrapper_db" Options.flags_database "oauth"
-  pure
-    ConnectInfo
-      { connectHost = host,
-        connectPort = read portStr,
-        connectUser = user,
-        connectPassword = pw,
-        connectDatabase = db
-      }
-  where
-    -- envName: env var name; flagVal: current HFlags value; flagDefault: the
-    -- value HFlags would have had if the operator did not pass the flag.
-    resolve :: String -> String -> String -> IO String
-    resolve envName flagVal flagDefault
-      | flagVal /= flagDefault = pure flagVal -- operator explicitly overrode via CLI
-      | otherwise = do
-          mEnv <- lookupEnv envName
-          pure $ case mEnv of
-            Just s | not (null s) -> s
-            _ -> flagDefault
-
 -- ----------------------------------------------------------------------------
 -- Export mode
 -- ----------------------------------------------------------------------------
@@ -173,7 +125,7 @@ runExport outPath = do
       uName = T.pack flags_x_user_unique_name
       uProv = T.pack flags_x_identity_provider_id
 
-  ci <- connectInfo
+  ci <- Options.connectInfo
   bracket (connect ci) close $ \conn -> do
     _ <- (query_ conn [sql| SELECT 1 |] :: IO [Only Int])
     putStrLn "DB connection OK."
@@ -271,7 +223,7 @@ runImport inPath force = do
     Just _ -> pure ()
     Nothing -> die_ "envelope address_hex is not a valid Ethereum address"
 
-  ci <- connectInfo
+  ci <- Options.connectInfo
   bracket (connect ci) close $ \conn -> do
     _ <- (query_ conn [sql| SELECT 1 |] :: IO [Only Int])
     putStrLn "Destination DB connection OK."

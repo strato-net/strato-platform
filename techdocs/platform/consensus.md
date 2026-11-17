@@ -68,7 +68,14 @@ There are two ways to change the set.
 
 ### Admin vote
 
-Registered admins call `voteToAddValidator(address)` or `voteToRemoveValidator(address)`. A change passes once it has `floor(2 × admins / 3) + 1` votes. Admins are added and removed the same way, with `voteToAddAdmin` and `voteToRemoveAdmin`.
+Registered admins call `voteToAddValidator(address)` or `voteToRemoveValidator(address)`. A change passes once it has `floor(2 × admins / 3) + 1` votes. A vote in the other direction restarts the count. Admins are added and removed the same way, with `voteToAddAdmin` and `voteToRemoveAdmin`.
+
+A passed vote also **pins** the validator, which overrides staking:
+
+- **Pinned in** (`voteToAddValidator`): the validator joins at once if it is not in the set, and staking can't remove it, however low its stake. Staking takes it into its own set at the next sync, so its stake still sets its weight. A validator with no stake has weight 0 and can't vote or propose.
+- **Pinned out** (`voteToRemoveValidator`): the validator leaves at once if it is in the set, and staking can't add it back. A validator outside the set can be pinned out before it joins.
+
+`voteToClearValidatorPin(address)` removes a pin. Clearing a pin in hands the validator to staking: it keeps its membership until staking next syncs or activates it, and from then on the stake rules decide whether it stays. Staking takes over no other seat it does not already hold, so one voted in before pins existed stays until the admins vote on it. A kick from `ValidatorRegistry` removes a pinned-in validator and clears its pin.
 
 At genesis, `MercataGovernance` is owned by `AdminRegistry` (`0x100c`), which is also its only admin. Votes are therefore carried out through `AdminRegistry` governance.
 
@@ -85,17 +92,19 @@ The contract never removes the last validator, and `hardCapValidators` bounds th
 An operator joins in three steps:
 
 1. **Register** in `ValidatorRegistry`, binding the node's validator address. Registration is permissionless.
-2. **Bond** stake: self-bond plus delegated stake must reach `minStake`, a governance parameter.
-3. **Activate** with `StratoStaking.tryActivate`. This needs a free slot, or enough stake to evict the lowest-weighted validator by a margin. While joins are paused, only the owner can activate operators.
+2. **Bond** stake: the operator's own self-bond must reach the self-bond minimum (`selfBondMinimum`, 10,000 STRATO until governance sets it). Delegated stake adds weight but does not count toward it. A validator seated before this rule keeps the rule it was admitted under (`minStake`, a governance parameter) until it leaves the set or changes operator.
+3. **Activate** with `StratoStaking.tryActivate`. This needs a free slot, or enough stake to evict the lowest-weighted validator by a margin. Anyone can activate an eligible operator from the agreed opening block (`joinsOpenFromBlock`); before it nobody can, the owner included.
 
-An active operator leaves automatically, in the same transaction, as soon as it stops being eligible. Reasons include:
+An active operator leaves automatically, in the same transaction, as soon as it stops being eligible, unless the admins have pinned it in. Reasons include:
 
-- falling below `minStake`
+- falling below its minimum stake
 - being jailed
-- reaching the end of an exit notice
+- reaching the end of an exit notice (it stays out until its operator calls `cancelExit`)
 - being removed by the owner
 
-An operator that holds more than one third of the total stake can be removed with an emergency kick.
+A validator leaves in the same transaction that makes it ineligible; a leave is never held back by the per-block limit on set changes.
+
+There is no emergency kick. A validator that holds a third of the total stake decides whether any block commits, including one that would remove it, so the owner's vote only works while a validator is below a third. Recovery from a holder of a third is off chain.
 
 ## Staking phases
 
@@ -120,7 +129,7 @@ The activation height is a per-network setting, and every node must agree on it 
 **After activation,** `selectProposer` (`strato/core/strato-model/src/Blockchain/Strato/Model/ProposerSelection.hs`) picks the proposer for each height and round:
 
 1. **Seed.** It computes `seed = keccak256(chainId ‖ height ‖ round)`. The seed contains nothing the previous proposer can choose.
-2. **Weighted pick.** It walks the validators in address order, each weighted by stake, and picks at `seed mod totalStake`. If no validator has stake, the pick is uniform.
+2. **Weighted pick.** It walks the validators in address order, each weighted by stake, and picks at `(seed × totalStake) >> 256`: the seed read as a fraction of the total. A small change in the total moves that point by the same small fraction, so a few wei of stake cannot re-draw the proposer. (Helium below its switch height uses the first rule, `seed mod totalStake`.) If no validator has stake, the pick is uniform.
 3. **Exclusion.** Validators already picked for earlier rounds at the same height are skipped, so a round change always moves to a different validator.
 
 Contracts see facts about the parent block through these values:
@@ -146,7 +155,10 @@ Every transaction pays a fee through the Decider (`0xDEC1DE`). The Decider runs 
 **Block rewards.** Once per block, before the block's transactions, the node calls `payBlockRewards()` on the current fee implementation. `FeeRouter` pays the proposer a flat 0.01 STRATO out of its own STRATO balance:
 
 - **An unfunded router pays nothing** and never reverts, so an empty reward pool can't stall the chain.
+- **Staking refuses it.** The staking contract's `creditBlockReward` is disabled in favour of the emission schedule below, so the reward stays in the router and no `BlockRewardsPaid` event is emitted.
 - **The `BlockRewardsPaid` event** is included in the block's first receipt, from the fork heights listed on [Networks](networks.md#fork-heights).
+
+**Emission schedule.** Once per block, `processBlock()` also pays the previous block's producer from a reserve prefunded in the staking contract: `E0 × √(S / S0) × (R / R0)` STRATO a year for the interval its block closed (at most an hour), where `S` is the consensus set's stake and `R` the reserve still unreleased. The schedule is committed once, by an admin vote, after the reserve holds `R0`. It can't be paused, and admins can't recover the reserve.
 
 Whether `FeeRouter` is the active fee implementation depends on each network's `DeciderState` configuration.
 

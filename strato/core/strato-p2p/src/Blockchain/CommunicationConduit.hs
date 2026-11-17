@@ -13,7 +13,10 @@ module Blockchain.CommunicationConduit
     bytesToMessages,
     debounceTxSendsAndUnseq,
     messageToBytes,
-    ethVersion
+    ethVersion,
+    maxMessageItems,
+    rlpItemsAtMost,
+    isValidatorKey
   )
 where
 
@@ -27,7 +30,11 @@ import           Blockchain.Event
 import           Blockchain.EventException
 import           Blockchain.Frame
 import           Blockchain.Metrics
+import           Blockchain.Data.PubKey                (pointToBytes)
 import           Blockchain.Model.SyncState
+import           Blockchain.Strato.Model.Address       (fromPublicKey)
+import qualified Blockchain.Strato.Model.Secp256k1     as Secp256k1
+import           Blockchain.Strato.Model.Validator     (Validator (..))
 import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -37,13 +44,14 @@ import           Blockchain.Strato.Model.Util
 import           Blockchain.SyncDB
 import           Blockchain.Threads
 import           Conduit
-import           Control.Monad                         (forever, when)
+import           Control.Monad                         (forever, unless, when)
 import qualified Control.Monad.Change.Modify           as Mod
 import           Crypto.Types.PubKey.ECC
 import           Data.Bits                             (shiftL)
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
 import qualified Data.Conduit.Binary                   as CB
+import           Data.List                             (foldl')
 import           Data.List.Split
 import           Data.Maybe
 import qualified Data.Text                             as T
@@ -121,7 +129,7 @@ handleMsgClientConduit myId peer = do
       -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
       let highestBlockNum'' = if ver < 63 then highestBlockNum' - 8192 else highestBlockNum'
       lift . updatePeerLastBestBlockHash peer $ PeerLastBestBlockHash peerBestHash
-      lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum''
+      lift . claimPeerBest (pPeerHost peer) $ BestBlock peerBestHash highestBlockNum''
       startSyncTask peer highestBlockNum''
 
       lift stampActionTimestamp
@@ -141,12 +149,19 @@ handleMsgServerConduit myPubkey peer = do
   -- This connection is past its handshake and counted, so the limit is the
   -- number of established peers.
   numActivePeers <- liftIO countEstablishedPeers
+  validators <- lift $ bestSequencedBlockValidators <$> Mod.get (Mod.Proxy @BestSequencedBlock)
 
-  when (numActivePeers > Conf.maxConnections (p2pConfig ethConf)) $ do
+  -- A validator is not held to the limit: full of other peers, a node would turn
+  -- away the validators it votes with. Its key is only claimed until the Hello
+  -- below authenticates it, so a claimed validator gets at most one slot per
+  -- validator past the limit, and must send that Hello within helloWaitSeconds.
+  let limit = Conf.maxConnections (p2pConfig ethConf)
+      claimsValidator = isValidatorKey validators $ pPeerPubkey peer
+  when (numActivePeers > limit && not (claimsValidator && numActivePeers <= limit + length validators)) $ do
     yield $ Right $ Disconnect TooManyPeers
     throwIO CurrentlyTooManyPeers
 
-  awaitMsg >>= \case
+  awaitMsgWithin helloWaitSeconds >>= \case
     Just Hello {} -> do
       $logInfoS "handshake/Hello{}" "received hello"
       -- The key from the RLPx handshake is only a claim until the first frame
@@ -193,7 +208,7 @@ handleMsgServerConduit myPubkey peer = do
         throwIO NetworkIDMismatch
 
       lift . updatePeerLastBestBlockHash peer $ PeerLastBestBlockHash peerBestHash
-      lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum'
+      lift . claimPeerBest (pPeerHost peer) $ BestBlock peerBestHash highestBlockNum'
       startSyncTask peer highestBlockNum'
 
       lift stampActionTimestamp
@@ -206,6 +221,21 @@ awaitMsg =
     Just (MsgEvt msg) -> return (Just msg)
     Nothing           -> return Nothing
     _                 -> awaitMsg
+
+-- | 'awaitMsg', giving up after @n@ timer ticks (a second each) without one.
+awaitMsgWithin :: (MonadIO m) => Int -> ConduitM Event (Either P2PCNC Message) m (Maybe Message)
+awaitMsgWithin n =
+  await >>= \case
+    Just (MsgEvt msg) -> return (Just msg)
+    Just TimerEvt
+      | n <= 1        -> return Nothing
+      | otherwise     -> awaitMsgWithin (n - 1)
+    Nothing           -> return Nothing
+    _                 -> awaitMsgWithin n
+
+-- | How long an inbound peer has to send its Hello after the RLPx handshake.
+helloWaitSeconds :: Int
+helloWaitSeconds = 10
 
 -- | Take a new sync task for this peer and ask it for the task's headers, or
 -- mark the task 'NotReady' when they lie beyond the peer's (version-normalized) tip.
@@ -253,7 +283,12 @@ getRLPData =
       return $ x `B.cons` rest
     x | x >= 0xF8 && x <= 0xFF -> do
       length' <- cbSafeTake' $ fromIntegral x - 0xF7
-      rest <- cbSafeTake' . fromIntegral . bytes2Integer $ B.unpack length'
+      -- The length is the peer's word, up to eight bytes of it: read no message
+      -- larger than a peer may send.
+      let size = bytes2Integer $ B.unpack length'
+      when (size > toInteger maxMessageSize) . error $
+        "RLP message declares " ++ show size ++ " bytes, over the " ++ show maxMessageSize ++ " byte limit"
+      rest <- cbSafeTake' $ fromInteger size
       return $ x `B.cons` length' `B.append` rest
     x -> error $ "missing case in getRLPData: " ++ show x
 
@@ -262,7 +297,69 @@ bytesToMessages = forever $ do
   msgTypeData <- cbSafeTake' 1
   let word = fromInteger (rlpDecode $ rlpDeserialize msgTypeData :: Integer)
   objBytes <- getRLPData
+  unless (rlpItemsAtMost maxMessageItems objBytes) . error $
+    "RLP message holds more than " ++ show maxMessageItems ++ " items"
   yield $ obj2WireMessage word $ rlpDeserialize objBytes
+
+-- | The most RLP items one inbound message may hold. Decoding builds a heap
+-- object per item, so a message of one-byte items costs many times its size in
+-- memory; within maxMessageSize, real messages hold far fewer items than this.
+maxMessageItems :: Int
+maxMessageItems = 4000000
+
+-- | Whether an RLP encoding holds at most @cap@ items, counted from the item
+-- headers without decoding anything. A list's payload is its items laid end to
+-- end, so one pass over the headers sees every item at every depth. Each item's
+-- header and payload must fit inside its innermost enclosing list, as the
+-- decoder parses them; one that runs past it is refused, since the decoder would
+-- read it differently (narrowing an oversized length to an Int, or splitting the
+-- bytes it overran into siblings this count never saw). Lists nest at most
+-- maxRlpDepth deep.
+rlpItemsAtMost :: Int -> B.ByteString -> Bool
+rlpItemsAtMost cap bs = go 0 [B.length bs] 0
+  where
+    byteAt i = fromIntegral (B.index bs i) :: Integer
+    lengthAt i k = foldl' (\acc j -> acc * 256 + byteAt (i + j)) 0 [0 .. k - 1]
+    -- @ends@: where each enclosing payload stops, innermost first
+    go :: Int -> [Int] -> Int -> Bool
+    go _ [] _ = True
+    go i ends@(end : outer) items
+      | items > cap = False
+      | i == end = go i outer items
+      | otherwise =
+          let b = byteAt i
+           in if b < 0x80
+                then go (i + 1) ends (items + 1)
+                else withPayload i end b $ \start len ->
+                  if b <= 0xBF
+                    then go (start + len) ends (items + 1)
+                    else length ends <= maxRlpDepth && go start (start + len : ends) (items + 1)
+    -- the payload (start, length) of the item at @i@ with first byte @b@, if its
+    -- header and payload both end by @end@
+    withPayload i end b k
+      | i + header > end || len < 0 || toInteger (i + header) + len > toInteger end = False
+      | otherwise = k (i + header) (fromInteger len)
+      where
+        (base, longBase) = if b <= 0xBF then (0x80, 0xB7) else (0xC0, 0xF7)
+        short = b <= longBase
+        ll = fromInteger (b - longBase)
+        header = if short then 1 else 1 + ll
+        len
+          | short = b - base
+          | i + header > end = -1
+          | otherwise = lengthAt (i + 1) ll
+
+-- | How deep lists may nest in a message: real ones nest a few levels.
+maxRlpDepth :: Int
+maxRlpDepth = 64
+
+-- | Whether a peer's key is a current validator's. A stored key that is no public
+-- key (discovery once took any 64 bytes as a node ID) belongs to nobody, rather
+-- than throwing in the conversion.
+isValidatorKey :: [Validator] -> Maybe Point -> Bool
+isValidatorKey validators mKey = case mKey of
+  Just p@(Point _ _) | Just pub <- Secp256k1.importPublicKey (B.cons 0x04 $ pointToBytes p) -> Validator (fromPublicKey pub) `elem` validators
+  _ -> False
 
 maxMessageSize :: Int
 maxMessageSize = 1 `shiftL` 24

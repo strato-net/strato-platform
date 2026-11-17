@@ -5,6 +5,7 @@
 
 module Blockchain.Bagger.Transactions where
 
+import BlockApps.Logging (MonadLogger, logWarnNS)
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.SolidStorageDB (HasSolidStorageDB, getSolidStorageKeyVal')
 import Blockchain.Data.ExecResults
@@ -15,6 +16,10 @@ import Blockchain.Data.TransactionResultStatus
 import Blockchain.Strato.Model.StateRoot (StateRoot (..))
 import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Validator (Validator (..))
+import Blockchain.EthConf (ethConf)
+import qualified Blockchain.EthConf.Model as Conf
+import Blockchain.Forks (isConsensusFromStateForkActive)
 import SolidVM.Model.Delta
 import SolidVM.Model.Event
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
@@ -22,11 +27,15 @@ import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import qualified Blockchain.Stream.Action as Action
 import Control.DeepSeq
 import Control.Lens.Setter (set)
+import Control.Monad (unless)
 import Control.Monad.IO.Class (MonadIO)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import Data.Maybe (catMaybes)
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.List (foldl')
+import qualified Data.Text as T
 import Data.Time.Clock
 import GHC.Generics
 import SolidVM.Model.TypedArg (valueToTypedArg)
@@ -92,6 +101,8 @@ data TxRejection
   | AdminFlushed BaggerStage BaggerTxQueue FlushScope OutputTx
   | InvalidEnvelope BaggerStage BaggerTxQueue String OutputTx -- why
   | FeeBoundExceeded BaggerStage BaggerTxQueue Integer Integer OutputTx -- quotedFee, signedBound
+  | GasLimitTooHigh BaggerStage BaggerTxQueue Integer Integer OutputTx -- most a block admits, tx gas limit
+  | SenderPoolFull BaggerStage BaggerTxQueue Integer OutputTx -- most one sender may hold
   deriving (Eq, Read, Show)
 
 rejectedTx :: TxRejection -> OutputTx
@@ -104,6 +115,8 @@ rejectedTx (ChainIdMismatch _ _ _ t) = t
 rejectedTx (AdminFlushed _ _ _ t) = t
 rejectedTx (InvalidEnvelope _ _ _ t) = t
 rejectedTx (FeeBoundExceeded _ _ _ _ t) = t
+rejectedTx (GasLimitTooHigh _ _ _ _ t) = t
+rejectedTx (SenderPoolFull _ _ _ t) = t
 
 data BaggerStage = Insertion | Validation | Promotion | Demotion | Execution deriving (Read, Eq, Show)
 
@@ -170,6 +183,12 @@ instance Format TxRejection where
   format (FeeBoundExceeded stage queue quote bound OutputTx {otHash = hash}) =
     "Fee bound exceeded at stage " ++ show stage ++ " in queue " ++ show queue
       ++ ": quoted fee " ++ show quote ++ " > signed bound " ++ show bound ++ "\n\ttx hash " ++ format hash
+  format (GasLimitTooHigh stage queue cap limit OutputTx {otHash = hash}) =
+    "Gas limit too high at stage " ++ show stage ++ " in queue " ++ show queue
+      ++ ": gas limit " ++ show limit ++ " > most a block admits " ++ show cap ++ "\n\ttx hash " ++ format hash
+  format (SenderPoolFull stage queue cap OutputTx {otHash = hash, otSigner = signer}) =
+    "Sender pool full at stage " ++ show stage ++ " in queue " ++ show queue
+      ++ ": " ++ format signer ++ " already holds " ++ show cap ++ " transactions\n\ttx hash " ++ format hash
 
 txRejectionToAPIFailureCause :: TxRejection -> TransactionResultStatus
 txRejectionToAPIFailureCause (NonceTooLow stage queue needed tx) =
@@ -190,6 +209,10 @@ txRejectionToAPIFailureCause (InvalidEnvelope stage queue why _) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.InvalidEnvelopeError Nothing Nothing (Just why)
 txRejectionToAPIFailureCause (FeeBoundExceeded stage queue quote bound _) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.FeeBoundExceededError (Just quote) (Just bound) (Just feeBoundAdvice)
+txRejectionToAPIFailureCause (GasLimitTooHigh stage queue cap limit _) =
+  Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.GasLimitTooHighError (Just cap) (Just limit) (Just "No block can hold this gas limit")
+txRejectionToAPIFailureCause (SenderPoolFull stage queue cap _) =
+  Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.SenderPoolFullError (Just cap) Nothing (Just "The sender already has the most transactions the pool holds for one account; wait for some to be mined")
 
 tfToBaggerTxRejection :: TransactionFailureCause -> TxRejection
 tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = BalanceTooLow Execution Queued cost balance tx
@@ -230,6 +253,55 @@ quotedStratoFee = do
         BInteger n -> n
         _ -> 0
 
+-- | The most transactions the pool holds for one sender, pending and queued
+-- together. A sender at the limit can still replace a queued nonce, and send its
+-- next executable nonce, which is what lets its queue drain.
+maxTxsPerSender :: Int
+maxTxsPerSender = 64
+
+-- | The fee per transaction before the STRATO-gas fork and the legacy fee: one
+-- cent of USDST (FeeRouter USD_FEE, DeciderState payFees).
+legacyUsdFee :: Integer
+legacyUsdFee = 10000000000000000
+
+-- | Whether @address@ holds nothing any fee route takes: less than a whole
+-- voucher, and no USDST or STRATO at all. The fee implementation (DeciderState's
+-- payFees, or FeeRouter.payFees) burns a voucher (0x100e), else charges USDST
+-- (0x937efa…1010) before the router's activation, or STRATO after it, buying a
+-- STRATO shortfall with USDST. Its activation height and pool prices are the
+-- contract's, so the pool refuses only a sender none of these can serve; one
+-- holding too little is left for execution to refuse.
+holdsNoFeeToken :: HasSolidStorageDB m => Address -> m Bool
+holdsNoFeeToken address = do
+  vouchers <- balanceIn 0x100e
+  usdst <- balanceIn 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010
+  strato <- maybe (pure 0) balanceIn . Conf.stratoTokenAddress . Conf.network $ Conf.networkConfig ethConf
+  pure $ vouchers < 1000000000000000000 && usdst <= 0 && strato <= 0
+  where
+    balanceIn token = do
+      held <- getSolidStorageKeyVal' token (StoragePath [Field "_balances", Index (BC.pack $ show address)])
+      pure $ case held of
+        BInteger n -> n
+        _ -> 0
+
+-- | Whether @address@ clearly holds enough for one fee route: a whole voucher, a
+-- cent of USDST (the legacy fee, and more than any STRATO shortfall costs), or
+-- STRATO covering @quote@ when one is set. Weaker than execution's own check,
+-- which can also combine STRATO with a USDST purchase, so it only decides what
+-- counts as work a block can take, never admission.
+canClearlyPayFee :: HasSolidStorageDB m => Integer -> Address -> m Bool
+canClearlyPayFee quote address = do
+  vouchers <- balanceIn 0x100e
+  usdst <- balanceIn 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010
+  strato <- maybe (pure 0) balanceIn . Conf.stratoTokenAddress . Conf.network $ Conf.networkConfig ethConf
+  pure $ vouchers >= 1000000000000000000 || usdst >= legacyUsdFee || (quote > 0 && strato >= quote)
+  where
+    balanceIn token = do
+      held <- getSolidStorageKeyVal' token (StoragePath [Field "_balances", Index (BC.pack $ show address)])
+      pure $ case held of
+        BInteger v -> v
+        _ -> 0
+
 -- | Why a transaction cannot pay the block's fee: the fee it signed for does
 -- not cover the quote. Only an Ethereum envelope signs a bound, and the quote
 -- is 0 wherever nothing is quoted, so STRATO-native transactions and legacy
@@ -239,6 +311,18 @@ feeBoundRejection :: Integer -> TD.Transaction -> Maybe (Integer, Integer)
 feeBoundRejection quote tx = case signedFeeBound tx of
   Just bound | quote > bound -> Just (quote, bound)
   _ -> Nothing
+
+-- | The most gas a block holding @blockGas@ admits for one transaction, when
+-- the transaction asks for more. Execution takes such a transaction for one
+-- the block has no room left for (TFBlockGasLimitExceeded in addTransaction)
+-- and keeps it for the next block, which has no more room, so it is never
+-- mined and never dropped.
+gasLimitRejection :: Integer -> TD.Transaction -> Maybe Integer
+gasLimitRejection blockGas tx
+  | TD.gasLimit tx > cap = Just cap
+  | otherwise = Nothing
+  where
+    cap = min blockGas (toInteger (maxBound :: Int))
 
 transactionChainIdValid :: Integer -> TD.Transaction -> Bool
 transactionChainIdValid expected tx = TD.chainId tx == Just expected
@@ -291,6 +375,134 @@ getStakeDeltasFromResults = foldl' go M.empty
   where go acc trr = case trrResult trr of
           Left _ -> acc
           Right ExecResults{..} -> M.union erStakeUpdates acc
+
+-- | The validators MercataGovernance (0x100) lists and the weight it holds for
+-- each, read from the state the block leaves behind, and the positions of any
+-- entries that do not read as an address.
+--
+-- An empty list means "nothing to go by", never "no validators": governance
+-- does not drop its last validator, so an empty list is a network without the
+-- contract, and the caller leaves the set as it is. An entry that does not read
+-- as an address (address(0) is stored as a default) is left out on its own:
+-- giving up the whole list for it would leave the set frozen from then on,
+-- removals included.
+governanceValidatorsAndStakes :: HasSolidStorageDB m => m ([(Validator, Integer)], [Integer])
+governanceValidatorsAndStakes = do
+  len <- at [Field "validators", Field "length"]
+  case len of
+    BInteger n | n > 0 -> do
+      entries <- mapM (\i -> (,) i <$> member i) [0 .. n - 1]
+      pure ([v | (_, Just v) <- entries], [i | (i, Nothing) <- entries])
+    _ -> pure ([], [])
+  where
+    governance = Address 0x100
+    at path = getSolidStorageKeyVal' governance (StoragePath path)
+    member i = do
+      entry <- at [Field "validators", Index (BC.pack $ show i)]
+      case entry of
+        BAddress a -> Just <$> weighed a
+        BContract _ a -> Just <$> weighed a
+        _ -> pure Nothing
+    weighed a = do
+      weight <- at [Field "validatorStake", Index (BC.pack $ show a)]
+      pure . (,) (Validator a) $ case weight of
+        BInteger w -> max 0 w
+        _ -> 0
+
+-- | The changes that take the validator set and weights in force for a block
+-- to the ones the contracts hold after it: validators to add, validators to
+-- remove, and the weight of every held validator whose weight differs (a
+-- validator without an entry weighs 0). Lists are ascending, so every node
+-- writes the same header.
+--
+-- This is 'getDeltasFromResults' and 'getStakeDeltasFromResults' asked of the
+-- state. An empty @held@ changes nothing (see 'governanceValidatorsAndStakes').
+--
+-- One case is held back. While no weight is in force every validator has one
+-- vote, and the first weights to arrive switch the network to voting by stake,
+-- where a validator without a weight counts on neither side. If state held a
+-- weight for some validators and none for others at that moment, the ones with
+-- a weight would take the whole vote. So the first weights are written only
+-- once every held validator has one; until then the header carries the set
+-- changes and no weights, and the network stays on one vote each.
+consensusDeltasFromHeld :: S.Set Validator -> M.Map Validator Integer -> [(Validator, Integer)] -> (ValidatorDelta, StakeDelta)
+consensusDeltasFromHeld _ _ [] = (mempty, M.empty)
+consensusDeltasFromHeld inForce inForceStakes held =
+  ( toDelta (S.toAscList $ heldSet S.\\ inForce) (S.toAscList $ inForce S.\\ heldSet),
+    if noWeightInForce && partial then M.empty else changed
+  )
+  where
+    heldStakes = M.fromList held
+    heldSet = M.keysSet heldStakes
+    changed = M.filterWithKey (\v w -> M.findWithDefault 0 v inForceStakes /= w) heldStakes
+    noWeightInForce = all (<= 0) (M.elems inForceStakes)
+    partial = any (<= 0) (M.elems heldStakes) && any (> 0) (M.elems heldStakes)
+
+-- | The validator-set and stake-weight changes a block's header carries, given
+-- the block's number, the set and weights in force for it, and the results of
+-- its transactions.
+--
+-- From the fork (and only once staking is active, since earlier headers carry
+-- no weights) they are what governance's storage holds at the block's state
+-- root, so the caller must be positioned on that state. Before it they are
+-- added up from the transactions' events. Proposer and verifier both come
+-- through here, which is what keeps them on the same rule at the same block.
+--
+-- Before the fork, once staking is active, the state is read as well and
+-- compared: a block where the two derivations would leave the consensus layer
+-- with a different set or different weights is logged (see 'shadowMismatch').
+-- Nothing else changes, so a node can run this for as long as it likes ahead of
+-- the fork and report every block the fork would have decided differently.
+blockConsensusDeltas ::
+  (HasSolidStorageDB m, MonadLogger m) =>
+  Integer ->
+  S.Set Validator ->
+  M.Map Validator Integer ->
+  [TxRunResult] ->
+  m (ValidatorDelta, StakeDelta)
+blockConsensusDeltas blockNum inForce inForceStakes trrs
+  | not (Conf.stakingActiveAt (Conf.networkConfig ethConf) blockNum) = pure fromEvents
+  | isConsensusFromStateForkActive blockNum = fromState
+  | otherwise = do
+      shadow <- fromState
+      mapM_ (logWarnNS "consensusFromState/shadow" . T.pack . (("block " ++ show blockNum ++ ": ") ++)) $
+        shadowMismatch inForce inForceStakes fromEvents shadow
+      pure fromEvents
+  where
+    fromEvents = (getDeltasFromResults trrs, getStakeDeltasFromResults trrs)
+    fromState = do
+      (held, unreadable) <- governanceValidatorsAndStakes
+      unless (null unreadable) . logWarnNS "consensusFromState" . T.pack $
+        "block " ++ show blockNum ++ ": governance validators at " ++ show unreadable ++ " do not read as an address; left out"
+      pure $ consensusDeltasFromHeld inForce inForceStakes held
+
+-- | What the consensus layer holds once a block's changes are applied to the
+-- set and weights in force for it: the set, and each member's weight where it
+-- has one. Two derivations that write their changes differently (a weight
+-- re-published unchanged, a validator added and removed in one block) but end
+-- here agree.
+consensusOutcome :: S.Set Validator -> M.Map Validator Integer -> (ValidatorDelta, StakeDelta) -> (S.Set Validator, M.Map Validator Integer)
+consensusOutcome inForce inForceStakes (vd, sd) =
+  (set', M.filter (> 0) $ applyStakeDelta removed sd inForceStakes `M.restrictKeys` set')
+  where
+    (added, removed) = fromDelta vd
+    set' = (inForce `S.union` S.fromList added) S.\\ S.fromList removed
+
+-- | The shadow comparison: 'Nothing' when the changes derived from events and
+-- the changes read from state leave the consensus layer with the same set and
+-- weights, otherwise a line saying what each would leave.
+shadowMismatch :: S.Set Validator -> M.Map Validator Integer -> (ValidatorDelta, StakeDelta) -> (ValidatorDelta, StakeDelta) -> Maybe String
+shadowMismatch inForce inForceStakes fromEvents fromState
+  | byEvents == byState = Nothing
+  | otherwise =
+      Just $
+        "events and state disagree. From events: " ++ describe byEvents ++ ". From state: " ++ describe byState
+  where
+    byEvents = consensusOutcome inForce inForceStakes fromEvents
+    byState = consensusOutcome inForce inForceStakes fromState
+    describe (set', stakes') =
+      show (S.size set') ++ " validators " ++ show (map format $ S.toAscList set')
+        ++ ", weights " ++ show [(format v, w) | (v, w) <- M.toAscList stakes']
 
 -- | Convert a 'TxRunResult' to its canonical 'Receipt' for inclusion in the
 -- receipts trie (Phase 0 spec §6.2). Mirrors the gas/status accounting in

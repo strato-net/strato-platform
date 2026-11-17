@@ -5,7 +5,7 @@ import "./MultisigWallet.sol";
  * @title MultisigFactory
  * @notice Canonical registry and deterministic deployment factory for dedicated multisigs.
  */
-contract record MultisigFactory is Ownable {
+contract MultisigFactory is Ownable {
     uint public constant SETUP_LIFETIME = 2592000; // 30 days
     uint public constant MAX_TRANSACTION_TIMELOCK = 2592000; // 30 days
 
@@ -29,14 +29,14 @@ contract record MultisigFactory is Ownable {
         string label;
     }
 
-    mapping (string => LogicVersion) public record logicVersions;
-    mapping (string => mapping (string => bool)) public record upgradePaths;
+    mapping (string => LogicVersion) public logicVersions;
+    mapping (string => mapping (string => bool)) public upgradePaths;
 
-    mapping (string => PendingSetup) public record pendingSetups;
-    mapping (string => address[]) public record setupSigners;
-    mapping (string => mapping (address => bool)) public record setupConfirmations;
+    mapping (string => PendingSetup) public pendingSetups;
+    mapping (string => address[]) public setupSigners;
+    mapping (string => mapping (address => bool)) public setupConfirmations;
 
-    mapping (address => bool) public record factoryWallets;
+    mapping (address => bool) public factoryWallets;
     address public registryGovernance;
     uint public setupNonce;
 

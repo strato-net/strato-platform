@@ -319,7 +319,7 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
 
-    // DexScreener: data.pairs[] across DEXes/chains; pick highest-liquidity Ethereum/Base pair where baseToken matches the mapped contract address
+    // DexScreener: data.pairs[] across DEXes/chains; pick highest-24h-volume Ethereum/Base pair where baseToken matches the mapped contract address
     } else if (parsePattern === 'dexscreener' && Array.isArray(data?.pairs)) {
         symbols.forEach(symbol => {
             const mappedAddress = (sourceConfig.symbolMapping?.[symbol] || symbol).toLowerCase();
@@ -329,7 +329,7 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
                 p.priceUsd
             );
             if (candidates.length === 0) return;
-            candidates.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
+            candidates.sort((a: any, b: any) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0));
             const best = candidates[0];
             const priceUSD = parseFloat(best.priceUsd);
             if (!isNaN(priceUSD) && priceUSD > 0) {

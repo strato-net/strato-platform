@@ -24,18 +24,19 @@
 --import Blockchain.Strato.Model.Secp256k1
 --import Blockchain.VMContext
 
-import Blockchain.Bagger (buildNextBlockHeader)
-import Blockchain.Bagger.Transactions (TxRunResult (..), getStakeDeltasFromResults)
+import Blockchain.Bagger (attachBlockRewards, buildNextBlockHeader)
+import Blockchain.Bagger.Transactions (TxRunResult (..), getDeltasFromResults, getStakeDeltasFromResults)
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ExecResults
 import Blockchain.Data.ProposalFacts
 import Blockchain.Data.RLP
 import Blockchain.Data.VmTrace
-import Blockchain.Forks (isBlockRewardReceiptForkActive)
+import Blockchain.EthConf (ethConf, networkConfig, networkID)
+import Blockchain.Forks (isBlockRewardReceiptForkActive, constructorPublicationForkBlock, isConstructorPublicationForkActive)
 import Blockchain.Model.SyncState (BestSequencedBlock (..))
 import Blockchain.Strato.Model.Address (Address (..))
-import SolidVM.Model.Delta (getStakeDeltasFromEvents)
+import SolidVM.Model.Delta (fromDelta, getStakeDeltasFromEvents)
 import SolidVM.Model.Event
 import SolidVM.Model.Value (Value (..))
 import Blockchain.Strato.Model.Keccak256 (zeroHash)
@@ -47,6 +48,8 @@ import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Executable.EVMFlags ()
 import HFlags
 import qualified ActionEncodeSpec
+import qualified BaggerSpec
+import qualified ConsensusFromStateSpec
 import qualified CrossLangFixtureSpec
 import qualified ReplayProtectionSpec
 import qualified ReceiptSpec
@@ -85,6 +88,8 @@ spec :: Spec
 spec = do
   describe "VMContext" $ pure ()
   ActionEncodeSpec.spec
+  BaggerSpec.spec
+  ConsensusFromStateSpec.spec
   ReplayProtectionSpec.spec
   ReceiptSpec.spec
   StratoGasEnvelopeSpec.spec
@@ -158,6 +163,16 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
     isBlockRewardReceiptForkActive (upquarkActivation - 1) `shouldBe` False
     isBlockRewardReceiptForkActive upquarkActivation `shouldBe` True
 
+  it "activates constructor publication at the network fork height" $ do
+    constructorPublicationForkBlock 114784819836269 `shouldBe` 76752
+    constructorPublicationForkBlock 33056204878082667 `shouldBe` 65607
+    constructorPublicationForkBlock 7381244120123405172 `shouldBe` 10000
+    constructorPublicationForkBlock 42 `shouldBe` 0
+    let activation = constructorPublicationForkBlock (networkID $ networkConfig ethConf)
+    isConstructorPublicationForkActive (activation - 1) `shouldBe` False
+    isConstructorPublicationForkActive activation `shouldBe` True
+    isConstructorPublicationForkActive (activation + 1) `shouldBe` True
+
   it "reads ValidatorStakeUpdated once the source is governance" $ do
     let govAddr = Address 0x100
         stakeArg st = ("stake", SInteger st)
@@ -176,6 +191,31 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
         trr st = TxRunResult undefined (Right $ er st) 0 M.empty M.empty []
         results = [trr (M.fromList [(v1, 1), (v2, 2)]), trr (M.fromList [(v1, 3)])]
     getStakeDeltasFromResults results `shouldBe` M.fromList [(v1, 3), (v2, 2)]
+
+  it "carries the fee payment's validator and stake changes into its transaction's" $ do
+    let er new removed st = (solidvmErrorResults undefined)
+          { erException = Nothing, erNewValidators = new, erRemovedValidators = removed, erStakeUpdates = st }
+        v3 = Validator 0x3
+        fee = er [v1] [v2] (M.fromList [(v1, 5), (v2, 0)])
+        tx = er [v3] [] (M.fromList [(v1, 9)])
+        results = [TxRunResult undefined (Right $ prependConsensusDeltas fee tx) 0 M.empty M.empty []]
+    fromDelta (getDeltasFromResults results) `shouldBe` ([v1, v3], [v2])
+    getStakeDeltasFromResults results `shouldBe` M.fromList [(v1, 9), (v2, 0)]
+
+  -- Heights on either side of every fork height the default test config can have.
+  it "carries the block-reward call's validator and stake changes into the first transaction's" $
+    forAll genBlockHeaderV3 $ \h -> do
+      let er new removed st = (solidvmErrorResults undefined)
+            { erException = Nothing, erNewValidators = new, erRemovedValidators = removed, erStakeUpdates = st }
+          reward = er [v1] [] (M.fromList [(v1, 5), (v2, 7)])
+          tx = er [] [v2] (M.fromList [(v2, 0)])
+          trr = TxRunResult undefined (Right tx) 0 M.empty M.empty []
+          after' = attachBlockRewards h {number = 2000000} (Just reward) [trr, trr]
+          before = attachBlockRewards h {number = 1} (Just reward) [trr, trr]
+      fromDelta (getDeltasFromResults after') `shouldBe` ([v1], [v2, v2])
+      getStakeDeltasFromResults after' `shouldBe` M.fromList [(v1, 5), (v2, 0)]
+      fromDelta (getDeltasFromResults before) `shouldBe` ([], [v2, v2])
+      getStakeDeltasFromResults before `shouldBe` M.fromList [(v2, 0)]
 
   it "derives no proposal facts from pre-v3 headers" $
     forAll arbitrary $ \h -> proposalFactsFromHeader 1 0 (h :: BlockHeader) `shouldBe` noProposalFacts

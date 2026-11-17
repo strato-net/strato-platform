@@ -30,14 +30,18 @@ push (SReference apt) _ vals = do
   writeBuiltinVariable @engine (Constant $ SReference lenPath) (SInteger $ fromIntegral (len + 1 :: Int))
   writeBuiltinVariable @engine (Constant $ SReference $ apt `MS.snoc` MS.Index (BC.pack $ show len)) av
   pure $ Constant (SInteger $ fromIntegral (len + 1))
-push (SArray vec) (Just (Variable ref)) vals = do
+push (SArray vec) (Just variable) vals | mutable variable = do
   let av = case vals of
              [] -> SNULL
              (a:_) -> a
   newVar <- createVar av
   let newArr = V.snoc vec newVar
-  writeBuiltinVariable @engine (Variable ref) (SArray newArr)
+  writeBuiltinVariable @engine variable (SArray newArr)
   pure $ Constant (SInteger $ fromIntegral $ V.length newArr)
+  where
+    mutable (Variable _) = True
+    mutable (TypedVariable _ inner) = mutable inner
+    mutable _ = False
 push v mv argVals = throw (InvalidArguments "push" (format (renderValueShallow v, mv, map renderValueShallow argVals)))
 
 stringConcat :: [String] -> String

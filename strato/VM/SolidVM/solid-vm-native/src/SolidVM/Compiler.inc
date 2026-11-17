@@ -95,6 +95,7 @@ scopeTypes = map variableType . sVars
 
 resolveTy :: CCtx -> Ty.Type -> C SomeTy
 resolveTy c = \case
+  Ty.Int (Just False) _ -> pure (SomeTy TUInt)
   Ty.Int{} -> pure (SomeTy TInt)
   Ty.Bool -> pure (SomeTy TBool)
   Ty.Address{} -> pure (SomeTy TAddr)
@@ -166,20 +167,26 @@ compileAsBody sc t e = atLine (S.extractExpression e) $ case (t, e) of
     pure pathOf
   _ -> do
     CE t' f <- compileE sc e
-    case (t, t') of
-      (TAddr, TContract _) -> pure f
-      (TContract _, TAddr) -> pure f
-      (TDecimal, TInt) -> pure (functionMap (primitiveCode FromIntegerPrimitive) f)
-      (_, TRaw) -> pure (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (\env_1 -> compiled_0 env_1 >>= (fromDyn t . Dyn TRaw))
-        EMIT_END)
-      (TRaw, _) -> pure (functionMap (primitiveCode (RetDynPrimitive t')) f)
-      (TVariadic, TVariadic) -> pure f
-      (TVariadic, _) -> pure (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap (\v_1 -> [Dyn t' v_1]) . compiled_0)
-        EMIT_END)
-      (_, TVariadic) -> pure (CAPTURE f $ \compiled_0 ->
-        EMIT_BEGIN (\env_1 -> compiled_0 env_1 >>= (\ds_2 -> fromDyn t (Dyn TVariadic ds_2)))
-        EMIT_END)
-      _ -> do Refl <- sameTy t t'; pure f
+    coerceExpression t t' f
+
+coerceExpression :: Ty a -> Ty b -> Code (Env ls -> SM b) -> C (Code (Env ls -> SM a))
+coerceExpression t t' f = case (t, t') of
+  (TAddr, TContract _) -> pure f
+  (TContract _, TAddr) -> pure f
+  (TDecimal, TInt) -> pure (functionMap (primitiveCode FromIntegerPrimitive) f)
+  (TInt, TUInt) -> pure (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap toInteger . compiled_0) EMIT_END)
+  (TUInt, TInt) -> pure (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (\env_1 -> compiled_0 env_1 >>= (\n_2 -> pure $! checkedNatural n_2)) EMIT_END)
+  (TDecimal, TUInt) -> pure (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap fromIntegral . compiled_0) EMIT_END)
+  (_, TRaw) -> pure (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (\env_1 -> compiled_0 env_1 >>= (fromDyn t . Dyn TRaw))
+    EMIT_END)
+  (TRaw, _) -> pure (functionMap (primitiveCode (RetDynPrimitive t')) f)
+  (TVariadic, TVariadic) -> pure f
+  (TVariadic, _) -> pure (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap (\v_1 -> [Dyn t' v_1]) . compiled_0)
+    EMIT_END)
+  (_, TVariadic) -> pure (CAPTURE f $ \compiled_0 ->
+    EMIT_BEGIN (\env_1 -> compiled_0 env_1 >>= (\ds_2 -> fromDyn t (Dyn TVariadic ds_2)))
+    EMIT_END)
+  _ -> do Refl <- sameTy t t'; pure f
 
 compileFields :: Scope ls r -> Fields ts -> [Expression] -> C (Code (Env ls -> SM (HL ts)))
 compileFields sc fs expressions = typedCode (scopeTypes sc) (TTuple fs) <$> compileFieldsBody sc fs expressions
@@ -329,6 +336,9 @@ compileExpressionBody sc chargeDestination e = case e of
           EMIT_END)
       TContract _ -> unsupported "contract creation (new)"
       _ -> typeErr ("new " <> showTy t)
+  S.InlineBoundsCheck _ lo hi x | Right (CE TUInt f) <- compileE sc x ->
+    pure $ CE TUInt $ functionUnary
+      (EMIT_BEGIN (\value -> checkUnsignedBounds lo hi value >> pure value) EMIT_END) f
   S.InlineBoundsCheck _ lo hi x -> do
     f <- compileAs sc TInt x
     if boundsImplied sc lo hi x || (lo == Nothing && hi == Nothing)
@@ -453,13 +463,18 @@ compileExpressionBody sc chargeDestination e = case e of
       case t of
         TDecimal -> pure $ CE TDecimal (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap negate . compiled_0)
           EMIT_END)
+        TUInt -> pure $ CE TUInt (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (\env_1 -> do {n_2 <- compiled_0 env_1; pure $! checkedNatural (negate $ toInteger n_2)}) EMIT_END)
         _ -> do Refl <- sameTy TInt t; pure $ CE TInt (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (fmap negate . compiled_0)
                  EMIT_END)
     "++" -> incr True x 1
     "--" -> incr True x (-1)
-    "~" -> do f <- compileAs sc TInt x; pure $ CE TInt (CAPTURE f $ \compiled_0 ->
-               EMIT_BEGIN (fmap complement . compiled_0)
-               EMIT_END)
+    "~" -> do
+      CE t f <- compileE sc x
+      case t of
+        TUInt -> pure $ CE TUInt (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (\env_1 -> do {n_2 <- compiled_0 env_1; pure $! checkedNatural (complement $ toInteger n_2)}) EMIT_END)
+        _ -> do
+          integer <- coerceExpression TInt t f
+          pure $ CE TInt (CAPTURE integer $ \compiled_0 -> EMIT_BEGIN (fmap complement . compiled_0) EMIT_END)
     "delete" -> do
       (_, pathF) <- compileStorage sc x
       pure $ CE TUnit $ (CAPTURE pathF $ \compiled_0 -> EMIT_BEGIN (\env_1 -> do {path_2 <- compiled_0 env_1;
@@ -470,13 +485,24 @@ compileExpressionBody sc chargeDestination e = case e of
   S.MinusMinus _ x -> incr False x (-1)
   S.Ternary _ cnd a b -> do
     cf <- compileAs sc TBool cnd
-    CE t af <- compileE sc a
-    bf <- compileAs sc t b
-    pure $ CE t (CAPTURE3 cf af bf $ \compiled_0 compiled_1 compiled_2 ->
-      EMIT_BEGIN (\env_3 -> compiled_0 env_3 >>= (\k_4 -> if k_4
-      then compiled_1 env_3
-      else compiled_2 env_3))
-      EMIT_END)
+    CE at af <- compileE sc a
+    let conditional :: Ty t -> C (CE ls)
+        conditional t = do
+          firstBranch <- coerceExpression t at af
+          second <- compileAs sc t b
+          pure $ CE t $ CAPTURE3 cf firstBranch second $ \compiled_0 compiled_1 compiled_2 ->
+            EMIT_BEGIN (\env_3 -> compiled_0 env_3 >>= (\k_4 -> if k_4 then compiled_1 env_3 else compiled_2 env_3)) EMIT_END
+    case at of
+      TUInt -> case compileE sc b of
+        Right (CE TRaw _) -> conditional TRaw
+        Right (CE TVariadic _) -> conditional TVariadic
+        Right (CE TInt _) | not (untypedInteger sc b) -> typeErr "Mismatched signedness between integer values"
+        _ -> conditional TUInt
+      TInt -> case compileE sc b of
+        Right (CE TUInt _) | untypedInteger sc a -> conditional TUInt
+        Right (CE TUInt _) -> typeErr "Mismatched signedness between integer values"
+        _ -> conditional TInt
+      _ -> conditional at
   S.Binary _ "=" (S.TupleExpression _ lhss) r -> do
     -- (a, b) = rhs : assign through each l-value (holes skip)
     compileTupleAssignment sc False lhss r
@@ -524,6 +550,18 @@ compileExpressionBody sc chargeDestination e = case e of
           compiled_2 env_3 value_5;
           pure value_5})
           EMIT_END)
+      (TUInt, _) -> do
+        rf <- compileAs sc TInt r
+        f <- intOp bop
+        pure $ CE TUInt (CAPTURE4 rf get f set $ \compiled_0 compiled_1 compiled_2 compiled_3 ->
+          EMIT_BEGIN (\env_4 -> do {b_5 <- compiled_0 env_4;
+          a_6 <- chargeAfter 1 (compiled_1 env_4);
+          void $ chargeAfter 1 (compiled_1 env_4);
+          checkedNatural b_5 `seq` pure ();
+          n_7 <- compiled_2 (toInteger a_6) b_5;
+          let {v_8 = checkedNatural n_7};
+          v_8 `seq` compiled_3 env_4 v_8;
+          pure v_8}) EMIT_END)
       _ -> do
         Refl <- sameTy TInt t
         rf <- compileAs sc TInt r
@@ -550,6 +588,7 @@ compileExpressionBody sc chargeDestination e = case e of
     literalConstant t initial = do
       CE source f <- compileE' sc initial
       case (t, source) of
+        (TUInt, TInt) -> pure (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (\env_1 -> compiled_0 env_1 >>= (\n_2 -> pure $! checkedNatural n_2)) EMIT_END)
         (TDecimal, TInt) -> pure (functionMap (primitiveCode FromIntegerPrimitive) f)
         (TContract _, TAddr) -> pure f
         _ -> do Refl <- sameTy t source; pure f
@@ -567,22 +606,59 @@ compileExpressionBody sc chargeDestination e = case e of
     incr :: Bool -> Expression -> Integer -> C (CE ls)
     incr prefix x d = do
       Destination t prepare <- compileDestination sc True x
-      Refl <- sameTy TInt t
-      pure $ CE TInt $ (CAPTURE prepare $ \compiled_0 ->
-        EMIT_BEGIN (\env_1 -> do {(_, get_2, set_3) <- compiled_0 env_1;
-        v_4 <- get_2;
-        next_5 <- if d == 1 then Operators.integerAdd v_4 1 else Operators.integerSubtract v_4 1;
-        set_3 next_5;
-        pure (if prefix
-        then next_5
-        else v_4)})
-        EMIT_END)
+      case t of
+        TUInt -> pure $ CE TUInt $ (CAPTURE prepare $ \compiled_0 ->
+          EMIT_BEGIN (\env_1 -> do {(_, get_2, set_3) <- compiled_0 env_1;
+          v_4 <- get_2;
+          n_5 <- if d == 1 then Operators.integerAdd (toInteger v_4) 1 else Operators.integerSubtract (toInteger v_4) 1;
+          let {next_5 = checkedNatural n_5};
+          next_5 `seq` set_3 next_5;
+          pure (if prefix then next_5 else v_4)}) EMIT_END)
+        _ -> do
+          Refl <- sameTy TInt t
+          pure $ CE TInt $ (CAPTURE prepare $ \compiled_0 ->
+            EMIT_BEGIN (\env_1 -> do {(_, get_2, set_3) <- compiled_0 env_1;
+            v_4 <- get_2;
+            next_5 <- if d == 1 then Operators.integerAdd v_4 1 else Operators.integerSubtract v_4 1;
+            set_3 next_5;
+            pure (if prefix
+            then next_5
+            else v_4)})
+            EMIT_END)
 
     binop :: T.Text -> Expression -> Expression -> C (CE ls)
     binop op l r
       | op `elem` ["+", "-", "*", "/", "%", "**", "|", "&", "^", "<<", ">>"] = do
           CE lt lf <- compileE sc l
-          case (lt, op) of
+          CE rightTy rawRight <- compileE sc r
+          let unsigned = case (lt, rightTy) of
+                (TUInt, TUInt) -> True
+                (TUInt, TRaw) -> True
+                (TRaw, TUInt) -> True
+                (TUInt, TVariadic) -> True
+                (TVariadic, TUInt) -> True
+                (TUInt, TInt) -> untypedInteger sc r
+                (TInt, TUInt) -> untypedInteger sc l
+                _ -> False
+              mixed = case (lt, rightTy) of
+                (TUInt, TInt) -> True
+                (TInt, TUInt) -> True
+                _ -> False
+          when (mixed && not unsigned) $ typeErr "Mismatched signedness between integer values"
+          if unsigned then do
+            left <- coerceExpression TUInt lt lf
+            right <- coerceExpression TUInt rightTy rawRight
+            f <- intOp op
+            pure $ CE TUInt $ if op `elem` ["/", "%"]
+              then (CAPTURE3 right left f $ \compiled_0 compiled_1 compiled_2 ->
+                EMIT_BEGIN (\env_3 -> do {compiled_0 env_3 >>= (\b_4 -> Operators.checkDivisor b_4);
+                a_5 <- compiled_1 env_3;
+                b_6 <- compiled_0 env_3;
+                n_7 <- compiled_2 (toInteger a_5) (toInteger b_6);
+                pure $! checkedNatural n_7}) EMIT_END)
+              else (CAPTURE3 left right f $ \compiled_0 compiled_1 compiled_2 ->
+                EMIT_BEGIN (\env_3 -> do {a_4 <- compiled_0 env_3; b_5 <- compiled_1 env_3; n_6 <- compiled_2 (toInteger a_4) (toInteger b_5); pure $! checkedNatural n_6}) EMIT_END)
+          else case (lt, op) of
             (TDecimal, _) -> do
               rf <- compileAs sc TDecimal r
               f <- decimalOp True (isDecimal r) op
@@ -594,20 +670,21 @@ compileExpressionBody sc chargeDestination e = case e of
                   compiled_2 a_5 b_6})
                   EMIT_END)
                 else functionBinary f lf rf
-            (TInt, _) | Right (CE TDecimal _) <- compileE sc r -> do
+            (_, _) | Right (CE TDecimal _) <- compileE sc r -> do
+              left <- coerceExpression TDecimal lt lf
               rf <- compileAs sc TDecimal r
               f <- decimalOp False True op
               pure $ CE TDecimal $ if op `elem` ["/", "%"]
-                then (CAPTURE3 rf lf f $ \compiled_0 compiled_1 compiled_2 ->
+                then (CAPTURE3 rf left f $ \compiled_0 compiled_1 compiled_2 ->
                   EMIT_BEGIN (\env_3 -> do {compiled_0 env_3 >>= (\b_4 -> Operators.checkDivisor b_4);
                   a_5 <- compiled_1 env_3;
                   b_6 <- compiled_0 env_3;
-                  compiled_2 (fromInteger a_5) b_6})
+                  compiled_2 a_5 b_6})
                   EMIT_END)
-                else (CAPTURE3 lf rf f $ \compiled_0 compiled_1 compiled_2 ->
+                else (CAPTURE3 left rf f $ \compiled_0 compiled_1 compiled_2 ->
                   EMIT_BEGIN (\env_3 -> do {a_4 <- compiled_0 env_3;
                   b_5 <- compiled_1 env_3;
-                  compiled_2 (fromInteger a_4) b_5})
+                  compiled_2 a_4 b_5})
                   EMIT_END)
             (TStr, "+") -> do rf <- compileAs sc TStr r; pure $ CE TStr (CAPTURE2 lf rf $ \compiled_0 compiled_1 ->
                                EMIT_BEGIN (\env_2 -> do {a_3 <- compiled_0 env_2;
@@ -632,7 +709,9 @@ compileExpressionBody sc chargeDestination e = case e of
                   EMIT_END)
                 else functionBinary f lf rf
       | op `elem` ["==", "!="] = do
-          CE lt lf <- compileE sc l
+          CE source value <- compileE sc l
+          SomeTy lt <- pure $ case source of TUInt -> SomeTy TInt; _ -> SomeTy source
+          lf <- coerceExpression lt source value
           rf <- compileAs sc lt r
           eq <- eqOn lt
           let k = if op == "==" then (identityFunction) else (primitiveCode NotPrimitive)
@@ -684,7 +763,7 @@ compileExpressionBody sc chargeDestination e = case e of
 
     eqOn :: Ty t -> C (Code (t -> t -> Bool))
     eqOn = \case
-      TDecimal -> pure (primitiveCode EqualPrimitive); TInt -> pure (primitiveCode EqualPrimitive); TBool -> pure (primitiveCode EqualPrimitive); TAddr -> pure (primitiveCode EqualPrimitive); TStr -> pure (primitiveCode EqualPrimitive); TBytes -> pure (primitiveCode EqualPrimitive)
+      TUInt -> pure (primitiveCode EqualPrimitive); TDecimal -> pure (primitiveCode EqualPrimitive); TInt -> pure (primitiveCode EqualPrimitive); TBool -> pure (primitiveCode EqualPrimitive); TAddr -> pure (primitiveCode EqualPrimitive); TStr -> pure (primitiveCode EqualPrimitive); TBytes -> pure (primitiveCode EqualPrimitive)
       TEnum _ _ -> pure (primitiveCode EqualPrimitive); TContract _ -> pure (primitiveCode EqualPrimitive)
       t -> typeErr ("no equality on " <> showTy t)
 
@@ -696,6 +775,37 @@ boundsImplied sc lo hi expression = case knownInteger sc expression of
       maybe True (\lower -> maybe False (>= lower) innerLo) lo &&
       maybe True (\upper -> maybe False (<= upper) innerHi) hi
     _ -> False
+
+untypedInteger :: Scope ls r -> Expression -> Bool
+untypedInteger _ expression | isIntegerLiteral expression = True
+untypedInteger sc expression = case expressionType (cCC c) (cContract c) locals expression of
+  Just (Ty.Int signed _) -> signed /= Just True
+  _ -> False
+  where
+    c = sC sc
+    locals = M.fromList [(varName v, variableType v) | v <- reverse (sVars sc)]
+    variableType (Var _ t _) = sourceType t
+    variableType (ValueVar _ t _ _) = sourceType t
+    sourceType :: Ty t -> Ty.Type
+    sourceType = \case
+      TInt -> Ty.Int (Just True) Nothing
+      TUInt -> Ty.Int (Just False) Nothing
+      TDecimal -> Ty.Decimal
+      TBool -> Ty.Bool
+      TAddr -> Ty.Address False
+      TStr -> Ty.String Nothing
+      TBytes -> Ty.Bytes Nothing Nothing
+      TArr t -> Ty.Array (sourceType t) Nothing
+      TStruct name _ -> Ty.UnknownLabel name
+      TEnum name _ -> Ty.UnknownLabel name
+      TContract name -> Ty.Contract name
+      TAlias t _ -> sourceType t
+      TRef st -> storageType st
+      _ -> Ty.Variadic
+    storageType (SScalar (SomeTy t)) = sourceType t
+    storageType (SArray t) = Ty.Array (storageType t) Nothing
+    storageType (SStruct name _) = Ty.UnknownLabel name
+    storageType (SMap (SomeTy k) v) = Ty.Mapping Nothing (sourceType k) (storageType v) Nothing Nothing
 
 knownInteger :: Scope ls r -> Expression -> Maybe Integer
 knownInteger sc = \case
@@ -786,10 +896,13 @@ tupleSettersBody sc (FCons _ t rest) (mx : xs) = do
                         EMIT_END)))))
     Just x -> do
       Destination lt location <- compileDestination sc True x
-      Refl <- sameTy lt t
-      pure (CAPTURE location $ \compiled_0 -> EMIT_BEGIN (\env_1 -> do {(_, _, set_2) <- compiled_0 env_1;
-        pure set_2})
-        EMIT_END)
+      case (lt, t) of
+        (TUInt, TInt) -> pure (CAPTURE location $ \compiled_0 -> EMIT_BEGIN (\env_1 -> do {(_, _, set_2) <- compiled_0 env_1; pure (\n_3 -> let {u_4 = checkedNatural n_3} in u_4 `seq` set_2 u_4)}) EMIT_END)
+        (TInt, TUInt) -> pure (CAPTURE location $ \compiled_0 -> EMIT_BEGIN (\env_1 -> do {(_, _, set_2) <- compiled_0 env_1; pure (set_2 . toInteger)}) EMIT_END)
+        _ -> do
+          Refl <- sameTy lt t
+          pure (CAPTURE location $ \compiled_0 -> EMIT_BEGIN (\env_1 -> do {(_, _, set_2) <- compiled_0 env_1;
+            pure set_2}) EMIT_END)
   remaining <- tupleSetters sc rest xs
   pure $ (CAPTURE2 prepare remaining $ \compiled_0 compiled_1 -> EMIT_BEGIN (\env_2 -> do {set_3 <- compiled_0 env_2;
     next_4 <- compiled_1 env_2;
@@ -929,12 +1042,15 @@ compileLVBody sc e | Right (ALV originalTy pathOf _ set) <- compileAliasLV sc e 
 compileLVBody sc e = atLine (S.extractExpression e) $ case e of
   S.InlineBoundsCheck _ lo hi x -> do
     LV t get set <- compileLVUnmetered sc x
-    Refl <- sameTy TInt t
-    pure $ LV TInt (functionAfter 1 get) $ (CAPTURE set $ \compiled_0 ->
-      EMIT_BEGIN (\env_1 v_2 -> do {when (maybe False (v_2 <) lo) $ revert ("underflow: " <> T.pack (show v_2));
-      when (maybe False (v_2 >) hi) $ revert ("overflow: " <> T.pack (show v_2));
-      compiled_0 env_1 v_2})
-      EMIT_END)
+    case t of
+      TUInt -> pure $ LV TUInt (functionAfter 1 get) (CAPTURE set $ \compiled_0 -> EMIT_BEGIN (\env_1 n_2 -> do {checkUnsignedBounds lo hi n_2; compiled_0 env_1 n_2}) EMIT_END)
+      _ -> do
+        Refl <- sameTy TInt t
+        pure $ LV TInt (functionAfter 1 get) $ (CAPTURE set $ \compiled_0 ->
+          EMIT_BEGIN (\env_1 v_2 -> do {when (maybe False (v_2 <) lo) $ revert ("underflow: " <> T.pack (show v_2));
+          when (maybe False (v_2 >) hi) $ revert ("overflow: " <> T.pack (show v_2));
+          compiled_0 env_1 v_2})
+          EMIT_END)
   S.Variable _ n | Just (Var _ t i) <- lookupVar sc n, notRef t ->
     pure $ LV t ((
                     (EMIT_BEGIN (\env_0 -> liftIO (readIORef (ref i env_0)))
@@ -1123,15 +1239,18 @@ compileDestinationBody :: forall ls r. Scope ls r -> Bool -> Expression -> C (De
 compileDestinationBody sc metered expression = case expression of
   S.InlineBoundsCheck _ lo hi inner -> do
     Destination t prepare <- compileDestinationUnmetered sc True inner
-    Refl <- sameTy TInt t
-    pure $ Destination TInt $ (CAPTURE prepare $ \compiled_0 ->
-      EMIT_BEGIN (\env_1 -> do {(path_2, get_3, set_3) <- compiled_0 env_1;
-      value_4 <- get_3;
-      when (maybe False (value_4 <) lo) $ revert ("underflow: " <> T.pack (show value_4));
-      when (maybe False (value_4 >) hi) $ revert ("overflow: " <> T.pack (show value_4));
-      when metered $ chargeGas 1;
-      pure (path_2, pure value_4, set_3)})
-      EMIT_END)
+    case t of
+      TUInt -> pure $ Destination TUInt (CAPTURE prepare $ \compiled_0 -> EMIT_BEGIN (\env_1 -> do {(path_2, get_3, set_3) <- compiled_0 env_1; n_4 <- get_3; checkUnsignedBounds lo hi n_4; when metered $ chargeGas 1; pure (path_2, pure n_4, set_3)}) EMIT_END)
+      _ -> do
+        Refl <- sameTy TInt t
+        pure $ Destination TInt $ (CAPTURE prepare $ \compiled_0 ->
+          EMIT_BEGIN (\env_1 -> do {(path_2, get_3, set_3) <- compiled_0 env_1;
+          value_4 <- get_3;
+          when (maybe False (value_4 <) lo) $ revert ("underflow: " <> T.pack (show value_4));
+          when (maybe False (value_4 >) hi) $ revert ("overflow: " <> T.pack (show value_4));
+          when metered $ chargeGas 1;
+          pure (path_2, pure value_4, set_3)})
+          EMIT_END)
   S.Variable _ n | Just (Var _ t i) <- lookupVar sc n, notReference t ->
     pure $ Destination t $ EMIT_BEGIN (\env_0 -> do {when metered $ chargeGas 1;
       pure (Nothing, liftIO (readIORef (ref i env_0)), liftIO . writeIORef (ref i env_0))})
@@ -1552,11 +1671,17 @@ compileCall sc callee args = case callee of
     castTarget n
       | n `elem` ["address", "payable"] = Just "address"
       | n `elem` ["bool", "string", "bytes", "decimal", "variadic"] = Just n
-      | "uint" `T.isPrefixOf` n || "int" `T.isPrefixOf` n = Just "int"
+      | "uint" `T.isPrefixOf` n = Just "uint"
+      | "int" `T.isPrefixOf` n = Just "int"
       | "bytes" `T.isPrefixOf` n = Just "bytes"
       | otherwise = Nothing
 
     cast :: T.Text -> C (CE ls)
+    cast "uint" = do
+      value <- cast "int"
+      case value of
+        CE TInt f -> pure $ CE TUInt (CAPTURE f $ \compiled_0 -> EMIT_BEGIN (\env_1 -> compiled_0 env_1 >>= (\n_2 -> pure $! checkedNatural n_2)) EMIT_END)
+        _ -> err Internal "integer cast result"
     cast "variadic" = do
       f <- dynArgs args
       pure $ CE TVariadic (CAPTURE f $ \compiled_run -> EMIT_BEGIN (\env -> compiled_run env >>= Metered.variadic) EMIT_END)
@@ -1567,6 +1692,7 @@ compileCall sc callee args = case callee of
         TAddr -> pure $ CE TStr (functionUnary (typedUnary t TStr (EMIT_BEGIN MeteredCasts.string EMIT_END)) raw)
         TInt -> pure $ CE TStr (functionUnary (typedUnary t TStr (EMIT_BEGIN MeteredCasts.string EMIT_END)) raw)
         TBool -> pure $ CE TStr (functionUnary (typedUnary t TStr (EMIT_BEGIN MeteredCasts.string EMIT_END)) raw)
+        TUInt -> pure $ CE TStr (functionUnary (typedUnary t TStr (EMIT_BEGIN (MeteredCasts.string . toInteger) EMIT_END)) raw)
         _ -> builtinCall TStr "string"
     cast k | k `elem` ["string", "decimal"] = do
       SomeTy t <- castTy k
@@ -1590,6 +1716,9 @@ compileCall sc callee args = case callee of
           ("bytes", TStr) -> pure $ CE TBytes (functionUnary (typedUnary t TBytes (EMIT_BEGIN MeteredCasts.bytes EMIT_END)) raw)
           ("bytes", TBytes) -> pure $ CE TBytes (functionUnary (typedUnary t TBytes (EMIT_BEGIN MeteredCasts.bytes EMIT_END)) raw)
           ("bool", TBool) -> pure $ CE TBool (functionUnary (typedUnary t TBool (EMIT_BEGIN MeteredCasts.bool EMIT_END)) raw)
+          ("int", TUInt) -> pure $ CE TInt (functionUnary (typedUnary t TInt (EMIT_BEGIN (MeteredCasts.int . toInteger) EMIT_END)) raw)
+          ("address", TUInt) -> pure $ CE TAddr (functionUnary (typedUnary t TAddr (EMIT_BEGIN (MeteredCasts.address . toInteger) EMIT_END)) raw)
+          ("bytes", TUInt) -> pure $ CE TBytes (functionUnary (typedUnary t TBytes (EMIT_BEGIN (MeteredCasts.bytes32 . toInteger) EMIT_END)) raw)
           -- explicit conversion out of the dynamic world: checked once at runtime
           (_, TVariadic) -> do
             SomeTy target <- castTy k
@@ -1610,7 +1739,7 @@ compileCall sc callee args = case callee of
 
     castTy :: T.Text -> C SomeTy
     castTy = \case
-      "address" -> pure (SomeTy TAddr); "int" -> pure (SomeTy TInt); "bool" -> pure (SomeTy TBool)
+      "address" -> pure (SomeTy TAddr); "uint" -> pure (SomeTy TUInt); "int" -> pure (SomeTy TInt); "bool" -> pure (SomeTy TBool)
       "decimal" -> pure (SomeTy TDecimal); "string" -> pure (SomeTy TStr); "bytes" -> pure (SomeTy TBytes); k -> unknown ("type " <> k)
 
     deriveCall target = do
@@ -2512,12 +2641,16 @@ destructureBody sc (FCons _ t fs) (en : ens) rest = case en of
       {_ :* vs_3 -> compiled_0 env_1 vs_3})
       EMIT_END)
   S.VarDefEntry mty _ n _ -> do
-    forM_ mty $ \ty -> do SomeTy dt <- resolveTy (sC sc) ty; void (sameTy dt t)
-    k <- destructure (pushVar n t sc) fs ens rest
+    SomeTy declared <- maybe (pure $ SomeTy t) (resolveTy $ sC sc) mty
+    case (declared, t) of
+      (TUInt, TInt) -> pure ()
+      (TInt, TUInt) -> pure ()
+      _ -> void (sameTy declared t)
+    k <- destructure (pushVar n declared sc) fs ens rest
     pure (CAPTURE k $ \compiled_0 -> EMIT_BEGIN (\env_1 hl_2 -> case hl_2 of
-      {v_3 :* vs_4 -> do {Operations.localWrite; rr_5 <- liftIO (newIORef v_3);
-      compiled_0 (rr_5 :& env_1) vs_4}})
-      EMIT_END)
+      {v_3 :* vs_4 -> do {Operations.localWrite; value_5 <- fromDyn declared (Dyn t v_3);
+      rr_6 <- liftIO (newIORef value_5);
+      compiled_0 (rr_6 :& env_1) vs_4}}) EMIT_END)
 destructureBody _ _ _ _ = typeErr "destructuring arity mismatch"
 
 -- Low-level results acquire their types at the destructuring boundary.

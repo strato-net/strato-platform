@@ -198,7 +198,7 @@ createContractValues contractName' mSalt getArgs = do
   pure $ fromMaybe (throw (InternalError ("a call to create did not create an address: " ++ (maybe "no VM exception" (either displayException displayException) $ erException execResults)))) $ erNewContractAddress execResults
 
 create' :: Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> SM ExecResults
-create' creator newAddress ch cc contractName' valList = do
+create' creator newAddress ch cc contractName' valList = withContractConstruction newAddress $ \deferPublication -> do
 
   let !contract' = fromMaybe (throw (MissingType "create'/contract" (labelToString contractName'))) (cc ^. CC.contracts . at contractName')
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
@@ -210,7 +210,9 @@ create' creator newAddress ch cc contractName' valList = do
     pure
       newAddressState
         { addressStateContractRoot = MP.emptyTriePtr,
-          addressStateCodeHash = SolidVMCode (labelToString contractName') ch
+          addressStateCodeHash = if deferPublication
+            then addressStateCodeHash blankAddressState
+            else SolidVMCode (labelToString contractName') ch
         }
 
   -- get the gasLeft from the environment
@@ -233,6 +235,12 @@ create' creator newAddress ch cc contractName' valList = do
 
   -- Run the constructor
   runTheConstructors creator newAddress ch cc contractName' resolvedValList
+
+  when deferPublication $
+    A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \addressState ->
+      pure $ if addressStateCodeHash addressState == addressStateCodeHash blankAddressState
+        then addressState {addressStateCodeHash = SolidVMCode (labelToString contractName') ch}
+        else addressState
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ labelToString contractName'
 
@@ -459,9 +467,22 @@ call' from to' fnCalltype functionName valList = do
       _ -> case M.lookup functionName $ contract ^. CC.storageDefs of
         Just CC.VariableDecl {..} | not (isExternal && _varVisibility /= Just CC.Public) -> do
           _ <- Runtime.compiledContract hsh cc contract
+          let checkIndices typ (v : vs) = case typ of
+                SVMType.Mapping _ keyType valueType _ _ -> do
+                  void $ coerceUnsignedValue contract cc keyType v
+                  checkIndices valueType vs
+                SVMType.Array valueType _ -> do
+                  void $ coerceUnsignedValue contract cc (SVMType.Int (Just False) Nothing) v
+                  checkIndices valueType vs
+                _ -> pure ()
+              checkIndices _ [] = pure ()
+              checkedValue typ v
+                | SReference _ <- v, SVMType.Int (Just False) _ <- typ = pure (SUnsigned 0)
+                | otherwise = coerceUnsignedValue contract cc typ v
+          checkIndices _varType valList
           let args' = fromMaybe [] $ case (_varType, valList) of
                 ((SVMType.Array _ _), oa) -> for oa $ \case
-                  SInteger n -> Just . MS.Index . BC.pack $ show n
+                  SIntegral n -> Just . MS.Index . BC.pack $ show n
                   _ -> Nothing
                 ((SVMType.Mapping _ _ _ _ _), oa) ->
                   traverse convertValueToStoragePathPiece oa
@@ -481,15 +502,15 @@ call' from to' fnCalltype functionName valList = do
                           SVMType.Error{} -> Nothing
                           SVMType.Array{} -> Nothing
                           SVMType.Mapping{} -> Nothing
-                          _ -> Just n
+                          _ -> Just (n, t)
                         ) <$> fields
-                  fieldVals <- for fieldsToLoad $ \fieldName ->
-                    getVar $ Constant $ SReference $ path `MS.snoc` MS.Field (BC.pack $ labelToString fieldName)
+                  fieldVals <- for fieldsToLoad $ \(fieldName, typ) ->
+                    getVar (Constant $ SReference $ path `MS.snoc` MS.Field (BC.pack $ labelToString fieldName)) >>= checkedValue typ
                   fieldVars <- traverse createVar fieldVals
                   pure . STuple $ V.fromList fieldVars
               handleSimple path = do
                 v <- getVar $ Constant $ SReference path
-                pure $ Just v
+                Just <$> checkedValue (returnType _varType) v
               typeTuple = [(Nothing, CC.IndexedType 0 (returnType _varType) Nothing)]
           case args' of
             [] -> do
@@ -518,7 +539,7 @@ call' from to' fnCalltype functionName valList = do
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
     convertValueToStoragePathPiece v =
       case v of
-        SInteger i -> Just $ MS.Index $ BC.pack $ show i
+        SIntegral i -> Just $ MS.Index $ BC.pack $ show i
         SString s -> Just $ MS.Index $ DT.encodeUtf8 $ T.pack s
         SAddress a _ -> Just $ MS.Index $ BC.pack $ show a
         SBool b -> Just $ MS.Index $ bool "false" "true" b
@@ -705,5 +726,5 @@ selfdestruct target = do
 
 derive :: Address -> T.Text -> T.Text -> ValList -> SM Address
 derive address salt name args = do
-  (_, hsh, _) <- Runtime.getCodeAndCollection address
+  hsh <- getCodeHashForDerivation address
   getNewAddressWithSalt_unsafe address (T.unpack salt) (keccak256ToByteString hsh) <$> rlpForkValues (SString (T.unpack name) : args)

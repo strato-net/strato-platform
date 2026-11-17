@@ -209,6 +209,131 @@ contract Describe_MultisigGovernance {
         require(MultisigLogic(wallet).signerMap(address(d)) > 0, "Nominee did not activate");
     }
 
+    function it_rejects_a_nomination_that_drops_a_signer() {
+        address wallet = deploy(0);
+        string issueId = a.invoke(
+            wallet,
+            "proposeIssue",
+            wallet,
+            "nominateConfiguration",
+            ["address", "address[]", "uint256"],
+            address(d),
+            [address(a), address(b), address(d)],
+            2
+        );
+        require(
+            rejects(
+                b,
+                wallet,
+                "approveIssue",
+                issueId,
+                wallet,
+                "nominateConfiguration",
+                ["address", "address[]", "uint256"],
+                address(d),
+                [address(a), address(b), address(d)],
+                2
+            ),
+            "Nomination dropped a signer"
+        );
+    }
+
+    function it_rejects_a_nomination_that_changes_required_approvals() {
+        address wallet = deploy(0);
+        string higher = a.invoke(
+            wallet,
+            "proposeIssue",
+            wallet,
+            "nominateConfiguration",
+            ["address", "address[]", "uint256"],
+            address(d),
+            [address(a), address(b), address(c), address(d)],
+            3
+        );
+        require(
+            rejects(
+                b,
+                wallet,
+                "approveIssue",
+                higher,
+                wallet,
+                "nominateConfiguration",
+                ["address", "address[]", "uint256"],
+                address(d),
+                [address(a), address(b), address(c), address(d)],
+                3
+            ),
+            "Nomination raised required approvals"
+        );
+
+        wallet = deployThreeOfFour(0);
+        string lower = a.invoke(
+            wallet,
+            "proposeIssue",
+            wallet,
+            "nominateConfiguration",
+            ["address", "address[]", "uint256"],
+            address(outsider),
+            [address(a), address(b), address(c), address(d), address(outsider)],
+            2
+        );
+        b.invoke(
+            wallet,
+            "approveIssue",
+            lower,
+            wallet,
+            "nominateConfiguration",
+            ["address", "address[]", "uint256"],
+            address(outsider),
+            [address(a), address(b), address(c), address(d), address(outsider)],
+            2
+        );
+        require(
+            rejects(
+                c,
+                wallet,
+                "approveIssue",
+                lower,
+                wallet,
+                "nominateConfiguration",
+                ["address", "address[]", "uint256"],
+                address(outsider),
+                [address(a), address(b), address(c), address(d), address(outsider)],
+                2
+            ),
+            "Nomination lowered required approvals"
+        );
+    }
+
+    function it_rejects_a_nomination_that_adds_two_accounts() {
+        address wallet = deploy(0);
+        string issueId = a.invoke(
+            wallet,
+            "proposeIssue",
+            wallet,
+            "nominateConfiguration",
+            ["address", "address[]", "uint256"],
+            address(d),
+            [address(a), address(b), address(c), address(d), address(outsider)],
+            2
+        );
+        require(
+            rejects(
+                b,
+                wallet,
+                "approveIssue",
+                issueId,
+                wallet,
+                "nominateConfiguration",
+                ["address", "address[]", "uint256"],
+                address(d),
+                [address(a), address(b), address(c), address(d), address(outsider)],
+                2
+            ),
+            "Nomination added two accounts"
+        );
+    }
+
     function it_applies_the_old_timelock_to_timelock_changes() {
         address wallet = deploy(100);
         string issueId = a.invoke(wallet, "proposeIssue", wallet, "setTransactionTimelock", ["uint256"], 0);

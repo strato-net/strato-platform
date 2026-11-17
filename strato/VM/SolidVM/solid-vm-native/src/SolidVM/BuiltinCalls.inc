@@ -65,6 +65,7 @@ lookupBuiltinFunction sc name args = select name
 
     integerCast :: Ty a -> Code (a -> SM Integer)
     integerCast t = case t of
+      TUInt -> EMIT_BEGIN (MeteredCasts.int . toInteger) EMIT_END
       TInt -> EMIT_BEGIN (MeteredCasts.int) EMIT_END
       TDecimal -> EMIT_BEGIN (MeteredCasts.int) EMIT_END
       TStr -> EMIT_BEGIN (MeteredCasts.int) EMIT_END
@@ -77,6 +78,7 @@ lookupBuiltinFunction sc name args = select name
 
     decimalCast :: Ty a -> Code (a -> SM Decimal)
     decimalCast t = case t of
+      TUInt -> EMIT_BEGIN (MeteredCasts.decimal . toInteger) EMIT_END
       TInt -> EMIT_BEGIN (MeteredCasts.decimal) EMIT_END
       TDecimal -> EMIT_BEGIN (MeteredCasts.decimal) EMIT_END
       TStr -> EMIT_BEGIN (MeteredCasts.decimal) EMIT_END
@@ -88,6 +90,7 @@ lookupBuiltinFunction sc name args = select name
     addressCast t = case t of
       TAddr -> EMIT_BEGIN (MeteredCasts.address) EMIT_END
       TContract _ -> EMIT_BEGIN (MeteredCasts.address) EMIT_END
+      TUInt -> EMIT_BEGIN (MeteredCasts.address . toInteger) EMIT_END
       TInt -> EMIT_BEGIN (MeteredCasts.address) EMIT_END
       TBytes -> EMIT_BEGIN (MeteredCasts.address) EMIT_END
       TStr -> EMIT_BEGIN (MeteredCasts.address) EMIT_END
@@ -99,6 +102,7 @@ lookupBuiltinFunction sc name args = select name
     stringCast t = case t of
       TStr -> EMIT_BEGIN (MeteredCasts.string) EMIT_END
       TAddr -> EMIT_BEGIN (MeteredCasts.string) EMIT_END
+      TUInt -> EMIT_BEGIN (MeteredCasts.string . toInteger) EMIT_END
       TInt -> EMIT_BEGIN (MeteredCasts.string) EMIT_END
       TBool -> EMIT_BEGIN (MeteredCasts.string) EMIT_END
       TBytes -> EMIT_BEGIN (MeteredCasts.string) EMIT_END
@@ -113,6 +117,7 @@ lookupBuiltinFunction sc name args = select name
     recoverFunction :: Ty a -> Code (a -> SM (Integer -> Integer -> Integer -> SM Address))
     recoverFunction t = case t of
       TBytes -> EMIT_BEGIN (pure . Metered.ecrecover) EMIT_END
+      TUInt -> EMIT_BEGIN (pure . Metered.ecrecover . toInteger) EMIT_END
       TInt -> EMIT_BEGIN (pure . Metered.ecrecover) EMIT_END
       TAddr -> EMIT_BEGIN (pure . Metered.ecrecover) EMIT_END
       TStr -> EMIT_BEGIN (pure . Metered.ecrecover) EMIT_END
@@ -135,6 +140,10 @@ lookupBuiltinFunction sc name args = select name
           pure $ SomeFunction (SigCons h (SigCons TInt (SigCons rType (SigCons s (SigNil TAddr)))))
             (CAPTURE3 (recoverFunction h) (integerCast rType) (integerCast s) $ \compiled_hash compiled_r compiled_s ->
               EMIT_BEGIN (Builtins.recoverTyped compiled_hash compiled_r compiled_s) EMIT_END)
+        [SomeTy h, SomeTy TUInt, SomeTy rType, SomeTy s] ->
+          pure $ SomeFunction (SigCons h (SigCons TUInt (SigCons rType (SigCons s (SigNil TAddr)))))
+            (CAPTURE3 (recoverFunction h) (integerCast rType) (integerCast s) $ \compiled_hash compiled_r compiled_s ->
+              EMIT_BEGIN (\hash recovery rValue sValue -> Builtins.recoverTyped compiled_hash compiled_r compiled_s hash (toInteger recovery) rValue sValue) EMIT_END)
         _ -> typeErr ("invalid arguments to builtin " <> name)
 
     createSaltedCall = do

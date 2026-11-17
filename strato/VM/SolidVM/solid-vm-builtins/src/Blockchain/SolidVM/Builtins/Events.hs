@@ -23,6 +23,7 @@ emit force defaultUnwritten curCnct statement eventName expVals = do
   -- checks that the event is declared and that the number of args match
   --   DOES NOT check consistency of arg types
   curInfo <- getCurrentCallInfo
+  when (readOnly curInfo) $ throw (InvalidWrite "Invalid event emission during read-only access" (labelToString eventName))
   let evs = CC._events curCnct
       mEv = M.lookup eventName evs
   case mEv of

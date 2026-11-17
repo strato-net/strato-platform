@@ -271,4 +271,26 @@ contract Describe_DedicatedMultisigAudit {
             "Empty string argument with no declared type was accepted"
         );
     }
+
+    function it_rejects_signature_style_proposal_function_names() {
+        address wallet = deploy(0);
+        AuditToken token = new AuditToken(wallet);
+        require(
+            rejects(
+                a,
+                wallet,
+                "proposeIssue",
+                address(token),
+                " transfer(address,uint256)",
+                ["address", "uint256"],
+                address(evil),
+                100
+            ),
+            "Signature-style token function was proposed"
+        );
+        require(
+            rejects(a, wallet, "proposeIssueNoArgs", wallet, " freezeUpgrades()"),
+            "Signature-style shell function was proposed"
+        );
+    }
 }

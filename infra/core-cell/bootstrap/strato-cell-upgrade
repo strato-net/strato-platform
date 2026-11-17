@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# Upgrades a running core cell in place, as root (scripts/ha.sh cells upgrade
+# runs it through SSM):
+#
+#   strato-cell-upgrade <strato image>   new binaries and node scripts, node restarted, waits until it follows the chain
+#   strato-cell-upgrade --restart [<s>]  node restarted on the binaries it has, waits until it follows the chain (at most <s> seconds)
+#   strato-cell-upgrade --check          exit 0 when the node follows the chain, with a one-line status
+#
+# The node directory, its data and its docker-compose.yml stay as they are:
+# this replaces what cell-bootstrap.sh installed from the image (step 3) and
+# the node scripts from the cell's EXTRA_BINARIES_S3 prefix. Stopping the node
+# is strato-down through the systemd unit; on the writer, a standby's
+# strato-lease-watch takes the lease about a minute later.
+#
+# A restart or an upgrade drains the cell first: strato-cell-health answers
+# 503 while /run/strato-cell/maintenance exists, so the core tier's load
+# balancer stops sending transactions here before the node stops, and the
+# watchdog leaves the cell alone until this script exits.
+set -euo pipefail
+export AWS_PAGER=""
+source /etc/strato/cell.env
+export AWS_DEFAULT_REGION="$AWS_REGION"
+NODE_DIR=/var/lib/strato/node
+NODE_USER=strato
+CURRENT=/etc/strato/current-image
+log() { echo "[cell-upgrade $(date -u +%FT%TZ)] $*"; }
+
+# The CloudWatch agent's config is published by the observability app and read
+# at first boot; fetching it again here carries a changed config to every cell.
+refresh_cloudwatch_agent() {
+  [[ -n ${CW_AGENT_PARAMETER:-} && -x /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl ]] || return 0
+  /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c "ssm:$CW_AGENT_PARAMETER" -s >/dev/null \
+    && log "cloudwatch agent config refreshed from $CW_AGENT_PARAMETER" \
+    || log "warning: could not refresh the cloudwatch agent config from $CW_AGENT_PARAMETER"
+}
+
+# A new instance is still being built by cell-bootstrap.sh (cloud-init runs
+# it), which installs binaries and scripts through the same scratch
+# directories as an upgrade: changing the node in the middle of that would mix
+# two versions, and the cell is not ready before it ends.
+bootstrapping() { [[ "$(cloud-init status 2>/dev/null || true)" == *running* ]]; }
+
+# Following the chain: the instance is built, the node runs (convoke stops all
+# of it when any process exits), every core process answers its metrics
+# endpoint (most listen only on the node's apiListenAddress, the docker
+# bridge) and the ingress its health, and the node has executed up to within a
+# few blocks of the best block its peers report (strato-indexer's chain gauges).
+check() {
+  local metrics best world listen p
+  if bootstrapping; then echo "the instance is still bootstrapping"; return 1; fi
+  pgrep -x convoke >/dev/null || { echo "the node is not running (no convoke; see $NODE_DIR/logs/convoke.log)"; return 1; }
+  listen=$(awk '$1 == "apiListenAddress:" {gsub(/"/, "", $2); print $2; exit}' "$NODE_DIR/.ethereumH/ethconf.yaml" 2>/dev/null || true)
+  [[ -n $listen && $listen != 0.0.0.0 ]] || listen=127.0.0.1
+  for p in strato-sequencer:8050 strato-p2p:10248 vm-runner:8009 slipstream:10777; do
+    curl -fsS -m 3 -o /dev/null "http://$listen:${p#*:}/metrics" 2>/dev/null || { echo "${p%:*} is not answering"; return 1; }
+  done
+  curl -fsS -m 3 -o /dev/null http://localhost:8600/health 2>/dev/null || { echo "strato-ingest is not answering"; return 1; }
+  metrics=$(curl -fsS -m 5 http://localhost:10779/metrics 2>/dev/null) || { echo "strato-indexer is not answering"; return 1; }
+  best=$(awk '$1 == "strato_best_block_number" {printf "%d", $2}' <<<"$metrics")
+  world=$(awk '$1 == "strato_world_best_block_number" {printf "%d", $2}' <<<"$metrics")
+  echo "cell $CELL_ID: block ${best:-?} of ${world:-?}"
+  [[ -n $best && -n $world ]] && (( world > 0 && best >= world - 5 ))
+}
+
+# One change to the node at a time (an upgrade or restart from the pipeline,
+# the watchdog's restart), each drained first. The flag goes when this script
+# exits; one left by a run that was killed counts for six hours at most.
+DRAIN_FLAG=/run/strato-cell/maintenance
+lock() {
+  [[ -z ${LOCKED:-} ]] || return 0
+  install -d -m 0755 /run/strato-cell
+  exec 9>/run/strato-cell/lock
+  flock 9
+  LOCKED=1
+}
+drain() {
+  lock
+  touch "$DRAIN_FLAG"
+  trap 'rm -f "$DRAIN_FLAG"' EXIT
+  log "draining: ${DRAIN_SECONDS:-30}s for the load balancer to stop sending here"
+  sleep "${DRAIN_SECONDS:-30}"
+}
+
+# Until the node follows the chain again; with a limit, at most that many seconds.
+follow() {
+  local limit=${1:-0} deadline=$(( SECONDS + ${1:-0} )) status
+  until status=$(check); do
+    log "$status"
+    (( limit == 0 || SECONDS < deadline )) || { log "not following the chain after ${limit}s"; return 1; }
+    sleep 30
+  done
+  log "$status"
+}
+
+# The health endpoint and the watchdog, from the node scripts just installed;
+# under the lock, so a restart the watchdog is running is never cut short.
+install_health() {
+  [[ -x /usr/local/bin/strato-cell-health ]] || return 0
+  lock
+  /usr/local/bin/strato-cell-health --install || log "warning: could not install the health endpoint and the watchdog"
+}
+
+if [[ ${1:-} == --check ]]; then
+  check
+  exit
+fi
+if bootstrapping; then
+  log "this instance is still bootstrapping: nothing was changed"
+  exit 1
+fi
+if [[ ${1:-} == --restart ]]; then
+  drain
+  log "restarting the node on $(cat "$CURRENT" 2>/dev/null || echo "$STRATO_IMAGE")"
+  systemctl restart strato-cell.service
+  follow "${2:-0}"
+  exit
+fi
+image=${1:?usage: strato-cell-upgrade <strato image> | --restart [<seconds>] | --check}
+
+# --- New binaries from the image, new node scripts from S3 ---
+# Under the lock from here on: the staging directories below are the same for
+# every run, and two upgrades at once would install each other's files.
+lock
+registry=${image%%/*}
+# Only ECR needs a login; the public GitHub registry (ghcr.io) pulls without one.
+if [[ "$registry" == *.dkr.ecr.*.amazonaws.com ]]; then
+  aws ecr get-login-password | docker login --username AWS --password-stdin "$registry" >/dev/null 2>&1
+  aws ecr get-login-password | sudo -u $NODE_USER -H docker login --username AWS --password-stdin "$registry" >/dev/null 2>&1
+fi
+docker pull -q "$image" >/dev/null
+cid=$(docker create "$image")
+trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+rm -rf /tmp/strato-bin && docker cp "$cid:/usr/local/bin" /tmp/strato-bin
+docker rm -f "$cid" >/dev/null; trap - EXIT
+rm -rf /tmp/node-scripts && mkdir /tmp/node-scripts
+aws s3 cp --recursive "$EXTRA_BINARIES_S3" /tmp/node-scripts --only-show-errors
+
+if [[ $(cat "$CURRENT" 2>/dev/null || echo "$STRATO_IMAGE") == "$image" ]]; then
+  find /tmp/node-scripts -maxdepth 1 -type f -exec install -m 0755 {} /usr/local/bin/ \;
+  refresh_cloudwatch_agent
+  install_health
+  log "already on $image; node scripts refreshed, node left running"
+  check
+  exit
+fi
+
+# --- Swap them in with the node stopped ---
+drain
+log "stopping the node"
+systemctl stop strato-cell.service
+# Regular files only: the image's bin directory also holds a directory entry (queryStrato).
+find /tmp/strato-bin -maxdepth 1 -type f -exec install -m 0755 {} /usr/local/bin/ \;
+find /tmp/node-scripts -maxdepth 1 -type f -exec install -m 0755 {} /usr/local/bin/ \;
+echo "$image" > "$CURRENT"
+log "starting the node on $image"
+systemctl start strato-cell.service
+refresh_cloudwatch_agent
+install_health
+
+# --- Until it follows the chain again (the caller's SSM timeout bounds this) ---
+follow
+log "upgraded to $image"

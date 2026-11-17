@@ -25,9 +25,12 @@ import qualified Blockchain.SolidVM.Builtins.ABI as ABI
 import qualified Blockchain.SolidVM.Builtins.ABI.Values.Metered as MeteredABI
 
 flatten :: [Dyn] -> [Dyn]
-flatten ds = case reverse ds of
+flatten ds = map signedInteger $ case reverse ds of
   Dyn TVariadic rest : xs -> reverse xs ++ rest
   _ -> ds
+  where
+    signedInteger (Dyn TUInt n) = Dyn TInt (toInteger n)
+    signedInteger d = d
 
 bad :: T.Text -> [Dyn] -> SM a
 bad name ds = liftIO $ throwIO $ E.InvalidArguments (T.unpack name) (format (map showDyn ds))
@@ -114,6 +117,7 @@ mulmodValue = Metered.mulmod
 
 integerValue :: Ty a -> a -> SM Integer
 integerValue t = case t of
+  TUInt -> MeteredCasts.int . toInteger
   TInt -> MeteredCasts.int
   TEnum _ _ -> MeteredCasts.int . enumNumber
   TDecimal -> MeteredCasts.int
@@ -126,6 +130,7 @@ integerValue t = case t of
 
 decimalValue :: Ty a -> a -> SM Decimal
 decimalValue t = case t of
+  TUInt -> MeteredCasts.decimal . toInteger
   TInt -> MeteredCasts.decimal
   TDecimal -> MeteredCasts.decimal
   TStr -> MeteredCasts.decimal
@@ -137,6 +142,7 @@ addressValue :: Ty a -> a -> SM Address
 addressValue t = case t of
   TAddr -> MeteredCasts.address
   TContract _ -> MeteredCasts.address
+  TUInt -> MeteredCasts.address . toInteger
   TInt -> MeteredCasts.address
   TBytes -> MeteredCasts.address
   TStr -> MeteredCasts.address
@@ -148,6 +154,7 @@ stringValue :: Ty a -> a -> SM T.Text
 stringValue t = case t of
   TStr -> MeteredCasts.string
   TAddr -> MeteredCasts.string
+  TUInt -> MeteredCasts.string . toInteger
   TInt -> MeteredCasts.string
   TBool -> MeteredCasts.string
   TBytes -> MeteredCasts.string
@@ -170,6 +177,7 @@ recoverValue ht rt' st = recoverTyped (recoverFunction ht) (integerValue rt') (i
 recoverFunction :: Ty h -> h -> SM (Integer -> Integer -> Integer -> SM Address)
 recoverFunction t = case t of
   TBytes -> pure . Metered.ecrecover
+  TUInt -> pure . Metered.ecrecover . toInteger
   TInt -> pure . Metered.ecrecover
   TAddr -> pure . Metered.ecrecover
   TStr -> pure . Metered.ecrecover
@@ -208,6 +216,7 @@ keccakValue = fmap T.pack . Metered.keccak256Hex
 -- These factories select and compose typed encoders once, while compiling.
 abiEncoder :: Bool -> Ty a -> a -> SM (Bool, B.ByteString)
 abiEncoder packed t = case t of
+  TUInt -> scalar (ABI.encodeInt256 . toInteger)
   TInt -> scalar ABI.encodeInt256
   TBool -> scalar $ \b -> if packed then B.singleton (if b then 1 else 0) else ABI.encodeUint256 (if b then 1 else 0)
   TAddr -> \value -> do

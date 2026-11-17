@@ -4,7 +4,7 @@
  * @dev SolidVM delegatecall storage is keyed by variable name. The multisig-prefixed
  * shell fields below intentionally match MultisigWallet and are read-only here.
  */
-contract record MultisigLogic {
+contract MultisigLogic {
     uint public constant MIN_SIGNERS = 3;
     uint public constant MAX_TRANSACTION_TIMELOCK = 2592000; // 30 days
     uint public constant ISSUE_APPROVAL_LIFETIME = 2592000; // 30 days
@@ -37,19 +37,19 @@ contract record MultisigLogic {
     address public multisigFactory;
     uint public multisigEpoch;
 
-    address[] public record signers;
-    mapping (address => uint) public record signerMap;
+    address[] public signers;
+    mapping (address => uint) public signerMap;
     uint public requiredApprovals;
     uint public transactionTimelock;
     uint public nextIssueNonce;
     bool public multisigInitialized;
     bool private multisigExecuting;
 
-    mapping (string => Issue) public record issues;
-    mapping (string => mapping (address => bool)) public record issueApprovals;
+    mapping (string => Issue) public issues;
+    mapping (string => mapping (address => bool)) public issueApprovals;
 
-    mapping (address => Nomination) public record nominations;
-    mapping (address => address[]) public record nominationSigners;
+    mapping (address => Nomination) public nominations;
+    mapping (address => address[]) public nominationSigners;
     address private openNominee;
 
     event IssueCreated(address creator, string issueId, uint nonce, uint epoch, address target, string functionName, string[] argumentTypes, uint approvalExpiresAt, variadic arguments);
@@ -100,8 +100,20 @@ contract record MultisigLogic {
         }
     }
 
+    /// @dev Read-only. The shell requires this to pass before adopting a logic version.
+    function multisigHealthCheck() external returns (bool) {
+        require(multisigInitialized, "Multisig is not initialized");
+        _validateConfiguration(signers, requiredApprovals);
+        require(transactionTimelock <= MAX_TRANSACTION_TIMELOCK, "Timelock exceeds maximum");
+        for (uint i = 0; i < signers.length; i++) {
+            require(signerMap[signers[i]] == i + 1, "Signer index does not match");
+        }
+        return true;
+    }
+
     function proposeIssue(address _target, string _functionName, string[] _argumentTypes, variadic _arguments) external onlySigner notExecuting returns (string) {
         require(_target != address(0), "Invalid target");
+        require(!_hasOpeningParenthesis(_functionName), "Signature-style function names are not allowed");
         address proposer = msg.sender;
         uint nonce = nextIssueNonce++;
         string argumentsHash = _canonicalArgumentsHash(_argumentTypes, _arguments);
@@ -125,6 +137,7 @@ contract record MultisigLogic {
 
     function proposeIssueNoArgs(address _target, string _functionName) external onlySigner notExecuting returns (string) {
         require(_target != address(0), "Invalid target");
+        require(!_hasOpeningParenthesis(_functionName), "Signature-style function names are not allowed");
         uint nonce = nextIssueNonce++;
         string noArgumentsHash = keccak256("NO_ARGUMENTS");
         string issueId = keccak256(address(this), multisigEpoch, nonce, _target, _functionName, noArgumentsHash);
@@ -214,12 +227,21 @@ contract record MultisigLogic {
         _validateConfiguration(_resultingSigners, _requiredApprovals);
 
         bool containsNominee = false;
-        uint newAccounts = 0;
         for (uint i = 0; i < _resultingSigners.length; i++) {
             if (_resultingSigners[i] == _nominee) containsNominee = true;
-            if (signerMap[_resultingSigners[i]] == 0) newAccounts++;
         }
-        require(containsNominee && newAccounts == 1, "Configuration must add only the nominee");
+        require(
+            containsNominee && _resultingSigners.length == signers.length + 1,
+            "Nomination can only add the nominee"
+        );
+        for (uint j = 0; j < signers.length; j++) {
+            bool containsSigner = false;
+            for (uint k = 0; k < _resultingSigners.length; k++) {
+                if (_resultingSigners[k] == signers[j]) containsSigner = true;
+            }
+            require(containsSigner, "Nomination can only add the nominee");
+        }
+        require(_requiredApprovals == requiredApprovals, "Nomination cannot change required approvals");
 
         _clearNominations();
         Nomination storage nomination = nominations[_nominee];
@@ -227,8 +249,8 @@ contract record MultisigLogic {
         nomination.epoch = multisigEpoch;
         nomination.expiresAt = block.timestamp + NOMINATION_LIFETIME;
         nomination.exists = true;
-        for (uint j = 0; j < _resultingSigners.length; j++) {
-            nominationSigners[_nominee].push(_resultingSigners[j]);
+        for (uint m = 0; m < _resultingSigners.length; m++) {
+            nominationSigners[_nominee].push(_resultingSigners[m]);
         }
         openNominee = _nominee;
         emit ConfigurationNominated(_nominee, multisigEpoch, nomination.expiresAt, _resultingSigners, _requiredApprovals);
@@ -422,6 +444,15 @@ contract record MultisigLogic {
             }
         }
         return result;
+    }
+
+    function _hasOpeningParenthesis(string _name) internal returns (bool) {
+        bytes name = bytes(_name);
+        bytes opening = bytes("(");
+        for (uint i = 0; i < name.length; i++) {
+            if (name[i] == opening[0]) return true;
+        }
+        return false;
     }
 
     function _applyConfiguration(address[] _resultingSigners, uint _requiredApprovals) internal {

@@ -30,6 +30,3 @@ README.md
 data/
 bridge-error.flag
 lastProcessedBlocks.json
-
-# Ignore the nginx path from the bridge build
-nginx/

@@ -31,7 +31,8 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Type.Equality
-import Blockchain.SolidVM.Exception (SolidException (InternalError, TooMuchGas))
+import Numeric.Natural (Natural)
+import Blockchain.SolidVM.Exception (SolidException (ArithmeticException, Require, InternalError, TooMuchGas))
 import qualified Blockchain.SolidVM.Builtins.Size as SharedSize
 import Blockchain.Strato.Model.Gas (Gas (..))
 import Blockchain.Strato.Model.Address (Address (..))
@@ -41,6 +42,7 @@ import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPie
 
 data Ty t where
   TInt      :: Ty Integer                 -- every int/uint width (unbounded, see notes)
+  TUInt     :: Ty Natural
   TDecimal  :: Ty Decimal
   TBool     :: Ty Bool
   TAddr     :: Ty Address
@@ -82,6 +84,7 @@ infixr 5 :*
 
 tyEq :: Ty a -> Ty b -> Maybe (a :~: b)
 tyEq TInt TInt = Just Refl
+tyEq TUInt TUInt = Just Refl
 tyEq TDecimal TDecimal = Just Refl
 tyEq TBool TBool = Just Refl
 tyEq TAddr TAddr = Just Refl
@@ -109,7 +112,7 @@ fieldsEq _ _ = Nothing
 
 showTy :: Ty t -> T.Text
 showTy = \case
-  TDecimal -> "decimal"; TInt -> "int"; TBool -> "bool"; TAddr -> "address"; TStr -> "string"; TBytes -> "bytes"
+  TDecimal -> "decimal"; TInt -> "int"; TUInt -> "uint"; TBool -> "bool"; TAddr -> "address"; TStr -> "string"; TBytes -> "bytes"
   TEnum n _ -> "enum " <> n; TContract n -> "contract " <> n; TUnit -> "()"
   TArr t -> showTy t <> "[]"; TStruct n _ -> "struct " <> n; TTuple fs -> "(" <> T.intercalate "," (fieldTys fs) <> ")"
   TVariadic -> "variadic"; TMaybe t -> "Maybe " <> showTy t; TRef st -> showST st <> " storage"
@@ -140,6 +143,7 @@ showDyn (Dyn t v) = formatValue t v
 formatValue :: Ty t -> t -> T.Text
 formatValue t v = case t of
   TDecimal -> T.pack (show v)
+  TUInt -> T.pack (show v)
   TInt -> T.pack (show v); TBool -> T.pack (show v); TAddr -> T.pack (show v); TStr -> v
   TBytes -> T.pack (format v); TEnum n ns -> let i = enumNumber v in n <> "." <> (if i >= 0 && fromIntegral i < length ns then ns !! fromIntegral i else T.pack (show i))
   TContract n -> n <> "(" <> T.pack (show v) <> ")"; TUnit -> "()"
@@ -169,6 +173,7 @@ instance SharedSize.GasSize Dyn where
 -- Resolve class instances while assembling typed code.
 gasSizeDict :: Ty a -> Dict (SharedSize.GasSize a)
 gasSizeDict ty = case ty of
+  TUInt -> Dict
   TInt -> Dict
   TDecimal -> Dict
   TBool -> Dict
@@ -207,6 +212,7 @@ withArgumentTuple (FCons _ ty rest) use = withGasArgument ty $ \adapt ->
 defaultOf :: Ty t -> t
 defaultOf = \case
   TDecimal -> 0
+  TUInt -> 0
   TInt -> 0; TBool -> False; TAddr -> Address 0; TStr -> ""; TBytes -> ""
   TEnum _ _ -> enumValue 0; TContract _ -> Address 0; TUnit -> (); TArr _ -> Seq.empty
   TStruct _ fs -> defaults fs; TTuple fs -> defaults fs
@@ -234,6 +240,7 @@ fromBasic :: Ty t -> BasicValue -> Either T.Text t
 fromBasic t v = case (t, v) of
   (_, BDefault) -> Right (defaultOf t)
   (TInt, BInteger n) -> Right n
+  (TUInt, BInteger n) -> let value = checkedNatural n in value `seq` Right value
   (TDecimal, BDecimal b) -> maybe (Left "invalid decimal storage") Right (readMaybe (BC.unpack b))
   (TDecimal, BInteger n) -> Right (fromInteger n)
   (TEnum _ _, BEnumVal _ _ w) -> Right (enumValue (fromIntegral w))
@@ -254,6 +261,7 @@ toBasic :: Ty t -> t -> BasicValue
 toBasic t v = case t of
   TDecimal -> BDecimal (BC.pack (show v))
   TInt -> BInteger v
+  TUInt -> BInteger (toInteger v)
   TEnum n ns -> let i = enumNumber v in if enumIsNumber v then BInteger i
     else BEnumVal n (if i >= 0 && fromIntegral i < length ns then ns !! fromIntegral i else "") (fromIntegral i)
   TBool -> BBool v
@@ -270,6 +278,7 @@ encodeKey t v = Index $ case t of
   TContract _ -> BC.pack (show v)
   TDecimal -> BC.pack (show v)
   TInt -> BC.pack (show v)
+  TUInt -> BC.pack (show v)
   TEnum _ _ -> BC.pack (show (enumNumber v))
   TBool -> if v then "true" else "false"
   TStr -> TE.encodeUtf8 v
@@ -393,13 +402,18 @@ chargeAfter amount action = do
   pure value
 
 catchContractFailure :: SM a -> SM a -> SM a
-catchContractFailure action handler = action `U.catches`
-  [ U.Handler (\(_ :: Revert) -> handler)
-  , U.Handler (\(e :: SolidException) -> case e of
-      InternalError{} -> U.throwIO e
-      TooMuchGas{} -> U.throwIO e
-      _ -> handler)
-  ]
+catchContractFailure action handler = do
+  forked <- SM.caughtFailureForkActive
+  if forked
+    then SM.attempt (action `U.catch` \(Revert message) -> U.throwIO (Require (Just (T.unpack message))))
+      >>= either (const handler) pure
+    else action `U.catches`
+      [ U.Handler (\(_ :: Revert) -> handler)
+      , U.Handler (\(e :: SolidException) -> case e of
+          InternalError{} -> U.throwIO e
+          TooMuchGas{} -> U.throwIO e
+          _ -> handler)
+      ]
 
 thisAddress :: SM Address
 thisAddress = SM.getCurrentAddress
@@ -571,6 +585,10 @@ fromDyn :: Ty t -> Dyn -> SM t
 fromDyn t (Dyn t' v) = case tyEq t t' of
   Just Refl -> pure v
   Nothing -> case (t, t') of
+    (TUInt, TInt) -> pure $! checkedNatural v
+    (TInt, TUInt) -> pure (toInteger v)
+    (TDecimal, TUInt) -> pure (fromIntegral v)
+    (TUInt, TEnum _ _) -> pure $! checkedNatural (enumNumber v)
     (_, TRaw) -> case v of
       [d] -> fromDyn t d
       ds -> fromDyn t (Dyn TVariadic ds)
@@ -593,6 +611,17 @@ fromDyn t (Dyn t' v) = case tyEq t t' of
     (TVariadic, _) -> pure [Dyn t' v]
     (_, TVariadic) | [d] <- v -> fromDyn t d
     _ -> diverge ("value of type " <> showTy t' <> " where " <> showTy t <> " was declared")
+
+checkedNatural :: Integer -> Natural
+checkedNatural n
+  | n < 0 = throw (ArithmeticException "unsigned integer underflow" (show n))
+  | otherwise = fromInteger n
+
+checkUnsignedBounds :: Maybe Integer -> Maybe Integer -> Natural -> SM ()
+checkUnsignedBounds lower upper value = do
+  let n = toInteger value
+  when (maybe False (n <) lower || maybe False (n >) upper) $
+    throw (ArithmeticException "unsigned integer out of bounds" (show n))
 
 fromDyns :: Fields ts -> [Dyn] -> SM (HL ts)
 fromDyns FNil [] = pure HNil

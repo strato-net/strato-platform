@@ -530,7 +530,7 @@
         "DexScreener": {
           "url": "https://api.dexscreener.com/latest/dex/tokens/${SYMBOLS}",
           "parse": "dexscreener",
-          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' or 'base' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
+          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' or 'base' and baseToken.address==<mapped address>, then pick the highest-volume.h24 pair's priceUsd. symbolMapping is the ERC-20 contract address.",
           "assets": [
             "SUSDS",
             "BOOE"
@@ -1173,7 +1173,7 @@
         "DexScreener": {
           "url": "https://api.dexscreener.com/latest/dex/tokens/${SYMBOLS}",
           "parse": "dexscreener",
-          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' or 'base' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
+          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' or 'base' and baseToken.address==<mapped address>, then pick the highest-volume.h24 pair's priceUsd. symbolMapping is the ERC-20 contract address.",
           "assets": [
             "SUSDS",
             "BOOE"
