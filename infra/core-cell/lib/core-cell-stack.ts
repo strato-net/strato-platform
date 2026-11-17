@@ -88,9 +88,9 @@ export class CoreCellStack extends Stack {
     });
     if (config.coreLoadBalancerSecurityGroupId) {
       const lb = ec2.SecurityGroup.fromSecurityGroupId(this, "CoreLbSg", config.coreLoadBalancerSecurityGroupId, { mutable: false });
-      this.securityGroup.addIngressRule(lb, ec2.Port.tcp(8600), "transaction ingress, through the core tier's load balancer");
-      this.securityGroup.addIngressRule(lb, ec2.Port.tcp(8601), "health check of the core tier's load balancer");
-      if (config.exposePrometheus) this.securityGroup.addIngressRule(lb, ec2.Port.tcp(9090), "Prometheus, through the core tier's load balancer");
+      this.securityGroup.addIngressRule(lb, ec2.Port.tcp(8600), "transaction ingress, through the core tier load balancer");
+      this.securityGroup.addIngressRule(lb, ec2.Port.tcp(8601), "health check of the core tier load balancer");
+      if (config.exposePrometheus) this.securityGroup.addIngressRule(lb, ec2.Port.tcp(9090), "Prometheus, through the core tier load balancer");
     }
     if (config.postgresSecurityGroupId) {
       // The cluster's group is imported mutable: the rule lives in this stack and goes with it.

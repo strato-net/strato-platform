@@ -109,7 +109,7 @@ export class GrafanaStack extends Stack {
     const cluster = new ecs.Cluster(this, "Cluster", { clusterName: name, vpc });
     const serviceSg = new ec2.SecurityGroup(this, "ServiceSg", { vpc, description: `${name} tasks` });
     const albSg = ec2.SecurityGroup.fromSecurityGroupId(this, "AlbSg", config.albSecurityGroupId);
-    serviceSg.addIngressRule(albSg, ec2.Port.tcp(3000), "the environment's load balancer");
+    serviceSg.addIngressRule(albSg, ec2.Port.tcp(3000), "the environment load balancer");
     const service = new ecs.FargateService(this, "Service", {
       serviceName: name,
       cluster,
