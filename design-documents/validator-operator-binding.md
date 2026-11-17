@@ -60,8 +60,9 @@ hosts have neither Node.js nor a checkout, and nobody knows how to mint that tok
   consent to `newOperator`. Requires the record to exist; works on delisted records too, and does
   not relist them.
 - Consent = `msg.sender == validator`, or `ecrecover(digest) == validator` where
-  `digest = keccak256(abi.encodePacked("STRATO validator operator authorization", registry,
-  validator, operator, authorizationNonce[validator]))`. Raw 32-byte hash, no prefix. The nonce
+  `digest = keccak256(abi.encodePacked("STRATO validator operator authorization", chainId,
+  registry, validator, operator, authorizationNonce[validator]))`, where `chainId` is SolidVM's
+  `block.chainid` (the network ID, not the EIP-155 chain id). Raw 32-byte hash, no prefix. The nonce
   increments **only** inside `_consumeAuthorization`, i.e. on `register` / `setOperator`. `v`
   accepted as 0/1 or 27/28. `operatorAuthorizationDigest(validator, operator)` is a public view.
 - Admin paths (`addValidator(s)`, `adminSetOperator`, `removeValidator`) need no signature and
@@ -180,8 +181,9 @@ strato-authorize-operator <operator-address> [--node-dir DIR] [--registry ADDR] 
 1. **Node files.** Node dir from `--node-dir` or `~/.strato/default-node`; credentials from
    `<node>/secrets/oauth_credentials.yaml`, else `~/.secrets/strato_credentials.yaml`
    (`discoveryUrl`, `clientId`, `clientSecret`); from
-   `<node>/.ethereumH/ethconf.yaml`: `urlConfig.vaultUrl` (appends `/strato/v2.3` only if missing)
-   and `networkConfig.network`. Per-network app host: helium → `https://app.testnet.strato.nexus`,
+   `<node>/.ethereumH/ethconf.yaml`: `urlConfig.vaultUrl` (appends `/strato/v2.3` only if missing),
+   `networkConfig.network` and `networkConfig.networkID` (the digest's chain id). Per-network
+   app host: helium → `https://app.testnet.strato.nexus`,
    upquark → `https://app.strato.nexus`; `--api-url` overrides. Registry address from
    `GET <api>/api/staking/info/public` → `validatorRegistryAddress`; `--registry` overrides.
 2. **Token.** OpenID discovery → `token_endpoint`; `POST grant_type=client_credentials` with
@@ -193,11 +195,11 @@ strato-authorize-operator <operator-address> [--node-dir DIR] [--registry ADDR] 
    Nonce `authorizationNonce[validator]`, absent → 0. Record → action: `register` (absent),
    `change` (different operator; `operator` field absent means the validator itself), `same`
    (exit 0, nothing signed); `active` absent → "not listed as active, will not relist" line.
-5. **Digest.** Local Keccak-256 over the 131-byte packed preimage; self-tested at start-up against
+5. **Digest.** Local Keccak-256 over the 163-byte packed preimage; self-tested at start-up against
    the contract test vector (exit 9 on failure).
 6. **Chain check, then confirm.** Simulates the deployed `operatorAuthorizationDigest(validator,
-   operator)` and refuses (exit 7, "logic predates the nonce fix") if it differs from the local
-   digest. Prints network, validator (+ registry name), operator, registry (+ source), nonce,
+   operator)` and refuses (exit 7, "logic predates the chain id or the nonce fix") if it differs
+   from the local digest. Prints network, validator (+ registry name), operator, registry (+ source), nonce,
    digest and the action text from the design (execute-now warning for changes), then `Sign? [y/N]`
    read from `/dev/tty`; `--yes` skips, `--digest-only` prints the digest and exits, no terminal
    without `--yes` → exit 10.

@@ -26,6 +26,7 @@ import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResult ()
 import Blockchain.Strato.Model.StateRoot (StateRoot (..))
+import Blockchain.Strato.Model.Validator (Validator)
 import Blockchain.Model.WrappedBlock (OutputBlock (..), OutputTx (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
@@ -134,6 +135,31 @@ attachBlockRewards' bd (Just rewardResult) (trr : rest)
 attachBlockRewards' _ _ trrs@(_ : _) = (trrs, Nothing)
 attachBlockRewards' _ mRewards [] = ([], mRewards)
 
+-- | Whether an incremental run is thrown away whole: it was the run that pays
+-- the block's rewards, it failed, and it ran no transaction.
+--
+-- The rewards are paid before the run's transactions, against the header the
+-- block has at that moment. Until a block has its first transaction its
+-- timestamp keeps moving (see getCacheWithUpdatedTimestamp), so a paying run
+-- that ends with nothing run leaves the reward payment in the state under a
+-- timestamp the block will not be sealed with. Emission is paid per second of
+-- block time, so that payment is for the wrong interval. Marked as paid, the
+-- block would be sealed later, with a later stamp, on top of it. Every verifier
+-- pays the rewards in the same run as the transactions, under the sealed
+-- stamp, and reaches a different state root. The block is rejected, the round
+-- changes, and the next validator in line takes the slot.
+--
+-- A transaction from an account that cannot pay the fee is enough to end a
+-- paying run that way, and anyone can send one for free. On helium two of them
+-- cost seven scheduled slots.
+--
+-- Throwing the run away puts the cache back where it started: the same state
+-- root and gas, rewards still to be paid, nothing carried. The next run pays
+-- them from that root under its own header, as a verifier does. Arguments:
+-- this run was to pay the rewards; it failed; it ran no transaction.
+discardsRewardRun :: Bool -> Bool -> Bool -> Bool
+discardsRewardRun payRewards failed ranNothing = payRewards && failed && ranNothing
+
 -- | Run @txs@ from @theBlockHeader@'s state root. The first component of the
 -- result is the block-reward results this run paid but could not attach to a
 -- receipt, which an incremental build must carry forward; it is returned
@@ -237,6 +263,10 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
     (p s q ++ "an invalid envelope: " ++ why, hsh)
   FeeBoundExceeded s q quote bound OutputTx {otHash = hsh} ->
     (p s q ++ "the quoted fee (" ++ show quote ++ ") exceeding the signed fee bound (" ++ show bound ++ "); requote and resubmit", hsh)
+  GasLimitTooHigh s q cap limit OutputTx {otHash = hsh} ->
+    (p s q ++ "a gas limit (" ++ show limit ++ ") above the most a block admits (" ++ show cap ++ ")", hsh)
+  SenderPoolFull s q cap OutputTx {otHash = hsh} ->
+    (p s q ++ "its sender already holding " ++ show cap ++ " transactions in the pool", hsh)
   where
     p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
     p' s q = p s q ++ "low "
@@ -251,12 +281,48 @@ getCheckpointableState = do
 updateBaggerState :: MonadBagger m => (B.BaggerState -> B.BaggerState) -> m ()
 updateBaggerState f = putBaggerState =<< (f <$> getBaggerState)
 
-addTransactionsToMempool :: MonadBagger m => [OutputTx] -> m ()
+-- | Admit transactions to the pool, and say whether any of them is now work the
+-- next block can take: pending, from a sender that clearly can pay a fee. One
+-- refused, queued behind a missing nonce, or from a sender holding too little
+-- to be sure is not.
+addTransactionsToMempool :: MonadBagger m => [OutputTx] -> m Bool
 addTransactionsToMempool txs = do
   $logDebugS "Bagger.addTransactionsToMempool" $ T.pack $ "Adding " ++ show (length txs) ++ " txs"
   withBagger $ do
     sequence_ (addToQueued Insertion <$> txs)
     promoteExecutables
+    pending <- B.pending <$> getBaggerState
+    let isPending t = maybe False ((== otHash t) . otHash) $ M.lookup (otSigner t) pending >>= M.lookup (TD.nonce $ otBaseTx t)
+    quote <- nextBlockFeeQuote
+    anyM (canClearlyPayFee quote . otSigner) (filter isPending txs)
+
+-- | Whether the pool holds work the next block can take: a pending transaction
+-- from a sender that clearly can pay. A new best block can leave some, by
+-- promoting transactions it made executable.
+hasPendingWork :: MonadBagger m => m Bool
+hasPendingWork = withBagger $ do
+  senders <- M.keys . M.filter (not . M.null) . B.pending <$> getBaggerState
+  quote <- nextBlockFeeQuote
+  anyM (canClearlyPayFee quote) senders
+
+-- | Transactions to admit now, and those whose sender holds nothing a fee can be
+-- paid with in the best block's state. A block later in the same batch may fund
+-- such a sender, so its transactions are admitted once that block is in.
+splitHoldingNothing :: MonadBagger m => [OutputTx] -> m ([OutputTx], [OutputTx])
+splitHoldingNothing txs = withBagger $ do
+  broke <- mapM (holdsNoFeeToken . otSigner) txs
+  pure ([t | (t, False) <- zip txs broke], [t | (t, True) <- zip txs broke])
+
+-- | The number of the block the pool is building toward.
+nextBlockNumber :: MonadBagger m => m Integer
+nextBlockNumber = (+ 1) . number . B.bestBlockHeader . B.miningCache <$> getBaggerState
+
+-- | The STRATO fee the next block charges, as the pool reads it (0 before the
+-- STRATO-gas fork or with no quote).
+nextBlockFeeQuote :: MonadBagger m => m Integer
+nextBlockFeeQuote = do
+  next <- nextBlockNumber
+  if isStratoGasForkActive next then quotedStratoFee else return 0
 
 flush :: MonadBagger m => FlushScope -> m [OutputTx]
 flush scope = do
@@ -353,34 +419,44 @@ makeNewBlock mineTransactions mSelfAddress = do
           let payRewards = not $ B.blockRewardsPaid cache
           withBagger $ do
             (!mUnattached, !run) <- runFromStateRoot mineTransactions remGas tempBlockHeader promoted mSelfAddress payRewards
-            (newSR, newGas, newExec, newUnexec) <- case run of
-              Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [])
+            (ranSR, ranGas, newRan, newUnexec) <- case run of
+              Right (newSR', newRR', newGas') -> return (newSR', newGas', newRR', [])
               Left e -> do
                 logRAE e
                 case e of
-                  (GasLimitReached rtx urtx nsr nbg) -> return (nsr, nbg, lastExec ++ rtx, urtx)
+                  (GasLimitReached rtx urtx nsr nbg) -> return (nsr, nbg, rtx, urtx)
                   (RecoverableFailure f rtx urtx nsr nbg) -> do
                     txsDroppedCallback [f] []
                     let theRejectedTx = rejectedTx f
                     purgeFromPending theRejectedTx
-                    return (nsr, nbg, lastExec ++ rtx, filter (on (/=) otSigner theRejectedTx) urtx)
+                    return (nsr, nbg, rtx, filter (on (/=) otSigner theRejectedTx) urtx)
                   x -> error (show x)
+
+            let discarded = discardsRewardRun payRewards (either (const True) (const False) run) (null newRan)
+                (newSR, newGas)
+                  | discarded = (lastSR, remGas)
+                  | otherwise = (ranSR, ranGas)
+            when discarded $
+              $logInfoS "Bagger.makeNewBlock" "the run that was to pay the block rewards ran no transaction; discarding it, the next run pays them"
 
             -- Rewards owed from an earlier run that ran no transactions, or
             -- from this one. Both can never be set at once: carrying any means
-            -- the rewards were already paid, which makes payRewards False.
-            let owedRewards = case B.pendingBlockRewards cache of
-                  Just carried -> Just carried
-                  Nothing -> mUnattached
+            -- the rewards were already paid, which makes payRewards False. A
+            -- discarded run owes nothing: its rewards are paid again.
+            let owedRewards
+                  | discarded = Nothing
+                  | otherwise = case B.pendingBlockRewards cache of
+                      Just carried -> Just carried
+                      Nothing -> mUnattached
                 (newExec', stillOwedRewards) =
-                  attachBlockRewards' tempBlockHeader owedRewards newExec
+                  attachBlockRewards' tempBlockHeader owedRewards (lastExec ++ newRan)
             let !newMiningCache =
                   cache
                     { B.lastExecutedStateRoot = newSR,
                       B.remainingGas = newGas,
                       B.lastExecutedTxs = newExec',
                       B.promotedTransactions = newUnexec,
-                      B.blockRewardsPaid = B.blockRewardsPaid cache || payRewards,
+                      B.blockRewardsPaid = B.blockRewardsPaid cache || (payRewards && not discarded),
                       B.pendingBlockRewards = stillOwedRewards
                     }
             $logDebugS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
@@ -608,17 +684,27 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = do
       sizeLimit = toInteger (Conf.txSizeLimit (networkConfig ethConf))
       nextBlock = number (B.bestBlockHeader $ B.miningCache state) + 1
       expectedChainId = Conf.chainId $ networkConfig ethConf
+      blockGas = nextGasLimit . getBlockGasLimit . B.bestBlockHeader $ B.miningCache state
   (addressNonce, addressBalance) <- getAddressNonceAndBalance address
   -- The best block's quote: the block being built requotes when it starts, so
   -- this is a first filter and execution has the final say.
   quote <- if isStratoGasForkActive nextBlock then quotedStratoFee else return 0
+  broke <- holdsNoFeeToken address
+  let held = maybe 0 M.size (M.lookup address $ B.pending state) + maybe 0 M.size (M.lookup address $ B.queued state)
+      -- only a queued nonce is replaced in place; one already pending would be held twice
+      replaces = M.member txn $ M.findWithDefault M.empty address (B.queued state)
   return $
     if
       | chainIdRequired (isReplayProtectionForkActive nextBlock) bt && not (transactionChainIdValid expectedChainId bt) -> Left $ ChainIdMismatch Validation Incoming expectedChainId t
       | Just why <- envelopeRejection (isStratoGasForkActive nextBlock) bt -> Left $ InvalidEnvelope Validation Incoming why t
       | Just (q, bound) <- feeBoundRejection quote bt -> Left $ FeeBoundExceeded Validation Incoming q bound t
+      | Just cap <- gasLimitRejection blockGas bt -> Left $ GasLimitTooHigh Validation Incoming cap (TD.gasLimit bt) t
       | addressNonce > txn -> Left $ NonceTooLow Validation Incoming addressNonce t
       | addressBalance < txFee -> Left $ BalanceTooLow Validation Incoming txFee addressBalance t
+      -- Admitted, a transaction that cannot pay is gossiped, starts the other
+      -- validators' dead-proposer timers, and is only refused when a block is built.
+      | broke -> Left $ BalanceTooLow Validation Incoming (max quote legacyUsdFee) 0 t
+      | held >= maxTxsPerSender && not replaces && txn /= addressNonce -> Left $ SenderPoolFull Validation Incoming (toInteger maxTxsPerSender) t
       | txSize >= sizeLimit -> Left $ TXSizeLimitExceeded Validation Incoming txSize sizeLimit t
       | otherwise -> Right ()
 
@@ -652,8 +738,18 @@ buildFromMiningCache = do
   let parentHash = B.bestBlockSHA cache
   let parentHeader = B.bestBlockHeader cache
   let stateRoot = B.lastExecutedStateRoot cache
-  let vDelt = getDeltasFromResults $ B.lastExecutedTxs cache
-  let sDelt = getStakeDeltasFromResults $ B.lastExecutedTxs cache
+  -- Stand on the state the cached transactions left. A caller that ran nothing
+  -- new stands somewhere else: on the parent's state (makeNewBlock with nothing
+  -- promoted) or on a discarded run's. The block is sealed with the root the node
+  -- stands on (buildRewardedBlockHeader), and from the fork its set and weight
+  -- changes are read there too, so a candidate built from anywhere else carries
+  -- the transactions without their state and is rejected.
+  startFromStateRoot stateRoot
+  -- The set and weights in force for the block being built are the parent's with
+  -- its changes applied. From the fork the block's own changes are read from
+  -- governance's storage as the last run left it.
+  let (inForce, inForceStakes) = validatorsAndStakesInForceAfter parentHeader
+  (vDelt, sDelt) <- blockConsensusDeltas (number parentHeader + 1) inForce inForceStakes (B.lastExecutedTxs cache)
   let txs = (trrTransaction <$> B.lastExecutedTxs cache) ++ (DL.toList $ B.privateHashes cache)
   let time = B.startTimestamp cache
   receipts <- traverse txRunResultToReceipt (B.lastExecutedTxs cache)
@@ -684,6 +780,14 @@ buildFromMiningCache = do
         obBlockData = rewardedBlockData
       }
 
+-- | The validator set and stake weights in force for the child of a header: its
+-- own with its changes applied. A version-1 header carries neither weights nor
+-- changes.
+validatorsAndStakesInForceAfter :: BlockHeader -> (S.Set Validator, M.Map Validator Integer)
+validatorsAndStakesInForceAfter parentHeader = case parentHeader of
+  BlockHeader{} -> (getValidatorSet parentHeader, M.empty)
+  _ -> nextValidatorsAndStakes parentHeader
+
 buildNextBlockHeader ::
   BlockHeader ->
   Keccak256 ->
@@ -706,9 +810,8 @@ buildNextBlockHeader parentHeader parentHash stateRoot txs receipts bloom time v
       -- in the proposed header agree.
       time' = max time (timestamp parentHeader)
       (newV, remV) = fromDelta vd
-      (curValidators, curStakes) = case parentHeader of
-        BlockHeader{} -> (S.toList $ getValidatorSet parentHeader, [])
-        _ -> let (vs, st) = nextValidatorsAndStakes parentHeader in (S.toList vs, M.toAscList st)
+      (curValidators, curStakes) =
+        let (vs, st) = validatorsAndStakesInForceAfter parentHeader in (S.toList vs, M.toAscList st)
       receiptsForRoot = if isReceiptsRootForkActive blockNum then receipts else []
       rcptRoot = V.receiptsVerificationValue receiptsForRoot
       txRoot = V.transactionsVerificationValue (otBaseTx <$> txs)

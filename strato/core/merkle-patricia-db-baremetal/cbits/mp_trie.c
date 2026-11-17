@@ -1819,7 +1819,14 @@ static int diff_choice(mp_store_t *s, uint8_t *path, size_t plen,
     }
     if (choice_eq(a, b)) return 0;
 
-    choice_t ca[17], cb[17];
+    /* Each choice embeds a full node. Two arrays cost over 21 KiB per
+     * nibble, overflowing the small native thread stacks on macOS. */
+    choice_t *ca = malloc(34 * sizeof(*ca));
+    if (!ca) {
+        store_error(s, "diff", "could not allocate choices");
+        return -1;
+    }
+    choice_t *cb = ca + 17;
     enter(s, a, ca);
     enter(s, b, cb);
     int rc = s->missing ? MP_ERR_MISSING : 0;
@@ -1835,6 +1842,7 @@ static int diff_choice(mp_store_t *s, uint8_t *path, size_t plen,
     }
     choices_free(ca);
     choices_free(cb);
+    free(ca);
     return rc;
 }
 

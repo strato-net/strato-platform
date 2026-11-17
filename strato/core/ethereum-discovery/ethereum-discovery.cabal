@@ -134,9 +134,12 @@ test-suite ethereum-discover-test
   ghc-options: -Wall -O2 -Wall -Werror -dynamic
   build-depends:
       base
+    , crypto-pubkey-types
     , ethereum-discovery
+    , ethereum-encryption
     , ethereum-rlp
     , format
     , hspec
+    , network
     , strato-model
   default-language: Haskell2010

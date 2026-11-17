@@ -4,12 +4,13 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { authorizationDigest, findOperatedValidator, mapRegistryRevert, profileText, splitSignature } from "./stakingAuthorization";
 import { StratoError } from "../../errors/StratoError";
 import { StratoPaths, constants } from "../../config/constants";
+import { networkId } from "../../config/config";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import { castVoteOnIssue } from "./user.service";
 import { getOraclePrices } from "./oracle.service";
 
-const { Token, StratoStaking, ValidatorRegistry } = constants;
+const { Token, StratoStaking, ValidatorRegistry, MercataGovernance } = constants;
 const WAD = 10n ** 18n;
 const BPS_DIVISOR = 10000n;
 // StratoStaking.DEFAULT_SELF_BOND_MINIMUM: the operator's own bond a new seat needs until
@@ -197,6 +198,7 @@ export type ValidatorProfileInput = {
 };
 
 export type StratoAuthorizationDigest = {
+  chainId: string;
   registry: string;
   validator: string;
   operator: string;
@@ -388,6 +390,27 @@ const getBlocState = (
 
 const getStakingBlocState = (accessToken: string, fresh = false): Promise<Record<string, any>> =>
   getBlocState(accessToken, extractContractName(StratoStaking), requireStakingAddress(), fresh);
+
+// Governance's part of the waiter test, from its state: _pinnedOut, the validators the
+// admins voted out of the set, and _heldByGovernance, seats it lists that were never handed
+// to staking (neither pinned in nor staking-managed). Staking reads the pin only while its
+// governance link is on. A read that fails leaves them unknown; the contract still applies them.
+const getPinnedOut = async (accessToken: string, state: Record<string, any>, fresh = false): Promise<Set<string>> => {
+  const governance = normalizeAddress(state.governance);
+  if (!parseBoolLike(state.governanceSyncEnabled) || !governance || /^0+$/.test(governance)) return new Set();
+  try {
+    const governanceState = await getBlocState(accessToken, extractContractName(MercataGovernance), governance, fresh);
+    const flagged = (map: unknown) => new Set([...addressKeyed(map)].filter(([, on]) => parseBoolLike(on)).map(([validator]) => validator));
+    const pinnedIn = flagged(governanceState.pinnedIn);
+    const stakingManaged = flagged(governanceState.stakingManaged);
+    const held = [...addressKeyed(governanceState.validatorMap)]
+      .filter(([validator, index]) => parseBigIntLike(index) > 0n && !pinnedIn.has(validator) && !stakingManaged.has(validator))
+      .map(([validator]) => validator);
+    return new Set([...flagged(governanceState.pinnedOut), ...held]);
+  } catch {
+    return new Set();
+  }
+};
 
 // A committed write makes every cached snapshot stale; drop them so the next /info read
 // (from this user or anyone else) sees the new state instead of waiting out the TTL.
@@ -738,6 +761,33 @@ const isSelfBondRuleActive = (state: Record<string, any>, now: bigint): boolean 
   return graceUntil > 0n && now >= graceUntil;
 };
 
+// _window: the stake-delay window the chain is in, or null while no delay is set. Stake
+// waits through the window it arrived in and the one after.
+const stakeDelayWindow = (state: Record<string, any>, now: bigint): bigint | null => {
+  const delay = parseBigIntLike(state.stakeDelaySeconds);
+  return delay > 0n ? (parseBigIntLike(state.stakeDelayGeneration) << 64n) + now / delay : null;
+};
+
+// _unmatured: the stake behind a validator that does not count toward its vote yet, from
+// its row of pendingWeight (window => amount).
+const unmaturedStake = (pendingByWindow: unknown, delayWindow: bigint | null): bigint => {
+  if (delayWindow === null || !pendingByWindow || typeof pendingByWindow !== "object") return 0n;
+  return Object.entries(pendingByWindow as Record<string, any>)
+    .filter(([arrived]) => parseBigIntLike(arrived) === delayWindow || parseBigIntLike(arrived) + 1n === delayWindow)
+    .reduce((sum, [, amount]) => sum + parseBigIntLike(amount), 0n);
+};
+
+// _waiting: how much of an operator's own bond is still waiting, from its pendingSelfBond record.
+const waitingSelfBond = (pending: Record<string, any> | undefined, delayWindow: bigint | null): bigint => {
+  if (delayWindow === null || !pending) return 0n;
+  const newWindow = parseBigIntLike(pending.newWindow);
+  const newAmount = parseBigIntLike(pending.newAmount);
+  if (newWindow === delayWindow) {
+    return parseBigIntLike(pending.oldWindow) + 1n === delayWindow ? newAmount + parseBigIntLike(pending.oldAmount) : newAmount;
+  }
+  return newWindow + 1n === delayWindow ? newAmount : 0n;
+};
+
 // _requireJoinsOpen, with the last processed block (the last block with a transaction)
 // standing in for the head.
 const isJoinsOpen = (state: Record<string, any>): boolean => {
@@ -761,15 +811,25 @@ type V2ValidatorRecord = {
   requiredStake: bigint;
   requiredStakeCountsDelegations: boolean;
   eligible: boolean;
+  // What the validator votes with: its stake less what is still waiting out the stake delay.
+  votingWeight: bigint;
+  // Can take a seat by right now: eligible, not seated, not pinned out or held by the admins,
+  // and its bond has waited out the delay (StratoStaking.isWaiter).
+  isWaiter: boolean;
 };
 
-// Every listed record with the lifecycle facts StratoStaking derives (status, eligible),
-// ordered by validator address like the v1 Cirrus read.
-const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => {
+// Every listed record with the lifecycle facts StratoStaking derives (status, eligible,
+// isWaiter), ordered by validator address like the v1 Cirrus read. pinnedOut is
+// governance's part of the waiter test (getPinnedOut); callers that do not use isWaiter
+// leave it out.
+const v2ValidatorRecords = (state: Record<string, any>, pinnedOut: Set<string> = new Set()): V2ValidatorRecord[] => {
   const now = BigInt(Math.floor(Date.now() / 1000));
   const minStake = parseBigIntLike(state.minStake);
   const selfBondMinimum = selfBondMinimumOf(state);
   const selfBondRuleActive = isSelfBondRuleActive(state, now);
+  const delayWindow = stakeDelayWindow(state, now);
+  const pendingWeightMap = addressKeyed(state.pendingWeight);
+  const pendingSelfBondMap = addressKeyed(state.pendingSelfBond);
   const isValidatorMap = addressKeyed(state.isValidator);
   const selfBondRuleSeatMap = addressKeyed(state.seatedUnderSelfBondRule);
   const jailedUntilMap = addressKeyed(state.jailedUntil);
@@ -793,6 +853,11 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
       const requiredStake = selfBondSeat ? selfBondMinimum : minStake;
       const requiredStakeCountsDelegations = !selfBondSeat && !selfBondRuleActive;
       const meetsMinStake = (requiredStakeCountsDelegations ? totalStake : selfBond) >= requiredStake;
+      const eligible = active && meetsMinStake && now >= jailedUntil && (exitReadyTime === 0n || now < exitReadyTime);
+      // _votingWeight and _bondMatured.
+      const unmatured = unmaturedStake(pendingWeightMap.get(validator), delayWindow);
+      const waitingBond = waitingSelfBond(pendingSelfBondMap.get(validator), delayWindow);
+      const bondMatured = selfBond >= waitingBond && selfBond - waitingBond >= selfBondMinimum;
 
       return {
         validator,
@@ -809,7 +874,9 @@ const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => 
         status: !active ? 3 : isValidator ? 2 : 1,
         requiredStake,
         requiredStakeCountsDelegations,
-        eligible: active && meetsMinStake && now >= jailedUntil && (exitReadyTime === 0n || now < exitReadyTime),
+        eligible,
+        votingWeight: unmatured >= totalStake ? 0n : totalStake - unmatured,
+        isWaiter: eligible && !isValidator && !pinnedOut.has(validator) && bondMatured,
       };
     });
 };
@@ -1407,6 +1474,7 @@ const getV2StakingInfo = async (
     lifetimeClaimedRewards,
     stratoPriceWad,
     recentRewards,
+    pinnedOut,
   ] = await Promise.all([
     getTokenInfo(accessToken, tokenAddress),
     getTokenBalance(accessToken, tokenAddress, user),
@@ -1414,6 +1482,7 @@ const getV2StakingInfo = async (
     getLifetimeClaimedRewards(accessToken, user),
     getStratoTokenPriceWad(accessToken),
     getRecentBlockRewards(accessToken),
+    getPinnedOut(accessToken, state),
   ] as const);
 
   const now = BigInt(Math.floor(Date.now() / 1000));
@@ -1434,7 +1503,7 @@ const getV2StakingInfo = async (
   let operatorClaimableTotal = 0n;
   const operated: Array<{ record: V2ValidatorRecord; rewards: bigint; fees: bigint }> = [];
 
-  const records = v2ValidatorRecords(state);
+  const records = v2ValidatorRecords(state, pinnedOut);
   const validators = records.map((record): StratoOperatorInfo => {
     const { validator, value } = record;
     const profile = validatorProfiles.get(validator) || {};
@@ -1487,7 +1556,7 @@ const getV2StakingInfo = async (
       status: record.status,
       isValidator: record.isValidator,
       eligible: record.eligible,
-      isWaiter: record.eligible && !record.isValidator,
+      isWaiter: record.isWaiter,
       requiredStake: record.requiredStake.toString(),
       requiredStakeCountsDelegations: record.requiredStakeCountsDelegations,
       jailedUntil: record.jailedUntil.toString(),
@@ -1835,8 +1904,8 @@ export const claimStratoOperatorFeeRewards = async (
 // ---- validator lifecycle (operator / permissionless) ----
 
 // The registry's operator-authorization message: keccak256 over the packed encoding of the
-// prefix, registry, validator, operator and uint256 nonce, with no signed-message prefix
-// (ValidatorRegistry.authorizationDigest); see stakingAuthorization.ts.
+// prefix, uint256 chain id, registry, validator, operator and uint256 nonce, with no
+// signed-message prefix (ValidatorRegistry.authorizationDigest); see stakingAuthorization.ts.
 
 export const getStratoAuthorizationDigest = async (
   accessToken: string,
@@ -1847,6 +1916,8 @@ export const getStratoAuthorizationDigest = async (
   const validatorAddress = requireValidatorArg(validator);
   const operatorAddress = normalizeAddress(operator);
   if (!isNormalizedAddress(operatorAddress)) throw badRequest("operator is required");
+  if (!networkId) throw new Error("Network ID is not configured");
+  const chainId = BigInt(networkId);
   await requireV2(accessToken);
 
   // Read fresh: every register/setOperator spends the nonce, and a digest over a spent
@@ -1855,11 +1926,12 @@ export const getStratoAuthorizationDigest = async (
   const nonce = parseBigIntLike(addressKeyed(registryState.authorizationNonce).get(validatorAddress));
 
   return {
+    chainId: chainId.toString(),
     registry,
     validator: validatorAddress,
     operator: operatorAddress,
     nonce: nonce.toString(),
-    digest: authorizationDigest(registry, validatorAddress, operatorAddress, nonce),
+    digest: authorizationDigest(chainId, registry, validatorAddress, operatorAddress, nonce),
   };
 };
 
@@ -2020,7 +2092,8 @@ export const activateStratoOperator = async (
 };
 
 // Fill free set slots from the waiters, best first. reconcileSet only considers the
-// candidates it is handed (at most maxBatchSize), so the backend does the indexing.
+// candidates it is handed (at most maxBatchSize), so the backend does the indexing: the
+// same waiters, in the same order (voting weight, then address), as the contract picks from.
 export const reconcileStratoValidatorSet = async (
   accessToken: string,
   userAddress: string
@@ -2028,11 +2101,17 @@ export const reconcileStratoValidatorSet = async (
   await requireV2(accessToken);
 
   const state = await getStakingBlocState(accessToken, true);
-  const candidates = v2ValidatorRecords(state)
-    .filter((record) => record.eligible && !record.isValidator)
+  // reconcileSet passes over a waiter that would hold more than maxOperatorStakeBps of the
+  // set once seated (_admissibleUnderCap), so those are left out before the batch is cut.
+  const records = v2ValidatorRecords(state, await getPinnedOut(accessToken, state, true));
+  const capBps = parseBigIntLike(state.maxOperatorStakeBps);
+  const consensusWeight = records.reduce((sum, record) => (record.isValidator ? sum + record.totalStake : sum), 0n);
+  const candidates = records
+    .filter((record) => record.isWaiter
+      && (capBps === 0n || record.totalStake * BPS_DIVISOR <= (consensusWeight + record.totalStake) * capBps))
     .sort((a, b) =>
-      a.totalStake !== b.totalStake
-        ? (b.totalStake > a.totalStake ? 1 : -1)
+      a.votingWeight !== b.votingWeight
+        ? (b.votingWeight > a.votingWeight ? 1 : -1)
         : (a.validator < b.validator ? -1 : 1))
     .slice(0, batchSizeFromValue(state.maxBatchSize))
     .map((record) => record.validator);
@@ -2335,18 +2414,6 @@ export const setStratoValidatorAddress = async (
   throw badRequest("This network's validator registry has no validator address binding.");
 };
 
-export const setStratoEmergencyKicker = async (
-  accessToken: string,
-  userAddress: string,
-  kicker: string
-): Promise<{ status: string; hash: string }> => {
-  await requireV2(accessToken);
-
-  return await castVoteOnIssue(accessToken, userAddress, requireValidatorRegistryAddress(), "setEmergencyKicker", [
-    normalizeAddress(kicker),
-  ]);
-};
-
 export const startStratoRewardSchedule = async (
   accessToken: string,
   userAddress: string,
@@ -2456,6 +2523,21 @@ export const setStratoSelfBondMinimum = async (
 
   return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setSelfBondMinimum", [
     selfBondMinimum,
+  ]);
+};
+
+// The wait before new stake counts toward a validator's vote, in seconds; 0 switches it
+// off. A change counts whatever was still waiting under the earlier setting.
+export const setStratoStakeDelay = async (
+  accessToken: string,
+  userAddress: string,
+  stakeDelaySeconds: string
+): Promise<{ status: string; hash: string }> => {
+  if (parseBigIntLike(stakeDelaySeconds) < 0n) throw badRequest("stakeDelaySeconds must not be negative");
+  await requireV2(accessToken);
+
+  return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setStakeDelay", [
+    stakeDelaySeconds,
   ]);
 };
 

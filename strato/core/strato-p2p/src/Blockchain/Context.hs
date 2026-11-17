@@ -28,6 +28,9 @@ module Blockchain.Context
     , RunsServer(..)
     , ActionTimestamp(..)
     , emptyActionTimestamp
+    , PbftWindow(..)
+    , admitPbftMessage
+    , maxPbftMessagesPerSecond
     , PeerAddress(..)
     , GenesisBlockHash(..)
     , PeerRunner
@@ -55,6 +58,7 @@ module Blockchain.Context
     , withActivePeer
     ) where
 
+import           Blockchain.EventException               (EventException (PeerNonResponsive))
 import           Conduit
 import           Control.Applicative
 import           Control.Exception                       hiding (bracket, catch, throwIO)
@@ -76,6 +80,7 @@ import qualified Data.Set.Ordered                        as S
 import           Data.String
 import qualified Data.Text                               as T
 import           Data.Time.Clock
+import           Data.Time.Clock.POSIX                   (getPOSIXTime)
 import           Data.Unique                             (Unique, newUnique)
 import           GHC.Exts                                (Constraint)
 
@@ -170,6 +175,25 @@ newtype ActionTimestamp = ActionTimestamp {unActionTimestamp :: Maybe UTCTime}
 emptyActionTimestamp :: ActionTimestamp
 emptyActionTimestamp = ActionTimestamp Nothing
 
+-- | This connection's consensus messages in the current second: (second, count).
+newtype PbftWindow = PbftWindow (Integer, Int)
+
+-- | The most consensus messages one connection may hand this node in a second:
+-- far above what a validator set sends in a round, and a bound on a peer that
+-- floods.
+maxPbftMessagesPerSecond :: Int
+maxPbftMessagesPerSecond = 500
+
+-- | Count a consensus message against this connection's second; False once
+-- the second is full.
+admitPbftMessage :: (MonadIO m, Mod.Modifiable PbftWindow m) => m Bool
+admitPbftMessage = do
+  now <- liftIO $ floor <$> getPOSIXTime
+  PbftWindow (second, n) <- Mod.get (Proxy @PbftWindow)
+  let n' = if second == now then n + 1 else 1
+  Mod.put (Proxy @PbftWindow) $ PbftWindow (now, n')
+  pure $ n' <= maxPbftMessagesPerSecond
+
 newtype RemainingBlockHeaders = RemainingBlockHeaders {unRemainingBlockHeaders :: [BlockHeader]}
 
 -- | Last missing-parent resync this connection asked for: (fetch number, when).
@@ -184,6 +208,7 @@ data Context = Context
   { blockHeaders          :: ([BlockHeader], UTCTime) -- keep track when last updated global headers cache
   , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp       :: ActionTimestamp
+  , pbftWindow            :: PbftWindow
   , _blockstanbulPeerAddr :: PeerAddress
   , _outboundWireMessages :: S.OSet (Host, Keccak256)
   }
@@ -222,7 +247,7 @@ instance RunsClient ContextM where
     let peerAddress = BC.pack $ hostToString host'
     runGeneralTCPClient (clientSettings p peerAddress) $ \app -> do
       let pSource = appSource app
-          pSink = appSink app
+          pSink = timedPeerSink app
           conduits = P2pConduits pSource pSink sSource
       -- Logged here, where the address is known, and rethrown so the client
       -- loop's handler can disable the peer: swallowed, every failure was
@@ -238,13 +263,22 @@ instance RunsServer ContextM where
     let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort' "*"
     runGeneralTCPServer settings $ \app -> runner $ \sSource -> do
       let pSource = appSource app
-          pSink = appSink app
+          pSink = timedPeerSink app
           conduits = P2pConduits pSource pSink sSource
           ip = fromString . sockAddrToIP $ appSockAddr app
           pn = TCPPort . fromMaybe 30303 . sockAddrToPort $ appSockAddr app
       catch
         (handler conduits ip pn)
         (\(e :: SomeException) -> $logErrorS "runServer/Exception" . T.pack $ show e)
+
+-- | Writes to the peer, giving up once one write has waited connectionTimeout
+-- seconds. A peer that stops reading would otherwise block the connection's loop
+-- on its socket: the sequencer events it has not been sent pile up unread, and
+-- the idle timer, which runs in that same loop, cannot fire.
+timedPeerSink :: MonadIO m => AppData -> ConduitM B.ByteString Void m ()
+timedPeerSink app = awaitForever $ \bs -> liftIO $
+  timeout (Conf.connectionTimeout (p2pConfig ethConf) * 1000000) (runConduit $ yield bs .| appSink app)
+    >>= maybe (throwIO PeerNonResponsive) pure
 
 -- | What peers say the chain's height is (see "Blockchain.PeerClaims"). A height
 -- is -1 while nobody has claimed one.
@@ -370,6 +404,10 @@ instance Mod.Modifiable Context ContextM where
 instance Mod.Modifiable ActionTimestamp ContextM where
   get _ = actionTimestamp <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {actionTimestamp = k}, ()))
+
+instance Mod.Modifiable PbftWindow ContextM where
+  get _ = pbftWindow <$> Mod.get (Proxy @Context)
+  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {pbftWindow = k}, ()))
 
 instance Mod.Accessible ActionTimestamp ContextM where
   access _ = Mod.get (Proxy @ActionTimestamp)
@@ -517,7 +555,8 @@ type MonadP2P m =
     All
       '[Mod.Modifiable]
       '[ BestBlock,
-         BestSequencedBlock
+         BestSequencedBlock,
+         PbftWindow
        ]
       m,
     All2
@@ -634,6 +673,7 @@ initContext :: MonadIO m => m Context
 initContext =
   return $
     Context { actionTimestamp = emptyActionTimestamp
+            , pbftWindow = PbftWindow (0, 0)
             , blockHeaders = ([], jamshidBirth)
             , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
             , _blockstanbulPeerAddr = PeerAddress Nothing

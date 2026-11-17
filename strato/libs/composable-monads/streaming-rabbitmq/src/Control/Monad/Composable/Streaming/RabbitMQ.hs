@@ -225,10 +225,12 @@ runConsume _consumerGroup topicName f = do
     consumeLoop msgQueue = do
       (item, envelope) <- liftIO $ atomically $ readTQueue msgQueue
       mResult <- f [item]
-      liftIO $ AMQP.ackEnv envelope
+      -- A message that stops the loop is left unacked, as if f had thrown.
       case mResult of
         Just result -> return result
-        Nothing -> consumeLoop msgQueue
+        Nothing -> do
+          liftIO $ AMQP.ackEnv envelope
+          consumeLoop msgQueue
 
 consumeFromLatest :: (Binary a, HasStreaming m) =>
                      TopicName -> m () -> ([a] -> m (Maybe b)) -> m b

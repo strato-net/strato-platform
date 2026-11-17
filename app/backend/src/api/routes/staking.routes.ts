@@ -13,8 +13,9 @@ router.get("/info/public", authHandler.authorizeRequest(true), StakingController
  *   get:
  *     summary: Digest a validator key must sign to authorize an operator
  *     description: >
- *       keccak256(abi.encodePacked("STRATO validator operator authorization", registry, validator,
- *       operator, authorizationNonce[validator])). Read fresh on every call: the nonce moves each time
+ *       keccak256(abi.encodePacked("STRATO validator operator authorization", chainId, registry,
+ *       validator, operator, authorizationNonce[validator])), where chainId is the network ID
+ *       (SolidVM's block.chainid). Read fresh on every call: the nonce moves each time
  *       a consent is consumed, and a signature over a stale digest is rejected by the registry.
  *       Validator hosts normally produce the signature with `strato-authorize-operator`, which
  *       computes the same digest locally.
@@ -38,6 +39,7 @@ router.get("/info/public", authHandler.authorizeRequest(true), StakingController
  *             schema:
  *               type: object
  *               properties:
+ *                 chainId:   { type: string, description: Network ID (block.chainid), decimal string }
  *                 registry:  { type: string, description: ValidatorRegistry proxy address }
  *                 validator: { type: string }
  *                 operator:  { type: string }
@@ -180,10 +182,10 @@ router.patch("/admin/operators/operator", walletAuth, StakingController.setValid
 router.patch("/admin/validator-params", walletAuth, StakingController.setValidatorParams);
 router.patch("/admin/self-bond-grace", walletAuth, StakingController.setSelfBondGrace);
 router.patch("/admin/self-bond-minimum", walletAuth, StakingController.setSelfBondMinimum);
+router.patch("/admin/stake-delay", walletAuth, StakingController.setStakeDelay);
 router.patch("/admin/set-params", walletAuth, StakingController.setSetParams);
 router.patch("/admin/governance", walletAuth, StakingController.setGovernance);
 router.post("/admin/recover-fees", walletAuth, StakingController.recoverUnattributedFees);
-router.patch("/admin/emergency-kicker", walletAuth, StakingController.setEmergencyKicker);
 router.patch("/admin/governance/staking-contract", walletAuth, StakingController.setGovernanceStakingContract);
 router.patch("/admin/governance/hard-cap", walletAuth, StakingController.setGovernanceHardCap);
 router.post("/admin/operators", walletAuth, StakingController.addOperator);

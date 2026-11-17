@@ -543,9 +543,10 @@ const OperatorPanel = ({
                 </AlertDialogContent>
               </AlertDialog>
             )}
-            {validatorSetDeployed && inSet && exiting && (
+            {/* After it leaves, a validator stays out until its exit is cancelled. */}
+            {validatorSetDeployed && exiting && (
               <Button size="sm" variant="outline" onClick={onCancelExit} disabled={submitting || !canCoverActionFee}>
-                {buttonLabel("cancel-exit", `Cancel exit (${formatReleaseTime(validator?.exitReadyTime || "0")})`, "Cancelling")}
+                {buttonLabel("cancel-exit", inSet ? `Cancel exit (${formatReleaseTime(validator?.exitReadyTime || "0")})` : "Cancel exit", "Cancelling")}
               </Button>
             )}
             {onUpdateProfile && validator && !profileDraft && (

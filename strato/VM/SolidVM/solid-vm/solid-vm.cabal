@@ -118,6 +118,7 @@ test-suite solid-vm-spec
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      CaughtFailureForkSpec
       ErrorHandlingSpec
       OptimizerSpec
       SolidVMSpec
@@ -163,6 +164,7 @@ test-suite solid-vm-spec
     , solid-vm-static-analysis
     , source-tools
     , statedb-monad
+    , strato-conf
     , strato-genesis
     , strato-init
     , strato-model
@@ -202,6 +204,31 @@ benchmark codebench
     , solid-vm-model
     , solid-vm-parser
     , solid-vm-static-analysis
+    , strato-model
+    , text
+    , vm-tools
+  default-language: Haskell2010
+
+test-suite caught-failure-fork-check
+  type: exitcode-stdio-1.0
+  main-is: ForkMain.hs
+  other-modules:
+      CaughtFailureForkSpec
+  hs-source-dirs:
+      fork-test
+      tests
+  ghc-options: -O2 -threaded -rtsopts
+  build-depends:
+      base
+    , blockapps-data
+    , common-log
+    , composable-monads-base
+    , hflags
+    , hspec
+    , lens
+    , solid-vm
+    , solid-vm-model
+    , strato-conf
     , strato-model
     , text
     , vm-tools

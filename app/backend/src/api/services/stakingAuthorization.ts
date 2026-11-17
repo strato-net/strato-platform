@@ -4,15 +4,18 @@ import { StratoError } from "../../errors/StratoError";
 // Pure helpers for the validator -> operator consent flow (ValidatorRegistry.register /
 // setOperator). Kept free of service imports so they can be unit tested directly.
 
-// What a validator key signs: keccak256 of the packed prefix, registry, validator, operator
-// and uint256 nonce, with no signed-message prefix (ValidatorRegistry.authorizationDigest).
+// What a validator key signs: keccak256 of the packed prefix, uint256 chain id, registry,
+// validator, operator and uint256 nonce, with no signed-message prefix
+// (ValidatorRegistry.authorizationDigest). The chain id is the network ID the node's metadata
+// reports (SolidVM's block.chainid), not the EIP-155 chain id.
 export const AUTHORIZATION_PREFIX = "STRATO validator operator authorization";
 
 const hex40 = (value: string): string => value.toLowerCase().replace(/^0x/, "");
 
-export const authorizationDigest = (registry: string, validator: string, operator: string, nonce: bigint): string => {
+export const authorizationDigest = (chainId: bigint, registry: string, validator: string, operator: string, nonce: bigint): string => {
   const packed = Buffer.concat([
     Buffer.from(AUTHORIZATION_PREFIX, "utf8"),
+    Buffer.from(chainId.toString(16).padStart(64, "0"), "hex"),
     Buffer.from(hex40(registry), "hex"),
     Buffer.from(hex40(validator), "hex"),
     Buffer.from(hex40(operator), "hex"),

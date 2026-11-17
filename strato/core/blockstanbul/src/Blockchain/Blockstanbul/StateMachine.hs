@@ -89,6 +89,12 @@ data BlockstanbulContext = BlockstanbulContext
     _sentRoundChange :: Maybe OutEvent,
     -- Which peers have we received a notice for a round-change
     _roundChanged :: M.Map RoundNumber (S.Set Validator),
+    -- Validators seen to have PREPARE'd or COMMIT'd at a higher round of the
+    -- current sequence: a round-change certificate. Once more than a third of the
+    -- weight shows here for a round, a node that fell behind (a restart or replay
+    -- lands it at the committed header's round, below the live round) catches up to
+    -- it instead of waiting to time out. Scoped to one height, like _roundChanged.
+    _catchUpVotes :: M.Map RoundNumber (S.Set Validator),
     -- The identity of this node
     _selfAddr :: Maybe Address,
     -- Block locking: a safety mechanism to prevent partial commits
@@ -174,6 +180,7 @@ newContext network' chainId' (Checkpoint v as mParent stakes' lastRound') addr v
           _pendingRound = Nothing,
           _sentRoundChange = Nothing,
           _roundChanged = M.empty,
+          _catchUpVotes = M.empty,
           _selfAddr = addr,
           _blockLock = Nothing,
           _lockSender = Nothing,

@@ -57,12 +57,26 @@ splitEraTopic :: StreamM '[Logger] Int
 splitEraTopic = do
   createTopicAndWait targetTopicName
   void $ produceItems targetTopicName (map event [1 .. total])
-  sqlFirst <- runConsume sqlConsumerGroup targetTopicName $ \es -> return (Just (length (es :: [IndexEvent])))
-  seen <- liftIO $ newIORef (0 :: Int)
-  runConsume p2pConsumerGroup targetTopicName $ \es -> do
-    n <- liftIO $ atomicModifyIORef' seen (\k -> (k + length (es :: [IndexEvent]), k + length es))
-    return $ if n >= total then Just () else Nothing
+  sqlFirst <- consumeFirstBatch sqlConsumerGroup
+  consumeAll p2pConsumerGroup
   return sqlFirst
+
+-- | Consume a group's first batch and stop on the second, which runConsume
+-- leaves unconsumed; the size of the first batch. The topic must hold more
+-- than one batch, or this waits for one.
+consumeFirstBatch :: ConsumerGroup -> StreamM '[Logger] Int
+consumeFirstBatch group = do
+  first <- liftIO $ newIORef Nothing
+  runConsume group targetTopicName $ \es -> liftIO . atomicModifyIORef' first $ \seen -> case seen of
+    Nothing -> (Just (length (es :: [IndexEvent])), Nothing)
+    Just n -> (Just n, Just n)
+
+-- | Consume everything on the topic: runConsume creates the group and stops
+-- on its first batch without consuming it, then the drain consumes it all.
+consumeAll :: ConsumerGroup -> StreamM '[Logger] ()
+consumeAll group = do
+  runConsume group targetTopicName $ \(_ :: [IndexEvent]) -> return (Just ())
+  void $ drainConsumerGroup group targetTopicName (\(_ :: [IndexEvent]) -> return ())
 
 -- HFlags only sees flags from earlier declaration groups; this splice ends the group.
 $(return [])
@@ -128,7 +142,7 @@ main = do
         withTopicDir $ \dir -> inStream dir $ do
           createTopicAndWait targetTopicName
           void $ produceItems targetTopicName (map event [1 .. total])
-          void $ runConsume sqlConsumerGroup targetTopicName $ \es -> return (Just (length (es :: [IndexEvent])))
+          void $ consumeFirstBatch sqlConsumerGroup
           outcome <- awaitLeaseAndReconcileWith 0 1000 (return False) (return "held by the writer") (\_ -> return ())
           liftIO $ outcome `shouldBe` SqlGroupKept
           seeded <- hasConsumerGroup p2pConsumerGroup targetTopicName
