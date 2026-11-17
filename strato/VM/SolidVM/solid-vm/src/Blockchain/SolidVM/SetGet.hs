@@ -12,6 +12,7 @@
 module Blockchain.SolidVM.SetGet
   ( setVar,
     assignmentValue,
+    memoryValue,
     getStorageValue,
     getVar,
     getMemberBase,
@@ -109,8 +110,26 @@ toBasic currentBlockNum = \case
 
 setVar :: MonadSM m => Variable -> Value -> m ()
 setVar (Constant dst) src = setVal dst src
-setVar (Variable var) val = Metered.localWrite >> liftIO (writeIORef var val)
+setVar (Variable var) val = Metered.localWrite >> (liftIO . writeIORef var =<< memoryValue val)
 setVar (TypedVariable t var) val = enforceUnsignedType t val >>= setVar var
+
+-- | A value as memory holds it. An array built from plain values is given a
+-- cell per element before it is stored, so that every name it is then assigned
+-- to refers to the same elements. Nothing is done before
+-- 'memoryReferenceForkActive'.
+memoryValue :: MonadSM m => Value -> m Value
+memoryValue value = case value of
+  SArray cells | Just first <- cells V.!? 0, plain first -> memoryReferenceForkActive >>= \case
+    True -> SArray <$> traverse (\cell -> if plain cell then createVar =<< plainValue cell else pure cell) cells
+    False -> pure value
+  _ -> pure value
+  where
+    plain (Constant _) = True
+    plain (TypedVariable _ var) = plain var
+    plain (Variable _) = False
+    plainValue (TypedVariable _ var) = plainValue var
+    plainValue (Constant v) = pure v
+    plainValue (Variable ref) = liftIO (readIORef ref)
 
 assignmentValue :: MonadSM m => Variable -> Value -> m Variable
 assignmentValue destination original = case original of

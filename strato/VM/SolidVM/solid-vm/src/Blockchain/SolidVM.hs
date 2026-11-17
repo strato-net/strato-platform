@@ -755,19 +755,13 @@ runStatement st@(CC.SimpleStatement (CC.ExpressionStatement ep@(CC.Binary _ "=" 
   pVar <- expToVar parent
   pVal <- weakGetVar pVar
 
-  -- If it's an array, calling (expToVar dst) gives us
-  -- the value at the index, NOT a reference that we can
-  -- assign to....so we need to make a new vector and reset the whole array
   case pVal of
     SArray fs -> do
       indVal <- getVar =<< expToVar indExp
       case indVal of
         SIntegral ind -> do
           when ((ind >= toInteger (V.length fs) || 0 > ind)) (throw (InvalidWrite "Cannot assign a value outside the allocated space for an array" (unparseStatement st)))
-          -- a cell of its own: the source's cell would tie the element to the source
-          cell <- liftIO $ Variable <$> newIORef srcVal
-          let newVec = fs V.// [(fromIntegral ind, cell)]
-          setVar pVar (SArray newVec)
+          setArrayElement pVar fs (fromIntegral ind) srcVal
           return Nothing
         _ -> throw (TypeError ("array index value (" ++ (T.unpack (renderValueShallow indVal)) ++ ") is not an integer") (unparseStatement st))
     SMap theMap -> do
@@ -1035,6 +1029,27 @@ runStatement (CC.ModifierExecutor pos) = do
   solidVMBreakpoint pos
   return $ Just SContinue
 runStatement x = throw (UnknownStatement "unknown statement in call to runStatement: " (show x))
+
+-- | Write one element of a memory array. An element holds the value it is
+-- given, in a cell of its own.
+--
+-- From 'memoryReferenceForkActive' the write goes into the element's cell and
+-- the array is not rebuilt, so every name that refers to the array sees it. An
+-- array that was built from plain values has no cells yet and is given them
+-- here, once. Before it, the array is rebuilt around a new cell.
+setArrayElement :: MonadSM m => Variable -> V.Vector Variable -> Int -> Value -> m ()
+setArrayElement array cells slot value = memoryReferenceForkActive >>= \case
+  False -> rebuild cells
+  True -> case plainValue (cells V.! slot) of
+    Nothing -> flip setVar value =<< typedElement array (cells V.! slot)
+    Just _ -> rebuild =<< for cells (\cell -> maybe (pure cell) createVar (plainValue cell))
+  where
+    rebuild from = do
+      cell <- liftIO $ Variable <$> newIORef value
+      setVar array . SArray $ from V.// [(slot, cell)]
+    plainValue (Constant plain) = Just plain
+    plainValue (TypedVariable _ var) = plainValue var
+    plainValue (Variable _) = Nothing
 
 while :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 while condition code = do
@@ -1952,19 +1967,13 @@ expToVar' ep@(CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src) =
 
   !pVar <- expToVar parent
   !pVal <- weakGetVar pVar
-  -- If it's an array, calling (expToVar dst) gives us
-  -- the value at the index, NOT a reference that we can
-  -- assign to....so we need to make a new vector and reset the whole array
   case pVal of
     SArray fs -> do
       indVal <- getVar =<< expToVar indExp
       case indVal of
         SIntegral ind -> do
           when ((ind >= toInteger (V.length fs) || 0 > ind)) (throw (InvalidWrite "Cannot assign a value outside the allocated space for an array" (unparseExpression ep)))
-          -- a cell of its own: the source's cell would tie the element to the source
-          cell <- liftIO $ Variable <$> newIORef srcVal
-          let newVec = fs V.// [(fromIntegral ind, cell)]
-          setVar pVar (SArray newVec)
+          setArrayElement pVar fs (fromIntegral ind) srcVal
           return $ Constant $ SBool True
         _ -> throw (TypeError ("array index value (" ++ (T.unpack (renderValueShallow indVal)) ++ ") is not an integer") (unparseExpression ep))
     SMap theMap -> do
@@ -2734,7 +2743,7 @@ addLocalVariable :: MonadSM m => SolidString -> Value -> m ()
 addLocalVariable name value = do
   Metered.localWrite
   --  initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack name) value
-  newVariable <- liftIO $ fmap Variable $ newIORef value
+  newVariable <- liftIO . fmap Variable . newIORef =<< memoryValue value
   addLocalBinding name newVariable
 
 addLocalBinding :: MonadSM m => SolidString -> Variable -> m ()
@@ -2755,7 +2764,7 @@ addLocalBinding name newVariable = unless (name == "") $ do
 addTypedLocalVariable :: MonadSM m => SVMType.Type -> SolidString -> Value -> m ()
 addTypedLocalVariable typ name value = do
   Metered.localWrite
-  checked <- enforceUnsignedType typ value
+  checked <- memoryValue =<< enforceUnsignedType typ value
   var <- liftIO $ fmap Variable $ newIORef checked
   typed <- typedVariable typ var
   addLocalBinding name typed

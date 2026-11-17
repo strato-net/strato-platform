@@ -24,6 +24,7 @@
 module Blockchain.SolidVM.SM
   ( parseOptionsForCurrentBlock,
     rlpForkValues,
+    memoryReferenceForkActive,
     CallInfo (..),
     SState (..),
     SM,
@@ -94,7 +95,7 @@ import Blockchain.EthConf (ethConf)
 import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
-import Blockchain.Forks (isOperatorPrecedenceForkActive, isConstructorPublicationForkActive, isRlpEncodeForkActive, isCaughtFailureForkActive)
+import Blockchain.Forks (isOperatorPrecedenceForkActive, isConstructorPublicationForkActive, isRlpEncodeForkActive, isCaughtFailureForkActive, isMemoryReferenceForkActive)
 import Blockchain.SolidVM.Exception
 import Blockchain.Data.VmTrace
 import Blockchain.SolidVM.GasInfo
@@ -1253,6 +1254,12 @@ rlpForkValues vs = do
       Variable ref -> fmap Constant . readCells =<< liftIO (readIORef ref)
       Constant plain -> Constant <$> readCells plain
       TypedVariable t inner -> TypedVariable t <$> readCell inner
+
+-- | Whether memory arrays are references at the block being executed. See
+-- 'isMemoryReferenceForkActive'.
+memoryReferenceForkActive :: (Functor m, Mod.Accessible Env.Environment m) => m Bool
+memoryReferenceForkActive =
+  isMemoryReferenceForkActive . blockHeaderBlockNumber . Env.blockHeader <$> Mod.access (Mod.Proxy @Env.Environment)
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection = getCodeAndCollectionWithTypeCheck True

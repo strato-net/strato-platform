@@ -30,6 +30,7 @@ module Blockchain.Forks
     isConstructorPublicationForkActive,
     caughtFailureForkBlock,
     isCaughtFailureForkActive,
+    isMemoryReferenceForkActive,
     forkNotScheduled,
     heliumNetworkID,
     upquarkNetworkID
@@ -231,6 +232,26 @@ caughtFailureForkBlock net
 isCaughtFailureForkActive :: Integer -> Bool
 isCaughtFailureForkActive blockNum =
   blockNum >= caughtFailureForkBlock (Conf.networkID $ networkConfig ethConf)
+
+-- | Block from which a memory array is a reference, as in Solidity.
+--
+-- Before it, assigning one memory array to another variable behaved as a copy:
+-- a write through either name rebuilt that name's array and left the other
+-- untouched. From it, both names refer to one array and a write goes into the
+-- element itself. Results differ for any contract that copies an array by
+-- assignment and then writes to it: Upquark block 191697 is a StablePool
+-- one-coin withdrawal that does. Unscheduled until each network coordinates
+-- activation.
+memoryReferenceForkBlock :: Integer -> Integer
+memoryReferenceForkBlock net
+  | net == heliumNetworkID = forkNotScheduled
+  | net == upquarkNetworkID = forkNotScheduled
+  | net == forktestNetworkID = forktestForkBlock
+  | otherwise = 0
+
+isMemoryReferenceForkActive :: Integer -> Bool
+isMemoryReferenceForkActive blockNum =
+  blockNum >= memoryReferenceForkBlock (Conf.networkID $ networkConfig ethConf)
 
 -- | Publish SolidVM runtime code only after construction succeeds.
 constructorPublicationForkBlock :: Integer -> Integer
