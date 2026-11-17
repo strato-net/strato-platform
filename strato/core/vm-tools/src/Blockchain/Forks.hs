@@ -255,12 +255,11 @@ isRlpEncodeForkActive blockNum =
          || (net == heliumNetworkID   && blockNum < heliumRlpEncodeForkBlock)
          || (net == forktestNetworkID && blockNum < forktestForkBlock)
 
--- | Require signed chain binding from this height. Public networks
--- remain unscheduled until the upgrade is coordinated.
+-- | Require signed chain binding from this height.
 replayProtectionForkBlock :: Integer -> Integer
 replayProtectionForkBlock net
-  | net == heliumNetworkID = forkNotScheduled
-  | net == upquarkNetworkID = forkNotScheduled
+  | net == heliumNetworkID = 1200000
+  | net == upquarkNetworkID = 1100000
   | net == forktestNetworkID = forktestForkBlock
   | otherwise = 0
 
@@ -276,8 +275,8 @@ isReplayProtectionForkActive blockNum =
 -- solely to get past the first failing block.
 caughtFailureForkBlock :: Integer -> Integer
 caughtFailureForkBlock net
-  | net == heliumNetworkID = forkNotScheduled
-  | net == upquarkNetworkID = forkNotScheduled
+  | net == heliumNetworkID = 1200000
+  | net == upquarkNetworkID = 1100000
   | net == forktestNetworkID = forktestForkBlock
   | otherwise = 0
 

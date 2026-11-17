@@ -9,8 +9,8 @@ including events/Cirrus action records and pending destruction effects, and
 sender identity is scoped to the frame. Both interpreter and native execution
 use the same network/height decision.
 
-`Blockchain.Forks.caughtFailureForkBlock` deliberately leaves **Helium and
-Upquark unscheduled** (`forkNotScheduled`). The existing throwaway fork-test
+`Blockchain.Forks.caughtFailureForkBlock` schedules **Helium at 1200000 and
+Upquark at 1100000**. The existing throwaway fork-test
 network switches at 10000; new networks use the hardened rules from genesis.
 These are consensus settings, not local operator overrides. Before deployment,
 reconcile actual canonical history and validator binary deployment times: a
@@ -111,7 +111,7 @@ the full Upquark evidence above and the Linux results apply to `a559256501b1`.
 Before release: replay the updated execution code from genesis on Upquark and
 Helium with canonical hash/root comparisons and durable Cirrus coverage, then
 coordinate activation heights against actual validator deployment history.
-Both public-network heights remain unscheduled. Do not skip validation or
+The scheduled public-network heights depend on that replay. Do not skip validation or
 substitute a snapshot for replay.
 
 Historical rules cannot simply be deleted while retaining genesis replay. They
