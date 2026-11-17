@@ -69,6 +69,13 @@ contract Describe_MemoryArrayElements {
         return a[0];
     }
 
+    function it_keeps_a_literal_element_after_its_variable_changes() public {
+        uint x = 1;
+        uint[] memory a = [x, 2];
+        x = 9;
+        require(a[0] == 1, "literal");
+    }
+
     function it_still_overwrites_an_element() public {
         uint[] memory a = new uint[](2);
         uint v = 1;

@@ -1529,7 +1529,12 @@ expToVar' (CC.TupleExpression _ exps) = do
   vars <- for exps $ maybe (return $ Constant SNULL) $ expToVar
   return $ Constant $ STuple $ V.fromList vars
 expToVar' (CC.ArrayExpression _ exps) = do
-  vars <- for exps expToVar
+  -- an element holds the value its variable had here, not the variable's cell
+  let snapshot var = case var of
+        Variable cell -> Constant <$> liftIO (readIORef cell)
+        TypedVariable t inner -> TypedVariable t <$> snapshot inner
+        Constant _ -> pure var
+  vars <- for exps $ snapshot <=< expToVar
   --  return $ Constant $ SArray (error "array type from array literal not known") $ V.fromList vars
   return $ Constant $ SArray $ V.fromList vars
 expToVar' expression@(CC.Ternary _ condition expr1 expr2) = do
