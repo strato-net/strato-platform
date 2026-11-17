@@ -79,10 +79,8 @@ same run builds the environment from nothing and updates it:
    `ghcr.io/strato-net/strato-platform/<image>:<VERSION>-<commit>-<hash>`
    (the node image under `strato:<VERSION>-<commit>`: a build regenerates
    tracked `.cabal` files, so its hash is not always the one a clean checkout
-   computes). `STRATO_BRANCH` is a branch or one commit by its full id; its
-   default is pinned to `0b05b66bf80fae031c78aea12be06efd9c3589fe`
-   (19.10-0b05b66) while develop is not deployable, and goes back to
-   `develop` afterwards;
+   computes). `STRATO_BRANCH` is a branch (default `develop`) or, to pin a
+   version, one commit by its full id;
    the packages are public, so nothing logs in anywhere, and a commit not
    published yet fails the run before it deploys (`scripts/ha.sh testnet-app
    images` reads the names from strato-platform's Makefile and checks each
