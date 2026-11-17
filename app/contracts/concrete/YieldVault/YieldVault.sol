@@ -248,10 +248,12 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         returns (uint256 shares)
     {
         _requireInitialized();
+        require(assets > 0, "YieldVault: zero assets");
         address caller = _msgSender();
         _accrue();
         require(assets <= maxWithdraw(owner_), "ERC4626: withdraw exceeds max");
         shares = previewWithdraw(assets);
+        require(shares > 0, "YieldVault: zero shares");
         _withdraw(caller, receiver, owner_, assets, shares);
         _checkpointAccrualBase();
         return shares;
@@ -265,10 +267,12 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         returns (uint256 assets)
     {
         _requireInitialized();
+        require(shares > 0, "YieldVault: zero shares");
         address caller = _msgSender();
         _accrue();
         require(shares <= maxRedeem(owner_), "ERC4626: redeem exceeds max");
         assets = previewRedeem(shares);
+        require(assets > 0, "YieldVault: zero assets");
         _withdraw(caller, receiver, owner_, assets, shares);
         _checkpointAccrualBase();
         return assets;
