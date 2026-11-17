@@ -1,0 +1,125 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CdkBootstrapRoles",
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": "arn:aws:iam::<account>:role/cdk-hnb659fds-*-<account>-<region>"
+    },
+    {
+      "Sid": "ReadDeploymentStacks",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:DescribeStacks",
+        "cloudformation:DescribeStackResources"
+      ],
+      "Resource": "arn:aws:cloudformation:<region>:<account>:stack/ha-<env>-*/*"
+    },
+    {
+      "Sid": "DescribeLoadBalancers",
+      "Effect": "Allow",
+      "Action": [
+        "elasticloadbalancing:DescribeLoadBalancers",
+        "elasticloadbalancing:DescribeTargetHealth"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudFrontOriginAddresses",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeManagedPrefixLists",
+        "ec2:GetManagedPrefixListEntries"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CellInstances",
+      "Effect": "Allow",
+      "Action": "autoscaling:DescribeAutoScalingGroups",
+      "Resource": "*"
+    },
+    {
+      "Sid": "ReplaceCellInstance",
+      "Effect": "Allow",
+      "Action": "autoscaling:SetInstanceHealth",
+      "Resource": "arn:aws:autoscaling:<region>:<account>:autoScalingGroup:*:autoScalingGroupName/ha-<env>-cell-*"
+    },
+    {
+      "Sid": "DeploymentSecretsMetadata",
+      "Effect": "Allow",
+      "Action": "secretsmanager:DescribeSecret",
+      "Resource": "arn:aws:secretsmanager:<region>:<account>:secret:ha-<env>/*"
+    },
+    {
+      "Sid": "DeploymentParameters",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameter",
+        "ssm:PutParameter"
+      ],
+      "Resource": "arn:aws:ssm:<region>:<account>:parameter/ha-<env>/*"
+    },
+    {
+      "Sid": "CellCommandsDocument",
+      "Effect": "Allow",
+      "Action": "ssm:SendCommand",
+      "Resource": "arn:aws:ssm:<region>::document/AWS-RunShellScript"
+    },
+    {
+      "Sid": "CellCommandsInstances",
+      "Effect": "Allow",
+      "Action": "ssm:SendCommand",
+      "Resource": "arn:aws:ec2:<region>:<account>:instance/*",
+      "Condition": {
+        "StringEquals": {
+          "ssm:resourceTag/Deployment": "ha-<env>"
+        }
+      }
+    },
+    {
+      "Sid": "CellCommandResults",
+      "Effect": "Allow",
+      "Action": "ssm:GetCommandInvocation",
+      "Resource": "*"
+    },
+    {
+      "Sid": "NodeScriptsList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::ha-<env>-node-scripts-<account>"
+    },
+    {
+      "Sid": "NodeScriptsObjects",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::ha-<env>-node-scripts-<account>/*"
+    },
+    {
+      "Sid": "EcrLogin",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*"
+    },
+    {
+      "Sid": "EcrPushStratoImages",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:BatchGetImage",
+        "ecr:CompleteLayerUpload",
+        "ecr:DescribeImages",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:InitiateLayerUpload",
+        "ecr:PutImage",
+        "ecr:UploadLayerPart"
+      ],
+      "Resource": "arn:aws:ecr:<region>:<account>:repository/strato/*"
+    }
+  ]
+}

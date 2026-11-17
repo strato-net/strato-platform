@@ -1,0 +1,24 @@
+{
+  "name": "strato-observability-infra",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CDK app for STRATO observability: Managed Prometheus with chain-health rules and SNS alert routing, Managed Grafana, collector configs for cells and tasks, CloudWatch alarms on managed services, and a synthetic end-to-end check",
+  "scripts": {
+    "synth": "cdk synth --strict",
+    "diff": "cdk diff",
+    "deploy": "cdk deploy",
+    "typecheck": "tsc --noEmit",
+    "dashboards": "./scripts/push-dashboards.sh",
+    "canary": "cd canary/nodejs && npm ci --omit=dev && cp ../src/*.js node_modules/"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.1100.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.220.0",
+    "constructs": "^10.4.0"
+  }
+}
