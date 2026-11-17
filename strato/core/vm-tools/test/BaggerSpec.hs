@@ -185,6 +185,18 @@ spec = do
       map otSigner (obReceiptTransactions built) `shouldBe` [funded]
       replayed `shouldBe` Right (stateRoot (obBlockData built))
 
+  describe "Bagger.runFromStateRoot" $
+    it "rejects a run whose transaction has the wrong nonce" $ do
+      let stale = atNonce 5 (signed funded)
+          mineStale _ remGas txs _ _ = pure $ TxMiningResult (Just $ TFNonceMismatch 5 0 stale) [] txs remGas Nothing
+      rejected <- inContext $ do
+        root <- startOnParent
+        let hdr = (BlockHeaderV2 zeroHash "" "" "" "" 11 (posixSecondsToUTCTime 1000) "" [Validator proposer] [] [] Nothing []) {stateRoot = root}
+        (_, res) <- withCurrentBlockHash (hash "verifier") $
+          runFromStateRoot mineStale (getBlockGasLimit hdr) hdr [stale] proposer True
+        pure $ either (const True) (const False) res
+      rejected `shouldBe` True
+
   describe "Bagger.isValidForPool" $ do
     it "refuses a gas limit no block can hold" $ do
       let cap = toInteger (maxBound :: Int)
