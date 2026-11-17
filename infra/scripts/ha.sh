@@ -476,12 +476,34 @@ cdk_in() {
   node_run "$ROOT/$dir" npx cdk "$@"
 }
 
+# A stack whose creation was rolled back holds nothing, and cdk deploy deletes
+# it to create it again. One with termination protection refuses that, and
+# every later run would stop there: lift the protection of such a stack first
+# (the new stack gets its own). This identity may only read the deployment's
+# stacks; the CDK deploy role, which it assumes as cdk does, may change them.
+unprotect_rolled_back() {
+  local stack state account creds key secret token
+  for stack in "$@"; do
+    [[ $stack != -* ]] || continue
+    state=$(aws cloudformation describe-stacks --stack-name "$stack" --query 'Stacks[0].[StackStatus,EnableTerminationProtection]' --output text 2>/dev/null) || continue
+    [[ $(tr 'A-Z\t' 'a-z ' <<<"$state") == "rollback_complete true" ]] || continue
+    log "$stack: its creation was rolled back; lifting its termination protection so that the deploy can replace it"
+    account=$(aws sts get-caller-identity --query Account --output text)
+    creds=$(aws sts assume-role --role-arn "arn:aws:iam::$account:role/cdk-hnb659fds-deploy-role-$account-$AWS_REGION" --role-session-name ha-sh \
+      --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' --output text) || die "cannot assume the CDK deploy role to lift the termination protection of $stack"
+    read -r key secret token <<<"$creds"
+    AWS_ACCESS_KEY_ID=$key AWS_SECRET_ACCESS_KEY=$secret AWS_SESSION_TOKEN=$token \
+      aws cloudformation update-termination-protection --no-enable-termination-protection --stack-name "$stack" >/dev/null
+  done
+}
+
 deploy() {
   local target dir stacks ctx skip
   for target in "$@"; do
     resolve "$target"
     [[ -z $skip ]] || { log "skip $target: $skip"; continue; }
     log "deploy $target: ${stacks[*]}"
+    unprotect_rolled_back "${stacks[@]}"
     cdk_in "$dir" deploy "${stacks[@]}" --require-approval never --progress events "${ctx[@]}"
   done
 }
@@ -575,6 +597,7 @@ cells_deploy() {
     fi
     ctx_cell "$id"
     log "cell $id: deploying $(host_stack "$id")"
+    unprotect_rolled_back "$P-cell-$id-network" "$P-cell-$id-host"
     cdk_in core-cell deploy "$P-cell-$id-network" "$P-cell-$id-host" --require-approval never --progress events "${ctx[@]}"
     if [[ $new == true ]]; then cells_wait_ready "$id"; fi
   done

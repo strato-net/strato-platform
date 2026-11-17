@@ -59,6 +59,11 @@ then the cells), `api-tier` (Network and Tier), the front door
   so the app tier is destroyed before the API tier.
 - An app tier stack that rolls back takes its ALB with it. Re-point the front
   door's `appOriginDomainName` at the new ALB from the stack output afterwards.
+- A stack whose creation fails is rolled back and holds nothing; the next
+  `scripts/ha.sh` deploy replaces it. Where such a stack has termination
+  protection (a cell's host stack, the data plane), the script lifts it first,
+  through the CDK deploy role: CloudFormation refuses to delete a protected
+  stack, and the stack created in its place is protected again.
 
 ## testnet-app: built and updated nightly
 
