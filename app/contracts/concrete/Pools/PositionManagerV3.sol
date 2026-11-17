@@ -413,7 +413,10 @@ contract record PositionManagerV3 is ERC721, Ownable {
         if (delta1 > 0) {
             position.tokensOwed1 += FullMath.mulDiv(uint(delta1), position.liquidity, FixedPoint128.Q128);
         }
-        position.feeGrowthInside0LastX128 = inside0;
-        position.feeGrowthInside1LastX128 = inside1;
+        //SOLIDVM_COMPATIBILITY: a zero snapshot read from the pool arrives as a storage
+        // reference, and assigning a reference writes nothing, leaving the old snapshot in
+        // place to be credited again; the addition stores the value
+        position.feeGrowthInside0LastX128 = inside0 + 0;
+        position.feeGrowthInside1LastX128 = inside1 + 0;
     }
 }
