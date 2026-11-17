@@ -9,6 +9,7 @@ import Blockchain.SolidVM.GasInfo (MonadBuiltinGas (..))
 import Blockchain.SolidVM.Execution (MonadContractCreation)
 import SolidVM.Model.Value (Value, ValList)
 import Blockchain.DB.AddressStateDB (HasAccountDB)
+import Blockchain.DB.StorageDB (HasMemStorageDB)
 import Blockchain.SolidVM.SM (CallInfo)
 import qualified Control.Monad.Change.Modify as Mod
 import qualified Blockchain.SolidVM.Builtins.Contracts as Original
@@ -18,7 +19,7 @@ import Blockchain.Strato.Model.Address (Address)
 
 payable :: MonadBuiltinGas m => Address -> m (Address, Bool)
 payable value = invoke (gasSize value) (pure (Original.payable value))
-selfdestruct :: (MonadBuiltinGas m, Mod.Modifiable [CallInfo] m, HasAccountDB m) => Address -> m Bool
+selfdestruct :: (MonadBuiltinGas m, Mod.Modifiable [CallInfo] m, HasAccountDB m, HasMemStorageDB m) => Address -> m Bool
 selfdestruct recipient = chargeBuiltinGas 5000 >> Original.selfdestruct recipient
 create :: forall engine m. (MonadBuiltinGas m, MonadContractCreation engine m) => String -> String -> ValList -> m Address
 create name source args = do

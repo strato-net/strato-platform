@@ -103,8 +103,8 @@ const StakingAdminTab = () => {
   const [validatorAddressEdit, setValidatorAddressEdit] = useState({ operator: "", validatorAddress: "" });
   const [selfBondGrace, setSelfBondGrace] = useState("");
   const [selfBondMinimum, setSelfBondMinimum] = useState("");
+  const [stakeDelay, setStakeDelay] = useState("");
   const [hardCap, setHardCap] = useState("");
-  const [emergencyKicker, setEmergencyKicker] = useState("");
   const [recovery, setRecovery] = useState({ to: "", amount: "" });
 
   const refresh = useCallback(async () => {
@@ -259,6 +259,29 @@ const StakingAdminTab = () => {
       {isV2 && (
         <Card>
           <CardHeader>
+            <CardTitle>Stake delay</CardTitle>
+            <CardDescription>The wait before new stake counts toward a validator's vote. New stake earns at once but joins the vote after between one and two delays, and a seat by right needs a bond that has already waited. 0 switches it off.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="space-y-1 text-xs">
+                <span className="text-muted-foreground">Delay (seconds)</span>
+                <Input value={stakeDelay} onChange={(event) => setStakeDelay(event.target.value)} placeholder="86400" className="w-48" />
+              </label>
+              <Button size="sm" disabled={blocked || !/^\d+$/.test(stakeDelay.trim())} onClick={() => run("stake-delay", () => api.patch("/staking/admin/stake-delay", {
+                stakeDelaySeconds: stakeDelay.trim(),
+              }), "Stake delay vote")}>
+                {label("stake-delay", "Set delay")}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Choose a delay longer than the admins need to act on a hostile stake. Changing it counts whatever was still waiting under the earlier setting.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {isV2 && (
+        <Card>
+          <CardHeader>
             <CardTitle>Self-bond grace deadline</CardTitle>
             <CardDescription>For seats held from before the self-bond rule: until this deadline their delegated stake still counts toward min stake; after it only self-bond does. New seats always need their operator's own bond at the self-bond minimum.</CardDescription>
           </CardHeader>
@@ -334,13 +357,6 @@ const StakingAdminTab = () => {
           </label>
           <Button size="sm" variant="outline" disabled={blocked || !/^\d+$/.test(hardCap)} onClick={() => run("gov-cap", () => api.patch("/staking/admin/governance/hard-cap", { hardCap }), "Governance hard-cap vote")}>
             {label("gov-cap", "Set hard cap")}
-          </Button>
-          <label className="space-y-1 text-xs">
-            <span className="text-muted-foreground">Emergency kicker (ops key)</span>
-            <Input value={emergencyKicker} onChange={(event) => setEmergencyKicker(event.target.value)} placeholder="address" className="w-96" />
-          </label>
-          <Button size="sm" variant="outline" disabled={blocked || !isAddressLike(emergencyKicker)} onClick={() => run("kicker", () => api.patch("/staking/admin/emergency-kicker", { kicker: emergencyKicker.trim() }), "Emergency kicker vote")}>
-            {label("kicker", "Set kicker")}
           </Button>
         </CardContent>
       </Card>

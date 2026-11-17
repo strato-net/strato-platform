@@ -30,9 +30,6 @@ contract record MockValidatorSync is IStratoStakingValidatorSync {
         validatorOperator[validator] = operator;
     }
 
-    mapping(address => bool) public record overOneThird;
-    function setOverOneThird(address validator, bool over) public { overOneThird[validator] = over; }
-    function exceedsOneThird(address validator) external view override returns (bool) { return overOneThird[validator]; }
 }
 
 // Signing is impossible inside a test, so this registry stands in a key's signature with a
@@ -46,6 +43,11 @@ contract ConsentRegistry is ValidatorRegistry {
 
     function sign(address validator, address operator) public {
         signedBy[operatorAuthorizationDigest(validator, operator)] = validator;
+    }
+
+    // The network the test runner lacks: helium's network ID.
+    function _chainId() internal view override returns (uint256) {
+        return 114784819836269;
     }
 
     function _recoverSigner(bytes32 digest, uint8 v, uint256 r, uint256 s) internal override returns (address) {
@@ -189,34 +191,21 @@ contract Describe_ValidatorRegistry {
         require(registry.validatorCount() == 1, "slot reused");
     }
 
-    function it_emergency_kick_only_by_the_kicker_and_only_over_one_third() public {
-        _addValidatorA();
-        user.doExpectingFailure(address(registry), "emergencyKick(address)", "VR: not the emergency kicker", VALIDATOR_A);
-
-        registry.setEmergencyKicker(address(user));
-        user.doExpectingFailure(address(registry), "emergencyKick(address)", "VR: validator below one third of stake", VALIDATOR_A);
-
-        staking.setOverOneThird(VALIDATOR_A, true);
-        user.doSuccessfully(address(registry), "emergencyKick(address)", VALIDATOR_A);
-        (, bool active,,,,,) = registry.operators(VALIDATOR_A);
-        require(!active, "validator delisted");
-        require(!staking.lastActive(), "staking synced as delisted");
-    }
-
-    // Known vector, produced off-chain with:
-    //   cast keccak $(cast abi-encode --packed "f(string,address,address,address,uint256)" \
-    //     "STRATO validator operator authorization" 0x1111...1111 <validator> 0x2222...2222 7)
-    //   cast wallet sign --no-hash --private-key <anvil key 0> <digest>
+    // Known vector, produced off-chain with ethers:
+    //   solidityPackedKeccak256(["string", "uint256", "address", "address", "address", "uint256"],
+    //     ["STRATO validator operator authorization", 114784819836269, 0x1111...1111, <validator>, 0x2222...2222, 7])
+    //   new SigningKey(<anvil key 0>).sign(digest)
+    // 114784819836269 is helium's network ID.
     // It pins both the digest encoding off-chain tooling must reproduce and the signature
     // conventions (v as 27/28 or as a 0/1 recovery id) the registry accepts.
     function it_matches_off_chain_digests_and_recovers_real_signatures() public {
         address signer = address(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266);
-        bytes32 expected = bytes32(0xb40f7746740b70994c96fae88ae656ddfaf42a06872675fdde41dbee73e79bd3);
-        bytes32 digest = registry.authorizationDigest(address(0x1111111111111111111111111111111111111111), signer, address(0x2222222222222222222222222222222222222222), 7);
+        bytes32 expected = bytes32(0xba7b553d0f1ae8dada79984723ddf311b90c9d0e84c6eb16a19445aa557d0d27);
+        bytes32 digest = registry.authorizationDigest(114784819836269, address(0x1111111111111111111111111111111111111111), signer, address(0x2222222222222222222222222222222222222222), 7);
         require(digest == expected, "digest matches Ethereum packed encoding");
 
-        uint256 r = 0xb5eefa7d20ec97007bd0fb457ac8da3140d90a4f163337c3de9778650b83d121;
-        uint256 s = 0x545274b8ace3c5a2044b42023d102bdc9cce776288710f2d4a09ef1751ba939f;
+        uint256 r = 0xe20114a7c9c9d0f87b14b2db2ae0aba935e9ce37ef66472fecc6ed17aac55598;
+        uint256 s = 0x74d78323e445044c3967614d037c46ae23d8ffba019480ec5d67c64754aa3b3c;
         RecoveryHarness harness = new RecoveryHarness(address(this));
         require(harness.recover(digest, 27, r, s) == signer, "recovers with v = 27");
         require(harness.recover(digest, 0, r, s) == signer, "recovers with a 0/1 recovery id");
@@ -231,7 +220,7 @@ contract Describe_ValidatorRegistry {
     function it_digest_for_a_fresh_validator_includes_nonce_zero() public {
         require(registry.authorizationNonce(GENESIS_X) == 0, "nonce never written");
         bytes32 onChain = registry.operatorAuthorizationDigest(GENESIS_X, address(operatorB));
-        bytes32 offChain = registry.authorizationDigest(address(registry), GENESIS_X, address(operatorB), 0);
+        bytes32 offChain = registry.authorizationDigest(114784819836269, address(registry), GENESIS_X, address(operatorB), 0);
         require(onChain == offChain, "operatorAuthorizationDigest must encode an unwritten nonce as uint256(0)");
     }
 
@@ -240,7 +229,18 @@ contract Describe_ValidatorRegistry {
         _register(user, GENESIS_X);
         require(registry.authorizationNonce(GENESIS_X) == 1, "consent spent");
         bytes32 onChain = registry.operatorAuthorizationDigest(GENESIS_X, address(operatorB));
-        bytes32 offChain = registry.authorizationDigest(address(registry), GENESIS_X, address(operatorB), 1);
+        bytes32 offChain = registry.authorizationDigest(114784819836269, address(registry), GENESIS_X, address(operatorB), 1);
         require(onChain == offChain, "operatorAuthorizationDigest must track the written nonce");
+    }
+
+    // The digest carries the chain id, so a consent signed on one network does not verify on
+    // another that shares the registry address and the validator key, as a network started
+    // from a copy of another's state does.
+    function it_scopes_the_digest_to_the_chain() public {
+        bytes32 onChain = registry.operatorAuthorizationDigest(GENESIS_X, address(operatorB));
+        uint256 chainId = 114784819836269;
+        uint256 nonce = 0;
+        require(onChain == keccak256(abi.encodePacked("STRATO validator operator authorization", chainId, address(registry), GENESIS_X, address(operatorB), nonce)), "this chain's id is in the digest");
+        require(onChain != keccak256(abi.encodePacked("STRATO validator operator authorization", address(registry), GENESIS_X, address(operatorB), nonce)), "a digest without it is not accepted");
     }
 }

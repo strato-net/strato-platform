@@ -101,6 +101,8 @@ test-suite contextm-test
   main-is: Spec.hs
   other-modules:
       ActionEncodeSpec
+      BaggerSpec
+      ConsensusFromStateSpec
       CrossLangFixtureSpec
       ReceiptSpec
       ReplayProtectionSpec
@@ -120,11 +122,14 @@ test-suite contextm-test
     , blockDB
     , blockapps-data
     , blockapps-datadefs
+    , blockapps-mpdbs
     , bytestring
+    , composable-monads-base
     , containers
     , ethereum-rlp
     , hflags
     , hspec
+    , monad-alter
     , ordered-containers
     , quickcheck-instances
     , solid-vm-model
@@ -133,6 +138,7 @@ test-suite contextm-test
     , strato-model
     , text
     , time
+    , unliftio
     , vector
     , vm-tools
   default-language: Haskell2010

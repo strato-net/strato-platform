@@ -1,6 +1,8 @@
 // What a validator key signs to bind an operator (ValidatorRegistry.operatorAuthorizationDigest).
-// The backend recomputes it from live state; `nonce` moves after every consumed consent.
+// The backend recomputes it from live state; `nonce` moves after every consumed consent, and
+// `chainId` (the network ID) scopes it to one network.
 export type AuthorizationDigest = {
+  chainId: string;
   registry: string;
   validator: string;
   operator: string;
