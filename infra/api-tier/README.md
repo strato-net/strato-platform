@@ -1,0 +1,207 @@
+# STRATO API tier on AWS
+
+CDK app for Phase 3 of the tiered deployment: strato-api, ethereum-jsonrpc,
+PostgREST, and the SMD with apex, behind the node's nginx as a sidecar, all
+in one Fargate task per copy behind an ALB. The copies share no edge state:
+nginx sessions ride in the encrypted session cookie (one `session_secret` for
+every copy), CSRF tokens stay in each copy's shared dict behind the ALB's
+session stickiness, and bloc's nonce counters are rows in the eth database's
+writer (`nonce_counter`), which every copy already shares.
+
+Data paths: eth reads go to the Aurora reader endpoint, writes and the
+resolve poll to the writer, Cirrus to the reader, transactions to every core
+cell's ingress (`strato-ingest`, port 8600: a batch is posted to all of the
+cells so each one's mempool holds it, and succeeds once one accepts), and VM
+calls to vm-query. Every task runs a vm-query over the SQL mirror and
+publishes it to the other copies through ECS Service Connect
+(`vm-query:8546`), so a copy whose own instance is down or shedding uses
+another's. Nothing here calls a core cell's VM: what the mirror cannot
+answer (a non-latest block tag, `eth_getProof`, a block replay) is an error.
+
+## Before deploying
+
+1. Images: `strato`, `nginx`, `postgrest`, and optionally `smd` and `apex`,
+   as strato-platform's autobuild publishes them for every commit it builds:
+   `ghcr.io/strato-net/strato-platform/<image>:<VERSION>-<commit>-<hash>`,
+   public, so the tasks pull them without credentials (an ECR URI is pulled
+   with the task's ECR permissions).
+2. The Aurora cluster (`data-plane`) and the core cells, each admitting this
+   stack's task security group (output `TaskSecurityGroupId`): the cluster on
+   5432, the cells on 8600 (the core-cell app's `clientSecurityGroupIds`).
+3. Secrets Manager: the secret of the node's database login (data-plane
+   output `NodeLoginSecretName`; the tier never uses the master login), the
+   node's `secrets/oauth_credentials.yaml` contents as a plain-string secret,
+   and a 64-character session secret. SSM Parameter Store: the node's
+   `.ethereumH/ethconf.yaml` base64-encoded, under the name given as
+   `ethconfParameterName` (about 2.6 KB; fits a standard parameter).
+4. A regional ACM certificate for the node hostname.
+5. `-c ethconfParameterName=...`: the node config, which the core cell publishes
+   there each boot (`ethconfParameterName` in the core-cell app). Without a cell
+   publishing it, create the parameter by hand from a node's `ethconf.yaml`
+   (base64, SecureString).
+
+## Deploy and cut over
+
+```sh
+cd api-tier && npm ci
+npx cdk deploy --all \
+  -c envName=testnet -c vpcId=vpc-0123 \
+  -c stratoImage=ghcr.io/strato-net/strato-platform/strato:<tag> \
+  -c nginxImage=ghcr.io/strato-net/strato-platform/nginx:<tag> \
+  -c postgrestImage=ghcr.io/strato-net/strato-platform/postgrest:<tag> \
+  -c smdImage=ghcr.io/strato-net/strato-platform/smd:<tag> -c apexImage=ghcr.io/strato-net/strato-platform/apex:<tag> \
+  -c postgresWriterHost=<writer> -c postgresReaderHost=<reader> \
+  -c ingressUrls=http://<core load balancer DnsName>:8600 -c coreLoadBalancerSecurityGroupId=<its SecurityGroupId> \
+  -c albCertificateArn=<cert> \
+  -c hostedZoneId=Z123 -c domainName=node.testnet.example -c nodeIpAddresses=1.2.3.4 \
+  -c apiTierWeight=10
+```
+
+The stack creates the deployment's ECS cluster, `ha-<env>` (`-c clusterName`,
+output `ClusterName`), which the app tier's services join. nginx takes the
+client's address from `X-Forwarded-For` behind the load balancer (the VPC's
+range is always trusted) and behind what `-c trustedProxyCidrs` lists: with
+the front door, CloudFront's origin-facing ranges (the managed prefix list
+`com.amazonaws.global.cloudfront.origin-facing`, comma-separated).
+
+The stack owns two weighted records for the node hostname: `node` (the
+existing address) and `api-tier` (the ALB). Delete the hostname's existing
+simple record first, or import it. Raise `apiTierWeight` in steps as these
+stay clean, and finish at 100:
+
+- duplicate-nonce rejections: zero (`grep -c "nonce" logs/strato-sequencer` on the core, or the sequencer's rejection metric)
+- CSRF 403s on the ALB: zero (`nginx_http_requests_total{status="403"}`)
+- Aurora replica lag under 1 s (`AuroraReplicaLag`)
+- `/eth/v1.2/metadata` from the ALB reports `isSynced: true`
+
+Rolling back is the same weight going down. The node keeps serving until
+the weight is 100 and has been for a while; then re-set-up the node with
+`--role=core` at the next window.
+
+Security groups: pass `-c postgresSecurityGroupId=<Aurora cluster SG>` and the stack opens it to its task security group at deploy time; `-c coreLoadBalancerSecurityGroupId=<the core-cell app's coreNlb stack SecurityGroupId>` admits the tasks on the core tier's load balancer, for the transaction ingress (8600) and Prometheus (`prometheusHost`); `-c coreSecurityGroupId=<a core cell SG>` is for that cell's Grafana (`grafanaTargetGroupArn`, the core tier's Grafana target group, which this load balancer forwards `/grafana` to). Without a load balancer, list every cell in `ingressUrls`, open their ingress on the cell side (`clientSecurityGroupIds` in the core-cell app, the output `TaskSecurityGroupId`), and `coreSecurityGroupId` also opens that cell's Prometheus port.
+
+## Hostname and certificate
+
+Outside Route 53, `-c domainName=<host>` (with no `hostedZoneId`) names the
+tier's public hostname. Without `-c albCertificateArn`, the app adds
+`ha-<env>-api-certificate` holding a DNS-validated ACM certificate; that
+stack stays in `CREATE_IN_PROGRESS` until the validation CNAME ACM asks for
+exists at the registrar (the record is in the stack's events and in `aws acm
+describe-certificate`). The Tier stack then serves HTTPS on 443 with it and
+redirects port 80, and its `HostnameRecord` output is the CNAME to create
+for the hostname itself (the ALB has no fixed IPs). Anything that reached
+the tier over plain HTTP (the app tier's `nodeUrl`) must move to
+`https://<host>` at the same time.
+
+## SMD on CloudFront
+
+`-c smdDomainName=smd.example.com` adds two stacks. `<prefix>-SmdCertificate`
+is a DNS-validated certificate for that hostname (the validation CNAME goes to
+the registrar; the stack waits for it). `<prefix>-Smd` serves the SMD bundle
+from a private S3 bucket behind CloudFront at `/smd/`, and sends the node API,
+apex, RPC and login paths (`/strato/*`, `/strato-api*`, `/bloc/*`, `/cirrus/*`,
+`/apex-api*`, `/apex-ws/*`, `/rpc*`, `/login*`, `/auth/*`) to this tier over
+https, so the browser keeps one origin and its session and CSRF cookies. A
+viewer-request function redirects `/` to `/smd/` and serves `index.html` for
+the SMD's client-side routes.
+
+CloudFront forwards the viewer's Host header, so login returns to the SMD's
+hostname; CloudFront then checks the origin certificate against that Host, so
+the same certificate is also attached to this tier's HTTPS listener.
+
+- Build first: `npm ci && npm run build` in `smd-ui` (base path `/smd/`).
+- Context: `-c deploySmdUi=true -c chainId=<id> -c networkName=<name>`
+  (`-c wagmiProjectId=` optional) for the SMD's `config.js`.
+- The SMD needs apex: pass `-c apexImage=...` so the task runs it.
+- The OAuth client needs `https://<smdDomainName>/*` among its redirect and
+  post-logout URIs.
+- Outputs: `HostnameRecord` (the CNAME to create) and `DistributionId` (name
+  it in the tier map's `frontend_labels`, `<id>=SMD`).
+
+## Front door: every UI on one hostname
+
+`-c frontDoorDomainName=node.example.com -c appOriginDomainName=<app ALB DNS name>`
+adds `<prefix>-FrontDoorCertificate` (DNS-validated, also attached to this
+tier's HTTPS listener) and `<prefix>-FrontDoor`: one CloudFront distribution
+serving the app UI at `/` and the SMD at `/smd/` from their own private
+buckets, as a single node does. It routes:
+
+| Paths | Origin |
+|---|---|
+| everything else | app UI bucket (client-side routes get `index.html`) |
+| `/smd`, `/smd/*` | SMD bucket (`/smd` redirects to `/smd/`) |
+| `/api/*`, `/api-docs*`, `/history-api/*` | the app tier's ALB |
+| `/strato/*`, `/strato-api*`, `/bloc/*`, `/cirrus/*`, `/apex-api*`, `/apex-ws/*`, `/rpc*`, `/docs*`, `/login*`, `/auth/*`, `/csrf-init`, `/health`, `/_ping` | this tier's ALB |
+
+Without `appOriginDomainName` the app tier's row is left out and its paths
+fall to the app UI bucket: the front door of an environment whose app tier
+does not exist yet, because the app backend only starts once this hostname
+answers. Deploy it again with `appOriginDomainName` once the app tier is up.
+
+CloudFront forwards the viewer's Host header to both ALBs, so each carries the
+front door's certificate: here through the stack reference, on the app tier
+with `-c extraCertificateArns=<FrontDoorCertificate's CertificateArn>` (the app
+ALB must serve https: `-c albCertificateArn=...` there).
+
+Two nginx tiers then answer one hostname, so they must agree on sessions:
+
+- **One session secret.** `-c nginxSessionSecretName=<the app tier's session
+  secret>` makes this tier's nginx read it. Pass the complete ARN when the name
+  ends in a hyphen and six characters, like `ha-<env>/app/session-secret`: a
+  name-only reference is misread as name plus random suffix and ECS fails with
+  AccessDenied (a secret this stack created under
+  `sessionSecretName` stays in place, unused; renaming it would collide).
+- **One secret for every client.** `-c oauthJsonSecretName=<JSON {discoveryUrl,
+  clientId, clientSecret}>` serves both strato-api (which writes its credentials
+  file from the three values) and nginx, instead of `oauthCredentialsSecretName`'s
+  YAML. The app tier's `oauthSecretName` and a core cell's `oauthSecretName` take
+  the same secret, so one secret covers the deployment.
+- **One OAuth client.** `-c nginxOauthSecretName=<JSON {discoveryUrl, clientId,
+  clientSecret}>` gives this tier's nginx the app tier's client (strato-api
+  keeps the node's credentials file). Login and logout for both UIs run here;
+  a token refresh needs the client that issued the session. The client needs
+  `https://<frontDoorDomainName>/*` among its redirect and post-logout URIs.
+- **Stateless CSRF.** `-c csrfStateless=true` on both tiers sets
+  `CSRF_STATELESS=true`: the token becomes an HMAC of the session under the
+  session secret, so any copy of either tier validates it. The default
+  per-instance token store would reset the shared `CSRF-TOKEN` cookie between
+  tiers, and the two ALBs' `AWSALB` stickiness cookies overwrite each other on
+  one hostname. Requires nginx images with the stateless mode (18.10-onehost
+  or later); single-node deployments leave it off and are unchanged.
+
+Other context: `-c deployAppUi=true` uploads `app/ui/dist` (run `npm run build`
+in `app/ui` first) with a `config.js` from `chainId`, `networkName` and the
+optional `appUiPosthogKey`, `appUiPosthogHost`, `appUiGoogleAnalyticsId`;
+`-c deploySmdUi=true` uploads the SMD as in the section above.
+
+Cut over by pointing the hostname at the `HostnameRecord` output's CloudFront
+name. If the hostname was a node's A record, give the node another name first
+(its Grafana, and the core-cell context's `tlsHostname`). Name the
+`DistributionId` in the tier map's `frontend_labels`.
+
+## Node health from a core cell
+
+apex answers `/health` and `/apex-api/status` from Prometheus metrics of the
+core's processes, which run in a core cell, not in this tier. Expose the cell's
+Prometheus on its private address (the core-cell app's `-c exposePrometheus=true`)
+and pass `-c prometheusHost=<core load balancer DnsName>:9090`, which reaches
+the first cell's Prometheus: apex reads it, the load balancer's security group
+(`coreLoadBalancerSecurityGroupId`) opens that port to the tasks, and
+the required health jobs leave out core-api (strato-api runs in this task).
+Without it apex reports health, consensus data and the node address as unknown.
+
+The task has no Redis, so apex is started with `redis_host=none` and reads the
+last block and the validator list from the Aurora mirror the writer cell
+maintains (`block_data_ref`, `node_status`). Without that setting apex tries
+the node's Redis first and every `/health` and `/status` waits out its 2 s
+connect timeout before falling back to the same tables.
+
+## API docs
+
+The task runs Swagger UI (`swaggerapi/swagger-ui`) as the `docs` container on
+port 8080, and the nginx sidecar serves it at `/docs/`, as on a node: the
+spec (`/docs/swagger.yaml`) and the initializer come from the nginx image
+itself. The container is not essential, so a docs failure never takes the
+API down. `-c docsImage=<uri>` points at a mirror (an ECR URI is pulled with
+the task's ECR permissions); `-c docs=false` leaves it out, and `/docs/` then
+answers 502.
