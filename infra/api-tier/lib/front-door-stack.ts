@@ -148,7 +148,7 @@ export class FrontDoorStack extends Stack {
     // The bundles are built outside CDK; each config.js is rendered here from
     // context, matching app/ui/render-config.sh and smd-ui/docker-run.sh.
     if (config.deployAppUi) {
-      const dist = path.resolve(process.env.STRATO_PLATFORM_DIR ?? path.resolve(__dirname, "../../../strato-platform"), "app/ui/dist");
+      const dist = path.resolve(process.env.STRATO_PLATFORM_DIR ?? path.resolve(__dirname, "../../.."), "app/ui/dist");
       if (!fs.existsSync(path.join(dist, "index.html"))) throw new Error(`deployAppUi is set but ${dist} has no build; run "npm run build" in app/ui first`);
       if (!config.chainId || !config.networkName) throw new Error("deployAppUi needs -c chainId=... and -c networkName=...");
       const configJs = [
@@ -171,7 +171,7 @@ export class FrontDoorStack extends Stack {
       });
     }
     if (config.deploySmdUi) {
-      const dist = path.resolve(process.env.STRATO_PLATFORM_DIR ?? path.resolve(__dirname, "../../../strato-platform"), "smd-ui/dist");
+      const dist = path.resolve(process.env.STRATO_PLATFORM_DIR ?? path.resolve(__dirname, "../../.."), "smd-ui/dist");
       if (!fs.existsSync(path.join(dist, "index.html"))) throw new Error(`deploySmdUi is set but ${dist} has no build; run "npm ci && npm run build" in smd-ui first`);
       if (!config.chainId || !config.networkName) throw new Error("deploySmdUi needs -c chainId=... and -c networkName=...");
       const configJs = [

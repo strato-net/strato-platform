@@ -181,9 +181,9 @@ export class CoreCellStack extends Stack {
 
     // --- Bootstrap: the script and the repo's node scripts, as one asset ---
     const bootstrap = new s3assets.Asset(this, "Bootstrap", { path: path.join(__dirname, "..", "bootstrap") });
-    // bin/strato-* live in the strato-platform checkout: a sibling of this repo
-    // by default, or wherever STRATO_PLATFORM_DIR points.
-    const platformBin = path.resolve(process.env.STRATO_PLATFORM_DIR ?? path.resolve(__dirname, "../../../strato-platform"), "bin");
+    // bin/strato-* live at the top of this repository (three levels up), or
+    // in the checkout STRATO_PLATFORM_DIR points at.
+    const platformBin = path.resolve(process.env.STRATO_PLATFORM_DIR ?? path.resolve(__dirname, "../../.."), "bin");
     if (!fs.existsSync(path.join(platformBin, "strato-up"))) {
       throw new Error(`${platformBin} has no strato-up; set STRATO_PLATFORM_DIR to a strato-platform checkout`);
     }

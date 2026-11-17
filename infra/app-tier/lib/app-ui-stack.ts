@@ -92,7 +92,7 @@ export class AppUiStack extends Stack {
 
     // The bundle is built outside CDK (`npm run build` in app/ui); config.js is
     // rendered here from context, matching app/ui/render-config.sh.
-    const dist = path.resolve(process.env.STRATO_PLATFORM_DIR ?? path.resolve(__dirname, "../../../strato-platform"), "app/ui/dist");
+    const dist = path.resolve(process.env.STRATO_PLATFORM_DIR ?? path.resolve(__dirname, "../../.."), "app/ui/dist");
     if (config.deployUi) {
       if (!fs.existsSync(path.join(dist, "index.html"))) {
         throw new Error(`deployUi is set but ${dist} has no build; run "npm run build" in app/ui first`);

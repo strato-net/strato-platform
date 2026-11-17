@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Deploys one HA environment from environments/<env>.env. Whatever one stack
-# needs from another (the VPC, Aurora endpoints, security groups, load
-# balancer and instance names) is read from the deployed stacks, never copied
-# by hand, so the same commands build an environment from nothing and update
-# it. Jenkinsfile.testnet runs it; by hand it runs from any directory:
+# Deploys one HA environment from its settings file, <env>.env, in
+# HA_ENV_DIR (default: environments/ here, where example.env lists every
+# setting; a real environment's file is kept outside this repository).
+# Whatever one stack needs from another (the VPC, Aurora endpoints, security
+# groups, load balancer and instance names) is read from the deployed stacks,
+# never copied by hand, so the same commands build an environment from nothing
+# and update it. A pipeline runs it; by hand it runs from any directory:
 #
 #   scripts/ha.sh <env> deploy <target>...        cdk deploy each target, in order
 #   scripts/ha.sh <env> cdk <target> <args>...    any cdk command (diff, synth)
@@ -31,13 +33,13 @@
 # from STRATO_IMAGE, NGINX_IMAGE, POSTGREST_IMAGE, APEX_IMAGE, APP_NGINX_IMAGE
 # and APP_BACKEND_IMAGE (the pipeline sources what the images command
 # printed), or, only with HA_IMAGES=recorded, from the set last deployed.
-# strato-platform is read from STRATO_PLATFORM_DIR, default ../strato-platform
-# beside this repo.
+# The rest of strato-platform (the Makefile, bin/, app/ui, smd-ui) is read from
+# STRATO_PLATFORM_DIR, default the repository this directory is in.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 env_name=${1:?usage: scripts/ha.sh <env> <command> ...}
-envfile="$ROOT/environments/$env_name.env"
+envfile="${HA_ENV_DIR:-$ROOT/environments}/$env_name.env"
 shift
 [[ -f $envfile ]] || { echo "ha.sh: no $envfile" >&2; exit 2; }
 
@@ -105,7 +107,7 @@ env_check
 cmd=${1:?usage: scripts/ha.sh <env> <command> ...}
 shift
 export AWS_REGION AWS_DEFAULT_REGION=$AWS_REGION AWS_PAGER=""
-export STRATO_PLATFORM_DIR=${STRATO_PLATFORM_DIR:-$(cd "$ROOT/.." && pwd)/strato-platform}
+export STRATO_PLATFORM_DIR=${STRATO_PLATFORM_DIR:-$(cd "$ROOT/.." && pwd)}
 P=ha-$ENV_NAME
 STATE=/$P/deploy
 # The strato image the cells run: cells upgrade records it, a new instance of a cell installs it.
@@ -387,21 +389,12 @@ ctx_api() {
     -c trustedProxyCidrs="$cdn")
   otel_ecs
 }
-# The partner referrals service follows the network: one per network, each
-# with its own internal key (a plain-string secret that service reads too).
-# The backend gets its URL and that key. An environment file names another
-# service with PARTNER_REFERRALS_URL and PARTNER_INTERNAL_KEY_SECRET; a network
-# without one gets neither and records no referrals. helium's address is the
-# one ECS Express generated for the service: a recreated service has another.
+# The partner referrals service the app backend reports to, when the
+# environment file names one: PARTNER_REFERRALS_URL and
+# PARTNER_INTERNAL_KEY_SECRET (that service's internal key, a plain-string
+# secret it reads too). Without them the backend records no referrals.
 partner_referrals() {
-  local url=${PARTNER_REFERRALS_URL:-} key=${PARTNER_INTERNAL_KEY_SECRET:-}
-  if [[ -z $url && -z $key ]]; then
-    case $NETWORK in
-      helium) url=https://partner-referrals.example.invalid key=helium-partner-referrals/internal-key.example ;;
-      upquark) url=https://partner-api.strato.nexus key=upquark-partner-referrals/internal-key.example ;;
-    esac
-  fi
-  [[ -z $url && -z $key ]] || ctx+=(-c partnerReferralsUrl="$url" -c partnerInternalKeySecretName="$key")
+  [[ -z ${PARTNER_REFERRALS_URL:-} ]] || ctx+=(-c partnerReferralsUrl="$PARTNER_REFERRALS_URL" -c partnerInternalKeySecretName="$PARTNER_INTERNAL_KEY_SECRET")
 }
 
 ctx_app() {
@@ -593,7 +586,7 @@ cells_deploy() {
     if ! exists "$(host_stack "$id")"; then
       new=true
       [[ -z $(existing_cells) ]] || cells_wait_ready
-      secret_exists "$OAUTH_SECRET" || die "$OAUTH_SECRET does not exist: create it first (environments/$ENV_NAME.env)"
+      secret_exists "$OAUTH_SECRET" || die "$OAUTH_SECRET does not exist: create it first ($envfile)"
     fi
     ctx_cell "$id"
     log "cell $id: deploying $(host_stack "$id")"

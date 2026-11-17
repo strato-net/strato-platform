@@ -101,7 +101,7 @@ export class SmdUiStack extends Stack {
     // The bundle is built outside CDK (`npm run build` in smd-ui, base path
     // /smd/); config.js is rendered here from context, matching
     // smd-ui/docker-run.sh.
-    const dist = path.resolve(process.env.STRATO_PLATFORM_DIR ?? path.resolve(__dirname, "../../../strato-platform"), "smd-ui/dist");
+    const dist = path.resolve(process.env.STRATO_PLATFORM_DIR ?? path.resolve(__dirname, "../../.."), "smd-ui/dist");
     if (config.deploySmdUi) {
       if (!fs.existsSync(path.join(dist, "index.html"))) {
         throw new Error(`deploySmdUi is set but ${dist} has no build; run "npm ci && npm run build" in smd-ui first`);

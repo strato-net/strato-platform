@@ -1,11 +1,12 @@
 # STRATO HA infrastructure
 
-AWS CDK apps for the tiered STRATO deployment. Each directory is an
-independent CDK app with its own `package.json`, context contract and README.
+AWS CDK apps for the high-availability STRATO deployment, and
+`scripts/ha.sh`, which deploys one environment with them. Each directory is
+an independent CDK app with its own `package.json`, context contract and
+README.
 
-> **This repo cannot synth on its own.** It needs a `strato-platform` checkout
-> beside it at `../strato-platform`, or at the path in `STRATO_PLATFORM_DIR`.
-> See [The strato-platform checkout](#the-strato-platform-checkout).
+The apps read a few things from the rest of this repository at synth time:
+see [What the apps read from the repository](#what-the-apps-read-from-the-repository).
 
 | App | Stacks | What it owns |
 | --- | --- | --- |
@@ -65,16 +66,27 @@ then the cells), `api-tier` (Network and Tier), the front door
   through the CDK deploy role: CloudFormation refuses to delete a protected
   stack, and the stack created in its place is protected again.
 
+## Environments
+
+An environment is one settings file, `<env>.env`: its name, region, network,
+hostname, certificate, cells and sizes. `environments/example.env` lists
+every setting `scripts/ha.sh` reads. A real environment's file is not kept in
+this repository: put it in a directory of its own and name that directory in
+`HA_ENV_DIR` (`HA_ENV_DIR=/path/to/environments scripts/ha.sh <env> ...`).
+The pipeline that deploys an environment every night lives with its file.
+`environments/deployer-policy.template.json` is the IAM policy of the
+identity such a pipeline runs as.
+
 ## testnet-app: built and updated nightly
 
 `testnet-app` (`ha-testnet-app-*`, the replacement for app.testnet.strato.nexus)
-is described by `environments/testnet-app.env` and deployed by
-`scripts/ha.sh`, which `Jenkinsfile.testnet` runs every night. The script
+is described by its environment file, `testnet-app.env`, and deployed by
+`scripts/ha.sh`, which a Jenkins pipeline runs every night. The script
 reads whatever a target needs from the stacks already deployed (the VPC,
 Aurora endpoints, security groups, load balancer and instance names), so the
 same run builds the environment from nothing and updates it:
 
-1. The image set is what strato-platform's autobuild published for the
+1. The image set is what this repository's autobuild published for the
    `STRATO_BRANCH` commit checked out, under
    `ghcr.io/strato-net/strato-platform/<image>:<VERSION>-<commit>-<hash>`
    (the node image under `strato:<VERSION>-<commit>`: a build regenerates
@@ -83,8 +95,8 @@ same run builds the environment from nothing and updates it:
    version, one commit by its full id;
    the packages are public, so nothing logs in anywhere, and a commit not
    published yet fails the run before it deploys (`scripts/ha.sh testnet-app
-   images` reads the names from strato-platform's Makefile and checks each
-   image). strato-platform's
+   images` reads the names from the Makefile and checks each
+   image). The repository's
    `bin/strato-*`, `core-cell/bootstrap/strato-cell-upgrade` and
    `strato-cell-health` go to the node scripts bucket of step 3.
 2. `data-plane` and `obs-core`. The data plane also generates the password
@@ -126,9 +138,9 @@ same run builds the environment from nothing and updates it:
    tiers' nginx are given the VPC's range and CloudFront's origin-facing
    ranges (read from the managed prefix list on every run) as trusted
    proxies, so they see the client's address. The app backend is pointed at
-   the partner referrals service of the environment's network (`NETWORK`:
-   helium's or upquark's, in `scripts/ha.sh`) with that service's internal
-   key.
+   the partner referrals service the environment file names
+   (`PARTNER_REFERRALS_URL`, `PARTNER_INTERNAL_KEY_SECRET`), when it names
+   one, with that service's internal key.
 7. The hostname. The app backend starts only once
    `https://app.testnet.strato.nexus` answers as a synced node, so the run
    waits before the app tier until the name leads to this front door (its
@@ -171,7 +183,7 @@ core process answers and the node is within 5 blocks of the network's best
 block (`strato-cell-upgrade --check`, the check the pipeline waits on);
 `strato-cell-health` answers the same over HTTP on port 8601.
 
-`scripts/ha.sh` checks `environments/testnet-app.env` before it asks anything
+`scripts/ha.sh` checks the environment file before it asks anything
 of AWS: a setting that is missing, misspelt or of the wrong shape stops every
 command at once. A command that needs the image set takes it from the
 environment (what `images` printed) and never falls back to the set last
@@ -195,9 +207,8 @@ Before the first run:
   `{discoveryUrl, clientId, clientSecret}` with
   `https://app.testnet.strato.nexus/*` among its redirect and post-logout
   URIs; optionally `ha-testnet-app/app/backend`, the app backend's keys.
-- Jenkins: a username/password credential
-  `ha-deployer.example` holding the access key of an IAM
-  user of the same name with `environments/testnet-app-deployer-policy.json`:
+- Jenkins: a username/password credential holding the access key of an IAM
+  user with the policy of `environments/deployer-policy.template.json`:
   the account's CDK bootstrap roles (`cdk-hnb659fds-*`), push to the
   `strato/*` ECR repositories, the node scripts bucket, SSM parameters under
   `/ha-testnet-app/`, `AWS-RunShellScript` on instances tagged
@@ -212,8 +223,8 @@ the front door, a CNAME to the `ha-testnet-app-api-frontdoor` stack's
 
 ## Known gaps (TODO)
 
-- **apex follows the writer** (raise with Dustin; strato-platform and the
-  api-tier app). The API tier's apex reads one Prometheus, `prometheusHost`,
+- **apex follows the writer** (the apex service and the api-tier app). The
+  API tier's apex reads one Prometheus, `prometheusHost`,
   which `scripts/ha.sh` sets to the first cell, so the node health and
   "stalled" readings are that cell's view whoever holds the writer lease:
   after a failover they describe a standby, and with the first cell down they
@@ -248,18 +259,17 @@ the Aurora cluster.
   (`vm-query:8546`); what the mirror cannot answer (a non-latest block tag,
   `eth_getProof`, a block replay) is an error from the tier.
 
-## The strato-platform checkout
+## What the apps read from the repository
 
-This code was split out of `strato-platform` (`infra/`), and three things are
-still read from a checkout of it at synth time:
+Three things outside `infra/` are read at synth time:
 
 - `bin/strato-*`: shipped to every core cell as a stack asset (always needed by `core-cell`)
 - `app/ui/dist`: only with `deployAppUi` / `deployUi`
 - `smd-ui/dist`: only with `deploySmdUi`
 
-The checkout is expected beside this repo at `../strato-platform`. Set
-`STRATO_PLATFORM_DIR` to use another path. Paths like
-`design-documents/...`, `app/ui` and `smd-ui` in the READMEs refer to that repo.
+They are taken from the repository this directory is in. Set
+`STRATO_PLATFORM_DIR` to read them from another checkout, for example to
+deploy the node scripts and UI of one commit with the CDK apps of another.
 
 ## Teardown
 
@@ -271,7 +281,8 @@ volumes go with its stack (its Auto Scaling group); delete the cells before
 
 ## Context drift
 
-`cdk.context.json` caches account lookups and the per-deployment values are
+`cdk.context.json` caches account lookups (it is not tracked: it names one
+account's resources) and the per-deployment values are
 passed with `-c`. Deploying against a live environment with different context
 values changes what is deployed, so run `npx cdk diff` first and expect it to
 be empty.
