@@ -9,6 +9,13 @@ export interface PostgresStackProps extends StackProps {
   envName: string;
   /** Existing VPC id (the node's), or omit to create a two-AZ VPC. */
   vpcId?: string;
+  /**
+   * NAT gateways of the VPC this stack creates. One (the default) serves both zones: when its
+   * zone fails, the private subnets of the other lose their way out (the tiers' calls to the
+   * OAuth provider, registries and the public hostname). Two give each zone its own, at the
+   * price of a second gateway.
+   */
+  natGateways?: number;
   /** Aurora PostgreSQL version; 14 matches the node's postgres:14.18 container. */
   engineVersion: string;
   writerInstanceClass: string;
@@ -47,7 +54,7 @@ export class PostgresStack extends Stack {
       ? ec2.Vpc.fromLookup(this, "Vpc", { vpcId: props.vpcId })
       : new ec2.Vpc(this, "Vpc", {
           maxAzs: 2,
-          natGateways: 1,
+          natGateways: props.natGateways ?? 1,
           subnetConfiguration: [
             { name: "public", subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 },
             { name: "private", subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS, cidrMask: 24 },

@@ -118,6 +118,9 @@ fi
 image=${1:?usage: strato-cell-upgrade <strato image> | --restart [<seconds>] | --check}
 
 # --- New binaries from the image, new node scripts from S3 ---
+# Under the lock from here on: the staging directories below are the same for
+# every run, and two upgrades at once would install each other's files.
+lock
 registry=${image%%/*}
 # Only ECR needs a login; the public GitHub registry (ghcr.io) pulls without one.
 if [[ "$registry" == *.dkr.ecr.*.amazonaws.com ]]; then

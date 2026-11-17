@@ -23,6 +23,23 @@ export interface AppUiStackProps extends StackProps {
 const API_PATHS = ["/api/*", "/api-docs*", "/auth/*", "/login", "/rpc", "/_ping"];
 
 /**
+ * Viewer-request function for the bucket: client-side routes (no file
+ * extension in the last segment) get index.html. A function rather than the
+ * distribution's error responses, which apply to every behavior and would
+ * turn the app tier's own 403s and 404s into the page with a 200.
+ */
+const UI_ROUTES = `
+function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+  if (uri.slice(uri.lastIndexOf("/") + 1).indexOf(".") === -1) {
+    request.uri = "/index.html";
+  }
+  return request;
+}
+`;
+
+/**
  * The app UI: the built Vite bundle in a private bucket behind CloudFront,
  * with the API, auth and RPC paths routed to the app tier's load balancer so
  * the browser sees one origin, exactly as it did behind the node's nginx.
@@ -58,9 +75,19 @@ export class AppUiStack extends Stack {
       origin: albOrigin,
       allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
       cachePolicy: cloudfront.CachePolicy.USE_ORIGIN_CACHE_CONTROL_HEADERS_QUERY_STRINGS,
-      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+      // With the viewer's Host, as the behavior above: over https CloudFront
+      // checks the ALB's certificate against the Host it sends, and the
+      // certificate is the app hostname's, not the ALB's own name.
+      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER,
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
     };
+
+    const routes = new cloudfront.Function(this, "UiRoutes", {
+      functionName: `${deploymentPrefix(config.envName)}-app-UiRoutes`,
+      runtime: cloudfront.FunctionRuntime.JS_2_0,
+      comment: `${deploymentPrefix(config.envName)} app: client-side routes`,
+      code: cloudfront.FunctionCode.fromInline(UI_ROUTES),
+    });
 
     const certificate =
       props.certificate ?? (config.cloudfrontCertificateArn ? acm.Certificate.fromCertificateArn(this, "CfCert", config.cloudfrontCertificateArn) : undefined);
@@ -71,16 +98,12 @@ export class AppUiStack extends Stack {
         origin: origins.S3BucketOrigin.withOriginAccessControl(bucket, { originAccessControl: new cloudfront.S3OriginAccessControl(this, "Oac", { originAccessControlName: `${deploymentPrefix(config.envName)}-app-ui` }) }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        functionAssociations: [{ function: routes, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST }],
       },
       additionalBehaviors: {
         ...Object.fromEntries(API_PATHS.map((p) => [p, apiBehavior])),
         ...(config.history ? { "/history-api/*": historyBehavior } : {}),
       },
-      // Client-side routes: the bucket has no such objects, the SPA does.
-      errorResponses: [
-        { httpStatus: 403, responseHttpStatus: 200, responsePagePath: "/index.html", ttl: Duration.seconds(0) },
-        { httpStatus: 404, responseHttpStatus: 200, responsePagePath: "/index.html", ttl: Duration.seconds(0) },
-      ],
       ...(config.domainName && certificate
         ? {
             domainNames: [config.domainName],

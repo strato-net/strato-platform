@@ -86,6 +86,14 @@ anonymous users without a token. The client id and secret go to nginx,
 which runs the login flow. That flow needs the app hostname's callback
 (`https://<host>/auth/openidc/return`) registered on the OAuth client.
 
+The `Ui` stack routes this tier's paths only. The app also calls
+`/csrf-init` and `/health`, which a node's nginx (or the API tier's) answers
+and this tier's nginx does not: through this distribution alone they get the
+page from the bucket, not an answer from nginx. For a complete single
+hostname use the API tier's front door (next section). The STRATO Wallet's
+`/vault/signature` exists only on a node with local auth; none of these
+stacks serve it.
+
 ## Behind the API tier's front door
 
 When the API tier app's front door serves every UI on one hostname (see its

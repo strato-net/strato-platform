@@ -62,7 +62,9 @@ groups:
           summary: "Cirrus is {{ $value }} blocks behind the chain: app data is stale"
 
       - alert: WriterLeaseNotHeldByExactlyOne
-        expr: sum(strato_writer_lease_held) != 1
+        # "or vector(0)": with every cell or its collector gone the sum is
+        # empty, and an empty result never fires.
+        expr: (sum(strato_writer_lease_held) or vector(0)) != 1
         for: 2m
         labels: { severity: page, env: __ENV__ }
         annotations:
@@ -99,7 +101,7 @@ groups:
           summary: "strato-ingest on {{ $labels.instance }} is dropping non-transaction events from the API tier's batches"
 
       - alert: VmRunnerHeapHigh
-        expr: strato_rts_live_bytes{name="vm-runner"} > 12e9
+        expr: strato_rts_live_bytes{process="vm-runner"} > 12e9
         for: 10m
         labels: { severity: warning, env: __ENV__ }
         annotations:

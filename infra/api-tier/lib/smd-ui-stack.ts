@@ -24,6 +24,12 @@ export interface SmdUiStackProps extends StackProps {
 const API_PATHS = ["/strato/*", "/strato-api*", "/bloc/*", "/cirrus/*", "/apex-api*", "/apex-ws/*", "/rpc*", "/login*", "/auth/*", "/csrf-init", "/health", "/_ping"];
 
 /**
+ * The app backend's paths, which the SMD calls too (its /api/config and the
+ * protocol metadata): the app tier's, when `appOriginDomainName` names its ALB.
+ */
+const APP_PATHS = ["/api-docs*", "/api/*"];
+
+/**
  * Viewer-request function for the bucket: "/" and "/smd" go to "/smd/" (the
  * bundle is built for that base path), and client-side routes under /smd/
  * (no file extension) get the app's index.html. A function rather than the
@@ -65,8 +71,8 @@ export class SmdUiStack extends Stack {
       removalPolicy: RemovalPolicy.RETAIN,
     });
 
-    const apiBehavior: cloudfront.BehaviorOptions = {
-      origin: new origins.HttpOrigin(config.domainName, {
+    const tierBehavior = (domainName: string): cloudfront.BehaviorOptions => ({
+      origin: new origins.HttpOrigin(domainName, {
         protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
         readTimeout: Duration.seconds(60),
       }),
@@ -75,7 +81,11 @@ export class SmdUiStack extends Stack {
       // Host, cookies, auth headers and query strings reach nginx unchanged.
       originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER,
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-    };
+    });
+    const apiBehavior = tierBehavior(config.domainName);
+    // Without the app tier's ALB its paths fall to the bucket, and what the
+    // SMD reads from the app backend stays empty.
+    const appBehavior = config.appOriginDomainName ? tierBehavior(config.appOriginDomainName) : undefined;
 
     const routes = new cloudfront.Function(this, "SmdRoutes", {
       functionName: `${deploymentPrefix(config.envName)}-smd-SmdRoutes`,
@@ -92,7 +102,10 @@ export class SmdUiStack extends Stack {
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         functionAssociations: [{ function: routes, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST }],
       },
-      additionalBehaviors: Object.fromEntries(API_PATHS.map((p) => [p, apiBehavior])),
+      additionalBehaviors: {
+        ...(appBehavior ? Object.fromEntries(APP_PATHS.map((p) => [p, appBehavior])) : {}),
+        ...Object.fromEntries(API_PATHS.map((p) => [p, apiBehavior])),
+      },
       domainNames: [config.smdDomainName],
       certificate: props.certificate,
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
