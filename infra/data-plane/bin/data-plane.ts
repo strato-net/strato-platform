@@ -19,6 +19,7 @@ new PostgresStack(app, `${prefix}-data-postgres`, {
   env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
   envName,
   vpcId: c("vpcId", "") || undefined,
+  natGateways: Number(c("natGateways", "1")),
   engineVersion: c("engineVersion", "14.15"),
   writerInstanceClass: c("writerInstanceClass", "r7g.large"),
   readerInstanceClass: c("readerInstanceClass", "r7g.large"),

@@ -112,3 +112,38 @@ report is more than 100 seconds behind the newest report in its cluster
 minutes late, so an absolute cutoff cannot tell stopped tasks from live
 ones). Replaced target groups and removed containers drop off after ten to
 fifteen minutes.
+
+## Known gaps on the metrics path
+
+The scrape configs, the rules and the transaction canary have only run in
+the first proof-out; `testnet-app` uses the traces-only configs. Before an
+environment turns `managedPrometheus` on, or gives the canary a key:
+
+- **Cell scrape targets.** `config/cell-otel-collector.yaml` scrapes
+  `localhost`, but strato-sequencer, vm-runner, strato-p2p and slipstream
+  bind their metrics to the node's `apiListenAddress` (the docker bridge on
+  Linux), as `strato-cell-upgrade --check` knows. The targets have to be
+  rendered with that address when the cell installs the config.
+- **One `instance` per cell.** Every cell reports `instance=localhost:<port>`,
+  so the tier map cannot tell cells apart or join them to their CloudWatch
+  boxes. Each scrape needs the cell's own name as its instance.
+- **Jobs that do not exist everywhere.** The cell config scrapes `core-api`,
+  which a core cell does not run, and the one sidecar config shared by the
+  API and app tiers scrapes `core-api`, `app-backend` and `history` on every
+  task: each missing target is `up == 0`, and `ProcessDown` pages on
+  `core-api`. The sidecar also scrapes nginx on port 80 (the API tier's nginx
+  listens on `httpPort`, 8081 by default; the app tier's has no `/metrics`)
+  and an app backend path that serves no metrics. The configs have to be per
+  role.
+- **`BlockAgeHigh`.** `strato_best_block_timestamp_seconds` is set by
+  strato-indexer only when a block's `RanBlock` and `NewBestBlock` events
+  arrive in one batch; split across batches the gauge goes stale and the
+  alert pages on a healthy chain. The producer has to carry the timestamp
+  across batches first.
+- **`VmRunnerHeapHigh`** reads `strato_rts_live_bytes{process="vm-runner"}`,
+  which process-monitor exports; no scrape job collects process-monitor yet.
+- **Transaction canary.** With `canaryKeySecretName` the canary sends a
+  legacy transfer of 1 wei at gas price zero. From the STRATO-gas fork a
+  native-value transfer must be a type-2 envelope, so on such a network the
+  step fails and the canary alarms. It has to sign a type-2 transfer with a
+  fee before it is given a key.

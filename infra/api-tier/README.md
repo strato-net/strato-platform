@@ -109,6 +109,12 @@ CloudFront forwards the viewer's Host header, so login returns to the SMD's
 hostname; CloudFront then checks the origin certificate against that Host, so
 the same certificate is also attached to this tier's HTTPS listener.
 
+The SMD also reads from the app backend (`/api/config`, protocol metadata).
+`-c appOriginDomainName=<app ALB DNS name>` sends `/api/*` and `/api-docs*`
+to the app tier, whose ALB then needs this hostname's certificate as well
+(`-c extraCertificateArns=...` there). Without it those paths fall to the
+bucket and that data stays empty.
+
 - Build first: `npm ci && npm run build` in `smd-ui` (base path `/smd/`).
 - Context: `-c deploySmdUi=true -c chainId=<id> -c networkName=<name>`
   (`-c wagmiProjectId=` optional) for the SMD's `config.js`.

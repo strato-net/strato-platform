@@ -22,6 +22,7 @@
 #   scripts/ha.sh <env> install                   npm ci in every app
 #   scripts/ha.sh <env> build-ui                  build app/ui and smd-ui for the front door
 #   scripts/ha.sh <env> publish-scripts           node scripts and the cell upgrade and health scripts to the core tier's bucket
+#   scripts/ha.sh <env> check-hostname            before a front door exists: stop if the hostname's DNS record would make CloudFront refuse it
 #   scripts/ha.sh <env> first-front-door          the front door where there is no app tier yet (without the app tier's routes) or no front door
 #   scripts/ha.sh <env> wait-hostname             wait until the environment's hostname leads to the front door and answers as a synced node (HOSTNAME_WAIT_MINUTES, 720, for its DNS record)
 #   scripts/ha.sh <env> smoke                     check the deployment through its front door
@@ -53,7 +54,7 @@ ENV_REQUIRED=(ENV_NAME AWS_REGION NETWORK CHAIN_ID NODE_HOSTNAME CERTIFICATE_ARN
 # Present in the file, but may be left empty: without a snapshot a cell syncs from the genesis block.
 ENV_MAY_BE_EMPTY=(SNAPSHOT_BUCKET SNAPSHOT_SOURCE)
 ENV_OPTIONAL=(BACKEND_SECRET BACKEND_SECRET_KEYS GRAFANA_ADMIN_GROUPS GRAFANA_VIEWER_GROUPS PARTNER_REFERRALS_URL PARTNER_INTERNAL_KEY_SECRET
-  READY_TIMEOUT_MINUTES)
+  READY_TIMEOUT_MINUTES NAT_GATEWAYS)
 # Only the file sets them: a value inherited from the caller's shell (the
 # pipeline exports ENV_NAME and AWS_REGION) would hide a missing line.
 # READY_TIMEOUT_MINUTES alone may also come from the caller.
@@ -90,6 +91,7 @@ env_check() {
   for name in OAUTH_SECRET BACKEND_SECRET PARTNER_INTERNAL_KEY_SECRET; do is "$name" '^[A-Za-z0-9/_+=.@:-]+$' "a Secrets Manager name or ARN"; done
   is BACKEND_SECRET_KEYS '^[A-Z0-9_]+( [A-Z0-9_]+)*$' "setting names separated by single spaces"
   for name in CHAIN_ID PG_READERS CELL_DATA_GIB API_DESIRED_COUNT APP_DESIRED_COUNT READY_TIMEOUT_MINUTES; do is "$name" '^[0-9]+$' "a whole number"; done
+  is NAT_GATEWAYS '^[12]$' "1 (one for both zones) or 2 (one for each)"
   for cell in ${CELLS:-}; do
     [[ $cell =~ ^[a-z][a-z0-9-]{0,30}:[a-z]{2}(-[a-z]+)+-[0-9][a-z]$ ]] || problems+=("CELLS: $cell is not <cellId>:<zone>, the id a short lowercase name starting with a letter")
     [[ " $ids " != *" ${cell%%:*} "* ]] || problems+=("CELLS: cell ${cell%%:*} is listed twice")
@@ -276,6 +278,8 @@ ctx_data_plane() {
   # The bus (MSK) stays off until the API tier submits through it.
   ctx=(-c envName="$ENV_NAME" -c engineVersion="$PG_ENGINE_VERSION" -c writerInstanceClass="$PG_INSTANCE_CLASS"
     -c readerInstanceClass="$PG_INSTANCE_CLASS" -c readerCount="$PG_READERS" -c bus=false)
+  # One NAT gateway for both zones unless the environment asks for one each.
+  [[ -z ${NAT_GATEWAYS:-} ]] || ctx+=(-c natGateways="$NAT_GATEWAYS")
 }
 
 ctx_obs() {
@@ -686,6 +690,20 @@ cells_replace() {
 # with the app tier's paths, or no later run would get past wait_hostname.
 # With both in place nothing is deployed here: a front door must never lose
 # those paths.
+# CloudFront refuses a distribution for a hostname whose DNS record still
+# points at another distribution, even a deleted one (an environment that was
+# torn down and is built again). The deploy then fails after minutes with a
+# 409 that does not name the record, and a first build reaches it only after
+# its cells are up. So before a front door is created, look at the record.
+check_hostname() {
+  local seen other
+  absent "$P-api-frontdoor" || return 0
+  command -v dig >/dev/null || { log "warning: no dig here: cannot check where $NODE_HOSTNAME points before the front door is created"; return 0; }
+  seen=$(dig +short "$NODE_HOSTNAME" 2>/dev/null | tr 'A-Z' 'a-z') || true
+  other=$(grep -m1 '\.cloudfront\.net\.\{0,1\}$' <<<"$seen" || true)
+  [[ -z $other ]] || die "$NODE_HOSTNAME is still a CNAME to ${other%.}, another CloudFront distribution: CloudFront will not create this environment's front door until that DNS record is deleted. Delete it; wait-hostname names the new target once the front door exists"
+}
+
 first_front_door() {
   local ctx mode=""
   if absent "$P-app-tier"; then
@@ -697,6 +715,7 @@ first_front_door() {
     log "the app tier and the front door exist: the front door is deployed after the app tier, as on every run"
     return 0
   fi
+  check_hostname
   ctx_front_door "$mode"
   cdk_in api-tier deploy "$P-api-frontdoor" --exclusively --require-approval never --progress events "${ctx[@]}"
 }
@@ -782,6 +801,7 @@ case $cmd in
     cp "$ROOT/core-cell/bootstrap/strato-cell-upgrade" "$ROOT/core-cell/bootstrap/strato-cell-health" "$staging/"
     aws s3 sync --delete --only-show-errors "$staging/" "$scripts"
     log "published $(ls "$staging" | wc -l | tr -d ' ') scripts to $scripts" ;;
+  check-hostname) check_hostname ;;
   first-front-door) first_front_door ;;
   wait-hostname) wait_hostname ;;
   smoke) smoke ;;
