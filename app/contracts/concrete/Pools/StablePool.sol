@@ -1117,7 +1117,8 @@ contract record StablePool is Ownable {
         uint newY = getYD(amp, i, xp, d1);
 
         uint baseFee = (fee * coins.length) / (4 * (coins.length - 1));
-        uint[] xpReduced = xp;
+        // An array of its own: assigning xp would share it, and xp is read again below.
+        uint[] xpReduced = new uint[](xp.length);
         uint ys = (d0 + d1) / (2 * coins.length);
 
         uint dxExpected = 0;
