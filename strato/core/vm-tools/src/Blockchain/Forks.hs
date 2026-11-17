@@ -19,6 +19,9 @@
 module Blockchain.Forks
   ( isReceiptsRootForkActive,
     isBlockRewardReceiptForkActive,
+    isFeeConsensusDeltaForkActive,
+    isConsensusFromStateForkActive,
+    heliumConsensusFromStateForkBlock,
     isEmitArgForkActive,
     isOperatorPrecedenceForkActive,
     isRlpEncodeForkActive,
@@ -27,6 +30,8 @@ module Blockchain.Forks
     isStratoGasForkActive,
     constructorPublicationForkBlock,
     isConstructorPublicationForkActive,
+    caughtFailureForkBlock,
+    isCaughtFailureForkActive,
     forkNotScheduled,
     heliumNetworkID,
     upquarkNetworkID
@@ -98,6 +103,82 @@ isBlockRewardReceiptForkActive blockNum =
         -- 'Nothing' means staking is live from genesis, so the fork is too.
         | otherwise = maybe 0 id (Conf.stakingActivationBlock conf)
    in blockNum >= switchAt
+
+-- | Block from which validator-set and stake changes published while paying a
+-- transaction's fee, or by the block-reward call, reach the block header.
+--
+-- The fee payment runs as its own call ahead of the transaction, and only its
+-- events, logs and action were folded into the transaction's results. Its
+-- ValidatorAdded / ValidatorRemoved / ValidatorStakeUpdated deltas were dropped,
+-- so governance changed while the header, and with it the consensus layer,
+-- never heard of it. The block-reward call's results were folded into the
+-- block's first transaction the same way.
+--
+-- Proposer and verifier both derive the header's deltas from those results, so
+-- they have to start carrying these calls' at the same block. Upquark switches
+-- with staking, the flag day it already has.
+--
+-- Helium switches where it starts reading the set and weights from state
+-- (heliumConsensusFromStateForkBlock): the first block every validator can
+-- apply a new rule at. The height here was 1,000,000, but helium passed that
+-- block on builds without this rule and has sealed blocks without it since.
+-- Block 1,000,587 jailed and removed a validator while paying a fee, and its
+-- header carries no removal, so a node holding the rule from 1,000,000 cannot
+-- verify it. From the state read on, the header's changes no longer come from
+-- events, and this rule has nothing left to decide on helium.
+heliumFeeConsensusDeltaForkBlock :: Integer
+heliumFeeConsensusDeltaForkBlock = heliumConsensusFromStateForkBlock
+
+forktestFeeConsensusDeltaForkBlock :: Integer
+forktestFeeConsensusDeltaForkBlock = forkNotScheduled
+
+isFeeConsensusDeltaForkActive :: Integer -> Bool
+isFeeConsensusDeltaForkActive blockNum =
+  let net = Conf.networkID $ networkConfig ethConf
+   in not $ (net == upquarkNetworkID  && blockNum < upquarkStakingForkBlock)
+         || (net == heliumNetworkID   && blockNum < heliumFeeConsensusDeltaForkBlock)
+         || (net == forktestNetworkID && blockNum < forktestFeeConsensusDeltaForkBlock)
+
+-- | Block from which the validator-set and stake-weight changes a block carries
+-- in its header are read from contract state, not added up from events.
+--
+-- The header's newValidators, removedValidators and stakeUpdates were derived
+-- from the ValidatorAdded, ValidatorRemoved and ValidatorStakeUpdated events of
+-- the block's transactions. Events are not state: a call that reverts and is
+-- caught by its caller has its storage rolled back, and on builds without the
+-- try/catch fix it kept its events, so a rolled-back call could add a validator
+-- or publish a weight that governance does not hold. Events of calls that run
+-- outside a transaction's own results (the fee payment, the block-reward call)
+-- needed a fork of their own to be counted at all.
+--
+-- From this block both proposer and verifier read the list of validators and
+-- each one's weight from MercataGovernance's storage as the block leaves it,
+-- and put the difference from the set and weights in force into the same
+-- header fields. The header format and the consensus layer do not change.
+--
+-- Proposer and verifier must switch at the same block. Helium has blocks
+-- sealed under the event rule and needs a height of its own; upquark switches
+-- with staking, the flag day it already has.
+--
+-- Helium's height is a placeholder: the flag day helium already has ahead of
+-- it (heliumRlpEncodeForkBlock), so validators upgrade once for both, and the
+-- same height as the proportional proposer pick
+-- (heliumProportionalSelectionBlock in strato-model, which this must equal).
+-- Move all three together if the flag day moves.
+heliumConsensusFromStateForkBlock :: Integer
+heliumConsensusFromStateForkBlock = 1200000
+
+-- A placeholder for the rehearsal network: just past its idle tip, and the same
+-- height as forktestProportionalSelectionBlock in strato-model.
+forktestConsensusFromStateForkBlock :: Integer
+forktestConsensusFromStateForkBlock = 1500
+
+isConsensusFromStateForkActive :: Integer -> Bool
+isConsensusFromStateForkActive blockNum =
+  let net = Conf.networkID $ networkConfig ethConf
+   in not $ (net == upquarkNetworkID  && blockNum < upquarkStakingForkBlock)
+         || (net == heliumNetworkID   && blockNum < heliumConsensusFromStateForkBlock)
+         || (net == forktestNetworkID && blockNum < forktestConsensusFromStateForkBlock)
 
 -- | Block from which SolidVM emits fully evaluated event args, with an arg that
 -- was never written replaced by its declared type's default.
@@ -184,6 +265,23 @@ replayProtectionForkBlock net
 isReplayProtectionForkActive :: Integer -> Bool
 isReplayProtectionForkActive blockNum =
   blockNum >= replayProtectionForkBlock (Conf.networkID $ networkConfig ethConf)
+
+-- | Atomic caught failures change storage, events, sender restoration and
+-- destruction effects. Upquark block 355722 committed an approval made by a
+-- successful call inside a try block whose later call failed. Replaying it
+-- with atomic rollback changes the state root. Keep the complete historical
+-- behavior until each network coordinates activation; never choose a height
+-- solely to get past the first failing block.
+caughtFailureForkBlock :: Integer -> Integer
+caughtFailureForkBlock net
+  | net == heliumNetworkID = forkNotScheduled
+  | net == upquarkNetworkID = forkNotScheduled
+  | net == forktestNetworkID = forktestForkBlock
+  | otherwise = 0
+
+isCaughtFailureForkActive :: Integer -> Bool
+isCaughtFailureForkActive blockNum =
+  blockNum >= caughtFailureForkBlock (Conf.networkID $ networkConfig ethConf)
 
 -- | Publish SolidVM runtime code only after construction succeeds.
 constructorPublicationForkBlock :: Integer -> Integer

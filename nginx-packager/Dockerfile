@@ -21,6 +21,7 @@ FROM openresty/openresty:1.31.8.1-0-alpine-slim
 LABEL maintainer="BlockApps Inc."
 
 RUN apk add --no-cache bash curl jq yq && \
+    adduser -S -D -H -u 82 -G www-data -h /var/www -s /sbin/nologin www-data && \
     mkdir -p /usr/local/openresty/nginx/lua && \
     rm /usr/local/openresty/nginx/conf/nginx.conf
 

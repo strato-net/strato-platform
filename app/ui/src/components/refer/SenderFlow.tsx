@@ -20,7 +20,7 @@ import { useTokenContext } from "@/context/TokenContext";
 import { Token } from "@/interface";
 import { sortTokensCompareFn } from "@/lib/tokenPriority";
 import { api } from "@/lib/axios";
-import { safeParseUnits, roundToDecimals, addCommasToInput, formatBalance, formatUnits } from "@/utils/numberUtils";
+import { roundToDecimals, addCommasToInput, formatBalance, formatUnits } from "@/utils/numberUtils";
 import { handleAmountInputChange } from "@/utils/transferValidation";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -75,8 +75,6 @@ export function SenderFlow(props: Props) {
     return `${hours}:${minutes}`;
   });
   const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [quantity, setQuantity] = useState<string>("1");
-  const [quantityError, setQuantityError] = useState<string>("");
 
   // Fetch tokens on mount
   const fetchUserTokens = useCallback(async () => {
@@ -124,32 +122,11 @@ export function SenderFlow(props: Props) {
     }
   }, [activeTokens, entries]);
 
-  // Get max amount for a specific token (balance divided by quantity)
+  // Get max amount for a specific token
   const getMaxAmount = (token: Token | undefined): string => {
     if (!token || !token.balance) return "0";
-    const balance = BigInt(token.balance);
-    const qty = parseInt(quantity, 10);
-    if (isNaN(qty) || qty <= 0) return balance.toString();
-    return (balance / BigInt(qty)).toString();
+    return BigInt(token.balance).toString();
   };
-
-  // Re-validate entry amounts when quantity changes
-  useEffect(() => {
-    setEntries(prevEntries =>
-      prevEntries.map(entry => {
-        if (!entry.token || !entry.amount) return entry;
-        const maxWei = BigInt(getMaxAmount(entry.token));
-        const amountWei = safeParseUnits(entry.amount, 18);
-        if (amountWei > 0n && maxWei > 0n && amountWei > maxWei) {
-          return { ...entry, amountError: "Maximum amount exceeded" };
-        }
-        if (entry.amountError === "Maximum amount exceeded") {
-          return { ...entry, amountError: "" };
-        }
-        return entry;
-      })
-    );
-  }, [quantity]);
 
   // Add a new entry
   const addEntry = () => {
@@ -271,19 +248,12 @@ export function SenderFlow(props: Props) {
         throw new Error("Expiry date and time must be in the future");
       }
 
-      // Validate quantity
-      const quantityNum = parseInt(quantity, 10);
-      if (!quantity || isNaN(quantityNum) || quantityNum <= 0) {
-        throw new Error("Quantity must be a positive integer greater than 0");
-      }
-
       // Step 4: Submit deposit transaction
       const response = await api.post("/refer/deposit", {
         tokens: tokenAddresses,
         amounts: amounts,
         ephemeralAddress: eAddr,
         expiry: expirySeconds,
-        quantity: quantityNum,
       });
 
       // Step 4: Store generated information for message display
@@ -844,46 +814,6 @@ export function SenderFlow(props: Props) {
             })}
           </div>
 
-          {/* Quantity Input */}
-          <div className="space-y-2">
-            <Label htmlFor="quantity">Quantity</Label>
-            <Input
-              id="quantity"
-              type="number"
-              min="1"
-              step="1"
-              value={quantity}
-              onChange={(e) => {
-                const value = e.target.value;
-                // Allow empty string
-                if (value === "") {
-                  setQuantity("");
-                  setQuantityError("");
-                  return;
-                }
-                
-                // Allow only positive integers
-                const numValue = parseInt(value, 10);
-                if (!isNaN(numValue) && numValue > 0) {
-                  setQuantity(value);
-                  setQuantityError("");
-                } else {
-                  setQuantity(value);
-                  setQuantityError("Quantity must be a positive integer greater than 0");
-                }
-              }}
-              placeholder="1"
-              className={quantityError ? "border-red-500" : "w-full"}
-            />
-            {quantityError ? (
-              <p className="text-xs text-red-600">{quantityError}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Number of referrals this deposit will support. Each redemption will use one quantity.
-              </p>
-            )}
-          </div>
-
           {/* Expiry Date and Time Picker */}
           <div className="space-y-4">
             <Label>Expiry Date & Time</Label>
@@ -955,12 +885,8 @@ export function SenderFlow(props: Props) {
               <Button
                 onClick={generateAndSubmitDeposit}
                 disabled={
-                  entries.every(e => !e.token || !e.amount || !!e.amountError) || 
-                  isSubmitting ||
-                  !quantity ||
-                  isNaN(parseInt(quantity, 10)) ||
-                  parseInt(quantity, 10) <= 0 ||
-                  !!quantityError
+                  entries.every(e => !e.token || !e.amount || !!e.amountError) ||
+                  isSubmitting
                 }
                 className="w-full"
               >

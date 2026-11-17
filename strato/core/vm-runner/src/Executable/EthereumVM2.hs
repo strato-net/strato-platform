@@ -52,6 +52,7 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Data.Foldable hiding (fold)
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Maybe
 import qualified Data.Text as T
 import Data.Traversable (for)
@@ -83,9 +84,25 @@ handleVmTasks InBatch {..} = do
     pure resps
   mapM_ (emitOut . OutJSONRPC) rpcResps
 
-  (txEvents, numPoolable) <- processTransactions txPairs
+  (txEvents, (numPoolable, deferred, admittedWork)) <- processTransactions txPairs
   mapM_ emitOut txEvents
   failures <- processBlocks blocks
+  -- A sender with nothing to pay a fee with before this batch's blocks may be
+  -- funded by one of them: its transactions are admitted now that they are in.
+  -- One those blocks already mined is left out: the pool only knows the last
+  -- block's transactions, so it would publish a false NonceTooLow for it.
+  let applied = case failures of
+        f : _ -> takeWhile ((/= _bvfBlockHash f) . outputBlockHash) blocks
+        [] -> blocks
+      mined = S.fromList [otHash t | b <- applied, t <- obReceiptTransactions b]
+      retry = filter ((`S.notMember` mined) . otHash) deferred
+  unless (null retry) . void $ Bagger.addTransactionsToMempool retry
+  -- The other validators expect a proposal only for work a block can take, so
+  -- they arm their dead-proposer timers on this, not on any new transaction. New
+  -- blocks change the height and can leave work they made executable, so the
+  -- pool is asked again after them; the sequencer ignores work for another height.
+  hasWork <- if null blocks then pure admittedWork else Bagger.hasPendingWork
+  when hasWork $ emitOut . OutPoolHasWork =<< Bagger.nextBlockNumber
 
   mPreDec <- do
     case preprepareBlock of
@@ -223,12 +240,15 @@ processBlockSummaries = mapM_ $ \b -> do
 
 processTransactions ::
   [(Timestamp, OutputTx)] ->
-  ContextM ([VmOutEvent], Int)
+  ContextM ([VmOutEvent], (Int, [OutputTx], Bool))
 processTransactions = uncurry (fmap . (,)) . (outputTransactions &&& getNumPoolable)
 
+-- | Admit the new transactions that are still live: how many there were, those
+-- held back until this batch's blocks are in (their senders hold nothing to pay
+-- a fee with yet), and whether the admitted ones gave the next block work.
 getNumPoolable ::
   [(Timestamp, OutputTx)] ->
-  ContextM Int
+  ContextM (Int, [OutputTx], Bool)
 getNumPoolable txPairs = do
   $logDebugS "evm/getNumPoolable" $ T.pack $ "allTxs :: " ++ show txPairs
   let allNewTxs = txPairs -- PrivateHashTXs have chainId = Nothing
@@ -239,8 +259,9 @@ getNumPoolable txPairs = do
     $logInfoS "evm/getNumPoolable/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
   let !poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
   $logInfoS "evm/loop" (T.pack ("adding " ++ show (length poolableNewTxs) ++ "/" ++ show (length allNewTxs) ++ " txs to mempool"))
-  unless (null poolableNewTxs) $ Bagger.addTransactionsToMempool poolableNewTxs
-  return $ length poolableNewTxs
+  (ready, deferred) <- Bagger.splitHoldingNothing poolableNewTxs
+  hasWork <- if null ready then pure False else Bagger.addTransactionsToMempool ready
+  return (length poolableNewTxs, deferred, hasWork)
 
 outputTransactions :: [(Timestamp, OutputTx)] -> [VmOutEvent]
 outputTransactions

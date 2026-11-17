@@ -102,6 +102,77 @@ contract Describe_MercataGovernance {
         require(!removed, "unknown validators are ignored");
     }
 
+    // Consensus applies a block's additions before its removals, so "removed, then
+    // added again" within one block would drop the validator from the consensus set
+    // while it stays listed here.
+    function it_refuses_to_readd_a_validator_in_the_block_that_removed_it() public {
+        _add(staking, v1, 1);
+        _add(staking, v2, 2);
+        staking.doSuccessfully(address(gov), "removeValidatorFromStaking(address)", v1);
+        staking.doExpectingFailure(address(gov), "addValidatorFromStaking(address,uint256)", "Validator was removed in this block", v1, uint256(1));
+        require(!gov.isValidator(v1), "still removed");
+
+        fastForward(1, 1);
+        _add(staking, v1, 1);
+        require(gov.isValidator(v1), "added again a block later");
+        require(gov.validatorStake(v1) == 1, "stake published again");
+    }
+
+    // With a quantum, a weight moves only when the stake has moved a whole quantum away
+    // from it, so parking a stake on a boundary and nudging it does not flip the weight.
+    function it_publishes_stake_weights_a_quantum_at_a_time() public {
+        gov.setStakeQuantum(10);
+        _add(staking, v1, 105);
+        require(gov.validatorStake(v1) == 100, "rounded down to the quantum");
+        _add(staking, v1, 109);
+        _add(staking, v1, 100);
+        _add(staking, v1, 99);
+        _add(staking, v1, 91);
+        require(gov.validatorStake(v1) == 100, "held while the stake stays within a quantum");
+        _add(staking, v1, 90);
+        require(gov.validatorStake(v1) == 90, "a whole quantum down");
+        _add(staking, v1, 99);
+        require(gov.validatorStake(v1) == 90, "held again");
+        _add(staking, v1, 127);
+        require(gov.validatorStake(v1) == 120, "several quanta up");
+        _add(staking, v1, 0);
+        require(gov.validatorStake(v1) == 0, "down to nothing");
+
+        gov.setStakeQuantum(0);
+        _add(staking, v1, 7);
+        require(gov.validatorStake(v1) == 7, "no quantum: every change is published");
+    }
+
+    function it_requires_a_complete_positive_set_for_the_stake_snapshot() public {
+        stranger.doExpectingFailure(address(gov), "publishValidatorStakeSnapshot()", "No validators to publish");
+        _add(staking, v1, 100);
+        _add(staking, v2, 0);
+        stranger.doExpectingFailure(address(gov), "publishValidatorStakeSnapshot()", "Validator has no stake weight");
+
+        staking.doSuccessfully(address(gov), "updateValidatorStake(address,uint256)", v2, uint256(200));
+        stranger.doSuccessfully(address(gov), "publishValidatorStakeSnapshot()");
+        require(gov.validatorStake(v1) == 100 && gov.validatorStake(v2) == 200, "snapshot leaves stored weights unchanged");
+        stranger.doSuccessfully(address(gov), "publishValidatorStakeSnapshot()");
+    }
+
+    // A vote to add must not count toward a removal once the validator has joined
+    // through staking.
+    function it_drops_pending_votes_when_membership_changes() public {
+        User a1 = new User();
+        User a2 = new User();
+        gov.seedAdmin(address(a1));
+        gov.seedAdmin(address(a2));
+        _add(staking, v2, 5);
+
+        a1.doSuccessfully(address(gov), "voteToAddValidator(address)", v1);
+        require(!gov.isValidator(v1), "one of two votes");
+        _add(staking, v1, 5);
+        a2.doSuccessfully(address(gov), "voteToRemoveValidator(address)", v1);
+        require(gov.isValidator(v1), "the add vote is gone: one removal vote is not a quorum");
+        a1.doSuccessfully(address(gov), "voteToRemoveValidator(address)", v1);
+        require(!gov.isValidator(v1), "removed by two removal votes");
+    }
+
     function it_keeps_state_across_a_logic_upgrade_behind_a_proxy() public {
         MercataGovernance proxied = MercataGovernance(address(new Proxy(address(gov), address(this))));
         proxied.setStakingContract(address(staking));
@@ -112,6 +183,7 @@ contract Describe_MercataGovernance {
         require(proxied.validatorCount() == 1, "validators survive the upgrade");
         require(proxied.validatorStake(v1) == 9, "stake survives the upgrade");
         require(proxied.stakingContract() == address(staking), "staking contract survives the upgrade");
+        stranger.doSuccessfully(address(proxied), "publishValidatorStakeSnapshot()");
     }
 
     function it_enforces_the_hard_cap_on_both_paths() public {
@@ -168,9 +240,137 @@ contract Describe_MercataGovernance {
         require(gov.validatorCount() == 1 && gov.isValidator(v3), "v2 voted out once v3 joined");
     }
 
+    // address(0) reads back from storage as no validator, so it never joins the list.
+    function it_refuses_the_zero_address_as_a_validator() public {
+        gov.seedAdmin(address(this));
+        staking.doExpectingFailure(address(gov), "addValidatorFromStaking(address,uint256)", "The zero address cannot be a validator", address(0), uint256(1));
+        bool rejected = false;
+        try gov.voteToAddValidator(address(0)) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected && gov.validatorCount() == 0, "no vote can pin it in");
+    }
+
+    // A pin in holds a validator against staking; clearing it hands the validator back.
+    function it_pins_validators_in_against_staking() public {
+        gov.seedAdmin(address(this));
+        _add(staking, v1, 5);
+        _add(staking, v2, 5);
+        gov.voteToAddValidator(v1);
+        require(gov.pinnedIn(v1) && gov.isValidator(v1), "a seated validator can be pinned");
+
+        staking.doSuccessfully(address(gov), "removeValidatorFromStaking(address)", v1);
+        require(gov.isValidator(v1), "staking cannot remove it");
+        _add(staking, v1, 7);
+        require(gov.validatorStake(v1) == 7, "its weight still follows staking");
+
+        gov.voteToAddValidator(v3);
+        require(gov.isValidator(v3) && gov.validatorStake(v3) == 0, "an outsider joins at once, with no weight yet");
+
+        bool rejected = false;
+        try gov.voteToClearValidatorPin(v2) {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "nothing to clear on an unpinned validator");
+
+        gov.voteToClearValidatorPin(v1);
+        require(!gov.pinnedIn(v1) && gov.isValidator(v1), "clearing changes no membership");
+        staking.doSuccessfully(address(gov), "removeValidatorFromStaking(address)", v1);
+        require(!gov.isValidator(v1), "staking manages it again");
+    }
+
+    // A pin out holds a validator out against staking, seated or not.
+    function it_pins_validators_out_against_staking() public {
+        gov.seedAdmin(address(this));
+        _add(staking, v1, 5);
+        _add(staking, v2, 5);
+        gov.voteToRemoveValidator(v3);
+        require(gov.pinnedOut(v3), "an outsider can be pinned out before it joins");
+        staking.doExpectingFailure(address(gov), "addValidatorFromStaking(address,uint256)", "Validator is pinned out by the admins", v3, uint256(5));
+
+        gov.voteToRemoveValidator(v1);
+        require(!gov.isValidator(v1) && gov.pinnedOut(v1), "a seated validator leaves at once");
+
+        gov.voteToAddValidator(v3);
+        require(gov.pinnedIn(v3) && !gov.pinnedOut(v3) && gov.isValidator(v3), "a pin in replaces the pin out");
+
+        gov.voteToClearValidatorPin(v1);
+        fastForward(1, 1);
+        _add(staking, v1, 5);
+        require(gov.isValidator(v1), "staking can add it once the pin is cleared");
+    }
+
+    // Clearing a pin in hands the seat to staking, even one staking never managed, so staking
+    // may take it over and remove it. A validator outside the set is handed nothing.
+    function it_hands_a_cleared_seat_to_staking() public {
+        gov.seedAdmin(address(this));
+        _add(staking, v1, 5);
+        gov.voteToAddValidator(v2);
+        require(gov.isValidator(v2) && !gov.stakingManaged(v2), "seated by the pin alone");
+
+        gov.voteToClearValidatorPin(v2);
+        require(gov.isValidator(v2) && gov.stakingManaged(v2), "still seated, now staking's");
+        bool removed = staking.doSuccessfully(address(gov), "removeValidatorFromStaking(address)", v2);
+        require(removed, "staking can remove it");
+
+        gov.voteToRemoveValidator(v3);
+        gov.voteToClearValidatorPin(v3);
+        require(!gov.stakingManaged(v3), "clearing a pin out hands over nothing");
+    }
+
+    // A kick removes a validator whatever its pin or staking say, and drops a pin in.
+    function it_removes_kicked_validators_over_a_pin() public {
+        gov.seedAdmin(address(this));
+        _add(staking, v1, 5);
+        gov.voteToAddValidator(v2); // pinned in, never staking-managed
+        staking.doSuccessfully(address(gov), "removeKickedValidator(address)", v2);
+        require(!gov.isValidator(v2) && !gov.pinnedIn(v2), "out, pin dropped");
+        staking.doSuccessfully(address(gov), "removeKickedValidator(address)", v1);
+        require(gov.isValidator(v1), "never the last validator");
+        stranger.doExpectingFailure(address(gov), "removeKickedValidator(address)", "Only the staking contract can manage staked validators", v1);
+    }
+
+    // A vote in another direction restarts the tally instead of counting toward it.
+    function it_restarts_the_tally_when_the_direction_changes() public {
+        User a1 = new User();
+        User a2 = new User();
+        gov.seedAdmin(address(a1));
+        gov.seedAdmin(address(a2)); // quorum is 2 of 2
+        a1.doSuccessfully(address(gov), "voteToAddValidator(address)", v1);
+        a2.doSuccessfully(address(gov), "voteToRemoveValidator(address)", v1);
+        require(!gov.pinnedIn(v1) && !gov.pinnedOut(v1), "one vote each way pins nothing");
+        a1.doSuccessfully(address(gov), "voteToRemoveValidator(address)", v1);
+        require(gov.pinnedOut(v1), "two votes out pin it out");
+    }
+
     // At genesis the admin list holds exactly one entry (the AdminRegistry), so
     // a single executed vote could empty it and strand the contract: every
     // voteTo* entry point then fails its admin check and nothing can re-seed one.
+    function it_does_not_count_the_votes_of_removed_admins() public {
+        User a1 = new User();
+        User a2 = new User();
+        User a3 = new User();
+        User a4 = new User();
+        gov.seedAdmin(address(a1));
+        gov.seedAdmin(address(a2));
+        gov.seedAdmin(address(a3));
+        gov.seedAdmin(address(a4)); // quorum is 3 of 4
+
+        a1.doSuccessfully(address(gov), "voteToAddValidator(address)", v1);
+        a2.doSuccessfully(address(gov), "voteToAddValidator(address)", v1);
+        a2.doSuccessfully(address(gov), "voteToRemoveAdmin(address)", address(a1));
+        a3.doSuccessfully(address(gov), "voteToRemoveAdmin(address)", address(a1));
+        a4.doSuccessfully(address(gov), "voteToRemoveAdmin(address)", address(a1));
+        require(gov.adminMap(address(a1)) == 0, "a1 voted out"); // quorum is now 3 of 3
+
+        a3.doSuccessfully(address(gov), "voteToAddValidator(address)", v1);
+        require(!gov.isValidator(v1), "a1's vote no longer counts: two of three");
+        a4.doSuccessfully(address(gov), "voteToAddValidator(address)", v1);
+        require(gov.isValidator(v1), "added by three current admins");
+    }
+
     function it_removes_admins_by_vote_but_never_the_last_one() public {
         User a1 = new User();
         User a2 = new User();

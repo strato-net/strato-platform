@@ -2,9 +2,11 @@
  * make -f strato/core/merkle-patricia-db-baremetal/test/errors.mk test
  * The injected failures use the real trie and a real LevelDB. */
 #define _POSIX_C_SOURCE 200809L
+#define _DARWIN_C_SOURCE
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <leveldb/c.h>
 
 static int fail_read, fail_write, fail_delete;

@@ -92,6 +92,31 @@ router.get("/partner-api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+// For a monitor outside: whether the service does its job, which is more
+// than answering. Always 200 with the state in the body, since an error
+// status here would count against a deployment while its poller catches up.
+const readStatus = async (): Promise<object> => {
+  try {
+    // A database that does not answer at all must not leave the monitor without an answer
+    const late = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("no answer")), config.status.timeoutMs).unref());
+    const read = query<{ as_of: Date }>("SELECT as_of FROM progress WHERE name = 'cirrus'");
+    const asOf = (await Promise.race([read, late])).rows[0]?.as_of ?? null;
+    const age = asOf && Math.max(0, Date.now() - asOf.getTime());
+    const current = age !== null && age <= config.status.staleAfterSeconds * 1000;
+    return { status: current ? "ok" : "behind", data_as_of: asOf?.toISOString() ?? null, lag_seconds: age === null ? null : Math.round(age / 1000) };
+  } catch {
+    return { status: "unavailable", data_as_of: null, lag_seconds: null };
+  }
+};
+let status: { at: number; body: Promise<object> } | null = null;
+router.get(
+  "/partner-api/status",
+  asyncHandler(async (_req, res) => {
+    if (!status || Date.now() - status.at >= config.status.cacheMs) status = { at: Date.now(), body: readStatus() };
+    res.json(await status.body);
+  })
+);
+
 // Issue a user's referral code. One code per (partner, external_user_id):
 // calling again returns the same code and takes in any identifier newly shared.
 router.post(
