@@ -32,6 +32,8 @@ module Blockchain.Forks
     isConstructorPublicationForkActive,
     caughtFailureForkBlock,
     isCaughtFailureForkActive,
+    argReferenceForkBlock,
+    isArgReferenceForkActive,
     forkNotScheduled,
     heliumNetworkID,
     upquarkNetworkID
@@ -282,6 +284,22 @@ caughtFailureForkBlock net
 isCaughtFailureForkActive :: Integer -> Bool
 isCaughtFailureForkActive blockNum =
   blockNum >= caughtFailureForkBlock (Conf.networkID $ networkConfig ethConf)
+
+-- | A storage reference handed to another contract is read from the caller's
+-- storage at the call. References nested in a variadic argument, and
+-- value-typed references passed to a delegatecall, used to reach the callee
+-- unresolved and were then read from the callee's storage: a caller could name
+-- any slot of a proxied contract as an argument.
+argReferenceForkBlock :: Integer -> Integer
+argReferenceForkBlock net
+  | net == heliumNetworkID = 1200000
+  | net == upquarkNetworkID = 1100000
+  | net == forktestNetworkID = forktestForkBlock
+  | otherwise = 0
+
+isArgReferenceForkActive :: Integer -> Bool
+isArgReferenceForkActive blockNum =
+  blockNum >= argReferenceForkBlock (Conf.networkID $ networkConfig ethConf)
 
 -- | Publish SolidVM runtime code only after construction succeeds.
 constructorPublicationForkBlock :: Integer -> Integer

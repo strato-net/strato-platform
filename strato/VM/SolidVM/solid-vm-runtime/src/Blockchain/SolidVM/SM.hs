@@ -41,6 +41,7 @@ module Blockchain.SolidVM.SM
     withStaticCallInfo,
     attempt,
     caughtFailureForkActive,
+    argReferenceForkActive,
     trimCallStackToDepth,
     purgeStorageOnCommit,
     withLocalVars,
@@ -94,7 +95,7 @@ import Blockchain.EthConf (ethConf)
 import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
-import Blockchain.Forks (isOperatorPrecedenceForkActive, isConstructorPublicationForkActive, isRlpEncodeForkActive, isCaughtFailureForkActive)
+import Blockchain.Forks (isOperatorPrecedenceForkActive, isConstructorPublicationForkActive, isRlpEncodeForkActive, isCaughtFailureForkActive, isArgReferenceForkActive)
 import Blockchain.SolidVM.Exception
 import Blockchain.Data.VmTrace
 import Blockchain.SolidVM.GasInfo
@@ -989,6 +990,10 @@ attempt f = do
 caughtFailureForkActive :: MonadSM m => m Bool
 caughtFailureForkActive =
   isCaughtFailureForkActive . blockHeaderBlockNumber . Env.blockHeader <$> getEnv
+
+argReferenceForkActive :: MonadSM m => m Bool
+argReferenceForkActive =
+  isArgReferenceForkActive . blockHeaderBlockNumber . Env.blockHeader <$> getEnv
 
 trimCallStackToDepth :: MonadSM m => Int -> m ()
 trimCallStackToDepth depth = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \stack ->
