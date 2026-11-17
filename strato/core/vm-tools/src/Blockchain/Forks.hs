@@ -34,6 +34,8 @@ module Blockchain.Forks
     isCaughtFailureForkActive,
     argReferenceForkBlock,
     isArgReferenceForkActive,
+    codelessImportForkBlock,
+    isCodelessImportForkActive,
     forkNotScheduled,
     heliumNetworkID,
     upquarkNetworkID
@@ -299,6 +301,21 @@ argReferenceForkBlock net
 isArgReferenceForkActive :: Integer -> Bool
 isArgReferenceForkActive blockNum =
   blockNum >= argReferenceForkBlock (Conf.networkID $ networkConfig ethConf)
+
+-- | A creation whose source imports an address without SolidVM code fails.
+-- Such an import used to be dropped, and resolved once code was deployed at
+-- the address: the importing contract then changed behaviour on whichever
+-- nodes recompiled it.
+codelessImportForkBlock :: Integer -> Integer
+codelessImportForkBlock net
+  | net == heliumNetworkID = 1200000
+  | net == upquarkNetworkID = 1100000
+  | net == forktestNetworkID = forktestForkBlock
+  | otherwise = 0
+
+isCodelessImportForkActive :: Integer -> Bool
+isCodelessImportForkActive blockNum =
+  blockNum >= codelessImportForkBlock (Conf.networkID $ networkConfig ethConf)
 
 -- | Publish SolidVM runtime code only after construction succeeds.
 constructorPublicationForkBlock :: Integer -> Integer

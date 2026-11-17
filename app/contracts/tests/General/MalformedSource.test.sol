@@ -16,10 +16,14 @@ contract Describe_MalformedSource {
         require(fails("A", "contract A { event E(uint x); function f() public { emit E(); } }"), "compiled");
     }
 
-    function it_c_import_of_a_destroyed_contract_is_skipped() public {
+    function it_c_import_of_a_destroyed_contract_fails_the_creation() public {
         address k = create("K", "contract K { function kill() public { selfdestruct(msg.sender); } }");
         IKill(k).kill();
-        require(!fails("A", "import <" + string(k) + ">; contract A { }"), "creation failed");
+        require(fails("A", "import <" + string(k) + ">; contract A { }"), "created");
+    }
+
+    function it_c_import_of_an_address_without_code_fails_the_creation() public {
+        require(fails("A", "import <dead>; contract A { }"), "created");
     }
 
     function it_d_runs_afterwards() public {

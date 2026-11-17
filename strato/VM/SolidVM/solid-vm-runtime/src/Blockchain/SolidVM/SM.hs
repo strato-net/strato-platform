@@ -42,6 +42,7 @@ module Blockchain.SolidVM.SM
     attempt,
     caughtFailureForkActive,
     argReferenceForkActive,
+    rejectCodelessImports,
     trimCallStackToDepth,
     purgeStorageOnCommit,
     withLocalVars,
@@ -95,7 +96,7 @@ import Blockchain.EthConf (ethConf)
 import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
-import Blockchain.Forks (isOperatorPrecedenceForkActive, isConstructorPublicationForkActive, isRlpEncodeForkActive, isCaughtFailureForkActive, isArgReferenceForkActive)
+import Blockchain.Forks (isOperatorPrecedenceForkActive, isConstructorPublicationForkActive, isRlpEncodeForkActive, isCaughtFailureForkActive, isArgReferenceForkActive, isCodelessImportForkActive)
 import Blockchain.SolidVM.Exception
 import Blockchain.Data.VmTrace
 import Blockchain.SolidVM.GasInfo
@@ -994,6 +995,14 @@ caughtFailureForkActive =
 argReferenceForkActive :: MonadSM m => m Bool
 argReferenceForkActive =
   isArgReferenceForkActive . blockHeaderBlockNumber . Env.blockHeader <$> getEnv
+
+-- | Fail a creation whose source imports an address without SolidVM code.
+rejectCodelessImports :: MonadSM m => ParseOptions -> BC.ByteString -> m ()
+rejectCodelessImports opts source = do
+  forked <- isCodelessImportForkActive . blockHeaderBlockNumber . Env.blockHeader <$> getEnv
+  when forked $ codelessImports opts source >>= \case
+    [] -> pure ()
+    addresses -> throw . TypeError "import" $ "no contract code at imported address: " ++ unwords (format <$> addresses)
 
 trimCallStackToDepth :: MonadSM m => Int -> m ()
 trimCallStackToDepth depth = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \stack ->

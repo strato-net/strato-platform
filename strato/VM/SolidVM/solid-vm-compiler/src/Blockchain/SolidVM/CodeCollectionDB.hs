@@ -23,6 +23,7 @@ module Blockchain.SolidVM.CodeCollectionDB
     compileSource,
     compileSourceWith,
     codeCollectionFromSourceWith,
+    codelessImports,
     codeCollectionFromHashWith,
     compileSourceWithAnnotations,
     compileSourceWithAnnotationsWithoutImports,
@@ -39,9 +40,11 @@ import Blockchain.SolidVM.ImportResolver
 import Blockchain.SolidVM.Metrics
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
+import Control.Applicative ((<|>))
 import Control.DeepSeq (force)
 import Control.Exception hiding (TypeError)
 import Control.Lens hiding (Context, assign, bimap, from, to)
+import Control.Monad (filterM)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
@@ -57,7 +60,7 @@ import qualified Data.Cache.LRU as LRU
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as M
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Source
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -330,6 +333,22 @@ codeCollectionFromSourceWith opts isRunningTests typeCheck initCode = do
             Left (TCEx xs) -> throw (TypeError "Typechecker" $ T.unpack (typeErrorToAnnotation xs))
       codeCacheInsert cacheKey cc
       return $ assert (hsh == hsh') (hsh, cc)
+
+-- | The addresses a submitted source imports that hold no SolidVM code.
+-- Read from the source itself, so the answer does not depend on the cache.
+codelessImports :: A.Selectable Address AddressState m => ParseOptions -> B.ByteString -> m [Address]
+codelessImports opts initCode = filterM (fmap (not . hasCode) . A.select (A.Proxy :: A.Proxy AddressState)) addresses
+  where
+    files = fromMaybe [(T.empty, decodeUtf8 initCode)] $
+      Aeson.decode (BL.fromStrict initCode) <|> (M.toList <$> Aeson.decode (BL.fromStrict initCode))
+    addresses = [a | (name, src) <- files, Right units <- [parseSourceWith opts name src], Import _ i <- units, AddressLiteral _ a <- [importPath i]]
+    importPath = \case
+      Simple path _ -> path
+      Qualified path _ _ -> path
+      Braced _ path _ -> path
+    hasCode = \case
+      Just AddressState {addressStateCodeHash = SolidVMCode _ ch} -> ch /= unsafeCreateKeccak256FromWord256 0
+      _ -> False
 
 codeCollectionFromHash ::
   ( MonadIO m,

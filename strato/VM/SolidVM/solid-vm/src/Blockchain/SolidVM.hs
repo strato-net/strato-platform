@@ -256,6 +256,7 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
 
     opts <- parseOptionsForCurrentBlock
     (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 initCode
+    rejectCodelessImports opts $ DT.encodeUtf8 initCode
     addNewCodeCollection hsh cc
     let eArgExps = traverse (Fast.parseArg initialParserState "") argsStrings
         !argExps = either ((throw . ParseError "create arguments") . show) id eArgExps

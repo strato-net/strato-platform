@@ -177,7 +177,7 @@ tests:
   arg-reference-fork-check:
     source-dirs: [fork-test, tests]
     main: ArgReferenceForkMain.hs
-    other-modules: [ArgReferenceForkSpec]
+    other-modules: [ArgReferenceForkSpec, CodelessImportForkSpec]
     ghc-options: -O2 -threaded -rtsopts
     dependencies:
       - blockapps-data

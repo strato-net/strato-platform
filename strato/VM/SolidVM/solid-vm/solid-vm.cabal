@@ -94,6 +94,7 @@ test-suite arg-reference-fork-check
   main-is: ArgReferenceForkMain.hs
   other-modules:
       ArgReferenceForkSpec
+      CodelessImportForkSpec
   hs-source-dirs:
       fork-test
       tests
@@ -170,6 +171,7 @@ test-suite solid-vm-spec
   other-modules:
       ArgReferenceForkSpec
       CaughtFailureForkSpec
+      CodelessImportForkSpec
       ErrorHandlingSpec
       OptimizerSpec
       SolidVMSpec
