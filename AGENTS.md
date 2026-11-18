@@ -37,6 +37,12 @@
 
 - `infra/TOPOLOGY.md` holds the diagram (Mermaid) and the reachability tables of one HA deployment. A change under `infra/` that adds or removes a stack, a service, a container, a port, a CloudFront path or a security-group rule updates that file in the same change.
 
+## Pending: turn TLS 1.3 back on in nginx
+
+- TLS 1.3 is off in all six nginx templates (`ssl_protocols TLSv1.2;`) as a workaround for CVE-2026-118899: on nginx 1.13.0–1.31.8 a TLS 1.3 client can hang a worker for good while it reads a request body. The images run OpenResty 1.31.8.1 (nginx 1.31.8).
+- When a change moves these images to an OpenResty release built on nginx 1.31.9 or later, restore TLS 1.3 in the same change: `git grep CVE-2026-118899` lists every place (the six `nginx.tpl.conf` files and `techdocs/node/configuration.md`). Put back `ssl_protocols TLSv1.2 TLSv1.3;` (hoogle-nginx had no such line before; an explicit `TLSv1.2 TLSv1.3` line is fine there), remove the two comment lines above it, restore the docs sentence, and delete this section.
+- Do not restore it while any of the six images is still on nginx 1.31.8 or older. Check the nginx core version with `openresty -V` in the built image, not the OpenResty version string alone.
+
 ## Learned Workspace Facts
 
 - STRATO network IDs exceed JS `Number.MAX_SAFE_INTEGER`; must guard with `Number.isSafeInteger()` before passing to viem/wagmi; MetaMask crashes on oversized chain IDs (`initProvider` → `numberToHex`)

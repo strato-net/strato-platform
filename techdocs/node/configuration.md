@@ -219,7 +219,7 @@ With `--sslDir`, `strato-setup` copies `server.pem` and `server.key` into `mynod
 
 nginx then does the following:
 
-- It listens on 443 with TLS 1.2 and 1.3.
+- It listens on 443 with TLS 1.2. TLS 1.3 is off until the image moves to nginx 1.31.9 (CVE-2026-118899).
 - It redirects requests on `--httpPort` to HTTPS.
 
 Docker publishes both the HTTP port and 443.
