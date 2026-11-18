@@ -42,29 +42,13 @@ done
 # up on (the ALB and nginx cut requests at 60 s) is cancelled instead of
 # running on and holding a pool connection.
 #
-# The database is created by strato on a fresh node and the function by
-# slipstream once it starts (or, on a replica, once it has replicated), so
-# wait for both. If the function has not shown up after a minute (an older
-# slipstream), PostgREST starts without the hook rather than not at all.
+# PostgREST starts without the hook: convoke's `compose up --wait` needs this
+# container healthy, so listening, before it launches slipstream, which
+# creates the database and the function. The watcher further down adds
+# db-pre-request to postgrest.conf and reloads the configuration (SIGUSR2)
+# once the function exists.
+PRE_REQUEST_SQL="select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'postgrest_pre_request'"
 POSTGREST_PRE_REQUEST=""
-if [ "${POSTGREST_STATEMENT_TIMEOUT:-60s}" != "0" ]; then
-  until psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" -d "${PG_ENV_POSTGRES_DB}" -c '\q' 2>/dev/null; do
-    >&2 echo "Database ${PG_ENV_POSTGRES_DB} is unavailable - sleeping"
-    sleep 1
-  done
-  PRE_REQUEST_SQL="select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'postgrest_pre_request'"
-  i=0
-  until [ "$(psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" -d "${PG_ENV_POSTGRES_DB}" -Atq -c "$PRE_REQUEST_SQL" 2>/dev/null)" = 1 ] || [ "$i" -ge 60 ]; do
-    i=$((i + 1))
-    sleep 1
-  done
-  if [ "$i" -lt 60 ]; then
-    POSTGREST_PRE_REQUEST='db-pre-request = "public.postgrest_pre_request"'
-  else
-    >&2 echo "public.postgrest_pre_request() not found in ${PG_ENV_POSTGRES_DB} - starting without the statement timeout"
-  fi
-fi
-export POSTGREST_PRE_REQUEST
 
 render_template() {
   eval "echo \"$(sed 's/\"/\\"/g' $1)\""
@@ -105,6 +89,24 @@ PG_PID=$!
 
 # Forward a stop to PostgREST and wait for it, so the container exits cleanly.
 trap 'kill -TERM "$PG_PID" 2>/dev/null; wait "$PG_PID"; exit 0' TERM INT
+
+# Statement-timeout hook: see PRE_REQUEST_SQL above. PostgREST must be
+# answering HTTP before it is signalled: until its handlers are installed a
+# SIGUSR2 would terminate it instead of reloading the configuration.
+if [ "${POSTGREST_STATEMENT_TIMEOUT:-60s}" != "0" ]; then
+  (
+    while kill -0 "$PG_PID" 2>/dev/null; do
+      if curl -s -o /dev/null "http://127.0.0.1:${POSTGREST_LISTEN_PORT}/" && [ "$(psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" -d "${PG_ENV_POSTGRES_DB}" -Atq -c "$PRE_REQUEST_SQL" 2>/dev/null)" = 1 ]; then
+        POSTGREST_PRE_REQUEST='db-pre-request = "public.postgrest_pre_request"'
+        render_template postgrest.conf.tpl > postgrest.conf
+        kill -USR2 "$PG_PID" 2>/dev/null || true
+        echo "statement timeout: public.postgrest_pre_request() is in place, db-pre-request enabled"
+        exit 0
+      fi
+      sleep 5
+    done
+  ) &
+fi
 
 if [ "$RELOAD_SECS" -gt 0 ] 2>/dev/null; then
   (

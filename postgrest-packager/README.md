@@ -24,5 +24,7 @@ slipstream creates the function on the primary, because a PostgREST on an
 API node reads a replica, which refuses DDL. The value reaches the function
 as the `strato.postgrest_statement_timeout` setting on PostgREST's
 connections (`options=` in `db-uri`), so each PostgREST keeps its own.
-`doit.sh` waits up to a minute for the function and starts without the hook,
-with a warning in the log, if it is still missing (an older slipstream).
+PostgREST starts without the hook, because convoke only launches slipstream
+once this container is healthy; a watcher in `doit.sh` adds `db-pre-request`
+to `postgrest.conf` and reloads the configuration (`SIGUSR2`) as soon as the
+function exists.
