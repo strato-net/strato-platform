@@ -42,7 +42,7 @@ returnedInteger result = case erReturnVal result of
 spec :: Spec
 spec = describe "caught-failure activation" $ do
   it "leaves public networks unscheduled and activates new networks at genesis" $ do
-    caughtFailureForkBlock heliumNetworkID `shouldBe` 1220000
+    caughtFailureForkBlock heliumNetworkID `shouldBe` 1217000
     caughtFailureForkBlock upquarkNetworkID `shouldBe` 1100000
     caughtFailureForkBlock 7381244120123405172 `shouldBe` 10000
     caughtFailureForkBlock 42 `shouldBe` 0

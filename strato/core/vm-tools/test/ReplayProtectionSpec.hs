@@ -49,7 +49,7 @@ spec = describe "transaction replay protection" $ do
       transactionChainIdValid (cid + 1) decoded `shouldBe` False
     ) [195049586845898, 123354377739506]
   it "keeps public fork heights unscheduled and enables new networks at genesis" $ do
-    replayProtectionForkBlock 114784819836269 `shouldBe` 1220000
+    replayProtectionForkBlock 114784819836269 `shouldBe` 1217000
     replayProtectionForkBlock 33056204878082667 `shouldBe` 1100000
     replayProtectionForkBlock 42 `shouldBe` 0
     replayProtectionForkBlock 7381244120123405172 `shouldBe` 10000
