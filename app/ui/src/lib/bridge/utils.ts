@@ -2,6 +2,7 @@ import { decodeErrorResult } from "viem";
 import { message } from "antd";
 import { DEPOSIT_ROUTER_ABI, SUPPORTED_CHAINS } from "./constants";
 import { BridgeError } from "./types";
+import { ensureHexPrefix } from "@/utils/numberUtils";
 
 /**
  * Normalizes errors from various sources into a consistent BridgeError format
@@ -219,12 +220,14 @@ export const handleCopyToClipboard = async (text: string): Promise<void> => {
   }
 };
 
-export function mergePendingDeposits(apiDeposits: any[]): {
+export function mergePendingDeposits(apiDeposits: any[], userAddress: string | null): {
   remaining: any[];
 } {
   const pendingRaw = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
   const apiTxHashes = new Set(apiDeposits.map((tx: any) => tx?.externalTxHash));
-  const remaining = pendingRaw.filter((p: any) => !apiTxHashes.has(p?.externalTxHash));
-  localStorage.setItem('pendingDeposits', JSON.stringify(remaining));
-  return { remaining };
+  const user = ensureHexPrefix(userAddress)?.toLowerCase();
+  const isOwn = (p: any) => !!user && ensureHexPrefix(p?.DepositInfo?.stratoRecipient)?.toLowerCase() === user;
+  const kept = pendingRaw.filter((p: any) => !(isOwn(p) && apiTxHashes.has(p?.externalTxHash)));
+  localStorage.setItem('pendingDeposits', JSON.stringify(kept));
+  return { remaining: kept.filter(isOwn) };
 }

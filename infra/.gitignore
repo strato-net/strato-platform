@@ -1,0 +1,11 @@
+node_modules/
+# Account lookups cached by cdk: they name one account's resources.
+cdk.context.json
+# A real environment's settings are kept outside this repository (HA_ENV_DIR).
+environments/*
+!environments/example.env
+!environments/deployer-policy.template.json
+cdk.out*/
+.DS_Store
+*.pem
+.env*
