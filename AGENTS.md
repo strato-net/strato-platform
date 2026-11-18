@@ -33,6 +33,10 @@
 - Watch what rebuilds. A warm `make` is well under a minute; ~4 min or more means something is wrong unless the reason is known (fresh clone, deliberate compiler-flag experiment). If packages or docker images rebuild that have no changed inputs, tell the user — do not just wait it out.
 - Known Makefile behaviour: docker image tags embed the commit SHA (`VERSION-HASH`), so every new HEAD rebuilds every image even when its content hash is unchanged.
 
+## Infrastructure topology
+
+- `infra/TOPOLOGY.md` holds the diagram (Mermaid) and the reachability tables of one HA deployment. A change under `infra/` that adds or removes a stack, a service, a container, a port, a CloudFront path or a security-group rule updates that file in the same change.
+
 ## Learned Workspace Facts
 
 - STRATO network IDs exceed JS `Number.MAX_SAFE_INTEGER`; must guard with `Number.isSafeInteger()` before passing to viem/wagmi; MetaMask crashes on oversized chain IDs (`initProvider` → `numberToHex`)
