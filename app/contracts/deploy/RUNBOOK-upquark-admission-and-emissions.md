@@ -110,27 +110,27 @@ fee goes to the fee collector.
    Validators and delegators claim with the existing claim calls.
 4. **Top-ups**: `fundreserve` again at any time, by anyone. `R` rises; `R0` does not change.
 
-## 5. Bootstrap the stake weights (around block 2,000,000)
+## 5. Bootstrap the stake weights (around block 1,010,000)
 
-Headers before block 2,000,000 carry no stakes, so the weights governance holds reach consensus
+Headers before block 1,010,000 carry no stakes, so the weights governance holds reach consensus
 only through `publishValidatorStakeSnapshot()`, which re-emits all of them in one transaction;
 until it lands every validator votes once. A weight published alone before it would make that
 validator the first-round proposer at every height and a one-validator quorum. So staking's
 governance link stays off from before the fork until the snapshot is in a header: while it is
 off, staking makes no governance calls, and the snapshot is the only way a weight gets published.
 
-1. **Dry run, before block 2,000,000** (direct, anyone), once every validator is seated with a
+1. **Dry run, before block 1,010,000** (direct, anyone), once every validator is seated with a
    weight and governance runs this branch's logic: `node deploy/staking-setup.js bootstrapstakes`.
    Its events are dropped before the fork, but it succeeds only if every governance validator has
    a stored weight above 0 (`Validator has no stake weight` otherwise). Fix a missing weight now,
    while the link is on.
-2. **Link off, before block 2,000,000** (vote): `node deploy/staking-setup.js govsync off`.
+2. **Link off, before block 1,010,000** (vote): `node deploy/staking-setup.js govsync off`.
    Verify `governanceSyncEnabled` reads `false`: a vote that opened a second issue instead of
    executing leaves the link on. Until the link is back on, governance keeps the weights and set
    it has (a validator that falls below its minimum keeps its seat until the resync), and no
    validator may be voted into governance: it would have no stored weight, and the snapshot
    would revert.
-3. **Snapshot, after block 2,000,000** (direct, anyone): `node deploy/staking-setup.js
+3. **Snapshot, after block 1,010,000** (direct, anyone): `node deploy/staking-setup.js
    bootstrapstakes`. For the block B that holds it, check
    `curl -s "$NODE_URL/strato-api/eth/v1.2/block?number=<B>"`: B's `stakeUpdates` lists every
    validator, and B+1's `currentStakes` lists every validator with a positive weight.

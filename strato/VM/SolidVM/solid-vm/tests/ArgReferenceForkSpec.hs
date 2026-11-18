@@ -55,7 +55,7 @@ spec :: Spec
 spec = describe "argument-reference activation" $ do
   it "schedules the public networks and activates new networks at genesis" $ do
     argReferenceForkBlock heliumNetworkID `shouldBe` 1217000
-    argReferenceForkBlock upquarkNetworkID `shouldBe` 1100000
+    argReferenceForkBlock upquarkNetworkID `shouldBe` 1010000
     argReferenceForkBlock 7381244120123405172 `shouldBe` 10000
     argReferenceForkBlock 42 `shouldBe` 0
 
