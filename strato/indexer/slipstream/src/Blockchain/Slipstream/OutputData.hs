@@ -505,8 +505,15 @@ slipstreamQueryText _ InsertTable{..} = T.concat $
         ";"
       ])
 slipstreamQueryText _ InsertDelegatecall{} = ""
+-- A field's contract type can change between code collections, and CREATE OR
+-- REPLACE cannot change a function's return type, so the old function is dropped.
 slipstreamQueryText _ (CreateFkeyFunction ForeignKeyInfo{..}) = T.concat
-  [ "CREATE OR REPLACE FUNCTION "
+  [ "DROP FUNCTION IF EXISTS "
+  , textToDoubleQuoteText fkiFunctionName
+  , "("
+  , tableNameToDoubleQuoteText fkiSourceTableName
+  , ");\n\n"
+  , "CREATE FUNCTION "
   , textToDoubleQuoteText fkiFunctionName
   , "(\n  lp "
   , tableNameToDoubleQuoteText fkiSourceTableName
