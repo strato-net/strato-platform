@@ -90,11 +90,13 @@ PG_PID=$!
 # Forward a stop to PostgREST and wait for it, so the container exits cleanly.
 trap 'kill -TERM "$PG_PID" 2>/dev/null; wait "$PG_PID"; exit 0' TERM INT
 
-# Statement-timeout hook: see PRE_REQUEST_SQL above.
+# Statement-timeout hook: see PRE_REQUEST_SQL above. PostgREST must be
+# answering HTTP before it is signalled: until its handlers are installed a
+# SIGUSR2 would terminate it instead of reloading the configuration.
 if [ "${POSTGREST_STATEMENT_TIMEOUT:-60s}" != "0" ]; then
   (
     while kill -0 "$PG_PID" 2>/dev/null; do
-      if [ "$(psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" -d "${PG_ENV_POSTGRES_DB}" -Atq -c "$PRE_REQUEST_SQL" 2>/dev/null)" = 1 ]; then
+      if curl -s -o /dev/null "http://127.0.0.1:${POSTGREST_LISTEN_PORT}/" && [ "$(psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" -d "${PG_ENV_POSTGRES_DB}" -Atq -c "$PRE_REQUEST_SQL" 2>/dev/null)" = 1 ]; then
         POSTGREST_PRE_REQUEST='db-pre-request = "public.postgrest_pre_request"'
         render_template postgrest.conf.tpl > postgrest.conf
         kill -USR2 "$PG_PID" 2>/dev/null || true
