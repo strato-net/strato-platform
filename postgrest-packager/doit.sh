@@ -32,6 +32,24 @@ until psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_E
   sleep 1
 done
 
+# Per-request statement timeout. slipstream creates public.postgrest_pre_request()
+# on the primary (this PostgREST may be reading a replica, where DDL is
+# refused); PostgREST calls it inside every request's transaction
+# (db-pre-request in postgrest.conf), so the limit covers API queries only,
+# never slipstream's own sessions. The value travels on PostgREST's
+# connections as strato.postgrest_statement_timeout (see the db-uri in
+# postgrest.conf.tpl). 0 disables it. A query the client has already given
+# up on (the ALB and nginx cut requests at 60 s) is cancelled instead of
+# running on and holding a pool connection.
+#
+# PostgREST starts without the hook: convoke's `compose up --wait` needs this
+# container healthy, so listening, before it launches slipstream, which
+# creates the database and the function. The watcher further down adds
+# db-pre-request to postgrest.conf and reloads the configuration (SIGUSR2)
+# once the function exists.
+PRE_REQUEST_SQL="select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'postgrest_pre_request'"
+POSTGREST_PRE_REQUEST=""
+
 render_template() {
   eval "echo \"$(sed 's/\"/\\"/g' $1)\""
 }
@@ -71,6 +89,24 @@ PG_PID=$!
 
 # Forward a stop to PostgREST and wait for it, so the container exits cleanly.
 trap 'kill -TERM "$PG_PID" 2>/dev/null; wait "$PG_PID"; exit 0' TERM INT
+
+# Statement-timeout hook: see PRE_REQUEST_SQL above. PostgREST must be
+# answering HTTP before it is signalled: until its handlers are installed a
+# SIGUSR2 would terminate it instead of reloading the configuration.
+if [ "${POSTGREST_STATEMENT_TIMEOUT:-60s}" != "0" ]; then
+  (
+    while kill -0 "$PG_PID" 2>/dev/null; do
+      if curl -s -o /dev/null "http://127.0.0.1:${POSTGREST_LISTEN_PORT}/" && [ "$(psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" -d "${PG_ENV_POSTGRES_DB}" -Atq -c "$PRE_REQUEST_SQL" 2>/dev/null)" = 1 ]; then
+        POSTGREST_PRE_REQUEST='db-pre-request = "public.postgrest_pre_request"'
+        render_template postgrest.conf.tpl > postgrest.conf
+        kill -USR2 "$PG_PID" 2>/dev/null || true
+        echo "statement timeout: public.postgrest_pre_request() is in place, db-pre-request enabled"
+        exit 0
+      fi
+      sleep 5
+    done
+  ) &
+fi
 
 if [ "$RELOAD_SECS" -gt 0 ] 2>/dev/null; then
   (
