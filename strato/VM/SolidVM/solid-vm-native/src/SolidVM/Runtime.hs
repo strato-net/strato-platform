@@ -13,11 +13,12 @@ import qualified Data.ByteString as B
 import qualified Control.Monad.Change.Modify as Mod
 import {-# SOURCE #-} qualified SolidVM.Blockchain as Blockchain
 import qualified Blockchain.SolidVM.Builtins.Events.Metered as Events
-import Blockchain.SolidVM.CodeCollectionDB (ParseOptions (..))
+import Blockchain.SolidVM.CodeCollectionDB (ParseOptions (..), cachedImportTargets)
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM hiding (action, getCodeAndCollection)
 import Blockchain.Strato.Model.Address (Address)
+import Blockchain.Strato.Model.CodePtr (CodePtr)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Control.Lens ((^.))
 import Control.Monad
@@ -42,14 +43,17 @@ getCodeAndCollection :: Address -> SM (CC.Contract, Keccak256, CC.CodeCollection
 getCodeAndCollection = getCodeAndCollectionWithTypeCheck False
 
 {-# NOINLINE compilationCache #-}
-compilationCache :: IORef (LRU.LRU (Keccak256, Bool, T.Text) (Either SolidException N.CompiledContract))
+compilationCache :: IORef (LRU.LRU (Keccak256, Bool, T.Text, [(Address, Maybe CodePtr)]) (Either SolidException N.CompiledContract))
 compilationCache = unsafePerformIO $ newIORef $ LRU.newLRU (Just 128)
 
 -- Admit the whole contract before executing any entry. Cache failures as well.
+-- The key carries what the collection's imports held when it was compiled, so
+-- a collection recompiled after an import changed is compiled again here too.
 compiledContract :: Keccak256 -> CC.CodeCollection -> CC.Contract -> SM N.CompiledContract
 compiledContract hsh cc contract = do
   opts <- parseOptionsForCurrentBlock
-  let key = (hsh, parseLegacyOperatorPrecedence opts, contract ^. CC.contractName)
+  targets <- cachedImportTargets opts hsh
+  let key = (,,,) hsh (parseLegacyOperatorPrecedence opts) (contract ^. CC.contractName) <$> targets
       duplicateArities f =
         let arities = map (length . CC._funcArgs) (f : CC._funcOverload f)
          in length arities /= M.size (M.fromList [(a, ()) | a <- arities])
@@ -60,14 +64,14 @@ compiledContract hsh cc contract = do
             else if any ((== N.Unsupported) . N.eKind . snd) errors then UnsupportedFeature context details
             else TypeError context details
   cached <- liftIO $ atomicModifyIORef' compilationCache $ \cache ->
-    let (cache', found) = LRU.lookup key cache in (cache', found)
+    maybe (cache, Nothing) (`LRU.lookup` cache) key
   result <- case cached of
     Just value -> pure value
     Nothing -> do
       let value = if any duplicateArities (M.elems (contract ^. CC.functions))
             then Left $ InvalidArguments context "overloads with the same arity"
             else either (Left . compilationFailure) Right (N.compileContractChecked cc contract)
-      liftIO $ atomicModifyIORef' compilationCache $ \cache -> (LRU.insert key value cache, ())
+      liftIO $ atomicModifyIORef' compilationCache $ \cache -> (maybe cache (\k -> LRU.insert k value cache) key, ())
       pure value
   either throwIO pure result
 

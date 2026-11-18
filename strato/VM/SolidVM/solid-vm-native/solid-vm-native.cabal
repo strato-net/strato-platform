@@ -171,3 +171,28 @@ test-suite caught-failure-fork-check
     , text
     , vm-tools
   default-language: Haskell2010
+
+test-suite codeless-import-fork-check
+  type: exitcode-stdio-1.0
+  main-is: CodelessImportForkMain.hs
+  other-modules:
+      CodelessImportForkSpec
+  hs-source-dirs:
+      ../solid-vm/fork-test
+      ../solid-vm/tests
+  ghc-options: -O2 -threaded -rtsopts
+  build-depends:
+      base
+    , blockapps-data
+    , common-log
+    , composable-monads-base
+    , hflags
+    , hspec
+    , lens
+    , solid-vm-native
+    , solid-vm-model
+    , strato-conf
+    , strato-model
+    , text
+    , vm-tools
+  default-language: Haskell2010

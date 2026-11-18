@@ -15,6 +15,7 @@ import Control.Monad.Composable.Base (runEff)
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe (isNothing)
 import qualified Data.Text as T
+import SolidVM.Model.Value (Value (SIntegral))
 import Test.Hspec
 
 runContext :: ContextM a -> IO a
@@ -84,3 +85,20 @@ spec = describe "codeless-import activation" $ do
     first <- deploy activation 0x2000 "Probe" "import <dead>; import <beef>; contract Probe is Library {}"
     second <- deploy activation 0x3000 "Probe" "import <dead>; import <beef>; contract Probe is Library {}"
     liftIO $ (library, first, second) `shouldBe` (True, False, False)
+
+  -- The imported address is destroyed and deployed again with other code: the
+  -- importer runs the new code, whatever this node compiled for it before.
+  it "runs the code an imported address holds now" $ runContext $ do
+    let answer result = case erReturnVal result of
+          Just (SIntegral n) -> Just (n :: Integer)
+          _ -> Nothing
+        library n = T.concat ["contract Library { function answer() public returns (uint) { return ", n, "; } function kill() public { selfdestruct(msg.sender); } }"]
+    first <- deploy activation 0xdead "Library" $ library "1"
+    created <- deploy activation 0x2000 "Probe" "import <dead>; contract Probe is Library {}"
+    earlier <- invoke activation 0x2000 "answer"
+    destroyed <- invoke activation 0xdead "kill"
+    second <- deploy activation 0xdead "Library" $ library "2"
+    later <- invoke activation 0x2000 "answer"
+    liftIO $ do
+      (first, created, erException destroyed, second) `shouldBe` (True, True, Nothing, True)
+      (answer earlier, answer later) `shouldBe` (Just 1, Just 2)

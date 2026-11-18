@@ -24,6 +24,7 @@ module Blockchain.SolidVM.CodeCollectionDB
     compileSourceWith,
     codeCollectionFromSourceWith,
     codelessImports,
+    cachedImportTargets,
     codeCollectionFromHashWith,
     compileSourceWithAnnotations,
     compileSourceWithAnnotationsWithoutImports,
@@ -143,6 +144,14 @@ codeCacheInsert opts hsh cc = do
   liftIO $ do
     c <- compact cc
     modifyIORef' unsafeCodeCacheIORef (LRU.insert (hsh, parseLegacyOperatorPrecedence opts) (targets, c))
+
+-- | What the cached collection for this code was compiled against: a cache of
+-- anything derived from the collection is keyed by it, so both go stale
+-- together. Nothing when the collection is not cached.
+cachedImportTargets :: MonadIO m => ParseOptions -> Keccak256 -> m (Maybe [(Address, Maybe CodePtr)])
+cachedImportTargets opts hsh
+  | not (parseCheckImportTargets opts) = pure (Just [])
+  | otherwise = liftIO $ fmap fst . snd . LRU.lookup (hsh, parseLegacyOperatorPrecedence opts) <$> readIORef unsafeCodeCacheIORef
 
 codeAt :: A.Selectable Address AddressState m => Address -> m (Maybe CodePtr)
 codeAt = fmap (fmap addressStateCodeHash) . A.select (A.Proxy :: A.Proxy AddressState)
