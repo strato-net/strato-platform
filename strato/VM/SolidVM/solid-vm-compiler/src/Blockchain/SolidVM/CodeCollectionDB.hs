@@ -24,7 +24,8 @@ module Blockchain.SolidVM.CodeCollectionDB
     compileSourceWith,
     codeCollectionFromSourceWith,
     codelessImports,
-    cachedImportTargets,
+    importTargets,
+    importTargetsUnchanged,
     codeCollectionFromHashWith,
     compileSourceWithAnnotations,
     compileSourceWithAnnotationsWithoutImports,
@@ -132,9 +133,7 @@ codeCacheLookup opts hsh = do
       (_, Nothing) -> pure Nothing
   case entry of
     Just (targets, c) -> do
-      unchanged <- if parseCheckImportTargets opts
-        then and <$> traverse (\(a, code) -> (== code) <$> codeAt a) targets
-        else pure True
+      unchanged <- importTargetsUnchanged opts targets
       pure $ if unchanged then Just (getCompact c) else Nothing
     Nothing -> pure Nothing
 
@@ -145,13 +144,11 @@ codeCacheInsert opts hsh cc = do
     c <- compact cc
     modifyIORef' unsafeCodeCacheIORef (LRU.insert (hsh, parseLegacyOperatorPrecedence opts) (targets, c))
 
--- | What the cached collection for this code was compiled against: a cache of
--- anything derived from the collection is keyed by it, so both go stale
--- together. Nothing when the collection is not cached.
-cachedImportTargets :: MonadIO m => ParseOptions -> Keccak256 -> m (Maybe [(Address, Maybe CodePtr)])
-cachedImportTargets opts hsh
-  | not (parseCheckImportTargets opts) = pure (Just [])
-  | otherwise = liftIO $ fmap fst . snd . LRU.lookup (hsh, parseLegacyOperatorPrecedence opts) <$> readIORef unsafeCodeCacheIORef
+-- | Whether the addresses still hold what was recorded for them.
+importTargetsUnchanged :: A.Selectable Address AddressState m => ParseOptions -> [(Address, Maybe CodePtr)] -> m Bool
+importTargetsUnchanged opts targets
+  | parseCheckImportTargets opts = and <$> traverse (\(a, code) -> (== code) <$> codeAt a) targets
+  | otherwise = pure True
 
 codeAt :: A.Selectable Address AddressState m => Address -> m (Maybe CodePtr)
 codeAt = fmap (fmap addressStateCodeHash) . A.select (A.Proxy :: A.Proxy AddressState)
