@@ -37,7 +37,7 @@ invoke height address name = call $ def & callCodeAddress .~ address & callFuncN
 spec :: Spec
 spec = describe "codeless-import activation" $ do
   it "schedules the public networks and activates new networks at genesis" $ do
-    codelessImportForkBlock heliumNetworkID `shouldBe` 1200000
+    codelessImportForkBlock heliumNetworkID `shouldBe` 1250000
     codelessImportForkBlock upquarkNetworkID `shouldBe` 1100000
     codelessImportForkBlock 7381244120123405172 `shouldBe` 10000
     codelessImportForkBlock 42 `shouldBe` 0
