@@ -260,7 +260,7 @@ isRlpEncodeForkActive blockNum =
 -- | Require signed chain binding from this height.
 replayProtectionForkBlock :: Integer -> Integer
 replayProtectionForkBlock net
-  | net == heliumNetworkID = 1220000
+  | net == heliumNetworkID = 1217000
   | net == upquarkNetworkID = 1100000
   | net == forktestNetworkID = forktestForkBlock
   | otherwise = 0
@@ -277,7 +277,7 @@ isReplayProtectionForkActive blockNum =
 -- solely to get past the first failing block.
 caughtFailureForkBlock :: Integer -> Integer
 caughtFailureForkBlock net
-  | net == heliumNetworkID = 1220000
+  | net == heliumNetworkID = 1217000
   | net == upquarkNetworkID = 1100000
   | net == forktestNetworkID = forktestForkBlock
   | otherwise = 0
@@ -293,7 +293,7 @@ isCaughtFailureForkActive blockNum =
 -- any slot of a proxied contract as an argument.
 argReferenceForkBlock :: Integer -> Integer
 argReferenceForkBlock net
-  | net == heliumNetworkID = 1220000
+  | net == heliumNetworkID = 1217000
   | net == upquarkNetworkID = 1100000
   | net == forktestNetworkID = forktestForkBlock
   | otherwise = 0
@@ -310,7 +310,7 @@ isArgReferenceForkActive blockNum =
 -- every node runs the same code whatever its cache history.
 codelessImportForkBlock :: Integer -> Integer
 codelessImportForkBlock net
-  | net == heliumNetworkID = 1220000
+  | net == heliumNetworkID = 1217000
   | net == upquarkNetworkID = 1100000
   | net == forktestNetworkID = forktestForkBlock
   | otherwise = 0
