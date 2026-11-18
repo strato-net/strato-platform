@@ -1454,32 +1454,40 @@ genericBaseTableIndexesSQL = T.unlines
     -- (sender, emitting contract, or the to/from/recipient/stratoRecipient
     -- attribute). Without these each one scans the whole table; a crawler
     -- fanning them out through the explorer filled the PostgREST pool and
-    -- took an RPC node down on 2026-11-01. The partial indexes skip the rows
-    -- without the attribute. The planner cannot use a partial index's
-    -- statistics for the 6-way OR the explorer sends, so the extended
-    -- statistics on the same expressions are what let it estimate that query
-    -- and pick the bitmap plan over a walk of event_timestamp_idx.
+    -- took an RPC node down on 2026-11-01. The attribute indexes are hash,
+    -- not btree: an attribute holds whatever the contract emitted, and a
+    -- btree entry over about 2.7 kB fails the INSERT (SQLSTATE 54000), which
+    -- would stop ingestion; only equality is needed. They are partial to
+    -- skip the rows without the attribute. The planner cannot use a partial
+    -- index's statistics for the 6-way OR the explorer sends, so the
+    -- extended statistics on the same expressions are what let it estimate
+    -- that query and pick the bitmap plan over a walk of event_timestamp_idx.
   , "CREATE INDEX IF NOT EXISTS event_transaction_hash_idx"
   , "  ON event (transaction_hash);"
   , ""
   , "CREATE INDEX IF NOT EXISTS event_transaction_sender_idx"
   , "  ON event (transaction_sender);"
   , ""
-  , "CREATE INDEX IF NOT EXISTS event_attr_to_idx"
-  , "  ON event ((attributes->>'to'))"
+  , "CREATE INDEX IF NOT EXISTS event_attr_to_hash_idx"
+  , "  ON event USING hash ((attributes->>'to'))"
   , "  WHERE (attributes->>'to') IS NOT NULL;"
   , ""
-  , "CREATE INDEX IF NOT EXISTS event_attr_from_idx"
-  , "  ON event ((attributes->>'from'))"
+  , "CREATE INDEX IF NOT EXISTS event_attr_from_hash_idx"
+  , "  ON event USING hash ((attributes->>'from'))"
   , "  WHERE (attributes->>'from') IS NOT NULL;"
   , ""
-  , "CREATE INDEX IF NOT EXISTS event_attr_recipient_idx"
-  , "  ON event ((attributes->>'recipient'))"
+  , "CREATE INDEX IF NOT EXISTS event_attr_recipient_hash_idx"
+  , "  ON event USING hash ((attributes->>'recipient'))"
   , "  WHERE (attributes->>'recipient') IS NOT NULL;"
   , ""
-  , "CREATE INDEX IF NOT EXISTS event_attr_strato_recipient_idx"
-  , "  ON event ((attributes->>'stratoRecipient'))"
+  , "CREATE INDEX IF NOT EXISTS event_attr_strato_recipient_hash_idx"
+  , "  ON event USING hash ((attributes->>'stratoRecipient'))"
   , "  WHERE (attributes->>'stratoRecipient') IS NOT NULL;"
+  , ""
+    -- The btree versions of the four, created by hand on the mainnet rpc
+    -- nodes before this code existed.
+  , "DROP INDEX IF EXISTS event_attr_to_idx, event_attr_from_idx,"
+  , "  event_attr_recipient_idx, event_attr_strato_recipient_idx;"
   , ""
   , "CREATE STATISTICS IF NOT EXISTS event_attr_to_stats"
   , "  ON (attributes->>'to') FROM event;"
