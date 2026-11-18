@@ -10,7 +10,7 @@ sender identity is scoped to the frame. Both interpreter and native execution
 use the same network/height decision.
 
 `Blockchain.Forks.caughtFailureForkBlock` schedules **Helium at 1217000 and
-Upquark at 1100000**. The existing throwaway fork-test
+Upquark at 1010000**. The existing throwaway fork-test
 network switches at 10000; new networks use the hardened rules from genesis.
 These are consensus settings, not local operator overrides. Before deployment,
 reconcile actual canonical history and validator binary deployment times: a

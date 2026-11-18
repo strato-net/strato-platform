@@ -96,7 +96,7 @@ heliumStakingForkBlock :: Integer
 heliumStakingForkBlock = 300000
 
 upquarkStakingForkBlock :: Integer
-upquarkStakingForkBlock = 2000000
+upquarkStakingForkBlock = 1010000
 
 isBlockRewardReceiptForkActive :: Integer -> Bool
 isBlockRewardReceiptForkActive blockNum =
@@ -261,7 +261,7 @@ isRlpEncodeForkActive blockNum =
 replayProtectionForkBlock :: Integer -> Integer
 replayProtectionForkBlock net
   | net == heliumNetworkID = 1217000
-  | net == upquarkNetworkID = 1100000
+  | net == upquarkNetworkID = 1010000
   | net == forktestNetworkID = forktestForkBlock
   | otherwise = 0
 
@@ -278,7 +278,7 @@ isReplayProtectionForkActive blockNum =
 caughtFailureForkBlock :: Integer -> Integer
 caughtFailureForkBlock net
   | net == heliumNetworkID = 1217000
-  | net == upquarkNetworkID = 1100000
+  | net == upquarkNetworkID = 1010000
   | net == forktestNetworkID = forktestForkBlock
   | otherwise = 0
 
@@ -294,7 +294,7 @@ isCaughtFailureForkActive blockNum =
 argReferenceForkBlock :: Integer -> Integer
 argReferenceForkBlock net
   | net == heliumNetworkID = 1217000
-  | net == upquarkNetworkID = 1100000
+  | net == upquarkNetworkID = 1010000
   | net == forktestNetworkID = forktestForkBlock
   | otherwise = 0
 
@@ -311,7 +311,7 @@ isArgReferenceForkActive blockNum =
 codelessImportForkBlock :: Integer -> Integer
 codelessImportForkBlock net
   | net == heliumNetworkID = 1217000
-  | net == upquarkNetworkID = 1100000
+  | net == upquarkNetworkID = 1010000
   | net == forktestNetworkID = forktestForkBlock
   | otherwise = 0
 

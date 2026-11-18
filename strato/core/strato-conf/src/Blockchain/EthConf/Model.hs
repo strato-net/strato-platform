@@ -332,7 +332,7 @@ defaultMaxTimestampDriftS = 15
 -- dev/test networks) activates from genesis.
 defaultStakingActivationBlock :: String -> Maybe Integer
 defaultStakingActivationBlock net
-  | net == "upquark" = Just 2000000
+  | net == "upquark" = Just 1010000
   | net `elem` ["lithium", "mercata", "mercata-hydrogen", "uranium"] = Just stakingNotScheduled
   | take 6 net == "helium" = Just 250000
   | otherwise = Nothing
@@ -386,7 +386,7 @@ stratoTokenAddress net
 -- wherever DeciderState points at a FeeRouter; the native-token switch is
 -- consensus-visible, so a live network keeps the configured token until its
 -- flag day (helium: 2026-10-19 tip 804099 + 50000, rounded up to 900000;
--- upquark: 1000000, ahead of its staking activation at 2000000;
+-- upquark: 1000000, ahead of its staking activation at 1010000;
 -- forktest: the mainnet-activation rehearsal, far enough past its idle tip
 -- that the lazy-block network only reaches it when driven there).
 -- A network without a STRATO token never leaves it.
