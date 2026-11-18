@@ -107,6 +107,7 @@ flowchart TB
 | App ALB | App tier tasks | 80 | The task's nginx, which fronts the app backend. |
 | API tier tasks | Core NLB, then a cell | 8600, 9090 | 8600 hands transactions to one healthy cell; the health check on 8601 covers every cell. 9090 is the first cell's Prometheus, read by apex. |
 | API tier tasks | Aurora | 5432 | Writes (nonce counters) and apex use the writer endpoint. Other reads use the reader endpoint. |
+| API tier tasks | Each other | 8546 | The vm-query fallback through ECS Service Connect. Each task uses its own vm-query first. |
 | App tier tasks | Aurora reader | 5432 | The app backend's reads. |
 | Cells | Aurora | 5432 | Every cell connects. Only the cell that holds the writer lease writes; the others are standbys. |
 | Cells | STRATO peers, both ways | 30303 TCP, UDP | The chain's peer-to-peer traffic, on each cell's Elastic IP. Open to any address. |
@@ -180,8 +181,5 @@ counted here.
 
 ## Known gaps
 
-- The API tier's tasks are set up to reach each other's vm-query on 8546
-  through ECS Service Connect, as a fallback for their own, but their
-  security group admits only 8081 from the load balancer.
 - CloudFront and the app tier's nginx route `/history-api/*`, but
   `scripts/ha.sh` deploys no history service, so those requests answer 503.

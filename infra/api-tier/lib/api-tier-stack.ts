@@ -281,6 +281,9 @@ export class ApiTierStack extends Stack {
     }
 
     const taskSg = new ec2.SecurityGroup(this, "TaskSg", { vpc, description: `${name} tasks` });
+    // Service Connect: the proxy in each task listens on the container port
+    // (no ingressPortOverride is set), so the tasks admit each other on it.
+    taskSg.addIngressRule(taskSg, ec2.Port.tcp(vmQueryPort), `${name} tasks: vm-query fallback (ECS Service Connect)`);
     if (config.postgresSecurityGroupId) {
       ec2.SecurityGroup.fromSecurityGroupId(this, "ClusterSg", config.postgresSecurityGroupId).addIngressRule(taskSg, ec2.Port.tcp(config.postgresPort), `${name} tasks`);
     }
