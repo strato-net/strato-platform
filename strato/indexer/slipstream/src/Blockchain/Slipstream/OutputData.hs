@@ -1384,6 +1384,7 @@ initialSlipstreamQueries =
   , RawSQL "DROP INDEX IF EXISTS mapping_idx, storage_status_address_idx;"
   , RawSQL jsonbMergeDeepSQL
   , RawSQL jsonbObjToArraySQL
+  , RawSQL postgrestPreRequestSQL
   , RawSQL upsertViewSQL
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "event") (indexTableName "" "storage") False "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "event" (indexTableName "" "storage") (indexTableName "" "event") True "address" SqlText
@@ -1491,6 +1492,23 @@ genericBaseTableIndexesSQL = T.unlines
   , ""
   , "CREATE STATISTICS IF NOT EXISTS event_attr_strato_recipient_stats"
   , "  ON (attributes->>'stratoRecipient') FROM event;"
+  ]
+
+-- PostgREST runs this inside every request's transaction (db-pre-request in
+-- postgrest-packager) to cap the request's statements. It lives here rather
+-- than in the PostgREST image because slipstream always writes to the
+-- primary, while an API node's PostgREST may read a replica, where any DDL
+-- is refused. The limit comes from the strato.postgrest_statement_timeout
+-- setting PostgREST carries on its connections (POSTGREST_STATEMENT_TIMEOUT),
+-- so each PostgREST keeps its own value; set_config's third argument scopes
+-- it to the transaction, so the indexer's sessions are never affected.
+postgrestPreRequestSQL :: Text
+postgrestPreRequestSQL = T.unlines
+  [ "CREATE OR REPLACE FUNCTION postgrest_pre_request() RETURNS void AS $fn$"
+  , "  SELECT set_config('statement_timeout',"
+  , "    coalesce(nullif(current_setting('strato.postgrest_statement_timeout', true), ''), '60s'),"
+  , "    true);"
+  , "$fn$ LANGUAGE sql;"
   ]
 
 jsonbMergeDeepSQL :: Text

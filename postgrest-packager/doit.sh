@@ -32,21 +32,39 @@ until psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_E
   sleep 1
 done
 
-# Per-request statement timeout. PostgREST calls this function inside every
-# request's transaction (db-pre-request in postgrest.conf), so the limit only
-# covers API queries, never slipstream's own sessions on the same role. A
-# query the client has already given up on (the ALB and nginx cut requests at
-# 60 s) is cancelled instead of running on and holding a pool connection.
-# 0 disables it. The database is created by strato on a fresh node, so wait
-# for it before installing the function.
-until psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" -d "${PG_ENV_POSTGRES_DB}" -c '\q' 2>/dev/null; do
-  >&2 echo "Database ${PG_ENV_POSTGRES_DB} is unavailable - sleeping"
-  sleep 1
-done
-psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" -d "${PG_ENV_POSTGRES_DB}" -v ON_ERROR_STOP=1 -q <<SQL
-CREATE OR REPLACE FUNCTION public.postgrest_pre_request() RETURNS void
-  LANGUAGE sql AS \$\$ SELECT set_config('statement_timeout', '${POSTGREST_STATEMENT_TIMEOUT:-60s}', true) \$\$;
-SQL
+# Per-request statement timeout. slipstream creates public.postgrest_pre_request()
+# on the primary (this PostgREST may be reading a replica, where DDL is
+# refused); PostgREST calls it inside every request's transaction
+# (db-pre-request in postgrest.conf), so the limit covers API queries only,
+# never slipstream's own sessions. The value travels on PostgREST's
+# connections as strato.postgrest_statement_timeout (see the db-uri in
+# postgrest.conf.tpl). 0 disables it. A query the client has already given
+# up on (the ALB and nginx cut requests at 60 s) is cancelled instead of
+# running on and holding a pool connection.
+#
+# The database is created by strato on a fresh node and the function by
+# slipstream once it starts (or, on a replica, once it has replicated), so
+# wait for both. If the function has not shown up after a minute (an older
+# slipstream), PostgREST starts without the hook rather than not at all.
+POSTGREST_PRE_REQUEST=""
+if [ "${POSTGREST_STATEMENT_TIMEOUT:-60s}" != "0" ]; then
+  until psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" -d "${PG_ENV_POSTGRES_DB}" -c '\q' 2>/dev/null; do
+    >&2 echo "Database ${PG_ENV_POSTGRES_DB} is unavailable - sleeping"
+    sleep 1
+  done
+  PRE_REQUEST_SQL="select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'postgrest_pre_request'"
+  i=0
+  until [ "$(psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" -d "${PG_ENV_POSTGRES_DB}" -Atq -c "$PRE_REQUEST_SQL" 2>/dev/null)" = 1 ] || [ "$i" -ge 60 ]; do
+    i=$((i + 1))
+    sleep 1
+  done
+  if [ "$i" -lt 60 ]; then
+    POSTGREST_PRE_REQUEST='db-pre-request = "public.postgrest_pre_request"'
+  else
+    >&2 echo "public.postgrest_pre_request() not found in ${PG_ENV_POSTGRES_DB} - starting without the statement timeout"
+  fi
+fi
+export POSTGREST_PRE_REQUEST
 
 render_template() {
   eval "echo \"$(sed 's/\"/\\"/g' $1)\""

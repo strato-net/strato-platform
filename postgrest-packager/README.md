@@ -17,6 +17,12 @@ disable the watcher.
 Every request runs `public.postgrest_pre_request()` first (PostgREST's
 `db-pre-request`), which sets `statement_timeout` for that transaction to
 `POSTGREST_STATEMENT_TIMEOUT` (default `60s`, matching the proxy timeouts in
-front of the node). `doit.sh` creates the function at startup. The limit
-applies to API queries only; slipstream's sessions are unaffected. `0`
-disables it.
+front of the node). The limit applies to API queries only; slipstream's
+sessions are unaffected. `0` disables it.
+
+slipstream creates the function on the primary, because a PostgREST on an
+API node reads a replica, which refuses DDL. The value reaches the function
+as the `strato.postgrest_statement_timeout` setting on PostgREST's
+connections (`options=` in `db-uri`), so each PostgREST keeps its own.
+`doit.sh` waits up to a minute for the function and starts without the hook,
+with a warning in the log, if it is still missing (an older slipstream).
