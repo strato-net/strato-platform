@@ -317,8 +317,10 @@ contract record PositionManagerV3 is ERC721, Ownable {
             _accrueFees(position, inside0, inside1);
         }
 
-        uint amount0Collect = position.tokensOwed0 < amount0Max ? position.tokensOwed0 : amount0Max;
-        uint amount1Collect = position.tokensOwed1 < amount1Max ? position.tokensOwed1 : amount1Max;
+        //SOLIDVM_COMPATIBILITY: a maximum can arrive as a storage reference instead of a
+        // value; the addition takes its value here
+        uint amount0Collect = position.tokensOwed0 < amount0Max ? position.tokensOwed0 : amount0Max + 0;
+        uint amount1Collect = position.tokensOwed1 < amount1Max ? position.tokensOwed1 : amount1Max + 0;
 
         (amount0, amount1) =
             poolContract.collect(recipient, position.tickLower, position.tickUpper, amount0Collect, amount1Collect);
