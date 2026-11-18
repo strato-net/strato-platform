@@ -23,6 +23,7 @@ module Blockchain.SolidVM.CodeCollectionDB
     compileSource,
     compileSourceWith,
     codeCollectionFromSourceWith,
+    codelessImports,
     codeCollectionFromHashWith,
     compileSourceWithAnnotations,
     compileSourceWithAnnotationsWithoutImports,
@@ -39,9 +40,11 @@ import Blockchain.SolidVM.ImportResolver
 import Blockchain.SolidVM.Metrics
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
+import Control.Applicative ((<|>))
 import Control.DeepSeq (force)
 import Control.Exception hiding (TypeError)
 import Control.Lens hiding (Context, assign, bimap, from, to)
+import Control.Monad (filterM, foldM)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
@@ -57,7 +60,7 @@ import qualified Data.Cache.LRU as LRU
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as M
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Source
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -110,36 +113,66 @@ runMemCompilerT = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT . un
 -- Keyed by (code hash, legacy operator precedence): the same source parses to
 -- a different AST on either side of the operator-precedence fork.
 -- Each entry lives in its own compact region: the GC neither traces nor copies it.
+-- An entry records what each address it imports held when it was compiled; a
+-- hit is used only while they still hold the same.
 maxCacheSize :: Integer
 maxCacheSize = 128
 
 {-# NOINLINE unsafeCodeCacheIORef #-}
-unsafeCodeCacheIORef :: IORef (LRU.LRU (Keccak256, Bool) (Compact CodeCollection))
+unsafeCodeCacheIORef :: IORef (LRU.LRU (Keccak256, Bool) ([(Address, Maybe CodePtr)], Compact CodeCollection))
 unsafeCodeCacheIORef = unsafePerformIO $ newIORef $ LRU.newLRU (Just maxCacheSize)
 
-codeCacheLookup :: MonadIO m => (Keccak256, Bool) -> m (Maybe CodeCollection)
-codeCacheLookup k = liftIO $ do
-  cache <- readIORef unsafeCodeCacheIORef
-  case LRU.lookup k cache of
-    (cache', Just c) -> writeIORef unsafeCodeCacheIORef cache' >> pure (Just (getCompact c))
-    (_, Nothing) -> pure Nothing
+codeCacheLookup :: (MonadIO m, A.Selectable Address AddressState m) => ParseOptions -> Keccak256 -> m (Maybe CodeCollection)
+codeCacheLookup opts hsh = do
+  entry <- liftIO $ do
+    cache <- readIORef unsafeCodeCacheIORef
+    case LRU.lookup (hsh, parseLegacyOperatorPrecedence opts) cache of
+      (cache', Just e) -> writeIORef unsafeCodeCacheIORef cache' >> pure (Just e)
+      (_, Nothing) -> pure Nothing
+  case entry of
+    Just (targets, c) -> do
+      unchanged <- if parseCheckImportTargets opts
+        then and <$> traverse (\(a, code) -> (== code) <$> codeAt a) targets
+        else pure True
+      pure $ if unchanged then Just (getCompact c) else Nothing
+    Nothing -> pure Nothing
 
-codeCacheInsert :: MonadIO m => (Keccak256, Bool) -> CodeCollection -> m ()
-codeCacheInsert k cc = liftIO $ do
-  c <- compact cc
-  modifyIORef' unsafeCodeCacheIORef (LRU.insert k c)
+codeCacheInsert :: (MonadIO m, HasCodeDB m, A.Selectable Address AddressState m) => ParseOptions -> Keccak256 -> CodeCollection -> m ()
+codeCacheInsert opts hsh cc = do
+  targets <- importTargets opts hsh
+  liftIO $ do
+    c <- compact cc
+    modifyIORef' unsafeCodeCacheIORef (LRU.insert (hsh, parseLegacyOperatorPrecedence opts) (targets, c))
+
+codeAt :: A.Selectable Address AddressState m => Address -> m (Maybe CodePtr)
+codeAt = fmap (fmap addressStateCodeHash) . A.select (A.Proxy :: A.Proxy AddressState)
+
+-- | What each address imported by the stored source, directly or through an
+-- imported contract, holds now.
+importTargets :: (HasCodeDB m, A.Selectable Address AddressState m) => ParseOptions -> Keccak256 -> m [(Address, Maybe CodePtr)]
+importTargets opts = fmap M.toList . from M.empty
+  where
+    from seen hsh = getCode hsh >>= maybe (pure seen) (foldM visit seen . addressImports opts)
+    visit seen a
+      | a `M.member` seen = pure seen
+      | otherwise = codeAt a >>= \code -> case code of
+          Just (SolidVMCode _ ch) -> from (M.insert a code seen) ch
+          _ -> pure $ M.insert a code seen
 
 -- | Parse-time switches. The VM derives them from the block being executed;
 -- everything else (APIs, tooling, tests) uses 'defaultParseOptions'.
-newtype ParseOptions = ParseOptions
+data ParseOptions = ParseOptions
   { -- | Parse with the pre-fork operator table. See
     -- 'SolidVM.Solidity.Parse.Statement.legacyExpression'.
-    parseLegacyOperatorPrecedence :: Bool
+    parseLegacyOperatorPrecedence :: Bool,
+    -- | Recompile a cached collection whose imported addresses no longer hold
+    -- what they held when it was compiled.
+    parseCheckImportTargets :: Bool
   }
   deriving (Eq, Show)
 
 defaultParseOptions :: ParseOptions
-defaultParseOptions = ParseOptions {parseLegacyOperatorPrecedence = False}
+defaultParseOptions = ParseOptions {parseLegacyOperatorPrecedence = False, parseCheckImportTargets = True}
 
 parserStateFor :: ParseOptions -> ParserState
 parserStateFor opts = withLegacyOperatorPrecedence (parseLegacyOperatorPrecedence opts) initialParserState
@@ -309,8 +342,7 @@ codeCollectionFromSourceWith opts isRunningTests typeCheck initCode = do
         [(t, src)] | T.null t -> encodeUtf8 src -- for backwards compatibility
         _ -> BL.toStrict $ Aeson.encode initList
       hsh = hash canonicalInitCode
-      cacheKey = (hsh, parseLegacyOperatorPrecedence opts)
-  mcc <- codeCacheLookup cacheKey
+  mcc <- codeCacheLookup opts hsh
   case mcc of
     Just cc -> do
       recordCacheEvent CacheHit
@@ -328,8 +360,28 @@ codeCollectionFromSourceWith opts isRunningTests typeCheck initCode = do
             Left (IEx p) -> throw (TypeError "codeCollectionFromSource" $ show p)
             Left (SVMEx (s, _)) -> throw s
             Left (TCEx xs) -> throw (TypeError "Typechecker" $ T.unpack (typeErrorToAnnotation xs))
-      codeCacheInsert cacheKey cc
+      codeCacheInsert opts hsh cc
       return $ assert (hsh == hsh') (hsh, cc)
+
+-- | The addresses a submitted source imports that hold no SolidVM code.
+-- Read from the source itself, so the answer does not depend on the cache.
+codelessImports :: A.Selectable Address AddressState m => ParseOptions -> B.ByteString -> m [Address]
+codelessImports opts = filterM (fmap (not . hasCode) . codeAt) . addressImports opts
+  where
+    hasCode = \case
+      Just (SolidVMCode _ ch) -> ch /= unsafeCreateKeccak256FromWord256 0
+      _ -> False
+
+-- | The addresses a source imports.
+addressImports :: ParseOptions -> B.ByteString -> [Address]
+addressImports opts initCode = [a | (name, src) <- files, Right units <- [parseSourceWith opts name src], Import _ i <- units, AddressLiteral _ a <- [importPath i]]
+  where
+    files = fromMaybe [(T.empty, decodeUtf8 initCode)] $
+      Aeson.decode (BL.fromStrict initCode) <|> (M.toList <$> Aeson.decode (BL.fromStrict initCode))
+    importPath = \case
+      Simple path _ -> path
+      Qualified path _ _ -> path
+      Braced _ path _ -> path
 
 codeCollectionFromHash ::
   ( MonadIO m,
@@ -355,8 +407,7 @@ codeCollectionFromHashWith ::
   Keccak256 ->
   m CodeCollection
 codeCollectionFromHashWith opts isRunningTests typeCheck hsh = do
-  let cacheKey = (hsh, parseLegacyOperatorPrecedence opts)
-  mcc <- codeCacheLookup cacheKey
+  mcc <- codeCacheLookup opts hsh
   case mcc of
     Just cc -> do
       recordCacheEvent CacheHit
@@ -364,7 +415,7 @@ codeCollectionFromHashWith opts isRunningTests typeCheck hsh = do
     Nothing -> do
       recordCacheEvent CacheMiss
       cc <- codeCollectionFromHashNoCacheWith opts isRunningTests True typeCheck hsh
-      codeCacheInsert cacheKey cc
+      codeCacheInsert opts hsh cc
       return cc
 
 codeCollectionFromHashNoCacheWith ::

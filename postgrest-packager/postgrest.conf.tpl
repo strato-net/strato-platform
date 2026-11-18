@@ -1,4 +1,5 @@
-db-uri = "postgres://${PG_ENV_POSTGRES_USER}:${PG_ENV_POSTGRES_PASSWORD}@${PG_ENV_POSTGRES_HOST}:${PG_PORT_5432_TCP_PORT}/${PG_ENV_POSTGRES_DB}"
+## options= carries the statement timeout postgrest_pre_request() applies (see doit.sh)
+db-uri = "postgres://${PG_ENV_POSTGRES_USER}:${PG_ENV_POSTGRES_PASSWORD}@${PG_ENV_POSTGRES_HOST}:${PG_PORT_5432_TCP_PORT}/${PG_ENV_POSTGRES_DB}?options=-c%20strato.postgrest_statement_timeout%3D${POSTGREST_STATEMENT_TIMEOUT}"
 db-schema = "${POSTGREST_SCHEMA}"
 db-anon-role = "${POSTGREST_ANONYMOUS}"
 db-pool = ${POSTGREST_POOL}
@@ -19,9 +20,10 @@ secret-is-base64 = false
 ## limit rows in response
 max-rows = ${POSTGREST_MAX_ROWS}
 
-## stored proc to exec immediately after auth
-# pre-request = "stored_proc_name"
+## runs inside every request's transaction and caps its statements at
+## POSTGREST_STATEMENT_TIMEOUT; slipstream creates the function, doit.sh
+## fills this in once it exists
+${POSTGREST_PRE_REQUEST}
 
 # allow aggregate queries
 db-aggregates-enabled = true
-statement_timeout = 5

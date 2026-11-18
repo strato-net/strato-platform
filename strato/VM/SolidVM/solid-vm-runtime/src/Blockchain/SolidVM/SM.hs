@@ -41,6 +41,8 @@ module Blockchain.SolidVM.SM
     withStaticCallInfo,
     attempt,
     caughtFailureForkActive,
+    argReferenceForkActive,
+    rejectCodelessImports,
     trimCallStackToDepth,
     purgeStorageOnCommit,
     withLocalVars,
@@ -94,7 +96,7 @@ import Blockchain.EthConf (ethConf)
 import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
-import Blockchain.Forks (isOperatorPrecedenceForkActive, isConstructorPublicationForkActive, isRlpEncodeForkActive, isCaughtFailureForkActive)
+import Blockchain.Forks (isOperatorPrecedenceForkActive, isConstructorPublicationForkActive, isRlpEncodeForkActive, isCaughtFailureForkActive, isArgReferenceForkActive, isCodelessImportForkActive)
 import Blockchain.SolidVM.Exception
 import Blockchain.Data.VmTrace
 import Blockchain.SolidVM.GasInfo
@@ -990,6 +992,18 @@ caughtFailureForkActive :: MonadSM m => m Bool
 caughtFailureForkActive =
   isCaughtFailureForkActive . blockHeaderBlockNumber . Env.blockHeader <$> getEnv
 
+argReferenceForkActive :: MonadSM m => m Bool
+argReferenceForkActive =
+  isArgReferenceForkActive . blockHeaderBlockNumber . Env.blockHeader <$> getEnv
+
+-- | Fail a creation whose source imports an address without SolidVM code.
+rejectCodelessImports :: MonadSM m => ParseOptions -> BC.ByteString -> m ()
+rejectCodelessImports opts source = do
+  forked <- isCodelessImportForkActive . blockHeaderBlockNumber . Env.blockHeader <$> getEnv
+  when forked $ codelessImports opts source >>= \case
+    [] -> pure ()
+    addresses -> throw . TypeError "import" $ "no contract code at imported address: " ++ unwords (format <$> addresses)
+
 trimCallStackToDepth :: MonadSM m => Int -> m ()
 trimCallStackToDepth depth = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \stack ->
   pure $ drop (max 0 $ length stack - depth) stack
@@ -1231,7 +1245,10 @@ getContractNameAndHash address' = do
 parseOptionsForCurrentBlock :: MonadSM m => m ParseOptions
 parseOptionsForCurrentBlock = do
   blockNum <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
-  pure defaultParseOptions {parseLegacyOperatorPrecedence = not (isOperatorPrecedenceForkActive blockNum)}
+  pure defaultParseOptions
+    { parseLegacyOperatorPrecedence = not (isOperatorPrecedenceForkActive blockNum),
+      parseCheckImportTargets = isCodelessImportForkActive blockNum
+    }
 
 -- | Values as 'rlpEncodeValue' should see them at the current block: before
 -- 'isRlpEncodeForkActive', every non-data value encoded as an empty list.

@@ -6,7 +6,7 @@ import Blockchain.Bagger.Transactions
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransaction)
 import Blockchain.Data.TransactionDef (Transaction (..))
-import Blockchain.Forks (forkNotScheduled, replayProtectionForkBlock)
+import Blockchain.Forks (replayProtectionForkBlock)
 import Blockchain.Strato.Model.Code (Code (..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
@@ -49,8 +49,8 @@ spec = describe "transaction replay protection" $ do
       transactionChainIdValid (cid + 1) decoded `shouldBe` False
     ) [195049586845898, 123354377739506]
   it "keeps public fork heights unscheduled and enables new networks at genesis" $ do
-    replayProtectionForkBlock 114784819836269 `shouldBe` forkNotScheduled
-    replayProtectionForkBlock 33056204878082667 `shouldBe` forkNotScheduled
+    replayProtectionForkBlock 114784819836269 `shouldBe` 1217000
+    replayProtectionForkBlock 33056204878082667 `shouldBe` 1010000
     replayProtectionForkBlock 42 `shouldBe` 0
     replayProtectionForkBlock 7381244120123405172 `shouldBe` 10000
   where

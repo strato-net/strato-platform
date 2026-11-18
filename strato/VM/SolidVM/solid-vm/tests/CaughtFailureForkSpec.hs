@@ -42,8 +42,8 @@ returnedInteger result = case erReturnVal result of
 spec :: Spec
 spec = describe "caught-failure activation" $ do
   it "leaves public networks unscheduled and activates new networks at genesis" $ do
-    caughtFailureForkBlock heliumNetworkID `shouldBe` forkNotScheduled
-    caughtFailureForkBlock upquarkNetworkID `shouldBe` forkNotScheduled
+    caughtFailureForkBlock heliumNetworkID `shouldBe` 1217000
+    caughtFailureForkBlock upquarkNetworkID `shouldBe` 1010000
     caughtFailureForkBlock 7381244120123405172 `shouldBe` 10000
     caughtFailureForkBlock 42 `shouldBe` 0
 
@@ -56,7 +56,7 @@ spec = describe "caught-failure activation" $ do
     isCaughtFailureForkActive (activation + 1) `shouldBe` True
 
   let boundaries = [("before", activation - 1, False), ("at", activation, True), ("after", activation + 1, True)]
-      historical = [("historical block 355722", 355722, False) | activation == forkNotScheduled]
+      historical = [("historical block 355722", 355722, False) | activation > 355722]
   forM_ (filter (\(_, height, _) -> height >= 0) (historical ++ boundaries)) $ \(label, height, atomic) -> do
     it (label ++ ": replays approval followed by a caught failure") $ runContext $ do
       deploy height $ T.unlines

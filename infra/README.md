@@ -19,6 +19,10 @@ see [What the apps read from the repository](#what-the-apps-read-from-the-reposi
 Each app: `cd <app> && npm ci`, then `npx cdk deploy` with the context values
 its README lists.
 
+[TOPOLOGY.md](TOPOLOGY.md) draws one deployed environment: where each part
+sits and which part can reach which. A change to the stacks, services, ports,
+CloudFront paths or security-group rules updates it in the same change.
+
 ## Naming
 
 Every AWS name a deployment creates starts with `ha-<envName>`: the stacks,

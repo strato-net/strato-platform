@@ -32,6 +32,10 @@ module Blockchain.Forks
     isConstructorPublicationForkActive,
     caughtFailureForkBlock,
     isCaughtFailureForkActive,
+    argReferenceForkBlock,
+    isArgReferenceForkActive,
+    codelessImportForkBlock,
+    isCodelessImportForkActive,
     forkNotScheduled,
     heliumNetworkID,
     upquarkNetworkID
@@ -92,7 +96,7 @@ heliumStakingForkBlock :: Integer
 heliumStakingForkBlock = 300000
 
 upquarkStakingForkBlock :: Integer
-upquarkStakingForkBlock = 2000000
+upquarkStakingForkBlock = 1010000
 
 isBlockRewardReceiptForkActive :: Integer -> Bool
 isBlockRewardReceiptForkActive blockNum =
@@ -253,12 +257,11 @@ isRlpEncodeForkActive blockNum =
          || (net == heliumNetworkID   && blockNum < heliumRlpEncodeForkBlock)
          || (net == forktestNetworkID && blockNum < forktestForkBlock)
 
--- | Require signed chain binding from this height. Public networks
--- remain unscheduled until the upgrade is coordinated.
+-- | Require signed chain binding from this height.
 replayProtectionForkBlock :: Integer -> Integer
 replayProtectionForkBlock net
-  | net == heliumNetworkID = forkNotScheduled
-  | net == upquarkNetworkID = forkNotScheduled
+  | net == heliumNetworkID = 1217000
+  | net == upquarkNetworkID = 1010000
   | net == forktestNetworkID = forktestForkBlock
   | otherwise = 0
 
@@ -274,14 +277,47 @@ isReplayProtectionForkActive blockNum =
 -- solely to get past the first failing block.
 caughtFailureForkBlock :: Integer -> Integer
 caughtFailureForkBlock net
-  | net == heliumNetworkID = forkNotScheduled
-  | net == upquarkNetworkID = forkNotScheduled
+  | net == heliumNetworkID = 1217000
+  | net == upquarkNetworkID = 1010000
   | net == forktestNetworkID = forktestForkBlock
   | otherwise = 0
 
 isCaughtFailureForkActive :: Integer -> Bool
 isCaughtFailureForkActive blockNum =
   blockNum >= caughtFailureForkBlock (Conf.networkID $ networkConfig ethConf)
+
+-- | A storage reference handed to another contract is read from the caller's
+-- storage at the call. References nested in a variadic argument, and
+-- value-typed references passed to a delegatecall, used to reach the callee
+-- unresolved and were then read from the callee's storage: a caller could name
+-- any slot of a proxied contract as an argument.
+argReferenceForkBlock :: Integer -> Integer
+argReferenceForkBlock net
+  | net == heliumNetworkID = 1217000
+  | net == upquarkNetworkID = 1010000
+  | net == forktestNetworkID = forktestForkBlock
+  | otherwise = 0
+
+isArgReferenceForkActive :: Integer -> Bool
+isArgReferenceForkActive blockNum =
+  blockNum >= argReferenceForkBlock (Conf.networkID $ networkConfig ethConf)
+
+-- | A creation whose source imports an address without SolidVM code fails.
+-- Such an import used to be dropped, and resolved once code was deployed at
+-- the address: the importing contract then changed behaviour on whichever
+-- nodes recompiled it. From the same height a cached compile is reused only
+-- while its imported addresses hold what they held when it was compiled, so
+-- every node runs the same code whatever its cache history.
+codelessImportForkBlock :: Integer -> Integer
+codelessImportForkBlock net
+  | net == heliumNetworkID = 1217000
+  | net == upquarkNetworkID = 1010000
+  | net == forktestNetworkID = forktestForkBlock
+  | otherwise = 0
+
+isCodelessImportForkActive :: Integer -> Bool
+isCodelessImportForkActive blockNum =
+  blockNum >= codelessImportForkBlock (Conf.networkID $ networkConfig ethConf)
 
 -- | Publish SolidVM runtime code only after construction succeeds.
 constructorPublicationForkBlock :: Integer -> Integer

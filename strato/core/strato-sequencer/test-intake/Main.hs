@@ -46,7 +46,8 @@ import Blockchain.Event (handleGossipedTransactions)
 import Blockchain.Model.JsonBlock (RawTransaction' (..))
 import Blockchain.Model.SyncState (BestSequencedBlock (..))
 import Blockchain.Model.WrappedBlock (IngestTx (..), OutputTx (..))
-import Blockchain.Sequencer (SeqOutEvent (..), transformFullTransactionsWith)
+import Blockchain.Blockstanbul (View (..))
+import Blockchain.Sequencer (SeqOutEvent (..), poolWorkIsForView, transformFullTransactionsWith)
 import Blockchain.Sequencer.Event (IngestEvent (..), P2pEvent (..), VmTask (..))
 import Blockchain.Strato.Discovery.Data.Peer (PPeer)
 import Blockchain.Strato.Model.Address (Address (..))
@@ -363,6 +364,12 @@ main = do
           result <- sequence' origin (concat (zipWith (\g b -> [b, g]) good bad))
           toVm result `shouldBe` good
           toPeers result `shouldBe` good
+
+    -- The VM reports work for the block it would build next; a view's sequence
+    -- is the block committed last.
+    describe "pool work" $
+      it "counts for the view when it is for the block after the committed one" $
+        map (poolWorkIsForView (View 3 7)) [7, 8, 9] `shouldBe` [False, True, False]
 
     describe "replay" $
       case replay of
