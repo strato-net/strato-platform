@@ -18,7 +18,8 @@ module Blockchain.Sequencer (
   sequencer,
   eventHandler,
   SeqOutEvent (..),
-  transformFullTransactionsWith
+  transformFullTransactionsWith,
+  poolWorkIsForView
   ) where
 
 import BlockApps.Logging
@@ -352,10 +353,16 @@ unseqEventHandler events = do
         -- another height is stale (the VM saw an older block), and ignored.
         IEPoolHasWork height -> lift $ do
           v <- currentView
-          when (toInteger (_sequence v) == height) createNewViewTimer
+          when (poolWorkIsForView v height) createNewViewTimer
         (IEFlushMempool req) -> do
           record "inevent_type_flush_mempool" "FlushMempool" 1
           yieldToVm [VmFlushMempool req]
+
+-- | Whether work the VM reports for a block is work for this view. A view's
+-- sequence is the last committed block, and the VM reports the height of the
+-- block it would build next, so they belong together when that is one above.
+poolWorkIsForView :: View -> Integer -> Bool
+poolWorkIsForView v height = toInteger (_sequence v) + 1 == height
 
 bootstrapBlockstanbul :: (MonadBlockstanbul m, Mod.Accessible View m) =>
                          ConduitT i SeqOutEvent m ()

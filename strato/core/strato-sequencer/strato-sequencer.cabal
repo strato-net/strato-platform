@@ -125,6 +125,7 @@ test-suite transaction-intake-test
       aeson
     , base
     , blockDB
+    , blockstanbul
     , blockapps-data
     , blockapps-datadefs
     , bytestring
