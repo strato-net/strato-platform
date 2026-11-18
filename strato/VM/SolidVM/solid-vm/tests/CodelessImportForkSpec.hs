@@ -10,7 +10,7 @@ import Blockchain.SolidVM.Simple hiding (name)
 import Blockchain.Strato.Model.Address (Address)
 import Blockchain.VMContext (ContextM, runMemContextM)
 import Control.Lens
-import Control.Monad (forM_)
+import Control.Monad (forM_, when)
 import Control.Monad.Composable.Base (runEff)
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe (isNothing)
@@ -87,18 +87,24 @@ spec = describe "codeless-import activation" $ do
     liftIO $ (library, first, second) `shouldBe` (True, False, False)
 
   -- The imported address is destroyed and deployed again with other code: the
-  -- importer runs the new code, whatever this node compiled for it before.
-  it "runs the code an imported address holds now" $ runContext $ do
-    let answer result = case erReturnVal result of
-          Just (SIntegral n) -> Just (n :: Integer)
-          _ -> Nothing
-        library n = T.concat ["contract Library { function answer() public returns (uint) { return ", n, "; } function kill() public { selfdestruct(msg.sender); } }"]
-    first <- deploy activation 0xdead "Library" $ library "1"
-    created <- deploy activation 0x2000 "Probe" "import <dead>; contract Probe is Library {}"
-    earlier <- invoke activation 0x2000 "answer"
-    destroyed <- invoke activation 0xdead "kill"
-    second <- deploy activation 0xdead "Library" $ library "2"
-    later <- invoke activation 0x2000 "answer"
-    liftIO $ do
-      (first, created, erException destroyed, second) `shouldBe` (True, True, Nothing, True)
-      (answer earlier, answer later) `shouldBe` (Just 1, Just 2)
+  -- importer runs the new code, whatever this node compiled for it before,
+  -- including what it compiled and ran before activation.
+  let answer result = case erReturnVal result of
+        Just (SIntegral n) -> Just (n :: Integer)
+        _ -> Nothing
+      library n = T.concat ["contract Library { function answer() public returns (uint) { return ", n, "; } function kill() public { selfdestruct(msg.sender); } }"]
+      redeployed from = do
+        first <- deploy from 0xdead "Library" $ library "1"
+        created <- deploy from 0x2000 "Probe" "import <dead>; contract Probe is Library {}"
+        earlier <- invoke from 0x2000 "answer"
+        destroyed <- invoke from 0xdead "kill"
+        second <- deploy from 0xdead "Library" $ library "2"
+        _ <- invoke from 0x2000 "answer"
+        later <- invoke activation 0x2000 "answer"
+        liftIO $ do
+          (first, created, erException destroyed, second) `shouldBe` (True, True, Nothing, True)
+          -- Before activation the first answer is whatever this node has cached.
+          (if from < activation then Just 1 else answer earlier, answer later) `shouldBe` (Just 1, Just 2)
+  it "runs the code an imported address holds now" $ runContext $ redeployed activation
+  when (activation > 0) $
+    it "runs the code an imported address holds now, changed before activation" $ runContext $ redeployed (activation - 1)

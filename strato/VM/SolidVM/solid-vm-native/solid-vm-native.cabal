@@ -172,11 +172,10 @@ test-suite caught-failure-fork-check
     , vm-tools
   default-language: Haskell2010
 
-test-suite arg-reference-fork-check
+test-suite codeless-import-fork-check
   type: exitcode-stdio-1.0
-  main-is: ArgReferenceForkMain.hs
+  main-is: CodelessImportForkMain.hs
   other-modules:
-      ArgReferenceForkSpec
       CodelessImportForkSpec
   hs-source-dirs:
       ../solid-vm/fork-test

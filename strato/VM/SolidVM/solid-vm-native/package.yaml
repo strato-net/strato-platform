@@ -129,10 +129,10 @@ tests:
       - text
       - vm-tools
 
-  arg-reference-fork-check:
+  codeless-import-fork-check:
     source-dirs: [../solid-vm/fork-test, ../solid-vm/tests]
-    main: ArgReferenceForkMain.hs
-    other-modules: [ArgReferenceForkSpec, CodelessImportForkSpec]
+    main: CodelessImportForkMain.hs
+    other-modules: [CodelessImportForkSpec]
     ghc-options: -O2 -threaded -rtsopts
     dependencies:
       - blockapps-data

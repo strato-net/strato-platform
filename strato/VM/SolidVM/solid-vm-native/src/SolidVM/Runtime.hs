@@ -13,12 +13,11 @@ import qualified Data.ByteString as B
 import qualified Control.Monad.Change.Modify as Mod
 import {-# SOURCE #-} qualified SolidVM.Blockchain as Blockchain
 import qualified Blockchain.SolidVM.Builtins.Events.Metered as Events
-import Blockchain.SolidVM.CodeCollectionDB (ParseOptions (..), importTargets, importTargetsUnchanged)
+import Blockchain.SolidVM.CodeCollectionDB (ParseOptions (..))
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM hiding (action, getCodeAndCollection)
 import Blockchain.Strato.Model.Address (Address)
-import Blockchain.Strato.Model.CodePtr (CodePtr)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Control.Lens ((^.))
 import Control.Monad
@@ -32,6 +31,7 @@ import qualified Data.Vector as V
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.Value
 import System.IO.Unsafe (unsafePerformIO)
+import System.Mem.StableName (StableName, makeStableName)
 import UnliftIO (bracket, catch, liftIO, onException, throwIO)
 import SolidVM.Values
 import SolidVM.Storage (forceValue, getVar, setVar)
@@ -43,12 +43,12 @@ getCodeAndCollection :: Address -> SM (CC.Contract, Keccak256, CC.CodeCollection
 getCodeAndCollection = getCodeAndCollectionWithTypeCheck False
 
 {-# NOINLINE compilationCache #-}
-compilationCache :: IORef (LRU.LRU (Keccak256, Bool, T.Text) ([(Address, Maybe CodePtr)], Either SolidException N.CompiledContract))
+compilationCache :: IORef (LRU.LRU (Keccak256, Bool, T.Text) (StableName CC.CodeCollection, Either SolidException N.CompiledContract))
 compilationCache = unsafePerformIO $ newIORef $ LRU.newLRU (Just 128)
 
 -- Admit the whole contract before executing any entry. Cache failures as well.
--- An entry records what the collection's imports held when it was compiled and
--- is used only while they hold the same, as the collection's own cache does.
+-- An entry is used only for the collection it was compiled from: once the
+-- collection is recompiled, for a changed import say, so is the contract.
 compiledContract :: Keccak256 -> CC.CodeCollection -> CC.Contract -> SM N.CompiledContract
 compiledContract hsh cc contract = do
   opts <- parseOptionsForCurrentBlock
@@ -63,17 +63,14 @@ compiledContract hsh cc contract = do
             else if any ((== N.Unsupported) . N.eKind . snd) errors then UnsupportedFeature context details
             else TypeError context details
   cached <- liftIO $ atomicModifyIORef' compilationCache $ LRU.lookup key
-  current <- case cached of
-    Just (targets, value) -> (\unchanged -> if unchanged then Just value else Nothing) <$> importTargetsUnchanged opts targets
-    Nothing -> pure Nothing
-  result <- case current of
-    Just value -> pure value
-    Nothing -> do
-      targets <- importTargets opts hsh
+  collection <- liftIO $ makeStableName $! cc
+  result <- case cached of
+    Just (compiledFrom, value) | compiledFrom == collection -> pure value
+    _ -> do
       let value = if any duplicateArities (M.elems (contract ^. CC.functions))
             then Left $ InvalidArguments context "overloads with the same arity"
             else either (Left . compilationFailure) Right (N.compileContractChecked cc contract)
-      liftIO $ atomicModifyIORef' compilationCache $ \cache -> (LRU.insert key (targets, value) cache, ())
+      liftIO $ atomicModifyIORef' compilationCache $ \cache -> (LRU.insert key (collection, value) cache, ())
       pure value
   either throwIO pure result
 
