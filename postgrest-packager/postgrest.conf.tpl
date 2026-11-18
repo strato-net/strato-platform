@@ -19,9 +19,9 @@ secret-is-base64 = false
 ## limit rows in response
 max-rows = ${POSTGREST_MAX_ROWS}
 
-## stored proc to exec immediately after auth
-# pre-request = "stored_proc_name"
+## runs inside every request's transaction and caps its statements at
+## POSTGREST_STATEMENT_TIMEOUT; doit.sh creates the function
+db-pre-request = "public.postgrest_pre_request"
 
 # allow aggregate queries
 db-aggregates-enabled = true
-statement_timeout = 5

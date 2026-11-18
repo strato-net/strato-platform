@@ -1448,6 +1448,49 @@ genericBaseTableIndexesSQL = T.unlines
   , ""
   , "CREATE INDEX IF NOT EXISTS event_block_number_idx"
   , "  ON event ((block_number::numeric), event_index);"
+  , ""
+    -- Lookups by transaction hash and by an address in any of its roles
+    -- (sender, emitting contract, or the to/from/recipient/stratoRecipient
+    -- attribute). Without these each one scans the whole table; a crawler
+    -- fanning them out through the explorer filled the PostgREST pool and
+    -- took an RPC node down on 2026-11-01. The partial indexes skip the rows
+    -- without the attribute. The planner cannot use a partial index's
+    -- statistics for the 6-way OR the explorer sends, so the extended
+    -- statistics on the same expressions are what let it estimate that query
+    -- and pick the bitmap plan over a walk of event_timestamp_idx.
+  , "CREATE INDEX IF NOT EXISTS event_transaction_hash_idx"
+  , "  ON event (transaction_hash);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_transaction_sender_idx"
+  , "  ON event (transaction_sender);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_attr_to_idx"
+  , "  ON event ((attributes->>'to'))"
+  , "  WHERE (attributes->>'to') IS NOT NULL;"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_attr_from_idx"
+  , "  ON event ((attributes->>'from'))"
+  , "  WHERE (attributes->>'from') IS NOT NULL;"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_attr_recipient_idx"
+  , "  ON event ((attributes->>'recipient'))"
+  , "  WHERE (attributes->>'recipient') IS NOT NULL;"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_attr_strato_recipient_idx"
+  , "  ON event ((attributes->>'stratoRecipient'))"
+  , "  WHERE (attributes->>'stratoRecipient') IS NOT NULL;"
+  , ""
+  , "CREATE STATISTICS IF NOT EXISTS event_attr_to_stats"
+  , "  ON (attributes->>'to') FROM event;"
+  , ""
+  , "CREATE STATISTICS IF NOT EXISTS event_attr_from_stats"
+  , "  ON (attributes->>'from') FROM event;"
+  , ""
+  , "CREATE STATISTICS IF NOT EXISTS event_attr_recipient_stats"
+  , "  ON (attributes->>'recipient') FROM event;"
+  , ""
+  , "CREATE STATISTICS IF NOT EXISTS event_attr_strato_recipient_stats"
+  , "  ON (attributes->>'stratoRecipient') FROM event;"
   ]
 
 jsonbMergeDeepSQL :: Text

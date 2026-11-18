@@ -32,6 +32,22 @@ until psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_E
   sleep 1
 done
 
+# Per-request statement timeout. PostgREST calls this function inside every
+# request's transaction (db-pre-request in postgrest.conf), so the limit only
+# covers API queries, never slipstream's own sessions on the same role. A
+# query the client has already given up on (the ALB and nginx cut requests at
+# 60 s) is cancelled instead of running on and holding a pool connection.
+# 0 disables it. The database is created by strato on a fresh node, so wait
+# for it before installing the function.
+until psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" -d "${PG_ENV_POSTGRES_DB}" -c '\q' 2>/dev/null; do
+  >&2 echo "Database ${PG_ENV_POSTGRES_DB} is unavailable - sleeping"
+  sleep 1
+done
+psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" -d "${PG_ENV_POSTGRES_DB}" -v ON_ERROR_STOP=1 -q <<SQL
+CREATE OR REPLACE FUNCTION public.postgrest_pre_request() RETURNS void
+  LANGUAGE sql AS \$\$ SELECT set_config('statement_timeout', '${POSTGREST_STATEMENT_TIMEOUT:-60s}', true) \$\$;
+SQL
+
 render_template() {
   eval "echo \"$(sed 's/\"/\\"/g' $1)\""
 }
