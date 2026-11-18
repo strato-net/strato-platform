@@ -314,13 +314,23 @@ instance FromJSON NetworkConf where
       <*> v .:? "blockPeriodMs" .!= 1000
       <*> v .:? "roundPeriodS" .!= 3600
       <*> v .:? "maxTimestampDriftS" .!= defaultMaxTimestampDriftS
-      <*> v .:? "stakingActivationBlock" .!= defaultStakingActivationBlock net
+      <*> (fixedHeight net (defaultStakingActivationBlock net) <$> v .:? "stakingActivationBlock" .!= defaultStakingActivationBlock net)
       <*> v .:? "stakingContractAddress" .!= defaultStakingContractAddress net
-      <*> v .:? "stakingEventsFromGovernanceBlock" .!= defaultStakingEventsFromGovernanceBlock net
+      <*> (fixedHeight net (defaultStakingEventsFromGovernanceBlock net) <$> v .:? "stakingEventsFromGovernanceBlock" .!= defaultStakingEventsFromGovernanceBlock net)
+
+-- | The staking heights of upquark and helium are the network's, not a node's:
+-- a node that kept an earlier height in its ethconf.yaml would switch rules at
+-- a different block from the rest. On those networks the height in the file is
+-- ignored and the one defined here is used.
+fixedHeight :: String -> Maybe Integer -> Maybe Integer -> Maybe Integer
+fixedHeight net height configured
+  | net == "upquark" || take 6 net == "helium" = height
+  | otherwise = configured
 
 -- | Sentinel meaning "staking activation has not been scheduled yet" — used as
 -- the default for networks that already exist so that a node upgrade never
--- switches consensus rules on its own. Set an explicit height in ethconf.yaml.
+-- switches consensus rules on its own. Set an explicit height in ethconf.yaml
+-- (upquark and helium take theirs from here instead, see 'fixedHeight').
 stakingNotScheduled :: Integer
 stakingNotScheduled = 2 ^ (62 :: Int)
 

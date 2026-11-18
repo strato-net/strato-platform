@@ -108,7 +108,7 @@ Most fork heights are defined in `strato/core/vm-tools/src/Blockchain/Forks.hs`.
 | Block-reward event included in the block's first receipt | 300,000 | 1,010,000 | Staking activation height |
 | SolidVM Solidity operator precedence | Not scheduled | Not scheduled | Genesis |
 
-Staking activation is set per network in `ethconf.yaml` (`networkConfig`), with these defaults:
+Staking activation is set per network in `ethconf.yaml` (`networkConfig`), with these defaults. On `upquark` and `helium` the heights are fixed in code and the values in `ethconf.yaml` are ignored:
 
 | Setting | `helium` | `upquark` | `lithium` | New networks |
 |---|---|---|---|---|
