@@ -31,6 +31,7 @@ import qualified Data.Vector as V
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.Value
 import System.IO.Unsafe (unsafePerformIO)
+import System.Mem.StableName (StableName, makeStableName)
 import UnliftIO (bracket, catch, liftIO, onException, throwIO)
 import SolidVM.Values
 import SolidVM.Storage (forceValue, getVar, setVar)
@@ -42,10 +43,12 @@ getCodeAndCollection :: Address -> SM (CC.Contract, Keccak256, CC.CodeCollection
 getCodeAndCollection = getCodeAndCollectionWithTypeCheck False
 
 {-# NOINLINE compilationCache #-}
-compilationCache :: IORef (LRU.LRU (Keccak256, Bool, T.Text) (Either SolidException N.CompiledContract))
+compilationCache :: IORef (LRU.LRU (Keccak256, Bool, T.Text) (StableName CC.CodeCollection, Either SolidException N.CompiledContract))
 compilationCache = unsafePerformIO $ newIORef $ LRU.newLRU (Just 128)
 
 -- Admit the whole contract before executing any entry. Cache failures as well.
+-- An entry is used only for the collection it was compiled from: once the
+-- collection is recompiled, for a changed import say, so is the contract.
 compiledContract :: Keccak256 -> CC.CodeCollection -> CC.Contract -> SM N.CompiledContract
 compiledContract hsh cc contract = do
   opts <- parseOptionsForCurrentBlock
@@ -59,15 +62,15 @@ compiledContract hsh cc contract = do
          in if any ((== N.Internal) . N.eKind . snd) errors then InternalError (context ++ ": " ++ details)
             else if any ((== N.Unsupported) . N.eKind . snd) errors then UnsupportedFeature context details
             else TypeError context details
-  cached <- liftIO $ atomicModifyIORef' compilationCache $ \cache ->
-    let (cache', found) = LRU.lookup key cache in (cache', found)
+  cached <- liftIO $ atomicModifyIORef' compilationCache $ LRU.lookup key
+  collection <- liftIO $ makeStableName $! cc
   result <- case cached of
-    Just value -> pure value
-    Nothing -> do
+    Just (compiledFrom, value) | compiledFrom == collection -> pure value
+    _ -> do
       let value = if any duplicateArities (M.elems (contract ^. CC.functions))
             then Left $ InvalidArguments context "overloads with the same arity"
             else either (Left . compilationFailure) Right (N.compileContractChecked cc contract)
-      liftIO $ atomicModifyIORef' compilationCache $ \cache -> (LRU.insert key value cache, ())
+      liftIO $ atomicModifyIORef' compilationCache $ \cache -> (LRU.insert key (collection, value) cache, ())
       pure value
   either throwIO pure result
 

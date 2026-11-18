@@ -180,7 +180,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress p
     Just TFBlockGasLimitExceeded {} -> Left (GasLimitReached ranTxs unranTxs newStateRoot newGas)
     Just f@TFInsufficientFunds {} -> recoverable f
     Just f@TFIntrinsicGasExceedsTxLimit {} -> recoverable f
-    Just f@TFNonceMismatch {} -> error $ "mineTransactions' we messed up: " ++ format f
+    Just f@TFNonceMismatch {} -> recoverable f
     Just f@TFTXSizeLimitExceeded {} -> recoverable f
     Just f@TFIncorrectChainId {} -> recoverable f
     Just f@TFInvalidEnvelope {} -> recoverable f

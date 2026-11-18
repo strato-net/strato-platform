@@ -256,6 +256,7 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
 
     opts <- parseOptionsForCurrentBlock
     (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 initCode
+    rejectCodelessImports opts $ DT.encodeUtf8 initCode
     addNewCodeCollection hsh cc
     let eArgExps = traverse (Fast.parseArg initialParserState "") argsStrings
         !argExps = either ((throw . ParseError "create arguments") . show) id eArgExps
@@ -506,6 +507,24 @@ call' from to' fnCalltype functionName valList = do
         | shouldResolve = resolveArgRefs from contract cc (CC._funcArgs theFunction) args
         | otherwise     = pure args
 
+      -- A delegatecall shares the caller's storage, so array, struct and
+      -- mapping references stay live. A value-typed reference is read now.
+      isReferenceType = \case
+        SVMType.Array {} -> True
+        SVMType.Mapping {} -> True
+        SVMType.Struct {} -> True
+        SVMType.Variadic -> True
+        SVMType.UnknownLabel s -> isJust $ (M.lookup s $ contract ^. CC.structs) <|> (M.lookup s $ cc ^. CC.flStructs)
+        _ -> False
+      resolveDelegateArgs theFunction args = argReferenceForkActive >>= \case
+        False -> pure args
+        True ->
+          let go ((_, CC.IndexedType _ t _) : ts') (v@(SReference _) : vs')
+                | not (isReferenceType t) = (:) <$> resolveArgRef from contract cc t v <*> go ts' vs'
+              go (_ : ts') (v : vs') = (v :) <$> go ts' vs'
+              go _ vs' = pure vs'
+           in go (CC._funcArgs theFunction) args
+
   let isConstructorName n = T.strip (T.takeWhile (/= '(') (labelToText n)) == "<constructor>"
   when (any isConstructorName [functionName, functionName']) $
     throw (UnknownFunction "constructor cannot be called on a deployed contract" (format (functionName, map renderValueShallow valList)))
@@ -527,7 +546,10 @@ call' from to' fnCalltype functionName valList = do
           throw (UnknownFunction "logFunctionCall" (labelToString functionName)) -- contract ^. CC.contractName)
         validateFunctionArguments cc contract theFunction valList >>= \case
           Just (theFunction', valList') -> do
-            resolvedValList <- resolveArgs shouldPushSender theFunction' valList'
+            resolvedValList <-
+              if fnCalltype == CC.DelegateCall
+                then resolveDelegateArgs theFunction' valList'
+                else resolveArgs shouldPushSender theFunction' valList'
             let validation =
                   if fnCalltype == CC.DelegateCall && not shouldPushSender
                     then validatedCallMode theFunction valList'
@@ -2702,6 +2724,9 @@ resolveArgRef src contract cc argType arg = case arg of
                _ -> argType
      in SMap <$> traverse (fmap Constant . resolveArgRef src contract cc t' <=< weakGetVar) m
   SStruct n vs -> SStruct n <$> traverse (fmap Constant . resolveArgRef src contract cc argType <=< weakGetVar) vs
+  SVariadic vs -> argReferenceForkActive >>= \case
+    True -> SVariadic <$> traverse (resolveArgRef src contract cc argType) vs
+    False -> pure arg
   _ -> pure arg
 
 resolveArgRefs ::

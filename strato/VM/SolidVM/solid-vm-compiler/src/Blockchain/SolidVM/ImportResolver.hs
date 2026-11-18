@@ -180,6 +180,8 @@ resolveFile getCCFromHash getNamedSUnits expr (seen, resolved) =
           Nothing -> pure (seen, resolved)
           Just AddressState {..} ->
             case addressStateCodeHash of
+              -- A destroyed contract has no code left to import.
+              SolidVMCode _ ch | ch == unsafeCreateKeccak256FromWord256 0 -> pure (seen, resolved)
               SolidVMCode _ ch -> do
                 rfu <- lift $ codeCollectionToFileUnits (Just addr) <$> getCCFromHash ch
                 pure (seen, M.insert (tShowExpr expr) (Right rfu) resolved)

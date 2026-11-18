@@ -46,5 +46,6 @@ compileSourceForCreation typeCheck source = do
   isRunningTests <- Env.runningTests <$> getEnv
   opts <- parseOptionsForCurrentBlock
   pair@(hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests typeCheck (DT.encodeUtf8 $ T.pack source)
+  rejectCodelessImports opts (DT.encodeUtf8 $ T.pack source)
   addNewCodeCollection hsh cc
   pure pair

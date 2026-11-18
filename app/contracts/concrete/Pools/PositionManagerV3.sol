@@ -317,8 +317,10 @@ contract record PositionManagerV3 is ERC721, Ownable {
             _accrueFees(position, inside0, inside1);
         }
 
-        uint amount0Collect = position.tokensOwed0 < amount0Max ? position.tokensOwed0 : amount0Max;
-        uint amount1Collect = position.tokensOwed1 < amount1Max ? position.tokensOwed1 : amount1Max;
+        //SOLIDVM_COMPATIBILITY: a maximum can arrive as a storage reference instead of a
+        // value; the addition takes its value here
+        uint amount0Collect = position.tokensOwed0 < amount0Max ? position.tokensOwed0 : amount0Max + 0;
+        uint amount1Collect = position.tokensOwed1 < amount1Max ? position.tokensOwed1 : amount1Max + 0;
 
         (amount0, amount1) =
             poolContract.collect(recipient, position.tickLower, position.tickUpper, amount0Collect, amount1Collect);
@@ -413,7 +415,10 @@ contract record PositionManagerV3 is ERC721, Ownable {
         if (delta1 > 0) {
             position.tokensOwed1 += FullMath.mulDiv(uint(delta1), position.liquidity, FixedPoint128.Q128);
         }
-        position.feeGrowthInside0LastX128 = inside0;
-        position.feeGrowthInside1LastX128 = inside1;
+        //SOLIDVM_COMPATIBILITY: a zero snapshot read from the pool arrives as a storage
+        // reference, and assigning a reference writes nothing, leaving the old snapshot in
+        // place to be credited again; the addition stores the value
+        position.feeGrowthInside0LastX128 = inside0 + 0;
+        position.feeGrowthInside1LastX128 = inside1 + 0;
     }
 }

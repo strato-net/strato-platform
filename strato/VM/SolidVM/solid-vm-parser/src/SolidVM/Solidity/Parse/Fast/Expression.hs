@@ -313,7 +313,11 @@ hexLiteral :: P Expression
 hexLiteral = do
   (a, digits) <- withPosition $ do
     reserved "hex"
-    digits <- T.unpack . T.init . T.tail . tText <$> peek
+    t <- peek
+    digits <-
+      if tKind t == TString
+        then pure . T.unpack . T.init . T.tail $ tText t
+        else failWith "a hex literal is a quoted string"
     hexDigits digits
     digits <$ skip
   pure (HexaLiteral a (stringToLabel digits))
