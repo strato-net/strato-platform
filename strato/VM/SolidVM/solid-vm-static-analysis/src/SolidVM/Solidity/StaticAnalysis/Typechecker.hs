@@ -441,7 +441,7 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames functionAr
                 Product (t1,t2,ts) _ -> (t1:t2:ts)
                 _ -> [args]
               zipped = M.fromList $ zip a pTypes
-              missing = bottom $ "Argument name does not exist" <$ productContext args
+              missing = bottom $ "Argument name does not exist" <$ context' args
               newOrder =
                 map
                   ( \case
@@ -451,7 +451,7 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames functionAr
                         Just y -> y
                   )
                   funcArgNames
-           in toType (productContext args) newOrder
+           in toType (context' args) newOrder
   p <- case argNames of
     Nothing -> typecheck funcArgTypes args
     _ -> typecheck funcArgTypes reorderedArgs
