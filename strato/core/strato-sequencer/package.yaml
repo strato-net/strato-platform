@@ -119,6 +119,7 @@ tests:
       - blockapps-data
       - blockapps-datadefs
       - blockDB
+      - blockstanbul
       - bytestring
       - common-log
       - conduit
