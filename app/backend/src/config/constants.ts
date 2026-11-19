@@ -48,6 +48,7 @@ export const constants = (() => {
   const MetalForge = `${CONTRACT_PREFIX}MetalForge`;
   const SafetyModule = `${CONTRACT_PREFIX}SafetyModule`;
   const DirectMintPSM = `${CONTRACT_PREFIX}DirectMintPSM`;
+  const VestingPool = `${CONTRACT_PREFIX}VestingPool`;
   const Event = "event";
     
   const tokenSelectFields = [
@@ -169,6 +170,7 @@ export const constants = (() => {
     MetalForge,
     SafetyModule,
     DirectMintPSM,
+    VestingPool,
     get directMintPsm() { return config.directMintPsm; },
     get metalForge() { return config.metalForge; },
     get saveUsdstVault() { return config.saveUsdstVault; },

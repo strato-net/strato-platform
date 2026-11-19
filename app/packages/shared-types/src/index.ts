@@ -33,3 +33,6 @@ export * from './nft-types';
 
 // Export the network fee quote
 export * from './fee-types';
+
+// Export the vesting grant views
+export * from './vesting-types';

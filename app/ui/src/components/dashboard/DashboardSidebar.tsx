@@ -18,9 +18,11 @@ import {
   HandCoins,
   Layers,
   ArrowDownToLine,
-  Compass
+  Compass,
+  Hourglass
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
+import { useVestings } from '@/hooks/useVestings';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
 
@@ -30,6 +32,7 @@ interface NavItem {
   path: string;
   adminOnly?: boolean;
   badge?: string;
+  visible?: boolean;
 }
 
 interface NavCategory {
@@ -60,6 +63,7 @@ const NAV_CATEGORIES: NavCategory[] = [
       { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
       { icon: Layers, label: 'Stake', path: '/dashboard/earn-staking' },
       { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
+      { icon: Hourglass, label: 'Vesting', path: '/dashboard/vesting' },
     ],
   },
   {
@@ -74,8 +78,13 @@ const NAV_CATEGORIES: NavCategory[] = [
   },
 ];
 
+// The nav list is a module constant, so the per-identity Vesting visibility is resolved in the component.
+const withVisibility = (item: NavItem, hasVesting: boolean): NavItem =>
+  item.path === '/dashboard/vesting' ? { ...item, visible: hasVesting } : item;
+
 const DashboardSidebar = () => {
   const { isAdmin } = useUser();
+  const { hasVesting } = useVestings();
   const { pathname } = useLocation();
   const { resolvedTheme } = useTheme();
 
@@ -134,7 +143,9 @@ const DashboardSidebar = () => {
 
       <nav className="flex-1 py-4 px-3 overflow-y-auto">
         {NAV_CATEGORIES.map((category, idx) => {
-          const visibleItems = category.items.filter(item => !item.adminOnly || isAdmin);
+          const visibleItems = category.items
+            .map(item => withVisibility(item, hasVesting))
+            .filter(item => (!item.adminOnly || isAdmin) && item.visible !== false);
           if (visibleItems.length === 0) return null;
           return (
             <div key={idx} className={idx > 0 ? 'mt-4' : ''}>
