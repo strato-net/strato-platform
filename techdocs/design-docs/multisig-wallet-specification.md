@@ -174,6 +174,10 @@ timelock. A signer who withdrew may approve again. This lets one approver stop a
 approved in error, at the cost that any single approver can delay a queued issue by one
 timelock per withdrawal.
 
+If the withdrawal comes after that original deadline has already passed, which can happen
+when a long timelock carries the issue beyond 30 days from its creation, the issue does not
+return to collecting approvals: it is expired at once and must be proposed again.
+
 Queued issues can also be cancelled by a normal M-of-N issue whose execution bypasses the
 transaction timelock. Upgrade cancellation and nomination revocation use the same
 immediate-on-quorum rule.

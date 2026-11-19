@@ -21,7 +21,7 @@ import {
 import { functionArgs } from "./contracts";
 import { getMultisigConfigError, loadBackendConfig, runtime } from "@/lib/env";
 import { parseUnsignedArgument, validateUnsignedTx } from "@/lib/walletTx";
-import { deriveCanonicalUserAddress } from "./userWallets";
+import { ADMIN_REGISTRY_ADDRESS, deriveCanonicalUserAddress } from "./userWallets";
 
 const wallet = "efa890674cad5e3a7640bb720c2a70bf3ae76709";
 const signer = "fdb36b791a35ba52798bbc46ab066587cb60e032";
@@ -102,22 +102,14 @@ test("external wallets sign only the transaction they requested", () => {
     method: "revokeIssueApproval",
     args: { _issueId: { type: "string", value: "abc123" } },
   }, 123, undefined, ["_issueId"]));
-  assert.doesNotThrow(() => validateUnsignedTx({
-    ...unsigned,
-    data: {
-      ...unsigned.data,
-      to: spender,
-      functionName: "callContract",
-      args: [`"${wallet}"`, '"transfer"', `["${signer}",42]`],
-    },
-  }, "FUNCTION", payload, 123, spender));
+  // Two arguments grouped into one list would reach the target as a single argument.
   assert.throws(() => validateUnsignedTx({
     ...unsigned,
     data: {
       ...unsigned.data,
       to: spender,
       functionName: "callContract",
-      args: [`"${wallet}"`, '"transfer"', `["${signer}",42,43]`],
+      args: [`"${wallet}"`, '"transfer"', `["${signer}",42]`],
     },
   }, "FUNCTION", payload, 123, spender), /could not be verified/);
   assert.doesNotThrow(() => validateUnsignedTx({
@@ -152,6 +144,41 @@ test("external wallets sign only the transaction they requested", () => {
     () => validateUnsignedTx(unsigned, "FUNCTION", payload, 456),
     /different network/
   );
+
+  const wrapped = { ...unsigned.data, to: spender, functionName: "callContract" };
+  const wrappedArgs = [`"${wallet}"`, '"transfer"', `"${signer}"`, "42"];
+  assert.doesNotThrow(() => validateUnsignedTx(
+    { ...unsigned, data: { ...wrapped, args: wrappedArgs } }, "FUNCTION", payload, 123, spender
+  ));
+  // The wrapper must be the User wallet's own callContract, not the inner function name.
+  assert.throws(() => validateUnsignedTx(
+    { ...unsigned, data: { ...wrapped, functionName: "transfer", args: wrappedArgs } }, "FUNCTION", payload, 123, spender
+  ), /could not be verified/);
+
+  const vote = { ...unsigned.data, functionName: "castVoteOnIssue", args: [`"${spender}"`, '"callContract"', ...wrappedArgs] };
+  assert.doesNotThrow(() => validateUnsignedTx(
+    { ...unsigned, data: { ...vote, to: ADMIN_REGISTRY_ADDRESS } }, "FUNCTION", payload, 123, spender
+  ));
+  // A vote sent anywhere but the AdminRegistry is refused.
+  assert.throws(() => validateUnsignedTx(
+    { ...unsigned, data: { ...vote, to: signer } }, "FUNCTION", payload, 123, spender
+  ), /could not be verified/);
+
+  // Nested lists keep their grouping: the same numbers regrouped are a different call.
+  const lists = {
+    contractAddress: wallet,
+    method: "setGroups",
+    args: { groups: [[1, 2], [3]] },
+  };
+  const listTx = (args: string[], data = unsigned.data) => ({ ...unsigned, data: { ...data, functionName: "setGroups", args } });
+  assert.doesNotThrow(() => validateUnsignedTx(listTx(["[[1,2],[3]]"]), "FUNCTION", lists, 123));
+  assert.throws(() => validateUnsignedTx(listTx(["[[1],[2,3]]"]), "FUNCTION", lists, 123), /could not be verified/);
+  assert.doesNotThrow(() => validateUnsignedTx(
+    { ...unsigned, data: { ...wrapped, args: [`"${wallet}"`, '"setGroups"', "[[1,2],[3]]"] } }, "FUNCTION", lists, 123, spender
+  ));
+  assert.throws(() => validateUnsignedTx(
+    { ...unsigned, data: { ...wrapped, args: [`"${wallet}"`, '"setGroups"', "[[1],[2,3]]"] } }, "FUNCTION", lists, 123, spender
+  ), /could not be verified/);
 });
 
 test("dedicated issue review flags unlimited approvals", () => {

@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 import { parseArgText } from "@/lib/args";
 import { env, runtime } from "@/lib/env";
 import {
+  ADMIN_REGISTRY_ADDRESS,
   deriveCanonicalUserAddress,
   fetchUserRegistryCodeHash,
   strip0x,
@@ -174,17 +175,9 @@ const requestedArguments = (
   );
 };
 
-const flattened = (values: unknown[]): unknown[] =>
-  values.flatMap((value) => Array.isArray(value) ? flattened(value) : [value]);
-
-const sameSequence = (values: unknown[], expected: unknown[]): boolean => {
-  const actual = flattened(values);
-  const wanted = flattened(expected);
-  return actual.length === wanted.length &&
-    wanted.every((value, index) =>
-      JSON.stringify(normalizedValue(actual[index])) === JSON.stringify(normalizedValue(value))
-    );
-};
+/** Exact comparison: nested arrays keep their grouping, so regrouped values never match. */
+const sameValues = (values: unknown[], expected: unknown[]): boolean =>
+  JSON.stringify(normalizedValue(values)) === JSON.stringify(normalizedValue(expected));
 
 /** Refuse to sign when bloc's unsigned transaction does not represent the requested action. */
 export function validateUnsignedTx(
@@ -212,23 +205,23 @@ export function validateUnsignedTx(
   const direct = type === "FUNCTION" &&
     strip0x(d.to) === expectedTarget &&
     (d.functionName ?? "") === expectedFunction &&
-    sameSequence(returnedArguments, expectedArguments);
+    sameValues(returnedArguments, expectedArguments);
   if (direct) return;
 
   const wallet = strip0x(userWalletAddress ?? "");
   if (!wallet) throw new Error("This transaction could not be verified, so it was not signed.");
+  const wrapper = type === "FUNCTION" ? "callContract" : "createContract";
+  // The node spreads the inner call's arguments after its target and function name.
   const requestedCall = type === "FUNCTION"
     ? [expectedTarget, expectedFunction, ...expectedArguments]
-    : [
-        String(payload.contract ?? ""),
-        String(payload.src ?? ""),
-        ...expectedArguments,
-      ];
+    : [String(payload.contract ?? ""), String(payload.src ?? ""), ...expectedArguments];
   const wrappedDirect = strip0x(d.to) === wallet &&
-    (d.functionName === expectedFunction || d.functionName === "callContract" || d.functionName === "createContract") &&
-    sameSequence(returnedArguments, requestedCall);
-  const wrappedVote = d.functionName === "castVoteOnIssue" &&
-    sameSequence(returnedArguments, [wallet, type === "FUNCTION" ? "callContract" : "createContract", ...requestedCall]);
+    d.functionName === wrapper &&
+    sameValues(returnedArguments, requestedCall);
+  // A User wallet owned by the AdminRegistry is called through a vote on that registry.
+  const wrappedVote = strip0x(d.to) === ADMIN_REGISTRY_ADDRESS &&
+    d.functionName === "castVoteOnIssue" &&
+    sameValues(returnedArguments, [wallet, wrapper, ...requestedCall]);
   if (!wrappedDirect && !wrappedVote) {
     throw new Error("This transaction could not be verified, so it was not signed.");
   }

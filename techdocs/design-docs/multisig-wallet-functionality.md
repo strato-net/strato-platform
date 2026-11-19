@@ -58,7 +58,7 @@ signer changes, upgrades.
 | Not enough approvals within 30 days | The proposal expires |
 | Not executed within 7 days of becoming executable | The proposal expires |
 | A signer changes their mind before `M` is reached | They can withdraw their approval |
-| An approver changes their mind during the waiting period | They can withdraw their approval. The waiting period ends and the proposal goes back to collecting approvals; reaching `M` again starts a fresh, full waiting period |
+| An approver changes their mind during the waiting period | They can withdraw their approval. The waiting period ends and the proposal goes back to collecting approvals; reaching `M` again starts a fresh, full waiting period. If more than 30 days have passed since the proposal was created, it expires instead and must be proposed again |
 | The proposer wants to drop it | Allowed only while no other signer has approved |
 | Signers want to stop a proposal already in its waiting period | A "cancel" proposal, which runs as soon as it reaches `M` approvals, with no waiting period |
 | The action fails when executed | The whole transaction is undone; the proposal can be retried until it expires |
