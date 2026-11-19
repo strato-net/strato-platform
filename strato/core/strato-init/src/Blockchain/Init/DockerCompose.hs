@@ -321,6 +321,11 @@ generateDockerCompose role = do
             -- Extra set_real_ip_from CIDRs, taken from the host environment
             -- at compose up; empty by default.
             , ("NGINX_TRUST_PROXY_CIDRS", "${NGINX_TRUST_PROXY_CIDRS:-}")
+            -- Rate limits of /rpc in requests per second, taken the same
+            -- way: per client address (25 when empty) and for all clients
+            -- together (200 when empty).
+            , ("RPC_RATE_LIMIT_PER_IP", "${RPC_RATE_LIMIT_PER_IP:-}")
+            , ("RPC_RATE_LIMIT_TOTAL", "${RPC_RATE_LIMIT_TOTAL:-}")
             ]
             -- The node processes answer by service name, not on the host.
             ++ containerOnly [("API_UPSTREAM_HOST", "strato")]
