@@ -4,6 +4,8 @@ import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { api } from "@/lib/api";
 import { formatVariadicArg, parseJsonExact, typedVariadicArg, variadicArgValue } from "@/lib/args";
 import { env, runtime } from "@/lib/env";
+import { fetchFunctionByAddress } from "@/services/contracts";
+import { simulateStratoTx } from "@/services/simulation";
 import {
   ADMIN_REGISTRY_ADDRESS,
   ZERO_ADDRESS,
@@ -971,6 +973,35 @@ export function buildDedicatedProtocolWorkflow(
     ),
     buildDedicatedProtocolCall(action, input, nowSeconds),
   ];
+}
+
+/**
+ * Dry-run a call as if the multisig wallet made it, so the target contract itself says
+ * whether it would succeed. Resolves to the contract's refusal, or "" when it would run.
+ */
+export function useDedicatedCallCheck(walletAddress: string, call: DedicatedCall | null) {
+  return useQuery({
+    queryKey: ["dedicated-multisig-call-check", walletAddress, call?.target, call?.functionName, JSON.stringify(call?.arguments)],
+    enabled: !!call,
+    staleTime: 15_000,
+    retry: false,
+    queryFn: async (): Promise<string> => {
+      const declared = await fetchFunctionByAddress(call!.target, call!.functionName);
+      if (!declared.found || declared.args.length !== call!.arguments.length) {
+        throw new Error("The target function could not be resolved");
+      }
+      const result = await simulateStratoTx("FUNCTION", {
+        contractAddress: strip0x(call!.target),
+        method: call!.functionName,
+        args: Object.fromEntries(declared.args.map((argument, index) => [argument.name, call!.arguments[index]])),
+        value: 0,
+        metadata: {},
+      }, { address: walletAddress, trace: false });
+      return result.status === "Success"
+        ? ""
+        : String(result.error || "The contract refused it").replace(/^solidity require failed:\s*/i, "");
+    },
+  });
 }
 
 export function useDedicatedMultisigActions(walletAddress?: string) {

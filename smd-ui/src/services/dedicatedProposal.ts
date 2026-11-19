@@ -130,6 +130,21 @@ export function knownAddressName(
   return metadata.pools.find((pool) => strip0x(pool.address) === address)?.poolName || undefined;
 }
 
+/** The coins a stable-pool deposit supplies, e.g. "1 USDST, 2 USDC". */
+const stableAmounts = (raw: string | undefined, pool: PoolMetadata): string | undefined => {
+  try {
+    const amounts: unknown = JSON.parse(raw ?? "");
+    if (!Array.isArray(amounts) || !pool.coins?.length) return undefined;
+    const supplied = pool.coins
+      .map((coin, index) => ({ coin, amount: String(amounts[index] ?? "0") }))
+      .filter(({ amount }) => amount !== "0")
+      .map(({ coin, amount }) => `${formatAmount(amount, undefined, coin.customDecimals)} ${coin._symbol}`);
+    return supplied.length ? supplied.join(", ") : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 const formatAmount = (value: string, token?: TokenMetadata, defaultDecimals?: number) => {
   try {
     const decimals = token?.decimals ?? defaultDecimals;
@@ -222,6 +237,11 @@ export function describeProposal(
   if (pool && (proposal.functionName === "addLiquidity" || proposal.functionName === "addLiquidityGeneral")) {
     return {
       headline: `Add liquidity to ${pool.poolName || short(proposal.target)}`,
+      detail: proposal.functionName === "addLiquidity" && proposal.arguments.length >= 2
+        ? `${formatAmount(proposal.arguments[0], undefined, pool.tokenB.customDecimals)} ${pool.tokenB._symbol} with up to ${
+            formatAmount(proposal.arguments[1], undefined, pool.tokenA.customDecimals)
+          } ${pool.tokenA._symbol}`
+        : stableAmounts(proposal.arguments[0], pool),
       addresses: proposal.functionName === "addLiquidityGeneral" && proposal.arguments[2]
         ? [address("Receiver", proposal.arguments[2])]
         : [],

@@ -23,7 +23,10 @@ import { CopyableAddress } from "@/components/CopyButton";
 import { shortenHex } from "@/lib/utils";
 import { describeProposal, type ProposalMetadata } from "@/services/dedicatedProposal";
 import {
+  buildDedicatedProtocolCall,
   buildDedicatedProtocolWorkflow,
+  type DedicatedCall,
+  useDedicatedCallCheck,
   type DedicatedProtocolAction,
   type MultisigWalletSummary,
   useDedicatedHistory,
@@ -417,8 +420,9 @@ export function DedicatedProtocolActionsTab({
   );
   const selectedAsset = cdp.data?.assets.find((item) => item.asset === asset);
   const selectedValidator = staking.data?.validators.find((item) => item.address === validator);
+  // A coin left blank is a coin not supplied.
   const stableRawAmounts = stableAmounts.map((value, index) =>
-    toRawUnits(value, selectedPool?.coins?.[index]?.customDecimals ?? 18)
+    toRawUnits(value.trim() || "0", selectedPool?.coins?.[index]?.customDecimals ?? 18)
   );
   const selectedStableCoin = selectedPool?.coins?.[Number(coinIndex)];
   let callAmount = amount;
@@ -485,6 +489,16 @@ export function DedicatedProtocolActionsTab({
                 { token: selectedV3Pool?.token1.address ?? "", amount: callAmount2 },
               ].filter((item) => positiveInteger(item.amount))
             : [];
+  // The pool takes the paired token at its current ratio and refuses if that exceeds the maximum.
+  let requiredTokenA: bigint | null = null;
+  try {
+    const reserveB = BigInt(selectedPool?.tokenB.poolBalance ?? "0");
+    if (effectiveAction === "addLiquidity" && reserveB > 0n && positiveInteger(callAmount)) {
+      requiredTokenA = (BigInt(callAmount) * BigInt(selectedPool?.tokenA.poolBalance ?? "0")) / reserveB;
+    }
+  } catch {
+    requiredTokenA = null;
+  }
   const targetName = action === "stake" || action === "unstake" ? "Staking"
     : action === "cdpDeposit" || action === "cdpBorrow" ? "CDP engine"
       : action.startsWith("v3") ? "V3 position manager"
@@ -573,25 +587,38 @@ export function DedicatedProtocolActionsTab({
         !allowances.isSuccess)) throw new Error("Still checking token permissions");
   };
 
+  const protocolInput = {
+    target,
+    validator: selectedValidator?.address,
+    asset: selectedAsset?.asset,
+    amount: callAmount,
+    amount2: callAmount2,
+    amount3: callAmount3,
+    amounts: action.startsWith("v3") ? [callAmount4] : stableRawAmounts,
+    receiver: strip0x(wallet.address),
+    coinIndex,
+    pool: selectedV3Pool?.address,
+    tokenId,
+    tickLower,
+    tickUpper,
+    liquidity,
+  };
+  // The action itself, once the form is complete: dry-run as the multisig wallet so the
+  // target contract says whether it would succeed. Its permissions must be in place first.
+  let actionCall: DedicatedCall | null = null;
+  try {
+    validate();
+    actionCall = buildDedicatedProtocolCall(effectiveAction as DedicatedProtocolAction, protocolInput);
+  } catch {
+    actionCall = null;
+  }
+  const checkable = !!actionCall && (!approvalSpecs.length || (allowances.isSuccess && !missingApprovals.length));
+  const check = useDedicatedCallCheck(wallet.address, checkable ? actionCall : null);
+
   const propose = async () => {
     try {
       validate();
-      const workflow = buildDedicatedProtocolWorkflow(effectiveAction as DedicatedProtocolAction, {
-        target,
-        validator: selectedValidator?.address,
-        asset: selectedAsset?.asset,
-        amount: callAmount,
-        amount2: callAmount2,
-        amount3: callAmount3,
-        amounts: action.startsWith("v3") ? [callAmount4] : stableRawAmounts,
-        receiver: strip0x(wallet.address),
-        coinIndex,
-        pool: selectedV3Pool?.address,
-        tokenId,
-        tickLower,
-        tickUpper,
-        liquidity,
-      }, missingApprovals.map((item) => ({
+      const workflow = buildDedicatedProtocolWorkflow(effectiveAction as DedicatedProtocolAction, protocolInput, missingApprovals.map((item) => ({
         token: item.token,
         spender: approvalSpender,
         amount: item.amount,
@@ -712,10 +739,17 @@ export function DedicatedProtocolActionsTab({
         </>
       ) : null}
 
-      {effectiveAction === "addLiquidity" ? (
+      {effectiveAction === "addLiquidity" && selectedPool ? (
         <>
-          {amountField(`${selectedPool?.tokenB._symbol ?? "Token B"} amount`, amount, setAmount)}
-          {amountField(`Maximum ${selectedPool?.tokenA._symbol ?? "Token A"} amount`, amount2, setAmount2)}
+          {amountField(`${selectedPool.tokenB._symbol} amount`, amount, setAmount)}
+          {amountField(`Maximum ${selectedPool.tokenA._symbol} amount`, amount2, setAmount2)}
+          {requiredTokenA !== null ? (
+            <p className="text-xs text-muted-foreground">
+              At the current pool price this needs about{" "}
+              {humanBalance({ balance: requiredTokenA.toString(), decimals: selectedPool.tokenA.customDecimals } as TokenBalance)}{" "}
+              {selectedPool.tokenA._symbol}. Leave some room above it in case the price moves.
+            </p>
+          ) : null}
         </>
       ) : null}
       {effectiveAction === "removeLiquidity" ? (
@@ -845,6 +879,19 @@ export function DedicatedProtocolActionsTab({
               </div>
             </>
           ) : null}
+          <div className={`text-xs ${check.data ? "text-destructive" : "text-muted-foreground"}`}>
+            {!actionCall
+              ? "Complete the fields to check that this would succeed."
+              : !checkable
+                ? "It can be checked once its token permissions are approved."
+                : check.isLoading
+                  ? "Checking that this would succeed…"
+                  : check.isError
+                    ? "Could not check whether this would succeed."
+                    : check.data
+                      ? `This would fail right now: ${check.data}`
+                      : "Checked: this would succeed right now."}
+          </div>
         </div>
       ) : null}
       {(staking.isError || cdp.isError || pools.isError || (v3Action && v3.isError)) ? (

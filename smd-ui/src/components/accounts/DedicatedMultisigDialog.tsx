@@ -38,6 +38,7 @@ import {
   parseDedicatedTypedArguments,
   type DedicatedIssue,
   type MultisigWalletSummary,
+  useDedicatedCallCheck,
   useDedicatedFactoryState,
   WALLET_NOT_ACTIVE,
 } from "@/services/dedicatedMultisig";
@@ -217,6 +218,13 @@ function IssueActions({
     );
   };
   const blocked = (issue.executableAt === 0 && !approved) || statusIndex === 2;
+  // When this signer's next click would run it, ask the target contract whether it would succeed.
+  const check = useDedicatedCallCheck(wallet.address, (finalApproval || statusIndex === 2) && !disabled ? {
+    target: issue.target,
+    functionName: issue.functionName,
+    argumentTypes: issue.argumentTypes,
+    arguments: issue.arguments.map((value, index) => typedVariadicArg(issue.argumentTypes[index] ?? "", value)),
+  } : null);
 
   return (
     <div className="space-y-3 rounded-lg border p-4 text-sm">
@@ -312,6 +320,13 @@ function IssueActions({
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>This contract could not be checked</AlertTitle>
           <AlertDescription>Review the function, argument types and values carefully before approving.</AlertDescription>
+        </Alert>
+      ) : null}
+      {check.data ? (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>This would fail right now</AlertTitle>
+          <AlertDescription>The contract would refuse it: {check.data}</AlertDescription>
         </Alert>
       ) : null}
       {executesOnApproval ? (
