@@ -157,7 +157,9 @@ function IssueActions({
   const proposalWarning = describeProposalWarning(issue);
   const sideEffect = describeProposalSideEffect(issue, wallet.address);
   const customCall = description.custom === true;
-  const [detailsOpen, setDetailsOpen] = useState(customCall);
+  // Token names load after the first render, so the default follows the description until the signer toggles it.
+  const [detailsToggled, setDetailsToggled] = useState<boolean | null>(null);
+  const detailsOpen = detailsToggled ?? customCall;
   const { data: contractFunction, isLoading: functionLoading, isError: functionError } =
     useFunctionByAddress(issue.target, issue.functionName);
   const expectedAbiTypes = contractFunction?.args.map(
@@ -324,7 +326,9 @@ function IssueActions({
       <details
         className="rounded-md bg-muted/40 p-2"
         open={detailsOpen}
-        onToggle={(event) => setDetailsOpen(event.currentTarget.open)}
+        onToggle={(event) => {
+          if (event.currentTarget.open !== detailsOpen) setDetailsToggled(event.currentTarget.open);
+        }}
       >
         <summary className="cursor-pointer font-medium">Technical details</summary>
         <div className="mt-2 space-y-2">
@@ -652,7 +656,7 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
           </div>
           <div className="rounded-md bg-muted/50 p-2">
             <div className="text-xs text-muted-foreground">Waiting period</div>
-            <div className="font-medium">{formatWaitingPeriod(state.transactionTimelock)}</div>
+            <div className="font-medium capitalize">{formatWaitingPeriod(state.transactionTimelock)}</div>
           </div>
           <div className="rounded-md bg-muted/50 p-2">
             <div className="text-xs text-muted-foreground">Version</div>

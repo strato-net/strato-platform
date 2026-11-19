@@ -44,7 +44,7 @@ function MultisigWalletRow({ wallet }: { wallet: MultisigWalletSummary }) {
       <TableCell>
         <div className="flex flex-wrap items-center gap-x-2">
           <span className="font-medium">{wallet.label || "Unnamed multisig wallet"}</span>
-          <span className="inline-flex items-center gap-1.5 font-mono text-xs">
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-mono text-xs">
             <AddrLink address={wallet.address} />
             <CopyButton value={wallet.address} />
           </span>
