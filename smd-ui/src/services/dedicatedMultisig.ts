@@ -157,7 +157,7 @@ export interface DedicatedIssue {
   expiresAt: number;
 }
 
-export const VERSION_NOT_APPROVED = "This multisig wallet's version is no longer approved";
+const VERSION_NOT_APPROVED = "This multisig wallet's version is no longer approved";
 export const WALLET_NOT_ACTIVE = "This multisig wallet is not active";
 
 export interface DedicatedSetupState {

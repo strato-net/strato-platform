@@ -151,10 +151,10 @@ Deprecating (revoking) a version in the registry:
 - Does not force anything. A multisig wallet stays on the deprecated version until its
   own signers upgrade.
 
-SMD currently treats a deprecated version as a failed check and makes the multisig
-wallet read-only, including the upgrade controls. Until that changes, publish the
-replacement version and its upgrade path, and let affected multisig wallets upgrade,
-**before** deprecating the old version.
+SMD follows the contract: a multisig wallet on a deprecated version keeps working in
+full. SMD shows a notice that the version has been retired and, when an approved upgrade
+path exists, that an upgrade is available. So versions can be deprecated in any order,
+with or without an upgrade path.
 
 ## Changing the registry
 

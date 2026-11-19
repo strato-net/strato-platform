@@ -67,12 +67,12 @@ export function SignerInvitationDialog({ wallet }: { wallet: MultisigWalletSumma
           <div className="text-muted-foreground">
             Accepting cancels every open proposal and any pending upgrade on this multisig wallet.
           </div>
-          {!isLoading && state && !state.verified ? (
+          {!isLoading && state && !state.provenanceVerified ? (
             <div className="text-destructive">This multisig wallet could not be verified.</div>
           ) : null}
         </div>
         <DialogFooter>
-          <Button disabled={busy || isLoading || !state?.verified} onClick={() => void accept()}>
+          <Button disabled={busy || isLoading || !state?.provenanceVerified} onClick={() => void accept()}>
             {busy ? "Accepting…" : "Accept invitation"}
           </Button>
         </DialogFooter>

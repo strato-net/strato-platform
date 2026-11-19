@@ -40,7 +40,6 @@ import {
   type DedicatedIssue,
   type MultisigWalletSummary,
   useDedicatedFactoryState,
-  VERSION_NOT_APPROVED,
   WALLET_NOT_ACTIVE,
 } from "@/services/dedicatedMultisig";
 import {
@@ -584,7 +583,7 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
           <CopyButton value={wallet.address} className="mt-0.5 shrink-0" />
         </div>
       </div>
-      {state.verified ? (
+      {state.provenanceVerified ? (
         <Alert>
           <CheckCircle2 className="h-4 w-4" />
           <AlertTitle>Verified multisig wallet</AlertTitle>
@@ -594,20 +593,11 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>
-            {state.provenanceVerified &&
-            state.verificationErrors.includes(VERSION_NOT_APPROVED)
-              ? "This multisig wallet version is no longer approved"
-              : state.verificationErrors.length === 1 &&
-                state.verificationErrors.includes(WALLET_NOT_ACTIVE)
+            {state.verificationErrors.length === 1 &&
+            state.verificationErrors.includes(WALLET_NOT_ACTIVE)
               ? "This multisig wallet is not active yet"
               : "This multisig wallet is not recognised on this network"}
           </AlertTitle>
-          {state.provenanceVerified &&
-          state.verificationErrors.includes(VERSION_NOT_APPROVED) ? (
-            <AlertDescription>
-              This version has been retired. Upgrade to keep using this multisig wallet.
-            </AlertDescription>
-          ) : null}
           <AlertDescription>
             <details>
               <summary className="cursor-pointer">Technical details</summary>
@@ -616,6 +606,19 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
           </AlertDescription>
         </Alert>
       )}
+      {state.provenanceVerified && !state.verified ? (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Version {state.version} has been retired</AlertTitle>
+          <AlertDescription>
+            {state.upgradesFrozen
+              ? "Upgrades are frozen on this multisig wallet, so it cannot move to a newer version. It keeps working; consider moving funds to a new multisig wallet."
+              : approvedUpgradeVersions.length
+                ? "This multisig wallet keeps working. An upgrade is available under Settings."
+                : "This multisig wallet keeps working. No upgrade is available yet."}
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {state.pendingNominees.length ? (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
@@ -705,10 +708,10 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="treasury" className="mt-4">
-          <DedicatedTreasuryTab wallet={wallet} disabled={!state.verified} onProposalCreated={proposalCreated} />
+          <DedicatedTreasuryTab wallet={wallet} disabled={!state.provenanceVerified} onProposalCreated={proposalCreated} />
         </TabsContent>
         <TabsContent value="actions" className="mt-4">
-          <DedicatedProtocolActionsTab wallet={wallet} disabled={!state.verified} onProposalCreated={proposalCreated} />
+          <DedicatedProtocolActionsTab wallet={wallet} disabled={!state.provenanceVerified} onProposalCreated={proposalCreated} />
         </TabsContent>
         <TabsContent value="issues" className="mt-4 space-y-4">
           <details>
@@ -725,7 +728,7 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
                 placeholder={'[{"type":"address","value":"..."},{"type":"uint256","value":"100"}]'}
                 className="font-mono text-xs"
               />
-              <Button disabled={busy || !state.verified || !target || !functionName} onClick={() => void propose()}>
+              <Button disabled={busy || !state.provenanceVerified || !target || !functionName} onClick={() => void propose()}>
                 Propose custom call
               </Button>
             </div>
@@ -739,15 +742,7 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
                   key={`${issue.issueId}:${JSON.stringify(issue.arguments)}`}
                   wallet={wallet}
                   issue={issue}
-                  disabled={!state.verified && !(
-                    state.provenanceVerified &&
-                    strip0x(issue.target) === strip0x(wallet.address) &&
-                    (
-                      issue.functionName === "scheduleUpgrade" ||
-                      issue.functionName === "cancelUpgrade" ||
-                      issue.functionName === "cancelIssue"
-                    )
-                  )}
+                  disabled={!state.provenanceVerified}
                   requiredApprovals={state.requiredApprovals}
                   transactionTimelock={state.transactionTimelock}
                   cancellationProposed={openIssues.some(
@@ -792,7 +787,7 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
               <div className="text-xs text-muted-foreground">
                 Accepting cancels every open proposal and any pending upgrade on this multisig wallet.
               </div>
-              <Button disabled={busy || !state.verified} onClick={() => void acceptNomination()}>
+              <Button disabled={busy || !state.provenanceVerified} onClick={() => void acceptNomination()}>
                 Accept invitation
               </Button>
             </div>
@@ -810,10 +805,10 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
               }}
               placeholder="Address or User wallet username"
             />
-            <Button disabled={busy || !state.verified} onClick={() => void proposeConfiguration("nominate")}>
+            <Button disabled={busy || !state.provenanceVerified} onClick={() => void proposeConfiguration("nominate")}>
               Propose new signer
             </Button>
-            <Button variant="outline" disabled={busy || !state.verified} onClick={() => void proposeNominationRevocation()}>
+            <Button variant="outline" disabled={busy || !state.provenanceVerified} onClick={() => void proposeNominationRevocation()}>
               Revoke invitation
             </Button>
           </div>
@@ -827,7 +822,7 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
                 ))}
               </SelectContent>
             </Select>
-            <Button disabled={busy || !state.verified} onClick={() => void proposeConfiguration("remove")}>
+            <Button disabled={busy || !state.provenanceVerified} onClick={() => void proposeConfiguration("remove")}>
               Propose signer removal
             </Button>
           </div>
@@ -841,7 +836,7 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
                 ))}
               </SelectContent>
             </Select>
-            <Button disabled={busy || !state.verified} onClick={() => void proposeConfiguration("threshold")}>
+            <Button disabled={busy || !state.provenanceVerified} onClick={() => void proposeConfiguration("threshold")}>
               Propose approval change
             </Button>
           </div>
@@ -853,7 +848,7 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
               inputMode="numeric"
               placeholder="Hours"
             />
-            <Button disabled={busy || !state.verified} onClick={() => void proposeConfiguration("timelock")}>
+            <Button disabled={busy || !state.provenanceVerified} onClick={() => void proposeConfiguration("timelock")}>
               Propose waiting-period change
             </Button>
           </div>
@@ -908,7 +903,7 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
                 <Button
                   size="sm"
                   variant="destructive"
-                  disabled={busy || !state.verified}
+                  disabled={busy || !state.provenanceVerified}
                   onClick={() => void proposeUpgradeControl("freeze")}
                 >
                   Propose permanent freeze
