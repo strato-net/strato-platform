@@ -28,8 +28,7 @@ contract Describe_RewardsConverter {
         stratoToken = _newToken("STRATO", "STRATO");
 
         conv = _newConverter();
-        owner.do(conv, "initialize", address(rewardsToken), address(stratoToken), WAD);
-        owner.do(conv, "unpause");
+        owner.do(conv, "initialize", address(rewardsToken), address(stratoToken), WAD, false);
 
         ERC20(rewardsToken).transfer(address(alice), ALICE_REWARDS);
         ERC20(stratoToken).transfer(conv, RESERVE);
@@ -71,28 +70,33 @@ contract Describe_RewardsConverter {
     // INITIALIZE
     // ═════════════════════════════════════════════════════════════════════════
 
-    function it_aa_initialize_sets_fields_and_leaves_it_paused() {
-        address fresh = _newConverter();
-        require(!Pausable(fresh).paused(), "Should not be paused before initialize");
+    function it_aa_initialize_sets_fields_and_the_pause_flag() {
+        address paused = _newConverter();
+        require(!Pausable(paused).paused(), "Should not be paused before initialize");
 
-        owner.do(fresh, "initialize", address(rewardsToken), address(stratoToken), 2 * WAD);
+        owner.do(paused, "initialize", address(rewardsToken), address(stratoToken), 2 * WAD, true);
 
-        require(RewardsConverter(fresh).rewardsToken() == address(rewardsToken), "rewardsToken not set");
-        require(RewardsConverter(fresh).stratoToken() == address(stratoToken), "stratoToken not set");
-        require(RewardsConverter(fresh).rate() == 2 * WAD, "rate not set");
-        require(Pausable(fresh).paused(), "Should be paused after initialize");
+        require(RewardsConverter(paused).rewardsToken() == address(rewardsToken), "rewardsToken not set");
+        require(RewardsConverter(paused).stratoToken() == address(stratoToken), "stratoToken not set");
+        require(RewardsConverter(paused).rate() == 2 * WAD, "rate not set");
+        require(Pausable(paused).paused(), "Should be paused when initialized paused");
+
+        address live = _newConverter();
+        owner.do(live, "initialize", address(rewardsToken), address(stratoToken), 2 * WAD, false);
+        require(RewardsConverter(live).rate() == 2 * WAD, "rate not set when starting unpaused");
+        require(!Pausable(live).paused(), "Should stay unpaused when initialized unpaused");
     }
 
     function it_ab_initialize_rejects_non_owner() {
         address fresh = _newConverter();
-        require(_fails(stranger, fresh, "initialize", address(rewardsToken), address(stratoToken), WAD), "Non-owner should not initialize");
+        require(_fails(stranger, fresh, "initialize", address(rewardsToken), address(stratoToken), WAD, true), "Non-owner should not initialize");
         require(RewardsConverter(fresh).rewardsToken() == address(0), "Failed initialize should set nothing");
 
-        owner.do(fresh, "initialize", address(rewardsToken), address(stratoToken), WAD);
+        owner.do(fresh, "initialize", address(rewardsToken), address(stratoToken), WAD, true);
     }
 
     function it_ac_initialize_only_once() {
-        owner.doExpectingFailure(conv, "initialize", "RewardsConverter: already initialized", address(stratoToken), address(rewardsToken), 2 * WAD);
+        owner.doExpectingFailure(conv, "initialize", "RewardsConverter: already initialized", address(stratoToken), address(rewardsToken), 2 * WAD, true);
         require(RewardsConverter(conv).rewardsToken() == address(rewardsToken), "rewardsToken should not change");
         require(RewardsConverter(conv).stratoToken() == address(stratoToken), "stratoToken should not change");
         require(RewardsConverter(conv).rate() == WAD, "rate should not change");
@@ -100,12 +104,12 @@ contract Describe_RewardsConverter {
 
     function it_ad_initialize_rejects_zero_addresses_and_zero_rate() {
         address fresh = _newConverter();
-        owner.doExpectingFailure(fresh, "initialize", "RewardsConverter: invalid rewards token address", address(0), address(stratoToken), WAD);
-        owner.doExpectingFailure(fresh, "initialize", "RewardsConverter: invalid strato token address", address(rewardsToken), address(0), WAD);
-        owner.doExpectingFailure(fresh, "initialize", "RewardsConverter: zero rate", address(rewardsToken), address(stratoToken), uint256(0));
+        owner.doExpectingFailure(fresh, "initialize", "RewardsConverter: invalid rewards token address", address(0), address(stratoToken), WAD, true);
+        owner.doExpectingFailure(fresh, "initialize", "RewardsConverter: invalid strato token address", address(rewardsToken), address(0), WAD, true);
+        owner.doExpectingFailure(fresh, "initialize", "RewardsConverter: zero rate", address(rewardsToken), address(stratoToken), uint256(0), true);
         require(!Pausable(fresh).paused(), "Failed initialize should not pause");
 
-        owner.do(fresh, "initialize", address(rewardsToken), address(stratoToken), WAD);
+        owner.do(fresh, "initialize", address(rewardsToken), address(stratoToken), WAD, true);
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -345,13 +349,12 @@ contract Describe_RewardsConverter_PausedTokens {
         stratoToken = _createToken(tokenFactory, "STRATO", "STRATO");
 
         conv = address(new Proxy(address(new RewardsConverter(address(this))), address(adminRegistry)));
-        _vote(conv, "initialize", rewardsToken, stratoToken, 1e18);
+        _vote(conv, "initialize", rewardsToken, stratoToken, 1e18, false);
 
         _vote(rewardsToken, "mint", address(alice), ALICE_REWARDS);
         _vote(stratoToken, "mint", conv, RESERVE);
         _vote(rewardsToken, "pause");
         _vote(stratoToken, "pause");
-        _vote(conv, "unpause");
 
         // approve is not pause-gated
         alice.do(rewardsToken, "approve", conv, AMOUNT);

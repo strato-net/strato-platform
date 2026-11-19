@@ -19,8 +19,8 @@ contract record RewardsConverter is Ownable, Pausable {
 
     constructor(address initialOwner) Ownable(initialOwner) {}
 
-    /// @dev Callable once. Leaves the contract paused; the token addresses can never change afterwards.
-    function initialize(address _rewardsToken, address _stratoToken, uint256 _rate) external onlyOwner {
+    /// @dev Callable once. `_paused` starts the contract paused or unpaused; the token addresses can never change afterwards.
+    function initialize(address _rewardsToken, address _stratoToken, uint256 _rate, bool _paused) external onlyOwner {
         require(rewardsToken == address(0), "RewardsConverter: already initialized");
         require(_rewardsToken != address(0), "RewardsConverter: invalid rewards token address");
         require(_stratoToken != address(0), "RewardsConverter: invalid strato token address");
@@ -29,7 +29,7 @@ contract record RewardsConverter is Ownable, Pausable {
         rewardsToken = _rewardsToken;
         stratoToken = _stratoToken;
         rate = _rate;
-        _pause();
+        if (_paused) _pause();
     }
 
     /// @notice Burn `amount` of the caller's rewards tokens and pay the caller STRATO at the current rate.
