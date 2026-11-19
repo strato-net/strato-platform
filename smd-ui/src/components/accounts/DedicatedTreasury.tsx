@@ -17,9 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
+import { CopyableAddress } from "@/components/CopyButton";
 import { shortenHex } from "@/lib/utils";
 import { describeProposal, type ProposalMetadata } from "@/services/dedicatedProposal";
 import {
@@ -73,9 +73,12 @@ const ACTION_LABELS: Record<DedicatedProtocolAction, string> = {
   v3Collect: "Collect V3 position",
 };
 
+/** Balance for display: at most six decimals, never rounded up. */
 const humanBalance = (token: TokenBalance) => {
   try {
-    return formatUnits(BigInt(token.balance), token.decimals);
+    const [whole, fraction = ""] = formatUnits(BigInt(token.balance), token.decimals).split(".");
+    const shown = fraction.slice(0, 6).replace(/0+$/, "");
+    return shown ? `${whole}.${shown}` : whole;
   } catch {
     return token.balance;
   }
@@ -87,7 +90,9 @@ function TokenAmount({
   setTokenAddress,
   amount,
   setAmount,
+  balanceLabel,
 }: {
+  balanceLabel: string;
   tokens: TokenBalance[];
   tokenAddress: string;
   setTokenAddress: (value: string) => void;
@@ -110,7 +115,7 @@ function TokenAmount({
       </div>
       {token ? (
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs text-muted-foreground">Balance: {humanBalance(token)} {token.symbol}</span>
+          <span className="text-xs text-muted-foreground">{balanceLabel}: {humanBalance(token)} {token.symbol}</span>
           <div className="flex gap-1">
             {PERCENTS.map((percent) => (
               <Button
@@ -241,7 +246,7 @@ export function DedicatedTreasuryTab({
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Label>Available holdings</Label>
+        <div className="text-xs font-medium text-muted-foreground">Holdings</div>
         {treasury.length ? treasury.map((token) => (
           <div key={token.address} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
             <span className="font-medium">{token.symbol}</span>
@@ -251,7 +256,7 @@ export function DedicatedTreasuryTab({
       </div>
 
       <div className="space-y-2">
-        <Label>Staked and supplied</Label>
+        <div className="text-xs font-medium text-muted-foreground">Staked and supplied</div>
         {positionsLoading || v3PositionsLoading ? <p className="text-sm text-muted-foreground">Loading positions…</p> : (
           <>
             {hasStaking ? (
@@ -277,9 +282,7 @@ export function DedicatedTreasuryTab({
                     <div className="font-medium">
                       {pool ? `${pool.token0._symbol}/${pool.token1._symbol}` : "V3"} position
                     </div>
-                    <div className="font-mono text-xs text-muted-foreground">
-                      {shortenHex(position.poolAddress, 6, 4)}
-                    </div>
+                    <CopyableAddress value={position.poolAddress} className="text-xs text-muted-foreground" />
                   </div>
                   <span className="font-mono text-xs">NFT #{position.tokenId}</span>
                 </div>
@@ -292,36 +295,61 @@ export function DedicatedTreasuryTab({
         )}
       </div>
 
-      <Separator />
-      <div className="space-y-3">
-        <div className="font-medium">Deposit into treasury</div>
-        <TokenAmount
-          tokens={sourceTokens}
-          tokenAddress={depositToken}
-          setTokenAddress={setDepositToken}
-          amount={depositAmount}
-          setAmount={setDepositAmount}
-        />
-        <Button disabled={disabled || !canSubmit || busy !== "" || !sourceTokens.length} onClick={() => void deposit()}>
-          {busy === "deposit" ? "Depositing…" : "Deposit"}
-        </Button>
-      </div>
-
-      <Separator />
-      <div className="space-y-3">
-        <div className="font-medium">Propose transfer</div>
-        <TokenAmount
-          tokens={treasury}
-          tokenAddress={transferToken}
-          setTokenAddress={setTransferToken}
-          amount={transferAmount}
-          setAmount={setTransferAmount}
-        />
-        <Label>Recipient</Label>
-        <Input value={recipient} onChange={(event) => setRecipient(event.target.value)} className="font-mono text-xs" />
-        <Button disabled={disabled || !canSubmit || busy !== "" || !treasury.length} onClick={() => void proposeTransfer()}>
-          {busy === "transfer" ? "Creating proposal…" : "Propose transfer"}
-        </Button>
+      <div className="space-y-2">
+        <div className="text-xs font-medium text-muted-foreground">Move tokens</div>
+        <div className="space-y-3 rounded-lg border p-4">
+          <div className="space-y-1">
+            <div className="font-medium">Deposit from your account</div>
+            <div className="text-sm text-muted-foreground">
+              Sends tokens from your connected account to this multisig wallet. It runs straight away, with no approvals.
+            </div>
+          </div>
+          <TokenAmount
+            tokens={sourceTokens}
+            tokenAddress={depositToken}
+            setTokenAddress={setDepositToken}
+            amount={depositAmount}
+            setAmount={setDepositAmount}
+            balanceLabel="Your balance"
+          />
+          <Button
+            disabled={disabled || !canSubmit || busy !== "" || !sourceTokens.length || !depositAmount}
+            onClick={() => void deposit()}
+          >
+            {busy === "deposit" ? "Depositing…" : "Deposit"}
+          </Button>
+        </div>
+        <div className="space-y-3 rounded-lg border p-4">
+          <div className="space-y-1">
+            <div className="font-medium">Send from this multisig wallet</div>
+            <div className="text-sm text-muted-foreground">
+              Creates a proposal. The tokens move once enough signers approve it.
+            </div>
+          </div>
+          <TokenAmount
+            tokens={treasury}
+            tokenAddress={transferToken}
+            setTokenAddress={setTransferToken}
+            amount={transferAmount}
+            setAmount={setTransferAmount}
+            balanceLabel="Multisig wallet balance"
+          />
+          <div className="space-y-1">
+            <Label>Recipient</Label>
+            <Input
+              value={recipient}
+              onChange={(event) => setRecipient(event.target.value)}
+              placeholder="0x…"
+              className="font-mono text-xs"
+            />
+          </div>
+          <Button
+            disabled={disabled || !canSubmit || busy !== "" || !treasury.length || !transferAmount || !recipient}
+            onClick={() => void proposeTransfer()}
+          >
+            {busy === "transfer" ? "Creating proposal…" : "Propose transfer"}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -564,7 +592,20 @@ export function DedicatedProtocolActionsTab({
         amount: item.amount,
       })));
       setBusy(true);
-      for (const call of workflow) await actions.proposeCall(call, wallet.signerUsername || undefined);
+      let created = 0;
+      try {
+        for (const call of workflow) {
+          await actions.proposeCall(call, wallet.signerUsername || undefined);
+          created++;
+        }
+      } catch (error: any) {
+        // A later step can fail after earlier ones are already on-chain; say so, so nothing is proposed twice.
+        throw created
+          ? new Error(`${created} of ${workflow.length} proposals were created before this stopped: ${
+              error?.message || "transaction failed"
+            } Check the Proposals tab before trying again.`)
+          : error;
+      }
       toast.success("Proposal created", {
         description: missingApprovals.length
           ? `${missingApprovals.length} permission proposal${missingApprovals.length === 1 ? " was" : "s were"} created before the protocol action.`
@@ -768,24 +809,25 @@ export function DedicatedProtocolActionsTab({
       ) : null}
 
       {validAddress(target) ? (
-        <div className="space-y-1 text-xs text-muted-foreground">
-          <div>Contract: <span className="break-all font-mono">{target}</span></div>
-          {approvalSpecs.length && validAddress(approvalSpender) ? (
-            <div>Allowed to spend: <span className="break-all font-mono">{approvalSpender}</span></div>
-          ) : null}
-        </div>
-      ) : null}
-      {approvalSpecs.length ? (
-        <div className="rounded-md border p-3 text-sm">
-          <div className="flex justify-between gap-2">
-            <span>Token permissions needed</span>
-            <Badge variant={missingApprovals.length ? "outline" : "secondary"}>
-              {allowances.isSuccess ? `${missingApprovals.length} required` : "Checking…"}
-            </Badge>
+        <div className="space-y-2 rounded-lg border p-4 text-sm">
+          <div className="font-medium">What will be proposed</div>
+          <div className="text-xs text-muted-foreground">
+            Contract: <CopyableAddress value={target} />
           </div>
-          <p className="text-xs text-muted-foreground">
-            This also creates {missingApprovals.length} permission proposal{missingApprovals.length === 1 ? "" : "s"}.
-          </p>
+          {approvalSpecs.length && validAddress(approvalSpender) ? (
+            <>
+              <div className="text-xs text-muted-foreground">
+                Allowed to spend: <CopyableAddress value={approvalSpender} />
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {allowances.isSuccess
+                  ? missingApprovals.length
+                    ? `Plus ${missingApprovals.length} token permission proposal${missingApprovals.length === 1 ? "" : "s"}, to be approved first.`
+                    : "No extra token permission is needed."
+                  : "Checking token permissions…"}
+              </div>
+            </>
+          ) : null}
         </div>
       ) : null}
       {(staking.isError || cdp.isError || pools.isError || (v3Action && v3.isError)) ? (
@@ -832,8 +874,8 @@ export function DedicatedHistoryTab({
             <span className="text-xs text-muted-foreground">{item.timestamp ? new Date(item.timestamp).toLocaleString() : ""}</span>
           </div>
           {description.addresses.map((entry) => (
-            <div key={`${entry.label}:${entry.value}`} className="font-mono text-xs break-all">
-              {entry.label}: {entry.value}
+            <div key={`${entry.label}:${entry.value}`} className="text-xs">
+              {entry.label}: <CopyableAddress value={entry.value} />
             </div>
           ))}
           <details className="mt-2 text-xs">

@@ -267,6 +267,8 @@ export interface MultisigWalletSummary {
   nomineeAddress?: string;
   nomineeUsername?: string;
   active: boolean;
+  /** When the registry created it, as Cirrus reports the block time. */
+  createdAt?: string;
 }
 
 export interface PendingMultisigSetupSummary {
@@ -346,7 +348,7 @@ export function useMyMultisigWallets(ownerAddress?: string | null) {
       const setupHashes = [...new Set(
         verifiedRows.map((row) => String(storageData(row)?.multisigSetupHash ?? "")).filter(Boolean)
       )];
-      const [setupRows, allSignerRows] = await Promise.all([
+      const [setupRows, allSignerRows, createdRows] = await Promise.all([
         inBatches(setupHashes, (batch) => pagedRows(
           "mapping",
           `address=eq.${factory}&collection_name=eq.pendingSetups` +
@@ -356,7 +358,15 @@ export function useMyMultisigWallets(ownerAddress?: string | null) {
           "mapping",
           `address=in.(${batch.join(",")})&collection_name=eq.signerMap&value=gt.0&select=address`
         )),
+        inBatches(verifiedAddresses, (batch) => pagedRows(
+          "event",
+          `address=eq.${factory}&event_name=eq.MultisigCreated` +
+            `&attributes-%3E%3Ewallet=in.(${batch.join(",")})&select=block_timestamp,attributes-%3E%3Ewallet`
+        )),
       ]);
+      const createdAt = new Map(
+        createdRows.map((row) => [strip0x(String(row?.wallet ?? "")), String(row?.block_timestamp ?? "")])
+      );
       const labels = new Map(
         setupRows.map((row) => [String(row?.key?.key ?? ""), String(row?.value?.label ?? "")])
       );
@@ -383,6 +393,7 @@ export function useMyMultisigWallets(ownerAddress?: string | null) {
           signerUsername: usernames.get(signerAddress) ?? "",
           pendingSigner: false,
           active: data.multisigActive === true || data.multisigActive === "true",
+          createdAt: createdAt.get(address),
         });
       }
       for (const row of verifiedNominationRows) {

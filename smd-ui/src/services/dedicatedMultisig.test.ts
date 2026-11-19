@@ -368,6 +368,26 @@ test("proposal descriptions expose stable liquidity and governance destinations"
   );
 });
 
+test("a token permission names the protocol contract it is for", () => {
+  const vault = "0000000000000000000000000000000000001013";
+  const cdp = { registryAddress: "", engineAddress: signer, vaultAddress: vault, usdstAddress: "", assets: [] };
+  const permission = describeProposal(
+    { target: spender, functionName: "approve", arguments: [vault, "1000000000000000"] },
+    [{ address: spender, symbol: "GOLDST", decimals: 18 }],
+    { walletAddress: wallet, pools: [], cdp }
+  );
+  assert.equal(permission.headline, "Allow CDP vault to spend 0.001 GOLDST");
+  assert.equal(permission.detail, "Token permission for CDP vault. The action that uses it is a separate proposal.");
+  assert.equal(
+    describeProposal(
+      { target: spender, functionName: "approve", arguments: [signer, "1000000000000000"] },
+      [{ address: spender, symbol: "GOLDST", decimals: 18 }],
+      { walletAddress: wallet, pools: [] }
+    ).headline,
+    "Allow 0xfdb36b…e032 to spend 0.001 GOLDST"
+  );
+});
+
 test("proposal descriptions decode tokens not held by the multisig wallet", () => {
   assert.equal(
     describeProposal(

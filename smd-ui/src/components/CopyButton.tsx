@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, shortenHex } from "@/lib/utils";
 
 /** Inline copy-to-clipboard icon button. */
 export function CopyButton({ value, className }: { value: string; className?: string }) {
@@ -29,3 +29,13 @@ export function CopyButton({ value, className }: { value: string; className?: st
     </button>
   );
 }
+
+/** A compressed address with its copy control; hovering shows it in full. */
+export function CopyableAddress({ value, className }: { value: string; className?: string }) {
+  const address = value.replace(/^0x/i, "");
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 font-mono", className)}>
+      <span title={`0x${address}`}>{shortenHex(address, 6, 4)}</span>
+      <CopyButton value={address} className="shrink-0" />
+    </span>
+  );}

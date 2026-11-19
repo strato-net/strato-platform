@@ -8,7 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CopyButton } from "@/components/CopyButton";
+import { CopyableAddress, CopyButton } from "@/components/CopyButton";
 import { AddrLink } from "@/components/explorer/AddrLink";
 import { DedicatedMultisigDialog } from "@/components/accounts/DedicatedMultisigDialog";
 import {
@@ -23,16 +23,9 @@ import {
   useMyPendingMultisigSetups,
 } from "@/services/dedicatedMultisig";
 import { getMultisigConfigError, runtime } from "@/lib/env";
-import { shortenHex } from "@/lib/utils";
 import { strip0x } from "@/services/userWallets";
 
-function MultisigWalletRow({
-  wallet,
-  ownerAddress,
-}: {
-  wallet: MultisigWalletSummary;
-  ownerAddress?: string | null;
-}) {
+function MultisigWalletRow({ wallet }: { wallet: MultisigWalletSummary }) {
   const { data: state } = useDedicatedWalletState(wallet.address);
   const { data: issues = [] } = useDedicatedIssues(wallet.address, state?.epoch);
   const now = Date.now() / 1000;
@@ -43,31 +36,34 @@ function MultisigWalletRow({
   ).length;
   const ready = open.filter((issue) => issue.executableAt > 0 && issue.executableAt <= now).length;
 
+  const created = wallet.createdAt ? new Date(wallet.createdAt.replace(" UTC", "Z").replace(" ", "T")) : null;
+  const upgradeAvailable = !!state && !state.verified && state.provenanceVerified;
+
   return (
     <TableRow>
-      <TableCell className="font-medium">
-        <div>{wallet.label || "Unnamed multisig wallet"}</div>
-        {needsApproval || ready ? (
-          <div className="text-xs text-amber-600">
-            {[
-              needsApproval ? `${needsApproval} need${needsApproval === 1 ? "s" : ""} your approval` : "",
-              ready ? `${ready} ready to execute` : "",
-            ].filter(Boolean).join(" · ")}
-          </div>
-        ) : null}
-      </TableCell>
-      <TableCell className="font-mono text-xs">
-        <span className="inline-flex items-center gap-1.5">
-          <AddrLink address={wallet.address} />
-          <CopyButton value={wallet.address} />
-        </span>
+      <TableCell>
+        <div className="flex flex-wrap items-center gap-x-2">
+          <span className="font-medium">{wallet.label || "Unnamed multisig wallet"}</span>
+          <span className="inline-flex items-center gap-1.5 font-mono text-xs">
+            <AddrLink address={wallet.address} />
+            <CopyButton value={wallet.address} />
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-x-2 text-xs">
+          {needsApproval ? (
+            <span className="text-amber-600">{needsApproval} to approve</span>
+          ) : null}
+          {ready ? <span className="text-amber-600">{ready} ready to execute</span> : null}
+          {upgradeAvailable ? <span className="text-amber-600">version retired</span> : null}
+          {wallet.signerUsername ? (
+            <span className="text-muted-foreground">signing via {wallet.signerUsername}</span>
+          ) : null}
+        </div>
       </TableCell>
       <TableCell>{wallet.requiredApprovals} of {wallet.signerCount}</TableCell>
-      <TableCell>
-        {wallet.signerUsername ||
-          (strip0x(wallet.signerAddress) === strip0x(ownerAddress ?? "")
-            ? "Connected account"
-            : shortenHex(wallet.signerAddress))}
+      <TableCell>{state?.version ?? "—"}</TableCell>
+      <TableCell className="whitespace-nowrap">
+        {created && !Number.isNaN(created.getTime()) ? created.toLocaleDateString(undefined, { dateStyle: "medium" }) : "—"}
       </TableCell>
       <TableCell className="text-right">
         <DedicatedMultisigDialog wallet={wallet} />
@@ -111,7 +107,7 @@ export function MultisigWalletsCard({ ownerAddress }: { ownerAddress?: string | 
               <div key={`nomination:${wallet.address}`} className="flex items-center justify-between gap-3 text-sm">
                 <div>
                   <div>Invitation to join multisig wallet {wallet.label || "Unnamed multisig wallet"}</div>
-                  <div className="font-mono text-xs text-muted-foreground">{wallet.address}</div>
+                  <CopyableAddress value={wallet.address} className="text-xs text-muted-foreground" />
                 </div>
                 <SignerInvitationDialog wallet={wallet} />
               </div>
@@ -140,16 +136,16 @@ export function MultisigWalletsCard({ ownerAddress }: { ownerAddress?: string | 
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Address</TableHead>
-                <TableHead>Approvals</TableHead>
-                <TableHead>Signing as</TableHead>
+                <TableHead>Multisig wallet</TableHead>
+                <TableHead>Approvals needed</TableHead>
+                <TableHead>Version</TableHead>
+                <TableHead>Created</TableHead>
                 <TableHead className="text-right">Manage</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {wallets.map((wallet) => (
-                <MultisigWalletRow key={wallet.address} wallet={wallet} ownerAddress={ownerAddress} />
+                <MultisigWalletRow key={wallet.address} wallet={wallet} />
               ))}
               {!wallets.length ? (
                 <TableRow>

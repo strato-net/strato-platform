@@ -109,6 +109,27 @@ export function describeProposalSideEffect(proposal: ProposalPayload, walletAddr
   return null;
 }
 
+/** The name this app knows a contract by: a registered token or a protocol contract. */
+export function knownAddressName(
+  value: string,
+  tokens: TokenMetadata[],
+  metadata: ProposalMetadata
+): string | undefined {
+  const address = strip0x(value);
+  if (!address) return undefined;
+  const token = tokens.find((item) => strip0x(item.address) === address);
+  if (token) return token.symbol;
+  if (address === strip0x(metadata.walletAddress)) return "this multisig wallet";
+  const protocol = ([
+    [metadata.staking?.stakingAddress, "Staking"],
+    [metadata.cdp?.engineAddress, "CDP engine"],
+    [metadata.cdp?.vaultAddress, "CDP vault"],
+    [metadata.v3?.positionManagerAddress, "V3 position manager"],
+  ] as [string | undefined, string][]).find(([candidate]) => candidate && strip0x(candidate) === address);
+  if (protocol) return protocol[1];
+  return metadata.pools.find((pool) => strip0x(pool.address) === address)?.poolName || undefined;
+}
+
 const formatAmount = (value: string, token?: TokenMetadata, defaultDecimals?: number) => {
   try {
     const decimals = token?.decimals ?? defaultDecimals;
@@ -146,8 +167,12 @@ export function describeProposal(
     const amount = isUnlimitedTokenApproval(proposal.functionName, proposal.arguments)
       ? `unlimited ${targetToken.symbol}`
       : `${formatAmount(proposal.arguments[1], targetToken)} ${targetToken.symbol}`;
+    const spenderName = knownAddressName(spender, tokens, metadata);
     return {
-      headline: `Allow ${short(spender)} to spend ${amount}`,
+      headline: `Allow ${spenderName ?? short(spender)} to spend ${amount}`,
+      detail: spenderName
+        ? `Token permission for ${spenderName}. The action that uses it is a separate proposal.`
+        : undefined,
       addresses: [address("Spender", spender)],
     };
   }

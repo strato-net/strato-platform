@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, CheckCircle2, Plus, ShieldCheck } from "lucide-react";
 import { AddressInput } from "@/components/AddressInput";
-import { CopyButton } from "@/components/CopyButton";
+import { CopyableAddress } from "@/components/CopyButton";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,7 +17,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -27,7 +26,7 @@ import {
 } from "@/components/accounts/DedicatedTreasury";
 import { useUser } from "@/context/UserContext";
 import { typedVariadicArg } from "@/lib/args";
-import { formatDateTime, formatWaitingPeriod, shortenHex } from "@/lib/utils";
+import { formatDateTime, formatWaitingPeriod } from "@/lib/utils";
 import {
   useDedicatedIssues,
   useDedicatedMultisigActions,
@@ -53,12 +52,36 @@ import {
   describeProposal,
   describeProposalSideEffect,
   describeProposalWarning,
+  knownAddressName,
   proposalArgumentTypesMatch,
   type ProposalMetadata,
 } from "@/services/dedicatedProposal";
 import { useFunctionByAddress } from "@/services/contracts";
 import { useTokenMetadata, type TokenMetadata } from "@/services/tokens";
 import { strip0x, useMyUserWallets } from "@/services/userWallets";
+
+/** A labelled group of related settings. */
+function SettingsGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-2">
+      <div className="text-xs font-medium text-muted-foreground">{title}</div>
+      {children}
+    </section>
+  );
+}
+
+/** One discrete action: what it does, its inputs and its button. */
+function ActionCard({ title, description, children }: { title: string; description?: React.ReactNode; children?: React.ReactNode }) {
+  return (
+    <div className="space-y-3 rounded-lg border p-4">
+      <div className="space-y-1">
+        <div className="font-medium">{title}</div>
+        {description ? <div className="text-sm text-muted-foreground">{description}</div> : null}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 const formatRemaining = (seconds: number) => {
   if (seconds <= 0) return "now";
@@ -182,49 +205,73 @@ function IssueActions({
     }
   };
 
+  const named = (value: string) => {
+    const name = knownAddressName(value, tokens, metadata);
+    return (
+      <>
+        {name ? <span className="mr-2">{name}</span> : null}
+        <CopyableAddress value={value} className={name ? "text-xs text-muted-foreground" : undefined} />
+      </>
+    );
+  };
+  const blocked = (issue.executableAt === 0 && !approved) || statusIndex === 2;
+
   return (
-    <div className="rounded-md border p-3 text-sm space-y-2">
-      <div className="text-base font-medium">{description.headline}</div>
-      {description.detail ? (
-        <div className="text-sm text-muted-foreground">{description.detail}</div>
-      ) : null}
-      {sideEffect ? <div className="text-sm text-muted-foreground">{sideEffect}</div> : null}
-      <div className="text-sm text-muted-foreground">
-        {issue.approvals} of {requiredApprovals} approvals
-        {remainingApprovals > 0 ? ` · waiting for ${remainingApprovals} more` : ""}
+    <div className="space-y-3 rounded-lg border p-4 text-sm">
+      <div className="space-y-1">
+        <div className="text-base font-medium">{description.headline}</div>
+        {description.detail ? (
+          <div className="text-muted-foreground">{description.detail}</div>
+        ) : null}
+        {sideEffect ? <div className="text-muted-foreground">{sideEffect}</div> : null}
       </div>
-      <div className="flex flex-wrap items-center gap-1 text-xs">
-        {statuses.map((status, index) => (
-          <div key={status} className="flex items-center gap-1">
-            {index > 0 ? <span className="text-muted-foreground">→</span> : null}
-            <Badge variant={index === statusIndex ? "default" : index < statusIndex ? "secondary" : "outline"}>
-              {status}
-            </Badge>
+
+      <div className="space-y-1 rounded-md bg-muted/40 p-3">
+        <div className="text-xs font-medium text-muted-foreground">What it does</div>
+        <div><span className="text-muted-foreground">Contract: </span>{named(issue.target)}</div>
+        {description.addresses.map((item) => (
+          <div key={`${item.label}:${item.value}`}>
+            <span className="text-muted-foreground">{item.label}: </span>{named(item.value)}
           </div>
         ))}
       </div>
-      {statusIndex === 1 ? (
-        <div className="text-xs text-muted-foreground">
-          Ready in {formatRemaining(issue.executableAt - now)} · {formatDateTime(issue.executableAt)}
+
+      <div className="space-y-2 rounded-md bg-muted/40 p-3">
+        <div className="text-xs font-medium text-muted-foreground">Progress</div>
+        <div className="flex flex-wrap items-center gap-1 text-xs">
+          {statuses.map((status, index) => (
+            <div key={status} className="flex items-center gap-1">
+              {index > 0 ? <span className="text-muted-foreground">→</span> : null}
+              <Badge variant={index === statusIndex ? "default" : index < statusIndex ? "secondary" : "outline"}>
+                {status}
+              </Badge>
+            </div>
+          ))}
         </div>
-      ) : null}
-      <div>
-        <span className="text-muted-foreground">Contract: </span>
-        <span className="font-mono break-all">{issue.target}</span>
-      </div>
-      {description.addresses.map((item) => (
-        <div key={`${item.label}:${item.value}`}>
-          <span className="text-muted-foreground">{item.label}: </span>
-          <span className="font-mono break-all">{item.value}</span>
+        <div>
+          {issue.approvals} of {requiredApprovals} approvals
+          {remainingApprovals > 0 ? ` · waiting for ${remainingApprovals} more` : ""}
         </div>
-      ))}
-      <div className="text-xs text-muted-foreground">
-        Approved by: {issue.approvedSigners.length
-          ? issue.approvedSigners.map((signer) =>
-              `${shortenHex(signer, 6, 4)}${strip0x(signer) === me ? " (you)" : ""}`
-            ).join(", ")
-          : "No one yet"}
+        {statusIndex === 1 ? (
+          <div>Ready in {formatRemaining(issue.executableAt - now)} · {formatDateTime(issue.executableAt)}</div>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+          <span>Proposed by</span>
+          <CopyableAddress value={issue.creator} />
+          {creator ? <span>(you)</span> : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+          <span>Approved by</span>
+          {issue.approvedSigners.length ? issue.approvedSigners.map((signer) => (
+            <span key={signer} className="inline-flex items-center gap-1">
+              <CopyableAddress value={signer} />
+              {strip0x(signer) === me ? <span>(you)</span> : null}
+            </span>
+          )) : <span>no one yet</span>}
+        </div>
+        <div className="text-xs text-muted-foreground">Expires {formatDateTime(issue.expiresAt)}</div>
       </div>
+
       {unlimitedApproval ? (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
@@ -281,21 +328,28 @@ function IssueActions({
       >
         <summary className="cursor-pointer font-medium">Technical details</summary>
         <div className="mt-2 space-y-2">
+          <div><span className="text-muted-foreground">Contract:</span> <span className="font-mono text-xs break-all">0x{strip0x(issue.target)}</span></div>
           <div><span className="text-muted-foreground">Function:</span> <span className="font-mono">{issue.functionName}</span></div>
           <div><span className="text-muted-foreground">Types:</span> <span className="font-mono break-all">{JSON.stringify(issue.argumentTypes)}</span></div>
           <div><span className="text-muted-foreground">Arguments:</span> <span className="font-mono break-all">{JSON.stringify(issue.arguments)}</span></div>
           <div><span className="text-muted-foreground">Configuration number:</span> <span className="font-mono">{issue.epoch}</span></div>
           <div><span className="text-muted-foreground">Proposal number:</span> <span className="font-mono">{issue.nonce}</span></div>
-          <div className="font-mono text-xs break-all">Proposal {issue.issueId}</div>
-          <div className="text-xs text-muted-foreground">Expires {formatDateTime(issue.expiresAt)}</div>
-          <Label>Arguments</Label>
-          <Textarea value={argumentsJson} onChange={(event) => setArgumentsJson(event.target.value)} className="font-mono text-xs" />
+          <div><span className="text-muted-foreground">Proposal ID:</span> <span className="font-mono text-xs break-all">{issue.issueId}</span></div>
+          <details>
+            <summary className="cursor-pointer text-muted-foreground">Advanced: arguments to submit</summary>
+            <div className="mt-2 space-y-1">
+              <div className="text-xs text-muted-foreground">
+                These are sent with your approval and must match the proposal exactly. Change them only if they failed to load.
+              </div>
+              <Textarea value={argumentsJson} onChange={(event) => setArgumentsJson(event.target.value)} className="font-mono text-xs" />
+            </div>
+          </details>
         </div>
       </details>
-      {verificationPending && ((issue.executableAt === 0 && !approved) || statusIndex === 2) ? (
+      {verificationPending && blocked ? (
         <div className="text-xs text-muted-foreground">Checking this proposal before it can be approved or executed…</div>
       ) : null}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {issue.executableAt === 0 && !approved ? (
           <Button size="sm" disabled={busy || disabled || approvalBlocked} onClick={() => void run(false)}>
             {executesOnApproval ? "Approve and execute" : "Approve"}
@@ -360,9 +414,9 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
   const [migrationFunction, setMigrationFunction] = useState("");
   const [nomineeText, setNomineeText] = useState("");
   const [nominee, setNominee] = useState("");
-  const [removeSigner, setRemoveSigner] = useState("");
   const [newRequiredApprovals, setNewRequiredApprovals] = useState("");
-  const [newTimelockHours, setNewTimelockHours] = useState("");
+  const [newTimelock, setNewTimelock] = useState("");
+  const [timelockUnit, setTimelockUnit] = useState("hours");
   const [busy, setBusy] = useState(false);
   const proposalMetadata = useMemo<ProposalMetadata>(
     () => ({
@@ -409,6 +463,14 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
       )
   );
   const pendingUpgradeExpired = !!state?.pendingUpgrade && state.pendingUpgrade.expiresAt < now;
+  const signerCount = state?.signers.length ?? 0;
+  const removalBlocked = signerCount <= 3
+    ? "A multisig wallet needs at least three signers, so none can be removed."
+    : (state?.requiredApprovals ?? 0) >= signerCount - 1
+      ? "Lower the approvals needed before removing a signer: they must be fewer than the remaining signers."
+      : "";
+  const approvalChoices = Array.from({ length: Math.max(0, signerCount - 2) }, (_, index) => index + 2)
+    .filter((value) => value !== state?.requiredApprovals);
   const cancelUpgradeProposed = openIssues.some(
     (issue) => strip0x(issue.target) === strip0x(wallet.address) && issue.functionName === "cancelUpgrade"
   );
@@ -501,15 +563,16 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
     }
   };
 
-  const proposeConfiguration = async (mode: "nominate" | "remove" | "threshold" | "timelock") => {
+  const proposeConfiguration = async (mode: "nominate" | "remove" | "threshold" | "timelock", removeSigner = "") => {
     if (!state) return;
     setBusy(true);
     try {
       if (mode === "timelock") {
-        if (!/^\d+$/.test(newTimelockHours) || Number(newTimelockHours) > 720) {
-          throw new Error("Waiting period must be a whole number from 0 to 720 hours");
+        const waitingSeconds = Number(newTimelock) * (timelockUnit === "days" ? 86400 : 3600);
+        if (!/^\d+$/.test(newTimelock) || waitingSeconds > 2592000) {
+          throw new Error("Waiting period must be a whole number of hours or days, up to 30 days");
         }
-        const seconds = String(Number(newTimelockHours) * 3600);
+        const seconds = String(waitingSeconds);
         await actions.proposeIssue(wallet.address, "setTransactionTimelock", ["uint256"], [
           typedVariadicArg("uint256", seconds),
         ], signerUsername);
@@ -553,12 +616,8 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
     }
   };
 
-  const proposeNominationRevocation = async () => {
-    const normalizedNominee = strip0x(nominee);
-    if (!/^[0-9a-f]{40}$/i.test(normalizedNominee)) {
-      toast.error("Enter the invited signer’s address");
-      return;
-    }
+  const proposeNominationRevocation = async (invited: string) => {
+    const normalizedNominee = strip0x(invited);
     setBusy(true);
     try {
       await actions.proposeIssue(wallet.address, "revokeNomination", ["address"], [
@@ -576,20 +635,32 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
   if (isLoading || !state) return <div className="text-sm text-muted-foreground">Loading multisig wallet…</div>;
   return (
     <div className="space-y-4">
-      <div className="space-y-1">
-        <div className="text-xl font-semibold">{wallet.label || "Unnamed multisig wallet"}</div>
-        <div className="flex items-start gap-2 text-sm text-muted-foreground">
-          <span className="break-all font-mono">{wallet.address}</span>
-          <CopyButton value={wallet.address} className="mt-0.5 shrink-0" />
+      <div className="space-y-3 rounded-lg border p-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="space-y-1">
+            <div className="text-xl font-semibold">{wallet.label || "Unnamed multisig wallet"}</div>
+            <CopyableAddress value={wallet.address} className="text-sm text-muted-foreground" />
+          </div>
+          {state.provenanceVerified ? (
+            <Badge variant="secondary" className="gap-1"><CheckCircle2 className="h-3.5 w-3.5" />Verified</Badge>
+          ) : null}
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-sm">
+          <div className="rounded-md bg-muted/50 p-2">
+            <div className="text-xs text-muted-foreground">Approvals needed</div>
+            <div className="font-medium">{state.requiredApprovals} of {state.signers.length}</div>
+          </div>
+          <div className="rounded-md bg-muted/50 p-2">
+            <div className="text-xs text-muted-foreground">Waiting period</div>
+            <div className="font-medium">{formatWaitingPeriod(state.transactionTimelock)}</div>
+          </div>
+          <div className="rounded-md bg-muted/50 p-2">
+            <div className="text-xs text-muted-foreground">Version</div>
+            <div className="font-medium">{state.version}</div>
+          </div>
         </div>
       </div>
-      {state.provenanceVerified ? (
-        <Alert>
-          <CheckCircle2 className="h-4 w-4" />
-          <AlertTitle>Verified multisig wallet</AlertTitle>
-          <AlertDescription>Version {state.version} · {state.requiredApprovals} of {state.signers.length} approvals</AlertDescription>
-        </Alert>
-      ) : (
+      {!state.provenanceVerified ? (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>
@@ -605,7 +676,7 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
             </details>
           </AlertDescription>
         </Alert>
-      )}
+      ) : null}
       {state.provenanceVerified && !state.verified ? (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
@@ -624,8 +695,8 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Pending signer invitation</AlertTitle>
           <AlertDescription className="space-y-1">
-            {state.pendingNominees.map((nominee) => (
-              <div key={nominee} className="font-mono break-all">{nominee}</div>
+            {state.pendingNominees.map((invited) => (
+              <div key={invited}><CopyableAddress value={invited} /></div>
             ))}
             <div>Acceptance will cancel every open proposal and any pending upgrade.</div>
           </AlertDescription>
@@ -651,8 +722,8 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
             ) : null}
             <details>
               <summary className="cursor-pointer">Advanced</summary>
-              <div className="mt-1 font-mono break-all">
-                New version address: {state.pendingUpgrade.targetLogic}
+              <div className="mt-1">
+                New version address: <CopyableAddress value={state.pendingUpgrade.targetLogic} />
               </div>
               <div>Migration: {state.pendingUpgrade.migrationFunction || "No migration"}</div>
             </details>
@@ -692,7 +763,7 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
           onClick={() => setTab("issues")}
         >
           {[
-            needsApproval ? `${needsApproval} proposal${needsApproval === 1 ? "" : "s"} need your approval` : "",
+            needsApproval ? `${needsApproval} proposal${needsApproval === 1 ? " needs" : "s need"} your approval` : "",
             ready ? `${ready} ready to execute` : "",
           ].filter(Boolean).join(" · ")}
         </button>
@@ -714,28 +785,8 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
           <DedicatedProtocolActionsTab wallet={wallet} disabled={!state.provenanceVerified} onProposalCreated={proposalCreated} />
         </TabsContent>
         <TabsContent value="issues" className="mt-4 space-y-4">
-          <details>
-            <summary className="cursor-pointer font-medium">Advanced: custom contract call</summary>
-            <div className="mt-2 space-y-2">
-              <Label>Full target address</Label>
-              <Input value={target} onChange={(event) => setTarget(event.target.value)} />
-              <Label>Function</Label>
-              <Input value={functionName} onChange={(event) => setFunctionName(event.target.value)} />
-              <Label>Typed arguments JSON</Label>
-              <Textarea
-                value={argumentsJson}
-                onChange={(event) => setArgumentsJson(event.target.value)}
-                placeholder={'[{"type":"address","value":"..."},{"type":"uint256","value":"100"}]'}
-                className="font-mono text-xs"
-              />
-              <Button disabled={busy || !state.provenanceVerified || !target || !functionName} onClick={() => void propose()}>
-                Propose custom call
-              </Button>
-            </div>
-          </details>
-          <Separator />
           <div className="space-y-2">
-            <div className="font-medium">Open proposals</div>
+            <div className="text-xs font-medium text-muted-foreground">Open proposals</div>
             {openIssues
               .map((issue) => (
                 <IssueActions
@@ -757,149 +808,231 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
               <div className="text-sm text-muted-foreground">No open proposals.</div>
             ) : null}
           </div>
+          <details className="rounded-lg border p-4">
+            <summary className="cursor-pointer font-medium">New custom proposal</summary>
+            <div className="mt-1 text-sm text-muted-foreground">
+              Call any function on any contract. Use this only when no guided action fits.
+            </div>
+            <div className="mt-2 space-y-2">
+              <Label>Full target address</Label>
+              <Input value={target} onChange={(event) => setTarget(event.target.value)} />
+              <Label>Function</Label>
+              <Input value={functionName} onChange={(event) => setFunctionName(event.target.value)} />
+              <Label>Typed arguments JSON</Label>
+              <Textarea
+                value={argumentsJson}
+                onChange={(event) => setArgumentsJson(event.target.value)}
+                placeholder={'[{"type":"address","value":"..."},{"type":"uint256","value":"100"}]'}
+                className="font-mono text-xs"
+              />
+              <Button disabled={busy || !state.provenanceVerified || !target || !functionName} onClick={() => void propose()}>
+                Propose custom call
+              </Button>
+            </div>
+          </details>
         </TabsContent>
         <TabsContent value="history" className="mt-4">
           <DedicatedHistoryTab wallet={wallet} tokens={tokens} metadata={proposalMetadata} />
         </TabsContent>
-        <TabsContent value="settings" className="mt-4 space-y-4">
-          <div className="grid gap-1 text-sm">
-            <div>
-              Waiting period: {formatWaitingPeriod(state.transactionTimelock)}
-            </div>
-            <div>Upgrades: {state.upgradesFrozen ? "permanently frozen" : "enabled"}</div>
-            <div>
-              Signers: {state.signers.map((signer) =>
-                `${shortenHex(signer, 6, 4)}${strip0x(signer) === strip0x(wallet.signerAddress) ? " (you)" : ""}`
-              ).join(", ")}
-            </div>
-            <details>
-              <summary className="cursor-pointer">Advanced</summary>
-              <div className="mt-1">Version address: <span className="font-mono break-all">{state.logic}</span></div>
-              <div>Configuration number: {state.epoch}</div>
-            </details>
-          </div>
+        <TabsContent value="settings" className="mt-4 space-y-6">
           {wallet.pendingSigner ? (
-            <div className="space-y-2">
-              <div className="text-xs text-muted-foreground">
-                Invited signer: <span className="font-mono">{wallet.nomineeAddress}</span>
+            <ActionCard
+              title="You are invited to become a signer"
+              description="Accepting cancels every open proposal and any pending upgrade on this multisig wallet."
+            >
+              <div className="text-sm">
+                <CopyableAddress value={wallet.nomineeAddress ?? ""} />
                 {wallet.nomineeUsername ? ` (${wallet.nomineeUsername})` : ""}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Accepting cancels every open proposal and any pending upgrade on this multisig wallet.
               </div>
               <Button disabled={busy || !state.provenanceVerified} onClick={() => void acceptNomination()}>
                 Accept invitation
               </Button>
-            </div>
+            </ActionCard>
           ) : null}
-          <Separator />
-          <div className="space-y-2">
-            <div className="font-medium">New signer</div>
-            <Label>Invited signer</Label>
-            <AddressInput
-              value={nomineeText}
-              resolved={nominee}
-              onChange={(text, address) => {
-                setNomineeText(text);
-                setNominee(address);
-              }}
-              placeholder="Address or User wallet username"
-            />
-            <Button disabled={busy || !state.provenanceVerified} onClick={() => void proposeConfiguration("nominate")}>
-              Propose new signer
-            </Button>
-            <Button variant="outline" disabled={busy || !state.provenanceVerified} onClick={() => void proposeNominationRevocation()}>
-              Revoke invitation
-            </Button>
-          </div>
-          <div className="space-y-2">
-            <div className="font-medium">Remove signer</div>
-            <Select value={removeSigner} onValueChange={setRemoveSigner}>
-              <SelectTrigger><SelectValue placeholder="Select a signer" /></SelectTrigger>
-              <SelectContent>
-                {state.signers.map((signer) => (
-                  <SelectItem key={signer} value={signer}>{shortenHex(signer, 8, 6)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button disabled={busy || !state.provenanceVerified} onClick={() => void proposeConfiguration("remove")}>
-              Propose signer removal
-            </Button>
-          </div>
-          <div className="space-y-2">
-            <div className="font-medium">Change required approvals</div>
-            <Select value={newRequiredApprovals} onValueChange={setNewRequiredApprovals}>
-              <SelectTrigger><SelectValue placeholder={`Current: ${state.requiredApprovals}`} /></SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: Math.max(0, state.signers.length - 2) }, (_, index) => index + 2).map((value) => (
-                  <SelectItem key={value} value={String(value)}>{value} of {state.signers.length}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button disabled={busy || !state.provenanceVerified} onClick={() => void proposeConfiguration("threshold")}>
-              Propose approval change
-            </Button>
-          </div>
-          <div className="space-y-2">
-            <div className="font-medium">Change waiting period</div>
-            <Input
-              value={newTimelockHours}
-              onChange={(event) => setNewTimelockHours(event.target.value)}
-              inputMode="numeric"
-              placeholder="Hours"
-            />
-            <Button disabled={busy || !state.provenanceVerified} onClick={() => void proposeConfiguration("timelock")}>
-              Propose waiting-period change
-            </Button>
-          </div>
-          {!state.upgradesFrozen && (!state.pendingUpgrade || pendingUpgradeExpired) ? (
-            <div className="space-y-2">
-              <div className="font-medium">Upgrade multisig wallet</div>
-              <Label>New version</Label>
-              <Select
-                value={upgradeVersion}
-                onValueChange={(version) => {
-                  setUpgradeVersion(version);
-                  setUpgradeLogic(approvedUpgradeVersions.find((item) => item.version === version)?.logic ?? "");
-                }}
-              >
-                <SelectTrigger><SelectValue placeholder="Select an approved version" /></SelectTrigger>
-                <SelectContent>
-                  {approvedUpgradeVersions.map((version) => (
-                    <SelectItem key={version.version} value={version.version}>{version.version}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {!factoryLoading && !approvedUpgradeVersions.length ? (
-                <div className="text-sm text-muted-foreground">No approved upgrade path is available.</div>
+
+          <SettingsGroup title="Signers">
+            <div className="divide-y rounded-lg border">
+              {state.signers.map((signer) => (
+                <div key={signer} className="flex items-center justify-between gap-2 px-4 py-2 text-sm">
+                  <span>
+                    <CopyableAddress value={signer} />
+                    {strip0x(signer) === strip0x(wallet.signerAddress) ? <span className="ml-2 text-muted-foreground">you</span> : null}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy || !state.provenanceVerified || !!removalBlocked}
+                    onClick={() => void proposeConfiguration("remove", signer)}
+                  >
+                    Propose removal
+                  </Button>
+                </div>
+              ))}
+              {state.pendingNominees.map((invited) => (
+                <div key={invited} className="flex items-center justify-between gap-2 px-4 py-2 text-sm">
+                  <span>
+                    <CopyableAddress value={invited} />
+                    <span className="ml-2 text-muted-foreground">invited, not yet accepted</span>
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy || !state.provenanceVerified}
+                    onClick={() => void proposeNominationRevocation(invited)}
+                  >
+                    Propose withdrawal
+                  </Button>
+                </div>
+              ))}
+              {removalBlocked ? (
+                <div className="px-4 py-2 text-xs text-muted-foreground">{removalBlocked}</div>
               ) : null}
-              {upgradeLogic ? (
+            </div>
+            <ActionCard
+              title="Add a signer"
+              description={`The invited account must accept within 30 days. Approvals needed stays at ${state.requiredApprovals}.`}
+            >
+              <AddressInput
+                value={nomineeText}
+                resolved={nominee}
+                onChange={(text, address) => {
+                  setNomineeText(text);
+                  setNominee(address);
+                }}
+                placeholder="Address or User wallet username"
+              />
+              <Button
+                disabled={busy || !state.provenanceVerified || !nominee}
+                onClick={() => void proposeConfiguration("nominate")}
+              >
+                Propose new signer
+              </Button>
+            </ActionCard>
+          </SettingsGroup>
+
+          <SettingsGroup title="Rules">
+            <ActionCard
+              title="Approvals needed"
+              description={`Currently ${state.requiredApprovals} of ${state.signers.length}.${
+                approvalChoices.length ? "" : " Add a signer before this can change."
+              }`}
+            >
+              {approvalChoices.length ? (
                 <>
-                  <Label>New version address</Label>
-                  <div className="font-mono text-xs break-all">{upgradeLogic}</div>
+                  <Select value={newRequiredApprovals} onValueChange={setNewRequiredApprovals}>
+                    <SelectTrigger><SelectValue placeholder="Select a new value" /></SelectTrigger>
+                    <SelectContent>
+                      {approvalChoices.map((value) => (
+                        <SelectItem key={value} value={String(value)}>{value} of {state.signers.length}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    disabled={busy || !state.provenanceVerified || !newRequiredApprovals}
+                    onClick={() => void proposeConfiguration("threshold")}
+                  >
+                    Propose approval change
+                  </Button>
                 </>
               ) : null}
-              <details>
-                <summary className="cursor-pointer text-sm">Advanced</summary>
-                <div className="mt-2 space-y-2">
-                  <Label>Migration function (must begin with migrate; empty for none)</Label>
-                  <Input value={migrationFunction} onChange={(event) => setMigrationFunction(event.target.value)} />
-                </div>
-              </details>
+            </ActionCard>
+            <ActionCard
+              title="Waiting period"
+              description={`Currently ${formatWaitingPeriod(state.transactionTimelock)}. Up to 30 days; the change itself waits out the current period.`}
+            >
+              <div className="flex gap-2">
+                <Input
+                  value={newTimelock}
+                  onChange={(event) => setNewTimelock(event.target.value)}
+                  inputMode="numeric"
+                  placeholder="0"
+                  className="w-24"
+                />
+                <Select value={timelockUnit} onValueChange={setTimelockUnit}>
+                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hours">hours</SelectItem>
+                    <SelectItem value="days">days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <Button
-                disabled={busy || !state.provenanceVerified || !approvedUpgradeVersions.length}
-                onClick={() => void proposeUpgradeControl("schedule")}
+                disabled={busy || !state.provenanceVerified || !newTimelock}
+                onClick={() => void proposeConfiguration("timelock")}
               >
-                Propose upgrade
+                Propose waiting-period change
               </Button>
-            </div>
-          ) : null}
+            </ActionCard>
+          </SettingsGroup>
+
+          <SettingsGroup title="Version">
+            <ActionCard
+              title="Upgrade"
+              description={
+                state.upgradesFrozen
+                  ? "Upgrades are permanently frozen on this multisig wallet."
+                  : state.pendingUpgrade && !pendingUpgradeExpired
+                    ? `An upgrade to version ${state.pendingUpgrade.targetVersion} is pending.`
+                    : approvedUpgradeVersions.length
+                      ? `On version ${state.version}. An upgrade takes the waiting period plus the upgrade delay.`
+                      : factoryLoading
+                        ? "Checking for upgrades…"
+                        : state.verified
+                          ? "This multisig wallet is on the latest version."
+                          : "No upgrade is available yet."
+              }
+            >
+              {!state.upgradesFrozen && (!state.pendingUpgrade || pendingUpgradeExpired) && approvedUpgradeVersions.length ? (
+                <>
+                  <Select
+                    value={upgradeVersion}
+                    onValueChange={(version) => {
+                      setUpgradeVersion(version);
+                      setUpgradeLogic(approvedUpgradeVersions.find((item) => item.version === version)?.logic ?? "");
+                    }}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select a version" /></SelectTrigger>
+                    <SelectContent>
+                      {approvedUpgradeVersions.map((version) => (
+                        <SelectItem key={version.version} value={version.version}>Version {version.version}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {upgradeLogic ? (
+                    <div className="text-xs text-muted-foreground">
+                      New version address: <CopyableAddress value={upgradeLogic} />
+                    </div>
+                  ) : null}
+                  <details>
+                    <summary className="cursor-pointer text-sm">Advanced</summary>
+                    <div className="mt-2 space-y-2">
+                      <Label>Migration function (must begin with migrate; empty for none)</Label>
+                      <Input value={migrationFunction} onChange={(event) => setMigrationFunction(event.target.value)} />
+                    </div>
+                  </details>
+                  <Button
+                    disabled={busy || !state.provenanceVerified || !upgradeVersion}
+                    onClick={() => void proposeUpgradeControl("schedule")}
+                  >
+                    Propose upgrade
+                  </Button>
+                </>
+              ) : null}
+              <details className="text-xs text-muted-foreground">
+                <summary className="cursor-pointer">Details</summary>
+                <div className="mt-1">Version address: <CopyableAddress value={state.logic} /></div>
+                <div>Configuration number: {state.epoch}</div>
+              </details>
+            </ActionCard>
+          </SettingsGroup>
+
           {!state.upgradesFrozen ? (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Permanent upgrade freeze</AlertTitle>
-              <AlertDescription className="space-y-2">
-                <p>A frozen multisig wallet can never receive security fixes.</p>
+            <details className="rounded-lg border border-destructive/40 p-4">
+              <summary className="cursor-pointer font-medium text-destructive">Danger zone</summary>
+              <div className="mt-3 space-y-3">
+                <div className="text-sm text-muted-foreground">
+                  Freezing upgrades is permanent. A frozen multisig wallet can never receive security fixes.
+                </div>
                 <Button
                   size="sm"
                   variant="destructive"
@@ -908,8 +1041,8 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
                 >
                   Propose permanent freeze
                 </Button>
-              </AlertDescription>
-            </Alert>
+              </div>
+            </details>
           ) : null}
         </TabsContent>
       </Tabs>
@@ -1121,14 +1254,14 @@ function CreateDedicatedMultisig() {
               {setupPending ? "Waiting for signers" : setupLifecycle === "deployed" ? "Created" : "Invitation unavailable"}
             </Badge>
             {createdWallet ? (
-              <div className="font-mono text-xs break-all">
-                Multisig wallet address: {createdWallet}
+              <div className="text-xs">
+                Multisig wallet address: <CopyableAddress value={createdWallet} />
               </div>
             ) : null}
             <div className="font-mono text-xs break-all">Invitation code: {setupHash}</div>
             <div>Approvals needed: {setup.requiredApprovals} of {setup.signers.length}</div>
             <div>Signer confirmation: {setup.confirmedSigners.length} of {setup.signers.length}</div>
-            <div className="font-mono text-xs break-all">Created by: {setup.creator}</div>
+            <div className="text-xs">Created by: <CopyableAddress value={setup.creator} /></div>
             {setupLifecycle !== "deployed" ? (
               <Alert>
                 <AlertTitle>Waiting for signer confirmations</AlertTitle>
@@ -1150,8 +1283,8 @@ function CreateDedicatedMultisig() {
                   (confirmedSigner) => strip0x(confirmedSigner) === strip0x(signer)
                 );
                 return (
-                  <div key={signer} className="font-mono break-all">
-                    {confirmed ? "✓" : "○"} {signer}
+                  <div key={signer}>
+                    {confirmed ? "✓" : "○"} <CopyableAddress value={signer} />
                     {controlled ? ` (${controlled.username ? `${controlled.username}, you` : "you"})` : ""}
                   </div>
                 );
@@ -1171,7 +1304,7 @@ function CreateDedicatedMultisig() {
           </div>
         ) : null}
         {setup && signingIdentity ? (
-          <div className="text-sm">Sign as: {signingIdentity.username || "Connected account"}</div>
+          <div className="text-sm">Sign as: {signingIdentity.username || <CopyableAddress value={signingIdentity.address} />}</div>
         ) : null}
         {setup ? (
           <div className="flex gap-2">

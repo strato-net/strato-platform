@@ -18,6 +18,7 @@ import {
   useDedicatedSetup,
   useDedicatedWalletState,
 } from "@/services/dedicatedMultisig";
+import { CopyableAddress } from "@/components/CopyButton";
 import { formatWaitingPeriod } from "@/lib/utils";
 import { strip0x } from "@/services/userWallets";
 
@@ -51,19 +52,19 @@ export function SignerInvitationDialog({ wallet }: { wallet: MultisigWalletSumma
         </DialogHeader>
         <div className="space-y-2 text-sm">
           <div>Multisig wallet address</div>
-          <div className="font-mono break-all">{wallet.address}</div>
+          <div><CopyableAddress value={wallet.address} /></div>
           <div>Invited signer</div>
-          <div className="font-mono break-all">{wallet.nomineeAddress}</div>
+          <div><CopyableAddress value={wallet.nomineeAddress ?? ""} /></div>
           <div>Current signers</div>
           {state?.signers.map((signer) => (
-            <div key={signer} className="font-mono break-all text-xs">{signer}</div>
+            <div key={signer} className="text-xs"><CopyableAddress value={signer} /></div>
           ))}
           <div>Approvals needed: {state ? `${state.requiredApprovals} of ${state.signers.length}` : "Checking…"}</div>
           <div>
             Waiting period: {state ? formatWaitingPeriod(state.transactionTimelock) : "Checking…"}
           </div>
           <div>Sign as</div>
-          <div>{wallet.nomineeUsername || "Connected account"}</div>
+          <div>{wallet.nomineeUsername || <CopyableAddress value={wallet.nomineeAddress ?? ""} />}</div>
           <div className="text-muted-foreground">
             Accepting cancels every open proposal and any pending upgrade on this multisig wallet.
           </div>
@@ -133,7 +134,7 @@ export function SetupInvitationDialog({ setup: summary }: { setup: PendingMultis
           <div>Invitation code</div>
           <div className="font-mono break-all">{summary.setupHash}</div>
           <div>Created by</div>
-          <div className="font-mono break-all">{setup?.creator ?? summary.creator}</div>
+          <div><CopyableAddress value={setup?.creator ?? summary.creator} /></div>
           {setupLoading ? <div className="text-muted-foreground">Checking invitation…</div> : null}
           {!setup && (setupError || !setupLoading) ? (
             <div className="text-destructive">Could not load invitation.</div>
@@ -147,10 +148,10 @@ export function SetupInvitationDialog({ setup: summary }: { setup: PendingMultis
               <div>Multisig wallet version: {setup.initialVersion}</div>
               <div className="space-y-1">
                 {setup.signers.map((signer) => (
-                  <div key={signer} className="font-mono break-all text-xs">
+                  <div key={signer} className="text-xs">
                     {setup.confirmedSigners.some((confirmed) =>
                       strip0x(confirmed) === strip0x(signer)
-                    ) ? "✓" : "○"} {signer}
+                    ) ? "✓" : "○"} <CopyableAddress value={signer} />
                     {strip0x(signer) === strip0x(summary.signerAddress)
                       ? ` (${summary.signerUsername ? `${summary.signerUsername}, you` : "you"})`
                       : ""}
@@ -166,7 +167,10 @@ export function SetupInvitationDialog({ setup: summary }: { setup: PendingMultis
             <div className="text-destructive">Could not verify multisig wallet support for this network.</div>
           ) : null}
           <div>Sign as</div>
-          <div>{summary.signerUsername || (summary.signerAddress ? "Connected account" : "Not a signer")}</div>
+          <div>
+            {summary.signerUsername ||
+              (summary.signerAddress ? <CopyableAddress value={summary.signerAddress} /> : "Not a signer")}
+          </div>
           <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
             The multisig wallet address will be available after every signer confirms.
           </div>
