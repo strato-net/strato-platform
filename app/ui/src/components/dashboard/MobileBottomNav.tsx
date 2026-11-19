@@ -18,6 +18,7 @@ import {
   Layers,
   ArrowDownToLine,
   Compass,
+  CandlestickChart,
   X
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
@@ -53,6 +54,7 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
   {
     label: 'TRADE',
     items: [
+      { icon: CandlestickChart, label: 'Terminal', path: '/dashboard/terminal', badge: 'New' },
       { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
       { icon: Send, label: 'Send', path: '/dashboard/transfer' },
       { icon: Download, label: 'Bridge Out', path: '/dashboard/withdrawals' },
@@ -69,7 +71,7 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
     label: 'PRO',
     items: [
       { icon: SlidersHorizontal, label: 'Advanced', path: '/dashboard/advanced' },
-      { icon: Droplets, label: 'V3 Liquidity', path: '/dashboard/v3-liquidity', badge: 'New' },
+      { icon: Droplets, label: 'V3 Liquidity', path: '/dashboard/v3-liquidity' },
       { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
       { icon: BarChart3, label: 'Analytics', path: '/dashboard/stats' },
       { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },

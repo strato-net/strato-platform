@@ -1,5 +1,6 @@
 import Joi from "joi";
 import { validateAddressField, numericStringField } from "./common.validators";
+import { CANDLE_RESOLUTIONS } from "../helpers/marketData.helper";
 
 export function validateTradeTokenArgs(args: any) {
   const schema = Joi.object({
@@ -66,5 +67,39 @@ export function validateTradeHistoryQuery(args: any) {
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Trade History Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateMarketArgs(args: any) {
+  const schema = Joi.object({
+    poolAddress: validateAddressField("poolAddress"),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Market Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateMarketCandlesQuery(args: any) {
+  const schema = Joi.object({
+    resolution: Joi.string().valid(...CANDLE_RESOLUTIONS).required(),
+    from: Joi.number().integer().min(0).optional(),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Market Candles Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateMarketTradesQuery(args: any) {
+  const schema = Joi.object({
+    limit: Joi.number().integer().min(1).max(200).optional(),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Market Trades Argument Validation Error: " + error.message);
   }
 }

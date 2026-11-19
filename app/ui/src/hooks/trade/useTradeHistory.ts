@@ -13,12 +13,14 @@ export interface UseTradeHistoryArgs {
   page: number;
   limit: number;
   sender?: string;
+  /** a change of this value refetches the page (e.g. the id of the newest trade seen elsewhere) */
+  revision?: number;
 }
 
 /** Paginated pair history across all pool types (rows tagged with their pool). */
-export function useTradeHistory({ tokenIn, tokenOut, page, limit, sender }: UseTradeHistoryArgs) {
+export function useTradeHistory({ tokenIn, tokenOut, page, limit, sender, revision }: UseTradeHistoryArgs) {
   return useQuery({
-    queryKey: ["trade", "history", tokenIn, tokenOut, page, limit, sender ?? null],
+    queryKey: ["trade", "history", tokenIn, tokenOut, page, limit, sender ?? null, revision ?? null],
     queryFn: async ({ signal }) => {
       const { data } = await api.get<TradeHistoryPage>(`/trade/history/${tokenIn}/${tokenOut}`, {
         params: { page, limit, ...(sender ? { sender } : {}) },

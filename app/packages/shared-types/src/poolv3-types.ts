@@ -188,6 +188,8 @@ export interface PoolV3LiquiditySegment {
 
 /** Pool-wide liquidity distribution across the price axis (depth-chart data) */
 export interface PoolV3LiquidityDistribution {
+  /** current sqrt(token1/token0 price), Q64.96, as decimal string */
+  sqrtPriceX96: string;
   currentTick: number;
   tickSpacing: number;
   /** the pool's current in-range liquidity (anchor: the segment containing currentTick matches this) */

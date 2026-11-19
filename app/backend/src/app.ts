@@ -6,6 +6,7 @@ import { initDbPool } from "./utils/dbService";
 import { errorHandler, notFoundHandler } from "./api/middleware/errorHandler";
 import { requestContext } from "./utils/requestContext";
 import { tracingMiddleware } from "./utils/tracing";
+import { warmMarketData } from "./api/services/marketData.service";
 
 const PORT = process.env.PORT || 3001;
 
@@ -53,6 +54,7 @@ app.use(errorHandler);
     await initOpenIdConfig();
     await initNetworkConfig();
     initDbPool();
+    void warmMarketData();
     app.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
     });

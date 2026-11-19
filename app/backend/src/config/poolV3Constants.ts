@@ -129,6 +129,17 @@ export const POOL_V3_SWAP_HISTORY_SELECT_FIELDS = [
  */
 export const POOL_V3_SWAP_24H_SELECT_FIELDS = ["address", "amount0::text", "amount1::text", "liquidity::text"] as const;
 
+/** Swap event rows for the trading terminal's candle aggregator (paged by id ascending) */
+export const POOL_V3_MARKET_SWAP_SELECT_FIELDS = [
+  "id",
+  "block_timestamp",
+  "sender",
+  "recipient",
+  "amount0::text",
+  "amount1::text",
+  "sqrtPriceX96::text",
+] as const;
+
 /**
  * Storage-history rows for the fee-APY window's time-weighted TVL. `history@storage` is
  * the generic per-contract snapshot table: `data` holds every storage field as text
