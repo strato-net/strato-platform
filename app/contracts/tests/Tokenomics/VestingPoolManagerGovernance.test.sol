@@ -1,12 +1,13 @@
 import "../../concrete/Tokenomics/VestingPoolManager.sol";
 import "../../concrete/Admin/AdminRegistry.sol";
+import "../../concrete/Proxy/Proxy.sol";
 import "../../concrete/Tokens/TokenFactory.sol";
 import "../Util.sol";
 
-// The manager's owner is the AdminRegistry (decided 2026-11-02). Every manager call by
-// an admin is therefore a vote: the repo Ownable catches the failed owner check and
-// routes the call into AdminRegistry.castVoteOnIssue; at quorum the registry calls the
-// manager back as its owner. These tests drive that path with a real AdminRegistry
+// The manager's owner is the AdminRegistry (decided 2026-11-02). onlyOwner is a plain
+// owner check, so an admin never calls the manager directly: each admin casts a vote
+// with AdminRegistry.castVoteOnIssue(manager, func, args) and at quorum the registry
+// calls the manager as its owner. These tests drive that path with a real AdminRegistry
 // (three admins, default threshold 60 % → two votes execute) and record what an admin
 // sees when the pool rejects the call during execution.
 contract Describe_VestingPoolManagerGovernance {
@@ -17,35 +18,43 @@ contract Describe_VestingPoolManagerGovernance {
     AdminRegistry registry;
     VestingPoolManager manager;
     VestingPool pool;
-    Admin a1;
-    Admin a2;
-    Admin a3;
+    User a1;
+    User a2;
+    User a3;
     User stranger;
     User alice;
     User bob;
 
     function beforeAll() public {
-        a1 = new Admin();
-        a2 = new Admin();
-        a3 = new Admin();
+        a1 = new User();
+        a2 = new User();
+        a3 = new User();
         stranger = new User();
         alice = new User();
         bob = new User();
     }
 
     function beforeEach() public {
-        registry = new AdminRegistry();
         address[] memory admins = new address[](3);
         admins[0] = address(a1);
         admins[1] = address(a2);
         admins[2] = address(a3);
-        registry.initialize(admins);
+        registry = newRegistry(admins);
         TokenFactory factory = new TokenFactory(address(this));
         strato = Token(factory.createTokenWithInitialOwner("STRATO", "STRATO Token", new string[](0), new string[](0), new string[](0), "STRATO", 0, 18, address(this)));
         strato.setStatus(2);
         manager = new VestingPoolManager(address(strato), address(registry));
         pool = manager.pool();
         strato.mint(address(pool), 10000);
+    }
+
+    // Ownership of a registry lives on its Proxy, which hands it to the registry itself
+    // once the admins are set (same setup as tests/Admin/AdminRegistry.test.sol).
+    function newRegistry(address[] memory admins) internal returns (AdminRegistry) {
+        AdminRegistry r = AdminRegistry(address(new Proxy(address(new AdminRegistry()), address(this))));
+        r.initialize(admins);
+        Ownable(address(r)).transferOwnership(address(r));
+        return r;
     }
 
     function it_wires_the_registry_as_owner() public {
@@ -57,15 +66,15 @@ contract Describe_VestingPoolManagerGovernance {
 
     function it_executes_addVesting_only_at_quorum() public {
         uint64 start = uint64(block.timestamp);
-        a1.do(address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(2400));
+        a1.do(address(registry), "castVoteOnIssue", address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(2400));
         require(pool.totalTokensInVesting() == 0, "one vote of three must not execute");
-        a2.do(address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(2400));
+        a2.do(address(registry), "castVoteOnIssue", address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(2400));
         require(pool.totalTokensInVesting() == 2400, "two votes execute: committed " + string(pool.totalTokensInVesting()));
         bytes32 id = pool.vestingHash(address(alice), 0, true, 104, start, 2400);
         (uint128 vested, uint128 claimed) = pool.calculateVestedAmount(id);
         require(vested == 0 && claimed == 0, "fresh vesting");
         // the executed issue is closed: a late third vote opens a NEW issue, it does not re-execute
-        a3.do(address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(2400));
+        a3.do(address(registry), "castVoteOnIssue", address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(2400));
         require(pool.totalTokensInVesting() == 2400, "a late vote must not create a duplicate");
     }
 
@@ -75,9 +84,9 @@ contract Describe_VestingPoolManagerGovernance {
         uint128[] memory amounts = new uint128[](2);
         accounts[0] = address(alice); amounts[0] = 400;
         accounts[1] = address(bob); amounts[1] = 600;
-        a1.do(address(manager), "addVestings", accounts, amounts, false, uint16(104), start);
+        a1.do(address(registry), "castVoteOnIssue", address(manager), "addVestings", accounts, amounts, false, uint16(104), start);
         require(pool.totalTokensInVesting() == 0, "no execution on the first vote");
-        a2.do(address(manager), "addVestings", accounts, amounts, false, uint16(104), start);
+        a2.do(address(registry), "castVoteOnIssue", address(manager), "addVestings", accounts, amounts, false, uint16(104), start);
         require(pool.totalTokensInVesting() == 1000, "batch executed: committed " + string(pool.totalTokensInVesting()));
         bytes32 bobId = pool.vestingHash(address(bob), 0, false, 104, start, 600);
         fastForward(104 * WEEK);
@@ -88,7 +97,7 @@ contract Describe_VestingPoolManagerGovernance {
     function it_rejects_non_admins_and_leaves_state_unchanged() public {
         uint64 start = uint64(block.timestamp);
         bool reverted = false;
-        try stranger.do(address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(2400)) {
+        try stranger.do(address(registry), "castVoteOnIssue", address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(2400)) {
         } catch {
             reverted = true;
         }
@@ -98,13 +107,13 @@ contract Describe_VestingPoolManagerGovernance {
 
     function it_cancels_a_managed_vesting_by_vote() public {
         uint64 start = uint64(block.timestamp);
-        a1.do(address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(2400));
-        a2.do(address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(2400));
+        a1.do(address(registry), "castVoteOnIssue", address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(2400));
+        a2.do(address(registry), "castVoteOnIssue", address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(2400));
         bytes32 id = pool.vestingHash(address(alice), 0, true, 104, start, 2400);
         fastForward(26 * WEEK);
-        a1.do(address(manager), "cancelVesting", id);
+        a1.do(address(registry), "castVoteOnIssue", address(manager), "cancelVesting", id);
         require(pool.totalTokensInVesting() == 2400, "one vote does not cancel");
-        a2.do(address(manager), "cancelVesting", id);
+        a2.do(address(registry), "castVoteOnIssue", address(manager), "cancelVesting", id);
         require(pool.totalTokensInVesting() == 600, "cancelled: only the vested 600 stays committed, got " + string(pool.totalTokensInVesting()));
         fastForward(52 * WEEK);
         (uint128 vested, ) = pool.calculateVestedAmount(id);
@@ -119,9 +128,9 @@ contract Describe_VestingPoolManagerGovernance {
     function it_surfaces_a_pool_rejection_during_execution_as_a_revert() public {
         uint64 start = uint64(block.timestamp);
         // 10000 funded, 20000 requested: the pool will reject with "Not enough tokens available"
-        a1.do(address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(20000));
+        a1.do(address(registry), "castVoteOnIssue", address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(20000));
         bool reverted = false;
-        try a2.do(address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(20000)) {
+        try a2.do(address(registry), "castVoteOnIssue", address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(20000)) {
         } catch {
             reverted = true;
         }
@@ -129,17 +138,17 @@ contract Describe_VestingPoolManagerGovernance {
         require(pool.totalTokensInVesting() == 0, "nothing committed");
         // Recovery: the first vote stands. Fix the cause (fund the pool) and re-vote.
         strato.mint(address(pool), 10000);
-        a2.do(address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(20000));
+        a2.do(address(registry), "castVoteOnIssue", address(manager), "addVesting", address(alice), uint8(0), true, uint16(104), start, uint128(20000));
         require(pool.totalTokensInVesting() == 20000, "re-voting after funding executes: " + string(pool.totalTokensInVesting()));
         // cancelling an UNMANAGED vesting by vote fails the same way (fund it first:
         // the recovered 20000 vesting consumed everything the pool held)
         strato.mint(address(pool), 1000);
-        a1.do(address(manager), "addVesting", address(bob), uint8(0), false, uint16(104), start, uint128(1000));
-        a2.do(address(manager), "addVesting", address(bob), uint8(0), false, uint16(104), start, uint128(1000));
+        a1.do(address(registry), "castVoteOnIssue", address(manager), "addVesting", address(bob), uint8(0), false, uint16(104), start, uint128(1000));
+        a2.do(address(registry), "castVoteOnIssue", address(manager), "addVesting", address(bob), uint8(0), false, uint16(104), start, uint128(1000));
         bytes32 bobId = pool.vestingHash(address(bob), 0, false, 104, start, 1000);
-        a1.do(address(manager), "cancelVesting", bobId);
+        a1.do(address(registry), "castVoteOnIssue", address(manager), "cancelVesting", bobId);
         reverted = false;
-        try a2.do(address(manager), "cancelVesting", bobId) {
+        try a2.do(address(registry), "castVoteOnIssue", address(manager), "cancelVesting", bobId) {
         } catch {
             reverted = true;
         }
@@ -150,26 +159,26 @@ contract Describe_VestingPoolManagerGovernance {
     }
 
     function it_executes_immediately_with_a_single_admin() public {
-        AdminRegistry solo = new AdminRegistry();
         address[] memory admins = new address[](1);
         admins[0] = address(a1);
-        solo.initialize(admins);
+        AdminRegistry solo = newRegistry(admins);
         VestingPoolManager m = new VestingPoolManager(address(strato), address(solo));
         strato.mint(address(m.pool()), 1000);
-        a1.do(address(m), "addVesting", address(alice), uint8(0), true, uint16(52), uint64(block.timestamp), uint128(1000));
+        a1.do(address(solo), "castVoteOnIssue", address(m), "addVesting", address(alice), uint8(0), true, uint16(52), uint64(block.timestamp), uint128(1000));
         require(m.pool().totalTokensInVesting() == 1000, "1 of 1 executes in the same transaction");
     }
 
     function it_rotates_the_owner_by_vote() public {
-        a1.do(address(manager), "transferOwnership", address(alice));
+        a1.do(address(registry), "castVoteOnIssue", address(manager), "transferOwnership", address(alice));
         require(manager.owner() == address(registry), "one vote does not rotate");
-        a2.do(address(manager), "transferOwnership", address(alice));
+        a2.do(address(registry), "castVoteOnIssue", address(manager), "transferOwnership", address(alice));
         require(manager.owner() == address(alice), "two votes rotate the owner");
         uint64 start = uint64(block.timestamp);
         alice.do(address(manager), "addVesting", address(bob), uint8(0), false, uint16(104), start, uint128(500));
         require(pool.totalTokensInVesting() == 500, "the new owner acts directly");
+        a1.do(address(registry), "castVoteOnIssue", address(manager), "addVesting", address(bob), uint8(0), false, uint16(104), start, uint128(700));
         bool reverted = false;
-        try a1.do(address(manager), "addVesting", address(bob), uint8(0), false, uint16(104), start, uint128(700)) {
+        try a2.do(address(registry), "castVoteOnIssue", address(manager), "addVesting", address(bob), uint8(0), false, uint16(104), start, uint128(700)) {
         } catch {
             reverted = true;
         }
