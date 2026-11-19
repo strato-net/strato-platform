@@ -9,6 +9,8 @@ module SolidVM.Solidity.StaticAnalysis.Typechecker
   ( detector
   , detector'
   , showType
+  , expressionType
+  , isIntegerLiteral
   )
 where
 
@@ -43,6 +45,26 @@ import Blockchain.VM.SolidException
 
 emptyAnnotation :: SourceAnnotation Text
 emptyAnnotation = (SourceAnnotation (initialPosition "") (initialPosition "") "")
+
+isIntegerLiteral :: ExpressionF a -> Bool
+isIntegerLiteral = \case
+  NumberLiteral{} -> True
+  InlineBoundsCheck _ _ _ e -> isIntegerLiteral e
+  Unitary _ "-" e -> isIntegerLiteral e
+  Binary _ operator a b | operator `elem` ["+", "-", "*", "/", "%", "**", "|", "&", "^", "<<", ">>"] ->
+    isIntegerLiteral a && isIntegerLiteral b
+  _ -> False
+
+expressionType :: CodeCollection -> Contract -> M.Map SolidString SVMType.Type -> Expression -> Maybe SVMType.Type
+expressionType cc ct locals expression = concrete result
+  where
+    annotate annotation = annotation {_sourceAnnotationAnnotation = ""}
+    environment = R False (annotate <$> cc) (annotate <$> ct) Nothing Nothing Nothing
+    variables = M.mapWithKey (\name typ -> VarDefEntry (Just typ) Nothing name emptyAnnotation) locals
+    result = runReader (evalStateT (tcExpr $ annotate <$> expression) ((Nothing, variables) :| [])) environment
+    concrete (Static typ _) = Just typ
+    concrete (Mutable typ) = concrete typ
+    concrete _ = Nothing
 
 data R = R
   { isRunningTests :: Bool,
@@ -419,16 +441,17 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames functionAr
                 Product (t1,t2,ts) _ -> (t1:t2:ts)
                 _ -> [args]
               zipped = M.fromList $ zip a pTypes
+              missing = bottom $ "Argument name does not exist" <$ context' args
               newOrder =
                 map
                   ( \case
-                      Nothing -> error "Argument name does not exist"
+                      Nothing -> missing
                       Just x -> case M.lookup x zipped of
-                        Nothing -> error "Argument name does not exist" x
+                        Nothing -> missing
                         Just y -> y
                   )
                   funcArgNames
-           in toType (productContext args) newOrder
+           in toType (context' args) newOrder
   p <- case argNames of
     Nothing -> typecheck funcArgTypes args
     _ -> typecheck funcArgTypes reorderedArgs

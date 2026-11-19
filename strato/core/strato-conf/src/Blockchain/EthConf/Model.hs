@@ -273,7 +273,6 @@ data NetworkConf = NetworkConf
   , chainId :: Integer
   , httpPort :: Int
   , txSizeLimit :: Int
-  , gasLimit :: Integer
   , blockPeriodMs :: Int
   , roundPeriodS :: Int
   -- | Seconds a proposed block's header timestamp may run ahead of this node's
@@ -312,17 +311,26 @@ instance FromJSON NetworkConf where
       <*> v .:? "chainId" .!= computeChainId net
       <*> v .:? "httpPort" .!= 8081
       <*> v .:? "txSizeLimit" .!= 2097152
-      <*> v .:? "gasLimit" .!= 1000000
       <*> v .:? "blockPeriodMs" .!= 1000
       <*> v .:? "roundPeriodS" .!= 3600
       <*> v .:? "maxTimestampDriftS" .!= defaultMaxTimestampDriftS
-      <*> v .:? "stakingActivationBlock" .!= defaultStakingActivationBlock net
+      <*> (fixedHeight net (defaultStakingActivationBlock net) <$> v .:? "stakingActivationBlock" .!= defaultStakingActivationBlock net)
       <*> v .:? "stakingContractAddress" .!= defaultStakingContractAddress net
-      <*> v .:? "stakingEventsFromGovernanceBlock" .!= defaultStakingEventsFromGovernanceBlock net
+      <*> (fixedHeight net (defaultStakingEventsFromGovernanceBlock net) <$> v .:? "stakingEventsFromGovernanceBlock" .!= defaultStakingEventsFromGovernanceBlock net)
+
+-- | The staking heights of upquark and helium are the network's, not a node's:
+-- a node that kept an earlier height in its ethconf.yaml would switch rules at
+-- a different block from the rest. On those networks the height in the file is
+-- ignored and the one defined here is used.
+fixedHeight :: String -> Maybe Integer -> Maybe Integer -> Maybe Integer
+fixedHeight net height configured
+  | net == "upquark" || take 6 net == "helium" = height
+  | otherwise = configured
 
 -- | Sentinel meaning "staking activation has not been scheduled yet" — used as
 -- the default for networks that already exist so that a node upgrade never
--- switches consensus rules on its own. Set an explicit height in ethconf.yaml.
+-- switches consensus rules on its own. Set an explicit height in ethconf.yaml
+-- (upquark and helium take theirs from here instead, see 'fixedHeight').
 stakingNotScheduled :: Integer
 stakingNotScheduled = 2 ^ (62 :: Int)
 
@@ -334,7 +342,7 @@ defaultMaxTimestampDriftS = 15
 -- dev/test networks) activates from genesis.
 defaultStakingActivationBlock :: String -> Maybe Integer
 defaultStakingActivationBlock net
-  | net == "upquark" = Just 2000000
+  | net == "upquark" = Just 1010000
   | net `elem` ["lithium", "mercata", "mercata-hydrogen", "uranium"] = Just stakingNotScheduled
   | take 6 net == "helium" = Just 250000
   | otherwise = Nothing
@@ -388,14 +396,14 @@ stratoTokenAddress net
 -- wherever DeciderState points at a FeeRouter; the native-token switch is
 -- consensus-visible, so a live network keeps the configured token until its
 -- flag day (helium: 2026-10-19 tip 804099 + 50000, rounded up to 900000;
--- upquark: the same block staking activates at, so the two switch together;
+-- upquark: 1000000, ahead of its staking activation at 1010000;
 -- forktest: the mainnet-activation rehearsal, far enough past its idle tip
 -- that the lazy-block network only reaches it when driven there).
 -- A network without a STRATO token never leaves it.
 stratoGasForkBlock :: String -> Integer
 stratoGasForkBlock net
   | take 6 net == "helium" = 900000
-  | net == "upquark" = 2000000
+  | net == "upquark" = 1000000
   | net == "forktest" = 1000
   | otherwise = 0
 
@@ -561,7 +569,6 @@ instance Default NetworkConf where
     , chainId = computeChainId "upquark"
     , httpPort = 8081
     , txSizeLimit = 2097152  -- 2 MiB
-    , gasLimit = 1000000
     , blockPeriodMs = 1000   -- minimum delay between blocks
     , roundPeriodS = 3600    -- backstop: seconds without progress before a forced round change
     , maxTimestampDriftS = defaultMaxTimestampDriftS

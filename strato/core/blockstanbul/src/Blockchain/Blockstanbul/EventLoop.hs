@@ -72,7 +72,7 @@ authorize = \case
 isAuthorized :: StateMachineM m => InEvent -> m AuthResult
 isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ do
   doAuthn <- use productionAuth
-  authenticated <- authenticate iev
+  authenticated <- flip authenticate iev =<< use chainId
   let raiseInProd reason = when doAuthn $ do
         $logWarnS "blockstanbul/auth" . T.pack $ reason
         throwE reason --debug statement?
@@ -175,17 +175,25 @@ mayVote = do
 
 roundChange :: (StateMachineM m) => ConduitM InEvent EOutEvent m ()
 roundChange = do
-  nextView <- uses view (over round (+ 1))
-  let target = _round nextView
+  v <- use view
   already <- use pendingRound
+  -- A round joined on a minority of votes can be past this view's next one.
+  -- Keep retrying that round rather than falling back to a lower one.
+  let target = max (_round v + 1) (fromMaybe 0 already)
   pendingRound .= Just target
   -- One signed ROUNDCHANGE per target round. Retransmitting with a new
   -- nonce breaks P2P rlpHash dedup and is what produced the floods.
-  when (already /= Just target) $
-    whenM mayVote $ do
-      rawMsg <- createRoundChangeMessage nextView
-      msg <- signMessage rawMsg
-      yieldR msg
+  whenM mayVote $ do
+    sent <- use sentRoundChange
+    case sent of
+      -- Re-send the same signed bytes: P2P forwards them only to peers that
+      -- never got them, so a vote lost to a dropped link still arrives.
+      Just msg@(OMsg _ RoundChange {roundchangeView = rv}) | _round rv == target -> yieldR msg
+      _ -> do
+        rawMsg <- createRoundChangeMessage (v & round .~ target)
+        msg <- signMessage rawMsg
+        sentRoundChange ?= msg
+        yieldR msg
 
 -- | Stamp the consensus data this node is responsible for (the validator set,
 -- and — once staking is active — the round and the stake weights in force) and
@@ -276,12 +284,25 @@ nextRound nt = do
 
   prepared .= M.empty
   committed .= M.empty
-  roundChanged %= M.dropWhileAntitone (<= thisR)
+  -- Round-change votes are scoped to a single height. Within a height, drop only the
+  -- rounds now behind us and keep votes for a still-higher pending round. On a height
+  -- change, clear them all: 'roundChanged' holds only the voters, not the height they
+  -- voted at, so a vote cast for the height just left would otherwise count toward a
+  -- round change at the next one, where one stale vote plus one fresh vote could cross
+  -- the threshold the set never actually met.
+  case nt of
+    Round _ -> do
+      roundChanged %= M.dropWhileAntitone (<= thisR)
+      catchUpVotes %= M.dropWhileAntitone (<= thisR)
+    Sequence _ -> do
+      roundChanged .= M.empty
+      catchUpVotes .= M.empty
 
   hasPreprepared .= False
   hasCommitted .= False
   hasPrepared .= False
   pendingRound .= Nothing
+  sentRoundChange .= Nothing
 
   when (isJust self) $ isValidator .= (Validator (fromJust self) `elem` vals)
 
@@ -294,6 +315,30 @@ applyValidatorChanges hdr = do
   validators %= (flip S.difference $ S.fromList removed)
   stakes %= applyStakeDelta removed (M.fromList $ getBlockStakeUpdates hdr)
 
+-- | A PREPARE or COMMIT for a higher round of the current sequence is a round-change
+-- certificate: evidence the network moved on. Buffer the sender, keep the message
+-- moving through the mesh, and once more than a third of the weight has shown at that
+-- round, catch up to it (see '_catchUpVotes'). A node only prepares or commits at the
+-- round it is on, so more than a third there means at least one honest validator
+-- reached it; catching up only lets this node take part, since a commit still needs a
+-- supermajority. This is what unsticks a node whose round fell behind the live one (a
+-- restart or replay lands it at the committed header's round) without waiting for its
+-- own view timer.
+noteCatchUp :: StateMachineM m => MsgAuth -> View -> TrustedMessage -> ConduitM InEvent EOutEvent m ()
+noteCatchUp auth v' msg = do
+  let rn = _round v'
+  -- Every such message is passed on, a validator's COMMIT after its PREPARE
+  -- included: peers may need it for their quorum, and p2p never resends a
+  -- message it has seen. The sender set only counts weight toward catching up.
+  yieldL $ OMsg auth msg
+  votes <- catchUpVotes <%= M.alter (Just . S.insert (Validator $ sender auth) . fromMaybe S.empty) rn
+  weights <- gets currentVoteWeights
+  let voters = fromMaybe S.empty $ M.lookup rn votes
+  chainId' <- use chainId
+  when (toInteger (_sequence v') + 1 >= wholeMessageSigningBlock chainId' && hasMinority weights voters) $ do
+    $logInfoS "blockstanbul/roundchange" . T.pack $ printf "Catching up to round %s on a certificate" (show rn)
+    nextRound (Round rn)
+
 commitBlock :: StateMachineM m =>
                Block -> ConduitM InEvent EOutEvent m ()
 commitBlock blk = do
@@ -304,7 +349,17 @@ commitBlock blk = do
   $logInfoS "blockstanbul" . T.pack $
     printf "Committed block #%d (%s)" blockNo (shortDescription hsh)
   lastParent .= Just hsh
-  lastRound .= getBlockRound (blockBlockData blk)
+  let blockRound = getBlockRound (blockBlockData blk)
+  lastRound .= blockRound
+  -- Catch the view round up to the committed block's round. Rounds persist across
+  -- heights, and the others committed this block at its header round or a later one.
+  -- A block that reaches this node by replay or sync advances its height only, so
+  -- without this the node sits on its old round: it rejects every proposal of the
+  -- next height as a view mismatch, misses its own slot, and the round change that
+  -- costs is what finally moves it. One validator a block behind during a round
+  -- change was enough to start that. A block committed here by its own quorum has a
+  -- header round at or below the view round, so this changes nothing for it.
+  view . round %= max (fromIntegral blockRound)
   clearLock
   myBlock .= Nothing
   whenM (use hasPreprepared) $
@@ -456,7 +511,12 @@ eventLoop ctx = execStateC ctx $
                   yieldR $ GapFound (intSeq v) (intSeq v') (sender auth)
                 when (_sequence v > _sequence v') $
                   yieldR $ LeadFound (intSeq v) (intSeq v') (sender auth)
-                roundChange
+                -- An older view means a late or re-sent copy of a proposal
+                -- this proposer made before, which says nothing about the
+                -- current view. Voting to change round on it would let anyone
+                -- holding an old proposal skip the proposer, so ignore it and
+                -- wait for the real proposal or the view timer.
+                when (v < v') roundChange
               | isJust mBlockLock && Just pp /= mBlockLock -> do
                 $logWarnS "blockstanbul/ppl" "Rejecting proposal: block does not match lock"
                 $logInfoS "blockstanbul/roundchange" "lock mismatch"
@@ -479,7 +539,9 @@ eventLoop ctx = execStateC ctx $
                       proposal .= Just pp
                       -- run in vm before sending prepare
                       whenM mayVote . yieldR $ RunPreprepare pp
-        IMsg auth ppp@(Prepare v' di) -> when (v <= v') $ do
+        IMsg auth ppp@(Prepare v' di) -> do
+         when (_sequence v == _sequence v' && _round v < _round v') $ noteCatchUp auth v' ppp
+         when (v == v') $ do
           preparers <- use prepared
           unless (M.member (Validator $ sender auth) preparers) . yieldL $ OMsg auth ppp
           ps <- prepared <%= M.insert (Validator $ sender auth) di
@@ -494,12 +556,15 @@ eventLoop ctx = execStateC ctx $
             whenM mayVote $ do
               msg <- signMessage (Commit v di seal)
               yieldR msg
-        IMsg auth ccc@(Commit v' di seal) -> when (v <= v') $ do
+        IMsg auth ccc@(Commit v' di seal) -> do
+         when (_sequence v == _sequence v' && _round v < _round v') $ noteCatchUp auth v' ccc
+         when (v == v') $ do
           committors <- use committed
           unless (M.member (Validator $ sender auth) committors) . yieldL $ OMsg auth ccc
           cs <- committed <%= M.insert (Validator $ sender auth) (di, seal)
           weights <- gets currentVoteWeights
-          let quorum = hasSupermajority weights . M.keysSet . M.filter ((== di) . fst) $ cs
+          let votes = M.filter ((== di) . fst) cs
+              quorum = hasSupermajority weights $ M.keysSet votes
           sameHash <- hasSameHash di
           -- TODO(tim): Is it necessary to check that we have prepared?
           hasSent <- use hasCommitted
@@ -509,7 +574,7 @@ eventLoop ctx = execStateC ctx $
             case ppl of
               Nothing -> error "TODO(tim): Decide how to handle this"
               Just blk -> do
-                let seals = map snd . M.elems $ cs
+                let seals = map snd $ M.elems votes
                 let blockNo = number . blockBlockData $ blk
                 recordMaxBlockNumber "pbft_commit" blockNo
                 commitBlock $ addCommitmentSeals seals blk
@@ -533,6 +598,7 @@ eventLoop ctx = execStateC ctx $
                   whenM mayVote $ do
                     rawMsg <- createRoundChangeMessage vn
                     msg <- signMessage rawMsg
+                    sentRoundChange ?= msg
                     yieldR msg
                 when (hasSupermajority weights voters) $ do
                   next <- use pendingRound

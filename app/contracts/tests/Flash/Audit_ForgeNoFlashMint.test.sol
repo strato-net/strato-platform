@@ -1,6 +1,5 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/Metals/MetalForge.sol";
 
@@ -44,16 +43,15 @@ contract Iterator {
     }
 }
 
-contract Describe_ForgeLeverageWithoutFlashMint is Authorizable {
+contract Describe_ForgeLeverageWithoutFlashMint {
     Mercata m;
     CDPEngine cdp; CDPRegistry reg; PriceOracle oracle; AdminRegistry admin; MetalForge forge;
     address USDST; address GOLD;
-    Token usdstT; Token goldT;
+    Token usdstT;
     string[] empty;
     uint GOLD_PRICE; uint MINCR;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         empty = new string[](0);
         GOLD_PRICE = 4595510000000000000000;
         MINCR = 155e16;
@@ -62,15 +60,17 @@ contract Describe_ForgeLeverageWithoutFlashMint is Authorizable {
         cdp = m.cdpEngine(); reg = m.cdpRegistry();
         oracle = m.priceOracle(); admin = m.adminRegistry();
 
-        USDST = m.tokenFactory().createToken("USDST","USD Stable",empty,empty,empty,"USDST",0,18);
-        usdstT = Token(USDST); usdstT.setStatus(2);
-        GOLD = m.tokenFactory().createToken("GOLDST","Gold",empty,empty,empty,"GOLDST",0,18);
-        goldT = Token(GOLD); goldT.setStatus(2);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",empty,empty,empty,"USDST",0,18);
+        USDST = address(ret);
+        usdstT = Token(USDST); admin.castVoteOnIssue(USDST, "setStatus", 2);
+        (executed, ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "GOLDST","Gold",empty,empty,empty,"GOLDST",0,18);
+        GOLD = address(ret);
+        admin.castVoteOnIssue(GOLD, "setStatus", 2);
 
-        reg.setUSDST(USDST);
-        oracle.setAssetPrice(USDST, 1e18);
-        oracle.setAssetPrice(GOLD, GOLD_PRICE);
-        cdp.setCollateralAssetParams(GOLD, 150e16, MINCR, 1000, 5000, 1e27, 1e18, 1e30, false);
+        admin.castVoteOnIssue(address(reg), "setUSDST", USDST);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", USDST, 1e18);
+        admin.castVoteOnIssue(address(oracle), "setAssetPrice", GOLD, GOLD_PRICE);
+        admin.castVoteOnIssue(address(cdp), "setCollateralAssetParams", GOLD, 150e16, MINCR, 1000, 5000, 1e27, 1e18, 1e30, false);
 
         forge = new MetalForge(address(this));
         forge.initialize(address(oracle), address(0xDEAD), address(m.feeCollector()), USDST);
@@ -88,7 +88,7 @@ contract Describe_ForgeLeverageWithoutFlashMint is Authorizable {
         it.init(address(cdp), address(forge), USDST, GOLD);
 
         uint equityGold = (100000e18 * 1e18) / GOLD_PRICE;   // $100,000 of equity
-        goldT.mint(address(it), equityGold);
+        admin.castVoteOnIssue(GOLD, "mint", address(it), equityGold);
         it.seedEquity();
 
         // 15 ordinary rounds. The series converges as (1 - r^(n+1))/(1 - r) with

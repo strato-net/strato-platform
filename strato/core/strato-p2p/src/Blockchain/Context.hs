@@ -28,12 +28,16 @@ module Blockchain.Context
     , RunsServer(..)
     , ActionTimestamp(..)
     , emptyActionTimestamp
+    , PbftWindow(..)
+    , admitPbftMessage
+    , maxPbftMessagesPerSecond
     , PeerAddress(..)
     , GenesisBlockHash(..)
     , PeerRunner
     , RemainingBlockHeaders(..)
     , LastResync(..)
     , HasResyncGate(..)
+    , HasPeerClaims(..)
     , initConfig
     , initContext
     , runContextM
@@ -54,6 +58,7 @@ module Blockchain.Context
     , withActivePeer
     ) where
 
+import           Blockchain.EventException               (EventException (PeerNonResponsive))
 import           Conduit
 import           Control.Applicative
 import           Control.Exception                       hiding (bracket, catch, throwIO)
@@ -75,6 +80,8 @@ import qualified Data.Set.Ordered                        as S
 import           Data.String
 import qualified Data.Text                               as T
 import           Data.Time.Clock
+import           Data.Time.Clock.POSIX                   (getPOSIXTime)
+import           Data.Unique                             (Unique, newUnique)
 import           GHC.Exts                                (Constraint)
 
 import           BlockApps.Logging
@@ -90,6 +97,7 @@ import qualified Blockchain.EthConf.Model as Conf
 import           Blockchain.Model.SyncState
 import qualified Blockchain.Model.SyncTask               as SYNCTASK
 import           Blockchain.P2PUtil
+import           Blockchain.PeerClaims
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka              as SK
 
@@ -105,7 +113,7 @@ import           Blockchain.Strato.Model.Keccak256
 
 import qualified Blockchain.Strato.RedisBlockDB          as RBDB
 import           Blockchain.SyncDB
-import           Control.Monad                           (unless, void)
+import           Control.Monad                           (forM_, unless, void, when)
 import           Control.Monad.Composable.Base
 import           Control.Monad.Composable.BlockDB (BlockDBEnv, HasBlockDB, runBlockDB)
 import qualified Database.Persist.Sql                    as SQL
@@ -153,13 +161,38 @@ data Config = Config
     -- shared: when it was per-connection, a single gap made EVERY connection
     -- fetch the same 500-block range (measured: one range pulled 113 times by
     -- 113 different peer threads, 8.7x total duplication).
-    configLastResync               :: IORef LastResync
+    configLastResync               :: IORef LastResync,
+    -- Process-wide: what every connection's peer says its best block is. Held
+    -- while the world best derived from it is written to Redis, so those writes
+    -- land in the order the claims changed.
+    configPeerClaims               :: MVar (PeerClaims Unique),
+    -- This connection's key in configPeerClaims; swapped in by the peer runner.
+    configConnectionId             :: Unique
   }
 
 newtype ActionTimestamp = ActionTimestamp {unActionTimestamp :: Maybe UTCTime}
 
 emptyActionTimestamp :: ActionTimestamp
 emptyActionTimestamp = ActionTimestamp Nothing
+
+-- | This connection's consensus messages in the current second: (second, count).
+newtype PbftWindow = PbftWindow (Integer, Int)
+
+-- | The most consensus messages one connection may hand this node in a second:
+-- far above what a validator set sends in a round, and a bound on a peer that
+-- floods.
+maxPbftMessagesPerSecond :: Int
+maxPbftMessagesPerSecond = 500
+
+-- | Count a consensus message against this connection's second; False once
+-- the second is full.
+admitPbftMessage :: (MonadIO m, Mod.Modifiable PbftWindow m) => m Bool
+admitPbftMessage = do
+  now <- liftIO $ floor <$> getPOSIXTime
+  PbftWindow (second, n) <- Mod.get (Proxy @PbftWindow)
+  let n' = if second == now then n + 1 else 1
+  Mod.put (Proxy @PbftWindow) $ PbftWindow (now, n')
+  pure $ n' <= maxPbftMessagesPerSecond
 
 newtype RemainingBlockHeaders = RemainingBlockHeaders {unRemainingBlockHeaders :: [BlockHeader]}
 
@@ -175,6 +208,7 @@ data Context = Context
   { blockHeaders          :: ([BlockHeader], UTCTime) -- keep track when last updated global headers cache
   , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp       :: ActionTimestamp
+  , pbftWindow            :: PbftWindow
   , _blockstanbulPeerAddr :: PeerAddress
   , _outboundWireMessages :: S.OSet (Host, Keccak256)
   }
@@ -213,7 +247,7 @@ instance RunsClient ContextM where
     let peerAddress = BC.pack $ hostToString host'
     runGeneralTCPClient (clientSettings p peerAddress) $ \app -> do
       let pSource = appSource app
-          pSink = appSink app
+          pSink = timedPeerSink app
           conduits = P2pConduits pSource pSink sSource
       -- Logged here, where the address is known, and rethrown so the client
       -- loop's handler can disable the peer: swallowed, every failure was
@@ -229,7 +263,7 @@ instance RunsServer ContextM where
     let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort' "*"
     runGeneralTCPServer settings $ \app -> runner $ \sSource -> do
       let pSource = appSource app
-          pSink = appSink app
+          pSink = timedPeerSink app
           conduits = P2pConduits pSource pSink sSource
           ip = fromString . sockAddrToIP $ appSockAddr app
           pn = TCPPort . fromMaybe 30303 . sockAddrToPort $ appSockAddr app
@@ -237,16 +271,47 @@ instance RunsServer ContextM where
         (handler conduits ip pn)
         (\(e :: SomeException) -> $logErrorS "runServer/Exception" . T.pack $ show e)
 
-instance Mod.Modifiable WorldBestBlock ContextM where
-  get _ =
-    RBDB.withRedisBlockDB getWorldBestBlockInfo <&> \case
-      Nothing -> WorldBestBlock $ BestBlock (unsafeCreateKeccak256FromWord256 0) (-1)
-      Just (BestBlock s n) -> WorldBestBlock $ BestBlock s n
-  put _ (WorldBestBlock (BestBlock s n)) =
-    RBDB.withRedisBlockDB (updateWorldBestBlockInfo s n) >>= \case
-      Left _ -> $logInfoS "ContextM.put WorldBestBlock" $ T.pack "Failed to update WorldBestBlockInfo"
-      Right False -> $logInfoS "ContextM.put WorldBestBlock" $ T.pack "NewBlock is not better than existing WorldBestBlock"
-      Right True -> return ()
+-- | Writes to the peer, giving up once one write has waited connectionTimeout
+-- seconds. A peer that stops reading would otherwise block the connection's loop
+-- on its socket: the sequencer events it has not been sent pile up unread, and
+-- the idle timer, which runs in that same loop, cannot fire.
+timedPeerSink :: MonadIO m => AppData -> ConduitM B.ByteString Void m ()
+timedPeerSink app = awaitForever $ \bs -> liftIO $
+  timeout (Conf.connectionTimeout (p2pConfig ethConf) * 1000000) (runConduit $ yield bs .| appSink app)
+    >>= maybe (throwIO PeerNonResponsive) pure
+
+-- | What peers say the chain's height is (see "Blockchain.PeerClaims"). A height
+-- is -1 while nobody has claimed one.
+class HasPeerClaims m where
+  -- | This connection's peer, at the given host, says this is its best block.
+  claimPeerBest :: Host -> BestBlock -> m ()
+  -- | This connection is over.
+  withdrawPeerClaim :: m ()
+  -- | What this connection's peer claims: how far it can be asked for blocks.
+  peerBestNumber :: m Integer
+  -- | What the connected peers agree on: what "caught up" is measured against.
+  worldBestNumber :: m Integer
+
+instance HasPeerClaims ContextM where
+  claimPeerBest host' best = do
+    conn <- asks configConnectionId
+    updatePeerClaims $ claim conn host' best
+  withdrawPeerClaim = updatePeerClaims . withdraw =<< asks configConnectionId
+  peerBestNumber = do
+    conn <- asks configConnectionId
+    maybe (-1) bestBlockNumber . claimOf conn <$> (readMVar =<< asks configPeerClaims)
+  worldBestNumber = maybe (-1) bestBlockNumber . worldBest <$> (readMVar =<< asks configPeerClaims)
+
+-- | Change the claims and, when that moves the world best, publish it to Redis
+-- for the API. Nothing is published while no peer has claimed anything.
+updatePeerClaims :: (PeerClaims Unique -> PeerClaims Unique) -> ContextM ()
+updatePeerClaims f = do
+  claims <- asks configPeerClaims
+  modifyMVar_ claims $ \old -> do
+    let new = f old
+    forM_ (worldBest new) $ \best ->
+      when (worldBest old /= Just best) . RBDB.withRedisBlockDB $ putWorldBestBlockInfo best
+    pure new
 
 instance Mod.Modifiable BestBlock ContextM where
   get _ =
@@ -339,6 +404,10 @@ instance Mod.Modifiable Context ContextM where
 instance Mod.Modifiable ActionTimestamp ContextM where
   get _ = actionTimestamp <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {actionTimestamp = k}, ()))
+
+instance Mod.Modifiable PbftWindow ContextM where
+  get _ = pbftWindow <$> Mod.get (Proxy @Context)
+  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {pbftWindow = k}, ()))
 
 instance Mod.Accessible ActionTimestamp ContextM where
   access _ = Mod.get (Proxy @ActionTimestamp)
@@ -462,6 +531,7 @@ type MonadP2P m =
   ( MonadIO m,
     MonadLogger m,
     HasResyncGate m,
+    HasPeerClaims m,
     MonadResource m,
     MonadUnliftIO m,
     HasVault m,
@@ -486,7 +556,7 @@ type MonadP2P m =
       '[Mod.Modifiable]
       '[ BestBlock,
          BestSequencedBlock,
-         WorldBestBlock
+         PbftWindow
        ]
       m,
     All2
@@ -528,8 +598,11 @@ getActionTimestamp = Mod.access (Proxy @ActionTimestamp)
 clearActionTimestamp :: Mod.Modifiable ActionTimestamp m => m ()
 clearActionTimestamp = Mod.put (Proxy @ActionTimestamp) emptyActionTimestamp
 
+-- | A connection's claim about the chain's height ends with the connection.
 runContextM :: Config -> ContextM a -> Eff '[VaultData, Logger] ()
-runContextM r (ContextM m) = void . withResources $ withReaderEnv r $ runBlockDB (configSQLDB r) m
+runContextM r m =
+  void . withResources . withReaderEnv r . runBlockDB (configSQLDB r) . unContextM $
+    m `UnliftIO.finally` withdrawPeerClaim
 
 initConfig :: (MonadLogger m, MonadUnliftIO m) => IORef (S.OSet Keccak256) -> m Config
 initConfig wireMessagesRef = do
@@ -582,6 +655,8 @@ initConfig wireMessagesRef = do
   streamEnv <- createStreamEnv "strato-p2p" (Conf.streamingHost k, Conf.streamingPort k)
   streamEnvVar <- newMVar streamEnv
   lastResyncRef <- newIORef $ LastResync Nothing
+  peerClaimsVar <- newMVar noClaims
+  connectionId <- liftIO newUnique
   return $ Config
     { configSQLDB = sqlDB' dbs
     , configPeerDB = peerDB' dbs
@@ -590,12 +665,15 @@ initConfig wireMessagesRef = do
     , configBlockstanbulWireMessages = wireMessagesRef
     , configStreamEnv = streamEnvVar
     , configLastResync = lastResyncRef
+    , configPeerClaims = peerClaimsVar
+    , configConnectionId = connectionId
     }
 
 initContext :: MonadIO m => m Context
 initContext =
   return $
     Context { actionTimestamp = emptyActionTimestamp
+            , pbftWindow = PbftWindow (0, 0)
             , blockHeaders = ([], jamshidBirth)
             , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
             , _blockstanbulPeerAddr = PeerAddress Nothing

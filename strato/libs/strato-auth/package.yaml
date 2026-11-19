@@ -31,6 +31,7 @@ library:
     - servant-client-core
     - text
     - time
+    - unix
     - yaml
 
 executables:

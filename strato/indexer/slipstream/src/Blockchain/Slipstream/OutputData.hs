@@ -505,8 +505,15 @@ slipstreamQueryText _ InsertTable{..} = T.concat $
         ";"
       ])
 slipstreamQueryText _ InsertDelegatecall{} = ""
+-- A field's contract type can change between code collections, and CREATE OR
+-- REPLACE cannot change a function's return type, so the old function is dropped.
 slipstreamQueryText _ (CreateFkeyFunction ForeignKeyInfo{..}) = T.concat
-  [ "CREATE OR REPLACE FUNCTION "
+  [ "DROP FUNCTION IF EXISTS "
+  , textToDoubleQuoteText fkiFunctionName
+  , "("
+  , tableNameToDoubleQuoteText fkiSourceTableName
+  , ");\n\n"
+  , "CREATE FUNCTION "
   , textToDoubleQuoteText fkiFunctionName
   , "(\n  lp "
   , tableNameToDoubleQuoteText fkiSourceTableName
@@ -552,10 +559,10 @@ slipstreamQueryText _ (CreateFkeyFunction ForeignKeyInfo{..}) = T.concat
   , textToDoubleQuoteText fkiFunctionName
   , "(\n  "
   , tableNameToDoubleQuoteText fkiSourceTableName
-  , "\n) TO postgres;\n\n"
+  , "\n) TO CURRENT_USER;\n\n"
   , "GRANT SELECT ON "
   , tableNameToDoubleQuoteText fkiDestTableName
-  , " TO postgres;"
+  , " TO CURRENT_USER;"
   ]
 slipstreamQueryText _ (RefreshMaterializedView _tableName) = T.concat []
   -- [ "REFRESH MATERIALIZED VIEW CONCURRENTLY "
@@ -1384,6 +1391,7 @@ initialSlipstreamQueries =
   , RawSQL "DROP INDEX IF EXISTS mapping_idx, storage_status_address_idx;"
   , RawSQL jsonbMergeDeepSQL
   , RawSQL jsonbObjToArraySQL
+  , RawSQL postgrestPreRequestSQL
   , RawSQL upsertViewSQL
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "event") (indexTableName "" "storage") False "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "event" (indexTableName "" "storage") (indexTableName "" "event") True "address" SqlText
@@ -1448,6 +1456,74 @@ genericBaseTableIndexesSQL = T.unlines
   , ""
   , "CREATE INDEX IF NOT EXISTS event_block_number_idx"
   , "  ON event ((block_number::numeric), event_index);"
+  , ""
+    -- Lookups by transaction hash and by an address in any of its roles
+    -- (sender, emitting contract, or the to/from/recipient/stratoRecipient
+    -- attribute). Without these each one scans the whole table; a crawler
+    -- fanning them out through the explorer filled the PostgREST pool and
+    -- took an RPC node down on 2026-11-01. The attribute indexes are hash,
+    -- not btree: an attribute holds whatever the contract emitted, and a
+    -- btree entry over about 2.7 kB fails the INSERT (SQLSTATE 54000), which
+    -- would stop ingestion; only equality is needed. They are partial to
+    -- skip the rows without the attribute. The planner cannot use a partial
+    -- index's statistics for the 6-way OR the explorer sends, so the
+    -- extended statistics on the same expressions are what let it estimate
+    -- that query and pick the bitmap plan over a walk of event_timestamp_idx.
+  , "CREATE INDEX IF NOT EXISTS event_transaction_hash_idx"
+  , "  ON event (transaction_hash);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_transaction_sender_idx"
+  , "  ON event (transaction_sender);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_attr_to_hash_idx"
+  , "  ON event USING hash ((attributes->>'to'))"
+  , "  WHERE (attributes->>'to') IS NOT NULL;"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_attr_from_hash_idx"
+  , "  ON event USING hash ((attributes->>'from'))"
+  , "  WHERE (attributes->>'from') IS NOT NULL;"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_attr_recipient_hash_idx"
+  , "  ON event USING hash ((attributes->>'recipient'))"
+  , "  WHERE (attributes->>'recipient') IS NOT NULL;"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_attr_strato_recipient_hash_idx"
+  , "  ON event USING hash ((attributes->>'stratoRecipient'))"
+  , "  WHERE (attributes->>'stratoRecipient') IS NOT NULL;"
+  , ""
+    -- The btree versions of the four, created by hand on the mainnet rpc
+    -- nodes before this code existed.
+  , "DROP INDEX IF EXISTS event_attr_to_idx, event_attr_from_idx,"
+  , "  event_attr_recipient_idx, event_attr_strato_recipient_idx;"
+  , ""
+  , "CREATE STATISTICS IF NOT EXISTS event_attr_to_stats"
+  , "  ON (attributes->>'to') FROM event;"
+  , ""
+  , "CREATE STATISTICS IF NOT EXISTS event_attr_from_stats"
+  , "  ON (attributes->>'from') FROM event;"
+  , ""
+  , "CREATE STATISTICS IF NOT EXISTS event_attr_recipient_stats"
+  , "  ON (attributes->>'recipient') FROM event;"
+  , ""
+  , "CREATE STATISTICS IF NOT EXISTS event_attr_strato_recipient_stats"
+  , "  ON (attributes->>'stratoRecipient') FROM event;"
+  ]
+
+-- PostgREST runs this inside every request's transaction (db-pre-request in
+-- postgrest-packager) to cap the request's statements. It lives here rather
+-- than in the PostgREST image because slipstream always writes to the
+-- primary, while an API node's PostgREST may read a replica, where any DDL
+-- is refused. The limit comes from the strato.postgrest_statement_timeout
+-- setting PostgREST carries on its connections (POSTGREST_STATEMENT_TIMEOUT),
+-- so each PostgREST keeps its own value; set_config's third argument scopes
+-- it to the transaction, so the indexer's sessions are never affected.
+postgrestPreRequestSQL :: Text
+postgrestPreRequestSQL = T.unlines
+  [ "CREATE OR REPLACE FUNCTION postgrest_pre_request() RETURNS void AS $fn$"
+  , "  SELECT set_config('statement_timeout',"
+  , "    coalesce(nullif(current_setting('strato.postgrest_statement_timeout', true), ''), '60s'),"
+  , "    true);"
+  , "$fn$ LANGUAGE sql;"
   ]
 
 jsonbMergeDeepSQL :: Text

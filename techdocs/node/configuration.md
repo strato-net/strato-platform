@@ -55,7 +55,6 @@ These flags are handled by `strato-up` itself and are not passed to `strato-setu
 | `--connectionTimeout` | `120` | Seconds to tolerate a peer that isn't sending anything useful. |
 | `--maxTxsPerBlock` | `500` | Maximum transactions in a block. |
 | `--mempoolLivenessCutoff` | `60` | Maximum age, in seconds, of a transaction kept in the mempool. |
-| `--gasLimit` | `1000000` | Maximum gas a transaction can use. |
 | `--txSizeLimit` | `2097152` | Maximum length of an RLP-encoded transaction, in bytes (2 MiB). |
 
 ### Consensus and VM flags
@@ -84,7 +83,7 @@ Main sections:
 
 | Section | Contains |
 |---|---|
-| `networkConfig` | `network`, `role` (what the directory was set up as, `node` unless `--role` was given), `networkID`, `chainId`, `httpPort`, `txSizeLimit`, `gasLimit`, `blockPeriodMs`, `roundPeriodS`, `maxTimestampDriftS`, and the staking activation settings |
+| `networkConfig` | `network`, `role` (what the directory was set up as, `node` unless `--role` was given), `networkID`, `chainId`, `httpPort`, `txSizeLimit`, `blockPeriodMs`, `roundPeriodS`, `maxTimestampDriftS`, and the staking activation settings |
 | `urlConfig` | `nodeUrl` (from the host name), `vaultUrl`, `vaultTimeoutSec`, `cookieRealm` |
 | `p2pConfig`, `discoveryConfig` | Peer limits and timeouts |
 | `quarryConfig` | Block building: `maxTxsPerBlock`, `mempoolLivenessCutoff` |
@@ -122,11 +121,14 @@ All environment variables are optional.
 | `STRATO_SNAPSHOT_DOWNLOAD_DIR` | `strato-snapshot` | Download cache (default `./.snapshot-downloads`). |
 | `LOCAL_AUTH_ADMIN_USERNAME` | `strato-up`, `strato-user-add` | First admin username with `--localAuth` (default `admin`). |
 | `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET` | `strato-setup` | With `--localAuth` only: fixed client credentials for the local identity provider. Random values are generated otherwise. |
+| `RPC_RATE_LIMIT_PER_IP` | `nginx` | Requests per second `/rpc` accepts from one client address (default `25`). Requests over the limit get HTTP 429. |
+| `RPC_RATE_LIMIT_TOTAL` | `nginx` | Requests per second `/rpc` accepts from all clients together (default `200`). |
 
 Where these variables take effect:
 
 - **`strato-setup` variables** matter only when a node directory is created.
 - **`strato-logrotate` variables** are read at runtime, so set them in the environment you run `strato-up` from. With `--dockerMode=all` they reach the `strato` container the way the app variables do below, so give them on every `strato-up`.
+- **`nginx` variables** reach the `nginx` container the same way, and the container reads them when it is created. To change a limit, run `strato-down`, then `strato-up` with the new values.
 - **App variables:** the generated `docker-compose.yml` also passes app settings through from your environment, such as the `RPC_URL_*` external-chain RPC endpoints. Docker Compose substitutes them each time the containers start, so pass the same variables on every `strato-up`.
 
 ## Host name
@@ -209,6 +211,7 @@ What answers:
 
 - **JSON-RPC server.** `--jsonrpc` (on by default) starts `ethereum-jsonrpc` and exposes it through nginx at `/rpc`.
 - **Guarded methods.** On that public route, nginx rejects every `strato_*` method with HTTP 403. These are the simulation, trace and proof extensions. Standard `eth_*` methods and `debug_traceBlockByHash` are allowed.
+- **Rate limits.** nginx accepts 25 requests per second from one client address on `/rpc` and 200 per second from all clients together, and answers HTTP 429 above that. Set `RPC_RATE_LIMIT_PER_IP` and `RPC_RATE_LIMIT_TOTAL` to change the limits (see [Environment variables](#environment-variables)).
 - **Opening them up.** Start the node with `--publicStratoRpc=true` to allow the `strato_*` methods on `/rpc`. Bloc's transaction simulation endpoint is not affected by this flag.
 - **Turning JSON-RPC off.** Start the node with `--jsonrpc=false` to remove the process and the `/rpc` route.
 
@@ -220,7 +223,7 @@ With `--sslDir`, `strato-setup` copies `server.pem` and `server.key` into `mynod
 
 nginx then does the following:
 
-- It listens on 443 with TLS 1.2 and 1.3.
+- It listens on 443 with TLS 1.2. TLS 1.3 is off until the image moves to nginx 1.31.9 (CVE-2026-118899).
 - It redirects requests on `--httpPort` to HTTPS.
 
 Docker publishes both the HTTP port and 443.

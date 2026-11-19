@@ -5,6 +5,20 @@ set -e
 # No "set -x": the trace echoes PGPASSWORD and the rendered db-uri, which
 # put the Postgres password into the container log.
 
+if [ -n "${ETHCONF_FILE:-}" ]; then
+  PG_ENV_POSTGRES_HOST=$(yq -er '.cirrusConfig.host' "$ETHCONF_FILE")
+  PG_PORT_5432_TCP_PORT=$(yq -er '.cirrusConfig.port' "$ETHCONF_FILE")
+  PG_ENV_POSTGRES_USER=$(yq -er '.cirrusConfig.user | select(type == "string" and length > 0)' "$ETHCONF_FILE") || {
+    echo "ERROR: $ETHCONF_FILE must define a non-empty string for cirrusConfig.user" >&2
+    exit 1
+  }
+  PG_ENV_POSTGRES_DB=$(yq -er '.cirrusConfig.database' "$ETHCONF_FILE")
+  PG_ENV_POSTGRES_PASSWORD=$(yq -r '.cirrusConfig.password // ""' "$ETHCONF_FILE")
+  POSTGREST_ANONYMOUS=$PG_ENV_POSTGRES_USER
+fi
+
+: "${PG_ENV_POSTGRES_USER:?A PostgreSQL username is required in ETHCONF_FILE or PG_ENV_POSTGRES_USER}"
+
 # Read postgres password from mounted secrets file
 if [ -f /run/secrets/postgres_password ]; then
   PG_ENV_POSTGRES_PASSWORD=$(cat /run/secrets/postgres_password)
@@ -13,10 +27,28 @@ export PGPASSWORD="${PG_ENV_POSTGRES_PASSWORD:-}"
 
 echo "the pg host and port are: ${PG_ENV_POSTGRES_HOST} ${PG_PORT_5432_TCP_PORT}"
 
-until psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER:-postgres}" -c '\q'; do
+until psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" -d postgres -c '\q'; do
   >&2 echo "Postgres is unavailable - sleeping"
   sleep 1
 done
+
+# Per-request statement timeout. slipstream creates public.postgrest_pre_request()
+# on the primary (this PostgREST may be reading a replica, where DDL is
+# refused); PostgREST calls it inside every request's transaction
+# (db-pre-request in postgrest.conf), so the limit covers API queries only,
+# never slipstream's own sessions. The value travels on PostgREST's
+# connections as strato.postgrest_statement_timeout (see the db-uri in
+# postgrest.conf.tpl). 0 disables it. A query the client has already given
+# up on (the ALB and nginx cut requests at 60 s) is cancelled instead of
+# running on and holding a pool connection.
+#
+# PostgREST starts without the hook: convoke's `compose up --wait` needs this
+# container healthy, so listening, before it launches slipstream, which
+# creates the database and the function. The watcher further down adds
+# db-pre-request to postgrest.conf and reloads the configuration (SIGUSR2)
+# once the function exists.
+PRE_REQUEST_SQL="select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'postgrest_pre_request'"
+POSTGREST_PRE_REQUEST=""
 
 render_template() {
   eval "echo \"$(sed 's/\"/\\"/g' $1)\""
@@ -48,7 +80,7 @@ FINGERPRINT_SQL="select md5(coalesce(string_agg(x, ',' order by x), '')) from (
 ) s"
 
 schema_fingerprint() {
-  psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER:-postgres}" \
+  psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" \
        -d "${PG_ENV_POSTGRES_DB}" -Atq -c "$FINGERPRINT_SQL" 2>/dev/null || true
 }
 
@@ -57,6 +89,24 @@ PG_PID=$!
 
 # Forward a stop to PostgREST and wait for it, so the container exits cleanly.
 trap 'kill -TERM "$PG_PID" 2>/dev/null; wait "$PG_PID"; exit 0' TERM INT
+
+# Statement-timeout hook: see PRE_REQUEST_SQL above. PostgREST must be
+# answering HTTP before it is signalled: until its handlers are installed a
+# SIGUSR2 would terminate it instead of reloading the configuration.
+if [ "${POSTGREST_STATEMENT_TIMEOUT:-60s}" != "0" ]; then
+  (
+    while kill -0 "$PG_PID" 2>/dev/null; do
+      if curl -s -o /dev/null "http://127.0.0.1:${POSTGREST_LISTEN_PORT}/" && [ "$(psql -h "${PG_ENV_POSTGRES_HOST}" -p "${PG_PORT_5432_TCP_PORT}" -U "${PG_ENV_POSTGRES_USER}" -d "${PG_ENV_POSTGRES_DB}" -Atq -c "$PRE_REQUEST_SQL" 2>/dev/null)" = 1 ]; then
+        POSTGREST_PRE_REQUEST='db-pre-request = "public.postgrest_pre_request"'
+        render_template postgrest.conf.tpl > postgrest.conf
+        kill -USR2 "$PG_PID" 2>/dev/null || true
+        echo "statement timeout: public.postgrest_pre_request() is in place, db-pre-request enabled"
+        exit 0
+      fi
+      sleep 5
+    done
+  ) &
+fi
 
 if [ "$RELOAD_SECS" -gt 0 ] 2>/dev/null; then
   (

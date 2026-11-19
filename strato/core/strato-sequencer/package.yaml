@@ -108,6 +108,39 @@ tests:
       - strato-sequencer
       - temporary
 
+  # Loose-transaction intake through the HTTP, gossip and sequencer handlers,
+  # against recorded mainnet transactions (see test-intake/Main.hs).
+  transaction-intake-test:
+    source-dirs: test-intake
+    main: Main.hs
+    ghc-options: -dynamic
+    dependencies:
+      - aeson
+      - blockapps-data
+      - blockapps-datadefs
+      - blockDB
+      - blockstanbul
+      - bytestring
+      - common-log
+      - conduit
+      - containers
+      - core-api2
+      - data-default
+      - directory
+      - ethereum-discovery
+      - filepath
+      - hspec
+      - monad-alter
+      - mtl
+      - prometheus-client
+      - seqevents
+      - servant-server
+      - strato-model
+      - strato-p2p
+      - strato-sequencer
+      - text
+      - time
+
 #For now, these tests are causing me more trouble than are useful, so I'm turning them off
 #tests:
 #  strato-sequencer-spec:

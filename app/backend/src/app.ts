@@ -5,7 +5,6 @@ import { initOpenIdConfig, initNetworkConfig } from "./config/config";
 import { initDbPool } from "./utils/dbService";
 import { errorHandler, notFoundHandler } from "./api/middleware/errorHandler";
 import { requestContext } from "./utils/requestContext";
-import { requestLogger, getRequestStats, resetRequestStats } from "./api/middleware/requestLogger";
 import { tracingMiddleware } from "./utils/tracing";
 
 const PORT = process.env.PORT || 3001;
@@ -19,12 +18,13 @@ app.use(tracingMiddleware);
 app.use(
   cors(),
   express.json({
+    // nginx's limit on /api/: an admin issue's args can carry a whole contract source
+    limit: "1mb",
     verify: (req: any, _res, buf) => {
       req.rawBody = buf;
     },
   }),
-  express.urlencoded({ extended: true }),
-  requestLogger
+  express.urlencoded({ extended: true })
 );
 
 // Inject unsigned tx data from AsyncLocalStorage into JSON responses
@@ -39,12 +39,6 @@ app.use((req: Request, res: Response, next) => {
   };
   next();
 });
-
-app.get("/api/diagnostics", (req, res) => {
-  const sortBy = (req.query.sortBy as string) || "avg";
-  res.json(getRequestStats(sortBy as "avg" | "max" | "count"));
-});
-app.delete("/api/diagnostics", (_req, res) => { resetRequestStats(); res.json({ reset: true }); });
 
 app.use("/api", routes);
 

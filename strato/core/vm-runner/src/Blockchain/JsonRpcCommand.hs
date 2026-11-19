@@ -50,7 +50,7 @@ import Blockchain.Strato.Model.Address (Address, addressToByteString, formatAddr
 import Blockchain.Strato.Model.Class (blockHeaderHash)
 import Blockchain.Strato.Model.Code (Code (..))
 import Blockchain.Strato.Model.CodePtr ()
-import Blockchain.Strato.Model.Gas (Gas (..))
+import Blockchain.Strato.Model.Gas (Gas (..), transactionGas)
 import SolidVM.Model.Event (Event (..))
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Blockchain.Strato.Model.Util (byteString2NibbleString)
@@ -129,7 +129,7 @@ runJsonRpcCommand' c@(JRCCall callObj id _blockTag) = do
     Just toAddr -> do
       initBestBlockContext
       withExecHeader Nothing id $ \header ->
-        ethCall id header (Gas 1000000) (TxCall.from callObj) toAddr (unHexData $ TxCall.data_ callObj)
+        ethCall id header transactionGas (TxCall.from callObj) toAddr (unHexData $ TxCall.data_ callObj)
 runJsonRpcCommand' c@(JRCCallV2 spec mHeader id) = do
   $logInfoS "JRCCallV2" . T.pack $ format c
   withExecHeader mHeader id $ \header -> case spec of
@@ -269,13 +269,13 @@ withExecHeader mHeader id f = do
       Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash $ blockHeaderHash header)
       f header
 
--- | Parse a JSON-RPC hex gas quantity ("0x2dc6c0"). Zero or unparseable
--- values fall back to the historical default of 1,000,000.
+-- | Parse a JSON-RPC hex gas quantity ("0x2dc6c0"), up to what a transaction
+-- gets. Zero or unparseable values get exactly that.
 parseHexGas :: T.Text -> Gas
 parseHexGas t =
   case T.stripPrefix "0x" t of
-    Just h | not (T.null h), Right (n, rest) <- TR.hexadecimal h, T.null rest, n > 0 -> Gas n
-    _ -> Gas 1000000
+    Just h | not (T.null h), Right (n, rest) <- TR.hexadecimal h, T.null rest, n > 0 -> min transactionGas (Gas n)
+    _ -> transactionGas
 
 --------------------------------------------------------------------------------
 -- eth_call: resolve contract, match selector, invoke SolidVM, encode return
@@ -451,9 +451,9 @@ lookupContract blockHeader fromAddr addr =
               , Env.prevBlock = Nothing
               }
             gi = GasInfo
-              { _gasLeft = Gas 1000000
+              { _gasLeft = transactionGas
               , _gasUsed = 0
-              , _gasInitialAllotment = Gas 1000000
+              , _gasInitialAllotment = transactionGas
               , _gasMetadata = ""
               }
         (_, result) <- runSM Nothing env gi $ do

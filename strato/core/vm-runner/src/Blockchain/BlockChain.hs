@@ -30,6 +30,7 @@ import BlockApps.Logging
 import BlockApps.Solidity.ABI (decodeABIArgs, valueToArgText, funcArgTypes)
 import qualified Blockchain.Bagger as Bagger
 import Blockchain.Bagger.Transactions
+import Blockchain.DB.SolidStorageDB (HasSolidStorageDB)
 import qualified Blockchain.DB.AddressStateDB as NoCache
 import qualified Blockchain.DB.BlockSummaryDB as BSDB
 import Blockchain.DB.CodeDB ()
@@ -52,7 +53,8 @@ import Blockchain.Data.TransactionResultStatus
 import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
-import Blockchain.Forks (isReceiptsRootForkActive, isReplayProtectionForkActive, isStratoGasForkActive)
+import Blockchain.Forks (isFeeConsensusDeltaForkActive, isReceiptsRootForkActive, isReplayProtectionForkActive, isStratoGasForkActive)
+import Blockchain.HistoricalOutOfGas (isHistoricalOutOfGasTx)
 import qualified Blockchain.Verification as V
 import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
@@ -72,7 +74,7 @@ import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 import Blockchain.TheDAOFork
 import Blockchain.Timing
-import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, RevertError))
+import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, RevertError, TooMuchGas))
 import Blockchain.VMContext
 import Blockchain.VMOut
 import Blockchain.Wiring ()
@@ -256,16 +258,19 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
 
 -- TODO: If we add more verifications, refactor tuple into a proper data type
 verifyBlock ::
-  (HasStateDB m, MonadIO m) =>
+  (HasStateDB m, HasSolidStorageDB m, MonadLogger m, MonadIO m) =>
   Block ->
   ([TxRunResult], Maybe MP.StateRoot) ->
   BlockSummary ->
   m [BlockVerificationFailureDetails]
 verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
   validity <- checkValidity parentBSum b
-  let vDelt = getDeltasFromResults trrs
-      sDelt = getStakeDeltasFromResults trrs
-      blockSR = Just $ stateRoot bh
+  -- The same derivation the proposer used: from the fork, what governance's storage
+  -- holds once the block's transactions have run (the state this node is on now),
+  -- against the set and weights the header says were in force for the block.
+  (vDelt, sDelt) <-
+    blockConsensusDeltas (number bh) (S.fromList $ getBlockValidators bh) (M.fromList $ getBlockStakes bh) trrs
+  let blockSR = Just $ stateRoot bh
       bVd = toDelta (getBlockNewValidators bh) (getBlockRemovedValidators bh)
       bSd = M.fromList $ getBlockStakeUpdates bh
       srCheck =  if derivedSR == blockSR
@@ -447,7 +452,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
         | txSize >= sizeLimit = Left $ TFTXSizeLimitExceeded txSize sizeLimit t
         | otherwise = Right ()
 
-  let availableGas = 400_000
+  let availableGas = transactionGas
 
   case precheck of
     Left failure -> pure (Left failure)
@@ -455,7 +460,11 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       Left failure -> pure (Left failure)
       Right feeResult -> do
         let combineA f x y = liftA2 f x y <|> x <|> y
-            attachFeeResult er = er
+            -- the fee payment's validator and stake changes are this transaction's too
+            attachFeeDeltas
+              | isFeeConsensusDeltaForkActive (number b) = prependConsensusDeltas feeResult
+              | otherwise = id
+            attachFeeResult er = attachFeeDeltas er
               { erAction = combineA (\era ->
                     (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era))
                   . (events %~ (_events era Seq.><))
@@ -486,7 +495,13 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
               P.incCounter txTypeCounter
 
               started <- liftIO Tr.nowNanos
-              execResults <- runCodeForTransaction b availableGas tAddr t proposer
+              -- ONE-OFF BACKWARDS-COMPATIBILITY HACK: a transaction that ran out of
+              -- gas under the original gas schedule is failed the same way here
+              -- without being executed. See Blockchain.HistoricalOutOfGas.
+              execResults <-
+                if isHistoricalOutOfGasTx (otHash t)
+                  then pure . solidvmErrorResults $ TooMuchGas 400_000 400_001
+                  else runCodeForTransaction b availableGas tAddr t proposer
               P.incCounter vmTxsProcessed
               liftIO $ recordExecuteSpan started b t (fromIntegral availableGas) execResults
 

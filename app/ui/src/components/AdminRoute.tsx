@@ -7,7 +7,7 @@ interface AdminRouteProps {
 }
 
 const AdminRoute = ({ children }: AdminRouteProps) => {
-  const { isAdmin, loading } = useUser();
+  const { isAdmin, isAdminLoading: loading } = useUser();
   const navigate = useNavigate();
 
   useEffect(() => {

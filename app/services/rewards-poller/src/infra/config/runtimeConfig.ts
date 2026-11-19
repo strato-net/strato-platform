@@ -35,6 +35,9 @@ const config = {
   voucher: {
     address: getEnv("VOUCHER_ADDRESS") || DEFAULTS.voucherAddress,
   },
+  adminRegistry: {
+    address: getEnv("ADMIN_REGISTRY_ADDRESS") || DEFAULTS.adminRegistryAddress,
+  },
   polling: {
     interval: getNumberEnvOrDefault("POLLING_INTERVAL", DEFAULTS.pollingIntervalMs),
     maxBatchSize: getNumberEnvOrDefault("MAX_BATCH_SIZE", DEFAULTS.maxBatchSize),

@@ -13,6 +13,7 @@ import qualified Data.ByteString as B
 import Data.List (sort)
 import Data.Maybe (fromMaybe)
 import Test.Hspec
+import qualified TransactionIntakeSpec
 
 -- | Bit indices set in a big-endian bloom (bit 0 = LSB of the last byte).
 setBits :: B.ByteString -> [Int]
@@ -25,7 +26,7 @@ setBits bs =
     ]
 
 main :: IO ()
-main = hspec $ spec >> nativeRLPChainIds >> nativeChainIdSigning
+main = hspec $ spec >> nativeRLPChainIds >> nativeChainIdSigning >> TransactionIntakeSpec.spec
 
 spec :: Spec
 spec = describe "Blockchain.Data.LogsBloom" $ do

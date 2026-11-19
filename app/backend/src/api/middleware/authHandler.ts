@@ -32,6 +32,7 @@ function getTokenFromHeader(req: Request): string | null {
 
 interface CustomJwtPayload extends JWTPayload {
   preferred_username: string;
+  email?: string;
 }
 
 type AuthOptions = {
@@ -88,6 +89,7 @@ class AuthHandler {
               req.isNewUser = isNew;
             }
             req.userName = userName;
+            req.userEmail = payload.email;
           } else if (walletAddress) {
             req.address = walletAddress.replace(/^0x/i, "").toLowerCase();
           }

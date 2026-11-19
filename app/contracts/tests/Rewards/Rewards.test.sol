@@ -3,10 +3,9 @@ pragma solidity ^0.8.30;
 
 import "../../concrete/BaseCodeCollection.sol";
 import "../Util.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
-contract Describe_RewardsDirectPayout is Authorizable {
+contract Describe_RewardsDirectPayout {
     using TestUtils for User;
 
     constructor() {}
@@ -21,7 +20,6 @@ contract Describe_RewardsDirectPayout is Authorizable {
     address rewardTokenAddr;
 
     function beforeAll() {
-        bypassAuthorizations = true;
         owner = new User();
         user1 = new User();
         user2 = new User();
@@ -34,12 +32,13 @@ contract Describe_RewardsDirectPayout is Authorizable {
 
         m = new Mercata();
 
-        rewardTokenAddr = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "TestCATA", "Test CATA Token", [], [], [], "TCATA", 0, 18
         );
+        rewardTokenAddr = address(ret);
 
         address(rewardsAddr).call("initialize", rewardTokenAddr);
-        Token(rewardTokenAddr).mint(rewardsAddr, 1000000 * 1e18);
+        m.adminRegistry().castVoteOnIssue(rewardTokenAddr, "mint", rewardsAddr, 1000000 * 1e18);
         Ownable(rewardsAddr).transferOwnership(address(owner));
         owner.do(rewardsAddr, "addOneTimeDirectPayoutActivity", "BonusReward", sourceContract, eventName);
     }
@@ -200,7 +199,7 @@ contract Describe_RewardsDirectPayout is Authorizable {
     }
 }
 
-contract Describe_RewardsTransfer is Authorizable {
+contract Describe_RewardsTransfer {
     using TestUtils for User;
 
     constructor() {}
@@ -216,7 +215,6 @@ contract Describe_RewardsTransfer is Authorizable {
     uint256 nextBlock;
 
     function beforeAll() {
-        bypassAuthorizations = true;
         user1 = new User();
         user2 = new User();
         vault = address(0xCAFE);
@@ -225,11 +223,12 @@ contract Describe_RewardsTransfer is Authorizable {
 
         rewards = new Rewards(address(this));
         Mercata m = new Mercata();
-        rewardTokenAddr = m.tokenFactory().createToken(
+        (bool executed, variadic ret) = m.adminRegistry().castVoteOnIssue(address(m.tokenFactory()), "createToken",
             "TestCATA", "Test CATA Token", [], [], [], "TCATA", 0, 18
         );
+        rewardTokenAddr = address(ret);
         rewards.initialize(rewardTokenAddr);
-        Token(rewardTokenAddr).mint(address(rewards), 1000000 * 1e18);
+        m.adminRegistry().castVoteOnIssue(rewardTokenAddr, "mint", address(rewards), 1000000 * 1e18);
 
         activityId = _addTransferableActivity("Vault Shares", vault);
         emissionActivityId = _addTransferableActivity("Emitting Vault Shares", emissionVault);

@@ -1,10 +1,11 @@
 // Produce a validator key's consent to an operator, for ValidatorRegistry.register and
 // ValidatorRegistry.setOperator: a secp256k1 signature over
 //
-//   keccak256(abi.encodePacked("STRATO validator operator authorization",
+//   keccak256(abi.encodePacked("STRATO validator operator authorization", chainId,
 //                              registry, validator, operator, authorizationNonce[validator]))
 //
-// with no message prefix. A validator's key is its node's vault key, so run this where the
+// with no message prefix. chainId is the network ID (SolidVM's block.chainid), not the
+// EIP-155 chain id. A validator's key is its node's vault key, so run this where the
 // node's vault is reachable, with the vault URL from the node's ethconf.yaml
 // (urlConfig.vaultUrl) and a token the vault accepts for the node's identity:
 //
@@ -14,6 +15,7 @@
 // For a key held outside a vault (dev networks) pass --private-key <hex> instead.
 //
 //   --registry <address>  ValidatorRegistry proxy (default: helium's)
+//   --chain-id <n>        network ID to sign for (default: read from NODE_URL metadata)
 //   --nonce <n>           authorizationNonce to sign for (default: read from NODE_URL storage)
 //   --digest <0x...>      sign this digest as given, e.g. copied from the staking page
 //
@@ -54,6 +56,12 @@ async function registryNonce(registry, validator) {
   return row ? BigInt(row.value) : 0n;
 }
 
+async function networkId() {
+  if (!config.nodes[0].url) throw new Error('NODE_URL is not set; pass --chain-id or --digest');
+  const { data } = await axios.get(`${config.nodes[0].url}/strato-api/eth/v1.2/metadata`, { timeout: 60000 });
+  return BigInt(data.networkID);
+}
+
 async function signWithVault(digest) {
   const base = String(process.env.VAULT_URL).replace(/\/+$/, '');
   const headers = { Authorization: `Bearer ${process.env.VAULT_TOKEN}` };
@@ -81,10 +89,11 @@ function signWithPrivateKey(digest, privateKey) {
     const operator = address('operator', args.operator);
     const registry = address('registry', args.registry || HELIUM_REGISTRY);
     const nonce = args.nonce !== undefined ? BigInt(args.nonce) : await registryNonce(registry, validator);
+    const chainId = args['chain-id'] !== undefined ? BigInt(args['chain-id']) : await networkId();
     digest = ethers.solidityPackedKeccak256(
-      ['string', 'address', 'address', 'address', 'uint256'],
-      [DOMAIN, registry, validator, operator, nonce]);
-    console.error(`registry ${registry}\nvalidator ${validator}\noperator ${operator}\nnonce ${nonce}`);
+      ['string', 'uint256', 'address', 'address', 'address', 'uint256'],
+      [DOMAIN, chainId, registry, validator, operator, nonce]);
+    console.error(`chain id ${chainId}\nregistry ${registry}\nvalidator ${validator}\noperator ${operator}\nnonce ${nonce}`);
   }
   console.error(`digest ${digest}`);
 

@@ -12,7 +12,7 @@ import BlockApps.Logging (LoggingT, runNoLoggingT)
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.EventLoop
 import Blockchain.Blockstanbul.Messages
-import Blockchain.Blockstanbul.Model.Authentication (proposalMessage)
+import Blockchain.Blockstanbul.Model.Authentication (commitmentMessage, proposalMessage)
 import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
@@ -28,6 +28,7 @@ import Conduit (runConduit, sinkNull, yieldMany, (.|))
 import Control.Monad (forM_)
 import Control.Monad.Composable.Vault
 import Control.Monad.State.Strict
+import Control.Monad.Trans.Except (runExceptT)
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.Map.Strict as M
 import Data.Maybe
@@ -136,6 +137,48 @@ spec = describe "stake-weighted consensus" $ do
         get
       M.keys (_roundChanged ctx') `shouldBe` [2]
 
+    it "clears round-change votes on a height change, so none carry to the next height" $ do
+      -- a vote for a future round arrives at the current height (sequence 10)
+      voted <- runWith activeCtx $ do
+        _ <- sendMessages [IMsg (MsgAuth other dummySig) (RoundChange (View 2 10) 0)]
+        get
+      M.keys (_roundChanged voted) `shouldBe` [2]
+      -- committing the next block (height 11) must not carry that vote forward: the
+      -- votes held no height, so without clearing them a vote cast at height 10 would
+      -- still count toward a round change at height 11.
+      let commit = runConduit $ yieldMany ([] :: [InEvent]) .| commitBlock (Block (v3 [Validator me, Validator other] [] 0 [] []) [] []) .| sinkNull
+      afterCommit <- runWith voted $ commit >> get
+      _sequence (_view afterCommit) `shouldBe` 11
+      _roundChanged afterCommit `shouldBe` M.empty
+
+    it "catches up to a higher round on a more-than-a-third PREPARE/COMMIT certificate" $ do
+      -- three validators, each weight 1: more than a third needs two of them.
+      let third = Address 0xdef
+          ckpt3 = Checkpoint (View 0 10) [Validator me, Validator other, Validator third] (Just zeroHash) [] 0
+          ctx3 = (newContext "test" 1 ckpt3 (Just me) True Nothing 15) {_productionAuth = False}
+      -- one higher-round PREPARE is not enough: the node stays on its round
+      one <- runWith ctx3 $ sendMessages [IMsg (MsgAuth other dummySig) (Prepare (View 5 10) zeroHash)] >> get
+      _round (_view one) `shouldBe` 0
+      -- a second, from a different validator, crosses a third: catch up to round 5
+      two <- runWith ctx3 $ do
+        _ <- sendMessages [IMsg (MsgAuth other dummySig) (Prepare (View 5 10) zeroHash)]
+        _ <- sendMessages [IMsg (MsgAuth third dummySig) (Commit (View 5 10) zeroHash dummySig)]
+        get
+      _round (_view two) `shouldBe` 5
+      _sequence (_view two) `shouldBe` 10
+
+    it "passes on a validator's higher-round COMMIT after its PREPARE, below the catch-up line" $ do
+      let third = Address 0xdef
+          ckpt3 = Checkpoint (View 0 10) [Validator me, Validator other, Validator third] (Just zeroHash) [] 0
+          ctx3 = (newContext "test" 1 ckpt3 (Just me) True Nothing 15) {_productionAuth = False}
+      (out, ctx) <- runWith ctx3 $ do
+        a <- sendMessages [IMsg (MsgAuth other dummySig) (Prepare (View 5 10) zeroHash)]
+        b <- sendMessages [IMsg (MsgAuth other dummySig) (Commit (View 5 10) zeroHash dummySig)]
+        (,) (a ++ b) <$> get
+      _round (_view ctx) `shouldBe` 0
+      [() | OMsg _ (Prepare (View 5 10) _) <- out] `shouldBe` [()]
+      [() | OMsg _ (Commit (View 5 10) _ _) <- out] `shouldBe` [()]
+
   describe "stake bookkeeping" $ do
     it "applies stake updates and drops removed validators on commit" $ do
       let hdr = v3 [] [] 0 [Validator other] [(Validator me, 5), (Validator other, 9)]
@@ -151,6 +194,16 @@ spec = describe "stake-weighted consensus" $ do
         get
       _lastRound ctx `shouldBe` 7
       _sequence (_view ctx) `shouldBe` 11
+
+    it "catches the view round up to a committed block's round, and never moves it back" $ do
+      let commit rnd = runConduit $ yieldMany ([] :: [InEvent]) .| commitBlock (Block (v3 [Validator me, Validator other] [] rnd [] []) [] []) .| sinkNull
+      -- a block the others committed at round 7 reaches a node still on round 0
+      behind <- runWith activeCtx $ commit 7 >> get
+      _view behind `shouldBe` View 7 11
+      -- a block locked in an earlier round and committed in a later one: the view stays
+      ahead <- runWith (activeCtx & view . round .~ 9) $ commit 7 >> get
+      _view ahead `shouldBe` View 9 11
+      _lastRound ahead `shouldBe` 7
 
     it "selects the leader by stake once active and round-robin before" $ do
       let weights = M.fromList [(Validator me, 1000), (Validator other, 0)]
@@ -190,6 +243,56 @@ spec = describe "stake-weighted consensus" $ do
         o2 <- sendMessages [prepare me]
         pure (commitsOut o1, commitsOut o2)
       legacy `shouldBe` (0, 1)
+
+  describe "commit seals" $ do
+    let attackerPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "attackerPriv" $ C8.pack "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318"))
+        attacker = fromPrivateKey attackerPriv
+        offDigest = hash "not the proposal"
+        sealOver priv di = signMsg priv (commitmentMessage di)
+
+    it "embeds only the seals for the committed block, not a validator's commit for another digest" $ do
+      let vals = [Validator me, Validator attacker]
+          weights = [(Validator me, 1000), (Validator attacker, 1)]
+          blk = Block (v3 vals weights 0 [] []) [] []
+          commitFrom priv di = IMsg (MsgAuth (fromPrivateKey priv) dummySig) (Commit (View 0 10) di (sealOver priv di))
+      out <- runWith activeCtx {_validators = S.fromList vals, _stakes = M.fromList weights} $ do
+        proposal .= Just blk
+        sendMessages [commitFrom attackerPriv offDigest, commitFrom myPriv (blockHash blk)]
+      [traverse (verifyCommitmentSeal (blockHash b)) . signatures $ blockBlockData b | ToCommit b <- out]
+        `shouldBe` [Right [me]]
+
+    -- Seals are outside the block hash, so whoever relays a block can add to them:
+    -- replay must neither reject an honest block for it nor count an outsider's seal.
+    describe "on replay" $ do
+      let sealed = let b = Block (v3 [Validator me] [(Validator me, 7)] 0 [] []) [] [] in addProposerSeal (signMsg myPriv (proposalMessage b)) b
+          unrecoverable = either error id . importSignature $ C8.replicate 65 '\0'
+          replayWith seals = runNoLoggingT . runExceptT $
+            replayHistoricBlock (S.singleton $ Validator me) (M.fromList [(Validator me, 7)]) Nothing 1 0 10 (addCommitmentSeals seals sealed)
+
+      it "accepts a supermajority alongside seals from outsiders, over another digest, or unrecoverable" $
+        replayWith [sealOver attackerPriv (blockHash sealed), sealOver myPriv offDigest, unrecoverable, sealOver myPriv (blockHash sealed)]
+          `shouldReturn` Right (11, Validator me)
+
+      it "does not count an outsider's seal toward the supermajority" $
+        replayWith [sealOver attackerPriv (blockHash sealed)] >>= (`shouldSatisfy` either (const True) (const False))
+
+  -- Votes are kept per validator for the current view only, so one from another
+  -- view must neither count toward it nor replace the sender's vote in it.
+  describe "vote views" $ do
+    let blk = Block (v3 [Validator me, Validator other] [] 0 [] []) [] []
+        commitAt who vw di = IMsg (MsgAuth who dummySig) (Commit vw di dummySig)
+        commitsFrom evs = runWith legacyCtx $ do
+          proposal .= Just blk
+          out <- sendMessages evs
+          pure $ length [() | ToCommit _ <- out]
+
+    it "does not count a commit from a later round, even for the same block" $
+      commitsFrom [commitAt other (View 1 10) (blockHash blk), commitAt me (View 0 10) (blockHash blk)]
+        `shouldReturn` 0
+
+    it "keeps a validator's commit when it also sends one for a later height" $
+      commitsFrom [commitAt other (View 0 10) (blockHash blk), commitAt other (View 0 11) (hash "next block"), commitAt me (View 0 10) (blockHash blk)]
+        `shouldReturn` 1
 
   describe "proposal checks" $ do
     let solo = activeCtx {_validators = S.singleton (Validator me), _stakes = M.fromList [(Validator me, 7)]}

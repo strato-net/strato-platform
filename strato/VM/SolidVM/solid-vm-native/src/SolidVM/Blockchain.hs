@@ -25,27 +25,29 @@ module SolidVM.Blockchain
     create,
     callReturnEnv,
     createReturnEnv,
+    call', createContractValues, createCode, selfdestruct, derive, getPrevBlockFacts,
   )
 where
 
 import Control.Exception (throw)
-import Blockchain.DB.ModifyStateDB (pay)
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.ExecResults
 import qualified Control.Monad.Composable.StateDB as MP
+import Blockchain.SolidVM.Execution
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.GasInfo
 import Blockchain.SolidVM.Metrics (recordCall)
+import qualified Blockchain.SolidVM.Builtins.Operations.Metered as Metered
+import Blockchain.SolidVM.Builtins.Size.Values (ValueArguments (..))
+import qualified Blockchain.SolidVM.Builtins.Contracts.Metered as ContractBuiltins
 import Blockchain.SolidVM.SM hiding (action)
 import SolidVM.Storage
 import SolidVM.Values
-import SolidVM.Events
 import SolidVM.Gas
-import qualified SolidVM.Core as N
 import qualified SolidVM.Runtime as Runtime
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
@@ -168,7 +170,8 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
   fmap (fmap $ either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
 
     opts <- parseOptionsForCurrentBlock
-    (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 initCode
+    (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests False $ DT.encodeUtf8 initCode
+    rejectCodelessImports opts $ DT.encodeUtf8 initCode
     addNewCodeCollection hsh cc
     let eArgExps = traverse (Fast.parseArg initialParserState "") argsStrings
         !argExps = either ((throw . ParseError "create arguments") . show) id eArgExps
@@ -190,13 +193,13 @@ createContractValues contractName' mSalt getArgs = do
     Just getSalt -> do
       salt <- getSalt
       values <- getArgs
-      address <- getNewAddressWithSalt creator salt hsh (SString (labelToString contractName') : values)
+      address <- getNewAddressWithSalt creator salt hsh =<< rlpForkValues (SString (labelToString contractName') : values)
       pure (address, values)
   execResults <- create' creator newAddress hsh cc contractName' argVals
   pure $ fromMaybe (throw (InternalError ("a call to create did not create an address: " ++ (maybe "no VM exception" (either displayException displayException) $ erException execResults)))) $ erNewContractAddress execResults
 
 create' :: Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> SM ExecResults
-create' creator newAddress ch cc contractName' valList = do
+create' creator newAddress ch cc contractName' valList = withContractConstruction newAddress $ \deferPublication -> do
 
   let !contract' = fromMaybe (throw (MissingType "create'/contract" (labelToString contractName'))) (cc ^. CC.contracts . at contractName')
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
@@ -208,7 +211,9 @@ create' creator newAddress ch cc contractName' valList = do
     pure
       newAddressState
         { addressStateContractRoot = MP.emptyTriePtr,
-          addressStateCodeHash = SolidVMCode (labelToString contractName') ch
+          addressStateCodeHash = if deferPublication
+            then addressStateCodeHash blankAddressState
+            else SolidVMCode (labelToString contractName') ch
         }
 
   -- get the gasLeft from the environment
@@ -231,6 +236,12 @@ create' creator newAddress ch cc contractName' valList = do
 
   -- Run the constructor
   runTheConstructors creator newAddress ch cc contractName' resolvedValList
+
+  when deferPublication $
+    A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \addressState ->
+      pure $ if addressStateCodeHash addressState == addressStateCodeHash blankAddressState
+        then addressState {addressStateCodeHash = SolidVMCode (labelToString contractName') ch}
+        else addressState
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ labelToString contractName'
 
@@ -370,7 +381,7 @@ call' from to' fnCalltype functionName valList = do
         else pure to'
   let shouldPushSender = bool False (fnCalltype /= CC.DelegateCall) isExternal
       currentReadOnly = maybe False readOnly currentCall
-  (contract, hsh, cc) <- getCodeAndCollection codeAddress
+  (contract, hsh, cc) <- Runtime.getCodeAndCollection codeAddress
 
   unless (maybe False ((storageAddress ==) . currentAddress) currentCall) $
     initializeAction storageAddress
@@ -457,9 +468,22 @@ call' from to' fnCalltype functionName valList = do
       _ -> case M.lookup functionName $ contract ^. CC.storageDefs of
         Just CC.VariableDecl {..} | not (isExternal && _varVisibility /= Just CC.Public) -> do
           _ <- Runtime.compiledContract hsh cc contract
+          let checkIndices typ (v : vs) = case typ of
+                SVMType.Mapping _ keyType valueType _ _ -> do
+                  void $ coerceUnsignedValue contract cc keyType v
+                  checkIndices valueType vs
+                SVMType.Array valueType _ -> do
+                  void $ coerceUnsignedValue contract cc (SVMType.Int (Just False) Nothing) v
+                  checkIndices valueType vs
+                _ -> pure ()
+              checkIndices _ [] = pure ()
+              checkedValue typ v
+                | SReference _ <- v, SVMType.Int (Just False) _ <- typ = pure (SUnsigned 0)
+                | otherwise = coerceUnsignedValue contract cc typ v
+          checkIndices _varType valList
           let args' = fromMaybe [] $ case (_varType, valList) of
                 ((SVMType.Array _ _), oa) -> for oa $ \case
-                  SInteger n -> Just . MS.Index . BC.pack $ show n
+                  SIntegral n -> Just . MS.Index . BC.pack $ show n
                   _ -> Nothing
                 ((SVMType.Mapping _ _ _ _ _), oa) ->
                   traverse convertValueToStoragePathPiece oa
@@ -479,15 +503,15 @@ call' from to' fnCalltype functionName valList = do
                           SVMType.Error{} -> Nothing
                           SVMType.Array{} -> Nothing
                           SVMType.Mapping{} -> Nothing
-                          _ -> Just n
+                          _ -> Just (n, t)
                         ) <$> fields
-                  fieldVals <- for fieldsToLoad $ \fieldName ->
-                    getVar $ Constant $ SReference $ path `MS.snoc` MS.Field (BC.pack $ labelToString fieldName)
+                  fieldVals <- for fieldsToLoad $ \(fieldName, typ) ->
+                    getVar (Constant $ SReference $ path `MS.snoc` MS.Field (BC.pack $ labelToString fieldName)) >>= checkedValue typ
                   fieldVars <- traverse createVar fieldVals
                   pure . STuple $ V.fromList fieldVars
               handleSimple path = do
                 v <- getVar $ Constant $ SReference path
-                pure $ Just v
+                Just <$> checkedValue (returnType _varType) v
               typeTuple = [(Nothing, CC.IndexedType 0 (returnType _varType) Nothing)]
           case args' of
             [] -> do
@@ -516,7 +540,7 @@ call' from to' fnCalltype functionName valList = do
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
     convertValueToStoragePathPiece v =
       case v of
-        SInteger i -> Just $ MS.Index $ BC.pack $ show i
+        SIntegral i -> Just $ MS.Index $ BC.pack $ show i
         SString s -> Just $ MS.Index $ DT.encodeUtf8 $ T.pack s
         SAddress a _ -> Just $ MS.Index $ BC.pack $ show a
         SBool b -> Just $ MS.Index $ bool "false" "true" b
@@ -566,11 +590,13 @@ runTheConstructors from to hsh cc contractName' argVals' = do
       Just (_, vals) -> pure vals
       Nothing -> throw (InvalidArguments "constructor arguments don't match" (format (contractName', map renderValueShallow argVals')))
 
+  Metered.functionEntry (ValueArguments argVals)
+
   nativeArgs <- liftIO $ newIORef $ maybe [] (const argVals) (contract' ^. CC.constructor)
   let runStage stage = do
         fun <- Runtime.constructorStage hsh cc contract' stage
         values <- liftIO $ readIORef nativeArgs
-        result <- runAction cc contract' "constructor" (CC._contractContext contract') fun values
+        result <- Runtime.runAction cc contract' "constructor" fun values
         if stage == "<constructor>" then pure result else case result of
           Just (STuple outputs) -> case V.toList outputs of
             [updatedVar, valueVar] -> do
@@ -674,47 +700,32 @@ runTheCallValidated validation address codeAddress contract name hsh cc original
       Just pair -> pure pair
       Nothing -> throw (TypeError "function arguments do not match" (labelToString name))
   fun <- Runtime.compiledFunction hsh cc contract name selected
-  decrementGas 5
+  Metered.functionEntry (ValueArguments values)
   result <- withCallInfo address codeAddress contract name hsh cc M.empty ro ff $
-    runAction cc contract name (CC._funcContext selected) fun values
+    Runtime.runAction cc contract name fun values
   pure (selected ^. CC.funcVals, result)
-
-runAction :: CC.CodeCollection -> CC.Contract -> T.Text -> SourceAnnotation () -> N.Fun -> ValList -> SM (Maybe Value)
-runAction cc contract name annotation = Runtime.runAction (decrementGas . Gas) call' createContractValues host emit cc contract name
-  where
-    host = Runtime.Host createCode selfdestruct getPrevBlockFacts derive
-    emit eventContractName event values = do
-      eventContract <- maybe (throw (MissingType "event contract" (labelToString eventContractName))) pure $ M.lookup eventContractName (cc ^. CC.contracts)
-      void $ emitEventValuesForContract eventContract (CC.EmitStatement event [] annotation) event values
 
 createCode :: Maybe Value -> T.Text -> T.Text -> ValList -> SM Address
 createCode salt name source args = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ throw (InvalidWrite "contract creation during read-only access" (T.unpack name))
-  creator <- getCurrentAddress
-  isRunningTests <- Env.runningTests <$> getEnv
-  opts <- parseOptionsForCurrentBlock
-  (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True (DT.encodeUtf8 source)
-  addNewCodeCollection hsh cc
-  address <- case salt of
-    Nothing -> getNewAddress creator
-    Just s -> getNewAddressWithSalt creator s hsh (SString (T.unpack name) : args)
-  result <- create' creator address hsh cc name args
-  pure $ fromMaybe (throw (InternalError ("create did not produce an address: " ++ (maybe "no VM exception" (either displayException displayException) $ erException result)))) (erNewContractAddress result)
+  let name' = T.unpack name
+      source' = T.unpack source
+  case salt of
+    Nothing -> ContractBuiltins.create @Native name' source' args
+    Just value -> ContractBuiltins.create2 @Native value name' source' args
+
+instance MonadContractCreation Native SM where
+  prepareContractSource = compileSourceForCreation False
+  runContractConstructor = create'
 
 selfdestruct :: Address -> SM Bool
 selfdestruct target = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ throw (InvalidWrite "selfdestruct during read-only access" (format target))
-  address <- getCurrentAddress
-  balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) address
-  A.adjustWithDefault_ (A.Proxy @AddressState) address $ \addressState ->
-    pure addressState {addressStateCodeHash = SolidVMCode "Code_0" (unsafeCreateKeccak256FromWord256 0)}
-  sent <- pay "selfdestruct function" address target balance
-  purgeStorageMap address
-  pure sent
+  ContractBuiltins.selfdestruct target
 
 derive :: Address -> T.Text -> T.Text -> ValList -> SM Address
 derive address salt name args = do
-  (_, hsh, _) <- getCodeAndCollection address
-  pure $ getNewAddressWithSalt_unsafe address (T.unpack salt) (keccak256ToByteString hsh) (SString (T.unpack name) : args)
+  hsh <- getCodeHashForDerivation address
+  getNewAddressWithSalt_unsafe address (T.unpack salt) (keccak256ToByteString hsh) <$> rlpForkValues (SString (T.unpack name) : args)

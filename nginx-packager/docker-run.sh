@@ -43,6 +43,10 @@ RPC_PORT=${RPC_PORT:-8545}
 # connector signs transactions client-side and submits via eth_sendRawTransaction
 # over /rpc, so deployments that expose the SMD wallet must set JSONRPC_ENABLED=true.
 JSONRPC_ENABLED=${JSONRPC_ENABLED:-false}
+# Rate limits of /rpc in requests per second: for one client address, and for
+# all clients together.
+RPC_RATE_LIMIT_PER_IP=${RPC_RATE_LIMIT_PER_IP:-25}
+RPC_RATE_LIMIT_TOTAL=${RPC_RATE_LIMIT_TOTAL:-200}
 # Whether app-backend and app-ui run next to this nginx (the bundled node) or
 # on their own tier. Unbundled, the app locations are dropped (their upstreams
 # would not resolve and nginx would refuse to start) and "/" redirects to
@@ -79,7 +83,7 @@ fi
 # Host-side STRATO processes are reached as host.docker.internal (aliased by docker-compose)
 STRATO_HOSTNAME=host.docker.internal
 # Read config from ethconf.yaml (single source of truth)
-# As a sidecar in the API tier (docker-compose.api.yml) nginx proxies to the
+# As a sidecar in the API tier nginx proxies to the
 # strato-api container next to it, not to the host.
 if [[ -n "${API_UPSTREAM_HOST:-}" ]]; then
   STRATO_HOSTNAME=$API_UPSTREAM_HOST
@@ -192,6 +196,14 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   else
     sed -i 's/[[:space:]]*#TEMPLATE_MARK_STRATO_RPC_GUARD//g' /tmp/nginx.conf
   fi
+
+  for name in RPC_RATE_LIMIT_PER_IP RPC_RATE_LIMIT_TOTAL; do
+    if [[ ! "${!name}" =~ ^[1-9][0-9]*$ ]]; then
+      echo "$name must be a whole number of requests per second (got: ${!name}). Exit"
+      exit 8
+    fi
+    sed -i "s/__${name}__/${!name}/g" /tmp/nginx.conf
+  done
 
   # Remove tracking-links routes unless the tracking service is deployed
   if [ "$TRACKING_ENABLED" != true ]; then

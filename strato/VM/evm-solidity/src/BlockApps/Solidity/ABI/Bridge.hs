@@ -44,7 +44,7 @@ decodeABIArgs bs types =
    in zipWith (\i t -> decode1 (i * 32) t) [0 ..] types
 
 valueToArgText :: Value -> T.Text
-valueToArgText (SInteger n) = T.pack $ show n
+valueToArgText (SIntegral n) = T.pack $ show n
 valueToArgText (SAddress addr _) = T.pack $ "0x" ++ formatAddressWithoutColor addr
 valueToArgText (SBool True) = "true"
 valueToArgText (SBool False) = "false"
@@ -188,8 +188,8 @@ encodeDynamicTail (SVMType.Bytes _ Nothing) (SBytes bs) =
 encodeDynamicTail _ _ = encodeUint256 0
 
 encodeSingleValue :: SVMType.Type -> Value -> B.ByteString
-encodeSingleValue (SVMType.Int (Just True) _) (SInteger n) = encodeInt256 n
-encodeSingleValue (SVMType.Int _ _) (SInteger n) = encodeUint256 n
+encodeSingleValue (SVMType.Int (Just True) _) (SIntegral n) = encodeInt256 n
+encodeSingleValue (SVMType.Int _ _) (SIntegral n) = encodeUint256 n
 encodeSingleValue SVMType.Bool (SBool b) = encodeUint256 (if b then 1 else 0)
 encodeSingleValue (SVMType.Address _) (SAddress a _) = padLeft32 $ addressToByteString a
 encodeSingleValue (SVMType.Address _) (SContract _ a) = padLeft32 $ addressToByteString a
@@ -205,7 +205,7 @@ encodeSingleValue (SVMType.Bytes _ (Just n)) (SBytes bs) =
 encodeSingleValue (SVMType.Enum _ _ _) (SEnumVal _ _ v) = encodeUint256 (fromIntegral v)
 encodeSingleValue _ (SContract _ a) = padLeft32 $ addressToByteString a
 encodeSingleValue _ (SAddress a _) = padLeft32 $ addressToByteString a
-encodeSingleValue _ (SInteger n) = encodeUint256 n
+encodeSingleValue _ (SIntegral n) = encodeUint256 n
 -- Unset / default struct fields read back as SNULL; encode them as a zero word
 -- so a static member always occupies its 32-byte slot (keeps tuple heads aligned).
 encodeSingleValue _ SNULL = encodeUint256 0
@@ -247,13 +247,13 @@ encodeEventToLog evName eventDef attrs =
 encodeTopic :: SVMType.Type -> Maybe Value -> B.ByteString
 encodeTopic _ Nothing = encodeUint256 0
 encodeTopic t (Just v) = case (t, v) of
-  (SVMType.Int (Just True) _, SInteger n) -> encodeInt256 n
-  (SVMType.Int _ _, SInteger n) -> encodeUint256 n
+  (SVMType.Int (Just True) _, SIntegral n) -> encodeInt256 n
+  (SVMType.Int _ _, SIntegral n) -> encodeUint256 n
   (SVMType.Bool, SBool b) -> encodeUint256 (if b then 1 else 0)
   (SVMType.Address _, SAddress a _) -> padLeft32 $ addressToByteString a
   (SVMType.Address _, SContract _ a) -> padLeft32 $ addressToByteString a
   (SVMType.Enum _ _ names, SEnumVal _ member _) -> encodeUint256 $ maybe 0 fromIntegral (elemIndex member =<< names)
-  (SVMType.Enum _ _ _, SInteger n) -> encodeUint256 n
+  (SVMType.Enum _ _ _, SIntegral n) -> encodeUint256 n
   (SVMType.String _, SString s) -> keccak256ToByteString . hash $ BC.pack s
   (SVMType.Bytes _ Nothing, SBytes bs) -> keccak256ToByteString $ hash bs
   (SVMType.Bytes _ (Just n), SBytes bs) -> padLeft32 $ B.take (fromIntegral n) bs

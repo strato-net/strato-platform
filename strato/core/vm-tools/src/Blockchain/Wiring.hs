@@ -27,7 +27,6 @@ module Blockchain.Wiring
 where
 
 import BlockApps.Init ()
-import BlockApps.Logging
 import Blockchain.Bagger.BaggerState (BaggerState)
 import qualified Blockchain.DB.AddressStateDB as DB
 import Blockchain.DB.BlockSummaryDB
@@ -60,7 +59,6 @@ import Data.Default (def)
 import Data.Maybe (fromMaybe)
 import Control.Monad.IO.Class
 import qualified Data.NibbleString as N
-import qualified Data.Text as T
 import Blockchain.Data.VmTrace (VmTracer)
 import Debugger
 import Text.Format (format)
@@ -146,9 +144,10 @@ withFetchMissingNodes f = ContextM $ withMissingNodeFetcher (unContextM . fetchM
 -- so when no peer replies there is nothing left to do but say so and stop.
 fetchMPNode :: MP.StateRoot -> ContextM (Maybe MP.TrieNode)
 fetchMPNode k = do
-  void $ writeUnseqEvents [IEGetMPNodes [k]]
+  -- Read from the topic's end, not the VM's own group: block tasks queued
+  -- behind the failed one must stay unconsumed for the restart.
   mnd <- timeout 10000000 $
-    runConsume "ethereum-vm" seqVmTasksTopicName $ \evs -> do
+    consumeFromLatest seqVmTasksTopicName (void $ writeUnseqEvents [IEGetMPNodes [k]]) $ \evs -> do
       let findND (VmMPNodesReceived [nd]) | k == MP.sha2StateRoot (rlpHash nd) = Just nd
           findND _ = Nothing
       pure $ foldr (<|>) Nothing (findND <$> evs)
@@ -201,10 +200,3 @@ instance (Keccak256 `A.Alters` BlockSummary) ContextM where
   lookup _ k = readStore memBlockSummaryDB (\d -> genericLookupBlockSummaryDB (pure $ _blockSummaryDB d) k) mirrorBlockSummary k
   insert _ k v = writeStore memBlockSummaryDB (\d -> genericInsertBlockSummaryDB (pure $ _blockSummaryDB d) k v) k (Just v)
   delete _ k = writeStore memBlockSummaryDB (\d -> genericDeleteBlockSummaryDB (pure $ _blockSummaryDB d) k) k Nothing
-
-instance Mod.Modifiable GasCap ContextM where
-  get _ = contextGets (GasCap . _vmGasCap)
-
-  put _ (GasCap g) = do
-    contextModify (vmGasCap .~ g)
-    $logDebugS "#### Mod.put @vmGasCap" . T.pack $ "VM Gas Cap updated to: " ++ show g

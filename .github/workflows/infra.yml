@@ -1,0 +1,53 @@
+name: infra
+
+# The CDK apps and scripts under infra/: they compile, the scripts parse, and
+# the example environment file passes the deploy script's own check. Nothing
+# is deployed and no credentials are used.
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra.yml"
+  push:
+    branches: [develop]
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [data-plane, core-cell, api-tier, app-tier, observability]
+    defaults:
+      run:
+        working-directory: infra/${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: infra/${{ matrix.app }}/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell scripts parse
+        run: |
+          for f in infra/scripts/ha.sh infra/core-cell/bootstrap/cell-bootstrap.sh \
+                   infra/core-cell/bootstrap/strato-cell-upgrade infra/core-cell/bootstrap/strato-cell-health; do
+            bash -n "$f"
+          done
+      - name: The example environment file is complete and well-formed
+        env:
+          AWS_EC2_METADATA_DISABLED: "true"
+        run: infra/scripts/ha.sh example state

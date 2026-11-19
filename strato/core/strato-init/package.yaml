@@ -9,9 +9,6 @@ category: Data Structures
 description: A tool to setup the DBs for a Strato instance
 license: Apache-2.0
 
-extra-source-files:
-  - config/postgres/*
-
 ghc-options: -Wall -O2 -threaded
 
 dependencies:

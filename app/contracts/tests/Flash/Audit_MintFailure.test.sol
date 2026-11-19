@@ -1,6 +1,5 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 
 contract Borrower {
@@ -14,22 +13,21 @@ contract Borrower {
 }
 
 /*
- * Ownable.onlyOwner in abstract/ERC20/access/Ownable.sol runs the function BODY inside a
- * try block and falls into a catch that calls AdminRegistry.castVoteOnIssue, which ends in
+ * FlashMint mints and burns USDST through AdminRegistry.castVoteOnIssue, which ends in
  * `_target.call(_func, _args)`. If that inner .call fails SILENTLY, then a FlashMint that
  * lacks the USDST "mint" grant would mint nothing, pass the balance check against the
  * borrower's own float, and then BURN the borrower's own money. This test decides it.
  */
-contract Describe_FlashMintMintFailure is Authorizable {
+contract Describe_FlashMintMintFailure {
     Mercata m; FlashMint fm; AdminRegistry admin; address USDST; Token usdstT;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata(); admin = m.adminRegistry(); fm = new FlashMint(address(admin));
-        USDST = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
-        usdstT = Token(USDST); usdstT.setStatus(2);
-        fm.initialize(USDST, address(m.feeCollector()), 1000000e18);
-        fm.setWhitelistEnabled(false);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",[],[],[],"USDST",0,18);
+        USDST = address(ret);
+        usdstT = Token(USDST); admin.castVoteOnIssue(USDST, "setStatus", 2);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), 1000000e18);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
     }
 
     /// No mint grant, but the borrower is pre-funded so a silently-failed mint would still
@@ -38,7 +36,7 @@ contract Describe_FlashMintMintFailure is Authorizable {
         require(!admin.whitelist(USDST, "mint", address(fm)), "no mint grant");
         Borrower b = new Borrower();
         b.init(address(fm), USDST);
-        usdstT.mint(address(b), 100e18);              // borrower's OWN money
+        admin.castVoteOnIssue(USDST, "mint", address(b), 100e18);              // borrower's OWN money
 
         uint before = usdstT.balanceOf(address(b));
         uint supplyBefore = usdstT.totalSupply();

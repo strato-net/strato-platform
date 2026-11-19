@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import axios from "axios";
 import { buildFunctionTx } from "../../utils/txBuilder";
+import { governedInput } from "./user.service";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { strato, cirrus } from "../../utils/appApiHelper";
 import { getServiceToken } from "../../utils/authHelper";
@@ -168,7 +169,7 @@ async function depositOnStrato(
 ): Promise<void> {
   const accessToken = await getBridgeAdminToken();
 
-  const tx = await buildFunctionTx({
+  const tx = await buildFunctionTx(await governedInput(accessToken, {
     contractName: extractContractName(MercataBridge),
     contractAddress: mercataBridge,
     method: "deposit",
@@ -181,7 +182,7 @@ async function depositOnStrato(
       stratoRecipient,
       targetStratoToken,
     },
-  });
+  }));
 
   console.log(
     `[Onramp] Calling deposit — chainId=${externalChainId}, token=${externalToken}, ` +

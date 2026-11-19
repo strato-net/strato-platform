@@ -1,0 +1,443 @@
+import { Annotations, CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
+import * as acm from "aws-cdk-lib/aws-certificatemanager";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
+import * as ecr from "aws-cdk-lib/aws-ecr";
+import * as ecs from "aws-cdk-lib/aws-ecs";
+import * as iam from "aws-cdk-lib/aws-iam";
+import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
+import * as logs from "aws-cdk-lib/aws-logs";
+import * as route53 from "aws-cdk-lib/aws-route53";
+import * as targets from "aws-cdk-lib/aws-route53-targets";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as servicediscovery from "aws-cdk-lib/aws-servicediscovery";
+import * as ssm from "aws-cdk-lib/aws-ssm";
+import { Construct } from "constructs";
+import { ApiTierConfig } from "./config";
+import { deploymentPrefix, elbName } from "./naming";
+
+export interface ApiTierStackProps extends StackProps {
+  /** Certificate for the ALB's HTTPS listener (from CertificateStack); `config.albCertificateArn` otherwise. */
+  albCertificate?: acm.ICertificate;
+  /** More hostnames the HTTPS listener answers for: the SMD's, which CloudFront forwards with the viewer's Host header and so needs a matching certificate here. */
+  extraCertificates?: acm.ICertificate[];
+  vpc: ec2.IVpc;
+  config: ApiTierConfig;
+}
+
+/**
+ * The STRATO API tier: one Fargate task per copy running the node's nginx as
+ * a sidecar in front of strato-api + ethereum-jsonrpc (the strato image's
+ * api-doit.sh entrypoint), PostgREST for Cirrus, and the SMD and apex
+ * containers the SMD needs, behind an ALB. There is no shared edge state:
+ * sessions ride in the encrypted cookie, CSRF tokens stay per instance behind
+ * ALB session stickiness, and nonce counters live in Aurora's writer.
+ *
+ * Transactions are posted to the core tier's ingress (ingressUrls: its load
+ * balancer, which hands a batch to one healthy cell). Reads that need a VM
+ * go to vm-query, which every task runs over the SQL mirror
+ * and publishes to the other copies through ECS Service Connect as
+ * vm-query:8546, so a copy whose own instance is down or shedding uses
+ * another's. Nothing here calls a core cell's VM: what the mirror cannot
+ * answer (a non-latest block tag, eth_getProof, a block replay) is an error.
+ */
+export class ApiTierStack extends Stack {
+  readonly loadBalancer: elbv2.ApplicationLoadBalancer;
+
+  constructor(scope: Construct, id: string, props: ApiTierStackProps) {
+    super(scope, id, props);
+    const { vpc, config } = props;
+    const name = `${deploymentPrefix(config.envName)}-api`;
+
+    // --- Secrets and the node config ---
+    const postgres = secretsmanager.Secret.fromSecretNameV2(this, "PostgresSecret", config.secrets.postgres);
+    // Either the credentials file as one secret, or a JSON secret whose three fields both
+    // strato-api and nginx take as OAUTH_* variables (see oauthJsonSecretName).
+    const oauthJson = config.oauthJsonSecretName
+      ? (config.oauthJsonSecretName.startsWith("arn:")
+          ? secretsmanager.Secret.fromSecretCompleteArn(this, "OauthJsonSecret", config.oauthJsonSecretName)
+          : secretsmanager.Secret.fromSecretNameV2(this, "OauthJsonSecret", config.oauthJsonSecretName))
+      : undefined;
+    const oauthYaml = oauthJson ? undefined : secretsmanager.Secret.fromSecretNameV2(this, "OauthYamlSecret", config.secrets.oauthCredentialsYaml);
+    const oauthFields = (secret: secretsmanager.ISecret) => ({
+      OAUTH_DISCOVERY_URL: ecs.Secret.fromSecretsManager(secret, "discoveryUrl"),
+      OAUTH_CLIENT_ID: ecs.Secret.fromSecretsManager(secret, "clientId"),
+      OAUTH_CLIENT_SECRET: ecs.Secret.fromSecretsManager(secret, "clientSecret"),
+    });
+    const session: secretsmanager.ISecret = config.createSessionSecret
+      ? new secretsmanager.Secret(this, "SessionSecret", {
+          secretName: config.secrets.session,
+          description: `${name} nginx session secret`,
+          generateSecretString: { passwordLength: 64, excludePunctuation: true },
+        })
+      : secretsmanager.Secret.fromSecretNameV2(this, "SessionSecret", config.secrets.session);
+    // nginx's session secret, when it is not this stack's own (front door: the app tier's).
+    // A complete ARN is required when the name ends in "-" and six characters (as
+    // strato/app/session-secret does): Secrets Manager reads that ending of a
+    // name-only reference as the random suffix, finds no such secret, and ECS's
+    // fetch fails as AccessDenied.
+    const nginxSession = !config.nginxSessionSecretName
+      ? session
+      : config.nginxSessionSecretName.startsWith("arn:")
+        ? secretsmanager.Secret.fromSecretCompleteArn(this, "NginxSessionSecret", config.nginxSessionSecretName)
+        : secretsmanager.Secret.fromSecretNameV2(this, "NginxSessionSecret", config.nginxSessionSecretName);
+    // nginx's login client, when it differs from the node's (front door: shared with the app tier).
+    const nginxOauth = config.nginxOauthSecretName ? secretsmanager.Secret.fromSecretNameV2(this, "NginxOauthSecret", config.nginxOauthSecretName) : undefined;
+    const ethconf = ssm.StringParameter.fromStringParameterAttributes(this, "EthconfParam", {
+      parameterName: config.ethconfParameterName,
+      // Read at task start by ECS, not at synth: the value is the node's
+      // whole config and changes with every re-setup of the node.
+      forceDynamicReference: true,
+    });
+    const ethconfEnv = { ETHCONF_BASE64: ecs.Secret.fromSsmParameter(ethconf) };
+
+    // --- ECS ---
+    // The deployment's one cluster: the app tier's services join it by name.
+    const cluster = new ecs.Cluster(this, "Cluster", { vpc, clusterName: config.clusterName, containerInsightsV2: ecs.ContainerInsights.ENABLED });
+    // Service Connect: each task's vm-query is reachable from every task as
+    // vm-query:8546 through ECS's proxy, which sends only to healthy tasks
+    // and ejects one that keeps failing. No listener of its own is needed.
+    // The namespace carries the cluster's name: a cluster under another name gets a namespace
+    // of its own, so its vm-query never meets one registered for the cluster it replaces.
+    cluster.addDefaultCloudMapNamespace({ name: config.clusterName, type: servicediscovery.NamespaceType.HTTP, useForServiceConnect: true });
+    const vmQueryPort = 8546;
+    // DESTROY, not the CDK default of RETAIN: a retained group keeps its name,
+    // and the next create of this stack then fails with "already exists".
+    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/${deploymentPrefix(config.envName)}/api`, retention: logs.RetentionDays.ONE_MONTH, removalPolicy: RemovalPolicy.DESTROY });
+    const task = new ecs.FargateTaskDefinition(this, "Task", {
+      family: name,
+      cpu: 2048,
+      memoryLimitMiB: 4096,
+      runtimePlatform: { cpuArchitecture: ecs.CpuArchitecture.X86_64, operatingSystemFamily: ecs.OperatingSystemFamily.LINUX },
+    });
+    const image = (id: string, uri: string) => containerImage(this, id, uri);
+    const awsLogs = (prefix: string) => ecs.LogDrivers.awsLogs({ logGroup, streamPrefix: prefix });
+
+    // strato-api + ethereum-jsonrpc. The OAuth credentials file is handed
+    // over whole as a secret; api-doit.sh writes it where strato-auth reads.
+    const api = task.addContainer("strato-api", {
+      image: image("StratoRepo", config.stratoImage),
+      entryPoint: ["/strato/api-doit.sh"],
+      logging: awsLogs("strato-api"),
+      portMappings: [{ containerPort: 3000 }, { containerPort: 8545 }, { containerPort: vmQueryPort, name: "vm-query", appProtocol: ecs.AppProtocol.http }],
+      environment: {
+        postgres_host: config.postgresWriterHost,
+        postgres_reader_host: config.postgresReaderHost,
+        postgres_port: String(config.postgresPort),
+        postgres_user: config.postgresUser,
+        INGRESS_URLS: config.ingressUrls.join(","),
+        // After this task's own vm-query (api-doit.sh lists it first): the other copies', through Service Connect.
+        VM_QUERY_URLS: `http://vm-query:${vmQueryPort}`,
+        ...(config.vaultUrl ? { VAULT_URL: config.vaultUrl } : {}),
+      },
+      secrets: {
+        ...ethconfEnv,
+        postgres_password: ecs.Secret.fromSecretsManager(postgres, "password"),
+        ...(oauthYaml ? { OAUTH_CREDENTIALS_YAML: ecs.Secret.fromSecretsManager(oauthYaml) } : oauthFields(oauthJson!)),
+      },
+      healthCheck: {
+        // vm-query is the tier's only VM, so a task without one is unhealthy.
+        command: ["CMD-SHELL", "pgrep -f '^strato-api' && pgrep -f '^ethereum-jsonrpc' && pgrep -f '^vm-query' || exit 1"],
+        interval: Duration.seconds(15),
+        startPeriod: Duration.seconds(90),
+      },
+    });
+
+    task.addContainer("postgrest", {
+      image: image("PostgrestRepo", config.postgrestImage),
+      logging: awsLogs("postgrest"),
+      portMappings: [{ containerPort: 3001 }],
+      environment: {
+        PG_ENV_POSTGRES_DB: "cirrus",
+        PG_ENV_POSTGRES_HOST: config.postgresReaderHost,
+        PG_ENV_POSTGRES_USER: config.postgresUser,
+        // The role anonymous requests run as: the image's default is postgres, which the node's login may not become.
+        POSTGREST_ANONYMOUS: config.postgresUser,
+        PG_PORT_5432_TCP_PORT: String(config.postgresPort),
+        POSTGREST_LOG_LEVEL: "error",
+        POSTGREST_SCHEMA_RELOAD_SECONDS: "30",
+      },
+      secrets: { PG_ENV_POSTGRES_PASSWORD: ecs.Secret.fromSecretsManager(postgres, "password") },
+    });
+
+    // SMD and apex ride along so the SMD keeps working through the cutover;
+    // apex here serves key creation for the SMD, its node-health views point
+    // at the public node URL from the config.
+    const smd = config.smdImage
+      ? task.addContainer("smd", {
+          image: image("SmdRepo", config.smdImage),
+          logging: awsLogs("smd"),
+          portMappings: [{ containerPort: 3002 }],
+          secrets: ethconfEnv,
+        })
+      : undefined;
+    const apex = config.apexImage
+      ? task.addContainer("apex", {
+          image: image("ApexRepo", config.apexImage),
+          logging: awsLogs("apex"),
+          portMappings: [{ containerPort: 3009 }],
+          environment: {
+            postgres_host: config.postgresWriterHost,
+            postgres_port: String(config.postgresPort),
+            postgres_user: config.postgresUser,
+            // The node's metrics live in a core cell's Prometheus (-c prometheusHost). strato-api
+            // runs in this task, so apex calls it locally and its health_check is not among the
+            // cell's jobs: the required jobs leave core-api out.
+            PROMETHEUS_HOST: config.prometheusHost ?? "127.0.0.1:1",
+            // apex would otherwise call strato-api at the node URL's host (the front door).
+            APEX_STRATO_API_HOST: "127.0.0.1",
+            APEX_STRATO_API_PORT: "3000",
+            // No Redis in this task: the block cache lives on the core cells and is not
+            // published. Told so, apex reads the last block and validators from the Aurora
+            // mirror (block_data_ref, node_status) at once, instead of waiting out a 2 s Redis
+            // connect timeout on every /health and /status (strato-platform apex honours
+            // redis_host=none; older images ignore it and behave as before).
+            redis_host: "none",
+            ...(config.prometheusHost
+              ? { HEALTH_CHECK_JOBS: "slipstream_main=slipstream,strato_p2p=strato-p2p,vm_main=vm-runner,seq_main=strato-sequencer" }
+              : {}),
+          },
+          secrets: { ...ethconfEnv, postgres_password: ecs.Secret.fromSecretsManager(postgres, "password") },
+        })
+      : undefined;
+
+    // The API docs: Swagger UI, served at /docs/ by the nginx sidecar, which
+    // also serves the spec and the initializer from its own image. Not
+    // essential, so a docs failure never takes the API down.
+    const docs = config.docsImage
+      ? task.addContainer("docs", {
+          image: image("DocsRepo", config.docsImage),
+          logging: awsLogs("docs"),
+          portMappings: [{ containerPort: 8080 }],
+          environment: { API_URL: "/docs/swagger.yaml" },
+          essential: false,
+          memoryReservationMiB: 64,
+        })
+      : undefined;
+
+    const nginx = task.addContainer("nginx", {
+      image: image("NginxRepo", config.nginxImage),
+      logging: awsLogs("nginx"),
+      portMappings: [{ containerPort: config.httpPort }],
+      environment: {
+        API_UPSTREAM_HOST: "127.0.0.1",
+        STRATO_PORT_API: "3000",
+        RPC_PORT: "8545",
+        JSONRPC_ENABLED: "true",
+        POSTGREST_HOST: "127.0.0.1:3001",
+        SMD_HOST: smd ? "127.0.0.1:3002" : "127.0.0.1:1",
+        APEX_HOST: apex ? "127.0.0.1:3009" : "127.0.0.1:1",
+        DOCS_HOST: docs ? "127.0.0.1:8080" : "127.0.0.1:1",
+        PROMETHEUS_HOST: "127.0.0.1:1",
+        BUNDLED_APP: "false",
+        ssl: "false",
+        // TLS ends at the ALB (or CloudFront): the OpenID redirect goes back over https.
+        ...(props.albCertificate || config.albCertificateArn ? { PUBLIC_SCHEME: "https" } : {}),
+        ...(config.csrfStateless ? { CSRF_STATELESS: "true" } : {}),
+        // The client's address is the X-Forwarded-For entry before the proxies listed here:
+        // the load balancer (the VPC's range) and what stands in front of it.
+        NGINX_TRUST_PROXY_CIDRS: [vpc.vpcCidrBlock, ...config.trustedProxyCidrs].join(","),
+      },
+      secrets: {
+        ...ethconfEnv,
+        SESSION_SECRET: ecs.Secret.fromSecretsManager(nginxSession),
+        ...(oauthYaml ? { OAUTH_CREDENTIALS_YAML: ecs.Secret.fromSecretsManager(oauthYaml) } : {}),
+        // docker-run.sh prefers these over the credentials file's client.
+        ...(nginxOauth || oauthJson
+          ? oauthFields((nginxOauth ?? oauthJson)!)
+          : {}),
+      },
+      healthCheck: {
+        command: ["CMD-SHELL", `curl -sf http://127.0.0.1:${config.httpPort}/_ping || exit 1`],
+        interval: Duration.seconds(10),
+        startPeriod: Duration.seconds(60),
+      },
+    });
+    nginx.addContainerDependencies({ container: api, condition: ecs.ContainerDependencyCondition.HEALTHY });
+
+    // Observability sidecar (optional): the ADOT collector scrapes this task's
+    // containers over localhost, forwards traces to X-Ray and remote-writes
+    // metrics to Managed Prometheus. Config and policy come from the
+    // observability app's outputs.
+    if (config.otelConfigParameterName) {
+      const otelConfig = ssm.StringParameter.fromStringParameterAttributes(this, "OtelConfigParam", {
+        parameterName: config.otelConfigParameterName,
+        forceDynamicReference: true,
+      });
+      task.addContainer("otel-collector", {
+        image: ecs.ContainerImage.fromRegistry("public.ecr.aws/aws-observability/aws-otel-collector:v0.43.0"),
+        logging: ecs.LogDrivers.awsLogs({ logGroup, streamPrefix: "otel" }),
+        essential: false,
+        portMappings: [{ containerPort: 4317 }, { containerPort: 4318 }],
+        secrets: { AOT_CONFIG_CONTENT: ecs.Secret.fromSsmParameter(otelConfig) },
+        memoryReservationMiB: 256,
+      });
+      if (config.otelSidecarPolicyArn) {
+        task.taskRole.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyArn(this, "OtelSidecarPolicy", config.otelSidecarPolicyArn));
+      }
+      // The instrumented processes export spans to the sidecar over localhost.
+      for (const containerName of ["strato-api", "nginx", "backend"]) {
+        task.findContainer(containerName)?.addEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4318");
+      }
+    }
+
+    const taskSg = new ec2.SecurityGroup(this, "TaskSg", { vpc, description: `${name} tasks` });
+    // Service Connect: the proxy in each task listens on the container port
+    // (no ingressPortOverride is set), so the tasks admit each other on it.
+    taskSg.addIngressRule(taskSg, ec2.Port.tcp(vmQueryPort), `${name} tasks: vm-query fallback (ECS Service Connect)`);
+    if (config.postgresSecurityGroupId) {
+      ec2.SecurityGroup.fromSecurityGroupId(this, "ClusterSg", config.postgresSecurityGroupId).addIngressRule(taskSg, ec2.Port.tcp(config.postgresPort), `${name} tasks`);
+    }
+    const coreSg = config.coreSecurityGroupId
+      ? ec2.SecurityGroup.fromSecurityGroupId(this, "CoreSg", config.coreSecurityGroupId)
+      : undefined;
+    // The tasks reach the core tier through its load balancer: the transaction
+    // ingress (8600) and a cell's Prometheus. Without one, the Prometheus cell
+    // admits them itself and the ingress is opened on the cell side (the
+    // core-cell app's clientSecurityGroupIds). Nothing else: a core cell runs
+    // no strato-api, jsonrpc or vault wrapper (this tier runs its own, and
+    // signs against the external vault), and its VM is never called.
+    const coreLbSg = config.coreLoadBalancerSecurityGroupId
+      ? ec2.SecurityGroup.fromSecurityGroupId(this, "CoreLbSg", config.coreLoadBalancerSecurityGroupId)
+      : undefined;
+    coreLbSg?.addIngressRule(taskSg, ec2.Port.tcp(8600), `${name} tasks: transaction ingress (strato-ingest)`);
+    const prometheusSg = coreLbSg ?? coreSg;
+    if (prometheusSg && config.prometheusHost) {
+      const port = Number(config.prometheusHost.split(":")[1] ?? "9090");
+      prometheusSg.addIngressRule(taskSg, ec2.Port.tcp(port), `${name} tasks: Prometheus (apex health)`);
+    }
+
+    const service = new ecs.FargateService(this, "Service", {
+      cluster,
+      taskDefinition: task,
+      desiredCount: config.desiredCount,
+      securityGroups: [taskSg],
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      circuitBreaker: { rollback: true },
+      minHealthyPercent: 100,
+      maxHealthyPercent: 200,
+      serviceConnectConfiguration: {
+        services: [{ portMappingName: "vm-query", dnsName: "vm-query", port: vmQueryPort }],
+        logDriver: awsLogs("service-connect"),
+      },
+    });
+    service.autoScaleTaskCount({ minCapacity: config.desiredCount, maxCapacity: config.desiredCount * 4 })
+      .scaleOnCpuUtilization("Cpu", { targetUtilizationPercent: 60 });
+
+    // --- ALB ---
+    const albSg = new ec2.SecurityGroup(this, "AlbSg", { vpc, description: `${name} alb` });
+    this.loadBalancer = new elbv2.ApplicationLoadBalancer(this, "Alb", { vpc, internetFacing: true, securityGroup: albSg, loadBalancerName: elbName(name) });
+    const albCertificate =
+      props.albCertificate ?? (config.albCertificateArn ? acm.Certificate.fromCertificateArn(this, "AlbCert", config.albCertificateArn) : undefined);
+    // The port-80 listener keeps one logical id whether it forwards (no
+    // certificate) or redirects to 443: two listeners on one port cannot
+    // coexist, so switching to HTTPS must update it in place. The service moves
+    // to the HTTPS listener's target group in place too.
+    const http = this.loadBalancer.addListener("Http", {
+      port: 80,
+      ...(albCertificate ? { defaultAction: elbv2.ListenerAction.redirect({ port: "443", protocol: "HTTPS", permanent: true }) } : {}),
+    });
+    const listener = albCertificate
+      ? this.loadBalancer.addListener("Https", {
+          port: 443,
+          certificates: [albCertificate],
+          sslPolicy: elbv2.SslPolicy.RECOMMENDED_TLS,
+        })
+      : http;
+    const extraCertificates = [
+      ...(props.extraCertificates ?? []).map((c) => elbv2.ListenerCertificate.fromCertificateManager(c)),
+      // CloudFront forwards the front door's Host header, so this ALB must serve its certificate.
+      // Skipped when the listener already serves it as its default certificate.
+      ...(config.frontDoorCertificateArn && config.frontDoorCertificateArn !== config.albCertificateArn
+        ? [elbv2.ListenerCertificate.fromArn(config.frontDoorCertificateArn)]
+        : []),
+    ];
+    if (albCertificate && extraCertificates.length) {
+      listener.addCertificates("ExtraCertificates", extraCertificates);
+    }
+    listener.addTargets("Nginx", {
+      // The port is in the name so that a port change, which replaces the
+      // target group, does not collide with the old group's name.
+      targetGroupName: elbName(`${name}-${config.httpPort}`),
+      port: config.httpPort,
+      protocol: elbv2.ApplicationProtocol.HTTP,
+      targets: [service.loadBalancerTarget({ containerName: "nginx", containerPort: config.httpPort })],
+      healthCheck: { path: "/_ping", interval: Duration.seconds(15), healthyThresholdCount: 2 },
+      deregistrationDelay: Duration.seconds(30),
+      // A browser stays on the instance that issued its CSRF token (kept in
+      // that nginx's shared dict); sessions themselves are in the cookie, so
+      // a re-pin after a deploy only costs one CSRF refresh.
+      stickinessCookieDuration: Duration.days(1),
+    });
+
+    // --- Grafana on a core cell, reached through this ALB ---
+    // Grafana runs on the cell, not in this tier, and the only public name in
+    // front of it is the front door, so /grafana* comes in over CloudFront,
+    // lands here and is forwarded to the core tier's Grafana target group,
+    // where that cell's instance registers itself. Grafana itself does the
+    // Keycloak login (generic_oauth) and refuses anyone outside the whitelisted
+    // group, so this rule is routing only - it is not the access control. The
+    // cell's 3001 stays shut to everything except this load balancer.
+    if (config.grafanaTargetGroupArn) {
+      const grafanaTargets = elbv2.ApplicationTargetGroup.fromTargetGroupAttributes(this, "GrafanaTargets", { targetGroupArn: config.grafanaTargetGroupArn });
+      Annotations.of(grafanaTargets).acknowledgeWarning("@aws-cdk/aws-elbv2:albTargetGroupCannotRegisterListener", "the cell's security group is opened to this load balancer below");
+      listener.addTargetGroups("Grafana", {
+        priority: 10,
+        conditions: [elbv2.ListenerCondition.pathPatterns(["/grafana", "/grafana/*"])],
+        targetGroups: [grafanaTargets],
+      });
+      coreSg?.addIngressRule(albSg, ec2.Port.tcp(config.grafanaPort), `${name} alb: Grafana`);
+    }
+
+    // --- Weighted cutover on the node hostname ---
+    // Two weighted records with the same name: the node(s) and this tier.
+    // Start with apiTierWeight=10, raise it as the validation queries stay
+    // clean, finish at 100; rollback is the same number going down.
+    if (config.hostedZoneId && config.domainName) {
+      const zone = route53.HostedZone.fromHostedZoneAttributes(this, "Zone", {
+        hostedZoneId: config.hostedZoneId,
+        zoneName: config.domainName.split(".").slice(1).join("."),
+      });
+      new route53.ARecord(this, "ApiTierRecord", {
+        zone,
+        recordName: config.domainName,
+        target: route53.RecordTarget.fromAlias(new targets.LoadBalancerTarget(this.loadBalancer)),
+        weight: config.apiTierWeight,
+        setIdentifier: "api-tier",
+      });
+      if (config.nodeIpAddresses.length > 0) {
+        new route53.ARecord(this, "NodeRecord", {
+          zone,
+          recordName: config.domainName,
+          target: route53.RecordTarget.fromIpAddresses(...config.nodeIpAddresses),
+          weight: 100 - config.apiTierWeight,
+          setIdentifier: "node",
+          ttl: Duration.seconds(60),
+        });
+      }
+    }
+
+    new CfnOutput(this, "AlbDnsName", { value: this.loadBalancer.loadBalancerDnsName });
+    new CfnOutput(this, "ClusterName", { value: cluster.clusterName, description: "The deployment's ECS cluster: the app tier app's clusterName" });
+    if (config.domainName && !config.hostedZoneId) {
+      new CfnOutput(this, "HostnameRecord", {
+        value: `${config.domainName} CNAME ${this.loadBalancer.loadBalancerDnsName}`,
+        description: "The record to create at the registrar for the tier's hostname",
+      });
+    }
+    new CfnOutput(this, "TaskSecurityGroupId", {
+      value: taskSg.securityGroupId,
+      description: "Allow on the Aurora cluster (5432) and, as the core-cell app's clientSecurityGroupIds, on every cell's ingress (8600)",
+    });
+  }
+}
+
+function containerImage(scope: Construct, id: string, uri: string): ecs.ContainerImage {
+  const m = uri.match(/^(\d{12})\.dkr\.ecr\.([a-z0-9-]+)\.amazonaws\.com\/([^:@]+)(?::([^@]+))?(?:@(sha256:[0-9a-f]+))?$/);
+  if (!m) return ecs.ContainerImage.fromRegistry(uri);
+  const [, account, region, repositoryName, tag, digest] = m;
+  const repository = ecr.Repository.fromRepositoryAttributes(scope, id, {
+    repositoryName,
+    repositoryArn: `arn:aws:ecr:${region}:${account}:repository/${repositoryName}`,
+  });
+  return digest ? ecs.ContainerImage.fromEcrRepository(repository, digest) : ecs.ContainerImage.fromEcrRepository(repository, tag ?? "latest");
+}

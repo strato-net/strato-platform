@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   getPools,
+  getPositionManagerMetadata,
   getFeeTiers,
   getPoolByAddress,
   getPositions,
@@ -27,6 +28,14 @@ import {
 
 class PoolV3Controller {
   // ----- reads -----
+
+  static async metadata(_req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      res.status(RestStatus.OK).json(getPositionManagerMetadata());
+    } catch (error) {
+      next(error);
+    }
+  }
 
   static async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

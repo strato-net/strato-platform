@@ -145,13 +145,20 @@ def checkNodeIsGettingBlocks() {
 }
 
 def spinUpVault() {
+  writeFile file: "vault.pgpass", text: "postgres:5432:*:strato:api\n"
+  sh 'chmod 600 vault.pgpass'
   writeFile file: "run-vault.sh", text: """#!/bin/bash
   sudo \\
+    COMPOSE_PROFILES=local-postgres \\
+    VAULT_CREATE_DB=true \\
+    VAULT_PGPASS_FILE=./vault.pgpass \\
+    PGSSLMODE=disable \\
+    PGSSLROOTCERT=/etc/ssl/certs/ca-certificates.crt \\
     ssl=true \\
     HTTPS_PORT=8093 \\
     INITIAL_OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration' \\
     INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/mercata' \\
-    INITIAL_OAUTH_JWT_USERNAME_CLAIM='sub' \\
+    INITIAL_OAUTH_JWT_USER_ID_CLAIM='sub' \\
     PASSWORD=123 \\
     ./vault
   """
@@ -298,6 +305,15 @@ def waitLocalNodeIsSynced(String nodeDir = '') {
         sudo docker exec strato-nginx-1 curl -fsS 172.17.0.1:3000/eth/v1.2/metadata 2>/dev/null
       }
 
+      # /metadata only reports isSynced; the block numbers are in the eth
+      # database's node_status table (Blockchain.Data.NodeStatus).
+      sync_progress() {
+        sudo docker exec strato-postgres-1 psql -U strato -d eth -tAc "
+          select 'nodeBestBlock=' || coalesce(max(value::json->>'number') filter (where name = 'best_block'), '?')
+              || ' worldBestBlock=' || coalesce(max(value::json->>'number') filter (where name = 'world_best_block'), '?')
+          from node_status;" 2>/dev/null || echo 'nodeBestBlock=? worldBestBlock=?'
+      }
+
       # strato-ps shells out to docker compose and strato-barometer, so it costs
       # far more than the metadata poll: callers invoke it every ~30s, not every
       # poll. Two attempts: strato-ps talks to the docker daemon, which can
@@ -326,11 +342,11 @@ def waitLocalNodeIsSynced(String nodeDir = '') {
       for (( i = 0; i < SYNC_MAX_POLLS; i++ )); do
         meta=$(metadata)
         if grep -q '"isSynced":true' <<<"$meta"; then
-          echo "Node is in-sync (nodeBestBlock=$(jq -r '.nodeBestBlock // "?"' <<<"$meta" 2>/dev/null)) after ${SECONDS}s"
+          echo "Node is in-sync ($(sync_progress)) after ${SECONDS}s"
           break
         fi
         if (( SECONDS - last_progress >= PROGRESS_EVERY_SECS )); then
-          echo "[$(date -u +%H:%M:%S)] still syncing: nodeBestBlock=$(jq -r '.nodeBestBlock // "?"' <<<"$meta" 2>/dev/null) worldBestBlock=$(jq -r '.worldBestBlock // "?"' <<<"$meta" 2>/dev/null)"
+          echo "[$(date -u +%H:%M:%S)] still syncing: $(sync_progress)"
           last_progress=$SECONDS
         fi
         # Skipping i=0 gives convoke a grace period to write .strato.pid, since
@@ -350,7 +366,7 @@ def waitLocalNodeIsSynced(String nodeDir = '') {
       last_kind=""
       for (( i = 0; i < CIRRUS_MAX_POLLS; i++ )); do
         node_tip=$(sudo docker exec strato-nginx-1 curl -fsS apex:3009/status 2>/dev/null | jq -r '.lastBlock.number // empty' 2>/dev/null)
-        cirrus_tip=$(sudo docker exec strato-postgres-1 psql -U postgres -d cirrus -tAc \\
+        cirrus_tip=$(sudo docker exec strato-postgres-1 psql -U strato -d cirrus -tAc \\
           "select coalesce(max(block_number::numeric), 0)::bigint from storage where block_number ~ '^[0-9]+$';" 2>/dev/null | tr -d '[:space:]')
         if ! [[ "$node_tip" =~ ^[0-9]+$ && "$cirrus_tip" =~ ^[0-9]+$ ]]; then
           kind="unreadable"

@@ -19,31 +19,45 @@ vault-wrapper:
 "
 
 echo 'Waiting for postgres to be available...'
-until pg_isready -h ${postgres_host} -p ${postgres_port}
+until pg_isready -h "$postgres_host" -p "$postgres_port"
 do
     echo "Check at $(date)"
     sleep 1
 done
 echo 'postgres is available'
 
-PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
 # Check if this container was initialized before
-if [ ! -f _container_initialized ]; then
+if [ "${VAULT_CREATE_DB:-false}" = true ] && [ ! -f _container_initialized ]; then
+    PSQL_CONNECTION_PARAMS=(-h "$postgres_host" -p "$postgres_port" -U "$postgres_user")
+    if [ -n "${PGPASSFILE:-}" ]; then
+      unset PGPASSWORD
+    else
+      export PGPASSWORD="${postgres_password:-}"
+    fi
     # Create the database for vault-wrapper if does not exist from previous STRATO deployments (e.g. STRATO upgrade flow)
-    if ! PGPASSWORD=${postgres_password} psql ${PSQL_CONNECTION_PARAMS} -lqt | cut -d \| -f 1 | grep -qw ${postgres_vault_wrapper_db}; then
+    existing_databases=$(psql "${PSQL_CONNECTION_PARAMS[@]}" -d postgres -XAtq -c 'SELECT datname FROM pg_database')
+    if ! grep -Fxq -- "$postgres_vault_wrapper_db" <<< "$existing_databases"; then
       echo "Creating the '${postgres_vault_wrapper_db}' database"
-      PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_vault_wrapper_db}
+      createdb "${PSQL_CONNECTION_PARAMS[@]}" -- "$postgres_vault_wrapper_db"
     else
       echo "Using the existing '${postgres_vault_wrapper_db}' database from previous STRATO deployment"
     fi
     # Create the '_container_initialized' sentinel file
     date '+%Y-%m-%d %H:%M:%S' > _container_initialized
+    unset PGPASSWORD
 fi
 
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+if [ -n "${PGPASSFILE:-}" ]; then
+  unset PGPASSWORD
+else
+  export PGPASSWORD="${postgres_password:-}"
+fi
+unset postgres_password
+
 exec blockapps-vault-wrapper-server \
   --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" \
-  --password="$postgres_password" --database="$postgres_vault_wrapper_db" --minLogLevel="${minLogLevel}" --keyStoreCacheTimeout="$keyStoreCacheTimeout"
+  --password="" --database="$postgres_vault_wrapper_db" --minLogLevel="${minLogLevel}" --keyStoreCacheTimeout="$keyStoreCacheTimeout"
 

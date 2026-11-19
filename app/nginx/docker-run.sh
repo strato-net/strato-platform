@@ -48,6 +48,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i 's/[[:space:]]*#TEMPLATE_MARK_SESSION_SECRET//g' /tmp/nginx.conf
   fi
   sed -i "s|__HISTORY_HOST__|${HISTORY_HOST:-}|g" /tmp/nginx.conf
+  sed -i "s|__PARTNER_REFERRALS_HOST__|${PARTNER_REFERRALS_HOST:-}|g" /tmp/nginx.conf
   # sed replacement: escape the characters that would otherwise be read as
   # syntax (backreference, delimiter, escape) in a generated secret
   SESSION_SECRET_SED=$(printf '%s' "$SESSION_SECRET" | sed -e 's/[\\&|]/\\&/g')
@@ -64,6 +65,19 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   DOCKER_NETWORK_CIDR=$(ip route | awk '/src/ {print $1}')
   sed -i "s|__DOCKER_NETWORK_CIDR__|$DOCKER_NETWORK_CIDR|g" /tmp/nginx.conf
+
+  # Generate set_real_ip_from directives for trusted proxy IPs
+  TRUST_PROXY_LINES=""
+  if [ -n "${NGINX_TRUST_PROXY_CIDRS:-}" ]; then
+    IFS=',' read -ra CIDRS <<< "$NGINX_TRUST_PROXY_CIDRS"
+    for cidr in "${CIDRS[@]}"; do
+      cidr=$(echo "$cidr" | xargs) # trim whitespace
+      if [ -n "$cidr" ]; then
+        TRUST_PROXY_LINES="${TRUST_PROXY_LINES}    set_real_ip_from ${cidr};\n"
+      fi
+    done
+  fi
+  sed -i "s|__TRUST_PROXY_CIDRS__|${TRUST_PROXY_LINES%\\\\n}|g" /tmp/nginx.conf
 
   if [ "$DOCKERIZED_APP" = true ]; then
     sed -i "s|__BACKEND_HOST__|backend|g" /tmp/nginx.conf

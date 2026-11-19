@@ -1,6 +1,5 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
-import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 
 /*
@@ -36,20 +35,20 @@ contract SequentialBorrower {
     }
 }
 
-contract Describe_FlashMintCapStacking is Authorizable {
+contract Describe_FlashMintCapStacking {
     Mercata m; FlashMint fm; AdminRegistry admin; address USDST; Token usdstT;
     uint CAP;
 
     function beforeAll() public {
-        bypassAuthorizations = true;
         m = new Mercata(); admin = m.adminRegistry(); fm = new FlashMint(address(admin));
-        USDST = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
-        usdstT = Token(USDST); usdstT.setStatus(2);
+        (bool executed, variadic ret) = admin.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDST","USD Stable",[],[],[],"USDST",0,18);
+        USDST = address(ret);
+        usdstT = Token(USDST); admin.castVoteOnIssue(USDST, "setStatus", 2);
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(fm));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(fm));
         CAP = 2000000e18;                        // the vendor test's own cap: 40% of mainnet USDST
-        fm.initialize(USDST, address(m.feeCollector()), CAP);
-        fm.setWhitelistEnabled(false);
+        admin.castVoteOnIssue(address(fm), "initialize", USDST, address(m.feeCollector()), CAP);
+        admin.castVoteOnIssue(address(fm), "setWhitelistEnabled", false);
     }
 
     /// One transaction draws 10 x maxLoan = 20,000,000 USDST of cumulative flash-minted
@@ -84,15 +83,15 @@ contract Describe_FlashMintCapStacking is Authorizable {
     /// A fee does not bound stacking either: it is charged per loan, so N loans cost N x fee,
     /// but the borrower only needs the fee, never the principal.
     function it_s3_fee_does_not_bound_stacking() public {
-        fm.setFeeBps(100);                       // 1%
+        admin.castVoteOnIssue(address(fm), "setFeeBps", 100);                       // 1%
         SequentialBorrower b = new SequentialBorrower();
         b.init(address(fm), USDST);
         uint smallLoan = 10000e18;
         uint feePerLoan = smallLoan / 100;
-        usdstT.mint(address(b), feePerLoan * 5); // only 500 USDST of float
+        admin.castVoteOnIssue(USDST, "mint", address(b), feePerLoan * 5); // only 500 USDST of float
         b.drawRepeatedly(smallLoan, 5);
         require(b.cumulativeBorrowed() == smallLoan * 5, "50,000 drawn on 500 of float");
         require(usdstT.balanceOf(address(b)) == 0, "float fully consumed by fees");
-        fm.setFeeBps(0);
+        admin.castVoteOnIssue(address(fm), "setFeeBps", 0);
     }
 }

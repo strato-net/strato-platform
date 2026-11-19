@@ -956,7 +956,9 @@ psql_scalar() {
   local container
   container="$(postgres_container "$node_dir")"
   [[ -n "$container" ]] || return 1
-  docker exec "$container" psql -U postgres -d "$db" -tAc "$sql" 2>/dev/null | tr -d '[:space:]'
+  local pg_user
+  pg_user="$(postgres_login_user "$node_dir")" || return 1
+  docker exec "$container" psql -U "$pg_user" -d "$db" -tAc "$sql" 2>/dev/null | tr -d '[:space:]'
 }
 
 probe_api_indexer_tip() {
@@ -1606,8 +1608,8 @@ Path(output).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", e
 PY
 }
 
-# Image used for the throwaway postgres container that dumps/loads the captured
-# databases. Must match the node's postgres major version to read the data dir.
+# Fallback image for temporary PostgreSQL containers and remote-database clients.
+# Local database containers use the image recorded in the node's Compose file.
 SNAPSHOT_POSTGRES_IMAGE="postgres:14.18"
 
 # A core cell in a tiered deployment keeps eth and cirrus in a shared cluster
@@ -1617,7 +1619,7 @@ SNAPSHOT_POSTGRES_IMAGE="postgres:14.18"
 # which is what a replica joining an already-populated cluster needs.
 SNAPSHOT_PG_HOST=""
 SNAPSHOT_PG_PORT="5432"
-SNAPSHOT_PG_USER="postgres"
+SNAPSHOT_PG_USER=""
 SNAPSHOT_PG_PASSWORD_FILE=""
 # Node dir whose ethconf.yaml carries the cluster credentials (set by create/restore).
 SNAPSHOT_PG_NODE_DIR=""
@@ -1633,6 +1635,14 @@ SNAPSHOT_PG_DATABASES=("eth" "cirrus")
 
 postgres_data_dir_initialized() {
   [[ -f "$1/PG_VERSION" ]]
+}
+
+postgres_login_user() {
+  local pg_user
+  pg_user="$(read_ethconf_value "$1/.ethereumH/ethconf.yaml" sqlConfig user)" \
+    || die "cannot read sqlConfig.user from $1/.ethereumH/ethconf.yaml"
+  [[ -n "$pg_user" ]] || die "sqlConfig.user is empty in $1/.ethereumH/ethconf.yaml"
+  printf '%s\n' "$pg_user"
 }
 
 # Determine the uid:gid the node's postgres container runs as. The node's
@@ -1684,24 +1694,22 @@ PY
 # postgres container expects.
 pg_temp_start() {
   local data_dir="$1"
+  local pg_user
+  pg_user="$(postgres_login_user "$(dirname "$data_dir")")" || return 1
   local init_password="${2:-}"
   local run_user="${3:-}"
   local mode="${4:-}"
   local dumps_dir="${5:-}"
-  local config_dir="${6:-}"
+  local pg_image
+  pg_image="$(compose_images_json "$(dirname "$data_dir")/docker-compose.yml" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("postgres", ""))')"
+  [[ -n "$pg_image" ]] || pg_image="$SNAPSHOT_POSTGRES_IMAGE"
   need_cmd docker
   local args=(-d --rm -v "$data_dir:/var/lib/postgresql/data")
   [[ -n "$run_user" ]] && args+=(--user "$run_user")
   # Optional read-only mount of the extracted dumps at /dumps, so pg_restore
   # reads them in place instead of a docker cp writing them a second time.
   [[ -n "$dumps_dir" ]] && args+=(-v "$dumps_dir:/dumps:ro")
-  if [[ -n "$config_dir" ]]; then
-    [[ -f "$config_dir/init-permissions.sql" && -f "$config_dir/pg_hba.conf" ]] \
-      || die "incomplete PostgreSQL configuration in $config_dir"
-    args+=(-e POSTGRES_USER=strato_admin
-           -v "$config_dir/init-permissions.sql:/docker-entrypoint-initdb.d/10-runtime-permissions.sql:ro"
-           -v "$config_dir/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro")
-  fi
   if postgres_data_dir_initialized "$data_dir"; then
     args+=(-e POSTGRES_HOST_AUTH_METHOD=trust)
   else
@@ -1711,7 +1719,7 @@ pg_temp_start() {
   # Server-side postgres args. In "fast" mode (bulk restore into a disposable
   # cluster) relax durability and grow bulk-load buffers for a much faster load.
   local pg_args=(-c max_connections=300)
-  [[ -n "$config_dir" ]] && pg_args+=(-c hba_file=/etc/postgresql/pg_hba.conf)
+  [[ "$pg_image" != "$SNAPSHOT_POSTGRES_IMAGE" ]] && pg_args+=(-c hba_file=/etc/postgresql/pg_hba.conf)
   if [[ "$mode" == "fast" ]]; then
     pg_args+=(-c fsync=off -c synchronous_commit=off -c full_page_writes=off \
       -c max_wal_size=4GB -c checkpoint_timeout=30min -c maintenance_work_mem=1GB)
@@ -1720,7 +1728,7 @@ pg_temp_start() {
   # and PGDATA owned by that uid; the bind-mounted data dir is created by
   # strato-setup as the operator, so ownership already matches.
   local cid
-  cid="$(docker run "${args[@]}" "$SNAPSHOT_POSTGRES_IMAGE" "${pg_args[@]}" 2>/dev/null)" \
+  cid="$(docker run "${args[@]}" "$pg_image" "${pg_args[@]}" 2>/dev/null)" \
     || die "failed to start temporary postgres container"
   TMP_PG_CONTAINERS+=("$cid")
   # A generous window: on a fresh restore the initdb of the empty cluster runs
@@ -1734,7 +1742,7 @@ pg_temp_start() {
   # gap between the two servers ("connection to server on socket ... failed").
   local i
   for i in $(seq 1 300); do
-    if docker exec "$cid" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then
+    if docker exec "$cid" pg_isready -h 127.0.0.1 -U "$pg_user" -d postgres >/dev/null 2>&1; then
       printf '%s\n' "$cid"
       return 0
     fi
@@ -1763,6 +1771,8 @@ snapshot_pg_jobs() {
 # container. Custom format enables parallel, index-rebuilding restore.
 dump_databases() {
   local data_dir="$1"
+  local pg_user
+  pg_user="$(postgres_login_user "$(dirname "$data_dir")")" || return 1
   local dest_dir="$2"
   [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && { mkdir -p "$dest_dir"; for db in "${SNAPSHOT_PG_DATABASES[@]}"; do printf -- 'offline fixture dump for %s\n' "$db" > "$dest_dir/$db.dump"; done; return 0; }
   mkdir -p "$dest_dir"
@@ -1773,7 +1783,7 @@ dump_databases() {
   for db in "${SNAPSHOT_PG_DATABASES[@]}"; do
     info "Dumping database '$db'..."
     # -Fc = custom (compressed) format; stream to a host file via stdout.
-    docker exec "$cid" pg_dump -U postgres --no-owner --no-privileges -Fc "$db" > "$dest_dir/$db.dump" \
+    docker exec "$cid" pg_dump -U "$pg_user" --no-owner --no-privileges -Fc "$db" > "$dest_dir/$db.dump" \
       || { pg_temp_stop "$cid"; die "pg_dump failed for database '$db'"; }
   done
   pg_temp_stop "$cid"
@@ -1783,15 +1793,15 @@ dump_databases() {
 # progress line every 30s: a large database (Cirrus) takes many minutes, nearly
 # all of it rebuilding indexes, and would otherwise sit silent. Progress comes
 # from pg_restore's own verbose log against the totals in the dump's TOC.
-# Args: <cid> <db> <jobs> <log>. Returns pg_restore's status.
+# Args: <cid> <db> <jobs> <log> <pg-user>. Returns pg_restore's status.
 pg_restore_with_progress() {
-  local cid="$1" db="$2" jobs="$3" log="$4"
+  local cid="$1" db="$2" jobs="$3" log="$4" pg_user="$5"
   local toc tables_total indexes_total tables_done indexes_done size t0 pid rc=0 n=0
   toc="$(docker exec "$cid" pg_restore -l "/dumps/$db.dump" 2>/dev/null || true)"
   tables_total="$(grep -cE '^[0-9]+; [0-9]+ [0-9]+ TABLE DATA ' <<< "$toc" || true)"
   indexes_total="$(grep -E '^[0-9]+; [0-9]+ [0-9]+ (INDEX|CONSTRAINT) ' <<< "$toc" | grep -vc ' INDEX ATTACH ' || true)"
   t0="$(date +%s)"
-  docker exec "$cid" pg_restore -U postgres --no-owner --no-privileges -v \
+  docker exec "$cid" pg_restore -U "$pg_user" --no-owner --no-privileges -v \
     -j "$jobs" -d "$db" "/dumps/$db.dump" >/dev/null 2>"$log" &
   pid=$!
   while kill -0 "$pid" 2>/dev/null; do
@@ -1800,7 +1810,7 @@ pg_restore_with_progress() {
     kill -0 "$pid" 2>/dev/null || break
     tables_done="$(grep -c 'processing data for table' "$log" || true)"
     indexes_done="$(grep -cE 'creating (INDEX|CONSTRAINT) "' "$log" || true)"
-    size="$(docker exec "$cid" psql -U postgres -tAc "SELECT pg_database_size('$db')" 2>/dev/null || true)"
+    size="$(docker exec "$cid" psql -U "$pg_user" -d postgres -tAc "SELECT pg_database_size('$db')" 2>/dev/null || true)"
     if (( tables_done < tables_total )); then
       info "      ... '$db' $(elapsed_since "$t0"): loading table data, $tables_done/$tables_total tables started; $(human_bytes "${size:-0}") on disk so far"
     else
@@ -1818,12 +1828,12 @@ pg_restore_with_progress() {
 # a foreign password, so the restored node keeps its own credentials (A2).
 load_databases() {
   local data_dir="$1"
+  local pg_user
+  pg_user="$(postgres_login_user "$(dirname "$data_dir")")" || return 1
   local dumps_dir="$2"
   local node_password="$3"
   [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && return 0
   local cid db run_user jobs t0 t1 restore_log
-  local config_dir="$(dirname "$data_dir")/config/postgres"
-  [[ -d "$config_dir" ]] || config_dir=""
   run_user="$(postgres_run_user "$(dirname "$data_dir")")"
   jobs="$(snapshot_pg_jobs)"
   # The dumps are bind-mounted read-only into the throwaway container: pg_restore
@@ -1832,15 +1842,15 @@ load_databases() {
   chmod a+r "$dumps_dir"/*.dump 2>/dev/null || true
   t0="$(date +%s)"
   if postgres_data_dir_initialized "$data_dir"; then
-    info "      Starting a temporary $SNAPSHOT_POSTGRES_IMAGE container on the node's existing postgres cluster ($data_dir)"
+    info "      Starting a temporary PostgreSQL container on the node's existing postgres cluster ($data_dir)"
   else
-    info "      Starting a temporary $SNAPSHOT_POSTGRES_IMAGE container that initializes the node's postgres cluster in $data_dir with the node's own password"
+    info "      Starting a temporary PostgreSQL container that initializes the node's postgres cluster in $data_dir with the node's own password"
   fi
   info "      (runs as uid:gid $run_user like the node's postgres; durability relaxed for the bulk load: fsync=off, synchronous_commit=off, maintenance_work_mem=1GB)"
   # "fast" mode relaxes durability on the throwaway load container for a much
   # faster bulk restore; safe because the data is disposable until restore
   # completes (on failure we just retry the whole restore).
-  cid="$(pg_temp_start "$data_dir" "$node_password" "$run_user" fast "$dumps_dir" "$config_dir")"
+  cid="$(pg_temp_start "$data_dir" "$node_password" "$run_user" fast "$dumps_dir")"
   info "      Temporary postgres ready after $(elapsed_since "$t0") (container ${cid:0:12}); dumps mounted read-only at /dumps"
   for db in $(selected_databases); do
     [[ -f "$dumps_dir/$db.dump" ]] || { pg_temp_stop "$cid"; die "snapshot missing database dump: $db.dump"; }
@@ -1850,12 +1860,12 @@ load_databases() {
     # client_min_messages keeps the expected "does not exist, skipping" NOTICE
     # of a fresh cluster out of the output.
     docker exec -e "PGOPTIONS=-c client_min_messages=warning" "$cid" \
-      psql -U postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"$db\";" >/dev/null \
+      psql -U "$pg_user" -d postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"$db\";" >/dev/null \
       || { pg_temp_stop "$cid"; die "failed to drop database '$db' before restore"; }
-    docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$db\";" >/dev/null \
+    docker exec "$cid" psql -U "$pg_user" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$db\";" >/dev/null \
       || { pg_temp_stop "$cid"; die "failed to create database '$db'"; }
     restore_log="$(mktemp_dir)/pg_restore-$db.log"
-    pg_restore_with_progress "$cid" "$db" "$jobs" "$restore_log" \
+    pg_restore_with_progress "$cid" "$db" "$jobs" "$restore_log" "$pg_user" \
       || {
         # pg_restore's own errors say why (e.g. "No space left on device": the
         # rebuilt cluster is ~15x the dumps, most of it Cirrus indexes).
@@ -1894,9 +1904,11 @@ external_pg_password() {
 
 external_pg() {
   local dumps_dir="$1"; shift
+  local pg_user="$SNAPSHOT_PG_USER"
+  [[ -n "$pg_user" ]] || pg_user="$(postgres_login_user "$SNAPSHOT_PG_NODE_DIR")" || return 1
   docker run --rm -v "$dumps_dir:/dumps" \
     -e PGPASSWORD="$(external_pg_password)" "$SNAPSHOT_POSTGRES_IMAGE" \
-    "$@" -h "$SNAPSHOT_PG_HOST" -p "$SNAPSHOT_PG_PORT" -U "$SNAPSHOT_PG_USER"
+    "$@" -h "$SNAPSHOT_PG_HOST" -p "$SNAPSHOT_PG_PORT" -U "$pg_user"
 }
 
 # Dump eth and cirrus straight from the shared cluster (create --postgres-host).

@@ -1,10 +1,10 @@
 -- A compiler-only normal form for monadic composition. The executable builder
 -- consumes it before returning an action; none of these nodes are interpreted
 -- during contract execution.
-data ActionStep = GasStep !Integer | forall a. EffectStep (Code (M a))
+data ActionStep = GasStep !Integer | forall a. EffectStep (Code (SM a))
   | forall a. WriteStep (Ty a) (Code StoragePath) (Code a)
 
-data ActionEnd a = KnownResult (Code a) | ResidualAction (Code (M a))
+data ActionEnd a = KnownResult (Code a) | ResidualAction (Code (SM a))
 
 data Form a where
   Ordinary :: Form a
@@ -18,25 +18,25 @@ data Form a where
   ActionFunction :: Monad m => Code (Action env m a) -> Form (env -> m a)
   PureComputation :: Code a -> Form (Action env m a)
   LiftedComputation :: Code (m a) -> Form (Action env m a)
-  FunctionSequence :: [FunctionStep env] -> FunctionEnd env a -> Form (env -> M a)
+  FunctionSequence :: [FunctionStep env] -> FunctionEnd env a -> Form (env -> SM a)
   PureAction :: Code a -> Form (m a)
-  ActionSequence :: [ActionStep] -> ActionEnd a -> Form (M a)
+  ActionSequence :: [ActionStep] -> ActionEnd a -> Form (SM a)
 
-buildAction :: [ActionStep] -> ActionEnd a -> Code (M a)
+buildAction :: [ActionStep] -> ActionEnd a -> Code (SM a)
 buildAction = emitAction
 
-actionParts :: Code (M a) -> ([ActionStep], ActionEnd a)
+actionParts :: Code (SM a) -> ([ActionStep], ActionEnd a)
 actionParts code = case codeForm code of
   PureAction value -> ([], KnownResult value)
   ActionSequence steps end -> (steps, end)
   _ -> ([], ResidualAction code)
 
-knownAction :: Code (M a) -> Maybe (Code (M ()), Code a)
+knownAction :: Code (SM a) -> Maybe (Code (SM ()), Code a)
 knownAction code = case actionParts code of
   (steps, KnownResult value) -> Just (buildAction steps (KnownResult unitCode), value)
   _ -> Nothing
 
-gasOnlyAction :: Code (M a) -> Maybe (Code Integer, Code a)
+gasOnlyAction :: Code (SM a) -> Maybe (Code Integer, Code a)
 gasOnlyAction code = case actionParts code of
   (steps, KnownResult value) -> do
     costs <- traverse gasCost steps
@@ -46,15 +46,15 @@ gasOnlyAction code = case actionParts code of
     gasCost (GasStep gas) = Just gas
     gasCost _ = Nothing
 
-sequenceCodeActions :: [Code (M a)] -> Code (M [a])
+sequenceCodeActions :: [Code (SM a)] -> Code (SM [a])
 sequenceCodeActions codes = case traverse knownAction codes of
   Just results -> foldr thenAction (pureAction (listCode (map snd results))) (map fst results)
   Nothing -> sequenceResidual codes
 
-traverseApply :: [Code (a -> M b)] -> Code a -> Code (M [b])
+traverseApply :: [Code (a -> SM b)] -> Code a -> Code (SM [b])
 traverseApply functions argument = sequenceCodeActions (map (`applyCode` argument) functions)
 
-thenAction :: Code (M a) -> Code (M b) -> Code (M b)
+thenAction :: Code (SM a) -> Code (SM b) -> Code (SM b)
 thenAction first second = buildAction (joinSteps before after) end
   where
     (steps, firstEnd) = actionParts first
@@ -63,19 +63,19 @@ thenAction first second = buildAction (joinSteps before after) end
       ResidualAction code -> joinSteps steps [EffectStep code]
     (after, end) = actionParts second
 
-beforeAction :: Integer -> Code (M a) -> Code (M a)
+beforeAction :: Integer -> Code (SM a) -> Code (SM a)
 beforeAction gas code = buildAction (joinSteps [GasStep gas] steps) end
   where (steps, end) = actionParts code
 
-afterAction :: Integer -> Code (M a) -> Code (M a)
+afterAction :: Integer -> Code (SM a) -> Code (SM a)
 afterAction gas code = case actionParts code of
   (steps, KnownResult value) -> buildAction (joinSteps steps [GasStep gas]) (KnownResult value)
   _ -> afterResidual gas code
 
-gasAction :: Integer -> Code (M ())
+gasAction :: Integer -> Code (SM ())
 gasAction gas = buildAction [GasStep gas] (KnownResult unitCode)
 
-writeAction :: Ty a -> Code StoragePath -> Code a -> Code (M ())
+writeAction :: Ty a -> Code StoragePath -> Code a -> Code (SM ())
 writeAction ty path value = buildAction [WriteStep ty path value] (KnownResult unitCode)
 
 joinSteps :: [ActionStep] -> [ActionStep] -> [ActionStep]
@@ -116,7 +116,7 @@ actionLift code = actionProgram $ case codeForm code of
       lower (WriteStep ty path value) rest = actionThen (actionStore ty path value) rest
   _ -> actionLiftResidual code
 
-unitActionSteps :: [ActionStep] -> Code (Action env M ())
+unitActionSteps :: [ActionStep] -> Code (Action env SM ())
 unitActionSteps [] = actionReturn unitCode
 unitActionSteps [GasStep gas] = actionCharge gas
 unitActionSteps [WriteStep ty path value] = actionStore ty path value
@@ -126,24 +126,24 @@ unitActionSteps (step : steps) = case step of
   WriteStep ty path value -> actionThen (actionStore ty path value) rest
   where rest = unitActionSteps steps
 
-actionThen :: Code (Action env M a) -> Code (Action env M b) -> Code (Action env M b)
+actionThen :: Code (Action env SM a) -> Code (Action env SM b) -> Code (Action env SM b)
 actionThen first second = case codeForm first of
   PureComputation _ -> second
   _ -> actionThenResidual first second
 
-bindAction :: Code (M a) -> Code (a -> M b) -> Code (M b)
+bindAction :: Code (SM a) -> Code (a -> SM b) -> Code (SM b)
 bindAction first continuation = case knownAction first of
   Just (effects, value) -> thenAction effects (applyCode continuation value)
   Nothing -> case codeForm continuation of
     ConstantFunction result -> thenAction first result
     _ -> bindResidual first continuation
 
-mapAction :: Code (a -> b) -> Code (M a) -> Code (M b)
+mapAction :: Code (a -> b) -> Code (SM a) -> Code (SM b)
 mapAction function action = case knownAction action of
   Just (effects, value) -> thenAction effects (pureAction (applyCode function value))
   Nothing -> mapResidual function action
 
-applyAction :: Code (M (a -> b)) -> Code (M a) -> Code (M b)
+applyAction :: Code (SM (a -> b)) -> Code (SM a) -> Code (SM b)
 applyAction function action = case knownAction function of
   Just (effects, value) -> thenAction effects (mapAction value action)
   Nothing -> applyActionResidual function action
@@ -153,17 +153,17 @@ localCode IZ code | ValueEnvironment value _ <- codeForm code = value
 localCode (IS index) code | ValueEnvironment _ rest <- codeForm code = localCode index rest
 localCode index code = localResidual index code
 
-valueFunction :: Ix ls a -> Code (Env ls -> M a)
+valueFunction :: Ix ls a -> Code (Env ls -> SM a)
 valueFunction index = staticFunction (actionFunction (valueAction index))
   (pureAction . localCode index)
 
 -- The same sequence normal form lifted over a runtime argument. Function
 -- boundaries which introduce variables or control flow remain residual calls.
-data FunctionStep env = FunctionGas !Integer | forall a. FunctionEffect (Code (env -> M a))
+data FunctionStep env = FunctionGas !Integer | forall a. FunctionEffect (Code (env -> SM a))
   | forall a. FunctionWrite (Ty a) (Code (env -> StoragePath)) (Code (env -> a))
-data FunctionEnd env a = PureFunction (Code (env -> a)) | ResidualFunction (Code (env -> M a))
+data FunctionEnd env a = PureFunction (Code (env -> a)) | ResidualFunction (Code (env -> SM a))
 
-functionAction :: [FunctionStep env] -> FunctionEnd env a -> Code (Action env M a)
+functionAction :: [FunctionStep env] -> FunctionEnd env a -> Code (Action env SM a)
 functionAction steps end = foldr lower final steps
   where
     final = case end of
@@ -185,7 +185,7 @@ constantBody = constantForm . codeForm
       _ -> Nothing
     constantForm _ = Nothing
 
-functionParts :: Code (env -> M a) -> ([FunctionStep env], FunctionEnd env a)
+functionParts :: Code (env -> SM a) -> ([FunctionStep env], FunctionEnd env a)
 functionParts code = parts (codeForm code)
   where
     parts (StaticFunction previous _) = parts previous
@@ -200,7 +200,7 @@ functionParts code = parts (codeForm code)
             ResidualAction value -> ResidualFunction (constantFunction value))
     parts _ = ([], ResidualFunction code)
 
-buildFunction :: [FunctionStep env] -> FunctionEnd env a -> Code (env -> M a)
+buildFunction :: [FunctionStep env] -> FunctionEnd env a -> Code (env -> SM a)
 buildFunction steps end = case (traverse staticStep steps, staticEnd end) of
   (Just actions, Just result) -> constantFunction (buildAction (foldr joinSteps [] actions) result)
   _ -> emitFunction steps end
@@ -217,10 +217,10 @@ buildFunction steps end = case (traverse staticStep steps, staticEnd end) of
     staticEnd (PureFunction function) = KnownResult <$> constantBody function
     staticEnd (ResidualFunction function) = ResidualAction <$> constantBody function
 
-functionPure :: Code (env -> a) -> Code (env -> M a)
+functionPure :: Code (env -> a) -> Code (env -> SM a)
 functionPure = buildFunction [] . PureFunction
 
-functionThen :: Code (env -> M a) -> Code (env -> M b) -> Code (env -> M b)
+functionThen :: Code (env -> SM a) -> Code (env -> SM b) -> Code (env -> SM b)
 functionThen first second = staticFunction (buildFunction (joinFunctions before after) end)
   (\environment -> thenAction (applyCode first environment) (applyCode second environment))
   where
@@ -228,19 +228,19 @@ functionThen first second = staticFunction (buildFunction (joinFunctions before 
     before = case firstEnd of PureFunction _ -> steps; ResidualFunction residual -> steps ++ [FunctionEffect residual]
     (after, end) = functionParts second
 
-functionBefore :: Integer -> Code (env -> M a) -> Code (env -> M a)
+functionBefore :: Integer -> Code (env -> SM a) -> Code (env -> SM a)
 functionBefore gas code = staticFunction (buildFunction (joinFunctions [FunctionGas gas] steps) end)
   (\environment -> beforeAction gas (applyCode code environment))
   where (steps, end) = functionParts code
 
-functionAfter :: Integer -> Code (env -> M a) -> Code (env -> M a)
+functionAfter :: Integer -> Code (env -> SM a) -> Code (env -> SM a)
 functionAfter gas code = staticFunction residual (\environment -> afterAction gas (applyCode code environment))
   where
     residual = case functionParts code of
       (steps, PureFunction value) -> buildFunction (joinFunctions steps [FunctionGas gas]) (PureFunction value)
       _ -> actionFunction (actionAfter gas (composedAction code))
 
-functionWrite :: Ty a -> Code (env -> StoragePath) -> Code (env -> a) -> Code (env -> M ())
+functionWrite :: Ty a -> Code (env -> StoragePath) -> Code (env -> a) -> Code (env -> SM ())
 functionWrite ty path value = staticFunction
   (buildFunction [FunctionWrite ty path value] (PureFunction (constantFunction unitCode)))
   (\environment -> writeAction ty (applyCode path environment) (applyCode value environment))
@@ -254,10 +254,10 @@ hlistFunction :: Code (a -> HL ls -> HL (a ': ls))
 hlistFunction = staticFunction hlistConstructor $ \a ->
   staticFunction (applyResidual hlistConstructor a) (hlistCode a)
 
-writePrimitive :: Ty a -> Code (StoragePath -> a -> M ())
+writePrimitive :: Ty a -> Code (StoragePath -> a -> SM ())
 writePrimitive ty = staticFunction (writePrimitiveResidual ty) (writeFunction ty)
 
-writeFunction :: Ty a -> Code StoragePath -> Code (a -> M ())
+writeFunction :: Ty a -> Code StoragePath -> Code (a -> SM ())
 writeFunction ty path = staticFunction (writeFunctionResidual ty path) (writeAction ty path)
 
 replaceCode :: Ix ls a -> Code a -> Code (Env ls) -> Code (Env ls)
@@ -272,19 +272,19 @@ staticFunction code specialize = case constantBody code of
   Just body -> constantFunction body
   Nothing -> withForm (StaticFunction (codeForm code) specialize) code
 
-actionPure :: Code (env -> a) -> Code (Action env M a)
+actionPure :: Code (env -> a) -> Code (Action env SM a)
 actionPure code = case constantBody code of
   Just value -> actionReturn value
   Nothing -> actionPureResidual code
 
-actionWrite :: Ty a -> Code (env -> StoragePath) -> Code (env -> a) -> Code (Action env M ())
+actionWrite :: Ty a -> Code (env -> StoragePath) -> Code (env -> a) -> Code (Action env SM ())
 actionWrite ty path value = case (constantBody path, constantBody value) of
   (Just p, Just v) -> actionStore ty p v
   (Just p, Nothing) -> actionWritePath ty p value
   (Nothing, Just v) -> actionWriteValue ty path v
   (Nothing, Nothing) -> actionWriteResidual ty path value
 
-emitAction :: [ActionStep] -> ActionEnd a -> Code (M a)
+emitAction :: [ActionStep] -> ActionEnd a -> Code (SM a)
 emitAction [] (KnownResult value) = pureAction value
 emitAction [] (ResidualAction action) = action
 emitAction steps end = withForm (ActionSequence steps end) $ case end of
@@ -294,7 +294,7 @@ emitAction steps end = withForm (ActionSequence steps end) $ case end of
     _ -> emitResultSteps steps value
   ResidualAction final -> emitResidualSteps steps final
 
-bindCodeChain :: T.Text -> Code (M a) -> [Code (a -> M a)] -> Code (a -> M b) -> Code (M b)
+bindCodeChain :: T.Text -> Code (SM a) -> [Code (a -> SM a)] -> Code (a -> SM b) -> Code (SM b)
 bindCodeChain name initial commands final = case knownAction initial of
   Just (effects, value) -> case commands of
     [] -> thenAction effects (applyCode final value)
@@ -322,22 +322,22 @@ data Primitive a where
   FromListPrimitive :: Primitive ([a] -> Data.Sequence.Seq a)
   DynPrimitive :: Ty a -> Primitive (a -> Core.Dyn)
   RetDynPrimitive :: Ty a -> Primitive (a -> [Core.Dyn])
-  ApplyLastPrimitive :: Primitive (M r -> HL '[] -> M r)
+  ApplyLastPrimitive :: Primitive (SM r -> HL '[] -> SM r)
 
-functionMap :: Code (a -> b) -> Code (env -> M a) -> Code (env -> M b)
+functionMap :: Code (a -> b) -> Code (env -> SM a) -> Code (env -> SM b)
 functionMap function action = staticFunction
   (actionFunction (mapComputation function (composedAction action)))
   (\environment -> mapAction function (applyCode action environment))
 
-functionApply :: Code (env -> M (a -> b)) -> Code (env -> M a) -> Code (env -> M b)
+functionApply :: Code (env -> SM (a -> b)) -> Code (env -> SM a) -> Code (env -> SM b)
 functionApply function action = staticFunction
   (actionFunction (applyComputation (composedAction function) (composedAction action)))
   (\environment -> applyAction (applyCode function environment) (applyCode action environment))
 
-functionPair :: Code (a -> b -> c) -> Code (env -> M a) -> Code (env -> M b) -> Code (env -> M c)
+functionPair :: Code (a -> b -> c) -> Code (env -> SM a) -> Code (env -> SM b) -> Code (env -> SM c)
 functionPair function first second = functionApply (functionMap function first) second
 
-functionTraverse :: [Code (env -> M a)] -> Code (env -> M [a])
+functionTraverse :: [Code (env -> SM a)] -> Code (env -> SM [a])
 functionTraverse functions = staticFunction (traverseFunctionResidual functions)
   (traverseApply functions)
 
@@ -354,11 +354,11 @@ dropEnvironment function = staticFunction residual $ \environment -> case codeFo
   _ -> applyResidual residual environment
   where residual = dropEnvironmentResidual function
 
-bindEnvironment :: Code (Env ls -> M a) -> Code (Env (a ': ls) -> M b) -> Code (Env ls -> M b)
+bindEnvironment :: Code (Env ls -> SM a) -> Code (Env (a ': ls) -> SM b) -> Code (Env ls -> SM b)
 bindEnvironment initial next = staticFunction (bindEnvironmentResidual initial next) $ \environment ->
   bindAction (applyCode initial environment) (applyCode (extendValueFunction next) environment)
 
-functionBind :: Code (env -> M a) -> Code (env -> a -> M b) -> Code (env -> M b)
+functionBind :: Code (env -> SM a) -> Code (env -> a -> SM b) -> Code (env -> SM b)
 functionBind first next = staticFunction (functionBindResidual first next) $ \environment ->
   bindAction (applyCode first environment) (applyCode next environment)
 

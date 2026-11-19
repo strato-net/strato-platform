@@ -16,7 +16,10 @@
 
 module Blockchain.Sequencer (
   sequencer,
-  eventHandler
+  eventHandler,
+  SeqOutEvent (..),
+  transformFullTransactionsWith,
+  poolWorkIsForView
   ) where
 
 import BlockApps.Logging
@@ -25,6 +28,8 @@ import Blockchain.EthConf (ethConf, urlConfig, vaultUrl)
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
+import Blockchain.Data.Transaction (transactionHash)
+import Blockchain.Data.TransactionIntake
 import Blockchain.DB.Witnessable
 import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
@@ -308,11 +313,7 @@ unseqEventHandler events = do
   let transactions = [(ts, tx) | IETx ts tx <- events]
 
   when (not $ null transactions) $ record "inevent_type_transaction" "IngestTransactions" (length transactions)
-  newTxs <- transformFullTransactions transactions
-  -- Only the proposer's VM builds blocks, so a new transaction is what tells
-  -- the other validators to expect a proposal. Re-gossip of a transaction we
-  -- already witnessed does not count: it may be committed already.
-  unless (newTxs == 0) $ lift createNewViewTimer
+  void $ transformFullTransactions transactions
 
   forM_ events $ \event ->
     case event of
@@ -345,28 +346,36 @@ unseqEventHandler events = do
         (IEPreprepareResponse decis) -> do
           record "inevent_type_preprepare_response" "PreprepareResponse" 1
           blockstanbulSend [PreprepareResponse decis]
+        -- Only the proposer's VM builds blocks, so the local VM holding work a block
+        -- can take is what tells the other validators to expect a proposal. A
+        -- transaction it refused (one that cannot pay, a nonce gap) never starts
+        -- the dead-proposer timer, so it cannot force a round change. Work for
+        -- another height is stale (the VM saw an older block), and ignored.
+        IEPoolHasWork height -> lift $ do
+          v <- currentView
+          when (poolWorkIsForView v height) createNewViewTimer
         (IEFlushMempool req) -> do
           record "inevent_type_flush_mempool" "FlushMempool" 1
           yieldToVm [VmFlushMempool req]
+
+-- | Whether work the VM reports for a block is work for this view. A view's
+-- sequence is the last committed block, and the VM reports the height of the
+-- block it would build next, so they belong together when that is one above.
+poolWorkIsForView :: View -> Integer -> Bool
+poolWorkIsForView v height = toInteger (_sequence v) + 1 == height
 
 bootstrapBlockstanbul :: (MonadBlockstanbul m, Mod.Accessible View m) =>
                          ConduitT i SeqOutEvent m ()
 bootstrapBlockstanbul = lift createFirstTimer
 
 blockstanbulSend ::
-  ( MonadLogger m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
-  ) =>
+  MonadSequencer m =>
   [InEvent] -> ConduitT i SeqOutEvent m ()
 blockstanbulSend = mapM_ $ \ie -> do
       void $ blockstanbulSend' ie
 
 blockstanbulSend' ::
-  ( MonadLogger m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
-  ) =>
+  MonadSequencer m =>
   InEvent -> ConduitT i SeqOutEvent m [OutputBlock]
 blockstanbulSend' msg = do
   (p2pevs, vmevs, committedBlocks) <- lift $ do
@@ -389,6 +398,12 @@ blockstanbulSend' msg = do
       $logWarnS "seq/pbft/send" . T.pack $
         "Rejected " ++ show droppedCount ++ " committed block(s) with unrecoverable transaction signatures"
     committedBlocks <- catMaybes <$> traverse insertEmitted rBlocks
+    -- Gossip can deliver a transaction after its block commits. Marking it seen
+    -- here drops that copy instead of taking it for new work, which would arm
+    -- the dead-proposer timer.
+    for_ (concatMap obReceiptTransactions committedBlocks) $ \t -> do
+      known <- wasTransactionWitnessed t
+      unless known $ witnessTransaction t
     liftIO $ recordSequencedSpans committedBlocks
     let (vms, p2ps) = vmEvenP2pCheckptFilterHelper resp
 
@@ -443,8 +458,28 @@ transformFullTransactions ::
     (Keccak256 `A.Alters` ()) m
   ) =>
   [(Timestamp, IngestTx)] -> ConduitT i SeqOutEvent m Int
-transformFullTransactions pairs = do
+transformFullTransactions = transformFullTransactionsWith nodeIntakeRules
+
+-- | 'transformFullTransactions' under explicit intake rules. Every loose
+-- transaction passes here whatever brought it (the HTTP API, strato-ingest or
+-- a peer), so this is where a malformed envelope is refused for good: before
+-- it is witnessed, gossiped, handed to the VM or indexed.
+transformFullTransactionsWith ::
+  ( MonadIO m,
+    MonadLogger m,
+    MonadMonitor m,
+    (Keccak256 `A.Alters` ()) m
+  ) =>
+  IntakeRules -> [(Timestamp, IngestTx)] -> ConduitT i SeqOutEvent m Int
+transformFullTransactionsWith intakeRules submitted = do
   let logF = logFF "transformEvents/emitTxs"
+  (pairs, refused) <- liftIO $ partitionIntake intakeRules (itTransaction . snd) submitted
+  lift . forM_ refused $ \((_, itx), reason) -> do
+    -- The hash and a fixed label, so the log line stays one line.
+    $logWarnS "transformEvents/intake" . T.pack $
+      "Refusing malformed transaction " ++ format (transactionHash (itTransaction itx))
+        ++ ": " ++ T.unpack (intakeRejectionLabel reason)
+    P.withLabel seqTxsRefused (intakeRejectionLabel reason) P.incCounter
   mOtxs <- lift . forM pairs $ \(ts, itx) ->
     wrapTransaction itx >>= \case
       Nothing -> return Nothing
@@ -470,11 +505,7 @@ transformFullTransactions pairs = do
   pure $ length txs
 
 emitOrCacheHistoricBlock ::
-  ( MonadLogger m,
-    MonadMonitor m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
-  ) =>
+  MonadSequencer m =>
   SequencedBlock -> ConduitT i SeqOutEvent m ()
 emitOrCacheHistoricBlock sb = do
   ready <- lift $ isBlockReadyForEmission sb
@@ -488,21 +519,14 @@ emitOrCacheHistoricBlock sb = do
       P.incCounter seqBlocksEnqueued
 
 emitSequencedBlock ::
-  ( MonadLogger m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
-  ) =>
+  MonadSequencer m =>
   SequencedBlock -> ConduitT i SeqOutEvent m Bool
 emitSequencedBlock sb = do
   committedBlocks <- blockstanbulSend' . PreviousBlock $ sequencedBlockToBlock sb
   return $ any ((== sbHash sb) . outputBlockHash) committedBlocks
 
 emitBlockAndCachedChildren ::
-  ( MonadLogger m,
-    MonadMonitor m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
-  ) =>
+  MonadSequencer m =>
   SequencedBlock -> ConduitT i SeqOutEvent m ()
 emitBlockAndCachedChildren sb =
   lift (claimBlockForEmission sb) >>= \case
@@ -514,11 +538,7 @@ emitBlockAndCachedChildren sb =
         mapM_ emitBlockAndCachedChildren children
 
 runConsensus ::
-  ( MonadLogger m,
-    MonadMonitor m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
-  ) =>
+  MonadSequencer m =>
   SequencedBlock -> ConduitT i SeqOutEvent m ()
 runConsensus sb = do
   let blk = sequencedBlockToBlock sb
@@ -535,11 +555,7 @@ runConsensus sb = do
           "Ignoring unsealed " ++ shortDescription sb ++ " from " ++ format origin ++ ": not a candidate built by this node"
 
 transformBlocks ::
-  ( MonadLogger m,
-    MonadMonitor m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
-  ) =>
+  MonadSequencer m =>
   [IngestBlock] -> ConduitT i SeqOutEvent m ()
 transformBlocks ibs = do
   forM_ ibs $ \ib ->
