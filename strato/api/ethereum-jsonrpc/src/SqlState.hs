@@ -16,6 +16,7 @@ module SqlState
   ( NativeBalance (..),
     nativeToken,
     nativeBalanceFromSql,
+    effectiveNativeBalanceFromSql,
     storageAtFromSql,
     feeQuoteFromSql,
     basicValueToWord,
@@ -28,7 +29,7 @@ import Blockchain.Data.Block (blockBlockData)
 import Blockchain.Data.BlockHeader (BlockHeader (..))
 import Blockchain.Data.DataDefs (AddressStateRef (..))
 import Blockchain.EthConf (ethConf)
-import Blockchain.EthConf.Model (contractsConfig, nativeTokenAt, nativeTokenBalancesField, network, networkConfig, stratoGasForkBlock)
+import Blockchain.EthConf.Model (contractsConfig, nativeTokenAddress, nativeTokenAt, nativeTokenBalancesField, network, networkConfig, stratoGasForkBlock)
 import Blockchain.Model.JsonBlock (AddressStateRef' (..), bPrimeToB)
 import Blockchain.Strato.Model.Address (Address (..))
 import Control.Monad (when)
@@ -199,6 +200,61 @@ feeQuoteFromSql =
         Right (BInteger _) -> return $ Right Nothing
         Right BDefault -> return $ Right Nothing
         Right other -> return $ Left $ "unexpected quotedFee in mirror: " ++ show other
+
+-- | eth_getBalance's effective STRATO balance: the native (STRATO) balance plus
+-- the account's USDST and Voucher holdings valued in STRATO at the fee system's
+-- own per-block quote, so a wallet's affordability check (e.g. MetaMask, which
+-- can only read eth_getBalance) counts every token it can actually pay gas with:
+--
+--   effective = strato
+--             + usdst   * quotedFee / USD_FEE      -- USDST at the STRATO/USDST price
+--             + voucher * quotedFee / VOUCHER_FEE  -- each whole voucher = one tx of STRATO
+--
+-- quotedFee is STRATO worth USD_FEE (0.01 USDST) at the pool's time-weighted
+-- price, frozen once per block ('feeQuoteFromSql'); USD_FEE (1e16) and VOUCHER_FEE
+-- (1e18, one whole voucher) match the FeeRouter. With no live quote (pre-gas-fork
+-- chains, DeciderState's legacy payFees, or a block not yet priced) this is just
+-- the plain native balance, so non-STRATO chains stay unchanged. USDST is the
+-- configured pre-fork native token; the Voucher is the fee system's 0x..100e.
+effectiveNativeBalanceFromSql :: Address -> IO NativeBalance
+effectiveNativeBalanceFromSql addr =
+  nativeBalanceFromSql addr >>= \case
+    unavailable@(NativeBalanceUnavailable _) -> return unavailable
+    NativeBalance strato ->
+      feeQuoteFromSql >>= \case
+        Right (Just quotedFee) -> do
+          usdst <- tokenBalanceOrZero (nativeTokenAddress (contractsConfig ethConf)) addr
+          voucher <- tokenBalanceOrZero voucherTokenAddress addr
+          return . NativeBalance $
+            strato
+              + (usdst * quotedFee) `div` usdFeeWei
+              + (voucher * quotedFee) `div` voucherFeeWei
+        _ -> return (NativeBalance strato)
+  where
+    usdFeeWei = 10 ^ (16 :: Int) -- USD_FEE: $0.01 in 18-decimal USDST
+    voucherFeeWei = 10 ^ (18 :: Int) -- VOUCHER_FEE: one whole voucher
+
+-- | The fee system's voucher token, fixed at 0x..100e as the FeeRouter names it.
+voucherTokenAddress :: Address
+voucherTokenAddress = Address 0x100e
+
+-- | A SolidVM ERC20-style token's @_balances[holder]@ from the mirror, treating
+-- any error, missing row, or the zero address as a zero balance, so the
+-- effective-balance sum degrades to the terms it can read rather than failing.
+tokenBalanceOrZero :: Address -> Address -> IO Integer
+tokenBalanceOrZero (Address 0) _ = return 0
+tokenBalanceOrZero token holder = do
+  r <-
+    runLocal $
+      Storage.getStorageClient
+        Storage.storageFilterParams
+          { Storage.qsAddress = Just token,
+            Storage.qsKey = Just (StoragePath [Field "_balances", Index (BC.pack (show holder))]),
+            Storage.qsLimit = Just 1
+          }
+  return $ case r of
+    Right (row : _) | BInteger n <- Storage.value row -> n
+    _ -> 0
 
 zeroWord :: String
 zeroWord = "0x" ++ replicate 64 '0'
