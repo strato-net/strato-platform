@@ -623,10 +623,16 @@ getNewAddressWithSalt address salt hsh args = do
   $logDebugS "getNewAddressWithSalt" $ T.pack $ show address ++ " " ++ saltAsString ++ " " ++ (show $ keccak256ToByteString hsh) ++ " " ++ show args
   doesAddressAlreadyExist <- A.lookup (Mod.Proxy @AddressState) newAddress
   case doesAddressAlreadyExist of
-    Just _ -> throw (DuplicateContract $ "The address " ++ show newAddress ++ " already exists. Try using a different salt or constructor arguments.")
-    Nothing -> do
+    Just existing | not (isBareAccount existing) ->
+      throw (DuplicateContract $ "The address " ++ show newAddress ++ " already exists. Try using a different salt or constructor arguments.")
+    _ -> do
       incrementNonce address
       return newAddress
+
+isBareAccount :: AddressState -> Bool
+isBareAccount as = addressStateNonce as == 0 && case addressStateCodeHash as of
+  ExternallyOwned ch -> ch == emptyHash
+  _ -> False
 
 purgeStorageMap :: HasMemStorageDB m => Address -> m ()
 purgeStorageMap address = do
