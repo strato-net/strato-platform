@@ -18,6 +18,7 @@ import {
   useDedicatedSetup,
   useDedicatedWalletState,
 } from "@/services/dedicatedMultisig";
+import { formatWaitingPeriod } from "@/lib/utils";
 import { strip0x } from "@/services/userWallets";
 
 export function SignerInvitationDialog({ wallet }: { wallet: MultisigWalletSummary }) {
@@ -59,12 +60,13 @@ export function SignerInvitationDialog({ wallet }: { wallet: MultisigWalletSumma
           ))}
           <div>Approvals needed: {state ? `${state.requiredApprovals} of ${state.signers.length}` : "Checking…"}</div>
           <div>
-            Waiting period: {state ? `${state.transactionTimelock / 3600} ${
-              state.transactionTimelock === 3600 ? "hour" : "hours"
-            }` : "Checking…"}
+            Waiting period: {state ? formatWaitingPeriod(state.transactionTimelock) : "Checking…"}
           </div>
           <div>Sign as</div>
           <div>{wallet.nomineeUsername || "Connected account"}</div>
+          <div className="text-muted-foreground">
+            Accepting cancels every open proposal and any pending upgrade on this multisig wallet.
+          </div>
           {!isLoading && state && !state.verified ? (
             <div className="text-destructive">This multisig wallet could not be verified.</div>
           ) : null}
@@ -140,8 +142,7 @@ export function SetupInvitationDialog({ setup: summary }: { setup: PendingMultis
             <>
               <div>Approvals needed: {setup.requiredApprovals} of {setup.signers.length}</div>
               <div>
-                Waiting period: {setup.transactionTimelock / 3600}{" "}
-                {setup.transactionTimelock === 3600 ? "hour" : "hours"}
+                Waiting period: {formatWaitingPeriod(setup.transactionTimelock)}
               </div>
               <div>Multisig wallet version: {setup.initialVersion}</div>
               <div className="space-y-1">

@@ -58,6 +58,7 @@ signer changes, upgrades.
 | Not enough approvals within 30 days | The proposal expires |
 | Not executed within 7 days of becoming executable | The proposal expires |
 | A signer changes their mind before `M` is reached | They can withdraw their approval |
+| An approver changes their mind during the waiting period | They can withdraw their approval. The waiting period ends and the proposal goes back to collecting approvals; reaching `M` again starts a fresh, full waiting period |
 | The proposer wants to drop it | Allowed only while no other signer has approved |
 | Signers want to stop a proposal already in its waiting period | A "cancel" proposal, which runs as soon as it reaches `M` approvals, with no waiting period |
 | The action fails when executed | The whole transaction is undone; the proposal can be retried until it expires |
@@ -69,7 +70,8 @@ Proposal function names must be plain names; signature-style names containing `(
 
 | Change | How | Extra step |
 |---|---|---|
-| Remove a signer or change required approvals | Proposal | None |
+| Remove a signer (and set required approvals in the same step) | Proposal | None |
+| Change required approvals | Proposal | None |
 | Add a signer | Proposal that nominates the new account | The nominee must accept within 30 days |
 | Change the waiting period (max 30 days) | Proposal | None |
 
@@ -77,12 +79,14 @@ Nuances:
 
 - All of these wait out the **current** waiting period. Shortening the waiting period
   still takes the old one.
-- A nomination adds exactly one new signer, keeps every current signer, and cannot change
-  the approvals needed. To replace a signer, add and activate the replacement first, then
-  remove the old signer with a separate proposal.
+- Each proposal changes one thing: add one signer, remove one signer, or change the
+  approvals needed. No signer list is passed, so a proposal cannot add or drop anyone
+  other than the account it names.
+- Adding a signer never changes the approvals needed. To replace a signer, add and
+  activate the replacement first, then remove the old signer with a separate proposal.
 - Only one nomination is open at a time. A new one replaces it.
-- Withdrawing a nomination is a normal proposal and waits the waiting period, so the
-  nominee can still accept in the meantime.
+- Withdrawing a nomination runs as soon as its proposal reaches `M` approvals, with no
+  waiting period, so the nominee cannot accept first.
 - **Any** of these changes invalidates every open proposal, the open nomination, and a
   pending upgrade. Signers must propose them again. This prevents approvals collected
   under the old signer set from being used under the new one.
@@ -107,7 +111,9 @@ This is what the 7-day upgrade delay is for. Publishing new rules never changes 
 multisig wallet on its own; each multisig wallet opts in.
 
 1. **Platform side, once.** The new rules are published in the registry as a version,
-   and an upgrade path from the old version to the new one is approved.
+   and an upgrade path from the old version to the new one is approved. Before the
+   publish vote, the candidate must pass `MultisigPublication.test.sol`, which runs every
+   action on a new multisig wallet and on one upgraded from the published version.
 2. Signers **propose** the upgrade and reach `M` approvals.
 3. The multisig wallet's **waiting period** passes.
 4. The **7-day upgrade delay** runs.
@@ -185,6 +191,9 @@ Consequences:
   `strato/api/bloc/bloc2/src/Bloc/Database/Queries.hs` and a node release.
 - `logicContract` is a reserved name. A rules version must never declare a variable
   with that name, or with any other name the shell uses.
+- `multisigExecuting` is the one name both sides share on purpose. The rules set it while
+  a proposal runs, and the shell reads it to refuse an upgrade in the middle of a
+  proposal. Every rules version must keep using that name for that flag.
 
 ## Timings
 

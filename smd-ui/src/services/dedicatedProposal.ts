@@ -1,5 +1,5 @@
 import { formatUnits } from "viem";
-import { shortenHex } from "@/lib/utils";
+import { formatWaitingPeriod, shortenHex } from "@/lib/utils";
 import { isUnlimitedTokenApproval } from "@/services/dedicatedMultisig";
 import type {
   CDPMetadata,
@@ -20,6 +20,9 @@ export interface ProposalMetadata {
   walletAddress: string;
   signers?: string[];
   requiredApprovals?: number;
+  currentVersion?: string;
+  approvedVersions?: { version: string; logic: string }[];
+  approvedUpgradePaths?: { fromVersion: string; toVersion: string }[];
   historical?: boolean;
   staking?: StakingMetadata;
   cdp?: CDPMetadata;
@@ -29,6 +32,8 @@ export interface ProposalMetadata {
 
 export interface ProposalDescription {
   headline: string;
+  /** True when the call is not one this app recognises. */
+  custom?: boolean;
   detail?: string;
   addresses: { label: string; value: string }[];
 }
@@ -81,6 +86,25 @@ export function describeProposalWarning(proposal: ProposalPayload): ProposalWarn
       title: "Token operator permission",
       detail: "This can give another address permission to manage every token in a collection. Review the operator and setting carefully.",
     };
+  }
+  return null;
+}
+
+/** Signer, waiting-period and version changes cancel whatever is still open on the multisig wallet. */
+export function describeProposalSideEffect(proposal: ProposalPayload, walletAddress: string): string | null {
+  if (strip0x(proposal.target) !== strip0x(walletAddress)) return null;
+  if (
+    proposal.functionName === "removeSigner" ||
+    proposal.functionName === "setRequiredApprovals" ||
+    proposal.functionName === "setTransactionTimelock"
+  ) {
+    return "When this runs, every other open proposal, any pending signer invitation and any pending upgrade are cancelled.";
+  }
+  if (proposal.functionName === "nominateSigner") {
+    return "When the invited signer accepts, every open proposal and any pending upgrade are cancelled.";
+  }
+  if (proposal.functionName === "scheduleUpgrade") {
+    return "When the upgrade is applied, every open proposal and any pending signer invitation are cancelled.";
   }
   return null;
 }
@@ -203,115 +227,34 @@ export function describeProposal(
       addresses: proposal.arguments[1] ? [address("Receiver", proposal.arguments[1])] : [],
     };
   }
-  if (targetIsWallet && proposal.functionName === "applyConfiguration") {
-    let nextSigners: string[] | null = null;
-    try {
-      const parsed = JSON.parse(proposal.arguments[0] ?? "[]");
-      if (Array.isArray(parsed)) nextSigners = parsed.map((signer) => strip0x(String(signer)));
-    } catch {
-      nextSigners = null;
-    }
-    const neutralHeadline = `Set ${nextSigners ? `${nextSigners.length} signers` : "signers"} and approvals needed to ${proposal.arguments[1] ?? ""}`;
-    if (!nextSigners || metadata.historical) {
-      return { headline: neutralHeadline, addresses: [] };
-    }
-    const removed = (metadata.signers ?? []).filter((signer) =>
-      !nextSigners.some((nextSigner) => strip0x(nextSigner) === strip0x(signer))
-    );
-    const added = nextSigners.filter((signer) =>
-      !(metadata.signers ?? []).some((currentSigner) => strip0x(currentSigner) === strip0x(signer))
-    );
-    const required = Number(proposal.arguments[1]);
-    const changes = [
-      removed.length
-        ? `Remove signer${removed.length === 1 ? "" : "s"} ${removed.map(short).join(", ")}`
-        : "",
-      added.length
-        ? `add signer${added.length === 1 ? "" : "s"} ${added.map(short).join(", ")}`
-        : "",
-      Number.isFinite(required) && required !== metadata.requiredApprovals
-        ? `change approvals needed to ${required}`
-        : "",
-    ].filter(Boolean);
-    const changeHeadline = changes.map(
-      (change, index) => index === 0 ? change : `and ${change}`
-    ).join(" ");
+  const signerCount = metadata.historical || metadata.requiredApprovals == null
+    ? undefined
+    : metadata.signers?.length;
+  if (targetIsWallet && proposal.functionName === "nominateSigner" && proposal.arguments[0]) {
     return {
-      headline: changes.length
-        ? `${changeHeadline.charAt(0).toUpperCase()}${changeHeadline.slice(1)}`
-        : neutralHeadline,
-      addresses: [
-        ...removed.map((signer) => address("Signer to remove", signer)),
-        ...added.map((signer) => address("Signer to add", signer)),
-      ],
+      headline: `Add signer ${short(proposal.arguments[0])}`,
+      detail: signerCount == null
+        ? undefined
+        : `${signerCount} signers become ${signerCount + 1}, approvals needed stays ${metadata.requiredApprovals}`,
+      addresses: [address("Invited signer", proposal.arguments[0])],
     };
   }
-  if (targetIsWallet && proposal.functionName === "nominateConfiguration" && proposal.arguments[0]) {
-    let nextSigners: string[] | null = null;
-    try {
-      const parsed = JSON.parse(proposal.arguments[1] ?? "[]");
-      if (Array.isArray(parsed)) nextSigners = parsed.map((signer) => strip0x(String(signer)));
-    } catch {
-      nextSigners = null;
-    }
-    if (!nextSigners || metadata.historical) {
-      return {
-        headline: nextSigners
-          ? `Invite signer ${short(proposal.arguments[0])} for a ${nextSigners.length}-signer configuration`
-          : `Invite signer ${short(proposal.arguments[0])}`,
-        detail: nextSigners
-          ? `Approvals needed: ${proposal.arguments[2] ?? "unknown"}`
-          : undefined,
-        addresses: [address("Invited signer", proposal.arguments[0])],
-      };
-    }
-    const currentSigners = metadata.signers ?? [];
-    const removed = currentSigners.filter((signer) =>
-      !nextSigners.some((nextSigner) => strip0x(nextSigner) === strip0x(signer))
-    );
-    const added = nextSigners.filter((signer) =>
-      !currentSigners.some((currentSigner) => strip0x(currentSigner) === strip0x(signer))
-    );
-    const required = Number(proposal.arguments[2]);
-    const sameRequired = Number.isFinite(required) && required === metadata.requiredApprovals;
-    const pureAdd = removed.length === 0 && added.length === 1 &&
-      strip0x(added[0]) === strip0x(proposal.arguments[0]) &&
-      nextSigners.length === currentSigners.length + 1 && sameRequired;
-    if (pureAdd) {
-      return {
-        headline: `Add signer ${short(proposal.arguments[0])}`,
-        detail: `${currentSigners.length} signers become ${nextSigners.length}, approvals needed stays ${required}`,
-        addresses: [address("Invited signer", proposal.arguments[0])],
-      };
-    }
-    const changes = [
-      removed.length
-        ? `Remove signer${removed.length === 1 ? "" : "s"} ${removed.map(short).join(", ")}`
-        : "",
-      added.length
-        ? `add signer${added.length === 1 ? "" : "s"} ${added.map(short).join(", ")}`
-        : "",
-      Number.isFinite(required) && required !== metadata.requiredApprovals
-        ? `change approvals needed to ${required}`
-        : "",
-    ].filter(Boolean);
-    const headline = changes.map(
-      (change, index) => index === 0 ? change : `and ${change}`
-    ).join(" ");
+  if (targetIsWallet && proposal.functionName === "removeSigner" && proposal.arguments[0]) {
+    const required = proposal.arguments[1] ?? "";
     return {
-      headline: headline
-        ? `${headline.charAt(0).toUpperCase()}${headline.slice(1)}`
-        : `Add signer ${short(proposal.arguments[0])}`,
-      detail: Number.isFinite(required)
-        ? `${currentSigners.length} signers become ${nextSigners.length}, approvals needed ${
-            sameRequired ? `stays ${required}` : `changes from ${metadata.requiredApprovals ?? "unknown"} to ${required}`
-          }`
-        : undefined,
-      addresses: [
-        ...removed.map((signer) => address("Signer to remove", signer)),
-        ...added.map((signer) => address("Signer to add", signer)),
-      ],
+      headline: `Remove signer ${short(proposal.arguments[0])}`,
+      detail: signerCount == null
+        ? `Approvals needed: ${required}`
+        : `${signerCount} signers become ${signerCount - 1}, approvals needed ${
+            Number(required) === metadata.requiredApprovals
+              ? `stays ${required}`
+              : `changes from ${metadata.requiredApprovals} to ${required}`
+          }`,
+      addresses: [address("Signer to remove", proposal.arguments[0])],
     };
+  }
+  if (targetIsWallet && proposal.functionName === "setRequiredApprovals") {
+    return { headline: `Change approvals needed to ${proposal.arguments[0] ?? ""}`, addresses: [] };
   }
   if (targetIsWallet && proposal.functionName === "revokeNomination" && proposal.arguments[0]) {
     return {
@@ -322,15 +265,15 @@ export function describeProposal(
   if (targetIsWallet && proposal.functionName === "setTransactionTimelock") {
     const seconds = Number(proposal.arguments[0] ?? 0);
     return {
-      headline: `Change waiting period to ${
-        seconds === 0 ? "none" : `${seconds / 3600} ${seconds === 3600 ? "hour" : "hours"}`
-      }`,
+      headline: `Change waiting period to ${formatWaitingPeriod(seconds)}`,
       addresses: [],
     };
   }
   if (targetIsWallet && proposal.functionName === "scheduleUpgrade") {
+    const migrationFunction = proposal.arguments[2] || "No migration";
     return {
       headline: `Upgrade multisig wallet to version ${proposal.arguments[1] ?? ""}`,
+      detail: `Migration: ${migrationFunction}`,
       addresses: proposal.arguments[0] ? [address("New version address", proposal.arguments[0])] : [],
     };
   }
@@ -346,5 +289,5 @@ export function describeProposal(
       addresses: [],
     };
   }
-  return { headline: "Custom contract call", addresses: [] };
+  return { headline: `Call ${proposal.functionName} on ${short(proposal.target)}`, custom: true, addresses: [] };
 }

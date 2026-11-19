@@ -203,26 +203,12 @@ export async function fetchFunctionByAddress(
   fnName: string
 ): Promise<ResolvedContractFunction> {
   const normalized = address.replace(/^0x/i, "").toLowerCase();
-  const { data: groups } = await api.get(`${env.BLOC_URL}/contracts`, {
-    params: { name: normalized, limit: 20, ...chainParam() },
+  const { data: info } = await api.get(`${env.BLOC_URL}/contracts/contract/${normalized}/details`, {
+    params: chainParam(),
   });
-  if (!groups || typeof groups !== "object") return { found: false, args: [] };
-
-  for (const [name, rawInstances] of Object.entries(groups as Record<string, any>)) {
-    const instances = Array.isArray(rawInstances) ? rawInstances : rawInstances?.instances ?? [];
-    const found = instances.some((instance: any) => {
-      const candidate = typeof instance === "string" ? instance : instance?.address;
-      return String(candidate ?? "").replace(/^0x/i, "").toLowerCase() === normalized;
-    });
-    if (!found) continue;
-    const { data: info } = await api.get(`${env.BLOC_URL}/contracts/${name}/${normalized}`, {
-      params: chainParam(),
-    });
-    if (info?._functions?.[fnName]) {
-      return { found: true, args: functionArgs(info, fnName) };
-    }
-  }
-  return { found: false, args: [] };
+  return info?._functions?.[fnName]
+    ? { found: true, args: functionArgs(info, fnName) }
+    : { found: false, args: [] };
 }
 
 /** Resolve a deployed contract by address and return one function's declared arguments. */

@@ -420,7 +420,8 @@ export function setExecutedIssuesLookbackConfig(networkId: string) {
 }
 
 export function setMultisigConfig(networkId: string) {
-  multisigFactory = process.env.MULTISIG_FACTORY_ADDRESS || defaultMultisigFactoryFor[networkId] || "";
+  const address = defaultMultisigFactoryFor[networkId] || process.env.MULTISIG_FACTORY_ADDRESS || "";
+  multisigFactory = /^(0x)?[0-9a-f]{40}$/i.test(address) ? address.replace(/^0x/i, "").toLowerCase() : "";
 }
 
 export async function initNetworkConfig() {

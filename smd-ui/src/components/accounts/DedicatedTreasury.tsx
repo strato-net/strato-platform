@@ -710,9 +710,6 @@ export function DedicatedProtocolActionsTab({
 
       {v3Action ? (
         <>
-          <p className="break-all font-mono text-xs text-muted-foreground">
-            PositionManagerV3: {v3.data?.positionManagerAddress || "Loading…"}
-          </p>
           {action === "v3Mint" ? (
             <>
               <Label>Pool</Label>
@@ -770,6 +767,14 @@ export function DedicatedProtocolActionsTab({
         </>
       ) : null}
 
+      {validAddress(target) ? (
+        <div className="space-y-1 text-xs text-muted-foreground">
+          <div>Contract: <span className="break-all font-mono">{target}</span></div>
+          {approvalSpecs.length && validAddress(approvalSpender) ? (
+            <div>Allowed to spend: <span className="break-all font-mono">{approvalSpender}</span></div>
+          ) : null}
+        </div>
+      ) : null}
       {approvalSpecs.length ? (
         <div className="rounded-md border p-3 text-sm">
           <div className="flex justify-between gap-2">

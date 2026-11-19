@@ -9,6 +9,7 @@ import {
   isUnlimitedTokenApproval,
   normalizeDedicatedArguments,
   parseDedicatedPendingUpgrade,
+  parseDedicatedUpgradePaths,
   parseDedicatedTypedArguments,
 } from "./dedicatedMultisig";
 import {
@@ -18,11 +19,23 @@ import {
   proposalArgumentTypesMatch,
 } from "./dedicatedProposal";
 import { functionArgs } from "./contracts";
-import { loadBackendConfig } from "@/lib/env";
+import { getMultisigConfigError, loadBackendConfig, runtime } from "@/lib/env";
+import { parseUnsignedArgument, validateUnsignedTx } from "@/lib/walletTx";
+import { deriveCanonicalUserAddress } from "./userWallets";
 
 const wallet = "efa890674cad5e3a7640bb720c2a70bf3ae76709";
 const signer = "fdb36b791a35ba52798bbc46ab066587cb60e032";
 const spender = "5b8f21b53d3a5ea7dd66710ff18d161bb62e9a71";
+
+test("canonical User wallet addresses derive from UserRegistry", () => {
+  assert.equal(
+    deriveCanonicalUserAddress(
+      "dnorwood-personal",
+      "25a323eec280e9523b4f00017c696bec8ba9aba406f60c2348eaa471e8c6129e"
+    ),
+    "a697e3496a44f704e144c0f64081f0da69b0238f"
+  );
+});
 
 test("dedicated setup signers are canonical and duplicate-free", () => {
   assert.deepEqual(
@@ -42,6 +55,103 @@ test("dedicated logic calls encode with the logic ABI at the permanent wallet ad
     args: {},
     metadata: {},
   });
+});
+
+test("external wallets sign only the transaction they requested", () => {
+  const payload = {
+    contractAddress: wallet,
+    method: "transfer",
+    args: {
+      to: { type: "address", value: signer },
+      value: { type: "uint256", value: "42" },
+    },
+  };
+  const unsigned = {
+    data: {
+      nonce: 1,
+      gasLimit: 600000,
+      to: wallet,
+      functionName: "transfer",
+      args: [`"${signer}"`, "42"],
+      network: "mercata",
+      chainId: 123,
+    },
+  };
+
+  assert.doesNotThrow(() => validateUnsignedTx(unsigned, "FUNCTION", payload, 123));
+  assert.doesNotThrow(() => validateUnsignedTx(unsigned, "FUNCTION", {
+    ...payload,
+    args: {
+      value: { type: "uint256", value: "42" },
+      to: { type: "address", value: signer },
+    },
+  }, 123, undefined, ["to", "value"]));
+  assert.deepEqual(
+    parseUnsignedArgument(`[10000000000000000000,bool(true),string("abc123")]`),
+    ["10000000000000000000", true, "abc123"]
+  );
+  assert.doesNotThrow(() => validateUnsignedTx({
+    ...unsigned,
+    data: {
+      ...unsigned.data,
+      functionName: "revokeIssueApproval",
+      args: ['string("abc123")'],
+    },
+  }, "FUNCTION", {
+    contractAddress: wallet,
+    method: "revokeIssueApproval",
+    args: { _issueId: { type: "string", value: "abc123" } },
+  }, 123, undefined, ["_issueId"]));
+  assert.doesNotThrow(() => validateUnsignedTx({
+    ...unsigned,
+    data: {
+      ...unsigned.data,
+      to: spender,
+      functionName: "callContract",
+      args: [`"${wallet}"`, '"transfer"', `["${signer}",42]`],
+    },
+  }, "FUNCTION", payload, 123, spender));
+  assert.throws(() => validateUnsignedTx({
+    ...unsigned,
+    data: {
+      ...unsigned.data,
+      to: spender,
+      functionName: "callContract",
+      args: [`"${wallet}"`, '"transfer"', `["${signer}",42,43]`],
+    },
+  }, "FUNCTION", payload, 123, spender), /could not be verified/);
+  assert.doesNotThrow(() => validateUnsignedTx({
+    ...unsigned,
+    data: {
+      ...unsigned.data,
+      functionName: "proposeIssue",
+      args: [`"${signer}"`, '"transfer"', `"address"`, `"${wallet}"`],
+    },
+  }, "FUNCTION", {
+    contractAddress: wallet,
+    method: "proposeIssue",
+    args: {
+      _target: { type: "address", value: signer },
+      _functionName: { type: "string", value: "transfer" },
+      _arguments: [
+        { type: "string", value: "address" },
+        { type: "address", value: wallet },
+      ],
+    },
+  }, 123));
+  assert.throws(
+    () => validateUnsignedTx(
+      { ...unsigned, data: { ...unsigned.data, args: [`"${signer}"`, "43"] } },
+      "FUNCTION",
+      payload,
+      123
+    ),
+    /could not be verified/
+  );
+  assert.throws(
+    () => validateUnsignedTx(unsigned, "FUNCTION", payload, 456),
+    /different network/
+  );
 });
 
 test("dedicated issue review flags unlimited approvals", () => {
@@ -189,72 +299,38 @@ test("proposal descriptions expose stable liquidity and governance destinations"
     ).addresses,
     [{ label: "Receiver", value: receiver }]
   );
+  const current = { walletAddress: wallet, signers: [wallet, signer, receiver, spender], requiredApprovals: 3, pools: [] };
+  const removal = describeProposal(
+    { target: wallet, functionName: "removeSigner", arguments: [receiver, "2"] },
+    [],
+    current
+  );
+  assert.equal(removal.headline, "Remove signer 0x333333…3333");
+  assert.equal(removal.detail, "4 signers become 3, approvals needed changes from 3 to 2");
+  assert.deepEqual(removal.addresses, [{ label: "Signer to remove", value: receiver }]);
   assert.equal(
     describeProposal(
-      {
-        target: wallet,
-        functionName: "applyConfiguration",
-        arguments: [JSON.stringify([wallet, signer]), "2"],
-      },
+      { target: wallet, functionName: "removeSigner", arguments: [receiver, "2"] },
       [],
-      { walletAddress: wallet, signers: [wallet, signer, receiver], requiredApprovals: 3, pools: [] }
-    ).headline,
-    "Remove signer 0x333333…3333 and change approvals needed to 2"
+      { ...current, historical: true }
+    ).detail,
+    "Approvals needed: 2"
   );
   assert.equal(
     describeProposal(
-      {
-        target: wallet,
-        functionName: "applyConfiguration",
-        arguments: ["unreadable", "2"],
-      },
+      { target: wallet, functionName: "setRequiredApprovals", arguments: ["2"] },
       [],
-      { walletAddress: wallet, signers: [wallet, signer, receiver], requiredApprovals: 3, pools: [] }
+      current
     ).headline,
-    "Set signers and approvals needed to 2"
-  );
-  assert.equal(
-    describeProposal(
-      {
-        target: wallet,
-        functionName: "applyConfiguration",
-        arguments: [JSON.stringify([wallet, signer]), "2"],
-      },
-      [],
-      {
-        walletAddress: wallet,
-        signers: [wallet, signer, receiver],
-        requiredApprovals: 3,
-        historical: true,
-        pools: [],
-      }
-    ).headline,
-    "Set 2 signers and approvals needed to 2"
+    "Change approvals needed to 2"
   );
   const addSigner = describeProposal(
-    {
-      target: wallet,
-      functionName: "nominateConfiguration",
-      arguments: [spender, JSON.stringify([wallet, signer, receiver, spender]), "3"],
-    },
+    { target: wallet, functionName: "nominateSigner", arguments: [spender] },
     [],
-    { walletAddress: wallet, signers: [wallet, signer, receiver], requiredApprovals: 3, pools: [] }
+    { walletAddress: wallet, signers: [wallet, signer, receiver], requiredApprovals: 2, pools: [] }
   );
   assert.equal(addSigner.headline, "Add signer 0x5b8f21…9a71");
-  assert.equal(addSigner.detail, "3 signers become 4, approvals needed stays 3");
-  const legacyNomination = describeProposal(
-    {
-      target: wallet,
-      functionName: "nominateConfiguration",
-      arguments: [spender, JSON.stringify([wallet, signer, spender]), "2"],
-    },
-    [],
-    { walletAddress: wallet, signers: [wallet, signer, receiver], requiredApprovals: 3, pools: [] }
-  );
-  assert.equal(
-    legacyNomination.headline,
-    "Remove signer 0x333333…3333 and add signer 0x5b8f21…9a71 and change approvals needed to 2"
-  );
+  assert.equal(addSigner.detail, "3 signers become 4, approvals needed stays 2");
   assert.equal(
     describeProposal(
       { target: wallet, functionName: "cancelIssue", arguments: ["proposal-7"] },
@@ -313,6 +389,25 @@ test("pending upgrade is read from the JSON string Cirrus stores", () => {
   assert.equal(parseDedicatedPendingUpgrade("not json"), undefined);
 });
 
+test("approved upgrade paths are read from nested factory mappings", () => {
+  assert.deepEqual(parseDedicatedUpgradePaths([
+    { key: { key: "1", key2: "2" }, value: true },
+    { key: { key: "1", key2: "3" }, value: false },
+  ]), [{ fromVersion: "1", toVersion: "2" }]);
+});
+
+test("upgrade proposal descriptions show the migration function", () => {
+  assert.equal(describeProposal(
+    {
+      target: wallet,
+      functionName: "scheduleUpgrade",
+      arguments: [signer, "2", "migrateV2"],
+    },
+    [],
+    { walletAddress: wallet, pools: [] }
+  ).detail, "Migration: migrateV2");
+});
+
 test("backend configuration timeout does not block SMD startup", async () => {
   const originalWindow = globalThis.window;
   const originalFetch = globalThis.fetch;
@@ -328,6 +423,8 @@ test("backend configuration timeout does not block SMD startup", async () => {
   try {
     await loadBackendConfig(10);
     assert.ok(Date.now() - started < 1_000, "startup remained blocked after the timeout");
+    assert.equal(runtime.multisigFactoryAddress(), "");
+    assert.equal(getMultisigConfigError(), "Multisig wallets could not be loaded. Refresh to try again.");
   } finally {
     Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
     globalThis.fetch = originalFetch;

@@ -26,6 +26,7 @@ import {
   resolveCoinIndex,
   calculateLPFees24h,
   calculatePoolAPY,
+  filterRegisteredPools,
   fetchMultiTokenStablePools,
   fetchStablePoolFees,
   MultiTokenStablePool,
@@ -84,16 +85,23 @@ export const getPools = async (
 ): Promise<PoolList> => {
   const params = buildPoolParams(rawParams, userAddress);
 
-  const [{data: poolData}, { data: factoryData }] = await Promise.all([
+  const [{data: poolData}, { data: factoryData }, { data: registeredPoolRows }] = await Promise.all([
     cirrus.get(accessToken, `/${PoolTable}`, { params }),
     cirrus.get(accessToken, `/${PoolFactory}`, {
       params: { address: "eq." + config.poolFactory, select: "swapFeeRate,lpSharePercent" }
-    })
+    }),
+    cirrus.get(accessToken, `/${PoolFactory}-allPools`, {
+      params: { address: "eq." + config.poolFactory, select: "value" }
+    }),
   ]);
 
-  // Filter out hidden pools and pools with deactivated tokens (status !== 2 = ACTIVE)
+  const rawPools = poolData as RawGetPool[];
+  // Keep only pools registered by the canonical factory, then apply display and token-status filters.
   const ACTIVE_TOKEN_STATUS = "2";
-  const validatedPools = (poolData as RawGetPool[]).filter(
+  const validatedPools = filterRegisteredPools(
+    rawPools,
+    Array.isArray(registeredPoolRows) ? registeredPoolRows : []
+  ).filter(
     pool => !config.hiddenSwapPools.has(pool.address)
       && pool.tokenA.status === ACTIVE_TOKEN_STATUS
       && pool.tokenB.status === ACTIVE_TOKEN_STATUS
@@ -127,7 +135,10 @@ export const getPools = async (
   // Replace or add multi-token stable pools. These pools also appear in the BlockApps-Pool table
   // (from Pool(pool).setFeeParameters()) but with invalid tokenA/tokenB. Replace those entries
   // with properly built multi-token pool entries.
-  const multiTokenStablePools = await fetchMultiTokenStablePools(accessToken);
+  const multiTokenStablePools = filterRegisteredPools(
+    await fetchMultiTokenStablePools(accessToken),
+    Array.isArray(registeredPoolRows) ? registeredPoolRows : []
+  );
   await Promise.all(multiTokenStablePools.map(async (stablePool) => {
     try {
       const poolEntry = await buildMultiTokenPoolEntry(

@@ -106,6 +106,7 @@ export interface DedicatedWalletState {
   requiredApprovals: number;
   transactionTimelock: number;
   signers: string[];
+  pendingNominees: string[];
   pendingUpgrade?: {
     targetLogic: string;
     fromVersion: string;
@@ -114,6 +115,7 @@ export interface DedicatedWalletState {
     executableAt: number;
     expiresAt: number;
   };
+  provenanceVerified: boolean;
   verified: boolean;
   verificationErrors: string[];
 }
@@ -155,6 +157,9 @@ export interface DedicatedIssue {
   expiresAt: number;
 }
 
+export const VERSION_NOT_APPROVED = "This multisig wallet's version is no longer approved";
+export const WALLET_NOT_ACTIVE = "This multisig wallet is not active";
+
 export interface DedicatedSetupState {
   setupHash: string;
   label: string;
@@ -173,9 +178,21 @@ export interface DedicatedFactoryState {
   owner: string;
   registryGovernance: string;
   approvedVersions: { version: string; logic: string }[];
+  approvedUpgradePaths: { fromVersion: string; toVersion: string }[];
   verified: boolean;
   verificationErrors: string[];
 }
+
+export const parseDedicatedUpgradePaths = (
+  pathRows: any[]
+): DedicatedFactoryState["approvedUpgradePaths"] =>
+  pathRows
+    .filter((row) => row?.value === true || row?.value === "true")
+    .map((row) => ({
+      fromVersion: String(row?.key?.key ?? ""),
+      toVersion: String(row?.key?.key2 ?? ""),
+    }))
+    .filter((path) => path.fromVersion && path.toVersion);
 
 const fetchDedicatedFactoryState = async (): Promise<DedicatedFactoryState> => {
   const address = runtime.multisigFactoryAddress();
@@ -186,13 +203,15 @@ const fetchDedicatedFactoryState = async (): Promise<DedicatedFactoryState> => {
       owner: "",
       registryGovernance: "",
       approvedVersions: [],
+      approvedUpgradePaths: [],
       verified: false,
-      verificationErrors: ["No factory is pinned for this network"],
+      verificationErrors: ["Multisig wallets are not configured for this network"],
     };
   }
-  const [storageRows, versionRows] = await Promise.all([
+  const [storageRows, versionRows, pathRows] = await Promise.all([
     rows("storage", `address=eq.${address}&select=data`),
     rows("mapping", `address=eq.${address}&collection_name=eq.logicVersions&select=key,value`),
+    rows("mapping", `address=eq.${address}&collection_name=eq.upgradePaths&value=eq.true&select=key,value`),
   ]);
   const data = storageRows[0]?.data ?? {};
   const logic = strip0x(String(data.logicContract ?? ""));
@@ -209,12 +228,12 @@ const fetchDedicatedFactoryState = async (): Promise<DedicatedFactoryState> => {
     .map(({ version, logic: versionLogic }) => ({ version, logic: versionLogic }))
     .sort((left, right) => left.version.localeCompare(right.version, undefined, { numeric: true }));
   const verificationErrors = [
-    ...(!logic ? ["Factory proxy has no implementation"] : []),
+    ...(!logic ? ["The multisig service on this network is not set up correctly"] : []),
     ...(![ADMIN_REGISTRY_ADDRESS, ZERO_ADDRESS].includes(owner)
-      ? ["Factory proxy is not owned by AdminRegistry or frozen"]
+      ? ["The multisig service is not under the expected network governance"]
       : []),
     ...(registryGovernance !== ADMIN_REGISTRY_ADDRESS
-      ? ["Factory registry is not governed by AdminRegistry"]
+      ? ["Multisig wallet versions are not under the expected network governance"]
       : []),
   ];
   return {
@@ -223,6 +242,7 @@ const fetchDedicatedFactoryState = async (): Promise<DedicatedFactoryState> => {
     owner,
     registryGovernance,
     approvedVersions,
+    approvedUpgradePaths: parseDedicatedUpgradePaths(pathRows),
     verified: verificationErrors.length === 0,
     verificationErrors,
   };
@@ -296,33 +316,47 @@ export function useMyMultisigWallets(ownerAddress?: string | null) {
           `collection_name=eq.nominations&key-%3E%3Ekey=in.(${controlled.join(",")})&${dedicatedSelect}`
         ),
       ]);
-      const allRows = [...signerRows, ...nominationRows];
-      const addresses = [...new Set(
-        allRows.map((row) => strip0x(String(row?.address ?? ""))).filter(Boolean)
-      )];
-      if (!addresses.length) return [];
-      const setupHashes = [...new Set(
-        allRows.map((row) => String(storageData(row)?.multisigSetupHash ?? "")).filter(Boolean)
-      )];
-      const [registeredRows, setupRows, allSignerRows] = await Promise.all([
-        inBatches(addresses, (batch) => pagedRows(
+      const verifyWalletRows = async (candidateRows: any[]): Promise<any[]> => {
+        const addresses = [...new Set(
+          candidateRows.map((row) => strip0x(String(row?.address ?? ""))).filter(Boolean)
+        )];
+        if (!addresses.length) return [];
+        const registeredRows = await inBatches(addresses, (batch) => pagedRows(
           "mapping",
           `address=eq.${factory}&collection_name=eq.factoryWallets` +
             `&key-%3E%3Ekey=in.(${batch.join(",")})&value=eq.true&select=key`
-        )),
+        ));
+        const registered = new Set(
+          registeredRows.map((row) => strip0x(String(row?.key?.key ?? "")))
+        );
+        return candidateRows.filter((row) => {
+          const address = strip0x(String(row?.address ?? ""));
+          return registered.has(address) &&
+            strip0x(String(storageData(row)?.multisigFactory ?? "")) === factory;
+        });
+      };
+      const directRows = await verifyWalletRows([...signerRows, ...nominationRows]);
+      const verifiedSignerRows = signerRows.filter((row) => directRows.includes(row));
+      const verifiedNominationRows = nominationRows.filter((row) => directRows.includes(row));
+      const verifiedRows = [...verifiedSignerRows, ...verifiedNominationRows];
+      if (!verifiedRows.length) return [];
+      const verifiedAddresses = [...new Set(
+        verifiedRows.map((row) => strip0x(String(row?.address ?? "")))
+      )];
+      const setupHashes = [...new Set(
+        verifiedRows.map((row) => String(storageData(row)?.multisigSetupHash ?? "")).filter(Boolean)
+      )];
+      const [setupRows, allSignerRows] = await Promise.all([
         inBatches(setupHashes, (batch) => pagedRows(
           "mapping",
           `address=eq.${factory}&collection_name=eq.pendingSetups` +
             `&key-%3E%3Ekey=in.(${batch.join(",")})&select=key,value`
         )),
-        inBatches(addresses, (batch) => pagedRows(
+        inBatches(verifiedAddresses, (batch) => pagedRows(
           "mapping",
           `address=in.(${batch.join(",")})&collection_name=eq.signerMap&value=gt.0&select=address`
         )),
       ]);
-      const registered = new Set(
-        registeredRows.map((row) => strip0x(String(row?.key?.key ?? "")))
-      );
       const labels = new Map(
         setupRows.map((row) => [String(row?.key?.key ?? ""), String(row?.value?.label ?? "")])
       );
@@ -333,11 +367,10 @@ export function useMyMultisigWallets(ownerAddress?: string | null) {
       }
 
       const summaries = new Map<string, MultisigWalletSummary>();
-      for (const row of signerRows) {
+      for (const row of verifiedSignerRows) {
         const address = strip0x(String(row?.address ?? ""));
         const signerAddress = strip0x(String(row?.key?.key ?? ""));
         const data = storageData(row);
-        if (!registered.has(address) || strip0x(String(data.multisigFactory ?? "")) !== factory) continue;
         const existing = summaries.get(address);
         if (existing && existing.signerAddress === controlled[0]) continue;
         if (existing && signerAddress !== controlled[0]) continue;
@@ -352,7 +385,7 @@ export function useMyMultisigWallets(ownerAddress?: string | null) {
           active: data.multisigActive === true || data.multisigActive === "true",
         });
       }
-      for (const row of nominationRows) {
+      for (const row of verifiedNominationRows) {
         const address = strip0x(String(row?.address ?? ""));
         const nomineeAddress = strip0x(String(row?.key?.key ?? ""));
         const data = storageData(row);
@@ -360,8 +393,7 @@ export function useMyMultisigWallets(ownerAddress?: string | null) {
         const live = (value.exists === true || value.exists === "true") &&
           Number(value.epoch ?? 0) === Number(data.multisigEpoch ?? 0) &&
           Number(value.expiresAt ?? 0) >= Date.now() / 1000;
-        if (!live || !registered.has(address) ||
-            strip0x(String(data.multisigFactory ?? "")) !== factory) continue;
+        if (!live) continue;
         const current = summaries.get(address);
         if (current) {
           current.pendingSigner = true;
@@ -577,11 +609,15 @@ export function useDedicatedWalletState(walletAddress?: string | null) {
     queryFn: async (): Promise<DedicatedWalletState> => {
       const address = strip0x(walletAddress!);
       const pinnedFactory = runtime.multisigFactoryAddress();
-      const [storageRows, signerRows, factoryRows, versionRows, factoryState] = await Promise.all([
+      const [storageRows, signerRows, nominationRows, factoryRows, versionRows, factoryState] = await Promise.all([
         rows("storage", `address=eq.${address}&select=data`),
         rows(
           "mapping",
           `address=eq.${address}&collection_name=eq.signerMap&value=gt.0&select=key,value`
+        ),
+        rows(
+          "mapping",
+          `address=eq.${address}&collection_name=eq.nominations&select=key,value`
         ),
         pinnedFactory
           ? rows(
@@ -611,12 +647,15 @@ export function useDedicatedWalletState(walletAddress?: string | null) {
           value.revoked !== true && value.revoked !== "true";
       });
       const approvedVersion = !!registeredVersion;
-      const verificationErrors = [
+      const provenanceErrors = [
         ...factoryState.verificationErrors,
-        ...(factory !== pinnedFactory ? ["Stored factory does not match the pinned factory"] : []),
-        ...(!registered ? ["Wallet is not registered by the pinned factory"] : []),
-        ...(!approvedVersion ? ["Current logic/version is not registry-approved"] : []),
-        ...(!(data.multisigActive === true || data.multisigActive === "true") ? ["Wallet is not active"] : []),
+        ...(factory !== pinnedFactory ? ["This multisig wallet was created by a different service than this network uses"] : []),
+        ...(!registered ? ["This multisig wallet is not registered on this network"] : []),
+        ...(!(data.multisigActive === true || data.multisigActive === "true") ? [WALLET_NOT_ACTIVE] : []),
+      ];
+      const verificationErrors = [
+        ...provenanceErrors,
+        ...(!approvedVersion ? [VERSION_NOT_APPROVED] : []),
       ];
       return {
         address,
@@ -631,7 +670,17 @@ export function useDedicatedWalletState(walletAddress?: string | null) {
         signers: signerRows
           .map((row) => strip0x(String(row?.key?.key ?? "")))
           .filter((signer) => signer.length === 40),
+        pendingNominees: nominationRows
+          .filter((row) => {
+            const value = row?.value ?? {};
+            return (value.exists === true || value.exists === "true") &&
+              Number(value.epoch ?? 0) === Number(data.multisigEpoch ?? 0) &&
+              Number(value.expiresAt ?? 0) >= Date.now() / 1000;
+          })
+          .map((row) => strip0x(String(row?.key?.key ?? "")))
+          .filter((nominee) => nominee.length === 40),
         pendingUpgrade: parseDedicatedPendingUpgrade(data.multisigPendingUpgrade),
+        provenanceVerified: provenanceErrors.length === 0,
         verified: verificationErrors.length === 0,
         verificationErrors,
       };
@@ -932,7 +981,7 @@ export function useDedicatedMultisigActions(walletAddress?: string) {
 
   const walletCall = useCallback(
     (method: string, args: Record<string, unknown>, username?: string) => {
-      if (!walletAddress) throw new Error("Wallet address is required");
+      if (!walletAddress) throw new Error("Multisig wallet address is required");
       return submit(
         "FUNCTION",
         buildDedicatedCallPayload(
@@ -959,7 +1008,12 @@ export function useDedicatedMultisigActions(walletAddress?: string) {
         queryClient.invalidateQueries({ queryKey: ["my-pending-multisig-setups"] })
       ),
     confirmSetup: (setupHash: string, username?: string) =>
-      factoryCall("confirmSetup", { _setupHash: setupHash }, username).finally(() => {
+      factoryCall("confirmSetup", { _setupHash: setupHash }, username).catch((error) => {
+        // The multisig wallet's address was taken before it could be created; only a new invitation gets a new address.
+        throw /already exists/i.test(String(error?.message))
+          ? new Error("This invitation can no longer be completed. Create a new invitation.")
+          : error;
+      }).finally(() => {
         queryClient.invalidateQueries({ queryKey: ["my-pending-multisig-setups"] });
         queryClient.invalidateQueries({ queryKey: ["my-multisig-wallets"] });
       }),

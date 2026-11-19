@@ -22,6 +22,7 @@ import {
   useMyMultisigWallets,
   useMyPendingMultisigSetups,
 } from "@/services/dedicatedMultisig";
+import { getMultisigConfigError, runtime } from "@/lib/env";
 import { shortenHex } from "@/lib/utils";
 import { strip0x } from "@/services/userWallets";
 
@@ -76,8 +77,12 @@ function MultisigWalletRow({
 }
 
 export function MultisigWalletsCard({ ownerAddress }: { ownerAddress?: string | null }) {
-  const { data: summaries = [], isLoading: walletsLoading } = useMyMultisigWallets(ownerAddress);
-  const { data: setups = [], isLoading: setupsLoading } = useMyPendingMultisigSetups(ownerAddress);
+  const configError = getMultisigConfigError();
+  const factory = runtime.multisigFactoryAddress();
+  const { data: summaries = [], isLoading: walletsLoading, isError: walletsError } =
+    useMyMultisigWallets(ownerAddress);
+  const { data: setups = [], isLoading: setupsLoading, isError: setupsError } =
+    useMyPendingMultisigSetups(ownerAddress);
   const nominations = summaries.filter((wallet) => wallet.pendingSigner);
   const wallets = summaries.filter((wallet) => wallet.signerAddress);
   const hasPending = nominations.length > 0 || setups.length > 0;
@@ -94,6 +99,11 @@ export function MultisigWalletsCard({ ownerAddress }: { ownerAddress?: string | 
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {configError ? (
+          <div className="text-sm text-destructive">{configError}</div>
+        ) : walletsError || setupsError ? (
+          <div className="text-sm text-destructive">Could not load multisig wallets.</div>
+        ) : null}
         {hasPending ? (
           <div className="rounded-md border bg-muted/30 p-3 space-y-3">
             <div className="font-medium">Pending invitations</div>
@@ -144,7 +154,9 @@ export function MultisigWalletsCard({ ownerAddress }: { ownerAddress?: string | 
               {!wallets.length ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground">
-                    You are not a signer of any multisig wallet yet.
+                    {factory
+                      ? "You are not a signer of any multisig wallet on this network yet."
+                      : "Multisig wallets are unavailable until the network configuration loads."}
                   </TableCell>
                 </TableRow>
               ) : null}

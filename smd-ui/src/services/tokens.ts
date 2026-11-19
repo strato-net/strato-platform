@@ -1,7 +1,7 @@
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { env } from "@/lib/env";
-import { strip0x } from "@/services/userWallets";
+import { strip0x, TOKEN_FACTORY_ADDRESS } from "@/services/userWallets";
 
 export interface TokenBalance {
   /** Token contract address (transfer target). */
@@ -59,7 +59,10 @@ export function useMyTokens(ownerAddress?: string | null) {
   });
 }
 
-/** Token names and decimals by contract address, independent of the wallet's balance. */
+/**
+ * Token names and decimals by contract address, independent of the wallet's balance.
+ * Only tokens registered in the token factory are returned, so a contract cannot name itself as one.
+ */
 export function useTokenMetadata(addresses: string[]) {
   const normalized = [...new Set(addresses.map(strip0x).filter((address) => address.length === 40))].sort();
   return useQuery({
@@ -67,40 +70,23 @@ export function useTokenMetadata(addresses: string[]) {
     enabled: normalized.length > 0,
     staleTime: 60_000,
     queryFn: async (): Promise<TokenMetadata[]> => {
-      const { data } = await api.get(
-        `${env.CIRRUS_URL}/storage?address=in.(${normalized.join(",")})` +
-          `&select=address,data-%3E%3E_symbol,data-%3E%3EcustomDecimals`
-      );
-      if (!Array.isArray(data)) return [];
+      const [{ data }, { data: registered }] = await Promise.all([
+        api.get(
+          `${env.CIRRUS_URL}/storage?address=in.(${normalized.join(",")})` +
+            `&select=address,data-%3E%3E_symbol,data-%3E%3EcustomDecimals`
+        ),
+        api.get(
+          `${env.CIRRUS_URL}/mapping?address=eq.${TOKEN_FACTORY_ADDRESS}&collection_name=eq.isFactoryToken` +
+            `&key-%3E%3Ekey=in.(${normalized.join(",")})&value=eq.true&select=key`
+        ),
+      ]);
+      if (!Array.isArray(data) || !Array.isArray(registered)) return [];
+      const factoryTokens = new Set(registered.map((row: any) => strip0x(String(row?.key?.key ?? ""))));
       return data.map((row: any) => ({
         address: strip0x(String(row?.address ?? "")),
         symbol: String(row?._symbol ?? row?.data?._symbol ?? "TOKEN"),
         decimals: Number(row?.customDecimals ?? row?.data?.customDecimals ?? 18),
-      })).filter((token) => token.address);
-    },
-  });
-}
-
-/** Current ERC-20 allowance granted by `ownerAddress` to `spenderAddress`. */
-export function useTokenAllowance(
-  tokenAddress?: string | null,
-  ownerAddress?: string | null,
-  spenderAddress?: string | null
-) {
-  return useQuery({
-    queryKey: ["token-allowance", tokenAddress, ownerAddress, spenderAddress],
-    enabled: !!tokenAddress && !!ownerAddress && !!spenderAddress,
-    refetchInterval: 12_000,
-    queryFn: async (): Promise<string> => {
-      const token = strip0x(tokenAddress!);
-      const owner = strip0x(ownerAddress!);
-      const spender = strip0x(spenderAddress!);
-      const { data } = await api.get(
-        `${env.CIRRUS_URL}/mapping?collection_name=eq._allowances` +
-          `&address=eq.${token}&key-%3E%3Ekey=eq.${owner}` +
-          `&key-%3E%3Ekey2=eq.${spender}&select=value::text&limit=1`
-      );
-      return String(Array.isArray(data) ? data[0]?.value ?? "0" : "0");
+      })).filter((token) => factoryTokens.has(token.address));
     },
   });
 }
@@ -129,50 +115,5 @@ export function useTokenAllowances(
         return String(Array.isArray(data) ? data[0]?.value ?? "0" : "0");
       }));
     },
-  });
-}
-
-export interface TokenAllowanceRequirement {
-  issueId: string;
-  tokenAddress: string;
-  ownerAddress: string;
-  spenderAddress: string;
-  amount: string;
-}
-
-/** On-chain allowance checks used to keep dependent multisig issues in execution order. */
-export function useTokenAllowanceRequirements(requirements: TokenAllowanceRequirement[]) {
-  const results = useQueries({
-    queries: requirements.map((requirement) => ({
-      queryKey: [
-        "token-allowance",
-        requirement.tokenAddress,
-        requirement.ownerAddress,
-        requirement.spenderAddress,
-      ],
-      refetchInterval: 12_000,
-      queryFn: async (): Promise<string> => {
-        const token = strip0x(requirement.tokenAddress);
-        const owner = strip0x(requirement.ownerAddress);
-        const spender = strip0x(requirement.spenderAddress);
-        const { data } = await api.get(
-          `${env.CIRRUS_URL}/mapping?collection_name=eq._allowances` +
-            `&address=eq.${token}&key-%3E%3Ekey=eq.${owner}` +
-            `&key-%3E%3Ekey2=eq.${spender}&select=value::text&limit=1`
-        );
-        return String(Array.isArray(data) ? data[0]?.value ?? "0" : "0");
-      },
-    })),
-  });
-
-  return requirements.map((requirement, index) => {
-    const result = results[index];
-    let ready = false;
-    try {
-      ready = BigInt(result.data ?? "0") >= BigInt(requirement.amount);
-    } catch {
-      ready = false;
-    }
-    return { ...requirement, ready, isLoading: result.isLoading, isError: result.isError };
   });
 }
