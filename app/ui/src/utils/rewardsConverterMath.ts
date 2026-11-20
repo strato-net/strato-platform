@@ -31,11 +31,11 @@ export const formatShare = (part: bigint, whole: bigint): string => {
 };
 
 /**
- * STRATO to add so the reserve pays for `coverage` (in hundredths of a percent) of `supply` at `rate`,
+ * STRATO to add so the reserve pays for `coverage` (a percentage scaled by 1e18) of `supply` at `rate`,
  * rounded up so the coverage is reached; zero when the reserve already does.
  */
 export const fundingForCoverage = (coverage: bigint, supply: bigint, rate: bigint, reserve: bigint): bigint => {
-  const scale = WAD * 10000n;
+  const scale = WAD * 100n * WAD;
   const target = (supply * rate * coverage + scale - 1n) / scale;
   return target > reserve ? target - reserve : 0n;
 };

@@ -21,8 +21,9 @@ const FundReserveForm = ({ state, stats }: {
   const [value, setValue] = useState("");
   const { symbol, decimals } = state.stratoToken;
   const supply = BigInt(stats?.outstandingSupply ?? 0);
+  const coverage = parseUnitsWithTruncation(value, 18);
   const amount = byCoverage
-    ? fundingForCoverage(parseUnitsWithTruncation(value, 2), supply, BigInt(state.rate), BigInt(state.reserve))
+    ? fundingForCoverage(coverage, supply, BigInt(state.rate), BigInt(state.reserve))
     : safeParseUnits(value, decimals);
   const exceedsBalance = !!account && amount > BigInt(account.stratoBalance);
 
@@ -57,7 +58,7 @@ const FundReserveForm = ({ state, stats }: {
             value={value}
             onChange={(event) => setValue(event.target.value)}
           />
-          {byCoverage && stats && value && (
+          {byCoverage && stats && coverage > 0n && (
             <p className="text-xs text-muted-foreground">
               {amount > 0n
                 ? `Sends ${formatTokenAmount(amount.toString(), state.stratoToken)}`
