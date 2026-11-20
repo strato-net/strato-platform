@@ -22,3 +22,10 @@ export const formatRate = (rate: bigint): string => {
   const scaled = rate / 10n ** 14n;
   return `${scaled / 10000n}.${(scaled % 10000n).toString().padStart(4, '0')}`;
 };
+
+/** `part` of `whole` as a percentage to 2 decimals ("40.00%"), rounded down; "—" when `whole` is zero. */
+export const formatShare = (part: bigint, whole: bigint): string => {
+  if (whole === 0n) return '—';
+  const hundredths = (part * 10000n) / whole;
+  return `${hundredths / 100n}.${(hundredths % 100n).toString().padStart(2, '0')}%`;
+};

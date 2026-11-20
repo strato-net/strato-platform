@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   formatRate,
+  formatShare,
   maxConvertAmount,
   payoutFor,
   rateFromDecimal,
@@ -59,4 +60,12 @@ test('formatRate shows 4 decimals, rounded down', () => {
   assert.equal(formatRate(999999999999999999n), '0.9999');
   assert.equal(formatRate(12345678900000000000n), '12.3456');
   assert.equal(formatRate(1n), '0.0000');
+});
+
+test('formatShare shows a percentage to 2 decimals, or a dash when the whole is zero', () => {
+  assert.equal(formatShare(4n * E18, 10n * E18), '40.00%');
+  assert.equal(formatShare(E18, E18), '100.00%');
+  assert.equal(formatShare(1505999n, 1000000n), '150.59%');
+  assert.equal(formatShare(0n, E18), '0.00%');
+  assert.equal(formatShare(E18, 0n), '—');
 });

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Info, Loader2 } from "lucide-react";
 import type { RewardsConverterAdminStats, RewardsConverterInfo } from "@strato/shared-types";
 import { truncateAddress } from "@/utils/numberUtils";
-import { formatRate, rateToDecimal } from "@/utils/rewardsConverterMath";
+import { formatRate, formatShare, rateToDecimal } from "@/utils/rewardsConverterMath";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import CopyButton from "@/components/ui/copy";
@@ -54,9 +54,13 @@ const ConverterNumbers = ({ state, stats }: {
       <Stat label="Reserve" tip={`${stratoToken.symbol} the converter holds to pay conversions.`}>{formatTokenAmount(state.reserve, stratoToken)}</Stat>
       <Stat
         label="Max Convertible"
-        tip={`The most ${rewardsToken.symbol} the reserve can pay for at the current rate. This limit is shared by all holders.`}
+        tip={`The share of the outstanding ${rewardsToken.symbol} the reserve can pay for at the current rate. This limit is shared by all holders.`}
       >
-        {formatTokenAmount(state.maxConvertible, rewardsToken)}
+        {stats ? (
+          <Hover tip={formatTokenAmount(state.maxConvertible, rewardsToken)}>
+            {formatShare(BigInt(state.maxConvertible), BigInt(stats.outstandingSupply))}
+          </Hover>
+        ) : loading}
       </Stat>
       <Stat label="Converter Address" tip="The converter contract's address on this network.">
         <div className="flex items-center gap-1">
