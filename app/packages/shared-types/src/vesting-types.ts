@@ -11,8 +11,9 @@ export interface VestingView {
   account: string;
   managed: boolean;
   cancelled: boolean;
-  /** 0 linear, 1 quadratic. */
+  /** 0 linear, 1 quadratic, 2 equal monthly steps. */
   curveType: number;
+  /** Weeks for curves 0 and 1; the number of monthly steps for curve 2. */
   durationWeeks: number;
   durationSeconds: number;
   startDate: number;
@@ -28,6 +29,10 @@ export interface VestingView {
   locked: string;
   /** Unvested remainder returned to the pool by a cancel; "0" otherwise. */
   returned: string;
+  /** Curve 2 only: when the next slice unlocks; 0 while paused, once cancelled or ended, and for other curves. */
+  nextUnlockDate: number;
+  /** Curve 2 only: what that slice adds, in atoms; "0" when nextUnlockDate is 0. */
+  nextUnlockAmount: string;
   status: VestingStatus;
 }
 

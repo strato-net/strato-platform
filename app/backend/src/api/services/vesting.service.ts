@@ -10,6 +10,8 @@ import type { VestingStatus, VestingSummary, VestingView, VestingsResponse } fro
 // VestingPool.claimVestedTokens treats max uint128 as "claim everything available".
 export const MAX_UINT128 = "340282366920938463463374607431768211455";
 export const WEEK_SECONDS = 604800;
+// One step of curve type 2 (equal monthly steps): 365.25 days / 12, as in VestingPool.sol.
+export const STEP_SECONDS = 2629800;
 
 // Accrual is reported from the Cirrus row, not from the contract: the public
 // vestings(id) getter returns empty fields over RPC and calculateVestedAmount
@@ -108,7 +110,9 @@ export const newestRowPerKey = (rows: VestingRow[]): VestingRow[] => {
 // ---- accrual, mirroring VestingPool._calculateVestedAmount ----
 
 export const computeVestingView = (parsed: ParsedVesting, nowSeconds: number): VestingView => {
-  const durationSeconds = parsed.durationWeeks * WEEK_SECONDS;
+  // Curve 2 counts durationWeeks as monthly steps.
+  const stepped = parsed.curveType === 2;
+  const durationSeconds = parsed.durationWeeks * (stepped ? STEP_SECONDS : WEEK_SECONDS);
   const started = nowSeconds >= parsed.startDate;
   // Pause and cancel both set pausingDate (never below startDate) and freeze accrual there.
   const effective = parsed.pausingDate > 0 ? parsed.pausingDate : nowSeconds;
@@ -128,8 +132,23 @@ export const computeVestingView = (parsed: ParsedVesting, nowSeconds: number): V
     const elapsedBig = BigInt(elapsed);
     const durationBig = BigInt(durationSeconds);
     vested = (parsed.amount * elapsedBig * elapsedBig) / (durationBig * durationBig);
+  } else if (stepped) {
+    vested = (parsed.amount * BigInt(Math.floor(elapsed / STEP_SECONDS))) / BigInt(parsed.durationWeeks);
   }
   // Any other curve type is unreachable: addVesting rejects it.
+
+  // The next slice of a step grant: known while it runs or waits for its start, unknown while
+  // paused (unpausing shifts every boundary), gone once cancelled or ended.
+  let nextUnlockDate = 0;
+  let nextUnlockAmount = 0n;
+  if (stepped && !parsed.cancelled && parsed.pausingDate === 0 && !ended) {
+    const completed = Math.floor(elapsed / STEP_SECONDS);
+    nextUnlockDate = parsed.startDate + (completed + 1) * STEP_SECONDS;
+    const afterNext = completed + 1 >= parsed.durationWeeks
+      ? parsed.amount
+      : (parsed.amount * BigInt(completed + 1)) / BigInt(parsed.durationWeeks);
+    nextUnlockAmount = afterNext - vested;
+  }
 
   const claimable = vested > parsed.amountClaimed ? vested - parsed.amountClaimed : 0n;
   // Cancelling returns the unvested remainder to the pool: the beneficiary never gets it,
@@ -171,6 +190,8 @@ export const computeVestingView = (parsed: ParsedVesting, nowSeconds: number): V
     claimable: claimable.toString(),
     locked: locked.toString(),
     returned: returned.toString(),
+    nextUnlockDate,
+    nextUnlockAmount: nextUnlockAmount.toString(),
     status,
   };
 };
