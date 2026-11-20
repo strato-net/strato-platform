@@ -52,12 +52,20 @@ const FundReserveForm = ({ state, stats }: {
           <Label htmlFor="converter-fund-amount">
             {byCoverage ? "Coverage of outstanding supply (%)" : `Amount (${symbol})`}
           </Label>
-          <Input
-            id="converter-fund-amount"
-            placeholder={byCoverage ? "100" : "0.00"}
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-          />
+          <div className="relative">
+            <Input
+              id="converter-fund-amount"
+              className={byCoverage ? "pr-8" : undefined}
+              placeholder={byCoverage ? "100" : "0.00"}
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+            />
+            {byCoverage && (
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
+                %
+              </span>
+            )}
+          </div>
           {byCoverage && stats && coverage > 0n && (
             <p className="text-xs text-muted-foreground">
               {amount > 0n
