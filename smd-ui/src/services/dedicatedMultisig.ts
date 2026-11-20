@@ -1059,6 +1059,8 @@ export function useDedicatedCallCheck(walletAddress: string, call: DedicatedCall
     queryKey: ["dedicated-multisig-call-check", walletAddress, call?.target, call?.functionName, JSON.stringify(call?.arguments)],
     enabled: !!call,
     staleTime: 15_000,
+    // Another proposal running can change the answer, such as the permission a paired action needs.
+    refetchInterval: 15_000,
     retry: false,
     queryFn: async (): Promise<string> => {
       const declared = await fetchFunctionByAddress(call!.target, call!.functionName);
