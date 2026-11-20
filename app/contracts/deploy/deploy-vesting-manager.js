@@ -67,7 +67,7 @@ async function buildSource() {
     }).join('\n');
   } else source = stripComments(String(source));
   const contracts = [...source.matchAll(/^\s*(?:abstract\s+)?contract\s+(?:record\s+)?([A-Za-z0-9_]+)/gm)].map(m => m[1]);
-  for (const must of ['VestingPool', 'VestingPoolManager', 'Ownable', 'AdminRegistry']) {
+  for (const must of ['VestingPool', 'VestingPoolManager', 'Ownable']) {
     if (!contracts.includes(must)) throw new Error(`flattened source is missing contract ${must}`);
   }
   fs.writeFileSync(ARTIFACT, source);

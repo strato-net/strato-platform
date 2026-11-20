@@ -11,6 +11,7 @@ import "../Util.sol";
 // (three admins, default threshold 60 % → two votes execute) and record what an admin
 // sees when the pool rejects the call during execution.
 contract Describe_VestingPoolManagerGovernance {
+    uint constant STEP = 2629800; // D5: one monthly step, 365.25 days / 12
     uint constant WEEK = 604800;
     uint128 constant MAX = 340282366920938463463374607431768211455;
 
@@ -84,9 +85,9 @@ contract Describe_VestingPoolManagerGovernance {
         uint128[] memory amounts = new uint128[](2);
         accounts[0] = address(alice); amounts[0] = 400;
         accounts[1] = address(bob); amounts[1] = 600;
-        a1.do(address(registry), "castVoteOnIssue", address(manager), "addVestings", accounts, amounts, false, uint16(104), start);
+        a1.do(address(registry), "castVoteOnIssue", address(manager), "addVestings", accounts, amounts, uint8(0), false, uint16(104), start);
         require(pool.totalTokensInVesting() == 0, "no execution on the first vote");
-        a2.do(address(registry), "castVoteOnIssue", address(manager), "addVestings", accounts, amounts, false, uint16(104), start);
+        a2.do(address(registry), "castVoteOnIssue", address(manager), "addVestings", accounts, amounts, uint8(0), false, uint16(104), start);
         require(pool.totalTokensInVesting() == 1000, "batch executed: committed " + string(pool.totalTokensInVesting()));
         bytes32 bobId = pool.vestingHash(address(bob), 0, false, 104, start, 600);
         fastForward(104 * WEEK);
@@ -184,5 +185,20 @@ contract Describe_VestingPoolManagerGovernance {
         }
         require(reverted, "admins lose control after rotation");
         require(pool.totalTokensInVesting() == 500, "no change from the ex-admin");
+    }
+
+    function it_batches_step_vestings_by_vote() public {
+        uint64 start = uint64(block.timestamp);
+        address[] memory accounts = new address[](1);
+        uint128[] memory amounts = new uint128[](1);
+        accounts[0] = address(bob); amounts[0] = 2400;
+        a1.do(address(registry), "castVoteOnIssue", address(manager), "addVestings", accounts, amounts, uint8(2), true, uint16(24), start);
+        require(pool.totalTokensInVesting() == 0, "no execution on the first vote");
+        a2.do(address(registry), "castVoteOnIssue", address(manager), "addVestings", accounts, amounts, uint8(2), true, uint16(24), start);
+        require(pool.totalTokensInVesting() == 2400, "step batch executed: committed " + string(pool.totalTokensInVesting()));
+        bytes32 bobId = pool.vestingHash(address(bob), 2, true, 24, start, 2400);
+        fastForward(STEP);
+        bob.do(address(pool), "claimVestedTokens", bobId, address(bob), MAX);
+        require(strato.balanceOf(address(bob)) == 100, "bob claims the first slice: " + string(strato.balanceOf(address(bob))));
     }
 }

@@ -15,6 +15,7 @@ contract InspectablePool is VestingPool {
 }
 
 contract Describe_VestingPoolManage {
+    uint constant STEP = 2629800; // D5: one monthly step, 365.25 days / 12
     uint constant WEEK = 604800;
     Token strato;
     User user2;
@@ -267,5 +268,73 @@ contract Describe_VestingPoolManage {
         bool reverted = false;
         try pool.unpauseVesting(vestingHash) { } catch Error(string e) { reverted = true; require(e == "Vesting has been cancelled and cannot be unpaused", e); }
         require(reverted, "cancelled vesting unpaused");
+    }
+
+    // ---- D5 monthly steps ----
+
+    function _addStepVesting(uint128 amount, uint16 steps, uint64 startTime) internal returns (bytes32) {
+        strato.mint(address(pool), amount);
+        bytes32 vestingHash = pool.vestingHash(address(user2), 2, true, steps, startTime, amount);
+        pool.addVesting(address(user2), 2, true, steps, startTime, amount);
+        return vestingHash;
+    }
+
+    function it_steps_cancel_before_start_releases_everything_and_leaves_nothing_claimable() public {
+        uint128 amount = _units(2400);
+        uint64 targetTime = _now() + 3600;
+        bytes32 id = _addStepVesting(amount, 24, targetTime);
+        pool.cancelVesting(id);
+        require(pool.vestingCancelled(id), "cancelled");
+        require(pool.vestingPausingDate(id) == targetTime, "frozen at the start date");
+        require(pool.totalTokensInVesting() == 0, "whole amount released");
+        // unlike a zero-week grant, a step grant cancelled before its start never vests anything
+        _warpTo(uint256(targetTime) + 30 * STEP);
+        (uint128 vested, ) = pool.calculateVestedAmount(id);
+        require(vested == 0, "cancelled step grant vested " + string(vested));
+    }
+
+    function it_steps_cancel_between_boundaries_keeps_the_completed_slices() public {
+        uint128 amount = _units(2400);
+        uint64 start = _now();
+        bytes32 id = _addStepVesting(amount, 24, start);
+        _warpTo(uint256(start) + 5 * STEP + STEP / 2);
+        pool.cancelVesting(id);
+        (uint128 vested, ) = pool.calculateVestedAmount(id);
+        require(vested == _units(500), "five slices kept: " + string(vested));
+        require(pool.totalTokensInVesting() == _units(500), "only the five slices stay committed");
+        require(pool.tokensAvailableForVesting() == amount - _units(500), "the rest is free again");
+        _warpTo(uint256(start) + 30 * STEP);
+        (uint128 later, ) = pool.calculateVestedAmount(id);
+        require(later == _units(500), "cancelled grant kept vesting: " + string(later));
+    }
+
+    function it_steps_cancel_on_a_boundary_counts_that_slice() public {
+        uint128 amount = _units(2400);
+        uint64 start = _now();
+        bytes32 id = _addStepVesting(amount, 24, start);
+        _warpTo(uint256(start) + 12 * STEP);
+        pool.cancelVesting(id);
+        (uint128 vested, ) = pool.calculateVestedAmount(id);
+        require(vested == _units(1200), "twelve slices: " + string(vested));
+        require(pool.totalTokensInVesting() == _units(1200), "committed " + string(pool.totalTokensInVesting()));
+    }
+
+    function it_steps_pause_before_start_delays_the_first_slice() public {
+        uint128 amount = _units(2400);
+        uint64 targetTime = _now() + 3600;
+        bytes32 id = _addStepVesting(amount, 24, targetTime);
+        pool.pauseVesting(id);
+        require(pool.vestingPausingDate(id) == targetTime, "paused at the start date");
+        _warpTo(uint256(targetTime) + STEP);
+        pool.unpauseVesting(id);
+        // the pause lasted one step, so the first slice is two steps after the original start
+        (uint128 v0, ) = pool.calculateVestedAmount(id);
+        require(v0 == 0, "slice vested during the pause: " + string(v0));
+        _warpTo(uint256(targetTime) + 2 * STEP - 1);
+        (uint128 v1, ) = pool.calculateVestedAmount(id);
+        require(v1 == 0, "slice vested early: " + string(v1));
+        _warpTo(uint256(targetTime) + 2 * STEP);
+        (uint128 v2, ) = pool.calculateVestedAmount(id);
+        require(v2 == _units(100), "first slice after the shifted start: " + string(v2));
     }
 }

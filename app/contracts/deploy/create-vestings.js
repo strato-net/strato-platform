@@ -31,10 +31,14 @@
 //                                        // file that has it unless ALLOW_TEST_SCALE=1 is set.
 //   "batchSize": 25,                     // OPTIONAL, default 25: entries per addVestings transaction
 //   "categories": [
-//     { "name": "team", "managed": true, "cliffMonths": 12, "durationWeeks": 104,
+//     { "name": "team", "managed": true, "cliffMonths": 12, "durationMonths": 24,
 //       "entries": [ { "account": "<40 hex>", "tokens": "1234567.89" } ] }   // tokens: decimal STRING, never a number
 //   ]
 // }
+// A category vests either in equal monthly steps ("durationMonths": N, curve type 2: nothing
+// at the start date, one Nth of the grant every 2629800 s = 365.25 days / 12, so the first
+// slice lands one step after the cliff) or linearly per second ("durationWeeks": N, curve
+// type 0); give exactly one. "durationWeeks": 0 with managed=false is an instant unlock.
 // startDate = TGE + cliffMonths calendar months (UTC, day clamped to the shorter
 // month), or TGE + cliffMonths * secondsPerMonth when that override is present.
 // Every entry's on-chain id is obtained from the pool itself (eth_call to
@@ -60,6 +64,7 @@ const { getIssueId } = require('./util');
 const ADDRESS_RE = /^[0-9a-fA-F]{40}$/;
 const MAX_UINT128 = (1n << 128n) - 1n;
 const DEFAULT_REGISTRY = '000000000000000000000000000000000000100c';
+const STEP_SECONDS = 2629800; // one step of curve type 2 (equal monthly steps): 365.25 days / 12
 const clean = (v) => String(v || '').trim().replace(/^0x/, '').toLowerCase();
 const iso = (s) => new Date(s * 1000).toISOString();
 
@@ -123,8 +128,13 @@ function loadSchedule(file) {
     if (!c.name || names.has(c.name)) throw new Error(`category name missing or duplicated: "${c.name}"`);
     names.add(c.name);
     if (typeof c.managed !== 'boolean') throw new Error(`${c.name}: managed must be true/false`);
-    if (!Number.isInteger(c.durationWeeks) || c.durationWeeks < 0 || c.durationWeeks > 65535) throw new Error(`${c.name}: durationWeeks must be 0..65535`);
-    if (c.managed && c.durationWeeks === 0) throw new Error(`${c.name}: a managed vesting needs a duration; the manager refuses managed zero-week grants (use managed=false for an instant unlock)`);
+    const monthly = c.durationMonths !== undefined;
+    if (monthly === (c.durationWeeks !== undefined)) throw new Error(`${c.name}: give exactly one of durationMonths (equal monthly steps) or durationWeeks (linear)`);
+    c.curveType = monthly ? 2 : 0;
+    c.duration = monthly ? c.durationMonths : c.durationWeeks; // the on-chain uint16: steps for curve 2, weeks for curve 0
+    if (!Number.isInteger(c.duration) || c.duration < 0 || c.duration > 65535) throw new Error(`${c.name}: ${monthly ? 'durationMonths' : 'durationWeeks'} must be 0..65535`);
+    if (c.managed && c.duration === 0) throw new Error(`${c.name}: a managed vesting needs a duration; the manager refuses managed zero-duration grants (use managed=false for an instant unlock)`);
+    c.durationSeconds = c.duration * (monthly ? STEP_SECONDS : 604800);
     if (c.startDate !== undefined) throw new Error(`${c.name}: startDate is derived from tge + cliffMonths; remove it`);
     if (!Number.isInteger(c.cliffMonths) || c.cliffMonths < 0 || c.cliffMonths > 1200) throw new Error(`${c.name}: cliffMonths must be an integer 0..1200`);
     c.startDate = s.secondsPerMonth ? s.tgeSeconds + c.cliffMonths * s.secondsPerMonth : addMonthsUtc(s.tgeSeconds, c.cliffMonths);
@@ -137,8 +147,8 @@ function loadSchedule(file) {
       if (seen.has(a)) throw new Error(`${c.name}: ${a} appears twice (same parameters would collide on the vesting id)`);
       seen.add(a);
       const atoms = toAtoms(e.tokens, s.decimals);
-      const tuple = `${a}|${c.managed}|${c.durationWeeks}|${c.startDate}|${atoms}`;
-      if (tuples.has(tuple)) throw new Error(`${c.name}: ${a} with the same managed flag, duration, start and amount already appears in category "${tuples.get(tuple)}"; identical parameters hash to the same vesting id, so the second one can never be created`);
+      const tuple = `${a}|${c.curveType}|${c.managed}|${c.duration}|${c.startDate}|${atoms}`;
+      if (tuples.has(tuple)) throw new Error(`${c.name}: ${a} with the same curve, managed flag, duration, start and amount already appears in category "${tuples.get(tuple)}"; identical parameters hash to the same vesting id, so the second one can never be created`);
       tuples.set(tuple, c.name);
       c.accounts.push(a); c.amounts.push(atoms.toString()); c.total += atoms;
     }
@@ -151,14 +161,15 @@ function loadSchedule(file) {
   return s;
 }
 
-// addVestings(address[] accounts, uint128[] amounts, bool managed, uint16 durationWeeks, uint64 startDate)
+// addVestings(address[] accounts, uint128[] amounts, uint8 curveType, bool managed, uint16 durationWeeks, uint64 startDate)
 // as typed variadic arguments for AdminRegistry.castVoteOnIssue. Integers are BigInt and
 // are serialised as bare JSON numbers (see toBody), addresses carry 0x, like the backend.
 const typedArgsFor = (c, b) => ([
   { type: 'address[]', value: b.accounts.map((a) => '0x' + a) },
   { type: 'uint128[]', value: b.amounts.map((x) => BigInt(x)) },
+  { type: 'uint8', value: BigInt(c.curveType) },
   { type: 'bool', value: c.managed },
-  { type: 'uint16', value: BigInt(c.durationWeeks) },
+  { type: 'uint16', value: BigInt(c.duration) },
   { type: 'uint64', value: BigInt(c.startDate) },
 ]);
 // JSON with BigInt rendered as bare numbers (JSON.stringify cannot do it natively).
@@ -173,10 +184,11 @@ function printPlan(s) {
   let grand = 0n, txs = 0;
   for (const c of s.categories) {
     grand += c.total;
-    console.log(`\n== ${c.name}: ${c.accounts.length} entries in ${c.batches.length} transaction(s) of up to ${s.batchSize}; managed=${c.managed}; start ${iso(c.startDate)} (cliff ${c.cliffMonths} months); end ${iso(c.startDate + c.durationWeeks * 604800)}${c.durationWeeks === 0 ? ' (fully vested at start)' : ''}; total ${fmtTokens(c.total, s.decimals)} tokens`);
+    const shape = c.duration === 0 ? 'instant unlock at start' : c.curveType === 2 ? `${c.duration} equal monthly steps, first slice ${iso(c.startDate + STEP_SECONDS)}` : `linear over ${c.duration} weeks`;
+    console.log(`\n== ${c.name}: ${c.accounts.length} entries in ${c.batches.length} transaction(s) of up to ${s.batchSize}; managed=${c.managed}; ${shape}; start ${iso(c.startDate)} (cliff ${c.cliffMonths} months); end ${iso(c.startDate + c.durationSeconds)}; total ${fmtTokens(c.total, s.decimals)} tokens`);
     for (const b of c.batches) {
       txs++;
-      console.log(`[${txs}] AdminRegistry(${s.adminRegistry}).castVoteOnIssue(${s.manager}, "addVestings", [accounts[${b.accounts.length}], amounts[${b.accounts.length}], managed=${c.managed}, durationWeeks=${c.durationWeeks}, startDate=${c.startDate}])   # ${batchLabel(c, b)}`);
+      console.log(`[${txs}] AdminRegistry(${s.adminRegistry}).castVoteOnIssue(${s.manager}, "addVestings", [accounts[${b.accounts.length}], amounts[${b.accounts.length}], curveType=${c.curveType}, managed=${c.managed}, duration=${c.duration}, startDate=${c.startDate}])   # ${batchLabel(c, b)}`);
       b.accounts.forEach((a, j) => console.log(`    ${a}  ${b.amounts[j]} atoms  (${fmtTokens(b.amounts[j], s.decimals)} tokens)`));
       console.log(`    batch total ${b.total} atoms (${fmtTokens(b.total, s.decimals)} tokens)   args sha256 ${argsHash(c, b)}`);
     }
@@ -252,9 +264,9 @@ async function verifyWiring(s) {
 }
 
 // The vesting id for an entry, from the pool's own vestingHash(address,uint8,bool,uint16,uint64,uint128)
-// via eth_call with the entry's ORIGINAL parameters (curve 0).
+// via eth_call with the entry's ORIGINAL parameters.
 async function expectedVestingId(s, c, j) {
-  const data = SEL.vestingHash + word('0x' + c.accounts[j]) + word(0) + word(c.managed ? 1 : 0) + word(c.durationWeeks) + word(c.startDate) + word(c.amounts[j]);
+  const data = SEL.vestingHash + word('0x' + c.accounts[j]) + word(c.curveType) + word(c.managed ? 1 : 0) + word(c.duration) + word(c.startDate) + word(c.amounts[j]);
   return ethCall(s.pool, data, `vestingHash for ${c.accounts[j]}`);
 }
 

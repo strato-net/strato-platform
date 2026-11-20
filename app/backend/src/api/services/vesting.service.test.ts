@@ -6,6 +6,7 @@ import * as config from "../../config/config";
 import { StratoError } from "../../errors";
 import {
   ParsedVesting,
+  STEP_SECONDS,
   VESTING_ROWS_PAGE,
   VESTING_ROW_SELECT,
   WEEK_SECONDS,
@@ -203,6 +204,102 @@ test("exponential curve squares elapsed over duration with BigInt floor", () => 
 
   const half = computeVestingView(parsed({ curveType: 1, amount: ONE_THOUSAND_TOKENS }), START + WEEK_SECONDS);
   assert.equal(half.vested, (ONE_THOUSAND_TOKENS / 4n).toString());
+});
+
+// ---- curve type 2: equal monthly steps ----
+
+const STEP_AMOUNT = 2400n * 10n ** 18n;
+const SLICE = STEP_AMOUNT / 24n;
+const stepped = (overrides: Partial<ParsedVesting> = {}): ParsedVesting =>
+  parsed({ curveType: 2, durationWeeks: 24, amount: STEP_AMOUNT, ...overrides });
+
+test("step vesting: nothing before the first boundary, one slice per boundary, flat in between", () => {
+  const atStart = computeVestingView(stepped(), START);
+  assert.equal(atStart.vested, "0");
+  assert.equal(atStart.status, "vesting");
+  assert.equal(atStart.durationSeconds, 24 * STEP_SECONDS);
+  assert.equal(atStart.endDate, START + 24 * STEP_SECONDS);
+  assert.equal(atStart.nextUnlockDate, START + STEP_SECONDS);
+  assert.equal(atStart.nextUnlockAmount, SLICE.toString());
+
+  assert.equal(computeVestingView(stepped(), START + STEP_SECONDS - 1).vested, "0");
+
+  const first = computeVestingView(stepped(), START + STEP_SECONDS);
+  assert.equal(first.vested, SLICE.toString());
+  assert.equal(first.claimable, SLICE.toString());
+  assert.equal(first.locked, (STEP_AMOUNT - SLICE).toString());
+  assert.equal(first.nextUnlockDate, START + 2 * STEP_SECONDS);
+  assert.equal(first.nextUnlockAmount, SLICE.toString());
+
+  const mid = computeVestingView(stepped(), START + 11 * STEP_SECONDS + 12345);
+  assert.equal(mid.vested, (11n * SLICE).toString());
+  assert.equal(mid.nextUnlockDate, START + 12 * STEP_SECONDS);
+
+  const last = computeVestingView(stepped(), START + 24 * STEP_SECONDS);
+  assert.equal(last.vested, STEP_AMOUNT.toString());
+  assert.equal(last.status, "fully_vested");
+  assert.equal(last.nextUnlockDate, 0);
+  assert.equal(last.nextUnlockAmount, "0");
+});
+
+test("step vesting pays the division remainder with the last slice", () => {
+  // 100 atoms over 3 steps: 33, 66, 100, so the slices are 33, 33, 34.
+  const three = { amount: 100n, durationWeeks: 3 };
+  const v1 = computeVestingView(stepped(three), START + STEP_SECONDS);
+  assert.equal(v1.vested, "33");
+  assert.equal(v1.nextUnlockAmount, "33");
+  const v2 = computeVestingView(stepped(three), START + 2 * STEP_SECONDS);
+  assert.equal(v2.vested, "66");
+  assert.equal(v2.nextUnlockAmount, "34");
+  assert.equal(v2.nextUnlockDate, START + 3 * STEP_SECONDS);
+  const v3 = computeVestingView(stepped(three), START + 3 * STEP_SECONDS);
+  assert.equal(v3.vested, "100");
+  assert.equal(v3.nextUnlockDate, 0);
+});
+
+test("step vesting before its cliff reports the first slice one step after the start", () => {
+  const view = computeVestingView(stepped(), START - 30 * DAY);
+  assert.equal(view.status, "not_started");
+  assert.equal(view.vested, "0");
+  assert.equal(view.nextUnlockDate, START + STEP_SECONDS);
+  assert.equal(view.nextUnlockAmount, SLICE.toString());
+});
+
+test("paused or cancelled step vesting freezes at completed slices and has no next unlock", () => {
+  const paused = computeVestingView(stepped({ pausingDate: START + 5 * STEP_SECONDS + 100 }), START + 9 * STEP_SECONDS);
+  assert.equal(paused.vested, (5n * SLICE).toString());
+  assert.equal(paused.status, "paused");
+  assert.equal(paused.nextUnlockDate, 0);
+  assert.equal(paused.nextUnlockAmount, "0");
+
+  const cancelled = computeVestingView(stepped({ pausingDate: START + 12 * STEP_SECONDS, cancelled: true }), START + 30 * STEP_SECONDS);
+  assert.equal(cancelled.vested, (12n * SLICE).toString());
+  assert.equal(cancelled.returned, (STEP_AMOUNT - 12n * SLICE).toString());
+  assert.equal(cancelled.status, "cancelled");
+  assert.equal(cancelled.nextUnlockDate, 0);
+
+  // Cancelled before the start: frozen at the start date, nothing ever vests.
+  const early = computeVestingView(stepped({ pausingDate: START, cancelled: true }), START + 30 * STEP_SECONDS);
+  assert.equal(early.vested, "0");
+  assert.equal(early.returned, STEP_AMOUNT.toString());
+  assert.equal(early.status, "complete");
+});
+
+test("linear and quadratic views carry no next unlock", () => {
+  const linear = computeVestingView(parsed(), START + DAY);
+  assert.equal(linear.nextUnlockDate, 0);
+  assert.equal(linear.nextUnlockAmount, "0");
+  const quadratic = computeVestingView(parsed({ curveType: 1 }), START + DAY);
+  assert.equal(quadratic.nextUnlockDate, 0);
+});
+
+test("parseVestingRow reads curve type 2 as a step count and the view follows", () => {
+  const row = parseVestingRow({ ...heliumRows[0], curveType: "2", durationWeeks: "24" });
+  assert.equal(row.curveType, 2);
+  assert.equal(row.durationWeeks, 24);
+  const view = computeVestingView(row, 1793836800 + STEP_SECONDS);
+  assert.equal(view.vested, (2500500000000000000000n / 24n).toString());
+  assert.equal(view.durationSeconds, 24 * STEP_SECONDS);
 });
 
 // ---- parseVestingRow ----

@@ -69,8 +69,8 @@ const percentOf = (part: bigint, whole: bigint): number => {
 const vestedPercent = (vesting: VestingView): number =>
   percentOf(toBigInt(vesting.vested), toBigInt(vesting.amount));
 
-// Amount vested at `at`, mirroring VestingPool._calculateVestedAmount (linear or quadratic);
-// a paused grant is frozen at its pausing date.
+// Amount vested at `at`, mirroring VestingPool._calculateVestedAmount (linear, quadratic or
+// monthly steps); a paused grant is frozen at its pausing date.
 const vestedAt = (vesting: VestingView, at: number): bigint => {
   const amount = toBigInt(vesting.amount);
   if (at < vesting.startDate) return 0n;
@@ -78,6 +78,11 @@ const vestedAt = (vesting: VestingView, at: number): bigint => {
   const elapsed = BigInt(Math.max(0, effective - vesting.startDate));
   const duration = BigInt(vesting.durationSeconds);
   if (elapsed >= duration) return amount;
+  if (vesting.curveType === 2) {
+    // durationWeeks is the step count for this curve, so the step length is duration / steps.
+    const steps = BigInt(vesting.durationWeeks);
+    return (amount * (elapsed / (duration / steps))) / steps;
+  }
   return vesting.curveType === 1
     ? (amount * elapsed * elapsed) / (duration * duration)
     : (amount * elapsed) / duration;
@@ -180,7 +185,7 @@ const claimErrorMessage = (error: unknown): string => {
 
 // ---- building blocks ----
 
-/** Local time inline, the UTC instant in the tooltip. */
+/** Local machine time everywhere: the day or the full timestamp inline, the full timestamp with its zone in the tooltip. */
 const LocalDate = ({ seconds, prefix, short }: { seconds: number; prefix?: string; short?: boolean }) => {
   const date = toDate(seconds);
   return (
@@ -189,7 +194,7 @@ const LocalDate = ({ seconds, prefix, short }: { seconds: number; prefix?: strin
         <span>{prefix}{short ? formatDay(seconds) : date.toLocaleString()}</span>
       </TooltipTrigger>
       <TooltipContent>
-        <p>{date.toISOString()}</p>
+        <p>{date.toLocaleString(undefined, { timeZoneName: "short" })}</p>
       </TooltipContent>
     </Tooltip>
   );
@@ -338,8 +343,17 @@ const ProgramHero = ({ summary, vestings, now }: ProgramHeroProps) => {
   const vested = toBigInt(summary.vested);
   const claimed = toBigInt(summary.claimed);
   const vestedPct = percentOf(vested, amount);
-  const accruing = vestings.filter((vesting) => vesting.status === "vesting");
+  // Step grants are not "per day": they get their own sentence below.
+  const accruing = vestings.filter((vesting) => vesting.status === "vesting" && vesting.curveType !== 2);
   const perDay = accruing.reduce((total, vesting) => total + dailyAccrual(vesting, now), 0n);
+  // The earliest upcoming monthly slice, and everything that unlocks at that same instant.
+  const nextUnlockDate = vestings.reduce(
+    (earliest, vesting) => (vesting.nextUnlockDate > 0 && (earliest === 0 || vesting.nextUnlockDate < earliest) ? vesting.nextUnlockDate : earliest),
+    0
+  );
+  const nextUnlockAmount = nextUnlockDate > 0
+    ? vestings.filter((vesting) => vesting.nextUnlockDate === nextUnlockDate).reduce((total, vesting) => total + toBigInt(vesting.nextUnlockAmount), 0n)
+    : 0n;
   // Grants with anything left to vest, including ones that have not started or are paused.
   const outstanding = vestings.filter((vesting) => !vesting.cancelled && toBigInt(vesting.locked) > 0n);
   const lastEnd = outstanding.reduce((latest, vesting) => Math.max(latest, vesting.endDate), 0);
@@ -348,6 +362,7 @@ const ProgramHero = ({ summary, vestings, now }: ProgramHeroProps) => {
   const nextStart = vestings
     .filter((vesting) => vesting.status === "not_started")
     .reduce((earliest, vesting) => (earliest === 0 ? vesting.startDate : Math.min(earliest, vesting.startDate)), 0);
+  const endNote = lastEnd > 0 ? ` Fully vested ${lastEndIsFloor ? "no earlier than" : "by"} ${formatDay(lastEnd)}.` : "";
 
   return (
     <div className="rounded-2xl overflow-hidden text-white" style={{ background: HERO_GRADIENT }}>
@@ -362,14 +377,18 @@ const ProgramHero = ({ summary, vestings, now }: ProgramHeroProps) => {
             <span className="ml-2 text-lg font-semibold text-white/60 md:text-xl">{TOKEN_SYMBOL}</span>
           </p>
           <p className="mt-3 text-sm text-white/60 md:text-base">
-            {perDay > 0n ? (
-              <>Vesting about {formatStrato(perDay)} over the next day.{lastEnd > 0 && ` Fully vested ${lastEndIsFloor ? "no earlier than" : "by"} ${formatDay(lastEnd)}.`}</>
+            {perDay > 0n || nextUnlockDate > 0 ? (
+              <>
+                {perDay > 0n && `Vesting about ${formatStrato(perDay)} over the next day. `}
+                {nextUnlockDate > 0 && `Next monthly unlock of ${formatStrato(nextUnlockAmount)} on ${formatDay(nextUnlockDate)}.`}
+                {endNote}
+              </>
             ) : nextStart > 0 ? (
               <>Vesting starts on {formatDay(nextStart)}.</>
             ) : vestedPct >= 100 ? (
               <>Everything has vested.</>
             ) : (
-              <>Nothing is vesting right now.{lastEnd > 0 && ` Fully vested ${lastEndIsFloor ? "no earlier than" : "by"} ${formatDay(lastEnd)}.`}</>
+              <>Nothing is vesting right now.{endNote}</>
             )}
           </p>
 
@@ -490,6 +509,11 @@ const VestingCard = ({ vesting, now, canPayFee, onClaim }: VestingCardProps) => 
           <Figure label="Unvested" value={formatAmount(vesting.locked)} />
         </div>
 
+        {vesting.nextUnlockDate > 0 && (
+          <p className="mt-4 text-xs text-muted-foreground">
+            Unlocks in equal monthly slices: the next {formatStrato(vesting.nextUnlockAmount)} on <LocalDate seconds={vesting.nextUnlockDate} />.
+          </p>
+        )}
         {paused && (
           <p className="mt-4 text-xs text-yellow-600">
             Accrual is paused since <LocalDate seconds={vesting.pausingDate} />. The end date moves out by the time paused.
