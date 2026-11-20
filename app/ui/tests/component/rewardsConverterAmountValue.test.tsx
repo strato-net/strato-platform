@@ -16,10 +16,10 @@ it.each<[bigint, string]>([
   [1551551500n, "0.0...1551 STRATO"],
   [1n, "0.0...1 STRATO"],
   [500000000000000000n, "0.50 STRATO"],
-  [0n, "0.00 STRATO"],
+  [0n, "0.0 STRATO"],
   // From one whole token up, the usual 2 to 6 decimals
   [10n ** 18n - 1n, "0.9999 STRATO"],
-  [10n ** 18n, "1.00 STRATO"],
+  [10n ** 18n, "1.0 STRATO"],
   [1234567891234567890000n, "1,234.567891 STRATO"],
 ])("shows %s as %s", (raw, text) => {
   expect(shown(raw)).toBe(text);

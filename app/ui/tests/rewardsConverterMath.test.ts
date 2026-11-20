@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  formatAmount,
   formatFraction,
   formatRate,
   formatRelevant,
@@ -120,14 +121,17 @@ test('rateToDecimal gives the full value and round-trips', () => {
   }
 });
 
-test('formatRate shows 4 decimals, rounded down', () => {
-  assert.equal(formatRate(E18), '1.0000');
+test('formatRate shows 4 decimals, rounded down, and one for a whole number', () => {
+  assert.equal(formatRate(E18), '1.0');
+  assert.equal(formatRate(25n * E18), '25.0');
+  assert.equal(formatRate(E18 + 1n), '1.0');
+  assert.equal(formatRate(E18 + 10n ** 14n), '1.0001');
   assert.equal(formatRate(333333333333333333n), '0.3333');
   assert.equal(formatRate(999999999999999999n), '0.9999');
   assert.equal(formatRate(12345678900000000000n), '12.3456');
   assert.equal(formatRate(500000000000000000n), '0.5000');
   assert.equal(formatRate(50000000000000000n), '0.0500');
-  assert.equal(formatRate(0n), '0.0000');
+  assert.equal(formatRate(0n), '0.0');
 });
 
 test('formatRate keeps the leading digits of a rate too small for 4 decimals, with dots for a long run of zeros', () => {
@@ -143,18 +147,33 @@ test('formatFraction keeps the leading digits of an amount below one token, at a
   assert.equal(formatFraction(500000000000000000n, 18), '0.50');
   assert.equal(formatFraction(1234567890000000n, 18), '0.001234');
   assert.equal(formatFraction(42n, 18), '0.0...42');
-  assert.equal(formatFraction(0n, 18), '0.00');
+  assert.equal(formatFraction(0n, 18), '0.0');
   assert.equal(formatFraction(500000n, 6), '0.50');
   assert.equal(formatFraction(42n, 6), '0.0...42');
   assert.equal(formatFraction(420n, 6), '0.00042');
 });
 
-test('formatShare shows 2 decimals from 1% up, rounded down, or a dash when the whole is zero', () => {
-  assert.equal(formatShare(4n * E18, 10n * E18), '40.00%');
-  assert.equal(formatShare(E18, E18), '100.00%');
+test('formatAmount shows 2 decimals up to the places given, rounded down, and one for a whole number', () => {
+  const strato = { address: '2'.repeat(40), symbol: 'STRATO', decimals: 18 };
+  assert.equal(formatAmount(1250n * E18, strato, 6), '1,250.0 STRATO');
+  assert.equal(formatAmount(E18, strato, 4), '1.0 STRATO');
+  assert.equal(formatAmount('0', strato, 4), '0.0 STRATO');
+  assert.equal(formatAmount(1250750000000000000000n, strato, 6), '1,250.75 STRATO');
+  assert.equal(formatAmount(1250500000000000000000n, strato, 6), '1,250.50 STRATO');
+  assert.equal(formatAmount('6992681116999999999999', strato, 6), '6,992.681116 STRATO');
+  assert.equal(formatAmount('6992681116999999999999', strato, 4), '6,992.6811 STRATO');
+  // Whole as far as it is shown
+  assert.equal(formatAmount(E18 + 1n, strato, 6), '1.0 STRATO');
+  assert.equal(formatAmount(1000001n * 10n ** 12n, strato, 6), '1.000001 STRATO');
+  assert.equal(formatAmount(5000000n, { ...strato, decimals: 6 }, 4), '5.0 STRATO');
+});
+
+test('formatShare shows 2 decimals from 1% up, rounded down, one for a whole number, or a dash when the whole is zero', () => {
+  assert.equal(formatShare(4n * E18, 10n * E18), '40.0%');
+  assert.equal(formatShare(E18, E18), '100.0%');
   assert.equal(formatShare(1505999n, 1000000n), '150.59%');
-  assert.equal(formatShare(1n, 100n), '1.00%');
-  assert.equal(formatShare(0n, E18), '0.00%');
+  assert.equal(formatShare(1n, 100n), '1.0%');
+  assert.equal(formatShare(0n, E18), '0.0%');
   assert.equal(formatShare(E18, 0n), '—');
 });
 
@@ -172,7 +191,7 @@ test('formatShare keeps the leading digits of a share below 1%, with dots for a 
   assert.equal(formatShare(10009n, whole), '0.0...1%');
   assert.equal(formatShare(1n, whole), '0.0...1%');
   // Under the 18th decimal of a percent nothing is left to show
-  assert.equal(formatShare(1n, whole * 10n), '0.00%');
+  assert.equal(formatShare(1n, whole * 10n), '0.0%');
 });
 
 test('shareToDecimal is the percentage to its 18th decimal, rounded down, or a dash when the whole is zero', () => {
@@ -239,7 +258,8 @@ test('funding to a coverage then shows that coverage as max convertible', () => 
     const rate = rateFromDecimal(rates[i % rates.length]);
     const hundredths = next(20000n) + 1n;
     const amount = fundingForCoverage((hundredths * E18) / 100n, supply, rate, 0n);
-    const expected = `${hundredths / 100n}.${(hundredths % 100n).toString().padStart(2, '0')}%`;
+    const cents = (hundredths % 100n).toString().padStart(2, '0');
+    const expected = `${hundredths / 100n}.${cents === '00' ? '0' : cents}%`;
     assert.equal(formatShare(maxConvertible(amount, rate), supply), expected, `supply ${supply} rate ${rate}`);
   }
 });

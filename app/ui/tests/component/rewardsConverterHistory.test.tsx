@@ -79,8 +79,8 @@ it("shows every amount in the short form of the convert card", async () => {
   const cells = rows.map((row) => Array.from(row.querySelectorAll("td")).slice(1).map((cell) => cell.textContent));
   expect(cells).toEqual([
     ["0.125 Rewards Points", "0.0...1551 STRATO", "0.0...1241"],
-    ["1.000000 Rewards Points", "0.3333 STRATO", "0.3333"],
-    ["4.00 Rewards Points", "4.00 STRATO", "1.0000"],
+    ["1.0 Rewards Points", "0.3333 STRATO", "0.3333"],
+    ["4.0 Rewards Points", "4.0 STRATO", "1.0"],
   ]);
 
   await waitFor(() => screen.getByText("6.125 Rewards Points"));

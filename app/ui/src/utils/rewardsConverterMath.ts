@@ -1,5 +1,6 @@
+import type { RewardsConverterToken } from '@strato/shared-types';
 import { WAD } from '../lib/constants.ts';
-import { formatWeiToDecimalHP, safeParseUnits } from './numberUtils.ts';
+import { formatBalance, formatWeiToDecimalHP, safeParseUnits } from './numberUtils.ts';
 
 // Amounts are raw token units and rates are STRATO per rewards token scaled by 1e18,
 // as the converter holds them. Everything rounds down, like the contract.
@@ -21,24 +22,32 @@ export const rateFromDecimal = (value: string): bigint => safeParseUnits(value, 
 export const rateToDecimal = (rate: bigint): string => formatWeiToDecimalHP(rate.toString(), 18);
 
 /**
- * A value at `decimals` decimals in short form, rounded down. From 1 up it has `places` decimals ("40.00").
- * Below 1 it runs to its first non-zero decimal and at most 3 digits after it, to `places` decimals at least
- * ("0.50", "0.001234"), and dots stand in for 4 or more zeros before that decimal ("0.0...1234").
+ * A value at `decimals` decimals in short form, rounded down. From 1 up it has `places` decimals ("40.25"),
+ * or one when those are all zeros ("40.0"). Below 1 it runs to its first non-zero decimal and at most 3
+ * digits after it, to `places` decimals at least ("0.50", "0.001234"), and dots stand in for 4 or more zeros
+ * before that decimal ("0.0...1234").
  */
 const shortDecimal = (value: bigint, places: number, decimals = 18): string => {
   const unit = 10n ** BigInt(decimals);
   const fraction = (value % unit).toString().padStart(decimals, '0');
   const zeros = fraction.search(/[1-9]/);
-  if (value >= unit || zeros < 0) return `${value / unit}.${fraction.slice(0, places)}`;
+  if (value >= unit || zeros < 0) return `${value / unit}.${fraction.slice(0, places).replace(/^0+$/, '0')}`;
   const digits = fraction.slice(zeros, zeros + 4).replace(/0+$/, '');
   return zeros < 4 ? `0.${`${fraction.slice(0, zeros)}${digits}`.padEnd(places, '0')}` : `0.0...${digits}`;
 };
 
-/** A rate in short form, 4 decimals at least ("0.3333", "0.0...7"). */
+/** A rate in short form, 4 decimals at least, or one for a whole number ("0.3333", "0.0...7", "1.0"). */
 export const formatRate = (rate: bigint): string => shortDecimal(rate, 4);
 
 /** A raw token amount below one whole token in short form, 2 decimals at least ("0.50", "0.0...42"). */
 export const formatFraction = (raw: bigint, decimals: number): string => shortDecimal(raw, 2, decimals);
+
+/**
+ * A raw amount of `token` with its symbol, rounded down to 2 to `places` decimals ("1,250.75 STRATO"), or to
+ * one when those are all zeros ("1,250.0 STRATO").
+ */
+export const formatAmount = (raw: bigint | string, { symbol, decimals }: RewardsConverterToken, places: number): string =>
+  formatBalance(raw, symbol, decimals, 2, places).replace(/\.0+ /, '.0 ');
 
 // `part` of `whole` as a percentage scaled by 1e18, rounded down
 const shareOf = (part: bigint, whole: bigint): bigint => (part * 100n * WAD) / whole;
@@ -47,7 +56,10 @@ const shareOf = (part: bigint, whole: bigint): bigint => (part * 100n * WAD) / w
 export const shareToDecimal = (part: bigint, whole: bigint): string =>
   whole === 0n ? '—' : `${formatWeiToDecimalHP(shareOf(part, whole).toString(), 18)}%`;
 
-/** `part` of `whole` as a percentage in short form, 2 decimals at least ("40.00%"); "—" when `whole` is zero. */
+/**
+ * `part` of `whole` as a percentage in short form, 2 decimals at least, or one for a whole number ("12.49%",
+ * "40.0%"); "—" when `whole` is zero.
+ */
 export const formatShare = (part: bigint, whole: bigint): string =>
   whole === 0n ? '—' : `${shortDecimal(shareOf(part, whole), 2)}%`;
 

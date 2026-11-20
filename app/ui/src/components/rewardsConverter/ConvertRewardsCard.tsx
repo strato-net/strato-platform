@@ -12,8 +12,8 @@ import NetworkFee, { FeeNotices } from "@/components/NetworkFee";
 import { useToast } from "@/hooks/use-toast";
 import { useConvertRewards, useRewardsConverterAccount } from "@/hooks/useRewardsConverter";
 import { REWARDS_CONVERT_CALLS } from "@/lib/constants";
-import { formatBalance, formatUnits, safeParseUnits } from "@/utils/numberUtils";
-import { maxConvertAmount, payoutFor } from "@/utils/rewardsConverterMath";
+import { formatUnits, safeParseUnits } from "@/utils/numberUtils";
+import { formatAmount, maxConvertAmount, payoutFor } from "@/utils/rewardsConverterMath";
 import AmountValue from "./AmountValue";
 import ConfirmConversionDialog from "./ConfirmConversionDialog";
 import RateValue from "./RateValue";
@@ -129,7 +129,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">Reserve</span>
                 <span className={reserveEmpty ? "text-destructive" : undefined}>
-                  {formatBalance(state.reserve, stratoToken.symbol, stratoToken.decimals, 2, 6)}
+                  {formatAmount(state.reserve, stratoToken, 6)}
                 </span>
               </div>
             </div>
@@ -173,14 +173,14 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
                 <div className="text-sm text-muted-foreground">
                   Balance:{" "}
                   {account
-                    ? formatBalance(account.balance, rewardsToken.symbol, rewardsToken.decimals, 2, 6)
+                    ? formatAmount(account.balance, rewardsToken, 6)
                     : <Loader2 className="inline h-3 w-3 animate-spin" />}
                 </div>
               )}
 
               {account && !paused && maxConvertible > 0n && balance > maxConvertible && (
                 <p className="text-sm text-yellow-600">
-                  Only {formatBalance(maxConvertible, rewardsToken.symbol, rewardsToken.decimals, 2, 6)}{" "}
+                  Only {formatAmount(maxConvertible, rewardsToken, 6)}{" "}
                   can be converted right now
                 </p>
               )}
