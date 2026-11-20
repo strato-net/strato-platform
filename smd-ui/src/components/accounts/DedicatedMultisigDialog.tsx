@@ -97,6 +97,7 @@ function IssueActions({
   transactionTimelock,
   approvalLifetime,
   cancellationProposed,
+  pendingPermissions,
   tokens,
   metadata,
 }: {
@@ -104,6 +105,8 @@ function IssueActions({
   issue: DedicatedIssue;
   disabled: boolean;
   cancellationProposed: boolean;
+  /** Headlines of open proposals that grant this proposal's target permission to spend. */
+  pendingPermissions: string[];
   requiredApprovals: number;
   transactionTimelock: number;
   /** The rules' approval lifetime in seconds, once read from the contract. */
@@ -330,7 +333,14 @@ function IssueActions({
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>This would fail right now</AlertTitle>
-          <AlertDescription>The contract would refuse it: {check.data}</AlertDescription>
+          <AlertDescription>
+            The contract would refuse it: {check.data}
+            {pendingPermissions.length && /allowance/i.test(check.data) ? (
+              <div className="mt-1">
+                An open proposal that grants this contract a token permission has not run yet: {pendingPermissions.join("; ")}. It may need to run first.
+              </div>
+            ) : null}
+          </AlertDescription>
         </Alert>
       ) : null}
       {executesOnApproval ? (
@@ -842,6 +852,10 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
                     (open) => strip0x(open.target) === strip0x(wallet.address) &&
                       open.functionName === "cancelIssue" && open.arguments[0] === issue.issueId
                   )}
+                  pendingPermissions={openIssues
+                    .filter((open) => open.issueId !== issue.issueId && open.functionName === "approve" &&
+                      strip0x(open.arguments[0] ?? "") === strip0x(issue.target))
+                    .map((open) => describeProposal(open, tokens, proposalMetadata).headline)}
                   tokens={tokens}
                   metadata={proposalMetadata}
                 />

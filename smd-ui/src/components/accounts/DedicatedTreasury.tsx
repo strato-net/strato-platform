@@ -108,7 +108,7 @@ function TokenAmount({
       <div className="flex gap-2">
         <Select value={token?.address ?? ""} onValueChange={setTokenAddress}>
           <SelectTrigger className="w-36"><SelectValue placeholder="Token" /></SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-w-[calc(100vw-2rem)]">
             {tokens.map((item) => (
               <SelectItem key={item.address} value={item.address} className="[overflow-wrap:anywhere]">{tokenLabel(item)}</SelectItem>
             ))}
@@ -695,7 +695,7 @@ export function DedicatedProtocolActionsTab({
               setStableAmounts(Array.from({ length: coinCount }, () => ""));
             }}>
               <SelectTrigger><SelectValue placeholder="Select a pool" /></SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-w-[calc(100vw-2rem)]">
                 {compatiblePools.map((pool) => (
                   <SelectItem key={pool.address} value={pool.address} className="[overflow-wrap:anywhere]">{pool.poolName} · 0x{pool.address}</SelectItem>
                 ))}
@@ -711,7 +711,7 @@ export function DedicatedProtocolActionsTab({
             <Label>Validator</Label>
             <Select value={validator} onValueChange={setValidator}>
               <SelectTrigger><SelectValue placeholder="Select a validator" /></SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-w-[calc(100vw-2rem)]">
                 {(staking.data?.validators ?? []).filter((item) => action === "unstake" || item.active).map((item) => (
                   <SelectItem key={item.address} value={item.address} className="[overflow-wrap:anywhere]">{item.name || `0x${item.address}`}</SelectItem>
                 ))}
@@ -802,7 +802,7 @@ export function DedicatedProtocolActionsTab({
                 <Label>Pool</Label>
                 <Select value={v3Pool} onValueChange={setV3Pool}>
                   <SelectTrigger><SelectValue placeholder="Select V3 pool" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-w-[calc(100vw-2rem)]">
                     {(v3.data?.pools ?? []).map((pool) => (
                       <SelectItem key={pool.address} value={pool.address} className="[overflow-wrap:anywhere]">
                         {pool.token0._symbol}/{pool.token1._symbol} · 0x{pool.address}
@@ -822,7 +822,7 @@ export function DedicatedProtocolActionsTab({
                 <Label>Owned V3 position</Label>
                 <Select value={tokenId} onValueChange={setTokenId}>
                   <SelectTrigger><SelectValue placeholder="Select position" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-w-[calc(100vw-2rem)]">
                     {(v3.data?.positions ?? []).map((position) => (
                       <SelectItem key={position.tokenId} value={position.tokenId} className="[overflow-wrap:anywhere]">
                         #{position.tokenId} · 0x{position.poolAddress}
