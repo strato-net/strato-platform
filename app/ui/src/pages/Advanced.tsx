@@ -47,7 +47,7 @@ const TAB_TITLES: Record<TopTab, string> = {
   psm: "PSM",
   "bad-debt": "Bad Debt",
   liquidations: "Liquidations",
-  "convert-rewards": "Convert Rewards",
+  "convert-rewards": "Convert Rewards → STRATO",
 };
 
 const Advanced = () => {
@@ -245,7 +245,7 @@ const Advanced = () => {
                     </TabsTrigger>
                     {converterConfigured && (
                       <TabsTrigger value="convert-rewards" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
-                        Convert Rewards
+                        Convert Rewards → STRATO
                       </TabsTrigger>
                     )}
                   </TabsList>
