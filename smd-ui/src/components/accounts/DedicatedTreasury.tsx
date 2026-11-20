@@ -922,7 +922,9 @@ export function DedicatedHistoryTab({
   tokens: TokenMetadata[];
   metadata: ProposalMetadata;
 }) {
-  const { data: history = [], isLoading } = useDedicatedHistory(wallet.address, wallet.setupHash, 30);
+  const [shown, setShown] = useState(30);
+  const { data: history = [], isLoading, isPlaceholderData } =
+    useDedicatedHistory(wallet.address, wallet.setupHash, shown);
   const { data: historyTokens = [] } = useTokenMetadata(
     history.flatMap((item) => [item.target, ...item.arguments])
   );
@@ -968,6 +970,11 @@ export function DedicatedHistoryTab({
         );
       })}
       {!history.length ? <p className="text-sm text-muted-foreground">No history yet.</p> : null}
+      {history.length >= shown || isPlaceholderData ? (
+        <Button variant="outline" size="sm" disabled={isPlaceholderData} onClick={() => setShown(shown + 30)}>
+          {isPlaceholderData ? "Loading…" : "Show older"}
+        </Button>
+      ) : null}
     </div>
   );
 }

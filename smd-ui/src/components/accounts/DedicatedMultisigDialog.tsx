@@ -1220,7 +1220,7 @@ export function DedicatedMultisigDialog({
           <DialogTitle>{wallet ? "Multisig wallet" : "Create multisig wallet"}</DialogTitle>
           <DialogDescription>
             {wallet
-              ? "Review and approve proposals, and manage signers."
+              ? "Manage funds, propose and approve actions, and administer signers and rules."
               : "Create a multisig wallet managed by the signers you choose."}
           </DialogDescription>
         </DialogHeader>

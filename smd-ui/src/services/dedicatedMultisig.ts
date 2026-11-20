@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { api } from "@/lib/api";
 import { formatVariadicArg, parseJsonExact, typedVariadicArg, variadicArgValue } from "@/lib/args";
@@ -839,6 +839,7 @@ export function useDedicatedHistory(walletAddress?: string | null, setupHash = "
     queryKey: ["dedicated-multisig-history", walletAddress, setupHash, limit],
     enabled: !!walletAddress,
     refetchInterval: 15_000,
+    placeholderData: keepPreviousData,
     queryFn: async (): Promise<DedicatedHistoryItem[]> => {
       const address = strip0x(walletAddress!);
       const factory = runtime.multisigFactoryAddress();
