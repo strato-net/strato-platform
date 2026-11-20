@@ -15,13 +15,6 @@
 //      sentinel and the two overflow checks) read the constant MAX_UINT128 instead.
 //  D4  The two EIP-712 typehash constants are wrapped in `bytes32(...)`: SolidVM types a
 //      bare hex literal as uint and rejects the assignment to bytes32.
-//  D5  A third curve, `curveType == 2`: monthly steps (STRATO tokenomics, 2026-11-20).
-//      For this curve `durationWeeks` is the NUMBER OF STEPS and one step is
-//      STEP_SECONDS = 2629800 s (365.25 days / 12). Nothing vests before the first step
-//      boundary; after k whole steps amount * k / steps is vested; the full amount at
-//      `steps` steps (the existing "elapsed >= duration" branch). The struct, the id
-//      hash and every other function are unchanged; `_addVesting` accepts the new
-//      type and `_calculateVestedAmount` gains the branch and `calculateSteps`.
 // Nothing else changes: every function, require, event, the struct layout, the EIP-712
 // id derivation (block.chainid + this), and the manager/claim rules are upstream's.
 import "../../abstract/ERC20/IERC20.sol";
@@ -66,9 +59,6 @@ contract record VestingPool {
     // D3: SolidVM has no type(uint128).max
     uint128 private constant MAX_UINT128 = 340282366920938463463374607431768211455;
 
-    // D5: one monthly step of curve type 2, 365.25 days / 12
-    uint64 private constant STEP_SECONDS = 2629800;
-
     address public immutable token;
     address public immutable poolManager;
 
@@ -91,7 +81,7 @@ contract record VestingPool {
     /// @param account The account for which the vesting is created
     /// @param curveType Type of the curve that should be used for the vesting
     /// @param managed Boolean that indicates if the vesting can be managed by the pool manager
-    /// @param durationWeeks The duration of the vesting in weeks (curve type 2: the number of monthly steps)
+    /// @param durationWeeks The duration of the vesting in weeks
     /// @param startDate The date when the vesting should be started (can be in the past)
     /// @param amount Amount of tokens that should be vested in atoms
     function addVesting(
@@ -118,7 +108,7 @@ contract record VestingPool {
     /// @param account The account for which the vesting is created
     /// @param curveType Type of the curve that should be used for the vesting
     /// @param managed Boolean that indicates if the vesting can be managed by the pool manager
-    /// @param durationWeeks The duration of the vesting in weeks (curve type 2: the number of monthly steps)
+    /// @param durationWeeks The duration of the vesting in weeks
     /// @param startDate The date when the vesting should be started (can be in the past)
     /// @param amount Amount of tokens that should be vested in atoms
     /// @param vestingId The id of the created vesting
@@ -131,7 +121,7 @@ contract record VestingPool {
         uint128 amount
     ) internal returns (bytes32 vestingId) {
         require(account != address(0), "Invalid account");
-        require(curveType < 3, "Invalid vesting curve"); // D5: 2 = monthly steps
+        require(curveType < 2, "Invalid vesting curve");
         vestingId = vestingHash(account, curveType, managed, durationWeeks, startDate, amount);
         require(vestings[vestingId].account == address(0), "Vesting id already used");
         // Check that enough tokens are available for the new vesting
@@ -270,10 +260,8 @@ contract record VestingPool {
     /// @return vestedAmount The amount in atoms of tokens vested
     function _calculateVestedAmount(Vesting storage vesting) internal view returns (uint128 vestedAmount) {
         require(vesting.startDate <= block.timestamp, "Vesting not active yet");
-        // Convert vesting duration to seconds (D5: curve type 2 counts monthly steps)
-        uint64 durationSeconds = vesting.curveType == 2
-            ? uint64(vesting.durationWeeks) * STEP_SECONDS
-            : uint64(vesting.durationWeeks) * 7 * 24 * 60 * 60;
+        // Convert vesting duration to seconds
+        uint64 durationSeconds = uint64(vesting.durationWeeks) * 7 * 24 * 60 * 60;
         // If contract is paused use the pausing date to calculate amount
         uint64 vestedSeconds = vesting.pausingDate > 0
             ? vesting.pausingDate - vesting.startDate
@@ -287,9 +275,6 @@ contract record VestingPool {
         } else if (vesting.curveType == 1) {
             // Exponential vesting
             vestedAmount = calculateExponential(vesting.amount, vestedSeconds, durationSeconds);
-        } else if (vesting.curveType == 2) {
-            // D5: monthly steps
-            vestedAmount = calculateSteps(vesting.amount, vestedSeconds, vesting.durationWeeks);
         } else {
             // This is unreachable because it is not possible to add a vesting with an invalid curve type
             revert("Invalid curve type");
@@ -330,32 +315,12 @@ contract record VestingPool {
         return uint128(amount);
     }
 
-    /// @notice D5: Calculate vested token amount on a monthly step curve.
-    /// @dev Calculate vested amount in whole steps: targetAmount * completedSteps / steps,
-    ///      where completedSteps = elapsedTime / STEP_SECONDS (rounded down). Nothing is
-    ///      vested before the first boundary; the remainder of the integer division is
-    ///      paid with the final step, which _calculateVestedAmount handles as fully vested.
-    /// @param targetAmount Amount of tokens that is being vested
-    /// @param elapsedTime Time that has elapsed for the vesting
-    /// @param steps Number of monthly steps of the vesting (never 0 here: a 0-step vesting is fully vested)
-    /// @return Tokens that have been vested on a step curve
-    function calculateSteps(
-        uint128 targetAmount,
-        uint64 elapsedTime,
-        uint16 steps
-    ) internal pure returns (uint128) {
-        uint256 completedSteps = uint256(elapsedTime) / uint256(STEP_SECONDS);
-        uint256 amount = (uint256(targetAmount) * completedSteps) / uint256(steps);
-        require(amount <= MAX_UINT128, "Overflow in curve calculation");
-        return uint128(amount);
-    }
-
     /// @notice Calculate the id for a vesting based on its parameters.
     /// @dev The id is a EIP-712 based hash of the vesting.
     /// @param account The account for which the vesting was created
     /// @param curveType Type of the curve that is used for the vesting
     /// @param managed Indicator if the vesting is managed by the pool manager
-    /// @param durationWeeks The duration of the vesting in weeks (curve type 2: the number of monthly steps)
+    /// @param durationWeeks The duration of the vesting in weeks
     /// @param startDate The date when the vesting started (can be in the future)
     /// @param amount Amount of tokens that are vested in atoms
     /// @return vestingId Id of a vesting based on its parameters

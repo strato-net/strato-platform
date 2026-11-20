@@ -58,13 +58,11 @@ contract record VestingPoolManager is Ownable {
         pool.addVesting(account, curveType, managed, durationWeeks, startDate, amount);
     }
 
-    /// @notice Create one vesting per account, all with the same shape.
-    /// @dev One tokenomics category per call: same curve, managed flag, duration and start.
-    ///      curveType 2 (monthly steps) counts `durationWeeks` as the number of steps.
+    /// @notice Create one linear vesting per account, all with the same shape.
+    /// @dev One tokenomics category per call: same managed flag, duration and start.
     function addVestings(
         address[] accounts,
         uint128[] amounts,
-        uint8 curveType,
         bool managed,
         uint16 durationWeeks,
         uint64 startDate
@@ -73,7 +71,7 @@ contract record VestingPoolManager is Ownable {
         require(accounts.length == amounts.length, "VestingPoolManager: length mismatch");
         require(!(managed && durationWeeks == 0), "VestingPoolManager: managed vesting needs a duration");
         for (uint256 i = 0; i < accounts.length; i++) {
-            pool.addVesting(accounts[i], curveType, managed, durationWeeks, startDate, amounts[i]);
+            pool.addVesting(accounts[i], 0, managed, durationWeeks, startDate, amounts[i]);
         }
     }
 

@@ -7,7 +7,6 @@ import "../Util.sol";
 // and routed into AdminRegistry.castVoteOnIssue on the owner; with this test contract
 // as owner that surfaces as a generic revert, so those cases assert state, not messages.
 contract Describe_VestingPoolManager {
-    uint constant STEP = 2629800; // D5: one monthly step, 365.25 days / 12
     uint constant WEEK = 604800;
     uint128 constant MAX128 = 340282366920938463463374607431768211455;
     Token strato;
@@ -69,7 +68,7 @@ contract Describe_VestingPoolManager {
         uint128[] memory amounts = new uint128[](2);
         accounts[0] = address(alice); amounts[0] = 400;
         accounts[1] = address(bob); amounts[1] = 600;
-        manager.addVestings(accounts, amounts, 0, false, 104, start);
+        manager.addVestings(accounts, amounts, false, 104, start);
         require(pool.totalTokensInVesting() == 1000, "batch committed " + string(pool.totalTokensInVesting()));
         bytes32 aliceId = pool.vestingHash(address(alice), 0, false, 104, start, 400);
         bytes32 bobId = pool.vestingHash(address(bob), 0, false, 104, start, 600);
@@ -88,13 +87,13 @@ contract Describe_VestingPoolManager {
         uint128[] memory amounts = new uint128[](1);
         accounts[0] = address(alice); accounts[1] = address(bob); amounts[0] = 400;
         bool reverted = false;
-        try manager.addVestings(accounts, amounts, 0, false, 104, start) { } catch { reverted = true; }
+        try manager.addVestings(accounts, amounts, false, 104, start) { } catch { reverted = true; }
         require(reverted, "length mismatch accepted");
         require(pool.totalTokensInVesting() == 0, "mismatch changed state");
         address[] memory none = new address[](0);
         uint128[] memory noAmounts = new uint128[](0);
         reverted = false;
-        try manager.addVestings(none, noAmounts, 0, false, 104, start) { } catch { reverted = true; }
+        try manager.addVestings(none, noAmounts, false, 104, start) { } catch { reverted = true; }
         require(reverted, "empty batch accepted");
         require(pool.totalTokensInVesting() == 0, "empty batch changed state");
     }
@@ -192,7 +191,7 @@ contract Describe_VestingPoolManager {
         uint128[] memory amounts = new uint128[](1);
         accounts[0] = address(alice); amounts[0] = 1000;
         reverted = false;
-        try manager.addVestings(accounts, amounts, 0, true, 0, start) { } catch { reverted = true; }
+        try manager.addVestings(accounts, amounts, true, 0, start) { } catch { reverted = true; }
         require(reverted, "managed zero-week batch accepted");
         require(pool.totalTokensInVesting() == 0, "batch changed state");
         manager.addVesting(address(alice), 0, false, 0, start, 1000); // instant unlock / sweep shape
@@ -214,73 +213,5 @@ contract Describe_VestingPoolManager {
         pool.claimVestedTokens(tId, address(this), MAX128);
         require(strato.balanceOf(address(this)) == uncommitted, "treasury received " + string(strato.balanceOf(address(this))));
         require(pool.tokensAvailableForVesting() == 0, "pool still has uncommitted tokens");
-    }
-
-    // ---- D5 monthly steps through the manager ----
-
-    function it_batches_step_vestings_with_the_curve_argument() public {
-        uint64 start = uint64(block.timestamp);
-        address[] memory accounts = new address[](2);
-        uint128[] memory amounts = new uint128[](2);
-        accounts[0] = address(alice); amounts[0] = 2400;
-        accounts[1] = address(bob); amounts[1] = 1200;
-        manager.addVestings(accounts, amounts, 2, true, 24, start);
-        require(pool.totalTokensInVesting() == 3600, "batch committed " + string(pool.totalTokensInVesting()));
-        bytes32 aliceId = pool.vestingHash(address(alice), 2, true, 24, start, 2400);
-        bytes32 bobId = pool.vestingHash(address(bob), 2, true, 24, start, 1200);
-        fastForward(STEP - 1);
-        (uint128 va0, ) = pool.calculateVestedAmount(aliceId);
-        require(va0 == 0, "nothing before the first step: " + string(va0));
-        fastForward(1);
-        (uint128 va1, ) = pool.calculateVestedAmount(aliceId);
-        (uint128 vb1, ) = pool.calculateVestedAmount(bobId);
-        require(va1 == 100 && vb1 == 50, "first slice per account: " + string(va1) + " / " + string(vb1));
-        fastForward(23 * STEP);
-        (uint128 vaEnd, ) = pool.calculateVestedAmount(aliceId);
-        (uint128 vbEnd, ) = pool.calculateVestedAmount(bobId);
-        require(vaEnd == 2400 && vbEnd == 1200, "complete: " + string(vaEnd) + " / " + string(vbEnd));
-    }
-
-    function it_cancels_a_step_grant_through_the_manager() public {
-        uint64 start = uint64(block.timestamp);
-        manager.addVesting(address(alice), 2, true, 24, start, 2400);
-        bytes32 aliceId = pool.vestingHash(address(alice), 2, true, 24, start, 2400);
-        fastForward(7 * STEP + STEP / 2);
-        manager.cancelVesting(aliceId);
-        (uint128 vested, ) = pool.calculateVestedAmount(aliceId);
-        require(vested == 700, "seven slices kept: " + string(vested));
-        require(pool.tokensAvailableForVesting() == 10000 - 700, "the rest is free: " + string(pool.tokensAvailableForVesting()));
-        alice.do(address(pool), "claimVestedTokens", aliceId, address(alice), MAX128);
-        require(strato.balanceOf(address(alice)) == 700, "alice claims the seven slices: " + string(strato.balanceOf(address(alice))));
-    }
-
-    function it_rejects_unknown_curves_through_the_manager() public {
-        uint64 start = uint64(block.timestamp);
-        bool reverted = false;
-        try manager.addVesting(address(alice), 3, true, 24, start, 1000) { } catch { reverted = true; }
-        require(reverted, "curve 3 accepted");
-        address[] memory accounts = new address[](1);
-        uint128[] memory amounts = new uint128[](1);
-        accounts[0] = address(alice); amounts[0] = 1000;
-        reverted = false;
-        try manager.addVestings(accounts, amounts, 3, true, 24, start) { } catch { reverted = true; }
-        require(reverted, "curve 3 batch accepted");
-        require(pool.totalTokensInVesting() == 0, "state changed");
-    }
-
-    function it_rejects_managed_zero_step_grants() public {
-        uint64 start = uint64(block.timestamp);
-        bool reverted = false;
-        try manager.addVesting(address(alice), 2, true, 0, start, 1000) { } catch { reverted = true; }
-        require(reverted, "managed zero-step addVesting accepted");
-        address[] memory accounts = new address[](1);
-        uint128[] memory amounts = new uint128[](1);
-        accounts[0] = address(alice); amounts[0] = 1000;
-        reverted = false;
-        try manager.addVestings(accounts, amounts, 2, true, 0, start) { } catch { reverted = true; }
-        require(reverted, "managed zero-step batch accepted");
-        require(pool.totalTokensInVesting() == 0, "state changed");
-        manager.addVesting(address(alice), 2, false, 0, start, 1000); // an unmanaged timelock on the step curve is fine
-        require(pool.totalTokensInVesting() == 1000, "unmanaged zero-step rejected");
     }
 }

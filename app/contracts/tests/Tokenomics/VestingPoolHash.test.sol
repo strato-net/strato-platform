@@ -71,11 +71,4 @@ contract Describe_VestingPoolHash {
         require(keccak256(abi.encodePacked("EIP712Domain(uint256 chainId,address verifyingContract)")) == bytes32(0x47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218), "domain typehash");
         require(keccak256(abi.encodePacked("Vesting(address account,uint8 curveType,bool managed,uint16 durationWeeks,uint64 startDate,uint128 amount)")) == bytes32(0x43838b5ce9ca440d1ac21b07179a1fdd88aa2175e5ea103f6e37aa6d18ce78ad), "vesting typehash");
     }
-
-    function it_calculate_correct_hash_for_step_vesting() public {
-        uint64 startDate = uint64(block.timestamp) + 1000;
-        bytes32 expected = _calculateVestingHash(address(user2), 2, true, 24, startDate, _units(200000));
-        require(pool.vestingHash(address(user2), 2, true, 24, startDate, _units(200000)) == expected, "step hash");
-        require(pool.vestingHash(address(user2), 0, true, 24, startDate, _units(200000)) != expected, "curve type not hashed");
-    }
 }
