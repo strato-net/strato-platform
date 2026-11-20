@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Gift } from "lucide-react";
+import { AlertTriangle, Gift, Loader2 } from "lucide-react";
 import type { RewardsConverterInfo } from "@strato/shared-types";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
@@ -47,6 +47,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
   const maxAmount = maxConvertAmount(balance, maxConvertible);
   const amount = safeParseUnits(amountInput, rewardsToken.decimals);
   const payout = payoutFor(amount, BigInt(state.rate));
+  const reserveEmpty = BigInt(state.reserve) === 0n;
   const canConvert = !paused && amount > 0n && amount <= maxAmount && payout > 0n;
   const formDisabled = !isLoggedIn || paused || convert.isPending;
 
@@ -118,7 +119,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
               </div>
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">Reserve</span>
-                <span className={BigInt(state.reserve) === 0n ? "text-destructive" : undefined}>
+                <span className={reserveEmpty ? "text-destructive" : undefined}>
                   {formatBalance(state.reserve, stratoToken.symbol, stratoToken.decimals, 2, 6)}
                 </span>
               </div>
@@ -146,7 +147,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
                   Balance:{" "}
                   {account
                     ? formatBalance(account.balance, rewardsToken.symbol, rewardsToken.decimals, 2, 6)
-                    : "…"}
+                    : <Loader2 className="inline h-3 w-3 animate-spin" />}
                 </div>
               )}
 
@@ -157,7 +158,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
                 </p>
               )}
 
-              {amount > 0n && (
+              {amount > 0n && !reserveEmpty && (
                 <div className="text-sm text-muted-foreground">
                   You receive:{" "}
                   {formatBalance(payout, stratoToken.symbol, stratoToken.decimals, 2, 6)}

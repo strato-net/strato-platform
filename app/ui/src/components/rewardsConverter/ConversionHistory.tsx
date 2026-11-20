@@ -46,7 +46,7 @@ const ConversionHistory = ({ rewardsToken, stratoToken }: ConversionHistoryProps
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="space-y-4">
       <CollapsibleTrigger asChild>
-        <Button variant="ghost" className="w-full flex items-center justify-between px-2">
+        <Button variant="ghost" className="w-full flex items-center justify-start gap-2 px-2">
           <span className="text-lg font-semibold">Conversion History</span>
           <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
         </Button>
