@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { shortenHex } from "@/lib/utils";
 import { useUserSearch } from "@/services/accounts";
 import { strip0x } from "@/services/userWallets";
 
@@ -88,11 +87,11 @@ export function AddressInput({
                 onChange(u.username, strip0x(u.address));
                 setShowSuggestions(false);
               }}
-              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+              className="flex w-full flex-wrap items-center justify-between gap-x-2 px-3 py-2 text-left text-sm hover:bg-accent"
             >
               <span className="font-medium">{u.username}</span>
-              <span className="font-mono text-xs text-muted-foreground">
-                {shortenHex(u.address)}
+              <span className="break-all font-mono text-xs text-muted-foreground">
+                0x{strip0x(u.address)}
               </span>
             </button>
           ))}

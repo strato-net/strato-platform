@@ -196,10 +196,15 @@ contract MultisigFactory is Ownable {
         );
         _setup.deployed = true;
         factoryWallets[address(wallet)] = true;
+        // An event logs a stored array as empty, so emit a copy.
+        address[] signers = new address[](setupSigners[_setupHash].length);
+        for (uint i = 0; i < signers.length; i++) {
+            signers[i] = setupSigners[_setupHash][i];
+        }
         emit MultisigCreated(
             address(wallet),
             _setup.creator,
-            setupSigners[_setupHash],
+            signers,
             _setup.requiredApprovals,
             _setup.transactionTimelock,
             _setup.initialVersion,

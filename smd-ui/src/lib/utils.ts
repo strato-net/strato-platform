@@ -20,6 +20,30 @@ export function secondsToHuman(total?: number): string {
   return parts.join(" ");
 }
 
+/** A waiting period in words, e.g. "7 days", "1 day 12 hours" or "none". */
+export function formatWaitingPeriod(seconds: number): string {
+  if (!seconds) return "none";
+  const unit = (count: number, name: string) => count ? `${count} ${name}${count === 1 ? "" : "s"}` : "";
+  return [
+    unit(Math.floor(seconds / 86400), "day"),
+    unit(Math.floor((seconds % 86400) / 3600), "hour"),
+    unit(Math.floor((seconds % 3600) / 60), "minute"),
+    unit(seconds % 60, "second"),
+  ].filter(Boolean).join(" ");
+}
+
+/** A chain time in seconds as a local date and time with its time zone. */
+export function formatDateTime(seconds: number): string {
+  return new Date(seconds * 1000).toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
 /** Format a block/tx timestamp (ISO string or epoch) for display. */
 export function formatTimestamp(ts?: string | number): string {
   if (ts == null || ts === "") return "—";

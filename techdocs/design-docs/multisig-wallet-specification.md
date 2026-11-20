@@ -167,15 +167,48 @@ An issue is valid only in the epoch in which it was created. Any epoch increment
 
 Expired or invalidated issues do not block recreation of the same proposal; the new issue receives a new nonce.
 
-Queued issues can be cancelled by a normal M-of-N issue whose execution bypasses the
-transaction timelock. Upgrade cancellation uses the same immediate-on-quorum rule.
+A signer may withdraw their own approval at any time before execution. Withdrawing from a
+queued issue takes it below M, so its timelock ends and it returns to collecting approvals
+under its original `ISSUE_APPROVAL_LIFETIME` deadline; reaching M again starts a fresh, full
+timelock. A signer who withdrew may approve again. This lets one approver stop an issue they
+approved in error.
+
+The cost is accepted and intended. A queued issue accepts no further approvals, so it holds
+exactly M of them and any one withdrawal takes it below M. An approver can therefore withdraw
+and approve again shortly before each timelock ends, and keep doing so until the issue
+expires at its `ISSUE_APPROVAL_LIFETIME` deadline. On a wallet with a non-zero timelock, one
+of the first M approvers can in this way prevent an issue they approved from executing,
+including an issue that removes them.
+
+This fails closed: nothing executes without M approvals or before its timelock, and no funds
+move. It blocks an action; it cannot cause one. Signers avoid it by having M cooperating
+signers propose and approve first, after which the remaining signers hold no approval to
+withdraw. A wallet with a zero timelock is not affected, because an issue executes on the
+approval that reaches M.
+
+Two alternatives were considered and not adopted. Accepting further approvals on a queued
+issue would stop the delay, but lets the set of approvers change late in the timelock, when
+other signers have no time to respond. Barring a signer who withdrew from approving the same
+issue again would bound the delay to one timelock per signer, but leaves an honest signer who
+withdrew in error unable to restore their approval.
+
+If the withdrawal comes after that original deadline has already passed, which can happen
+when a long timelock carries the issue beyond 30 days from its creation, the issue does not
+return to collecting approvals: it is expired at once and must be proposed again.
+
+Queued issues can also be cancelled by a normal M-of-N issue whose execution bypasses the
+transaction timelock. Upgrade cancellation and nomination revocation use the same
+immediate-on-quorum rule.
 
 ### Signer and threshold changes
 
 Signer or threshold changes:
 
-- Must leave `2 <= M < N`.
-- May update signers and M atomically.
+- Change one thing per issue: add one signer (`nominateSigner`), remove one signer
+  (`removeSigner`), or change M (`setRequiredApprovals`). No signer list is passed after
+  setup, so the cost of a change does not depend on the number of signers.
+- Must leave at least three signers and `2 <= M < N`.
+- A removal sets M in the same step, so no intermediate configuration exists.
 - Increment the configuration epoch.
 - Invalidate all unexecuted issues from the previous epoch.
 - Clear any pending upgrade.
@@ -183,16 +216,17 @@ Signer or threshold changes:
 
 New signers use two-phase activation:
 
-1. The current quorum executes an issue that nominates exactly one signer. The resulting configuration must contain every current signer plus the nominee, with M unchanged.
+1. The current quorum executes an issue that nominates exactly one account. Adding never changes M.
 2. The nominee proves control by confirming from the nominated address.
-3. Confirmation applies the recorded configuration immediately, after rechecking `2 <= M < N`; no second quorum vote is required.
+3. Confirmation appends the nominee to the signer set immediately; no second quorum vote is required.
 
 Nominations are bound to the epoch in which they were created. They expire, can be revoked by quorum, and are voided by any epoch increment.
 
 Replacing a signer requires two proposals: add and activate the replacement first, then
-remove the old signer through a separate configuration proposal.
+remove the old signer.
 
-Removals that add no new signer need no nomination and apply when the issue executes.
+A removal needs no nomination and applies when the issue executes. The last signer in the
+stored list takes the removed signer's position, so stored signer order is not stable.
 
 ### Transaction timelock changes
 
@@ -247,6 +281,16 @@ This review is the only control for this class of defect. It should be enforced 
 automated check in the contract test suite and in the publication step before the first
 new logic version is published; until then it is a manual step.
 
+The health check only shows that a version can read the wallet's signer data, so a version
+must also pass `MultisigPublication.test.sol` before it is published. That test runs every
+governance action on a wallet created on the candidate and on a wallet upgraded to it from
+the published version, whose source is kept in `tests/Admin/published/`. One upgraded wallet
+is created by the published registry logic, so it sits on the shell real wallets have. On
+the current shell the test also checks that `executeUpgrade` is refused while an issue
+executes, which fails if a candidate renames `multisigExecuting`. When a version is
+published, add its source there and point the test's upgrade case at it; when the registry
+logic is replaced, add its source and shell there too.
+
 ### Scheduling
 
 A quorum-executed wallet self-call schedules an upgrade.
@@ -284,7 +328,9 @@ review described above.
 
 ### Execution
 
-Anyone may call `executeUpgrade`.
+Anyone may call `executeUpgrade`, except while an issue is executing. The shell reads the
+logic's `multisigExecuting` flag and refuses, so a contract called by an issue cannot apply
+a pending upgrade in the middle of that issue. Every logic version must keep that flag name.
 
 Execution:
 
@@ -482,7 +528,7 @@ The upgrade controls reduce accidental and look-alike upgrades. They do not prot
 - Boolean, integer, string, address, and contract-typed arguments cannot collide or be substituted after proposal.
 - Issues expire under the applicable approval or execution window and can be recreated.
 - Pending nominees expire and can be revoked.
-- Nominee confirmation applies exactly the recorded configuration.
+- Nominee confirmation adds exactly the nominated account and leaves M unchanged.
 - Open nominations are voided by an epoch increment.
 - Timelock changes wait out the old timelock, respect the maximum, and increment the epoch.
 

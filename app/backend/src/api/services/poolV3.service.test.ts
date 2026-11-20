@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { V3_POOL_APY_MIN_TVL_USD } from "../../config/poolV3Constants";
+import { filterRegisteredPools } from "../helpers/swapping.helper";
+import { cirrus } from "../../utils/appApiHelper";
+import * as config from "../../config/config";
 import {
   attributableInputs,
   buildPool,
+  fetchRawPools,
   timeWeightedTvlUSD,
   PoolWindow,
   RawV3Pool,
@@ -239,4 +243,44 @@ test("attributableInputs mixes swaps executed at different liquidity levels per 
   // a position of 100 units: full share of the $1k swap at L=100, a tenth of the $10k swap at L=1000
   const mixed = [swapIn1(1_000n, 100n), swapIn1(10_000n, 1000n)];
   assert.deepEqual(attributableInputs(mixed, 100n), { in0: 0n, in1: 2_000n * WAD });
+});
+
+test("only pools recorded by the V3 factory are listed", () => {
+  const lookalike = makeRaw({ address: "d".repeat(40) });
+
+  assert.deepEqual(
+    filterRegisteredPools([makeRaw(), lookalike], [{ value: `0x${POOL.toUpperCase()}` }]),
+    [makeRaw()]
+  );
+  assert.deepEqual(filterRegisteredPools([makeRaw(), lookalike], []), []);
+});
+
+test("a listing reads the whole factory record and keeps only recorded pools", async () => {
+  const late = "e".repeat(40);
+  const listed = [makeRaw(), makeRaw({ address: "d".repeat(40) }), makeRaw({ address: late })];
+  const filler = Array.from({ length: 499 }, (_, index) => ({ value: index.toString(16).padStart(40, "0") }));
+  const calls: { path: string; params: Record<string, string> }[] = [];
+  const originalGet = cirrus.get;
+  cirrus.get = (async (_token: string, path: string, options: { params: Record<string, string> }) => {
+    calls.push({ path, params: options.params });
+    if (!path.endsWith("PoolV3Factory-allPools")) return { data: listed };
+    return { data: options.params.offset === "0" ? [...filler, { value: POOL }] : [{ value: late }] };
+  }) as typeof cirrus.get;
+  try {
+    assert.deepEqual((await fetchRawPools("token")).map((pool) => pool.address), [POOL, late]);
+    const record = calls.filter((call) => call.path.endsWith("PoolV3Factory-allPools"));
+    assert.deepEqual(record.map((call) => call.params.offset), ["0", "500"]);
+    for (const call of record) {
+      assert.equal(call.params.address, `eq.${config.poolV3Factory}`);
+      assert.equal(call.params.order, "key.asc");
+    }
+    assert.equal(calls[0].params.poolV3Factory, `eq.${config.poolV3Factory}`);
+
+    calls.length = 0;
+    assert.equal((await fetchRawPools("token", {}, { anyFactory: true })).length, 3);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].params.poolV3Factory, undefined);
+  } finally {
+    cirrus.get = originalGet;
+  }
 });

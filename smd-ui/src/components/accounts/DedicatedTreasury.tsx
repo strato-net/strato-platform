@@ -17,13 +17,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
-import { shortenHex } from "@/lib/utils";
+import { CopyableAddress } from "@/components/CopyButton";
 import { describeProposal, type ProposalMetadata } from "@/services/dedicatedProposal";
 import {
+  buildDedicatedProtocolCall,
   buildDedicatedProtocolWorkflow,
+  type DedicatedCall,
+  useDedicatedCallCheck,
   type DedicatedProtocolAction,
   type MultisigWalletSummary,
   useDedicatedHistory,
@@ -37,6 +39,7 @@ import {
   useV3AllowanceMetadata,
 } from "@/services/protocolMetadata";
 import {
+  tokenLabel,
   useMyTokens,
   useTokenMetadata,
   useTokenAllowances,
@@ -73,9 +76,12 @@ const ACTION_LABELS: Record<DedicatedProtocolAction, string> = {
   v3Collect: "Collect V3 position",
 };
 
+/** Balance for display: at most six decimals, never rounded up. */
 const humanBalance = (token: TokenBalance) => {
   try {
-    return formatUnits(BigInt(token.balance), token.decimals);
+    const [whole, fraction = ""] = formatUnits(BigInt(token.balance), token.decimals).split(".");
+    const shown = fraction.slice(0, 6).replace(/0+$/, "");
+    return shown ? `${whole}.${shown}` : whole;
   } catch {
     return token.balance;
   }
@@ -87,7 +93,9 @@ function TokenAmount({
   setTokenAddress,
   amount,
   setAmount,
+  balanceLabel,
 }: {
+  balanceLabel: string;
   tokens: TokenBalance[];
   tokenAddress: string;
   setTokenAddress: (value: string) => void;
@@ -100,9 +108,9 @@ function TokenAmount({
       <div className="flex gap-2">
         <Select value={token?.address ?? ""} onValueChange={setTokenAddress}>
           <SelectTrigger className="w-36"><SelectValue placeholder="Token" /></SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-w-[calc(100vw-2rem)]">
             {tokens.map((item) => (
-              <SelectItem key={item.address} value={item.address}>{item.symbol}</SelectItem>
+              <SelectItem key={item.address} value={item.address} className="[overflow-wrap:anywhere]">{tokenLabel(item)}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -110,7 +118,7 @@ function TokenAmount({
       </div>
       {token ? (
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs text-muted-foreground">Balance: {humanBalance(token)} {token.symbol}</span>
+          <span className="text-xs text-muted-foreground">{balanceLabel}: {humanBalance(token)} {tokenLabel(token)}</span>
           <div className="flex gap-1">
             {PERCENTS.map((percent) => (
               <Button
@@ -187,7 +195,7 @@ export function DedicatedTreasuryTab({
       });
       setDepositAmount("");
       refresh();
-      toast.success(`Deposited ${depositAmount} ${token.symbol}`);
+      toast.success(`Deposited ${depositAmount} ${tokenLabel(token)}`);
     } catch (error: any) {
       toast.error(error?.message || "Deposit failed");
     } finally {
@@ -241,17 +249,17 @@ export function DedicatedTreasuryTab({
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Label>Available holdings</Label>
+        <div className="text-xs font-medium text-muted-foreground">Holdings</div>
         {treasury.length ? treasury.map((token) => (
           <div key={token.address} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-            <span className="font-medium">{token.symbol}</span>
+            <span className={token.verified ? "font-medium" : "break-all text-muted-foreground"}>{tokenLabel(token)}</span>
             <span className="font-mono text-xs">{humanBalance(token)}</span>
           </div>
         )) : <p className="text-sm text-muted-foreground">This multisig wallet holds no tokens yet.</p>}
       </div>
 
       <div className="space-y-2">
-        <Label>Staked and supplied</Label>
+        <div className="text-xs font-medium text-muted-foreground">Staked and supplied</div>
         {positionsLoading || v3PositionsLoading ? <p className="text-sm text-muted-foreground">Loading positions…</p> : (
           <>
             {hasStaking ? (
@@ -277,9 +285,7 @@ export function DedicatedTreasuryTab({
                     <div className="font-medium">
                       {pool ? `${pool.token0._symbol}/${pool.token1._symbol}` : "V3"} position
                     </div>
-                    <div className="font-mono text-xs text-muted-foreground">
-                      {shortenHex(position.poolAddress, 6, 4)}
-                    </div>
+                    <CopyableAddress value={position.poolAddress} className="text-xs text-muted-foreground" />
                   </div>
                   <span className="font-mono text-xs">NFT #{position.tokenId}</span>
                 </div>
@@ -292,36 +298,61 @@ export function DedicatedTreasuryTab({
         )}
       </div>
 
-      <Separator />
-      <div className="space-y-3">
-        <div className="font-medium">Deposit into treasury</div>
-        <TokenAmount
-          tokens={sourceTokens}
-          tokenAddress={depositToken}
-          setTokenAddress={setDepositToken}
-          amount={depositAmount}
-          setAmount={setDepositAmount}
-        />
-        <Button disabled={disabled || !canSubmit || busy !== "" || !sourceTokens.length} onClick={() => void deposit()}>
-          {busy === "deposit" ? "Depositing…" : "Deposit"}
-        </Button>
-      </div>
-
-      <Separator />
-      <div className="space-y-3">
-        <div className="font-medium">Propose transfer</div>
-        <TokenAmount
-          tokens={treasury}
-          tokenAddress={transferToken}
-          setTokenAddress={setTransferToken}
-          amount={transferAmount}
-          setAmount={setTransferAmount}
-        />
-        <Label>Recipient</Label>
-        <Input value={recipient} onChange={(event) => setRecipient(event.target.value)} className="font-mono text-xs" />
-        <Button disabled={disabled || !canSubmit || busy !== "" || !treasury.length} onClick={() => void proposeTransfer()}>
-          {busy === "transfer" ? "Creating proposal…" : "Propose transfer"}
-        </Button>
+      <div className="space-y-2">
+        <div className="text-xs font-medium text-muted-foreground">Move tokens</div>
+        <div className="space-y-3 rounded-lg border p-4">
+          <div className="space-y-1">
+            <div className="font-medium">Deposit from your account</div>
+            <div className="text-sm text-muted-foreground">
+              Sends tokens from your connected account to this multisig wallet. It runs straight away, with no approvals.
+            </div>
+          </div>
+          <TokenAmount
+            tokens={sourceTokens}
+            tokenAddress={depositToken}
+            setTokenAddress={setDepositToken}
+            amount={depositAmount}
+            setAmount={setDepositAmount}
+            balanceLabel="Your balance"
+          />
+          <Button
+            disabled={disabled || !canSubmit || busy !== "" || !sourceTokens.length || !depositAmount}
+            onClick={() => void deposit()}
+          >
+            {busy === "deposit" ? "Depositing…" : "Deposit"}
+          </Button>
+        </div>
+        <div className="space-y-3 rounded-lg border p-4">
+          <div className="space-y-1">
+            <div className="font-medium">Send from this multisig wallet</div>
+            <div className="text-sm text-muted-foreground">
+              Creates a proposal. The tokens move once enough signers approve it.
+            </div>
+          </div>
+          <TokenAmount
+            tokens={treasury}
+            tokenAddress={transferToken}
+            setTokenAddress={setTransferToken}
+            amount={transferAmount}
+            setAmount={setTransferAmount}
+            balanceLabel="Multisig wallet balance"
+          />
+          <div className="space-y-1">
+            <Label>Recipient</Label>
+            <Input
+              value={recipient}
+              onChange={(event) => setRecipient(event.target.value)}
+              placeholder="0x…"
+              className="font-mono text-xs"
+            />
+          </div>
+          <Button
+            disabled={disabled || !canSubmit || busy !== "" || !treasury.length || !transferAmount || !recipient}
+            onClick={() => void proposeTransfer()}
+          >
+            {busy === "transfer" ? "Creating proposal…" : "Propose transfer"}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -389,8 +420,9 @@ export function DedicatedProtocolActionsTab({
   );
   const selectedAsset = cdp.data?.assets.find((item) => item.asset === asset);
   const selectedValidator = staking.data?.validators.find((item) => item.address === validator);
+  // A coin left blank is a coin not supplied.
   const stableRawAmounts = stableAmounts.map((value, index) =>
-    toRawUnits(value, selectedPool?.coins?.[index]?.customDecimals ?? 18)
+    toRawUnits(value.trim() || "0", selectedPool?.coins?.[index]?.customDecimals ?? 18)
   );
   const selectedStableCoin = selectedPool?.coins?.[Number(coinIndex)];
   let callAmount = amount;
@@ -457,6 +489,21 @@ export function DedicatedProtocolActionsTab({
                 { token: selectedV3Pool?.token1.address ?? "", amount: callAmount2 },
               ].filter((item) => positiveInteger(item.amount))
             : [];
+  // The pool takes the paired token at its current ratio and refuses if that exceeds the maximum.
+  let requiredTokenA: bigint | null = null;
+  try {
+    const reserveB = BigInt(selectedPool?.tokenB.poolBalance ?? "0");
+    if (effectiveAction === "addLiquidity" && reserveB > 0n && positiveInteger(callAmount)) {
+      requiredTokenA = (BigInt(callAmount) * BigInt(selectedPool?.tokenA.poolBalance ?? "0")) / reserveB;
+    }
+  } catch {
+    requiredTokenA = null;
+  }
+  const targetName = action === "stake" || action === "unstake" ? "Staking"
+    : action === "cdpDeposit" || action === "cdpBorrow" ? "CDP engine"
+      : action.startsWith("v3") ? "V3 position manager"
+        : selectedPool?.poolName ?? "";
+  const spenderName = action === "cdpDeposit" ? "CDP vault" : targetName;
   const allowances = useTokenAllowances(
     approvalSpecs.map((item) => item.token),
     wallet.address,
@@ -540,31 +587,57 @@ export function DedicatedProtocolActionsTab({
         !allowances.isSuccess)) throw new Error("Still checking token permissions");
   };
 
+  const protocolInput = {
+    target,
+    validator: selectedValidator?.address,
+    asset: selectedAsset?.asset,
+    amount: callAmount,
+    amount2: callAmount2,
+    amount3: callAmount3,
+    amounts: action.startsWith("v3") ? [callAmount4] : stableRawAmounts,
+    receiver: strip0x(wallet.address),
+    coinIndex,
+    pool: selectedV3Pool?.address,
+    tokenId,
+    tickLower,
+    tickUpper,
+    liquidity,
+  };
+  // The action itself, once the form is complete: dry-run as the multisig wallet so the
+  // target contract says whether it would succeed. Its permissions must be in place first.
+  let actionCall: DedicatedCall | null = null;
+  try {
+    validate();
+    actionCall = buildDedicatedProtocolCall(effectiveAction as DedicatedProtocolAction, protocolInput);
+  } catch {
+    actionCall = null;
+  }
+  const checkable = !!actionCall && (!approvalSpecs.length || (allowances.isSuccess && !missingApprovals.length));
+  const check = useDedicatedCallCheck(wallet.address, checkable ? actionCall : null);
+
   const propose = async () => {
     try {
       validate();
-      const workflow = buildDedicatedProtocolWorkflow(effectiveAction as DedicatedProtocolAction, {
-        target,
-        validator: selectedValidator?.address,
-        asset: selectedAsset?.asset,
-        amount: callAmount,
-        amount2: callAmount2,
-        amount3: callAmount3,
-        amounts: action.startsWith("v3") ? [callAmount4] : stableRawAmounts,
-        receiver: strip0x(wallet.address),
-        coinIndex,
-        pool: selectedV3Pool?.address,
-        tokenId,
-        tickLower,
-        tickUpper,
-        liquidity,
-      }, missingApprovals.map((item) => ({
+      const workflow = buildDedicatedProtocolWorkflow(effectiveAction as DedicatedProtocolAction, protocolInput, missingApprovals.map((item) => ({
         token: item.token,
         spender: approvalSpender,
         amount: item.amount,
       })));
       setBusy(true);
-      for (const call of workflow) await actions.proposeCall(call, wallet.signerUsername || undefined);
+      let created = 0;
+      try {
+        for (const call of workflow) {
+          await actions.proposeCall(call, wallet.signerUsername || undefined);
+          created++;
+        }
+      } catch (error: any) {
+        // A later step can fail after earlier ones are already on-chain; say so, so nothing is proposed twice.
+        throw created
+          ? new Error(`${created} of ${workflow.length} proposals were created before this stopped: ${
+              error?.message || "transaction failed"
+            } Check the Proposals tab before trying again.`)
+          : error;
+      }
       toast.success("Proposal created", {
         description: missingApprovals.length
           ? `${missingApprovals.length} permission proposal${missingApprovals.length === 1 ? " was" : "s were"} created before the protocol action.`
@@ -614,56 +687,69 @@ export function DedicatedProtocolActionsTab({
 
       {(standardPoolAction || stableAction) ? (
         <div className="space-y-1">
-          <Label>Pool</Label>
-          <Select value={poolAddress} onValueChange={(value) => {
-            setPoolAddress(value);
-            const coinCount = (pools.data ?? []).find((pool) => pool.address === value)?.coins?.length ?? 0;
-            setStableAmounts(Array.from({ length: coinCount }, () => ""));
-          }}>
-            <SelectTrigger><SelectValue placeholder="Select a pool" /></SelectTrigger>
-            <SelectContent>
-              {compatiblePools.map((pool) => (
-                <SelectItem key={pool.address} value={pool.address}>{pool.poolName} · {shortenHex(pool.address, 6, 4)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="space-y-1">
+            <Label>Pool</Label>
+            <Select value={poolAddress} onValueChange={(value) => {
+              setPoolAddress(value);
+              const coinCount = (pools.data ?? []).find((pool) => pool.address === value)?.coins?.length ?? 0;
+              setStableAmounts(Array.from({ length: coinCount }, () => ""));
+            }}>
+              <SelectTrigger><SelectValue placeholder="Select a pool" /></SelectTrigger>
+              <SelectContent className="max-w-[calc(100vw-2rem)]">
+                {compatiblePools.map((pool) => (
+                  <SelectItem key={pool.address} value={pool.address} className="[overflow-wrap:anywhere]">{pool.poolName} · 0x{pool.address}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       ) : null}
 
       {(action === "stake" || action === "unstake") ? (
         <>
-          <Label>Validator</Label>
-          <Select value={validator} onValueChange={setValidator}>
-            <SelectTrigger><SelectValue placeholder="Select a validator" /></SelectTrigger>
-            <SelectContent>
-              {(staking.data?.validators ?? []).filter((item) => action === "unstake" || item.active).map((item) => (
-                <SelectItem key={item.address} value={item.address}>{item.name || shortenHex(item.address, 6, 4)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="space-y-1">
+            <Label>Validator</Label>
+            <Select value={validator} onValueChange={setValidator}>
+              <SelectTrigger><SelectValue placeholder="Select a validator" /></SelectTrigger>
+              <SelectContent className="max-w-[calc(100vw-2rem)]">
+                {(staking.data?.validators ?? []).filter((item) => action === "unstake" || item.active).map((item) => (
+                  <SelectItem key={item.address} value={item.address} className="[overflow-wrap:anywhere]">{item.name || `0x${item.address}`}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           {amountField(`Amount (${staking.data?.tokenSymbol ?? "token"})`, amount, setAmount)}
         </>
       ) : null}
 
       {(action === "cdpDeposit" || action === "cdpBorrow") ? (
         <>
-          <Label>Collateral asset</Label>
-          <Select value={asset} onValueChange={setAsset}>
-            <SelectTrigger><SelectValue placeholder="Select collateral" /></SelectTrigger>
-            <SelectContent>
-              {(cdp.data?.assets ?? []).filter((item) => item.isSupported && !item.isPaused).map((item) => (
-                <SelectItem key={item.asset} value={item.asset}>{item.symbol}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="space-y-1">
+            <Label>Collateral asset</Label>
+            <Select value={asset} onValueChange={setAsset}>
+              <SelectTrigger><SelectValue placeholder="Select collateral" /></SelectTrigger>
+              <SelectContent>
+                {(cdp.data?.assets ?? []).filter((item) => item.isSupported && !item.isPaused).map((item) => (
+                  <SelectItem key={item.asset} value={item.asset}>{item.symbol}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           {amountField(action === "cdpDeposit" ? `Collateral amount (${selectedAsset?.symbol ?? "token"})` : "USDST amount", amount, setAmount)}
         </>
       ) : null}
 
-      {effectiveAction === "addLiquidity" ? (
+      {effectiveAction === "addLiquidity" && selectedPool ? (
         <>
-          {amountField(`${selectedPool?.tokenB._symbol ?? "Token B"} amount`, amount, setAmount)}
-          {amountField(`Maximum ${selectedPool?.tokenA._symbol ?? "Token A"} amount`, amount2, setAmount2)}
+          {amountField(`${selectedPool.tokenB._symbol} amount`, amount, setAmount)}
+          {amountField(`Maximum ${selectedPool.tokenA._symbol} amount`, amount2, setAmount2)}
+          {requiredTokenA !== null ? (
+            <p className="text-xs text-muted-foreground">
+              At the current pool price this needs about{" "}
+              {humanBalance({ balance: requiredTokenA.toString(), decimals: selectedPool.tokenA.customDecimals } as TokenBalance)}{" "}
+              {selectedPool.tokenA._symbol}. Leave some room above it in case the price moves.
+            </p>
+          ) : null}
         </>
       ) : null}
       {effectiveAction === "removeLiquidity" ? (
@@ -710,22 +796,21 @@ export function DedicatedProtocolActionsTab({
 
       {v3Action ? (
         <>
-          <p className="break-all font-mono text-xs text-muted-foreground">
-            PositionManagerV3: {v3.data?.positionManagerAddress || "Loading…"}
-          </p>
           {action === "v3Mint" ? (
             <>
-              <Label>Pool</Label>
-              <Select value={v3Pool} onValueChange={setV3Pool}>
-                <SelectTrigger><SelectValue placeholder="Select V3 pool" /></SelectTrigger>
-                <SelectContent>
-                  {(v3.data?.pools ?? []).map((pool) => (
-                    <SelectItem key={pool.address} value={pool.address}>
-                      {pool.token0._symbol}/{pool.token1._symbol} · {shortenHex(pool.address, 6, 4)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-1">
+                <Label>Pool</Label>
+                <Select value={v3Pool} onValueChange={setV3Pool}>
+                  <SelectTrigger><SelectValue placeholder="Select V3 pool" /></SelectTrigger>
+                  <SelectContent className="max-w-[calc(100vw-2rem)]">
+                    {(v3.data?.pools ?? []).map((pool) => (
+                      <SelectItem key={pool.address} value={pool.address} className="[overflow-wrap:anywhere]">
+                        {pool.token0._symbol}/{pool.token1._symbol} · 0x{pool.address}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 {amountField("Lower tick", tickLower, setTickLower)}
                 {amountField("Upper tick", tickUpper, setTickUpper)}
@@ -733,17 +818,19 @@ export function DedicatedProtocolActionsTab({
             </>
           ) : (
             <>
-              <Label>Owned V3 position</Label>
-              <Select value={tokenId} onValueChange={setTokenId}>
-                <SelectTrigger><SelectValue placeholder="Select position" /></SelectTrigger>
-                <SelectContent>
-                  {(v3.data?.positions ?? []).map((position) => (
-                    <SelectItem key={position.tokenId} value={position.tokenId}>
-                      #{position.tokenId} · {shortenHex(position.poolAddress, 6, 4)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-1">
+                <Label>Owned V3 position</Label>
+                <Select value={tokenId} onValueChange={setTokenId}>
+                  <SelectTrigger><SelectValue placeholder="Select position" /></SelectTrigger>
+                  <SelectContent className="max-w-[calc(100vw-2rem)]">
+                    {(v3.data?.positions ?? []).map((position) => (
+                      <SelectItem key={position.tokenId} value={position.tokenId} className="[overflow-wrap:anywhere]">
+                        #{position.tokenId} · 0x{position.poolAddress}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </>
           )}
           {action === "v3Mint" || action === "v3Increase" ? (
@@ -770,17 +857,41 @@ export function DedicatedProtocolActionsTab({
         </>
       ) : null}
 
-      {approvalSpecs.length ? (
-        <div className="rounded-md border p-3 text-sm">
-          <div className="flex justify-between gap-2">
-            <span>Token permissions needed</span>
-            <Badge variant={missingApprovals.length ? "outline" : "secondary"}>
-              {allowances.isSuccess ? `${missingApprovals.length} required` : "Checking…"}
-            </Badge>
+      {validAddress(target) ? (
+        <div className="space-y-2 rounded-lg border p-4 text-sm">
+          <div className="font-medium">What will be proposed</div>
+          <div className="text-xs text-muted-foreground">
+            Contract: {targetName ? `${targetName} ` : ""}<CopyableAddress value={target} />
           </div>
-          <p className="text-xs text-muted-foreground">
-            This also creates {missingApprovals.length} permission proposal{missingApprovals.length === 1 ? "" : "s"}.
-          </p>
+          {approvalSpecs.length && validAddress(approvalSpender) ? (
+            <>
+              <div className="text-xs text-muted-foreground">
+                Allowed to spend: {spenderName ? `${spenderName} ` : ""}<CopyableAddress value={approvalSpender} />
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {!approvalSpecs.every((item) => validAddress(item.token) && positiveInteger(item.amount))
+                  ? "Choose the token and amount to see which permissions are needed."
+                  : allowances.isSuccess
+                  ? missingApprovals.length
+                    ? `Plus ${missingApprovals.length} token permission proposal${missingApprovals.length === 1 ? "" : "s"}, to be approved first.`
+                    : "No extra token permission is needed."
+                  : "Checking token permissions…"}
+              </div>
+            </>
+          ) : null}
+          <div className={`text-xs ${check.data ? "text-destructive" : "text-muted-foreground"}`}>
+            {!actionCall
+              ? "Complete the fields to check that this would succeed."
+              : !checkable
+                ? "It can be checked once its token permissions are approved."
+                : check.isLoading
+                  ? "Checking that this would succeed…"
+                  : check.isError
+                    ? "Could not check whether this would succeed."
+                    : check.data
+                      ? `This would fail right now: ${check.data}`
+                      : "Checked: this would succeed right now."}
+          </div>
         </div>
       ) : null}
       {(staking.isError || cdp.isError || pools.isError || (v3Action && v3.isError)) ? (
@@ -789,12 +900,20 @@ export function DedicatedProtocolActionsTab({
           <AlertDescription>Could not load protocol data. Nothing was proposed.</AlertDescription>
         </Alert>
       ) : null}
-      <Button className="w-full" disabled={disabled || !action || busy} onClick={() => void propose()}>
+      <Button className="w-full" disabled={disabled || !action || busy || !validAddress(target)} onClick={() => void propose()}>
         {busy ? "Creating proposal…" : action ? `Propose ${ACTION_LABELS[action]}` : "Select an action"}
       </Button>
     </div>
   );
 }
+
+const HISTORY_OUTCOMES = {
+  dismissed: "Not executed: dismissed by its proposer.",
+  cancelled: "Not executed: cancelled by the signers.",
+  superseded: "Not executed: cancelled when the signers or rules changed.",
+  withdrawn: "Approval withdrawn.",
+  unqueued: "Waiting period ended: approvals dropped below the number needed.",
+};
 
 export function DedicatedHistoryTab({
   wallet,
@@ -805,7 +924,9 @@ export function DedicatedHistoryTab({
   tokens: TokenMetadata[];
   metadata: ProposalMetadata;
 }) {
-  const { data: history = [], isLoading } = useDedicatedHistory(wallet.address, 30);
+  const [shown, setShown] = useState(30);
+  const { data: history = [], isLoading, isPlaceholderData } =
+    useDedicatedHistory(wallet.address, wallet.setupHash, shown);
   const { data: historyTokens = [] } = useTokenMetadata(
     history.flatMap((item) => [item.target, ...item.arguments])
   );
@@ -819,31 +940,45 @@ export function DedicatedHistoryTab({
   return (
     <div className="space-y-2">
       {history.map((item) => {
-        const description = describeProposal(item, allTokens, { ...metadata, historical: true });
+        const proposal = item.outcome ? describeProposal(item, allTokens, { ...metadata, historical: true }) : null;
+        const description = {
+          headline: proposal?.headline ?? item.headline,
+          addresses: [...(proposal?.addresses ?? []), ...(item.account ? [item.account] : [])],
+        };
         return (
-          <div key={`${item.transactionHash}:${item.issueId}`} className="rounded-md border p-3 text-sm">
+          <div key={item.key} className="rounded-md border p-3 text-sm">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-medium">{description.headline}</span>
+            <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{description.headline}</span>
             <span className="text-xs text-muted-foreground">{item.timestamp ? new Date(item.timestamp).toLocaleString() : ""}</span>
           </div>
+          {item.outcome && item.outcome !== "executed" ? (
+            <div className="text-xs text-muted-foreground">{HISTORY_OUTCOMES[item.outcome]}</div>
+          ) : null}
           {description.addresses.map((entry) => (
-            <div key={`${entry.label}:${entry.value}`} className="font-mono text-xs break-all">
-              {entry.label}: {entry.value}
+            <div key={`${entry.label}:${entry.value}`} className="text-xs">
+              {entry.label}: <CopyableAddress value={entry.value} />
             </div>
           ))}
-          <details className="mt-2 text-xs">
-            <summary className="cursor-pointer text-muted-foreground">Technical details</summary>
-            <div className="mt-2 space-y-1 font-mono break-all">
-              <div>Target: {item.target}</div>
-              <div>Function: {item.functionName}</div>
-              <div>Arguments: {JSON.stringify(item.arguments)}</div>
-              <div>Proposal ID: {item.issueId}</div>
-            </div>
-          </details>
+          {item.outcome ? (
+            <details className="mt-2 text-xs">
+              <summary className="cursor-pointer text-muted-foreground">Technical details</summary>
+              <div className="mt-2 space-y-1 font-mono break-all">
+                <div>Target: {item.target}</div>
+                <div>Function: {item.functionName}</div>
+                <div>Arguments: {JSON.stringify(item.arguments)}</div>
+                <div>Proposal ID: {item.issueId}</div>
+              </div>
+            </details>
+          ) : null}
         </div>
         );
       })}
-      {!history.length ? <p className="text-sm text-muted-foreground">No completed proposals.</p> : null}
+      {!history.length ? <p className="text-sm text-muted-foreground">No history yet.</p> : null}
+      {history.length >= shown || isPlaceholderData ? (
+        <Button variant="outline" size="sm" disabled={isPlaceholderData} onClick={() => setShown(shown + 30)}>
+          {isPlaceholderData ? "Loading…" : "Show older"}
+        </Button>
+      ) : null}
     </div>
   );
 }
