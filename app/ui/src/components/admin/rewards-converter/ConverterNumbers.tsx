@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, Loader2 } from "lucide-react";
 import type { RewardsConverterAdminStats, RewardsConverterInfo } from "@strato/shared-types";
 import { truncateAddress } from "@/utils/numberUtils";
 import { formatCoverage, formatRate, rateToDecimal } from "@/utils/rewardsConverterMath";
@@ -34,6 +34,7 @@ const ConverterNumbers = ({ state, stats }: {
   stats: RewardsConverterAdminStats | undefined;
 }) => {
   const { rewardsToken, stratoToken } = state;
+  const loading = <Loader2 className="inline h-4 w-4 animate-spin" />;
   const rate = BigInt(state.rate);
   const rateUnit = `${stratoToken.symbol} per Rewards Point`;
 
@@ -62,16 +63,16 @@ const ConverterNumbers = ({ state, stats }: {
           <CopyButton address={state.address} />
         </div>
       </Stat>
-      <Stat label="Total Burned">{stats ? formatTokenAmount(stats.totalBurned, rewardsToken) : "—"}</Stat>
-      <Stat label={`Total ${stratoToken.symbol} Paid`}>{stats ? formatTokenAmount(stats.totalPaid, stratoToken) : "—"}</Stat>
-      <Stat label="Outstanding Supply">{stats ? formatTokenAmount(stats.outstandingSupply, rewardsToken) : "—"}</Stat>
-      <Stat label="Coverage">{stats ? formatCoverage(stats.coverage) : "—"}</Stat>
+      <Stat label="Total Burned">{stats ? formatTokenAmount(stats.totalBurned, rewardsToken) : loading}</Stat>
+      <Stat label={`Total ${stratoToken.symbol} Paid`}>{stats ? formatTokenAmount(stats.totalPaid, stratoToken) : loading}</Stat>
+      <Stat label="Outstanding Supply">{stats ? formatTokenAmount(stats.outstandingSupply, rewardsToken) : loading}</Stat>
+      <Stat label="Coverage">{stats ? formatCoverage(stats.coverage) : loading}</Stat>
       <Stat label="Total Funded (net of withdrawals)">
         {stats ? (
           <Hover tip={`Withdrawn: ${formatTokenAmount(stats.totalWithdrawn, stratoToken)}`}>
             {formatTokenAmount(stats.totalFunded, stratoToken)}
           </Hover>
-        ) : "—"}
+        ) : loading}
       </Stat>
     </div>
   );
