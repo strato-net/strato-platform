@@ -75,7 +75,7 @@ export const rewardsConverterService = {
     return data;
   },
 
-  async fundReserve(amount: bigint): Promise<GovernedCallResult> {
+  async fundReserve(amount: bigint): Promise<TransactionResponse> {
     const { data } = await api.post("/rewards-converter/admin/fund-reserve", { amount: amount.toString() });
     return data;
   },

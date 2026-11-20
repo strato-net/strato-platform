@@ -348,18 +348,25 @@ export const withdrawConverterReserve = (
   amount: string
 ) => governedCall(accessToken, userAddress, converterCall("withdrawReserve", { to, amount }));
 
-/** Funding: a governed STRATO mint straight to the converter. */
+/** Funding: the caller sends its own STRATO straight to the converter. */
 export const fundConverterReserve = async (
   accessToken: string,
   userAddress: string,
   amount: string
-): Promise<GovernedCallResult> => {
+): Promise<{ status: string; hash: string }> => {
   const address = constants.rewardsConverter;
   const { stratoToken } = await readConverter(accessToken, address, "stratoToken");
-  return governedCall(accessToken, userAddress, {
-    contractName: extractContractName(Token),
-    contractAddress: stratoToken,
-    method: "mint",
-    args: { to: address, amount },
-  });
+  const builtTx = await buildFunctionTx(
+    {
+      contractName: extractContractName(Token),
+      contractAddress: stratoToken,
+      method: "transfer",
+      args: { to: address, value: amount },
+    },
+    userAddress,
+    accessToken
+  );
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  );
 };

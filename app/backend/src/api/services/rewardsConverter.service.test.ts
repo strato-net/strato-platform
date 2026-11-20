@@ -59,31 +59,19 @@ const mockFeeRouter = (t: TestContext) =>
 const mockDetails = (t: TestContext) =>
   t.mock.method(bloc, "get", (async (_token: string, path: string) => ({
     status: 200,
-    data: path.includes(STRATO_TOKEN)
-      ? {
-          _contractName: "Proxy",
-          _functions: {
-            mint: {
-              _funcArgs: [
-                ["to", { index: 0, type: { tag: "Address" } }],
-                ["amount", { index: 1, type: { tag: "Int", signed: false, bytes: 32 } }],
-              ],
-            },
-          },
-        }
-      : {
-          _contractName: "Proxy",
-          _functions: {
-            setRate: { _funcArgs: [["newRate", { index: 0, type: { tag: "Int", signed: false, bytes: 32 } }]] },
-            pause: { _funcArgs: [] },
-            withdrawReserve: {
-              _funcArgs: [
-                ["amount", { index: 1, type: { tag: "Int", signed: false, bytes: 32 } }],
-                ["to", { index: 0, type: { tag: "Address" } }],
-              ],
-            },
-          },
+    data: {
+      _contractName: "Proxy",
+      _functions: {
+        setRate: { _funcArgs: [["newRate", { index: 0, type: { tag: "Int", signed: false, bytes: 32 } }]] },
+        pause: { _funcArgs: [] },
+        withdrawReserve: {
+          _funcArgs: [
+            ["amount", { index: 1, type: { tag: "Int", signed: false, bytes: 32 } }],
+            ["to", { index: 0, type: { tag: "Address" } }],
+          ],
         },
+      },
+    },
   })) as typeof bloc.get);
 
 /** Captures the submitted transactions and answers with the given castVoteOnIssue return. */
@@ -462,24 +450,22 @@ test("withdrawReserve votes with the recipient and amount in declared order", as
   });
 });
 
-test("funding is a governed mint of the converter's STRATO token to the converter", async (t) => {
+test("funding transfers the caller's STRATO to the converter, with no vote and no mint", async (t) => {
   mockFeeRouter(t);
-  mockDetails(t);
-  mockCirrus(t, {
-    "BlockApps-RewardsConverter": [{ stratoToken: STRATO_TOKEN }],
-    "BlockApps-AdminRegistry-IssueCreated": [{ issueId: "issue-3" }],
-  });
-  const bodies = mockSubmit(t, [false, "issue-3"]);
+  const calls = mockCirrus(t, { "BlockApps-RewardsConverter": [{ stratoToken: STRATO_TOKEN }] });
+  const bodies = mockSubmit(t);
 
   const result = await fundConverterReserve("access-token", USER, "1000000000000000000000");
 
-  assert.deepEqual(result, { status: "Success", hash: "0xhash", issueId: "issue-3", executed: false });
-  assert.deepEqual(JSON.parse(JSON.stringify(bodies[0].txs[0].payload.args)), {
-    _func: "mint",
-    _target: STRATO_TOKEN,
-    _args: [
-      { type: "address", value: `0x${CONVERTER}` },
-      { type: "uint256", value: "1000000000000000000000" },
-    ],
-  });
+  assert.equal(result.status, "Success");
+  assert.equal(result.hash, "0xhash");
+  assert.deepEqual(bodies[0].txs.map((tx: any) => tx.payload), [
+    {
+      contractName: "Token",
+      contractAddress: STRATO_TOKEN,
+      method: "transfer",
+      args: { to: CONVERTER, value: "1000000000000000000000" },
+    },
+  ]);
+  assert.equal(calls.filter((call) => call.path.includes("AdminRegistry")).length, 0);
 });

@@ -19,7 +19,7 @@ const FundReserveForm = ({ state }: { state: RewardsConverterInfo }) => {
       <CardHeader>
         <CardTitle className="text-lg">Fund Reserve</CardTitle>
         <CardDescription>
-          A governed mint of {symbol} to the converter.
+          Sends {symbol} from your account to the converter.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -39,7 +39,10 @@ const FundReserveForm = ({ state }: { state: RewardsConverterInfo }) => {
         >
           {fund.isPending ? "Submitting..." : "Fund Reserve"}
         </Button>
-        <GovernedCallNote result={fund.data} />
+        {/* A transfer has no vote: it has executed unless a wallet is still to sign it */}
+        <GovernedCallNote
+          result={fund.data && { ...fund.data, issueId: null, executed: fund.data.status !== "unsigned" }}
+        />
       </CardContent>
     </Card>
   );

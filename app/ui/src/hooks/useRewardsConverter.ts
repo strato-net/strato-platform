@@ -134,5 +134,12 @@ export const useWithdrawConverterReserve = () =>
   useGovernedCall(({ to, amount }: { to: string; amount: bigint }) =>
     rewardsConverterService.withdrawReserve(to, amount));
 
-/** Funding: a governed mint of a raw STRATO amount to the converter. */
-export const useFundConverterReserve = () => useGovernedCall(rewardsConverterService.fundReserve);
+/** Funding: sends a raw STRATO amount from the signed-in account to the converter. */
+export function useFundConverterReserve() {
+  const refresh = useRefreshConverter();
+  const { fetchTokens } = useUserTokens();
+  return useMutation({
+    mutationFn: rewardsConverterService.fundReserve,
+    onSuccess: () => Promise.all([refresh(), fetchTokens()]),
+  });
+}
