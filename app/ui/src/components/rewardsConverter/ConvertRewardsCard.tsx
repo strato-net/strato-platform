@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Gift } from "lucide-react";
+import { AlertTriangle, Gift, Loader2 } from "lucide-react";
 import type { RewardsConverterInfo } from "@strato/shared-types";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
@@ -147,7 +147,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
                   Balance:{" "}
                   {account
                     ? formatBalance(account.balance, rewardsToken.symbol, rewardsToken.decimals, 2, 6)
-                    : "…"}
+                    : <Loader2 className="inline h-3 w-3 animate-spin" />}
                 </div>
               )}
 

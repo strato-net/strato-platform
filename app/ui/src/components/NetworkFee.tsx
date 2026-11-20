@@ -1,11 +1,14 @@
+import { Loader2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTokenContext } from "@/context/TokenContext";
 import { describeFallback, describeFee, feeBalanceLow, feeCurrencySpend, feeShortfall } from "@/utils/feeUtils";
 
 /** The network fee for `calls` contract calls, as the signed-in user will pay it. */
 const NetworkFee = ({ calls = 1 }: { calls?: number }) => {
-  const { feeQuote, feeQuoteAt } = useTokenContext();
-  if (!feeQuote || !feeQuoteAt) return <>…</>;
+  const { feeQuote, feeQuoteAt, loadingUsdstBalance } = useTokenContext();
+  if (!feeQuote || !feeQuoteAt) {
+    return loadingUsdstBalance ? <Loader2 className="inline h-3 w-3 animate-spin" /> : <>…</>;
+  }
   return (
     <Tooltip>
       <TooltipTrigger asChild>
