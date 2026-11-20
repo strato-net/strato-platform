@@ -42,7 +42,7 @@ const ConverterNumbers = ({ state, stats }: {
   const rate = BigInt(state.rate);
   const maxConvertible = BigInt(state.maxConvertible);
   const supply = BigInt(stats?.outstandingSupply ?? 0);
-  const rateUnit = `${stratoToken.symbol} per Rewards Point`;
+  const rateUnit = `${stratoToken.symbol} / Point`;
 
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
