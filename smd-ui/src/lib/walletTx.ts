@@ -189,10 +189,15 @@ export function validateUnsignedTx(
   argumentNames?: string[]
 ): void {
   const d = tx.data;
-  if (expectedChainId !== null && String(d.chainId) !== String(expectedChainId)) {
+  if (expectedChainId === null) {
+    throw new Error("This network could not be identified, so nothing was signed.");
+  }
+  if (String(d.chainId) !== String(expectedChainId)) {
     throw new Error("The node returned a transaction for a different network, so it was not signed.");
   }
-  if (type !== "FUNCTION" && type !== "CONTRACT") return;
+  if (type !== "FUNCTION" && type !== "CONTRACT") {
+    throw new Error("This kind of transaction cannot be signed with an external wallet.");
+  }
 
   const expectedTarget = type === "FUNCTION"
     ? strip0x(String(payload.contractAddress ?? ""))
@@ -316,6 +321,7 @@ export async function signAndSubmitViaWallet(
 ): Promise<any> {
   const unsigned = await fetchUnsignedTxs(type, payload, userAddress, options?.username);
   if (unsigned.length === 0) throw new Error("The node did not return a transaction to sign. Try again.");
+  if (unsigned.length > 1) throw new Error("The node returned more than one transaction, so nothing was signed.");
   const userWalletAddress = options?.username
     ? deriveCanonicalUserAddress(options.username, await fetchUserRegistryCodeHash())
     : undefined;

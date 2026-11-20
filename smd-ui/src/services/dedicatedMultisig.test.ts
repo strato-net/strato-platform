@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  buildDedicatedHistory,
   buildDedicatedProtocolCall,
   buildDedicatedProtocolWorkflow,
   buildDedicatedCallPayload,
@@ -20,7 +21,8 @@ import {
 } from "./dedicatedProposal";
 import { functionArgs } from "./contracts";
 import { getMultisigConfigError, loadBackendConfig, runtime } from "@/lib/env";
-import { parseUnsignedArgument, validateUnsignedTx } from "@/lib/walletTx";
+import { api } from "@/lib/api";
+import { parseUnsignedArgument, signAndSubmitViaWallet, validateUnsignedTx } from "@/lib/walletTx";
 import { ADMIN_REGISTRY_ADDRESS, deriveCanonicalUserAddress } from "./userWallets";
 
 const wallet = "efa890674cad5e3a7640bb720c2a70bf3ae76709";
@@ -179,6 +181,104 @@ test("external wallets sign only the transaction they requested", () => {
   assert.throws(() => validateUnsignedTx(
     { ...unsigned, data: { ...wrapped, args: [`"${wallet}"`, '"setGroups"', "[[1],[2,3]]"] } }, "FUNCTION", lists, 123, spender
   ), /could not be verified/);
+});
+
+test("external wallets refuse what they cannot check as one requested transaction", async () => {
+  const payload = {
+    contractAddress: wallet,
+    method: "transfer",
+    args: {
+      to: { type: "address", value: signer },
+      value: { type: "uint256", value: "42" },
+    },
+  };
+  const unsigned = {
+    data: {
+      nonce: 1,
+      gasLimit: 600000,
+      to: wallet,
+      functionName: "transfer",
+      args: [`"${signer}"`, "42"],
+      network: "mercata",
+      chainId: 123,
+    },
+  };
+  assert.throws(() => validateUnsignedTx(unsigned, "FUNCTION", payload, null), /could not be identified/);
+  assert.throws(() => validateUnsignedTx(unsigned, "TRANSFER", payload, 123), /cannot be signed/);
+
+  const originalWindow = globalThis.window;
+  const originalPost = api.post;
+  let signed = 0;
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { ENV: { CHAIN_ID: 123 } } });
+  api.post = (async () => ({ data: [unsigned, unsigned] })) as typeof api.post;
+  try {
+    await assert.rejects(
+      signAndSubmitViaWallet(
+        { signTypedData: async () => { signed += 1; return "0x"; } } as never,
+        signer,
+        "FUNCTION",
+        payload
+      ),
+      /more than one transaction/
+    );
+    assert.equal(signed, 0);
+  } finally {
+    Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
+    api.post = originalPost;
+  }
+});
+
+test("history shows how each proposal ended and wallet events that are not proposals", () => {
+  const at = (minute: number) => `2026-11-20 03:${String(minute).padStart(2, "0")}:00 UTC`;
+  const event = (minute: number, event_name: string, attributes: Record<string, unknown>) => ({
+    event_name,
+    attributes,
+    block_timestamp: at(minute),
+    transaction_hash: `tx${minute}`,
+  });
+  const proposal = (minute: number, issueId: string, epoch: number) => event(minute, "IssueCreated", {
+    issueId,
+    epoch: String(epoch),
+    target: wallet,
+    functionName: "transfer",
+    arguments: `["${signer}", 1]`,
+  });
+  const history = buildDedicatedHistory([
+    proposal(9, "open", 2),
+    event(8, "ConfigurationAdvanced", { epoch: "2" }),
+    event(8, "SignerAdded", { signer, epoch: "2" }),
+    event(7, "UpgradeExecuted", { executor: signer, fromVersion: "6", targetVersion: "7", epoch: "1" }),
+    event(6, "IssueCancelled", { issueId: "cancelled" }),
+    event(5, "IssueDismissed", { issueId: "dismissed" }),
+    event(4, "IssueExecuted", { issueId: "executed", target: wallet, functionName: "transfer", arguments: "[]" }),
+    proposal(3, "left-open", 1),
+    proposal(3, "cancelled", 1),
+    proposal(2, "dismissed", 1),
+    proposal(2, "executed", 1),
+    event(1, "MultisigCreated", { wallet, creator: signer }),
+    event(0, "InitialSignerConfirmed", { signer: spender, confirmations: "2", totalSigners: "3" }),
+    event(0, "InitialSignerConfirmed", { signer, confirmations: "1", totalSigners: "3" }),
+    event(0, "MultisigSetupRegistered", { creator: signer }),
+  ], 30);
+
+  assert.deepEqual(
+    history.map((item) => [item.outcome ?? item.headline, item.issueId, item.timestamp]),
+    [
+      ["Signer joined", "", at(8)],
+      ["superseded", "left-open", at(8)],
+      ["Upgraded from version 6 to 7", "", at(7)],
+      ["cancelled", "cancelled", at(6)],
+      ["dismissed", "dismissed", at(5)],
+      ["executed", "executed", at(4)],
+      ["Multisig wallet created", "", at(1)],
+      ["Signer confirmed the setup (2 of 3)", "", at(0)],
+      ["Signer confirmed the setup (1 of 3)", "", at(0)],
+      ["Multisig wallet setup started", "", at(0)],
+    ]
+  );
+  assert.equal(new Set(history.map((item) => item.key)).size, history.length);
+  assert.deepEqual(history[1].arguments, [signer, "1"]);
+  assert.deepEqual(history[6].account, { label: "Created by", value: signer });
 });
 
 test("dedicated issue review flags unlimited approvals", () => {

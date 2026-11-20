@@ -907,6 +907,12 @@ export function DedicatedProtocolActionsTab({
   );
 }
 
+const HISTORY_OUTCOMES = {
+  dismissed: "Not executed: dismissed by its proposer.",
+  cancelled: "Not executed: cancelled by the signers.",
+  superseded: "Not executed: cancelled when the signers or rules changed.",
+};
+
 export function DedicatedHistoryTab({
   wallet,
   tokens,
@@ -916,7 +922,7 @@ export function DedicatedHistoryTab({
   tokens: TokenMetadata[];
   metadata: ProposalMetadata;
 }) {
-  const { data: history = [], isLoading } = useDedicatedHistory(wallet.address, 30);
+  const { data: history = [], isLoading } = useDedicatedHistory(wallet.address, wallet.setupHash, 30);
   const { data: historyTokens = [] } = useTokenMetadata(
     history.flatMap((item) => [item.target, ...item.arguments])
   );
@@ -930,31 +936,38 @@ export function DedicatedHistoryTab({
   return (
     <div className="space-y-2">
       {history.map((item) => {
-        const description = describeProposal(item, allTokens, { ...metadata, historical: true });
+        const description = item.outcome
+          ? describeProposal(item, allTokens, { ...metadata, historical: true })
+          : { headline: item.headline, addresses: item.account ? [item.account] : [] };
         return (
-          <div key={`${item.transactionHash}:${item.issueId}`} className="rounded-md border p-3 text-sm">
+          <div key={item.key} className="rounded-md border p-3 text-sm">
           <div className="flex items-center justify-between gap-2">
             <span className="font-medium">{description.headline}</span>
             <span className="text-xs text-muted-foreground">{item.timestamp ? new Date(item.timestamp).toLocaleString() : ""}</span>
           </div>
+          {item.outcome && item.outcome !== "executed" ? (
+            <div className="text-xs text-muted-foreground">{HISTORY_OUTCOMES[item.outcome]}</div>
+          ) : null}
           {description.addresses.map((entry) => (
             <div key={`${entry.label}:${entry.value}`} className="text-xs">
               {entry.label}: <CopyableAddress value={entry.value} />
             </div>
           ))}
-          <details className="mt-2 text-xs">
-            <summary className="cursor-pointer text-muted-foreground">Technical details</summary>
-            <div className="mt-2 space-y-1 font-mono break-all">
-              <div>Target: {item.target}</div>
-              <div>Function: {item.functionName}</div>
-              <div>Arguments: {JSON.stringify(item.arguments)}</div>
-              <div>Proposal ID: {item.issueId}</div>
-            </div>
-          </details>
+          {item.outcome ? (
+            <details className="mt-2 text-xs">
+              <summary className="cursor-pointer text-muted-foreground">Technical details</summary>
+              <div className="mt-2 space-y-1 font-mono break-all">
+                <div>Target: {item.target}</div>
+                <div>Function: {item.functionName}</div>
+                <div>Arguments: {JSON.stringify(item.arguments)}</div>
+                <div>Proposal ID: {item.issueId}</div>
+              </div>
+            </details>
+          ) : null}
         </div>
         );
       })}
-      {!history.length ? <p className="text-sm text-muted-foreground">No completed proposals.</p> : null}
+      {!history.length ? <p className="text-sm text-muted-foreground">No history yet.</p> : null}
     </div>
   );
 }

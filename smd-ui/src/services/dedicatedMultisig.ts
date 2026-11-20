@@ -260,6 +260,7 @@ export function useDedicatedFactoryState() {
 
 export interface MultisigWalletSummary {
   address: string;
+  setupHash: string;
   label: string;
   requiredApprovals: number;
   signerCount: number;
@@ -388,6 +389,7 @@ export function useMyMultisigWallets(ownerAddress?: string | null) {
         if (existing && signerAddress !== controlled[0]) continue;
         summaries.set(address, {
           address,
+          setupHash: String(data.multisigSetupHash ?? ""),
           label: labels.get(String(data.multisigSetupHash ?? "")) ?? "",
           requiredApprovals: Number(data.requiredApprovals ?? 0),
           signerCount: signerCounts.get(address) ?? 0,
@@ -415,6 +417,7 @@ export function useMyMultisigWallets(ownerAddress?: string | null) {
         } else {
           summaries.set(address, {
             address,
+            setupHash: String(data.multisigSetupHash ?? ""),
             label: labels.get(String(data.multisigSetupHash ?? "")) ?? "",
             requiredApprovals: Number(data.requiredApprovals ?? 0),
             signerCount: signerCounts.get(address) ?? 0,
@@ -577,43 +580,6 @@ export function useDedicatedSetup(setupHash?: string | null) {
   });
 }
 
-export function useDedicatedSetupLifecycle(setupHash?: string | null) {
-  return useQuery({
-    queryKey: ["dedicated-multisig-setup-lifecycle", setupHash],
-    enabled: !!setupHash && !!runtime.multisigFactoryAddress(),
-    refetchInterval: 3_000,
-    queryFn: async (): Promise<"pending" | "cancelled" | "deployed" | "unknown"> => {
-      const events = await rows(
-        "event",
-        `address=eq.${runtime.multisigFactoryAddress()}` +
-          `&event_name=in.(MultisigSetupRegistered,MultisigSetupCancelled,MultisigCreated)` +
-          `&attributes-%3E%3EsetupHash=eq.${String(setupHash)}` +
-          `&order=block_number.desc,event_index.desc&limit=1&select=event_name`
-      );
-      if (events[0]?.event_name === "MultisigCreated") return "deployed";
-      if (events[0]?.event_name === "MultisigSetupCancelled") return "cancelled";
-      if (events[0]?.event_name === "MultisigSetupRegistered") return "pending";
-      return "unknown";
-    },
-  });
-}
-
-export function useDedicatedCreatedWallet(setupHash?: string | null, deployed = false) {
-  return useQuery({
-    queryKey: ["dedicated-multisig-created-wallet", setupHash],
-    enabled: deployed && !!setupHash && !!runtime.multisigFactoryAddress(),
-    queryFn: async (): Promise<string> => {
-      const events = await rows(
-        "event",
-        `address=eq.${runtime.multisigFactoryAddress()}&event_name=eq.MultisigCreated` +
-          `&attributes-%3E%3EsetupHash=eq.${String(setupHash)}` +
-          `&order=block_number.desc,event_index.desc&limit=1&select=attributes`
-      );
-      return strip0x(String(events[0]?.attributes?.wallet ?? ""));
-    },
-  });
-}
-
 export function useDedicatedWalletState(walletAddress?: string | null) {
   return useQuery({
     queryKey: ["dedicated-multisig-state", walletAddress],
@@ -763,41 +729,130 @@ export function useDedicatedIssues(walletAddress?: string | null, epoch?: number
   });
 }
 
-export interface DedicatedExecutedIssue {
+export interface DedicatedHistoryItem {
+  key: string;
+  timestamp?: string;
+  /** How a proposal ended. Absent for wallet events that are not proposals. */
+  outcome?: "executed" | "dismissed" | "cancelled" | "superseded";
   issueId: string;
   target: string;
   functionName: string;
   arguments: string[];
-  executor: string;
-  timestamp?: string;
-  transactionHash?: string;
+  /** Wallet events that are not proposals: setup, creation, a signer joining, an upgrade. */
+  headline?: string;
+  account?: { label: string; value: string };
 }
 
-export function useDedicatedHistory(walletAddress?: string | null, limit = 10) {
+const HISTORY_EVENTS = [
+  "IssueExecuted", "IssueExecutedNoArgs", "IssueCreated", "IssueCreatedNoArgs", "IssueDismissed",
+  "IssueCancelled", "SignerAdded", "UpgradeExecuted", "ConfigurationAdvanced",
+];
+
+/** Turns a wallet's events, newest first, into the entries shown under History. */
+export const buildDedicatedHistory = (events: any[], limit: number): DedicatedHistoryItem[] => {
+  const created = new Map<string, any>();
+  const ended = new Set<string>();
+  const advances: { epoch: number; timestamp?: string }[] = [];
+  for (const event of events) {
+    const attributes = event?.attributes ?? {};
+    const name = String(event?.event_name ?? "");
+    if (name.startsWith("IssueCreated")) created.set(String(attributes.issueId ?? ""), event);
+    else if (name.startsWith("Issue")) ended.add(String(attributes.issueId ?? ""));
+    if (name === "ConfigurationAdvanced" || name === "UpgradeExecuted") {
+      advances.push({ epoch: Number(attributes.epoch ?? 0), timestamp: event?.block_timestamp });
+    }
+  }
+  const issue = (attributes: any) => ({
+    issueId: String(attributes.issueId ?? ""),
+    target: strip0x(String(attributes.target ?? "")),
+    functionName: String(attributes.functionName ?? ""),
+    arguments: normalizeDedicatedArguments(attributes.arguments),
+  });
+  const walletEvent = (headline: string, label: string, value: unknown) => ({
+    ...issue({}),
+    headline,
+    account: { label, value: strip0x(String(value ?? "")) },
+  });
+  const items: DedicatedHistoryItem[] = [];
+  for (const event of events) {
+    const attributes = event?.attributes ?? {};
+    const name = String(event?.event_name ?? "");
+    const base = { key: `${event?.transaction_hash}:${name}:${attributes.issueId ?? ""}`, timestamp: event?.block_timestamp };
+    if (name.startsWith("IssueExecuted")) {
+      items.push({ ...base, outcome: "executed", ...issue(attributes) });
+    } else if (name === "IssueDismissed" || name === "IssueCancelled") {
+      const origin = created.get(String(attributes.issueId ?? ""));
+      if (origin) {
+        items.push({
+          ...base,
+          outcome: name === "IssueDismissed" ? "dismissed" : "cancelled",
+          ...issue(origin.attributes),
+        });
+      }
+    } else if (name === "SignerAdded") {
+      items.push({ ...base, ...walletEvent("Signer joined", "Signer", attributes.signer) });
+    } else if (name === "UpgradeExecuted") {
+      items.push({
+        ...base,
+        ...walletEvent(
+          `Upgraded from version ${attributes.fromVersion} to ${attributes.targetVersion}`,
+          "Applied by",
+          attributes.executor
+        ),
+      });
+    } else if (name === "MultisigCreated") {
+      items.push({ ...base, ...walletEvent("Multisig wallet created", "Created by", attributes.creator) });
+    } else if (name === "MultisigSetupRegistered") {
+      items.push({ ...base, ...walletEvent("Multisig wallet setup started", "Started by", attributes.creator) });
+    } else if (name === "InitialSignerConfirmed") {
+      items.push({
+        ...base,
+        key: `${base.key}${attributes.signer}`,
+        ...walletEvent(
+          `Signer confirmed the setup (${attributes.confirmations} of ${attributes.totalSigners})`,
+          "Signer",
+          attributes.signer
+        ),
+      });
+    }
+  }
+  for (const [issueId, origin] of created) {
+    if (ended.has(issueId)) continue;
+    // Advances are newest first, so the last match is the change that ended the proposal's epoch.
+    const advance = advances.filter((entry) => entry.epoch > Number(origin.attributes.epoch ?? 0)).pop();
+    if (advance) {
+      items.push({
+        key: `superseded:${issueId}`,
+        timestamp: advance.timestamp,
+        outcome: "superseded",
+        ...issue(origin.attributes),
+      });
+    }
+  }
+  return items
+    .sort((left, right) => String(right.timestamp ?? "").localeCompare(String(left.timestamp ?? "")))
+    .slice(0, limit);
+};
+
+export function useDedicatedHistory(walletAddress?: string | null, setupHash = "", limit = 10) {
   return useQuery({
-    queryKey: ["dedicated-multisig-history", walletAddress, limit],
+    queryKey: ["dedicated-multisig-history", walletAddress, setupHash, limit],
     enabled: !!walletAddress,
     refetchInterval: 15_000,
-    queryFn: async (): Promise<DedicatedExecutedIssue[]> => {
+    queryFn: async (): Promise<DedicatedHistoryItem[]> => {
       const address = strip0x(walletAddress!);
+      const factory = runtime.multisigFactoryAddress();
       const events = await rows(
         "event",
-        `address=eq.${address}&event_name=in.(IssueExecuted,IssueExecutedNoArgs)` +
-          `&order=block_timestamp.desc&limit=${limit}` +
-          `&select=attributes,block_timestamp,transaction_hash`
+        `or=(and(address.eq.${address},event_name.in.(${HISTORY_EVENTS.join(",")}))` +
+          (factory && setupHash
+            ? `,and(address.eq.${factory},attributes-%3E%3EsetupHash.eq.${setupHash},` +
+              `event_name.in.(MultisigSetupRegistered,InitialSignerConfirmed,MultisigCreated))`
+            : "") +
+          `)&order=block_timestamp.desc&limit=${limit * 10}` +
+          `&select=event_name,attributes,block_timestamp,transaction_hash`
       );
-      return events.map((event) => {
-        const attributes = event?.attributes ?? {};
-        return {
-          issueId: String(attributes.issueId ?? ""),
-          target: strip0x(String(attributes.target ?? "")),
-          functionName: String(attributes.functionName ?? ""),
-          arguments: normalizeDedicatedArguments(attributes.arguments),
-          executor: strip0x(String(attributes.executor ?? "")),
-          timestamp: event?.block_timestamp,
-          transactionHash: event?.transaction_hash,
-        };
-      });
+      return buildDedicatedHistory(events, limit);
     },
   });
 }

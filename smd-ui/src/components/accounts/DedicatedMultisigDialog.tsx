@@ -30,9 +30,6 @@ import { formatDateTime, formatWaitingPeriod } from "@/lib/utils";
 import {
   useDedicatedIssues,
   useDedicatedMultisigActions,
-  useDedicatedCreatedWallet,
-  useDedicatedSetup,
-  useDedicatedSetupLifecycle,
   useDedicatedWalletState,
   isUnlimitedTokenApproval,
   parseDedicatedTypedArguments,
@@ -59,7 +56,7 @@ import {
 } from "@/services/dedicatedProposal";
 import { useFunctionByAddress } from "@/services/contracts";
 import { useTokenMetadata, type TokenMetadata } from "@/services/tokens";
-import { strip0x, useMyUserWallets } from "@/services/userWallets";
+import { strip0x } from "@/services/userWallets";
 
 /** A labelled group of related settings. */
 function SettingsGroup({ title, children }: { title: string; children: React.ReactNode }) {
@@ -627,6 +624,10 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
         );
       }
       toast.success("Proposal created");
+      setNomineeText("");
+      setNominee("");
+      setNewRequiredApprovals("");
+      setNewTimelock("");
       proposalCreated();
     } catch (error: any) {
       toast.error(error?.message || "Could not create proposal");
@@ -1071,7 +1072,6 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
 
 function CreateDedicatedMultisig() {
   const { userAddress } = useUser();
-  const { data: userWallets = [] } = useMyUserWallets(userAddress);
   const actions = useDedicatedMultisigActions();
   const { data: factoryState } = useDedicatedFactoryState();
   const [label, setLabel] = useState("");
@@ -1080,10 +1080,8 @@ function CreateDedicatedMultisig() {
   ]);
   const [required, setRequired] = useState(2);
   const [timelockHours, setTimelockHours] = useState(24);
-  const [setupHash, setSetupHash] = useState("");
   const [registeredHere, setRegisteredHere] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState("create");
   const invalidSigners = signerInputs.filter((signer) => signer.text.trim() && !signer.address);
   const normalizedSignerEntries = signerInputs.map((signer) => strip0x(signer.address)).filter(Boolean);
   const duplicateSigners = normalizedSignerEntries.length !== new Set(normalizedSignerEntries).size;
@@ -1091,26 +1089,6 @@ function CreateDedicatedMultisig() {
   const configured = factoryState?.verified === true;
   const latestVersion =
     factoryState?.approvedVersions[factoryState.approvedVersions.length - 1]?.version || "";
-  const { data: setup, isLoading: setupLoading } = useDedicatedSetup(setupHash);
-  const { data: setupLifecycle = "unknown" } = useDedicatedSetupLifecycle(setupHash);
-  const { data: createdWallet = "" } = useDedicatedCreatedWallet(
-    setupHash,
-    setupLifecycle === "deployed"
-  );
-  const setupPending = setupLifecycle === "pending" && !!setup && setup.expiresAt >= Date.now() / 1000;
-  const controlledSigners = [
-    { address: strip0x(userAddress ?? ""), username: "" },
-    ...userWallets.map((wallet) => ({ address: strip0x(wallet.address), username: wallet.username })),
-  ].filter((identity) => identity.address);
-  const signingIdentity = controlledSigners.find((identity) =>
-    setup?.signers.some((signer) => strip0x(signer) === identity.address)
-  );
-  const cancellingIdentity = signingIdentity ?? controlledSigners.find(
-    (identity) => identity.address === strip0x(setup?.creator ?? "")
-  );
-  const signerConfirmed = !!signingIdentity && !!setup?.confirmedSigners.some(
-    (signer) => strip0x(signer) === signingIdentity.address
-  );
   const labelByteLength = new TextEncoder().encode(label).length;
   const validLabel = labelByteLength <= 64;
   const validRequired = Number.isInteger(required) && required >= 2 && required < signers.length;
@@ -1129,9 +1107,7 @@ function CreateDedicatedMultisig() {
         initialVersion: latestVersion,
         label,
       });
-      setSetupHash("");
       setRegisteredHere(true);
-      setTab("confirm");
       toast.success("Invitation created");
     } catch (error: any) {
       toast.error(error?.message || "Could not create multisig wallet");
@@ -1140,207 +1116,89 @@ function CreateDedicatedMultisig() {
     }
   };
 
-  const confirm = async () => {
-    setBusy(true);
-    try {
-      await actions.confirmSetup(setupHash, signingIdentity?.username || undefined);
-      toast.success("Invitation confirmed");
-    } catch (error: any) {
-      toast.error(error?.message || "Could not confirm invitation");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const cancel = async () => {
-    setBusy(true);
-    try {
-      await actions.cancelSetup(setupHash, cancellingIdentity?.username || undefined);
-      toast.success("Invitation cancelled");
-    } catch (error: any) {
-      toast.error(error?.message || "Could not cancel invitation");
-    } finally {
-      setBusy(false);
-    }
-  };
+  if (registeredHere) {
+    return (
+      <div className="rounded-md border p-3 text-sm">
+        <div className="font-medium">Invitation created</div>
+        <div className="mt-1 text-muted-foreground">
+          Review it under Pending invitations to confirm or share it with the other signers.
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <Tabs value={tab} onValueChange={setTab}>
-      <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="create">Create</TabsTrigger>
-        <TabsTrigger value="confirm">Confirm</TabsTrigger>
-      </TabsList>
-      <TabsContent value="create" className="space-y-3">
-        {!configured ? (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>
-              {factoryState ? "Multisig wallet creation is not available on this network" : "Checking…"}
-            </AlertTitle>
-            <AlertDescription>
-              {factoryState ? "Multisig wallets are not set up on this network" : ""}
-            </AlertDescription>
-          </Alert>
-        ) : null}
-        <Label>Multisig wallet name</Label>
-        <Input value={label} onChange={(event) => setLabel(event.target.value)} />
-        <p className={`text-xs ${validLabel ? "text-muted-foreground" : "text-destructive"}`}>
-          {validLabel
-            ? `Visible to everyone and cannot be changed · ${labelByteLength}/64`
-            : `Multisig wallet name is too long · ${labelByteLength}/64`}
-        </p>
-        <Label>Signers</Label>
-        <div className="space-y-2">
-          {signerInputs.map((signer, index) => (
-            <div key={index} className="flex items-start gap-2">
-              <AddressInput
-                value={signer.text}
-                resolved={signer.address}
-                onChange={(text, address) => setSignerInputs((current) =>
-                  current.map((entry, entryIndex) =>
-                    entryIndex === index ? { text, address } : entry
-                  )
-                )}
-                placeholder="Address or User wallet username"
-              />
-              {signerInputs.length > 1 ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setSignerInputs((current) =>
-                    current.filter((_, entryIndex) => entryIndex !== index)
-                  )}
-                >
-                  Remove
-                </Button>
-              ) : null}
-            </div>
-          ))}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setSignerInputs((current) => [...current, { text: "", address: "" }])}
-          >
-            Add signer
-          </Button>
-        </div>
-        {invalidSigners.length ? (
-          <p className="text-xs text-destructive">Enter a valid signer address or username.</p>
-        ) : duplicateSigners ? (
-          <p className="text-xs text-destructive">Signer addresses must be unique.</p>
-        ) : null}
-        <div className="grid grid-cols-2 gap-3">
-          <div><Label>Approvals needed</Label><Input type="number" min={2} step={1} value={required} onChange={(event) => setRequired(Number(event.target.value))} /></div>
-          <div><Label>Waiting period (hours)</Label><Input type="number" min={0} max={720} step={1} value={timelockHours} onChange={(event) => setTimelockHours(Number(event.target.value))} /></div>
-        </div>
-        <Button
-          disabled={busy || !configured || invalidSigners.length > 0 || duplicateSigners ||
-            !validLabel || signers.length < 3 || !validRequired || !validTimelock || !latestVersion}
-          onClick={() => void register()}
-        >
-          Create multisig wallet
-        </Button>
-      </TabsContent>
-      <TabsContent value="confirm" className="space-y-3">
-        {!setup && !registeredHere ? (
-          <>
-            <p className="text-sm text-muted-foreground">
-              Enter an invitation code to review and confirm a multisig wallet.
-            </p>
-            <Label>Invitation code</Label>
-            <Input
-              value={setupHash}
-              onChange={(event) => setSetupHash(event.target.value)}
-              className="font-mono"
+    <div className="space-y-3">
+      {!configured ? (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>
+            {factoryState ? "Multisig wallet creation is not available on this network" : "Checking…"}
+          </AlertTitle>
+          <AlertDescription>
+            {factoryState ? "Multisig wallets are not set up on this network" : ""}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      <Label>Multisig wallet name</Label>
+      <Input value={label} onChange={(event) => setLabel(event.target.value)} />
+      <p className={`text-xs ${validLabel ? "text-muted-foreground" : "text-destructive"}`}>
+        {validLabel
+          ? `Visible to everyone and cannot be changed · ${labelByteLength}/64`
+          : `Multisig wallet name is too long · ${labelByteLength}/64`}
+      </p>
+      <Label>Signers</Label>
+      <div className="space-y-2">
+        {signerInputs.map((signer, index) => (
+          <div key={index} className="flex items-start gap-2">
+            <AddressInput
+              value={signer.text}
+              resolved={signer.address}
+              onChange={(text, address) => setSignerInputs((current) =>
+                current.map((entry, entryIndex) =>
+                  entryIndex === index ? { text, address } : entry
+                )
+              )}
+              placeholder="Address or User wallet username"
             />
-          </>
-        ) : null}
-        {!setup && registeredHere ? (
-          <div className="rounded-md border p-3 text-sm">
-            <div className="font-medium">Invitation created</div>
-            <div className="mt-1 text-muted-foreground">
-              Review it under Pending invitations to confirm or share it with the other signers.
-            </div>
-          </div>
-        ) : null}
-        {setupLoading && setupHash ? (
-          <div className="text-sm text-muted-foreground">Checking invitation…</div>
-        ) : null}
-        {setup ? (
-          <div className="rounded-md border p-3 text-sm space-y-1">
-            <div className="font-medium">{setup.label || "Unnamed multisig wallet"}</div>
-            <Badge variant="outline">
-              {setupPending ? "Waiting for signers" : setupLifecycle === "deployed" ? "Created" : "Invitation unavailable"}
-            </Badge>
-            {createdWallet ? (
-              <div className="text-xs">
-                Multisig wallet address: <CopyableAddress value={createdWallet} />
-              </div>
-            ) : null}
-            <div className="font-mono text-xs break-all">Invitation code: {setupHash}</div>
-            <div>Approvals needed: {setup.requiredApprovals} of {setup.signers.length}</div>
-            <div>Signer confirmation: {setup.confirmedSigners.length} of {setup.signers.length}</div>
-            <div className="text-xs">Created by: <CopyableAddress value={setup.creator} /></div>
-            {setupLifecycle !== "deployed" ? (
-              <Alert>
-                <AlertTitle>Waiting for signer confirmations</AlertTitle>
-                <AlertDescription>
-                  The multisig wallet address will be available after every signer confirms.
-                </AlertDescription>
-              </Alert>
-            ) : null}
-            <div>
-              Waiting period: {formatWaitingPeriod(setup.transactionTimelock)}
-            </div>
-            <div>Invitation expires: {formatDateTime(setup.expiresAt)}</div>
-            <div className="space-y-1 text-xs text-muted-foreground">
-              {setup.signers.map((signer) => {
-                const controlled = controlledSigners.find(
-                  (identity) => identity.address === strip0x(signer)
-                );
-                const confirmed = setup.confirmedSigners.some(
-                  (confirmedSigner) => strip0x(confirmedSigner) === strip0x(signer)
-                );
-                return (
-                  <div key={signer}>
-                    {confirmed ? "✓" : "○"} <CopyableAddress value={signer} />
-                    {controlled ? ` (${controlled.username ? `${controlled.username}, you` : "you"})` : ""}
-                  </div>
-                );
-              })}
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSetupHash("");
-                setRegisteredHere(false);
-              }}
-            >
-              Use another invitation code
-            </Button>
-          </div>
-        ) : null}
-        {setup && signingIdentity ? (
-          <div className="text-sm">Sign as: {signingIdentity.username || <CopyableAddress value={signingIdentity.address} />}</div>
-        ) : null}
-        {setup ? (
-          <div className="flex gap-2">
-            {signingIdentity && !signerConfirmed ? (
-              <Button disabled={busy || !configured || !setupPending} onClick={() => void confirm()}>
-                Confirm invitation
-              </Button>
-            ) : null}
-            {cancellingIdentity ? (
-              <Button variant="outline" disabled={busy || !configured || !setupPending} onClick={() => void cancel()}>
-                Cancel invitation
+            {signerInputs.length > 1 ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSignerInputs((current) =>
+                  current.filter((_, entryIndex) => entryIndex !== index)
+                )}
+              >
+                Remove
               </Button>
             ) : null}
           </div>
-        ) : null}
-      </TabsContent>
-    </Tabs>
+        ))}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setSignerInputs((current) => [...current, { text: "", address: "" }])}
+        >
+          Add signer
+        </Button>
+      </div>
+      {invalidSigners.length ? (
+        <p className="text-xs text-destructive">Enter a valid signer address or username.</p>
+      ) : duplicateSigners ? (
+        <p className="text-xs text-destructive">Signer addresses must be unique.</p>
+      ) : null}
+      <div className="grid grid-cols-2 gap-3">
+        <div><Label>Approvals needed</Label><Input type="number" min={2} step={1} value={required} onChange={(event) => setRequired(Number(event.target.value))} /></div>
+        <div><Label>Waiting period (hours)</Label><Input type="number" min={0} max={720} step={1} value={timelockHours} onChange={(event) => setTimelockHours(Number(event.target.value))} /></div>
+      </div>
+      <Button
+        disabled={busy || !configured || invalidSigners.length > 0 || duplicateSigners ||
+          !validLabel || signers.length < 3 || !validRequired || !validTimelock || !latestVersion}
+        onClick={() => void register()}
+      >
+        Create multisig wallet
+      </Button>
+    </div>
   );
 }
 
