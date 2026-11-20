@@ -30,12 +30,16 @@ export const formatShare = (part: bigint, whole: bigint): string => {
   return `${hundredths / 100n}.${(hundredths % 100n).toString().padStart(2, '0')}%`;
 };
 
+const divideUp = (value: bigint, by: bigint): bigint => (value + by - 1n) / by;
+
 /**
- * STRATO to add so the reserve pays for `coverage` (a percentage scaled by 1e18) of `supply` at `rate`,
- * rounded up so the coverage is reached; zero when the reserve already does.
+ * STRATO to add so max convertible reaches `coverage` (a percentage scaled by 1e18) of `supply` at `rate`:
+ * the least that does, and zero when the reserve already does.
  */
 export const fundingForCoverage = (coverage: bigint, supply: bigint, rate: bigint, reserve: bigint): bigint => {
-  const scale = WAD * 100n * WAD;
-  const target = (supply * rate * coverage + scale - 1n) / scale;
+  // Max convertible rounds down, so both steps round up:
+  // the rewards tokens to cover, then the reserve that pays for them
+  const covered = divideUp(supply * coverage, 100n * WAD);
+  const target = divideUp(covered * rate, WAD);
   return target > reserve ? target - reserve : 0n;
 };

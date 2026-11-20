@@ -14,6 +14,16 @@ import {
 
 const E18 = 10n ** 18n;
 
+/** A repeatable stream of integers below `bound`, so a failure names a case that fails again. */
+const sequence = (seed: bigint) => (bound: bigint): bigint => {
+  let value = 0n;
+  for (let i = 0; i < 2; i++) {
+    seed = (seed * 6364136223846793005n + 1442695040888963407n) % (1n << 64n);
+    value = (value << 64n) + seed;
+  }
+  return value % bound;
+};
+
 test('payoutFor is amount × rate ÷ 1e18, rounded down', () => {
   assert.equal(payoutFor(4n * E18, E18), 4n * E18);
   // Helium test run, step 3.3
@@ -81,6 +91,7 @@ test('fundingForCoverage is what the reserve lacks to pay for that share of the 
   // Already covered
   assert.equal(fundingForCoverage(20n * E18, 1000n * E18, rate, 100n * E18), 0n);
   assert.equal(fundingForCoverage(0n, 1000n * E18, rate, 0n), 0n);
+  assert.equal(fundingForCoverage(100n * E18, 0n, rate, 0n), 0n);
   // Rounded up, so the funded reserve reaches the coverage
   assert.equal(fundingForCoverage(100n * E18, 10n, 333333333333333333n, 0n), 4n);
   // A small fraction of a percent of a large supply is still an amount: 0.001% of 311,584,735.9999 at 1:1
@@ -88,4 +99,61 @@ test('fundingForCoverage is what the reserve lacks to pay for that share of the 
     fundingForCoverage(E18 / 1000n, 311584735999900000000000000n, E18, 0n),
     3115847359999000000000n,
   );
+  // The smallest coverage the field takes, of the same supply: 1e-18 %
+  assert.equal(fundingForCoverage(1n, 311584735999900000000000000n, E18, 0n), 3115848n);
+});
+
+// RewardsConverter.maxConvertible: reserve × 1e18 ÷ rate, rounded down
+const maxConvertible = (reserve: bigint, rate: bigint): bigint => (reserve * E18) / rate;
+
+/** The funded reserve's max convertible is at least `coverage` (a percentage scaled by 1e18) of `supply`. */
+const covers = (reserve: bigint, rate: bigint, coverage: bigint, supply: bigint): boolean =>
+  maxConvertible(reserve, rate) * 100n * E18 >= supply * coverage;
+
+test('fundingForCoverage reaches a coverage the supply and rate do not divide evenly', () => {
+  // 12.5% of 580,827,941.45… at 0.333…: one raw unit less shows as 12.49%
+  const supply = 580827941454712398160809626n;
+  const rate = 333333333333333333n;
+  const coverage = 125n * E18 / 10n;
+  const amount = fundingForCoverage(coverage, supply, rate, 0n);
+  assert.equal(amount, 24201164227279683232499238n);
+  assert.ok(covers(amount, rate, coverage, supply));
+  assert.ok(!covers(amount - 1n, rate, coverage, supply));
+  assert.equal(formatShare(maxConvertible(amount, rate), supply), '12.50%');
+  assert.equal(formatShare(maxConvertible(amount - 1n, rate), supply), '12.49%');
+  // A rate above 1:1, where one raw rewards unit costs several of STRATO
+  assert.equal(fundingForCoverage(40n * E18, 11n, 3n * E18, 0n), 15n);
+  assert.ok(covers(15n, 3n * E18, 40n * E18, 11n));
+  assert.ok(!covers(14n, 3n * E18, 40n * E18, 11n));
+});
+
+test('fundingForCoverage sends the least that reaches the coverage, for any supply, rate and reserve', () => {
+  const rates = ['1', '0.5', '0.7', '0.333333333333333333', '3', '2.5', '0.01', '1234.000000000000000001', '0.000000000000000007'];
+  const coverages = ['40', '100', '33.33', '0.001', '150', '12.5', '99.99', '66.666666666666666666', '0.000000000000000001'];
+  const next = sequence(12345n);
+  for (let i = 0; i < 20000; i++) {
+    const supply = next(10n ** BigInt(1 + (i % 28))) + 1n;
+    const rate = rateFromDecimal(rates[i % rates.length]);
+    const coverage = rateFromDecimal(coverages[(i * 7) % coverages.length]);
+    const reserve = i % 3 === 0 ? 0n : next((supply * rate) / E18 + 2n);
+    const amount = fundingForCoverage(coverage, supply, rate, reserve);
+    const where = `supply ${supply} rate ${rate} reserve ${reserve} coverage ${coverage} amount ${amount}`;
+    assert.ok(amount >= 0n, where);
+    assert.ok(covers(reserve + amount, rate, coverage, supply), `short: ${where}`);
+    if (amount > 0n) assert.ok(!covers(reserve + amount - 1n, rate, coverage, supply), `over: ${where}`);
+  }
+});
+
+test('funding to a coverage then shows that coverage as max convertible', () => {
+  const rates = ['1', '0.5', '0.7', '0.333333333333333333', '3', '2.5', '0.01'];
+  const next = sequence(99n);
+  for (let i = 0; i < 5000; i++) {
+    // Realistic sizes: a million to a billion rewards tokens
+    const supply = 10n ** 24n + next(10n ** 27n);
+    const rate = rateFromDecimal(rates[i % rates.length]);
+    const hundredths = next(20000n) + 1n;
+    const amount = fundingForCoverage((hundredths * E18) / 100n, supply, rate, 0n);
+    const expected = `${hundredths / 100n}.${(hundredths % 100n).toString().padStart(2, '0')}%`;
+    assert.equal(formatShare(maxConvertible(amount, rate), supply), expected, `supply ${supply} rate ${rate}`);
+  }
 });
