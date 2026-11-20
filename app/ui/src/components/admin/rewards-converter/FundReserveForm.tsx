@@ -26,6 +26,8 @@ const FundReserveForm = ({ state, stats }: {
     ? fundingForCoverage(coverage, supply, BigInt(state.rate), BigInt(state.reserve))
     : safeParseUnits(value, decimals);
   const exceedsBalance = !!account && amount > BigInt(account.stratoBalance);
+  const unreadable = !!value.trim() && (byCoverage ? coverage : amount) <= 0n;
+  const invalid = unreadable || exceedsBalance;
 
   return (
     <Card className="border border-border/70">
@@ -55,7 +57,8 @@ const FundReserveForm = ({ state, stats }: {
           <div className="relative">
             <Input
               id="converter-fund-amount"
-              className={byCoverage ? "pr-8" : undefined}
+              className={`${byCoverage ? "pr-8" : ""} ${invalid ? "border-destructive text-destructive focus-visible:ring-destructive" : ""}`}
+              aria-invalid={invalid}
               placeholder={byCoverage ? "100" : "0.00"}
               value={value}
               onChange={(event) => setValue(event.target.value)}
