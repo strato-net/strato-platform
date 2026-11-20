@@ -129,26 +129,32 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
             </div>
 
             <div className="space-y-2">
-              <Input
-                type="number"
-                className={invalid ? "border-destructive text-destructive focus-visible:ring-destructive" : ""}
-                aria-invalid={invalid}
-                placeholder="0.00"
-                value={amountInput}
-                onChange={(e) => setAmountInput(e.target.value)}
-                disabled={formDisabled}
-              />
-
-              {isLoggedIn && (
-                <div className="text-sm text-muted-foreground">
-                  <button
+              <div className="relative">
+                <Input
+                  type="number"
+                  className={`pr-16 ${invalid ? "border-destructive text-destructive focus-visible:ring-destructive" : ""}`}
+                  aria-invalid={invalid}
+                  placeholder="0.00"
+                  value={amountInput}
+                  onChange={(e) => setAmountInput(e.target.value)}
+                  disabled={formDisabled}
+                />
+                {isLoggedIn && (
+                  <Button
                     type="button"
-                    className="text-blue-600 hover:underline mr-2 disabled:opacity-50 disabled:no-underline"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-6 px-2 text-xs font-medium text-blue-600 hover:text-blue-600"
                     onClick={() => setAmountInput(formatUnits(maxAmount, rewardsToken.decimals))}
                     disabled={formDisabled || maxAmount === 0n}
                   >
                     Max
-                  </button>
+                  </Button>
+                )}
+              </div>
+
+              {isLoggedIn && (
+                <div className="text-sm text-muted-foreground">
                   Balance:{" "}
                   {account
                     ? formatBalance(account.balance, rewardsToken.symbol, rewardsToken.decimals, 2, 6)

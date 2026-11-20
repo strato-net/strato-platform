@@ -104,6 +104,15 @@ describe("the convert amount input", () => {
     expect(convertButton().disabled).toBe(true);
   });
 
+  it("holds a Max button that fills the most that can be converted", async () => {
+    await show();
+    const max = screen.getByRole("button", { name: "Max" });
+    expect(input().parentElement?.contains(max)).toBe(true);
+    fireEvent.click(max);
+    expect(input().value).toBe("60.0");
+    expect(input().getAttribute("aria-invalid")).toBe("false");
+  });
+
   it("clears the mark once the amount is corrected", async () => {
     await show();
     type("61");
