@@ -185,7 +185,7 @@ const claimErrorMessage = (error: unknown): string => {
 
 // ---- building blocks ----
 
-/** Local time inline, the UTC instant in the tooltip. */
+/** Local machine time everywhere: the day or the full timestamp inline, the full timestamp with its zone in the tooltip. */
 const LocalDate = ({ seconds, prefix, short }: { seconds: number; prefix?: string; short?: boolean }) => {
   const date = toDate(seconds);
   return (
@@ -194,7 +194,7 @@ const LocalDate = ({ seconds, prefix, short }: { seconds: number; prefix?: strin
         <span>{prefix}{short ? formatDay(seconds) : date.toLocaleString()}</span>
       </TooltipTrigger>
       <TooltipContent>
-        <p>{date.toISOString()}</p>
+        <p>{date.toLocaleString(undefined, { timeZoneName: "short" })}</p>
       </TooltipContent>
     </Tooltip>
   );
