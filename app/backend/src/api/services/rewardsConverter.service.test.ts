@@ -6,6 +6,7 @@ import { constants } from "../../config/constants";
 import * as config from "../../config/config";
 import { bloc, cirrus, strato } from "../../utils/appApiHelper";
 import { requestContext } from "../../utils/requestContext";
+import RewardsConverterController from "../controllers/rewardsConverter.controller";
 import {
   convert,
   convertInputs,
@@ -473,4 +474,73 @@ test("funding transfers the caller's STRATO to the converter, with no vote and n
     },
   ]);
   assert.equal(calls.filter((call) => call.path.includes("AdminRegistry")).length, 0);
+});
+
+// ── Precision ─────────────────────────────────────────────────────────────────
+
+// Integers a JSON number cannot carry (past 2^53, past 15 digits), next to small ones that travel as numbers
+const AWKWARD = [
+  "1",
+  "999999999999999",
+  "9007199254740993",
+  "333333333333333333",
+  "1000000000000000001",
+  "311584735999999999999068943",
+  (2n ** 256n - 1n).toString(),
+];
+
+test("a governed rate and amount reach the node digit for digit", async (t) => {
+  mockFeeRouter(t);
+  mockDetails(t);
+  mockCirrus(t, { "BlockApps-AdminRegistry-IssueCreated": [{ issueId: "issue-1" }] });
+  const bodies = mockSubmit(t, [false, "issue-1"]);
+
+  for (const value of AWKWARD) {
+    await setConverterRate("access-token", USER, value);
+    await withdrawConverterReserve("access-token", USER, USER, value);
+  }
+
+  // Read from the request text, which is what the node parses
+  const sent = bodies.map((body) => /"type":"uint256","value":"?(\d+)"?[},]/.exec(JSON.stringify(body))?.[1]);
+  assert.deepEqual(sent, AWKWARD.flatMap((value) => [value, value]));
+});
+
+test("a funding amount reaches the node digit for digit", async (t) => {
+  mockFeeRouter(t);
+  mockCirrus(t, { "BlockApps-RewardsConverter": [{ stratoToken: STRATO_TOKEN }] });
+  const bodies = mockSubmit(t);
+
+  for (const value of AWKWARD) await fundConverterReserve("access-token", USER, value);
+
+  const sent = bodies.map((body) => /"value":"(\d+)"/.exec(JSON.stringify(body))?.[1]);
+  assert.deepEqual(sent, AWKWARD);
+});
+
+test("a rate or amount is taken only as a string of digits, so none arrives as a rounded number", async (t) => {
+  mockFeeRouter(t);
+  mockDetails(t);
+  mockCirrus(t, {});
+  const bodies = mockSubmit(t);
+
+  const statusOf = async (handler: (req: any, res: any, next: any) => Promise<void>, body: unknown) => {
+    let status = 0;
+    const res = { status: (code: number) => ((status = code), res), json: () => res };
+    await handler({ body, accessToken: "access-token", address: USER }, res, (error: unknown) => {
+      throw error;
+    });
+    return status;
+  };
+
+  // 1000000000000000001 as a JSON number is already 1000000000000000000 once parsed
+  const refused = [1000000000000000001, 1e21, 5, 0.1, "0.1", "1.0", "1e21", "-1", "0", "", " 1", "0x10", null, undefined, ["1"]];
+  for (const value of refused) {
+    assert.equal(await statusOf(RewardsConverterController.setRate, { rate: value }), 400, String(value));
+    assert.equal(await statusOf(RewardsConverterController.fundReserve, { amount: value }), 400, String(value));
+    assert.equal(
+      await statusOf(RewardsConverterController.withdrawReserve, { to: USER, amount: value }),
+      400,
+      String(value),
+    );
+  }
+  assert.equal(bodies.length, 0);
 });
