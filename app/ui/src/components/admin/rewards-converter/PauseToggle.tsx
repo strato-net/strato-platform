@@ -65,7 +65,7 @@ const PauseToggle = ({ paused }: { paused: boolean }) => {
           />
           {pending && (
             <Loader2
-              className={`pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin ${
+              className={`pointer-events-none absolute inset-y-0 my-auto h-3.5 w-3.5 animate-spin ${
                 paused ? "left-1 text-primary-foreground" : "right-1 text-foreground"
               }`}
             />
