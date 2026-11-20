@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyRow, LoadingRow, PaginationControls, PaginationInfo } from "@/components/common/HistoryTable";
 import { useRewardsConverterAccount, useRewardsConverterHistory } from "@/hooks/useRewardsConverter";
-import { formatBalance } from "@/utils/numberUtils";
+import AmountValue from "./AmountValue";
 import RateValue from "./RateValue";
 
 const ITEMS_PER_PAGE = 10;
@@ -38,11 +38,6 @@ const ConversionHistory = ({ rewardsToken, stratoToken }: ConversionHistoryProps
   const totalCount = history.data?.totalCount ?? 0;
   const loading = history.isFetching;
 
-  const formatConverted = (value: string) =>
-    formatBalance(value, rewardsToken.symbol, rewardsToken.decimals, 2, 6);
-  const formatReceived = (value: string) =>
-    formatBalance(value, stratoToken.symbol, stratoToken.decimals, 2, 6);
-
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="space-y-4">
       <CollapsibleTrigger asChild>
@@ -56,11 +51,15 @@ const ConversionHistory = ({ rewardsToken, stratoToken }: ConversionHistoryProps
           <div className="flex flex-wrap gap-x-6 gap-y-1 px-2 text-sm text-muted-foreground">
             <span>
               Total converted:{" "}
-              <span className="font-medium text-foreground">{formatConverted(account.totalConverted)}</span>
+              <span className="font-medium text-foreground">
+                <AmountValue raw={BigInt(account.totalConverted)} token={rewardsToken} />
+              </span>
             </span>
             <span>
               Total received:{" "}
-              <span className="font-medium text-foreground">{formatReceived(account.totalReceived)}</span>
+              <span className="font-medium text-foreground">
+                <AmountValue raw={BigInt(account.totalReceived)} token={stratoToken} />
+              </span>
             </span>
           </div>
         )}
@@ -82,8 +81,12 @@ const ConversionHistory = ({ rewardsToken, stratoToken }: ConversionHistoryProps
                 conversions.map((conversion) => (
                   <TableRow key={conversion.transactionHash}>
                     <TableCell className="text-sm">{formatTimestamp(conversion.timestamp)}</TableCell>
-                    <TableCell className="text-sm">{formatConverted(conversion.converted)}</TableCell>
-                    <TableCell className="text-sm">{formatReceived(conversion.received)}</TableCell>
+                    <TableCell className="text-sm">
+                      <AmountValue raw={BigInt(conversion.converted)} token={rewardsToken} />
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <AmountValue raw={BigInt(conversion.received)} token={stratoToken} />
+                    </TableCell>
                     <TableCell className="text-sm">
                       <RateValue rate={conversion.rate} />
                     </TableCell>
