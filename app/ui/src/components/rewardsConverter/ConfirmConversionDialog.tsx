@@ -14,7 +14,7 @@ import { REWARDS_CONVERT_CALLS } from "@/lib/constants";
 interface ConfirmConversionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Rewards tokens to burn, with symbol. */
+  /** Rewards points to burn, with label. */
   converted: string;
   /** STRATO to receive, with symbol. */
   received: string;
@@ -45,7 +45,7 @@ const ConfirmConversionDialog = ({
               to you.
             </p>
             <p className="font-medium text-destructive">
-              Converted tokens are burned. This cannot be undone.
+              Converted rewards points are burned. This cannot be undone.
             </p>
             <p className="text-xs">
               Transaction fee: <NetworkFee calls={REWARDS_CONVERT_CALLS} />

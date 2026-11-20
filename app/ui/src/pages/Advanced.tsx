@@ -279,7 +279,7 @@ const Advanced = () => {
                 {converterConfigured && (
                   <TabsContent value="convert-rewards">
                     {!isLoggedIn && (
-                      <GuestSignInBanner message="Sign in to convert your rewards" />
+                      <GuestSignInBanner message="Sign in to convert your rewards points" />
                     )}
                     <ConvertRewardsSection />
                   </TabsContent>

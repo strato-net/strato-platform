@@ -94,7 +94,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
               Convert {rewardsToken.symbol} to {stratoToken.symbol}
             </h3>
             <p className="text-sm text-muted-foreground mb-3">
-              Converted {rewardsToken.symbol} is burned and you receive{" "}
+              Converted {rewardsToken.symbol} are burned and you receive{" "}
               {stratoToken.symbol} from the reserve at the current rate.
             </p>
 
@@ -102,7 +102,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">Rate</span>
                 <span>
-                  1 {rewardsToken.symbol} = <RateValue rate={state.rate} /> {stratoToken.symbol}
+                  1 Rewards Point = <RateValue rate={state.rate} /> {stratoToken.symbol}
                 </span>
               </div>
               <div className="flex justify-between gap-2">
