@@ -36,7 +36,7 @@ const ConfirmConversionDialog = ({
       <AlertDialogHeader>
         <AlertDialogTitle>Confirm Conversion</AlertDialogTitle>
         <AlertDialogDescription asChild>
-          <div className="space-y-2">
+          <div className="space-y-4">
             <p>
               This will burn{" "}
               <span className="font-semibold text-foreground">{converted}</span>
