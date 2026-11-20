@@ -124,7 +124,18 @@ test('formatRate shows 4 decimals, rounded down', () => {
   assert.equal(formatRate(333333333333333333n), '0.3333');
   assert.equal(formatRate(999999999999999999n), '0.9999');
   assert.equal(formatRate(12345678900000000000n), '12.3456');
-  assert.equal(formatRate(1n), '0.0000');
+  assert.equal(formatRate(500000000000000000n), '0.5000');
+  assert.equal(formatRate(50000000000000000n), '0.0500');
+  assert.equal(formatRate(0n), '0.0000');
+});
+
+test('formatRate keeps the leading digits of a rate too small for 4 decimals, with dots for a long run of zeros', () => {
+  assert.equal(formatRate(12345678900000000n), '0.01234');
+  assert.equal(formatRate(123456789000000n), '0.0001234');
+  assert.equal(formatRate(100000000000000n), '0.0001');
+  assert.equal(formatRate(12345678900000n), '0.0...1234');
+  assert.equal(formatRate(7n), '0.0...7');
+  assert.equal(formatRate(1n), '0.0...1');
 });
 
 test('formatShare shows 2 decimals from 1% up, rounded down, or a dash when the whole is zero', () => {
