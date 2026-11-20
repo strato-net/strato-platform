@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,9 +16,9 @@ interface ConfirmConversionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Rewards points to burn, with label. */
-  converted: string;
+  converted: ReactNode;
   /** STRATO to receive, with symbol. */
-  received: string;
+  received: ReactNode;
   confirmDisabled: boolean;
   onConfirm: () => void;
 }
