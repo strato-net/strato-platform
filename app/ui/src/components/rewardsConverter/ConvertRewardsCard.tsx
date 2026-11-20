@@ -107,7 +107,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
               </div>
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">Reserve</span>
-                <span>
+                <span className={BigInt(state.reserve) === 0n ? "text-destructive" : undefined}>
                   {formatBalance(state.reserve, stratoToken.symbol, stratoToken.decimals, 2, 6)}
                 </span>
               </div>
@@ -139,7 +139,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
                 </div>
               )}
 
-              {account && !paused && balance > maxConvertible && (
+              {account && !paused && maxConvertible > 0n && balance > maxConvertible && (
                 <p className="text-sm text-yellow-600">
                   Only {formatBalance(maxConvertible, rewardsToken.symbol, rewardsToken.decimals, 2, 6)}{" "}
                   can be converted right now
