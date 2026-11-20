@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { GovernedCallResult } from "@strato/shared-types";
 import { useUser } from "@/context/UserContext";
@@ -70,6 +71,37 @@ export function useIssueExecutionHash(voteHash: string, enabled: boolean) {
     staleTime: Infinity,
     refetchInterval: (query) => (query.state.data ? false : INDEX_LAG_MS),
   });
+}
+
+/**
+ * The last governed call made here that moves a chain value to a target, followed until `current` shows it.
+ * `track` starts following a call and `clear` forgets it.
+ */
+export function useGovernedChange<T>(current: T) {
+  const [change, setChange] = useState<{ result: GovernedCallResult; target: T; settled: boolean } | null>(null);
+  if (change && !change.settled && change.target === current) setChange({ ...change, settled: true });
+
+  // The vote this call was waiting on passed. Another admin's vote executed it, so that transaction is looked up
+  const votePassed = !!change?.settled && !!change.result.issueId;
+  const { data: executionHash } = useIssueExecutionHash(change?.result.hash ?? "", votePassed);
+  const unsettled = !!change && !change.settled;
+
+  return {
+    /** What the call did, as it stands now: a vote that passed since reads as executed. */
+    result: change && {
+      ...change.result,
+      executed: change.result.executed || votePassed,
+      ...(votePassed && executionHash && { hash: executionHash, issueId: null }),
+    },
+    /** The target of a call the chain does not show yet, otherwise `current`. */
+    shown: unsettled ? change.target : current,
+    /** The chain does not show the target yet. */
+    unsettled,
+    /** Submitted but not executed. */
+    waiting: unsettled && !change.result.executed,
+    track: (result: GovernedCallResult, target: T) => setChange({ result, target, settled: false }),
+    clear: () => setChange(null),
+  };
 }
 
 // A loaded series stays for the session: only a converter transaction made here refetches it.

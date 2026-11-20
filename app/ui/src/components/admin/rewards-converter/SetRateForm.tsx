@@ -1,18 +1,34 @@
 import { useState } from "react";
 import type { RewardsConverterInfo } from "@strato/shared-types";
-import { useSetConverterRate } from "@/hooks/useRewardsConverter";
+import { useGovernedChange, useSetConverterRate } from "@/hooks/useRewardsConverter";
 import { rateFromDecimal } from "@/utils/rewardsConverterMath";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import GovernedCallNote from "./GovernedCallNote";
+import WaitingDots from "./WaitingDots";
 
 const SetRateForm = ({ state }: { state: RewardsConverterInfo }) => {
   const setRate = useSetConverterRate();
   const [value, setValue] = useState("");
+  // What was typed for the last rate submitted: the input holds it while that rate waits on its vote
+  const [submitted, setSubmitted] = useState("");
+  const { result, waiting, track, clear } = useGovernedChange(state.rate);
   const rate = rateFromDecimal(value);
   const invalid = !!value.trim() && rate <= 0n;
+  const busy = setRate.isPending || waiting;
+
+  const submit = () => {
+    clear();
+    setRate.mutate(rate, {
+      onSuccess: (result) => {
+        track(result, rate.toString());
+        setSubmitted(value);
+        setValue("");
+      },
+    });
+  };
 
   return (
     <Card className="border border-border/70">
@@ -32,18 +48,17 @@ const SetRateForm = ({ state }: { state: RewardsConverterInfo }) => {
             className={invalid ? "border-destructive text-destructive focus-visible:ring-destructive" : ""}
             aria-invalid={invalid}
             placeholder="0.00"
-            value={value}
+            value={waiting ? submitted : value}
+            disabled={busy}
             onChange={(event) => setValue(event.target.value)}
           />
         </div>
-        <Button
-          className="w-full"
-          disabled={rate <= 0n || setRate.isPending}
-          onClick={() => setRate.mutate(rate, { onSuccess: () => setValue("") })}
-        >
-          {setRate.isPending ? "Submitting..." : "Set Rate"}
+        <Button className="w-full" disabled={rate <= 0n || busy} onClick={submit}>
+          {waiting ? <>Setting Rate<WaitingDots /></> : setRate.isPending ? "Submitting..." : "Set Rate"}
         </Button>
-        <GovernedCallNote result={setRate.data} />
+        <GovernedCallNote result={result ?? undefined}>
+          {result?.issueId && !result.executed && " · waiting on vote"}
+        </GovernedCallNote>
       </CardContent>
     </Card>
   );

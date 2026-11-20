@@ -1,48 +1,23 @@
-import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import type { GovernedCallResult } from "@strato/shared-types";
-import { useIssueExecutionHash, usePauseConverter, useUnpauseConverter } from "@/hooks/useRewardsConverter";
+import { useGovernedChange, usePauseConverter, useUnpauseConverter } from "@/hooks/useRewardsConverter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import GovernedCallNote from "./GovernedCallNote";
-
-interface Flip {
-  result: GovernedCallResult;
-  /** The position the flip asked for. */
-  paused: boolean;
-  /** The chain state has reached that position. */
-  settled: boolean;
-}
+import WaitingDots from "./WaitingDots";
 
 const PauseToggle = ({ paused }: { paused: boolean }) => {
   const pause = usePauseConverter();
   const unpause = useUnpauseConverter();
-  // The last flip made here
-  const [flip, setFlip] = useState<Flip | null>(null);
-  if (flip && !flip.settled && flip.paused === paused) setFlip({ ...flip, settled: true });
-
-  // The vote this flip was waiting on passed. Another admin's vote executed it, so that transaction is looked up
-  const votePassed = !!flip?.settled && !!flip.result.issueId;
-  const { data: executionHash } = useIssueExecutionHash(flip?.result.hash ?? "", votePassed);
-  const result = flip && {
-    ...flip.result,
-    executed: flip.result.executed || votePassed,
-    ...(votePassed && executionHash && { hash: executionHash, issueId: null }),
-  };
+  // The last flip made here. An executed one shows its position at once, ahead of the next state refresh,
+  // and one that waits on its vote holds the knob mid-way
+  const { result, shown: shownPaused, unsettled, waiting, track, clear } = useGovernedChange(paused);
 
   const pending = pause.isPending || unpause.isPending;
-  const unsettled = !!flip && !flip.settled;
-  // Submitted but not executed: the knob waits mid-way
-  const waiting = unsettled && !flip.result.executed;
-  // An executed flip shows its position at once, ahead of the next state refresh
-  const shownPaused = unsettled ? flip.paused : paused;
 
   const requestFlip = (next: boolean) => {
-    setFlip(null);
-    (next ? pause : unpause).mutate(undefined, {
-      onSuccess: (result) => setFlip({ result, paused: next, settled: false }),
-    });
+    clear();
+    (next ? pause : unpause).mutate(undefined, { onSuccess: (result) => track(result, next) });
   };
 
   return (
@@ -72,13 +47,11 @@ const PauseToggle = ({ paused }: { paused: boolean }) => {
           )}
         </span>
         <Label htmlFor="converter-paused">
-          {waiting ? (flip.paused ? "Pausing" : "Unpausing") : shownPaused ? "Paused" : "Active"}
-          {waiting && [0, 200, 400].map((delay) => (
-            <span key={delay} className="animate-dot-blink" style={{ animationDelay: `${delay}ms` }}>.</span>
-          ))}
+          {waiting ? (shownPaused ? "Pausing" : "Unpausing") : shownPaused ? "Paused" : "Active"}
+          {waiting && <WaitingDots />}
         </Label>
         <GovernedCallNote result={result ?? undefined}>
-          {flip?.result.issueId && !votePassed && " · waiting on vote"}
+          {result?.issueId && !result.executed && " · waiting on vote"}
         </GovernedCallNote>
       </CardContent>
     </Card>
