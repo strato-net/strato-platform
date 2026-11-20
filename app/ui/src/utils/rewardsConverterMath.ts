@@ -26,11 +26,26 @@ export const formatRate = (rate: bigint): string => {
   return `${scaled / 10000n}.${(scaled % 10000n).toString().padStart(4, '0')}`;
 };
 
-/** `part` of `whole` as a percentage to 2 decimals ("40.00%"), rounded down; "—" when `whole` is zero. */
+// `part` of `whole` as a percentage scaled by 1e18, rounded down
+const shareOf = (part: bigint, whole: bigint): bigint => (part * 100n * WAD) / whole;
+
+/** `part` of `whole` as a percentage to all 18 decimals, without trailing zeros; "—" when `whole` is zero. */
+export const shareToDecimal = (part: bigint, whole: bigint): string =>
+  whole === 0n ? '—' : `${formatWeiToDecimalHP(shareOf(part, whole).toString(), 18)}%`;
+
+/**
+ * `part` of `whole` as a short percentage, rounded down; "—" when `whole` is zero. From 1% up it has
+ * 2 decimals ("40.00%"). Below 1% it runs to its first non-zero decimal and at most 3 digits after it
+ * ("0.50%", "0.001234%"), and dots stand in for 4 or more zeros before that decimal ("0.0...1234%").
+ */
 export const formatShare = (part: bigint, whole: bigint): string => {
   if (whole === 0n) return '—';
-  const hundredths = (part * 10000n) / whole;
-  return `${hundredths / 100n}.${(hundredths % 100n).toString().padStart(2, '0')}%`;
+  const percent = shareOf(part, whole);
+  const fraction = (percent % WAD).toString().padStart(18, '0');
+  const zeros = fraction.search(/[1-9]/);
+  if (percent >= WAD || zeros < 0) return `${percent / WAD}.${fraction.slice(0, 2)}%`;
+  const digits = fraction.slice(zeros, zeros + 4).replace(/0+$/, '');
+  return zeros < 4 ? `0.${`${fraction.slice(0, zeros)}${digits}`.padEnd(2, '0')}%` : `0.0...${digits}%`;
 };
 
 /**
