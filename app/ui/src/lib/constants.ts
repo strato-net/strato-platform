@@ -68,6 +68,7 @@ export const METAL_BUY_CALLS = 2; // approve + mintMetal
 export const PSM_MINT_CALLS = 2; // approve + mint
 export const PSM_REDEEM_CALLS = 2; // approve + redeem
 export const REWARDS_CONVERT_CALLS = 2; // approve + convert
+export const REWARDS_POINTS = "Rewards Points"; // shown in place of the rewards token's on-chain symbol
 
 // ============================================
 // Withdrawal limits

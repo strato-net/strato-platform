@@ -1,4 +1,5 @@
 import { api } from "@/lib/axios";
+import { REWARDS_POINTS } from "@/lib/constants";
 import type {
   GovernedCallResult,
   RewardsConverterAccount,
@@ -9,11 +10,11 @@ import type {
   TransactionResponse,
 } from "@strato/shared-types";
 
-// Amounts and rates are raw integers: token units, and STRATO per rewards token scaled by 1e18.
+// Amounts and rates are raw integers: token units, and STRATO per rewards point scaled by 1e18.
 export const rewardsConverterService = {
   async getState(signal?: AbortSignal): Promise<RewardsConverterState> {
-    const { data } = await api.get("/rewards-converter/state", { signal });
-    return data;
+    const { data } = await api.get<RewardsConverterState>("/rewards-converter/state", { signal });
+    return data.configured ? { ...data, rewardsToken: { ...data.rewardsToken, symbol: REWARDS_POINTS } } : data;
   },
 
   async getAccount(signal?: AbortSignal): Promise<RewardsConverterAccount> {
