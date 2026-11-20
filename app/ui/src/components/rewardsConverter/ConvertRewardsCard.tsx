@@ -140,6 +140,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
                   <TooltipTrigger asChild>
                     <Input
                       type="number"
+                      step="any"
                       className={`pr-16 ${invalid ? "border-destructive text-destructive focus-visible:ring-destructive" : ""}`}
                       aria-invalid={invalid}
                       placeholder="0.00"
