@@ -24,7 +24,7 @@ const SetRateForm = ({ state }: { state: RewardsConverterInfo }) => {
       <CardContent className="space-y-3">
         <div className="space-y-2">
           <Label htmlFor="converter-rate">
-            Rate ({state.stratoToken.symbol} per {state.rewardsToken.symbol})
+            Rate ({state.stratoToken.symbol} per Rewards Point)
           </Label>
           <Input
             id="converter-rate"

@@ -35,7 +35,7 @@ const ConverterNumbers = ({ state, stats }: {
 }) => {
   const { rewardsToken, stratoToken } = state;
   const rate = BigInt(state.rate);
-  const rateUnit = `${stratoToken.symbol} per ${rewardsToken.symbol}`;
+  const rateUnit = `${stratoToken.symbol} per Rewards Point`;
 
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">

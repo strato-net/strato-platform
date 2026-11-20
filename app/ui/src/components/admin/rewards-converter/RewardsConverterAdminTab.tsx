@@ -35,7 +35,7 @@ const RewardsConverterAdminTab = () => {
       <CardHeader>
         <CardTitle>Rewards Converter</CardTitle>
         <CardDescription>
-          The converter burns {state.rewardsToken.symbol} and pays {state.stratoToken.symbol} from the reserve at the rate. Every change here is a governed call.
+          The converter burns {state.rewardsToken.symbol.toLowerCase()} and pays {state.stratoToken.symbol} from the reserve at the rate. Every change here is a governed call.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
