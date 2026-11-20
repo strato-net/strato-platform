@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote, Database, ChevronDown, ArrowRightLeft, Vault, Layers } from 'lucide-react';
+import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote, Database, ChevronDown, ArrowRightLeft, Vault, Layers, Gift } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import CreateTokenForm from '@/components/admin/CreateTokenForm';
 import CreatePoolForm from '@/components/admin/CreatePoolForm';
@@ -18,6 +18,7 @@ import VoteTab from '@/components/admin/VoteTab';
 import BridgeTransactionsPage from '@/components/dashboard/BridgeTransactionsPage';
 import YieldVaultAdminTab from '@/components/admin/YieldVaultAdminTab';
 import StakingAdminTab from '@/components/admin/StakingAdminTab';
+import RewardsConverterAdminTab from '@/components/admin/rewards-converter/RewardsConverterAdminTab';
 
 const Admin = () => {
   usePageTitle("Admin");
@@ -137,15 +138,16 @@ const Admin = () => {
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${['vault', 'cdp'].includes(activeTab)
+                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${['vault', 'cdp', 'converter'].includes(activeTab)
                       ? 'bg-background text-foreground shadow-sm dark:bg-muted dark:text-primary-foreground'
                       : 'hover:bg-muted hover:text-accent-foreground dark:hover:bg-muted/50 dark:hover:text-primary-foreground'
                       }`}
                   >
                     {activeTab === 'vault' && <Vault className="h-3 w-3 md:h-4 md:w-4" />}
                     {activeTab === 'cdp' && <Database className="h-3 w-3 md:h-4 md:w-4" />}
-                    <span className="hidden sm:inline">{activeTab === 'vault' ? 'Vault' : activeTab === 'cdp' ? 'CDP Config' : 'More'}</span>
-                    <span className="sm:hidden">{activeTab === 'vault' ? 'Vault' : activeTab === 'cdp' ? 'CDP' : 'More'}</span>
+                    {activeTab === 'converter' && <Gift className="h-3 w-3 md:h-4 md:w-4" />}
+                    <span className="hidden sm:inline">{activeTab === 'vault' ? 'Vault' : activeTab === 'cdp' ? 'CDP Config' : activeTab === 'converter' ? 'Rewards Converter' : 'More'}</span>
+                    <span className="sm:hidden">{activeTab === 'vault' ? 'Vault' : activeTab === 'cdp' ? 'CDP' : activeTab === 'converter' ? 'Converter' : 'More'}</span>
                     <ChevronDown className="h-3 w-3" />
                   </button>
                 </DropdownMenuTrigger>
@@ -157,6 +159,10 @@ const Admin = () => {
                   <DropdownMenuItem onClick={() => setActiveTab('cdp')}>
                     <Database className="h-4 w-4 mr-2" />
                     CDP Config
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveTab('converter')}>
+                    <Gift className="h-4 w-4 mr-2" />
+                    Rewards Converter
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -253,6 +259,9 @@ const Admin = () => {
                 <YieldVaultAdminTab />
               </CardContent>
             </Card>
+          </TabsContent>
+          <TabsContent value="converter" className="space-y-6">
+            <RewardsConverterAdminTab />
           </TabsContent>
         </Tabs>
       </div>
