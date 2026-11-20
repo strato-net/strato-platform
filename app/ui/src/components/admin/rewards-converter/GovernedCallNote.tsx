@@ -1,12 +1,17 @@
 import type { ReactNode } from "react";
 import type { GovernedCallResult } from "@strato/shared-types";
 import { formatHash } from "@/utils/numberUtils";
+import CopyButton from "@/components/ui/copy";
 
-const message = ({ executed, issueId, hash }: GovernedCallResult): string => {
-  if (executed) return "Executed";
-  if (issueId) return `Vote submitted · issue ${formatHash(issueId)}`;
-  // Signed with an external wallet, or the issue lookup timed out
-  return `Transaction ${formatHash(hash)}`;
+const message = ({ executed, issueId, hash }: GovernedCallResult): ReactNode => {
+  if (issueId && !executed) return `Vote submitted · issue ${formatHash(issueId)}`;
+  // Executed, signed with an external wallet, or the issue lookup timed out
+  return (
+    <>
+      {formatHash(hash)}
+      <CopyButton address={hash} />
+    </>
+  );
 };
 
 /** What a governed call did: it ran, the vote was recorded, or a wallet sent it. Nothing before the first call. */
