@@ -49,7 +49,9 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
   const amount = safeParseUnits(amountInput, rewardsToken.decimals);
   const payout = payoutFor(amount, BigInt(state.rate));
   const reserveEmpty = BigInt(state.reserve) === 0n;
-  const canConvert = !paused && amount > 0n && amount <= maxAmount && payout > 0n;
+  const convertible = amount > 0n && amount <= maxAmount && payout > 0n;
+  const canConvert = !paused && convertible;
+  const invalid = !!amountInput && !!account && !convertible;
   const formDisabled = !isLoggedIn || paused || convert.isPending;
 
   const converted = `${formatUnits(amount, rewardsToken.decimals)} ${rewardsToken.symbol}`;
@@ -129,6 +131,8 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
             <div className="space-y-2">
               <Input
                 type="number"
+                className={invalid ? "border-destructive text-destructive focus-visible:ring-destructive" : ""}
+                aria-invalid={invalid}
                 placeholder="0.00"
                 value={amountInput}
                 onChange={(e) => setAmountInput(e.target.value)}
