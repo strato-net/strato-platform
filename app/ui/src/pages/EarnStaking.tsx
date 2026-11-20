@@ -163,19 +163,19 @@ type StakingInfo = {
   unbondingRequests: UnbondingRequest[];
 };
 
-const formatToken = (value: string | undefined, decimals: number, maxFractionDigits = 4): string => {
+const formatToken = (value: string | bigint | undefined, decimals: number, maxFractionDigits = 4): string => {
   try {
     // Truncate (never round) so displayed amounts match the portfolio's formatBalance convention.
-    const amount = Number(truncateDecimals(formatUnits(value || "0", decimals), maxFractionDigits));
-    if (!Number.isFinite(amount) || amount === 0) return "0";
-    return amount.toLocaleString("en-US", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: maxFractionDigits,
-    });
+    const [whole, fraction] = truncateDecimals(formatUnits(value || "0", decimals), maxFractionDigits).split(".");
+    const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return fraction ? `${grouped}.${fraction}` : grouped;
   } catch {
     return "0";
   }
 };
+
+const formatReward = (value: string | undefined, decimals: number): string =>
+  formatToken(value, decimals, decimals);
 
 const formatAmountInput = (value: bigint, decimals: number): string => {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
@@ -560,7 +560,7 @@ const OperatorPanel = ({
         <div className={`mt-4 grid gap-3 ${active || selfBond > 0n ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
           <div className="rounded-md bg-muted/30 p-3">
             <p className="text-xs text-muted-foreground">Operator Rewards</p>
-            <p className="mt-1 font-semibold">{formatToken(claimableRewards, decimals)} {symbol}</p>
+            <p className="mt-1 font-semibold">{formatReward(claimableRewards, decimals)} {symbol}</p>
             {rewardBreakdown && (
               <p className="mt-1 text-xs text-muted-foreground">{rewardBreakdown}</p>
             )}
@@ -825,9 +825,12 @@ const EarnStaking = () => {
       ? (info?.operatedValidators || [])
         .map((address) => validators.find((validator) => sameAddress(validator.address, address)))
         .filter((validator): validator is StakingValidator => Boolean(validator))
-      : []),
-    [info?.operatedValidators, isV2, validators]
+      : info?.isOperator && operatorValidator ? [operatorValidator] : []),
+    [info?.operatedValidators, info?.isOperator, isV2, operatorValidator, validators]
   );
+  const totalBonded = operatedValidators.reduce((total, validator) => total + BigInt(validator.selfBond || "0"), 0n);
+  const stakeWithSelfBond = (validator: StakingValidator) =>
+    BigInt(validator.userStake || "0") + (operatedValidators.includes(validator) ? BigInt(validator.selfBond || "0") : 0n);
   // A backend that predates the flag still reports the full validator set, so only an
   // explicit false hides these controls.
   const validatorSetDeployed = info?.validatorSetDeployed !== false;
@@ -1318,7 +1321,7 @@ const EarnStaking = () => {
     }
 
     return (
-      <div className="space-y-5">
+      <div className="space-y-5 [overflow-wrap:anywhere]">
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
           <StatCard
             label="Available to Stake"
@@ -1328,8 +1331,8 @@ const EarnStaking = () => {
           />
           <StatCard
             label="Amount Staked"
-            tooltip="Total STRATO you currently have delegated across all validators."
-            value={`${formatToken(info.userTotalStake, decimals)} ${symbol}`}
+            tooltip="Your delegated STRATO plus your operator self-bond across all validators."
+            value={`${formatToken(BigInt(info.userTotalStake || "0") + totalBonded, decimals)} ${symbol}`}
             icon={Layers}
           />
           <StatCard
@@ -1343,13 +1346,13 @@ const EarnStaking = () => {
           <StatCard
             label="Total Rewards"
             tooltip="Lifetime STRATO you've earned through staking, including rewards already claimed."
-            value={`${formatToken(info.totalEarned, decimals)} ${symbol}`}
+            value={`${formatReward(info.totalEarned, decimals)} ${symbol}`}
             icon={Trophy}
           />
           <StatCard
             label="Claimable"
             tooltip="Rewards you've earned and can claim now without unstaking your delegated STRATO. Claiming doesn't affect your staked balance."
-            value={`${formatToken(info.claimableRewards, decimals)} ${symbol}`}
+            value={`${formatReward(info.claimableRewards, decimals)} ${symbol}`}
             icon={Gift}
           />
           {claimableFees > 0n && (
@@ -1396,7 +1399,7 @@ const EarnStaking = () => {
               )}
               <p className="mt-2 text-sm text-muted-foreground">
                 {isV2
-                  ? `${formatToken(info.totalRewardsCredited, decimals)} ${symbol} credited to date`
+                  ? `${formatReward(info.totalRewardsCredited, decimals)} ${symbol} credited to date`
                   : formatRewardPeriodStatus(info.periodStart, info.periodFinish)}
                 {" · "}
                 <a
@@ -1415,7 +1418,7 @@ const EarnStaking = () => {
         {isLoggedIn && !isV2 && info.isOperator && renderOperatorPanel(info.operatorAddress, operatorValidator, {
           claimableRewards: info.operatorClaimableRewards,
           claimableFees: info.operatorClaimableFees,
-          rewardBreakdown: `Base ${formatToken(info.operatorPendingBaseRewards, decimals)} · Commission ${formatToken(info.operatorPendingCommission, decimals)} · Self-bond ${formatToken(info.operatorPendingSelfBondRewards, decimals)}`,
+          rewardBreakdown: `Base ${formatReward(info.operatorPendingBaseRewards, decimals)} · Commission ${formatReward(info.operatorPendingCommission, decimals)} · Self-bond ${formatReward(info.operatorPendingSelfBondRewards, decimals)}`,
           currentCommissionBps: info.currentOperatorCommissionBps,
         })}
 
@@ -1424,7 +1427,7 @@ const EarnStaking = () => {
           claimableFees: validator.operatorPendingFees || "0",
           // The info-level split describes a single operated validator; with several there is no per-validator split.
           rewardBreakdown: operatedValidators.length === 1
-            ? `Self-bond ${formatToken(info.operatorPendingSelfBondRewards, decimals)} · Commission ${formatToken(info.operatorPendingCommission, decimals)}`
+            ? `Self-bond ${formatReward(info.operatorPendingSelfBondRewards, decimals)} · Commission ${formatReward(info.operatorPendingCommission, decimals)}`
             : "",
           currentCommissionBps: validator.commissionBps,
         }))}
@@ -1579,11 +1582,11 @@ const EarnStaking = () => {
                         )}
                         <div className="rounded-md bg-muted/30 px-3 py-2">
                           <p className="text-xs text-muted-foreground">Your Stake</p>
-                          <p className="font-semibold">{formatToken(validator.userStake, decimals)} {symbol}</p>
+                          <p className="font-semibold">{formatToken(stakeWithSelfBond(validator), decimals)} {symbol}</p>
                         </div>
                         <div className="rounded-md bg-muted/30 px-3 py-2">
                           <p className="text-xs text-muted-foreground">Rewards</p>
-                          <p className="font-semibold">{formatToken(validator.pendingRewards, decimals)} {symbol}</p>
+                          <p className="font-semibold">{formatReward(validator.pendingRewards, decimals)} {symbol}</p>
                         </div>
                         <div className="rounded-md bg-muted/30 px-3 py-2">
                           <p className="text-xs text-muted-foreground">{apyLabel}</p>
@@ -1670,7 +1673,7 @@ const EarnStaking = () => {
                         <TipLabel label="Total Stake" tooltip="All STRATO staked with this validator, including delegations and the operator's self-bond." />
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                        <TipLabel label="Your Stake" tooltip="STRATO you have delegated to this validator." />
+                        <TipLabel label="Your Stake" tooltip="Your delegation to this validator plus any self-bond you hold as its operator." />
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
                         <TipLabel label="Rewards" tooltip="Rewards you've accrued from this validator and can claim now." />
@@ -1718,8 +1721,8 @@ const EarnStaking = () => {
                             <td className="px-4 py-3 text-right text-sm tabular-nums">{formatUptime(validator.blocksProposed, validator.missedProposals)}</td>
                           )}
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.totalStake, decimals)}</td>
-                          <td className="px-4 py-3 text-right text-sm">{formatToken(validator.userStake, decimals)}</td>
-                          <td className="px-4 py-3 text-right text-sm">{formatToken(validator.pendingRewards, decimals)}</td>
+                          <td className="px-4 py-3 text-right text-sm">{formatToken(stakeWithSelfBond(validator), decimals)}</td>
+                          <td className="px-4 py-3 text-right text-sm">{formatReward(validator.pendingRewards, decimals)}</td>
                           <td className="px-4 py-3 text-right text-sm">{apyWithBreakdown(validator.estimatedApy)}</td>
                           <td className="px-4 py-3 text-right text-sm">{formatPercentFromBps(validator.commissionBps)}</td>
                           <td className="px-4 py-3">
@@ -1946,7 +1949,7 @@ const EarnStaking = () => {
                   {actionMode === "claim" && (
                     <div className="rounded-md bg-muted/40 px-3 py-2 text-sm">
                       <p className="text-xs text-muted-foreground">Claimable</p>
-                      <p className="font-semibold">{formatToken(actionValidator.pendingRewards, decimals)} {symbol}</p>
+                      <p className="break-all font-semibold">{formatReward(actionValidator.pendingRewards, decimals)} {symbol}</p>
                     </div>
                   )}
 
@@ -1971,7 +1974,7 @@ const EarnStaking = () => {
                         disabled={!isLoggedIn || actionValidatorStake <= 0n}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Your stake: {formatToken(actionValidator.userStake, decimals)} {symbol} · unbonding {formatDuration(info?.unbondingSeconds)}
+                        Your delegation: {formatToken(actionValidator.userStake, decimals)} {symbol} · unbonding {formatDuration(info?.unbondingSeconds)}
                       </p>
                     </div>
                   )}
@@ -2021,7 +2024,7 @@ const EarnStaking = () => {
                           disabled={!isLoggedIn || actionValidatorStake <= 0n}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Your stake: {formatToken(actionValidator.userStake, decimals)} {symbol}
+                          Your delegation: {formatToken(actionValidator.userStake, decimals)} {symbol}
                         </p>
                       </div>
                     </div>
