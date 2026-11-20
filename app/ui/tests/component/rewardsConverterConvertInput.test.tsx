@@ -113,6 +113,24 @@ describe("the convert amount input", () => {
     expect(input().getAttribute("aria-invalid")).toBe("false");
   });
 
+  it.each([
+    ["61", "Exceeds the reserve"],
+    ["100.000000000000000001", "Exceeds your balance"],
+    ["1.0000000000000000001", "Enter an amount above zero with at most 18 decimal places"],
+  ])("says why %s is invalid in a tooltip: %s", async (value, reason) => {
+    await show();
+    type(value);
+    fireEvent.focus(input());
+    expect((await screen.findByRole("tooltip")).textContent).toBe(reason);
+  });
+
+  it("shows no tooltip on a valid amount", async () => {
+    await show();
+    type("60");
+    fireEvent.focus(input());
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
   it("clears the mark once the amount is corrected", async () => {
     await show();
     type("61");

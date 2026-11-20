@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import NetworkFee, { FeeNotices } from "@/components/NetworkFee";
 import { useToast } from "@/hooks/use-toast";
 import { useConvertRewards, useRewardsConverterAccount } from "@/hooks/useRewardsConverter";
@@ -52,6 +53,11 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
   const convertible = amount > 0n && amount <= maxAmount && payout > 0n;
   const canConvert = !paused && convertible;
   const invalid = !!amountInput && !!account && !convertible;
+  const invalidReason = amount > balance
+    ? "Exceeds your balance"
+    : amount > maxConvertible
+      ? "Exceeds the reserve"
+      : `Enter an amount above zero with at most ${rewardsToken.decimals} decimal places`;
   const formDisabled = !isLoggedIn || paused || convert.isPending;
 
   const converted = `${formatUnits(amount, rewardsToken.decimals)} ${rewardsToken.symbol}`;
@@ -130,15 +136,24 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
 
             <div className="space-y-2">
               <div className="relative">
-                <Input
-                  type="number"
-                  className={`pr-16 ${invalid ? "border-destructive text-destructive focus-visible:ring-destructive" : ""}`}
-                  aria-invalid={invalid}
-                  placeholder="0.00"
-                  value={amountInput}
-                  onChange={(e) => setAmountInput(e.target.value)}
-                  disabled={formDisabled}
-                />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Input
+                      type="number"
+                      className={`pr-16 ${invalid ? "border-destructive text-destructive focus-visible:ring-destructive" : ""}`}
+                      aria-invalid={invalid}
+                      placeholder="0.00"
+                      value={amountInput}
+                      onChange={(e) => setAmountInput(e.target.value)}
+                      disabled={formDisabled}
+                    />
+                  </TooltipTrigger>
+                  {invalid && (
+                    <TooltipContent>
+                      <p>{invalidReason}</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
                 {isLoggedIn && (
                   <Button
                     type="button"
