@@ -11,7 +11,7 @@ const NetworkFee = ({ calls = 1 }: { calls?: number }) => {
       <TooltipTrigger asChild>
         <span className="cursor-help">{describeFee(feeQuote, calls)}</span>
       </TooltipTrigger>
-      <TooltipContent>As of {new Date(feeQuoteAt).toLocaleString()}</TooltipContent>
+      <TooltipContent>As of {new Date(feeQuoteAt).toLocaleTimeString()}</TooltipContent>
     </Tooltip>
   );
 };
