@@ -323,7 +323,6 @@
             "WBTC",
             "PAXG",
             "XAUT",
-            "SUSDS",
             "SYRUPUSDC",
             "RETH",
             "USDC",
@@ -549,6 +548,17 @@
           ],
           "symbolMapping": {
             "BOOE": "0x289ff00235d2b98b0145ff5d4435d3e92f9540a6"
+          }
+        },
+        "DIASUSDS": {
+          "url": "https://api.diadata.org/v1/assetQuotation/Ethereum/${SYMBOLS}",
+          "parse": "Price",
+          "comment": "Free, no API key. Second DIA entry because the endpoint takes ONE token address (see DIA). Replaces Alchemy for SUSDS: Alchemy's DEX-weighted sUSDS price is pulled down by dead high-liquidity pools (~$1.06-1.07 vs the on-chain convertToAssets rate ~$1.117). symbolMapping is the ERC-20 contract address.",
+          "assets": [
+            "SUSDS"
+          ],
+          "symbolMapping": {
+            "SUSDS": "0xa3931d71877C0E7a3148CB7Eb4463524FEc27fbD"
           }
         },
         "CommodityPriceAPI": {
@@ -966,7 +976,6 @@
             "WBTC",
             "PAXG",
             "XAUT",
-            "SUSDS",
             "SYRUPUSDC",
             "RETH",
             "USDC",
@@ -1192,6 +1201,17 @@
           ],
           "symbolMapping": {
             "BOOE": "0x289ff00235d2b98b0145ff5d4435d3e92f9540a6"
+          }
+        },
+        "DIASUSDS": {
+          "url": "https://api.diadata.org/v1/assetQuotation/Ethereum/${SYMBOLS}",
+          "parse": "Price",
+          "comment": "Free, no API key. Second DIA entry because the endpoint takes ONE token address (see DIA). Replaces Alchemy for SUSDS: Alchemy's DEX-weighted sUSDS price is pulled down by dead high-liquidity pools (~$1.06-1.07 vs the on-chain convertToAssets rate ~$1.117). symbolMapping is the ERC-20 contract address.",
+          "assets": [
+            "SUSDS"
+          ],
+          "symbolMapping": {
+            "SUSDS": "0xa3931d71877C0E7a3148CB7Eb4463524FEc27fbD"
           }
         },
         "CommodityPriceAPI": {

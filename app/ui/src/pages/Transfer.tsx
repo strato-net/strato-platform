@@ -8,8 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Token } from "@/interface";
-import { useWalletClient, useWriteContract } from "wagmi";
-import { ensureStratoChainInWallet, getStratoChainId } from "@/lib/stratoChain";
 
 import { useUser } from "@/context/UserContext";
 import { useTokenContext, BulkTransferItem, BulkTransferResponse } from "@/context/TokenContext";
@@ -30,32 +28,11 @@ import {
 import { ChevronDown, Upload, AlertTriangle } from "lucide-react";
 import { handleRecipientAddress, handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { sortTokensCompareFn } from "@/lib/tokenPriority";
-import { captureApi } from "@/lib/analytics";
-
-const erc20TransferAbi = [
-  {
-    name: "transfer",
-    type: "function",
-    inputs: [
-      { name: "to", type: "address" },
-      { name: "value", type: "uint256" },
-    ],
-    outputs: [{ type: "bool" }],
-    stateMutability: "nonpayable",
-  },
-] as const;
-
-const ensureHexPrefix = (addr: string): `0x${string}` =>
-  (addr.startsWith("0x") ? addr : `0x${addr}`) as `0x${string}`;
 
 const Transfer = () => {
-  const { userAddress, userName, isLoggedIn } = useUser();
+  const { userAddress, isLoggedIn } = useUser();
   const { feeQuote, fetchUsdstBalance, loadingUsdstBalance, getTransferableTokens, transferToken, bulkTransferToken } = useTokenContext();
-  const { writeContractAsync } = useWriteContract();
-  const { data: walletClient } = useWalletClient();
-  const stratoChainId = getStratoChainId();
   const { toast } = useToast();
-  const isVaultUser = !!userName;
   const guestMode = !isLoggedIn;
   usePageTitle("Send Assets");
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -134,40 +111,18 @@ const Transfer = () => {
       setShowConfirmModal(false);
       const weiValue = safeParseUnits(fromAmount, 18).toString();
 
-      if (isVaultUser) {
-        await transferToken({
-          address: fromAsset.address,
-          to: recipient,
-          value: weiValue,
-        });
-      } else {
-        // External-wallet transfers are signed via wagmi and never reach the
-        // axios interceptor; the vault branch above is instrumented there.
-        captureApi("token_transfer", "started", {
-          transport: "wagmi",
-          token_symbol: fromAsset?.token?._symbol,
-        });
-        await ensureStratoChainInWallet(walletClient);
-        const nonceRes = await fetch("/rpc", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionCount", params: [userAddress, "latest"] }),
-        }).then((r) => r.json());
-        const nonce = Number(nonceRes.result);
-        await writeContractAsync({
-          chainId: stratoChainId || undefined,
-          address: ensureHexPrefix(fromAsset.address),
-          abi: erc20TransferAbi,
-          functionName: "transfer",
-          args: [ensureHexPrefix(recipient), BigInt(weiValue)],
-          nonce: Number(nonce),
-          gas: 1000000n,
-        });
-        captureApi("token_transfer", "succeeded", {
-          transport: "wagmi",
-          token_symbol: fromAsset?.token?._symbol,
-        });
-      }
+      // Vault and external wallets both go through the shared signing flow:
+      // the backend builds the transfer with the correct gas and nonce, the
+      // connected wallet signs the EIP-712 Transaction (the axios interceptor
+      // routes it to the registered wallet signer and records analytics), and
+      // the call resolves only once the on-chain result is in -- so the success
+      // toast below means the transfer landed, not just that the wallet
+      // returned a hash.
+      await transferToken({
+        address: fromAsset.address,
+        to: recipient,
+        value: weiValue,
+      });
 
       toast({
         title: "Success",
@@ -185,14 +140,9 @@ const Transfer = () => {
       }).catch(() => { });
       fetchUsdstBalance();
     } catch (error) {
+      // Wallet-signed failures (rejection, on-chain revert) are captured in the
+      // axios interceptor, which is the only place that sees the real outcome.
       console.error("Transfer error:", error);
-      if (!isVaultUser) {
-        captureApi("token_transfer", "failed", {
-          transport: "wagmi",
-          token_symbol: fromAsset?.token?._symbol,
-          error_message: error instanceof Error ? error.message : "Transfer failed",
-        });
-      }
       setSwapLoading(false);
     }
   };
