@@ -45,9 +45,6 @@ const ConfirmConversionDialog = ({
               <span className="font-semibold text-foreground">{received}</span>{" "}
               to you.
             </p>
-            <p className="font-medium text-destructive">
-              Converted rewards points are burned. This cannot be undone.
-            </p>
             <p className="text-xs">
               Transaction fee: <NetworkFee calls={REWARDS_CONVERT_CALLS} />
             </p>
