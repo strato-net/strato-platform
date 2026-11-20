@@ -207,13 +207,16 @@ export function validateUnsignedTx(
     : "createContract";
   const expectedArguments = requestedArguments(payload, argumentNames);
   const returnedArguments = decodedUnsignedArgs(tx);
+  const wallet = strip0x(userWalletAddress ?? "");
+  // With a User wallet selected, a direct call would run as the connected account instead,
+  // so it is accepted only for a call to that User wallet itself.
   const direct = type === "FUNCTION" &&
+    (!wallet || expectedTarget === wallet) &&
     strip0x(d.to) === expectedTarget &&
     (d.functionName ?? "") === expectedFunction &&
     sameValues(returnedArguments, expectedArguments);
   if (direct) return;
 
-  const wallet = strip0x(userWalletAddress ?? "");
   if (!wallet) throw new Error("This transaction could not be verified, so it was not signed.");
   const wrapper = type === "FUNCTION" ? "callContract" : "createContract";
   // The node spreads the inner call's arguments after its target and function name.

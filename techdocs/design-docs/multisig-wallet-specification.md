@@ -266,8 +266,12 @@ new logic version is published; until then it is a manual step.
 The health check only shows that a version can read the wallet's signer data, so a version
 must also pass `MultisigPublication.test.sol` before it is published. That test runs every
 governance action on a wallet created on the candidate and on a wallet upgraded to it from
-the published version, whose source is kept in `tests/Admin/published/`. When a version is
-published, add its source there and point the test's upgrade case at it.
+the published version, whose source is kept in `tests/Admin/published/`. One upgraded wallet
+is created by the published registry logic, so it sits on the shell real wallets have. On
+the current shell the test also checks that `executeUpgrade` is refused while an issue
+executes, which fails if a candidate renames `multisigExecuting`. When a version is
+published, add its source there and point the test's upgrade case at it; when the registry
+logic is replaced, add its source and shell there too.
 
 ### Scheduling
 

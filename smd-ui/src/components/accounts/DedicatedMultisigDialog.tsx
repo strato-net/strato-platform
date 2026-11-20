@@ -54,7 +54,7 @@ import {
   proposalArgumentTypesMatch,
   type ProposalMetadata,
 } from "@/services/dedicatedProposal";
-import { useFunctionByAddress } from "@/services/contracts";
+import { useContractConstant, useFunctionByAddress } from "@/services/contracts";
 import { useTokenMetadata, type TokenMetadata } from "@/services/tokens";
 import { strip0x } from "@/services/userWallets";
 
@@ -95,6 +95,7 @@ function IssueActions({
   disabled,
   requiredApprovals,
   transactionTimelock,
+  approvalLifetime,
   cancellationProposed,
   tokens,
   metadata,
@@ -105,6 +106,8 @@ function IssueActions({
   cancellationProposed: boolean;
   requiredApprovals: number;
   transactionTimelock: number;
+  /** The rules' approval lifetime in seconds, once read from the contract. */
+  approvalLifetime?: number | null;
   tokens: TokenMetadata[];
   metadata: ProposalMetadata;
 }) {
@@ -177,6 +180,10 @@ function IssueActions({
   );
   const upgradeUnavailable = isUpgradeProposal && metadata.approvedVersions !== undefined &&
     (!upgradeVersionApproved || !upgradePathApproved);
+  const withdrawalEndsWait = approved && issue.executableAt > 0 && issue.approvals <= requiredApprovals;
+  // Until both are known, the guidance must not promise that approvals can be restored.
+  const approvalDeadline = issue.createdAt > 0 && approvalLifetime ? issue.createdAt + approvalLifetime : null;
+  const withdrawalExpires = withdrawalEndsWait && approvalDeadline !== null && now > approvalDeadline;
   const finalApproval = issue.executableAt === 0 && !approved &&
     issue.approvals + 1 >= requiredApprovals;
   const executesOnApproval = finalApproval && (
@@ -226,7 +233,7 @@ function IssueActions({
   return (
     <div className="space-y-3 rounded-lg border p-4 text-sm">
       <div className="space-y-1">
-        <div className="text-base font-medium">{description.headline}</div>
+        <div className="text-base font-medium [overflow-wrap:anywhere]">{description.headline}</div>
         {description.detail ? (
           <div className="text-muted-foreground">{description.detail}</div>
         ) : null}
@@ -286,7 +293,7 @@ function IssueActions({
           <AlertDescription>Review the spender and amount carefully before approving.</AlertDescription>
         </Alert>
       ) : null}
-      {proposalWarning ? (
+      {proposalWarning && !unlimitedApproval ? (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>{proposalWarning.title}</AlertTitle>
@@ -394,7 +401,9 @@ function IssueActions({
         ) : null}
         {approved ? (
           <Button size="sm" variant="outline" disabled={busy || disabled} onClick={() => void control(false)}>
-            Revoke approval
+            {withdrawalExpires
+              ? "Withdraw approval and expire the proposal"
+              : withdrawalEndsWait ? "Withdraw approval and end the wait" : "Revoke approval"}
           </Button>
         ) : null}
         {issue.executableAt === 0 && creator && (issue.approvals === 0 || (approved && issue.approvals === 1)) ? (
@@ -403,12 +412,24 @@ function IssueActions({
           </Button>
         ) : null}
       </div>
+      {withdrawalExpires ? (
+        <p className="text-xs text-destructive">
+          This proposal is past its approval window. Withdrawing your approval ends it for good; it cannot be approved again.
+        </p>
+      ) : withdrawalEndsWait ? (
+        <p className="text-xs text-muted-foreground">
+          {approvalDeadline === null
+            ? "Withdrawing your approval ends the waiting period. If this proposal is past its approval window, it ends for good."
+            : "Withdrawing your approval ends the waiting period. It restarts once the approvals are back."}
+        </p>
+      ) : null}
     </div>
   );
 }
 
 function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) {
   const { data: state, isLoading } = useDedicatedWalletState(wallet.address);
+  const { data: approvalLifetime } = useContractConstant(state?.logic, "ISSUE_APPROVAL_LIFETIME");
   const { data: issues = [] } = useDedicatedIssues(wallet.address, state?.epoch);
   const proposalTokenAddresses = useMemo(
     () => issues.flatMap((issue) => [issue.target, ...issue.arguments]),
@@ -816,6 +837,7 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
                   disabled={!state.provenanceVerified}
                   requiredApprovals={state.requiredApprovals}
                   transactionTimelock={state.transactionTimelock}
+                  approvalLifetime={approvalLifetime}
                   cancellationProposed={openIssues.some(
                     (open) => strip0x(open.target) === strip0x(wallet.address) &&
                       open.functionName === "cancelIssue" && open.arguments[0] === issue.issueId

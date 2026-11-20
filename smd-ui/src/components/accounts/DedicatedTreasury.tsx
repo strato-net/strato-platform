@@ -20,7 +20,6 @@ import {
 import { useUser } from "@/context/UserContext";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { CopyableAddress } from "@/components/CopyButton";
-import { shortenHex } from "@/lib/utils";
 import { describeProposal, type ProposalMetadata } from "@/services/dedicatedProposal";
 import {
   buildDedicatedProtocolCall,
@@ -40,6 +39,7 @@ import {
   useV3AllowanceMetadata,
 } from "@/services/protocolMetadata";
 import {
+  tokenLabel,
   useMyTokens,
   useTokenMetadata,
   useTokenAllowances,
@@ -110,7 +110,7 @@ function TokenAmount({
           <SelectTrigger className="w-36"><SelectValue placeholder="Token" /></SelectTrigger>
           <SelectContent>
             {tokens.map((item) => (
-              <SelectItem key={item.address} value={item.address}>{item.symbol}</SelectItem>
+              <SelectItem key={item.address} value={item.address} className="[overflow-wrap:anywhere]">{tokenLabel(item)}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -118,7 +118,7 @@ function TokenAmount({
       </div>
       {token ? (
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs text-muted-foreground">{balanceLabel}: {humanBalance(token)} {token.symbol}</span>
+          <span className="text-xs text-muted-foreground">{balanceLabel}: {humanBalance(token)} {tokenLabel(token)}</span>
           <div className="flex gap-1">
             {PERCENTS.map((percent) => (
               <Button
@@ -195,7 +195,7 @@ export function DedicatedTreasuryTab({
       });
       setDepositAmount("");
       refresh();
-      toast.success(`Deposited ${depositAmount} ${token.symbol}`);
+      toast.success(`Deposited ${depositAmount} ${tokenLabel(token)}`);
     } catch (error: any) {
       toast.error(error?.message || "Deposit failed");
     } finally {
@@ -252,7 +252,7 @@ export function DedicatedTreasuryTab({
         <div className="text-xs font-medium text-muted-foreground">Holdings</div>
         {treasury.length ? treasury.map((token) => (
           <div key={token.address} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-            <span className="font-medium">{token.symbol}</span>
+            <span className={token.verified ? "font-medium" : "break-all text-muted-foreground"}>{tokenLabel(token)}</span>
             <span className="font-mono text-xs">{humanBalance(token)}</span>
           </div>
         )) : <p className="text-sm text-muted-foreground">This multisig wallet holds no tokens yet.</p>}
@@ -697,7 +697,7 @@ export function DedicatedProtocolActionsTab({
               <SelectTrigger><SelectValue placeholder="Select a pool" /></SelectTrigger>
               <SelectContent>
                 {compatiblePools.map((pool) => (
-                  <SelectItem key={pool.address} value={pool.address}>{pool.poolName} · {shortenHex(pool.address, 6, 4)}</SelectItem>
+                  <SelectItem key={pool.address} value={pool.address} className="[overflow-wrap:anywhere]">{pool.poolName} · 0x{pool.address}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -713,7 +713,7 @@ export function DedicatedProtocolActionsTab({
               <SelectTrigger><SelectValue placeholder="Select a validator" /></SelectTrigger>
               <SelectContent>
                 {(staking.data?.validators ?? []).filter((item) => action === "unstake" || item.active).map((item) => (
-                  <SelectItem key={item.address} value={item.address}>{item.name || shortenHex(item.address, 6, 4)}</SelectItem>
+                  <SelectItem key={item.address} value={item.address} className="[overflow-wrap:anywhere]">{item.name || `0x${item.address}`}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -804,8 +804,8 @@ export function DedicatedProtocolActionsTab({
                   <SelectTrigger><SelectValue placeholder="Select V3 pool" /></SelectTrigger>
                   <SelectContent>
                     {(v3.data?.pools ?? []).map((pool) => (
-                      <SelectItem key={pool.address} value={pool.address}>
-                        {pool.token0._symbol}/{pool.token1._symbol} · {shortenHex(pool.address, 6, 4)}
+                      <SelectItem key={pool.address} value={pool.address} className="[overflow-wrap:anywhere]">
+                        {pool.token0._symbol}/{pool.token1._symbol} · 0x{pool.address}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -824,8 +824,8 @@ export function DedicatedProtocolActionsTab({
                   <SelectTrigger><SelectValue placeholder="Select position" /></SelectTrigger>
                   <SelectContent>
                     {(v3.data?.positions ?? []).map((position) => (
-                      <SelectItem key={position.tokenId} value={position.tokenId}>
-                        #{position.tokenId} · {shortenHex(position.poolAddress, 6, 4)}
+                      <SelectItem key={position.tokenId} value={position.tokenId} className="[overflow-wrap:anywhere]">
+                        #{position.tokenId} · 0x{position.poolAddress}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -911,6 +911,8 @@ const HISTORY_OUTCOMES = {
   dismissed: "Not executed: dismissed by its proposer.",
   cancelled: "Not executed: cancelled by the signers.",
   superseded: "Not executed: cancelled when the signers or rules changed.",
+  withdrawn: "Approval withdrawn.",
+  unqueued: "Waiting period ended: approvals dropped below the number needed.",
 };
 
 export function DedicatedHistoryTab({
@@ -938,13 +940,15 @@ export function DedicatedHistoryTab({
   return (
     <div className="space-y-2">
       {history.map((item) => {
-        const description = item.outcome
-          ? describeProposal(item, allTokens, { ...metadata, historical: true })
-          : { headline: item.headline, addresses: item.account ? [item.account] : [] };
+        const proposal = item.outcome ? describeProposal(item, allTokens, { ...metadata, historical: true }) : null;
+        const description = {
+          headline: proposal?.headline ?? item.headline,
+          addresses: [...(proposal?.addresses ?? []), ...(item.account ? [item.account] : [])],
+        };
         return (
           <div key={item.key} className="rounded-md border p-3 text-sm">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-medium">{description.headline}</span>
+            <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{description.headline}</span>
             <span className="text-xs text-muted-foreground">{item.timestamp ? new Date(item.timestamp).toLocaleString() : ""}</span>
           </div>
           {item.outcome && item.outcome !== "executed" ? (

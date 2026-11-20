@@ -204,6 +204,9 @@ test("external wallets refuse what they cannot check as one requested transactio
     },
   };
   assert.throws(() => validateUnsignedTx(unsigned, "FUNCTION", payload, null), /could not be identified/);
+  // A send chosen from a User wallet must not be signed as a direct call from the connected account.
+  assert.throws(() => validateUnsignedTx(unsigned, "FUNCTION", payload, 123, spender), /could not be verified/);
+  assert.doesNotThrow(() => validateUnsignedTx(unsigned, "FUNCTION", payload, 123, wallet));
   assert.throws(() => validateUnsignedTx(unsigned, "TRANSFER", payload, 123), /cannot be signed/);
 
   const originalWindow = globalThis.window;
@@ -249,6 +252,8 @@ test("history shows how each proposal ended and wallet events that are not propo
     event(8, "SignerAdded", { signer, epoch: "2" }),
     event(7, "UpgradeExecuted", { executor: signer, fromVersion: "6", targetVersion: "7", epoch: "1" }),
     event(6, "IssueCancelled", { issueId: "cancelled" }),
+    event(6, "IssueUnqueued", { issueId: "left-open" }),
+    event(6, "IssueApprovalRevoked", { issueId: "left-open", signer: spender, approvals: "1" }),
     event(5, "IssueDismissed", { issueId: "dismissed" }),
     event(4, "IssueExecuted", { issueId: "executed", target: wallet, functionName: "transfer", arguments: "[]" }),
     proposal(3, "left-open", 1),
@@ -268,6 +273,8 @@ test("history shows how each proposal ended and wallet events that are not propo
       ["superseded", "left-open", at(8)],
       ["Upgraded from version 6 to 7", "", at(7)],
       ["cancelled", "cancelled", at(6)],
+      ["unqueued", "left-open", at(6)],
+      ["withdrawn", "left-open", at(6)],
       ["dismissed", "dismissed", at(5)],
       ["executed", "executed", at(4)],
       ["Multisig wallet created", "", at(1)],
@@ -278,12 +285,21 @@ test("history shows how each proposal ended and wallet events that are not propo
   );
   assert.equal(new Set(history.map((item) => item.key)).size, history.length);
   assert.deepEqual(history[1].arguments, [signer, "1"]);
-  assert.deepEqual(history[6].account, { label: "Created by", value: signer });
+  assert.deepEqual(history[5].account, { label: "Withdrawn by", value: spender });
+  assert.deepEqual(history[8].account, { label: "Created by", value: signer });
 });
 
 test("dedicated issue review flags unlimited approvals", () => {
   assert.equal(isUnlimitedTokenApproval("approve", [spender, String(1n << 256n)]), true);
   assert.equal(isUnlimitedTokenApproval("transfer", [spender, String(1n << 256n)]), false);
+  assert.equal(isUnlimitedTokenApproval("increaseAllowance", [spender, String(1n << 256n)]), true);
+  assert.equal(isUnlimitedTokenApproval("increaseAllowance", [spender, "100"]), false);
+  assert.equal(isUnlimitedTokenApproval("setApprovalForAll", [spender, "true"]), false);
+  assert.equal(describeProposalWarning({
+    target: wallet,
+    functionName: "setApprovalForAll",
+    arguments: [spender, "true"],
+  })?.title, "Token operator permission");
 });
 
 test("dedicated issue review flags high-risk custom calls", () => {
@@ -432,7 +448,7 @@ test("proposal descriptions expose stable liquidity and governance destinations"
     [],
     current
   );
-  assert.equal(removal.headline, "Remove signer 0x333333…3333");
+  assert.equal(removal.headline, `Remove signer 0x${"3".repeat(40)}`);
   assert.equal(removal.detail, "4 signers become 3, approvals needed changes from 3 to 2");
   assert.deepEqual(removal.addresses, [{ label: "Signer to remove", value: receiver }]);
   assert.equal(
@@ -456,7 +472,7 @@ test("proposal descriptions expose stable liquidity and governance destinations"
     [],
     { walletAddress: wallet, signers: [wallet, signer, receiver], requiredApprovals: 2, pools: [] }
   );
-  assert.equal(addSigner.headline, "Add signer 0x5b8f21…9a71");
+  assert.equal(addSigner.headline, `Add signer 0x${spender}`);
   assert.equal(addSigner.detail, "3 signers become 4, approvals needed stays 2");
   assert.equal(
     describeProposal(
@@ -484,7 +500,7 @@ test("a token permission names the protocol contract it is for", () => {
       [{ address: spender, symbol: "GOLDST", decimals: 18 }],
       { walletAddress: wallet, pools: [] }
     ).headline,
-    "Allow 0xfdb36b…e032 to spend 0.001 GOLDST"
+    `Allow 0x${signer} to spend 0.001 GOLDST`
   );
 });
 
@@ -495,7 +511,7 @@ test("proposal descriptions decode tokens not held by the multisig wallet", () =
       [{ address: spender, symbol: "USDC", decimals: 6 }],
       { walletAddress: wallet, pools: [] }
     ).headline,
-    "Send 123 USDC to 0xfdb36b…e032"
+    `Send 123 USDC to 0x${signer}`
   );
 });
 

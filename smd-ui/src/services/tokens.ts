@@ -10,9 +10,14 @@ export interface TokenBalance {
   decimals: number;
   /** Raw balance in the token's smallest units (string to preserve precision). */
   balance: string;
+  /** Registered in the token factory. Anything else names itself, so its symbol is not shown. */
+  verified: boolean;
 }
 
-export type TokenMetadata = Omit<TokenBalance, "balance">;
+export const tokenLabel = (token: TokenBalance): string =>
+  token.verified ? token.symbol : `Unverified 0x${strip0x(token.address)}`;
+
+export type TokenMetadata = Omit<TokenBalance, "balance" | "verified">;
 
 function toRawString(value: unknown): string {
   if (typeof value === "number") {
@@ -45,15 +50,27 @@ export function useMyTokens(ownerAddress?: string | null) {
           `&storage.data-%3E%3Estatus=eq.2&key-%3E%3Ekey=eq.${key}&value=gt.0` +
           `&select=address,value::text,storage!inner(data-%3E%3E_symbol,data-%3E%3EcustomDecimals)`
       );
-      if (!Array.isArray(data)) return [];
+      if (!Array.isArray(data) || !data.length) return [];
+      // A failed lookup leaves every holding unverified instead of hiding the balances.
+      const { data: registered } = await api.get(
+        `${env.CIRRUS_URL}/mapping?address=eq.${TOKEN_FACTORY_ADDRESS}&collection_name=eq.isFactoryToken` +
+          `&key-%3E%3Ekey=in.(${data.map((row: any) => strip0x(String(row?.address ?? ""))).join(",")})` +
+          `&value=eq.true&select=key`,
+        { skipErrorToast: true }
+      ).catch(() => ({ data: [] }));
+      const factoryTokens = new Set(
+        (Array.isArray(registered) ? registered : []).map((row: any) => strip0x(String(row?.key?.key ?? "")))
+      );
       return data
         .map((row: any) => ({
           address: row?.address ?? "",
           symbol: row?.storage?._symbol ?? "TOKEN",
           decimals: Number(row?.storage?.customDecimals ?? 18),
           balance: toRawString(row?.value),
+          verified: factoryTokens.has(strip0x(String(row?.address ?? ""))),
         }))
-        .filter((t) => t.address);
+        .filter((t) => t.address)
+        .sort((left, right) => Number(right.verified) - Number(left.verified));
     },
     refetchInterval: 15000,
   });
@@ -64,7 +81,7 @@ export function useMyTokens(ownerAddress?: string | null) {
  * Only tokens registered in the token factory are returned, so a contract cannot name itself as one.
  */
 export function useTokenMetadata(addresses: string[]) {
-  const normalized = [...new Set(addresses.map(strip0x).filter((address) => address.length === 40))].sort();
+  const normalized = [...new Set(addresses.map(strip0x).filter((address) => /^[0-9a-f]{40}$/.test(address)))].sort();
   return useQuery({
     queryKey: ["token-metadata", normalized],
     enabled: normalized.length > 0,

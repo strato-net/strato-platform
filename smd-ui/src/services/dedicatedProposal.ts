@@ -1,5 +1,5 @@
 import { formatUnits } from "viem";
-import { formatWaitingPeriod, shortenHex } from "@/lib/utils";
+import { formatWaitingPeriod } from "@/lib/utils";
 import { isUnlimitedTokenApproval } from "@/services/dedicatedMultisig";
 import type {
   CDPMetadata,
@@ -162,7 +162,7 @@ export function describeProposal(
   const targetToken = tokens.find((token) => strip0x(token.address) === strip0x(proposal.target));
   const tokenFor = (value: string) =>
     tokens.find((token) => strip0x(token.address) === strip0x(value));
-  const short = (value: string) => shortenHex(strip0x(value), 6, 4);
+  const hex = (value: string) => `0x${strip0x(value)}`;
   const address = (label: string, value: string) => ({ label, value: strip0x(value) });
   const targetIsWallet = strip0x(proposal.target) === strip0x(metadata.walletAddress);
   const stakingTarget = strip0x(proposal.target) === strip0x(metadata.staking?.stakingAddress ?? "");
@@ -173,7 +173,7 @@ export function describeProposal(
   if (targetToken && proposal.functionName === "transfer" && proposal.arguments.length >= 2) {
     const recipient = proposal.arguments[0];
     return {
-      headline: `Send ${formatAmount(proposal.arguments[1], targetToken)} ${targetToken.symbol} to ${short(recipient)}`,
+      headline: `Send ${formatAmount(proposal.arguments[1], targetToken)} ${targetToken.symbol} to ${hex(recipient)}`,
       addresses: [address("Recipient", recipient)],
     };
   }
@@ -184,7 +184,7 @@ export function describeProposal(
       : `${formatAmount(proposal.arguments[1], targetToken)} ${targetToken.symbol}`;
     const spenderName = knownAddressName(spender, tokens, metadata);
     return {
-      headline: `Allow ${spenderName ?? short(spender)} to spend ${amount}`,
+      headline: `Allow ${spenderName ?? hex(spender)} to spend ${amount}`,
       detail: spenderName
         ? `Token permission for ${spenderName}. The action that uses it is a separate proposal.`
         : undefined,
@@ -198,7 +198,7 @@ export function describeProposal(
       strip0x(item.address) === strip0x(validator)
     )?.name;
     return {
-      headline: `${proposal.functionName === "stake" ? "Stake" : "Unstake"} ${formatAmount(proposal.arguments[1], undefined, metadata.staking?.tokenDecimals ?? 18)} ${metadata.staking?.tokenSymbol ?? "STRATO"} ${proposal.functionName === "stake" ? "with" : "from"} ${validatorName || short(validator)}`,
+      headline: `${proposal.functionName === "stake" ? "Stake" : "Unstake"} ${formatAmount(proposal.arguments[1], undefined, metadata.staking?.tokenDecimals ?? 18)} ${metadata.staking?.tokenSymbol ?? "STRATO"} ${proposal.functionName === "stake" ? "with" : "from"} ${validatorName || hex(validator)}`,
       addresses: [address("Validator", validator)],
     };
   }
@@ -218,7 +218,7 @@ export function describeProposal(
       strip0x(item.asset) === strip0x(asset)
     );
     return {
-      headline: `Borrow ${formatAmount(proposal.arguments[1], undefined, 18)} USDST against ${assetMetadata?.symbol ?? short(asset)}`,
+      headline: `Borrow ${formatAmount(proposal.arguments[1], undefined, 18)} USDST against ${assetMetadata?.symbol ?? hex(asset)}`,
       addresses: [address("Collateral asset", asset)],
     };
   }
@@ -227,7 +227,7 @@ export function describeProposal(
       strip0x(item.address) === strip0x(proposal.arguments[0])
     );
     return {
-      headline: `Create a ${v3Pool ? `${v3Pool.token0._symbol}/${v3Pool.token1._symbol}` : short(proposal.arguments[0])} liquidity position`,
+      headline: `Create a ${v3Pool ? `${v3Pool.token0._symbol}/${v3Pool.token1._symbol}` : hex(proposal.arguments[0])} liquidity position`,
       addresses: [
         address("Pool", proposal.arguments[0]),
         ...(proposal.arguments[7] ? [address("Receiver", proposal.arguments[7])] : []),
@@ -236,7 +236,7 @@ export function describeProposal(
   }
   if (pool && (proposal.functionName === "addLiquidity" || proposal.functionName === "addLiquidityGeneral")) {
     return {
-      headline: `Add liquidity to ${pool.poolName || short(proposal.target)}`,
+      headline: `Add liquidity to ${pool.poolName || hex(proposal.target)}`,
       detail: proposal.functionName === "addLiquidity" && proposal.arguments.length >= 2
         ? `${formatAmount(proposal.arguments[0], undefined, pool.tokenB.customDecimals)} ${pool.tokenB._symbol} with up to ${
             formatAmount(proposal.arguments[1], undefined, pool.tokenA.customDecimals)
@@ -249,14 +249,14 @@ export function describeProposal(
   }
   if (pool && proposal.functionName === "removeliquidityOneCoin") {
     return {
-      headline: `Remove liquidity from ${pool.poolName || short(proposal.target)} as one coin`,
+      headline: `Remove liquidity from ${pool.poolName || hex(proposal.target)} as one coin`,
       addresses: proposal.arguments[3] ? [address("Receiver", proposal.arguments[3])] : [],
     };
   }
   if (pool && (proposal.functionName === "removeLiquidity" || proposal.functionName === "removeLiquidityGeneral")) {
     const receiver = proposal.functionName === "removeLiquidityGeneral" ? proposal.arguments[2] : "";
     return {
-      headline: `Remove liquidity from ${pool.poolName || short(proposal.target)}`,
+      headline: `Remove liquidity from ${pool.poolName || hex(proposal.target)}`,
       addresses: receiver ? [address("Receiver", receiver)] : [],
     };
   }
@@ -277,7 +277,7 @@ export function describeProposal(
     : metadata.signers?.length;
   if (targetIsWallet && proposal.functionName === "nominateSigner" && proposal.arguments[0]) {
     return {
-      headline: `Add signer ${short(proposal.arguments[0])}`,
+      headline: `Add signer ${hex(proposal.arguments[0])}`,
       detail: signerCount == null
         ? undefined
         : `${signerCount} signers become ${signerCount + 1}, approvals needed stays ${metadata.requiredApprovals}`,
@@ -287,7 +287,7 @@ export function describeProposal(
   if (targetIsWallet && proposal.functionName === "removeSigner" && proposal.arguments[0]) {
     const required = proposal.arguments[1] ?? "";
     return {
-      headline: `Remove signer ${short(proposal.arguments[0])}`,
+      headline: `Remove signer ${hex(proposal.arguments[0])}`,
       detail: signerCount == null
         ? `Approvals needed: ${required}`
         : `${signerCount} signers become ${signerCount - 1}, approvals needed ${
@@ -303,7 +303,7 @@ export function describeProposal(
   }
   if (targetIsWallet && proposal.functionName === "revokeNomination" && proposal.arguments[0]) {
     return {
-      headline: `Revoke signer invitation for ${short(proposal.arguments[0])}`,
+      headline: `Revoke signer invitation for ${hex(proposal.arguments[0])}`,
       addresses: [address("Invited signer", proposal.arguments[0])],
     };
   }
@@ -334,5 +334,5 @@ export function describeProposal(
       addresses: [],
     };
   }
-  return { headline: `Call ${proposal.functionName} on ${short(proposal.target)}`, custom: true, addresses: [] };
+  return { headline: `Call ${proposal.functionName} on ${hex(proposal.target)}`, custom: true, addresses: [] };
 }

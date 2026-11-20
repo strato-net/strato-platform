@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CopyableAddress, CopyButton } from "@/components/CopyButton";
-import { AddrLink } from "@/components/explorer/AddrLink";
+import { Link } from "react-router-dom";
 import { DedicatedMultisigDialog } from "@/components/accounts/DedicatedMultisigDialog";
 import {
   SetupInvitationDialog,
@@ -44,9 +44,11 @@ function MultisigWalletRow({ wallet }: { wallet: MultisigWalletSummary }) {
       <TableCell>
         <div className="flex flex-wrap items-center gap-x-2">
           <span className="font-medium">{wallet.label || "Unnamed multisig wallet"}</span>
-          <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-mono text-xs">
-            <AddrLink address={wallet.address} />
-            <CopyButton value={wallet.address} />
+          <span className="inline-flex items-center gap-1.5 break-all font-mono text-xs">
+            <Link to={`/explorer/accounts/${wallet.address}`} className="text-primary hover:underline">
+              0x{wallet.address}
+            </Link>
+            <CopyButton value={`0x${wallet.address}`} />
           </span>
         </div>
         <div className="flex flex-wrap gap-x-2 text-xs">

@@ -157,6 +157,8 @@ export interface DedicatedIssue {
   approvedSigners: string[];
   executableAt: number;
   expiresAt: number;
+  /** Block time the proposal was created, in seconds; 0 if unknown. */
+  createdAt: number;
 }
 
 const VERSION_NOT_APPROVED = "This multisig wallet's version is no longer approved";
@@ -723,6 +725,7 @@ export function useDedicatedIssues(walletAddress?: string | null, epoch?: number
             approvedSigners: approvalsById.get(issueId) ?? [],
             executableAt: Number(value.executableAt ?? 0),
             expiresAt: Number(value.expiresAt ?? 0),
+            createdAt: Number(value.createdAt ?? 0),
           };
         });
     },
@@ -733,7 +736,7 @@ export interface DedicatedHistoryItem {
   key: string;
   timestamp?: string;
   /** How a proposal ended. Absent for wallet events that are not proposals. */
-  outcome?: "executed" | "dismissed" | "cancelled" | "superseded";
+  outcome?: "executed" | "dismissed" | "cancelled" | "superseded" | "withdrawn" | "unqueued";
   issueId: string;
   target: string;
   functionName: string;
@@ -745,7 +748,8 @@ export interface DedicatedHistoryItem {
 
 const HISTORY_EVENTS = [
   "IssueExecuted", "IssueExecutedNoArgs", "IssueCreated", "IssueCreatedNoArgs", "IssueDismissed",
-  "IssueCancelled", "SignerAdded", "UpgradeExecuted", "ConfigurationAdvanced",
+  "IssueCancelled", "IssueApprovalRevoked", "IssueUnqueued", "SignerAdded", "UpgradeExecuted",
+  "ConfigurationAdvanced",
 ];
 
 /** Turns a wallet's events, newest first, into the entries shown under History. */
@@ -757,7 +761,9 @@ export const buildDedicatedHistory = (events: any[], limit: number): DedicatedHi
     const attributes = event?.attributes ?? {};
     const name = String(event?.event_name ?? "");
     if (name.startsWith("IssueCreated")) created.set(String(attributes.issueId ?? ""), event);
-    else if (name.startsWith("Issue")) ended.add(String(attributes.issueId ?? ""));
+    else if (name.startsWith("IssueExecuted") || name === "IssueDismissed" || name === "IssueCancelled") {
+      ended.add(String(attributes.issueId ?? ""));
+    }
     if (name === "ConfigurationAdvanced" || name === "UpgradeExecuted") {
       advances.push({ epoch: Number(attributes.epoch ?? 0), timestamp: event?.block_timestamp });
     }
@@ -787,6 +793,18 @@ export const buildDedicatedHistory = (events: any[], limit: number): DedicatedHi
           ...base,
           outcome: name === "IssueDismissed" ? "dismissed" : "cancelled",
           ...issue(origin.attributes),
+        });
+      }
+    } else if (name === "IssueApprovalRevoked" || name === "IssueUnqueued") {
+      const origin = created.get(String(attributes.issueId ?? ""));
+      if (origin) {
+        items.push({
+          ...base,
+          outcome: name === "IssueUnqueued" ? "unqueued" : "withdrawn",
+          ...issue(origin.attributes),
+          ...(attributes.signer
+            ? { account: { label: "Withdrawn by", value: strip0x(String(attributes.signer)) } }
+            : {}),
         });
       }
     } else if (name === "SignerAdded") {
@@ -869,8 +887,9 @@ export interface RegisterDedicatedSetup {
 export const canonicalizeSetupSigners = (signers: string[]): string[] =>
   [...new Set(signers.map(strip0x).filter((signer) => signer.length === 40))].sort();
 
+/** An allowance with no practical limit. Operator permissions have their own warning. */
 export const isUnlimitedTokenApproval = (functionName: string, args: string[]): boolean => {
-  if (functionName !== "approve" || args.length < 2) return false;
+  if ((functionName !== "approve" && functionName !== "increaseAllowance") || args.length < 2) return false;
   try {
     return BigInt(args[1] || "0") > (1n << 255n);
   } catch {

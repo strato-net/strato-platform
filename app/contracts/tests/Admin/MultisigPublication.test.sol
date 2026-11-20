@@ -1,6 +1,7 @@
 import "../../concrete/Admin/MultisigFactory.sol";
 import "../../concrete/Admin/MultisigLogic.sol";
 import "../../concrete/Proxy/Proxy.sol";
+import "./published/MultisigFactoryV1.sol";
 import "./published/MultisigLogicV1.sol";
 
 contract PublicationSigner {
@@ -23,6 +24,12 @@ contract PublicationToken {
     }
 }
 
+contract PublicationUpgradeTrigger {
+    function trigger(address _wallet) public {
+        MultisigWallet(_wallet).executeUpgrade();
+    }
+}
+
 /**
  * Release check for a rules version. Run it before the publish vote: it proves a wallet
  * created on the candidate, and a wallet upgraded to it from the published version, can
@@ -33,7 +40,9 @@ contract Describe_MultisigPublication {
     uint constant UPGRADE_DELAY = 604800;
 
     MultisigFactory factory;
+    MultisigFactory publishedFactory;
     address candidate;
+    address successor;
     PublicationSigner a;
     PublicationSigner b;
     PublicationSigner c;
@@ -50,6 +59,17 @@ contract Describe_MultisigPublication {
         factory.publishLogicVersion("1", address(new MultisigLogicV1()));
         factory.publishLogicVersion("2", candidate);
         factory.setUpgradePath("1", "2", true);
+        // A later version, only so a wallet on the candidate has an upgrade to refuse.
+        successor = address(new MultisigLogic());
+        factory.publishLogicVersion("3", successor);
+        factory.setUpgradePath("2", "3", true);
+        // The registry logic and wallet shell as published, for wallets created before this one.
+        MultisigFactoryV1 publishedImplementation = new MultisigFactoryV1(address(0xdeadbeef));
+        publishedFactory = MultisigFactory(address(new Proxy(address(publishedImplementation), address(this))));
+        publishedFactory.initializeRegistryGovernance(address(this));
+        publishedFactory.publishLogicVersion("1", address(new MultisigLogicV1()));
+        publishedFactory.publishLogicVersion("2", candidate);
+        publishedFactory.setUpgradePath("1", "2", true);
         a = new PublicationSigner();
         b = new PublicationSigner();
         c = new PublicationSigner();
@@ -59,11 +79,37 @@ contract Describe_MultisigPublication {
         outsider = new PublicationSigner();
     }
 
-    function deploy(string _version) internal returns (address) {
-        string setupHash = factory.registerSetup([address(a), address(b), address(c)], 2, TIMELOCK, _version, "publication");
-        a.invoke(address(factory), "confirmSetup", setupHash);
-        b.invoke(address(factory), "confirmSetup", setupHash);
-        return c.invoke(address(factory), "confirmSetup", setupHash);
+    function deploy(MultisigFactory _registry, string _version) internal returns (address) {
+        string setupHash = _registry.registerSetup([address(a), address(b), address(c)], 2, TIMELOCK, _version, "publication");
+        a.invoke(address(_registry), "confirmSetup", setupHash);
+        b.invoke(address(_registry), "confirmSetup", setupHash);
+        return c.invoke(address(_registry), "confirmSetup", setupHash);
+    }
+
+    function upgrade(address _wallet, address _logic, string _version) internal {
+        string[] types = ["address", "string", "string"];
+        string id = a.invoke(_wallet, "proposeIssue", _wallet, "scheduleUpgrade", types, _logic, _version, "");
+        b.invoke(_wallet, "approveIssue", id, _wallet, "scheduleUpgrade", types, _logic, _version, "");
+        fastForward(TIMELOCK);
+        a.invoke(_wallet, "executeIssue", id, _wallet, "scheduleUpgrade", types, _logic, _version, "");
+        fastForward(UPGRADE_DELAY);
+    }
+
+    /// @dev The shell reads the candidate's executing flag by name. A candidate that renamed it
+    ///      would let an upgrade be applied in the middle of an issue.
+    function requireUpgradeIsRefusedDuringAnIssue(address _wallet) internal {
+        upgrade(_wallet, successor, "3");
+        PublicationUpgradeTrigger trigger = new PublicationUpgradeTrigger();
+        string id = a.invoke(_wallet, "proposeIssue", address(trigger), "trigger", ["address"], _wallet);
+        b.invoke(_wallet, "approveIssue", id, address(trigger), "trigger", ["address"], _wallet);
+        fastForward(TIMELOCK);
+        require(
+            rejects(a, _wallet, "executeIssue", id, address(trigger), "trigger", ["address"], _wallet),
+            "Upgrade applied in the middle of an issue"
+        );
+        require(MultisigWallet(_wallet).multisigCurrentVersion() == "2", "Version changed in the middle of an issue");
+        string cancellation = a.invoke(_wallet, "proposeIssueNoArgs", _wallet, "cancelUpgrade");
+        b.invoke(_wallet, "approveIssueNoArgs", cancellation, _wallet, "cancelUpgrade");
     }
 
     function rejects(PublicationSigner _caller, address _target, string _function, variadic _arguments) internal returns (bool) {
@@ -203,13 +249,14 @@ contract Describe_MultisigPublication {
     }
 
     function it_runs_every_governance_action_on_a_wallet_created_on_the_candidate() {
-        address wallet = deploy("2");
+        address wallet = deploy(factory, "2");
         require(MultisigWallet(wallet).logicContract() == candidate, "Wallet is not on the candidate");
+        requireUpgradeIsRefusedDuringAnIssue(wallet);
         exercise(wallet, d, e);
     }
 
     function it_runs_every_governance_action_on_a_wallet_upgraded_to_the_candidate() {
-        address wallet = deploy("1");
+        address wallet = deploy(factory, "1");
         PublicationToken token = new PublicationToken(wallet);
 
         // Give the old version real state to carry over: a fourth signer, an open
@@ -232,12 +279,7 @@ contract Describe_MultisigPublication {
         uint indexC = MultisigLogic(wallet).signerMap(address(c));
         uint indexD = MultisigLogic(wallet).signerMap(address(d));
 
-        string[] upgradeTypes = ["address", "string", "string"];
-        string upgrade = a.invoke(wallet, "proposeIssue", wallet, "scheduleUpgrade", upgradeTypes, candidate, "2", "");
-        b.invoke(wallet, "approveIssue", upgrade, wallet, "scheduleUpgrade", upgradeTypes, candidate, "2", "");
-        fastForward(TIMELOCK);
-        a.invoke(wallet, "executeIssue", upgrade, wallet, "scheduleUpgrade", upgradeTypes, candidate, "2", "");
-        fastForward(UPGRADE_DELAY);
+        upgrade(wallet, candidate, "2");
         outsider.invoke(wallet, "executeUpgrade");
 
         require(MultisigWallet(wallet).logicContract() == candidate, "Upgrade did not install the candidate");
@@ -255,6 +297,17 @@ contract Describe_MultisigPublication {
             "Issue from the old version survived the upgrade"
         );
 
+        requireUpgradeIsRefusedDuringAnIssue(wallet);
         exercise(wallet, f, e);
+    }
+
+    /// @dev Wallets created before a registry update keep the shell they were created with.
+    function it_runs_every_governance_action_on_a_published_wallet_upgraded_to_the_candidate() {
+        address wallet = deploy(publishedFactory, "1");
+        upgrade(wallet, candidate, "2");
+        outsider.invoke(wallet, "executeUpgrade");
+        require(MultisigWallet(wallet).logicContract() == candidate, "Upgrade did not install the candidate");
+        require(MultisigWallet(wallet).multisigCurrentVersion() == "2", "Upgrade did not record the version");
+        exercise(wallet, d, e);
     }
 }

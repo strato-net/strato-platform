@@ -113,7 +113,9 @@ multisig wallet on its own; each multisig wallet opts in.
 1. **Platform side, once.** The new rules are published in the registry as a version,
    and an upgrade path from the old version to the new one is approved. Before the
    publish vote, the candidate must pass `MultisigPublication.test.sol`, which runs every
-   action on a new multisig wallet and on one upgraded from the published version.
+   action on a new multisig wallet and on one upgraded from the published version,
+   including one created by the published registry, and checks an upgrade is still
+   refused in the middle of a proposal.
 2. Signers **propose** the upgrade and reach `M` approvals.
 3. The multisig wallet's **waiting period** passes.
 4. The **7-day upgrade delay** runs.

@@ -226,6 +226,24 @@ export function useFunctionByAddress(address: string, fnName: string) {
   });
 }
 
+/** A deployed contract's numeric constant, or null when it declares none by that name. */
+export function useContractConstant(address: string | undefined, name: string) {
+  return useQuery({
+    queryKey: ["contract-constant", address, name],
+    enabled: !!address,
+    staleTime: Infinity,
+    queryFn: async (): Promise<number | null> => {
+      const normalized = address!.replace(/^0x/i, "").toLowerCase();
+      const { data: info } = await api.get(`${env.BLOC_URL}/contracts/contract/${normalized}/details`, {
+        params: chainParam(),
+      });
+      const value = info?._constants?.[name]?._constInitialVal;
+      const number = value?.tag === "NumberLiteral" ? Number(value.contents?.[1]) : NaN;
+      return Number.isFinite(number) ? number : null;
+    },
+  });
+}
+
 /** Whether a function is payable (accepts value), from its state mutability. */
 export function isPayable(info: any, fnName: string): boolean {
   return info?._functions?.[fnName]?._funcStateMutability === "payable";
