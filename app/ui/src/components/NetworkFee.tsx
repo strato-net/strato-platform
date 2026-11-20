@@ -1,10 +1,19 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTokenContext } from "@/context/TokenContext";
 import { describeFallback, describeFee, feeBalanceLow, feeCurrencySpend, feeShortfall } from "@/utils/feeUtils";
 
 /** The network fee for `calls` contract calls, as the signed-in user will pay it. */
 const NetworkFee = ({ calls = 1 }: { calls?: number }) => {
-  const { feeQuote } = useTokenContext();
-  return <>{feeQuote ? describeFee(feeQuote, calls) : "…"}</>;
+  const { feeQuote, feeQuoteAt } = useTokenContext();
+  if (!feeQuote || !feeQuoteAt) return <>…</>;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-help">{describeFee(feeQuote, calls)}</span>
+      </TooltipTrigger>
+      <TooltipContent>As of {new Date(feeQuoteAt).toLocaleString()}</TooltipContent>
+    </Tooltip>
+  );
 };
 
 export default NetworkFee;

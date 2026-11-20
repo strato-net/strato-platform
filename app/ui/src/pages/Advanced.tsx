@@ -12,6 +12,8 @@ import LiquidationsView from '@/components/cdp/LiquidationsView';
 import { useUser } from '@/context/UserContext';
 import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 import DirectMintPSMSection from '@/components/dashboard/DirectMintPSMSection';
+import ConvertRewardsSection from '@/components/rewardsConverter/ConvertRewardsSection';
+import { useRewardsConverterState } from '@/hooks/useRewardsConverter';
 
 // Hidden imports - temporarily disabled per issue #7228
 // import { CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +36,7 @@ import { WITHDRAW_COLLATERAL_CALLS, SUPPLY_COLLATERAL_CALLS } from "@/lib/consta
 // import { useSmartPolling } from "@/hooks/useSmartPolling";
 // import LiquidationAlertBanner from '@/components/ui/LiquidationAlertBanner';
 
-type TopTab = "swap" | "psm" | "bad-debt" | "liquidations";
+type TopTab = "swap" | "psm" | "bad-debt" | "liquidations" | "convert-rewards";
 // Hidden type - temporarily disabled per issue #7228
 // type TopTab = "borrow" | "lending" | "swap" | "liquidations" | "safety" | "psm" | "vault";
 
@@ -45,19 +47,24 @@ const TAB_TITLES: Record<TopTab, string> = {
   psm: "PSM",
   "bad-debt": "Bad Debt",
   liquidations: "Liquidations",
+  "convert-rewards": "Convert Rewards → STRATO",
 };
 
 const Advanced = () => {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TopTab>("swap");
   const { isLoggedIn } = useUser();
+  const converter = useRewardsConverterState();
+  const converterConfigured = converter.data?.configured === true;
+  // A link to the converter tab waits for the converter state, and lands on the default tab where there is no converter
+  const shownTab = activeTab === "convert-rewards" && !converterConfigured && !converter.isLoading ? "swap" : activeTab;
 
-  usePageTitle(TAB_TITLES[activeTab]);
+  usePageTitle(TAB_TITLES[shownTab]);
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
 
-    if (tabParam && ['swap', 'psm', 'bad-debt', 'liquidations'].includes(tabParam)) {
+    if (tabParam && ['swap', 'psm', 'bad-debt', 'liquidations', 'convert-rewards'].includes(tabParam)) {
       setActiveTab(tabParam as TopTab);
     }
     // Hidden route validation - temporarily disabled per issue #7228
@@ -221,9 +228,9 @@ const Advanced = () => {
         <main className="px-3 md:px-6 pt-2 md:pt-3 pb-2 md:pb-6">
           <Card className="mb-2 md:mb-6 bg-transparent border-0 rounded-none shadow-none">
             <CardContent className="p-0 md:pt-4">
-              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TopTab)} className="w-full">
+              <Tabs value={shownTab} onValueChange={(value) => setActiveTab(value as TopTab)} className="w-full">
                 <div className="w-full overflow-x-auto mb-3 md:mb-4">
-                  <TabsList className="grid w-full grid-cols-4 min-w-[380px] md:min-w-0 h-auto gap-0.5 md:gap-1">
+                  <TabsList className={`grid w-full ${converterConfigured ? "grid-cols-[repeat(4,minmax(0,1fr))_auto] md:grid-cols-5" : "grid-cols-4"} min-w-[380px] md:min-w-0 h-auto gap-0.5 md:gap-1`}>
                     <TabsTrigger value="swap" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                       Swap Pools
                     </TabsTrigger>
@@ -236,6 +243,11 @@ const Advanced = () => {
                     <TabsTrigger value="liquidations" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                       Liquidations
                     </TabsTrigger>
+                    {converterConfigured && (
+                      <TabsTrigger value="convert-rewards" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
+                        Convert Rewards → STRATO
+                      </TabsTrigger>
+                    )}
                   </TabsList>
                 </div>
 
@@ -263,6 +275,15 @@ const Advanced = () => {
                   )}
                   <LiquidationsView guestMode={!isLoggedIn} />
                 </TabsContent>
+
+                {converterConfigured && (
+                  <TabsContent value="convert-rewards">
+                    {!isLoggedIn && (
+                      <GuestSignInBanner message="Sign in to convert your rewards points" />
+                    )}
+                    <ConvertRewardsSection />
+                  </TabsContent>
+                )}
 
                 {/* Hidden tabs - temporarily disabled per issue #7228 
                 <TabsTrigger value="borrow" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
