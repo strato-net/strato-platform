@@ -66,6 +66,8 @@ type TokenContextType = {
   // USDST balance
   usdstBalance: string;
   feeQuote: FeeQuote | null;
+  /** When `feeQuote` was fetched, ms since epoch. */
+  feeQuoteAt: number | null;
   loadingUsdstBalance: boolean;
   fetchUsdstBalance: (signal?: AbortSignal) => Promise<void>;
   // Net balance (current snapshot)
@@ -103,6 +105,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   // USDST balance state
   const [usdstBalance, setUsdstBalance] = useState("0");
   const [feeQuote, setFeeQuote] = useState<FeeQuote | null>(null);
+  const [feeQuoteAt, setFeeQuoteAt] = useState<number | null>(null);
   const [loadingUsdstBalance, setLoadingUsdstBalance] = useState(false);
 
   // Balance history caches
@@ -233,6 +236,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
 
       setUsdstBalance(usdstResponse?.data?.[0]?.balance || "0");
       setFeeQuote(quoteResponse.data);
+      setFeeQuoteAt(Date.now());
     } catch (err) {
       if (signal?.aborted) return;
       setUsdstBalance("0");
@@ -556,6 +560,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         loadingInactiveTokens,
         usdstBalance,
         feeQuote,
+        feeQuoteAt,
         loadingUsdstBalance,
         fetchUsdstBalance,
         netBalance,

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, Gift } from "lucide-react";
 import type { RewardsConverterInfo } from "@strato/shared-types";
+import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,8 @@ import { maxConvertAmount, payoutFor } from "@/utils/rewardsConverterMath";
 import ConfirmConversionDialog from "./ConfirmConversionDialog";
 import RateValue from "./RateValue";
 
+const FEE_QUOTE_REFRESH_MS = 60_000;
+
 interface ConvertRewardsCardProps {
   state: RewardsConverterInfo;
   refetchState: () => Promise<unknown>;
@@ -25,10 +28,18 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
   const { toast } = useToast();
   const { data: account } = useRewardsConverterAccount();
   const convert = useConvertRewards();
+  const { fetchUsdstBalance } = useTokenContext();
 
   const [amountInput, setAmountInput] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    fetchUsdstBalance();
+    const timer = setInterval(fetchUsdstBalance, FEE_QUOTE_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [fetchUsdstBalance, isLoggedIn]);
 
   const { rewardsToken, stratoToken, paused } = state;
   const maxConvertible = BigInt(state.maxConvertible);
