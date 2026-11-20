@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import type { GovernedCallResult } from "@strato/shared-types";
 import { usePauseConverter, useUnpauseConverter } from "@/hooks/useRewardsConverter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,10 @@ const PauseToggle = ({ paused }: { paused: boolean }) => {
   // The vote passed and the toggle moved, so the waiting note goes
   if (flip?.result.issueId && flip.paused === paused) setFlip(null);
 
+  const pending = pause.isPending || unpause.isPending;
+  // The flip was submitted but the chain state has not moved yet
+  const underway = !!flip && flip.paused !== paused;
+
   const requestFlip = (next: boolean) => {
     setFlip(null);
     (next ? pause : unpause).mutate(undefined, { onSuccess: (result) => setFlip({ result, paused: next }) });
@@ -28,13 +33,26 @@ const PauseToggle = ({ paused }: { paused: boolean }) => {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap items-center gap-3">
-        <Switch
-          id="converter-paused"
-          checked={paused}
-          disabled={pause.isPending || unpause.isPending}
-          onCheckedChange={requestFlip}
-        />
-        <Label htmlFor="converter-paused">{paused ? "Paused" : "Active"}</Label>
+        {pending ? (
+          <span className="flex h-6 w-11 items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </span>
+        ) : (
+          <Switch
+            id="converter-paused"
+            checked={paused}
+            disabled={underway}
+            // Thumb held mid-way until the chain state moves
+            className={underway ? "[&>span]:!translate-x-2.5" : undefined}
+            onCheckedChange={requestFlip}
+          />
+        )}
+        <Label htmlFor="converter-paused">
+          {underway ? (flip.paused ? "Pausing" : "Unpausing") : paused ? "Paused" : "Active"}
+          {underway && [0, 200, 400].map((delay) => (
+            <span key={delay} className="animate-dot-blink" style={{ animationDelay: `${delay}ms` }}>.</span>
+          ))}
+        </Label>
         <GovernedCallNote result={flip?.result}>{flip?.result.issueId && " · waiting on vote"}</GovernedCallNote>
       </CardContent>
     </Card>

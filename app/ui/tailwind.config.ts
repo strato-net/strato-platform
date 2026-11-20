@@ -92,6 +92,10 @@ export default {
 					'0%, 100%': { backgroundPosition: '0% 50%' },
 					'50%': { backgroundPosition: '100% 50%' },
 				},
+				'dot-blink': {
+					'0%, 80%, 100%': { opacity: '0' },
+					'40%': { opacity: '1' },
+				},
 				'pulse-slow': {
 					'0%, 100%': { opacity: '1' },
 					'50%': { opacity: '0.8' },
@@ -105,6 +109,7 @@ export default {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'gradient-flow': 'gradient-flow 8s ease infinite',
+				'dot-blink': 'dot-blink 1.2s ease-in-out infinite',
 				'pulse-slow': 'pulse-slow 3s ease-in-out infinite',
 				'float': 'float 6s ease-in-out infinite',
 			},
