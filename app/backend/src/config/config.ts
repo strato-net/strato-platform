@@ -228,7 +228,7 @@ export const defaultSilvstYieldVaultFor: Record<string, string> = {
 };
 
 export const defaultVestingPoolFor: Record<string, string> = {
-  "114784819836269": "cbdce547b625a90dd211c3eeede43d1f77ac9b84", // Helium testnet
+  "114784819836269": "f412ebeba45bdd7426d2f417a9a97c3e92f4c444", // Helium testnet
 };
 
 /*
