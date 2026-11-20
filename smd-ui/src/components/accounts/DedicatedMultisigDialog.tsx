@@ -705,7 +705,7 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
             {state.upgradesFrozen
               ? "Upgrades are frozen on this multisig wallet, so it cannot move to a newer version. It keeps working; consider moving funds to a new multisig wallet."
               : approvedUpgradeVersions.length
-                ? "This multisig wallet keeps working. An upgrade is available under Settings."
+                ? "This multisig wallet keeps working. An upgrade is available under Admin."
                 : "This multisig wallet keeps working. No upgrade is available yet."}
           </AlertDescription>
         </Alert>
@@ -763,7 +763,7 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
                 Apply upgrade
               </Button>
             ) : (
-              <div>Select an approved replacement under Settings.</div>
+              <div>Select an approved replacement under Admin.</div>
             )}
             <Button
               size="sm"
@@ -795,8 +795,8 @@ function ManageDedicatedMultisig({ wallet }: { wallet: MultisigWalletSummary }) 
           <TabsTrigger value="issues">
             Proposals{needsApproval + ready ? ` (${needsApproval + ready})` : ""}
           </TabsTrigger>
+          <TabsTrigger value="settings">Admin</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="treasury" className="mt-4">
           <DedicatedTreasuryTab wallet={wallet} disabled={!state.provenanceVerified} onProposalCreated={proposalCreated} />
