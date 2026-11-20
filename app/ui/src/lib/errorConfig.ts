@@ -66,6 +66,7 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/rewards-converter/convert": "Conversion Error",
   "/rewards-converter/admin/stats": "Converter Stats Error",
   "/rewards-converter/admin/volume": "Conversion Volume Error",
+  "/rewards-converter/admin/issue-execution": "Issue Lookup Error",
   "/rewards-converter/admin/set-rate": "Set Rate Error",
   "/rewards-converter/admin/pause": "Pause Converter Error",
   "/rewards-converter/admin/unpause": "Unpause Converter Error",

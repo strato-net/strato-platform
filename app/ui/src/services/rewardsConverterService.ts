@@ -49,6 +49,12 @@ export const rewardsConverterService = {
     return data;
   },
 
+  /** Hash of the transaction that executed the issue `voteHash` voted on; null while it has not executed. */
+  async getIssueExecutionHash(voteHash: string, signal?: AbortSignal): Promise<string | null> {
+    const { data } = await api.get("/rewards-converter/admin/issue-execution", { params: { voteHash }, signal });
+    return data.hash;
+  },
+
   async setRate(rate: bigint): Promise<GovernedCallResult> {
     const { data } = await api.post("/rewards-converter/admin/set-rate", { rate: rate.toString() });
     return data;

@@ -61,6 +61,17 @@ export function useRewardsConverterAdminStats() {
   });
 }
 
+/** The transaction that executed the issue `voteHash` voted on. Asks again until the indexer has it. */
+export function useIssueExecutionHash(voteHash: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [KEY, "admin", "issueExecution", voteHash],
+    queryFn: ({ signal }) => rewardsConverterService.getIssueExecutionHash(voteHash, signal),
+    enabled,
+    staleTime: Infinity,
+    refetchInterval: (query) => (query.state.data ? false : INDEX_LAG_MS),
+  });
+}
+
 // A loaded series stays for the session: only a converter transaction made here refetches it.
 const SESSION_CACHE = { staleTime: Infinity, gcTime: Infinity };
 

@@ -17,7 +17,7 @@ import { normalizeAddress } from "../helpers/earnRewards.helper";
 import { safeBigInt } from "../helpers/safeBigInt.helper";
 import { governedInput, findIssueIdForTx } from "./user.service";
 
-const { RewardsConverter, Token, DECIMALS: WAD } = constants;
+const { RewardsConverter, Token, AdminRegistry, DECIMALS: WAD } = constants;
 const Converted = `${RewardsConverter}-Converted`;
 
 // ---- Pure logic ----
@@ -272,6 +272,27 @@ export const getConverterMonthlyVolume = async (
   accessToken: string
 ): Promise<RewardsConverterVolumeBucket[]> =>
   monthlyVolume(await volumeRows(accessToken, constants.rewardsConverter), utcToday());
+
+/** Hash of the transaction that executed the issue `voteHash` voted on, or null while it has not executed. */
+export const getIssueExecutionHash = async (accessToken: string, voteHash: string): Promise<string | null> => {
+  const firstRow = (event: string, params: Record<string, string>) =>
+    cirrus
+      .get(accessToken, `/${AdminRegistry}-${event}`, { params: { ...params, limit: "1" } })
+      .then((res) => res.data?.[0]);
+  const byVote = { transaction_hash: `eq.${voteHash}`, select: "issueId,block_timestamp" };
+  const [created, voted] = await Promise.all([firstRow("IssueCreated", byVote), firstRow("IssueVoted", byVote)]);
+  const vote = created ?? voted;
+  if (!vote) return null;
+  // The same call always gets the same issue id, so only an execution from this vote on counts.
+  // block_timestamp is text: it compares correctly only against Cirrus's own format.
+  const executed = await firstRow("IssueExecuted", {
+    issueId: `eq.${vote.issueId}`,
+    block_timestamp: `gte.${vote.block_timestamp}`,
+    select: "transaction_hash",
+    order: "block_timestamp.asc",
+  });
+  return executed?.transaction_hash ?? null;
+};
 
 // ---- Writes ----
 

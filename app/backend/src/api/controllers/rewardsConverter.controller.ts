@@ -10,6 +10,7 @@ import {
   getConverterHistory,
   getConverterMonthlyVolume,
   getConverterState,
+  getIssueExecutionHash,
   pauseConverter,
   setConverterRate,
   unpauseConverter,
@@ -21,6 +22,9 @@ const isPositiveIntegerString = (value: unknown): value is string =>
 
 const isAddress = (value: unknown): value is string =>
   typeof value === "string" && /^(0x)?[a-fA-F0-9]{40}$/.test(value);
+
+const isTxHash = (value: unknown): value is string =>
+  typeof value === "string" && /^(0x)?[a-fA-F0-9]{64}$/.test(value);
 
 const isMonth = (value: unknown): value is string =>
   typeof value === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
@@ -100,6 +104,17 @@ class RewardsConverterController {
   static async getMonthlyVolume(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       res.status(RestStatus.OK).json(await getConverterMonthlyVolume(req.accessToken));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getIssueExecution(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { voteHash } = req.query;
+      if (!isTxHash(voteHash)) return badRequest(res, "Invalid vote transaction hash");
+
+      res.status(RestStatus.OK).json({ hash: await getIssueExecutionHash(req.accessToken, voteHash) });
     } catch (error) {
       next(error);
     }

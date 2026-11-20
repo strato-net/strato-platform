@@ -15,6 +15,7 @@ import {
   getConverterAdminStats,
   getConverterDailyVolume,
   getConverterHistory,
+  getIssueExecutionHash,
   getConverterState,
   maxConvertible,
   monthlyVolume,
@@ -309,6 +310,30 @@ test("history pages one account's conversions, newest first, with a total", asyn
     user: `eq.${USER}`,
     select: "count()",
   });
+});
+
+test("issue execution is the first one from the vote on, or null before it executes", async (t) => {
+  const calls = mockCirrus(t, {
+    "BlockApps-AdminRegistry-IssueCreated": [],
+    "BlockApps-AdminRegistry-IssueVoted": [{ issueId: "issue-1", block_timestamp: "2026-11-20 02:15:04 UTC" }],
+    "BlockApps-AdminRegistry-IssueExecuted": [{ transaction_hash: "executing-tx" }],
+  });
+
+  assert.equal(await getIssueExecutionHash("access-token", "vote-tx"), "executing-tx");
+  assert.deepEqual(calls.find((call) => call.path.endsWith("-IssueExecuted"))?.params, {
+    issueId: "eq.issue-1",
+    block_timestamp: "gte.2026-11-20 02:15:04 UTC",
+    select: "transaction_hash",
+    order: "block_timestamp.asc",
+    limit: "1",
+  });
+
+  mockCirrus(t, {
+    "BlockApps-AdminRegistry-IssueCreated": [],
+    "BlockApps-AdminRegistry-IssueVoted": [{ issueId: "issue-1", block_timestamp: "2026-11-20 02:15:04 UTC" }],
+    "BlockApps-AdminRegistry-IssueExecuted": [],
+  });
+  assert.equal(await getIssueExecutionHash("access-token", "vote-tx"), null);
 });
 
 test("admin stats derive total funded from the reserve", async (t) => {
