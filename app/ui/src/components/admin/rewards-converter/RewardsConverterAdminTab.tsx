@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { useRewardsConverterAdminStats, useRewardsConverterState } from "@/hooks/useRewardsConverter";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import ConversionVolume from "./ConversionVolume";
 import ConverterNumbers from "./ConverterNumbers";
@@ -33,7 +34,10 @@ const RewardsConverterAdminTab = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Rewards Converter</CardTitle>
+        <CardTitle className="flex items-center gap-3">
+          Rewards Converter
+          <Badge variant={state.paused ? "destructive" : "default"}>{state.paused ? "Paused" : "Active"}</Badge>
+        </CardTitle>
         <CardDescription>
           The converter burns {state.rewardsToken.symbol.toLowerCase()} and pays {state.stratoToken.symbol} from the reserve at the rate. Every change here is a governed call, except funding the reserve.
         </CardDescription>

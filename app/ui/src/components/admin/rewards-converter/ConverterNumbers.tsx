@@ -3,7 +3,6 @@ import { Info, Loader2 } from "lucide-react";
 import type { RewardsConverterAdminStats, RewardsConverterInfo } from "@strato/shared-types";
 import { truncateAddress } from "@/utils/numberUtils";
 import { formatRate, formatShare, rateToDecimal, shareToDecimal } from "@/utils/rewardsConverterMath";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import CopyButton from "@/components/ui/copy";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -49,9 +48,6 @@ const ConverterNumbers = ({ state, stats }: {
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
       <Stat label="Rate" tip={`${stratoToken.symbol} paid for each Rewards Point converted. Changed by a governed call.`}>
         <Hover tip={`${rateToDecimal(rate)} ${rateUnit}`}>{formatRate(rate)} {rateUnit}</Hover>
-      </Stat>
-      <Stat label="Status" tip="Whether holders can convert right now. While paused, every conversion is rejected.">
-        <Badge variant={state.paused ? "destructive" : "default"}>{state.paused ? "Paused" : "Active"}</Badge>
       </Stat>
       <Stat label="Reserve" tip={`${stratoToken.symbol} the converter holds to pay conversions.`}>
         {stats ? (
