@@ -30,6 +30,9 @@ export const WAD = 10n ** 18n;
  */
 export const rewardsEnabled = false;
 
+/** Enable the Vesting tab and page. The tab also needs a configured pool and rows for the identity. */
+export const vestingEnabled = true;
+
 /** Enable MetalForge purchase controls and bridge-to-metal options in the UI. */
 export const metalPurchasesEnabled = false;
 
@@ -64,6 +67,7 @@ export const SAFETY_STAKE_CALLS = 2; // approve + stake
 export const SAFETY_REDEEM_CALLS = 1;
 export const STAKING_STAKE_CALLS = 2; // approve + stake
 export const STAKING_ACTION_CALLS = 1; // claim/unstake/withdraw
+export const VESTING_CLAIM_CALLS = 1; // claimVestedTokens
 export const METAL_BUY_CALLS = 2; // approve + mintMetal
 export const PSM_MINT_CALLS = 2; // approve + mint
 export const PSM_REDEEM_CALLS = 2; // approve + redeem

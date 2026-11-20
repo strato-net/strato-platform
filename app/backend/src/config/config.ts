@@ -227,6 +227,10 @@ export const defaultSilvstYieldVaultFor: Record<string, string> = {
   "33056204878082667": "f8884c44d7cfbfb7c6326c515f375f8572f03e2b", // Upquark mainnet
 };
 
+export const defaultVestingPoolFor: Record<string, string> = {
+  "114784819836269": "cbdce547b625a90dd211c3eeede43d1f77ac9b84", // Helium testnet
+};
+
 /*
    How far back the admin "Executed Issues" list looks. IssueExecuted grows with every
    whitelisted call, not just governance votes, so an unbounded sort/count is proportional
@@ -269,6 +273,7 @@ export let validatorRegistry: string = '';
 export let usdcYieldVault: string = '';
 export let goldstYieldVault: string = '';
 export let silvstYieldVault: string = '';
+export let vestingPoolAddress: string = '';
 export let executedIssuesLookbackDays: number = UNKNOWN_NETWORK_EXECUTED_ISSUES_LOOKBACK_DAYS;
 export let multisigFactory: string = '';
 
@@ -414,6 +419,11 @@ export function setMetalYieldVaultConfig(networkId: string) {
   silvstYieldVault = process.env.SILVST_YIELD_VAULT || defaultSilvstYieldVaultFor[networkId] || "";
 }
 
+// Stored as 40-hex without 0x, like req.address and Cirrus rows.
+export function setVestingPoolConfig(networkId: string) {
+  vestingPoolAddress = (process.env.VESTING_POOL_ADDRESS || defaultVestingPoolFor[networkId] || "").replace(/^0x/i, "").toLowerCase();
+}
+
 export function setExecutedIssuesLookbackConfig(networkId: string) {
   executedIssuesLookbackDays =
     defaultExecutedIssuesLookbackDaysFor[networkId] || UNKNOWN_NETWORK_EXECUTED_ISSUES_LOOKBACK_DAYS;
@@ -451,6 +461,7 @@ export async function initNetworkConfig() {
   setDirectMintPsmConfig(networkId);
   setUsdcYieldVaultConfig(networkId);
   setMetalYieldVaultConfig(networkId);
+  setVestingPoolConfig(networkId);
   setExecutedIssuesLookbackConfig(networkId);
   setMultisigConfig(networkId);
 }

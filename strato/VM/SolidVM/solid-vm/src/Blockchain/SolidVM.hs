@@ -265,7 +265,9 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
     create' sender' newAddress hsh cc (textToLabel contractName) argVals
 
 create' :: MonadSM m => Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ExecResults
-create' creator newAddress ch cc contractName' valList = withContractConstruction newAddress $ \deferPublication -> do
+create' creator newAddress ch cc contractName' valList = do
+ assertNotConstructing newAddress
+ withContractConstruction newAddress $ \deferPublication -> do
 
   let !contract' = fromMaybe (throw (MissingType "create'/contract" (labelToString contractName'))) (cc ^. CC.contracts . at contractName')
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
