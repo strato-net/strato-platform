@@ -533,8 +533,12 @@ contract  StratoStaking is Ownable {
         uint256 w = _window();
         if (p.newWindow != w) {
             if (p.newWindow + 1 == w) {
-                p.oldWindow = p.newWindow;
-                p.oldAmount = p.newAmount;
+                // `+ 0` materialises the slot as a value. A storage-to-storage copy of an
+                // unwritten (zero) scalar is a silent no-op in SolidVM, which would leave a
+                // stale oldAmount/oldWindow behind when newAmount is 0 (same idiom as
+                // ValidatorRegistry.operatorAuthorizationDigest). Not redundant.
+                p.oldWindow = p.newWindow + 0;
+                p.oldAmount = p.newAmount + 0;
             } else {
                 p.oldWindow = 0;
                 p.oldAmount = 0;
