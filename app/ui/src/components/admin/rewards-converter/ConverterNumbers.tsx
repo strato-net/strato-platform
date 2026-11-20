@@ -53,7 +53,13 @@ const ConverterNumbers = ({ state, stats }: {
       <Stat label="Status" tip="Whether holders can convert right now. While paused, every conversion is rejected.">
         <Badge variant={state.paused ? "destructive" : "default"}>{state.paused ? "Paused" : "Active"}</Badge>
       </Stat>
-      <Stat label="Reserve" tip={`${stratoToken.symbol} the converter holds to pay conversions.`}>{formatTokenAmount(state.reserve, stratoToken)}</Stat>
+      <Stat label="Reserve" tip={`${stratoToken.symbol} the converter holds to pay conversions.`}>
+        {stats ? (
+          <Hover tip={`Total funded (net of withdrawals): ${formatTokenAmount(stats.totalFunded, stratoToken)}`}>
+            {formatTokenAmount(state.reserve, stratoToken)}
+          </Hover>
+        ) : formatTokenAmount(state.reserve, stratoToken)}
+      </Stat>
       <Stat
         label="Coverage"
         tip={`The share of the outstanding ${rewardsToken.symbol} the reserve can pay for at the current rate. This limit is shared by all holders.`}
@@ -79,17 +85,6 @@ const ConverterNumbers = ({ state, stats }: {
       </Stat>
       <Stat label="Total Burned" tip={`${rewardsToken.symbol} burned by all conversions so far.`}>{stats ? formatTokenAmount(stats.totalBurned, rewardsToken) : loading}</Stat>
       <Stat label={`Total ${stratoToken.symbol} Paid`} tip={`${stratoToken.symbol} paid out from the reserve by all conversions so far.`}>{stats ? formatTokenAmount(stats.totalPaid, stratoToken) : loading}</Stat>
-      <Stat label="Outstanding Supply" tip={`${rewardsToken.symbol} in existence: everything not yet converted and burned.`}>{stats ? formatTokenAmount(stats.outstandingSupply, rewardsToken) : loading}</Stat>
-      <Stat
-        label="Total Funded (net of withdrawals)"
-        tip={`${stratoToken.symbol} put into the reserve minus reserve withdrawals.`}
-      >
-        {stats ? (
-          <Hover tip={`Withdrawn: ${formatTokenAmount(stats.totalWithdrawn, stratoToken)}`}>
-            {formatTokenAmount(stats.totalFunded, stratoToken)}
-          </Hover>
-        ) : loading}
-      </Stat>
     </div>
   );
 };
