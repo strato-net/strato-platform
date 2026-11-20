@@ -69,7 +69,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
       <CardHeader className="px-2 py-2 md:px-6 md:py-6">
         <CardTitle className="flex items-center gap-2">
           <Gift className="h-5 w-5" />
-          Convert Rewards
+          Convert Rewards → STRATO
           <Badge variant={paused ? "destructive" : "default"}>
             {paused ? "Paused" : "Active"}
           </Badge>
