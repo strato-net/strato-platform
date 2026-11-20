@@ -24,9 +24,11 @@ export interface RewardsConverterInfo {
 
 export type RewardsConverterState = { configured: false } | RewardsConverterInfo;
 
-/** One account's rewards-token balance and lifetime conversion totals. */
+/** One account's balances of the two tokens and lifetime conversion totals. */
 export interface RewardsConverterAccount {
+  /** Rewards-token balance. */
   balance: string;
+  stratoBalance: string;
   totalConverted: string;
   totalReceived: string;
   conversionCount: number;

@@ -192,13 +192,15 @@ export const getConverterAccount = async (
 ): Promise<RewardsConverterAccount> => {
   const address = constants.rewardsConverter;
   const user = normalizeAddress(userAddress);
-  const { rewardsToken } = await readConverter(accessToken, address, "rewardsToken");
-  const [balance, totals] = await Promise.all([
+  const { rewardsToken, stratoToken } = await readConverter(accessToken, address, "rewardsToken,stratoToken");
+  const [balance, stratoBalance, totals] = await Promise.all([
     balanceOf(accessToken, rewardsToken, user),
+    balanceOf(accessToken, stratoToken, user),
     convertedTotals(accessToken, address, user),
   ]);
   return {
     balance: balance.toString(),
+    stratoBalance: stratoBalance.toString(),
     totalConverted: totals.burned.toString(),
     totalReceived: totals.paid.toString(),
     conversionCount: totals.count,

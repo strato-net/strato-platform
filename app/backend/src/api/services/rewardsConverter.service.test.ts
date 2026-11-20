@@ -213,9 +213,9 @@ test("an empty reserve has no balance row and reads as zero", async (t) => {
   assert.equal(state.maxConvertible, "0");
 });
 
-test("account view resolves the balance through the converter's rewards token", async (t) => {
+test("account view resolves both balances through the converter's tokens", async (t) => {
   const calls = mockCirrus(t, {
-    "BlockApps-RewardsConverter": [{ rewardsToken: REWARDS_TOKEN }],
+    "BlockApps-RewardsConverter": [{ rewardsToken: REWARDS_TOKEN, stratoToken: STRATO_TOKEN }],
     "BlockApps-Token-_balances": [{ value: "4002827208295469080" }],
     "BlockApps-RewardsConverter-Converted": [
       { burned: "6000000000000000001", paid: "5333333333333333333", n: 3 },
@@ -224,15 +224,19 @@ test("account view resolves the balance through the converter's rewards token", 
 
   assert.deepEqual(await getConverterAccount("access-token", `0x${USER.toUpperCase()}`), {
     balance: "4002827208295469080",
+    stratoBalance: "4002827208295469080",
     totalConverted: "6000000000000000001",
     totalReceived: "5333333333333333333",
     conversionCount: 3,
   });
-  assert.deepEqual(calls.find((call) => call.path === "/BlockApps-Token-_balances")?.params, {
-    address: `eq.${REWARDS_TOKEN}`,
-    key: `eq.${USER}`,
-    select: "value::text",
-  });
+  assert.deepEqual(
+    calls.filter((call) => call.path === "/BlockApps-Token-_balances").map((call) => call.params),
+    [REWARDS_TOKEN, STRATO_TOKEN].map((token) => ({
+      address: `eq.${token}`,
+      key: `eq.${USER}`,
+      select: "value::text",
+    })),
+  );
   assert.deepEqual(calls.find((call) => call.path === "/BlockApps-RewardsConverter-Converted")?.params, {
     address: `eq.${CONVERTER}`,
     user: `eq.${USER}`,
@@ -242,12 +246,13 @@ test("account view resolves the balance through the converter's rewards token", 
 
 test("an account that never converted has zero totals", async (t) => {
   mockCirrus(t, {
-    "BlockApps-RewardsConverter": [{ rewardsToken: REWARDS_TOKEN }],
+    "BlockApps-RewardsConverter": [{ rewardsToken: REWARDS_TOKEN, stratoToken: STRATO_TOKEN }],
     "BlockApps-Token-_balances": [],
     "BlockApps-RewardsConverter-Converted": [{ burned: null, paid: null, n: 0 }],
   });
   assert.deepEqual(await getConverterAccount("access-token", USER), {
     balance: "0",
+    stratoBalance: "0",
     totalConverted: "0",
     totalReceived: "0",
     conversionCount: 0,

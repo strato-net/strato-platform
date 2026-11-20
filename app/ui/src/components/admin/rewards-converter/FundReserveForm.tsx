@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { RewardsConverterAdminStats, RewardsConverterInfo } from "@strato/shared-types";
-import { useFundConverterReserve } from "@/hooks/useRewardsConverter";
+import { useFundConverterReserve, useRewardsConverterAccount } from "@/hooks/useRewardsConverter";
 import { parseUnitsWithTruncation, safeParseUnits } from "@/utils/numberUtils";
 import { fundingForCoverage } from "@/utils/rewardsConverterMath";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ const FundReserveForm = ({ state, stats }: {
   stats: RewardsConverterAdminStats | undefined;
 }) => {
   const fund = useFundConverterReserve();
+  const { data: account } = useRewardsConverterAccount();
   const [byCoverage, setByCoverage] = useState(false);
   const [value, setValue] = useState("");
   const { symbol, decimals } = state.stratoToken;
@@ -23,6 +24,7 @@ const FundReserveForm = ({ state, stats }: {
   const amount = byCoverage
     ? fundingForCoverage(parseUnitsWithTruncation(value, 2), supply, BigInt(state.rate), BigInt(state.reserve))
     : safeParseUnits(value, decimals);
+  const exceedsBalance = !!account && amount > BigInt(account.stratoBalance);
 
   return (
     <Card className="border border-border/70">
@@ -62,10 +64,15 @@ const FundReserveForm = ({ state, stats }: {
                 : "Nothing to send: the reserve already covers this."}
             </p>
           )}
+          {account && (
+            <p className={`text-xs ${exceedsBalance ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
+              Your balance: {formatTokenAmount(account.stratoBalance, state.stratoToken)}
+            </p>
+          )}
         </div>
         <Button
           className="w-full"
-          disabled={amount <= 0n || fund.isPending}
+          disabled={amount <= 0n || !account || exceedsBalance || fund.isPending}
           onClick={() => fund.mutate(amount, { onSuccess: () => setValue("") })}
         >
           {fund.isPending ? "Submitting..." : "Fund Reserve"}

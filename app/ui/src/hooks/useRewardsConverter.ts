@@ -25,7 +25,7 @@ function useSignedInWithConverter(): boolean {
   return data?.configured === true && isLoggedIn && !!userAddress;
 }
 
-/** The signed-in account's rewards-token balance and lifetime totals. */
+/** The signed-in account's balances of the two tokens and lifetime totals. */
 export function useRewardsConverterAccount() {
   const { userAddress } = useUser();
   const enabled = useSignedInWithConverter();
