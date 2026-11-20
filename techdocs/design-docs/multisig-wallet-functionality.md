@@ -64,6 +64,16 @@ signer changes, upgrades.
 | The action fails when executed | The whole transaction is undone; the proposal can be retried until it expires |
 
 Only signers can propose, approve, and execute.
+
+**A known limit of withdrawing during the waiting period.** While a proposal is waiting, no
+further signer can approve it, so it has exactly `M` approvals and any one withdrawal ends the
+wait. An approver acting against the others can withdraw and approve again just before each
+waiting period ends, and so keep a proposal they approved from ever running, until it expires
+30 days after it was created. This is accepted as the safer behaviour: it can only stop an
+action, never cause one, and nothing moves without `M` approvals. Signers who want an action
+to go through avoid it by having `M` cooperating signers propose and approve first; a signer
+outside that group then has no approval to withdraw. Multisig wallets with no waiting period
+are not affected.
 Proposal function names must be plain names; signature-style names containing `(` are rejected.
 
 ## Changing signers, approvals, or the waiting period

@@ -171,8 +171,26 @@ A signer may withdraw their own approval at any time before execution. Withdrawi
 queued issue takes it below M, so its timelock ends and it returns to collecting approvals
 under its original `ISSUE_APPROVAL_LIFETIME` deadline; reaching M again starts a fresh, full
 timelock. A signer who withdrew may approve again. This lets one approver stop an issue they
-approved in error, at the cost that any single approver can delay a queued issue by one
-timelock per withdrawal.
+approved in error.
+
+The cost is accepted and intended. A queued issue accepts no further approvals, so it holds
+exactly M of them and any one withdrawal takes it below M. An approver can therefore withdraw
+and approve again shortly before each timelock ends, and keep doing so until the issue
+expires at its `ISSUE_APPROVAL_LIFETIME` deadline. On a wallet with a non-zero timelock, one
+of the first M approvers can in this way prevent an issue they approved from executing,
+including an issue that removes them.
+
+This fails closed: nothing executes without M approvals or before its timelock, and no funds
+move. It blocks an action; it cannot cause one. Signers avoid it by having M cooperating
+signers propose and approve first, after which the remaining signers hold no approval to
+withdraw. A wallet with a zero timelock is not affected, because an issue executes on the
+approval that reaches M.
+
+Two alternatives were considered and not adopted. Accepting further approvals on a queued
+issue would stop the delay, but lets the set of approvers change late in the timelock, when
+other signers have no time to respond. Barring a signer who withdrew from approving the same
+issue again would bound the delay to one timelock per signer, but leaves an honest signer who
+withdrew in error unable to restore their approval.
 
 If the withdrawal comes after that original deadline has already passed, which can happen
 when a long timelock carries the issue beyond 30 days from its creation, the issue does not
