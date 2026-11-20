@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
   formatRate,
   formatShare,
+  fundingForCoverage,
   maxConvertAmount,
   payoutFor,
   rateFromDecimal,
@@ -68,4 +69,18 @@ test('formatShare shows a percentage to 2 decimals, or a dash when the whole is 
   assert.equal(formatShare(1505999n, 1000000n), '150.59%');
   assert.equal(formatShare(0n, E18), '0.00%');
   assert.equal(formatShare(E18, 0n), '—');
+});
+
+test('fundingForCoverage is what the reserve lacks to pay for that share of the supply', () => {
+  const rate = E18 / 2n;
+  // Paying for all 1000 takes 500: 100 are there
+  assert.equal(fundingForCoverage(10000n, 1000n * E18, rate, 100n * E18), 400n * E18);
+  assert.equal(fundingForCoverage(2500n, 1000n * E18, rate, 100n * E18), 25n * E18);
+  // Headroom past the whole supply
+  assert.equal(fundingForCoverage(15000n, 1000n * E18, rate, 0n), 750n * E18);
+  // Already covered
+  assert.equal(fundingForCoverage(2000n, 1000n * E18, rate, 100n * E18), 0n);
+  assert.equal(fundingForCoverage(0n, 1000n * E18, rate, 0n), 0n);
+  // Rounded up, so the funded reserve reaches the coverage
+  assert.equal(fundingForCoverage(10000n, 10n, 333333333333333333n, 0n), 4n);
 });

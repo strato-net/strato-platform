@@ -43,7 +43,7 @@ const RewardsConverterAdminTab = () => {
         <div className="grid gap-4 xl:grid-cols-3">
           <PauseToggle paused={state.paused} />
           <SetRateForm state={state} />
-          <FundReserveForm state={state} />
+          <FundReserveForm state={state} stats={stats} />
         </div>
         <WithdrawReserveForm state={state} />
         <ConversionVolume state={state} />
