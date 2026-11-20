@@ -5,11 +5,15 @@ import CopyButton from "@/components/ui/copy";
 
 const message = ({ executed, issueId, hash }: GovernedCallResult): ReactNode => {
   if (issueId && !executed) return `Vote submitted · issue ${formatHash(issueId)}`;
-  // Executed, signed with an external wallet, or the issue lookup timed out
+  // Executed, signed with an external wallet, or the issue lookup timed out.
+  // A vote that passed later has only its issue to show: another admin's transaction executed it.
+  const id = issueId ?? hash;
   return (
     <>
-      {formatHash(hash)}
-      <CopyButton address={hash} />
+      {executed && "Executed: "}
+      {issueId && "issue "}
+      {formatHash(id)}
+      <CopyButton address={id} />
     </>
   );
 };
