@@ -12,6 +12,7 @@ const SetRateForm = ({ state }: { state: RewardsConverterInfo }) => {
   const setRate = useSetConverterRate();
   const [value, setValue] = useState("");
   const rate = rateFromDecimal(value);
+  const invalid = !!value.trim() && rate <= 0n;
 
   return (
     <Card className="border border-border/70">
@@ -28,6 +29,8 @@ const SetRateForm = ({ state }: { state: RewardsConverterInfo }) => {
           </Label>
           <Input
             id="converter-rate"
+            className={invalid ? "border-destructive text-destructive focus-visible:ring-destructive" : ""}
+            aria-invalid={invalid}
             placeholder="0.00"
             value={value}
             onChange={(event) => setValue(event.target.value)}
