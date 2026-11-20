@@ -165,7 +165,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
                 </div>
               )}
 
-              {isLoggedIn && (
+              {isLoggedIn && !paused && (
                 <div className="text-sm text-muted-foreground">
                   Transaction Fee: <NetworkFee calls={REWARDS_CONVERT_CALLS} />
                   <FeeNotices calls={REWARDS_CONVERT_CALLS} />
