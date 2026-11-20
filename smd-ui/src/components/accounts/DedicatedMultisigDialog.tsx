@@ -1215,7 +1215,10 @@ export function DedicatedMultisigDialog({
           {wallet ? "Manage" : "Create multisig wallet"}
         </Button>
       </DialogTrigger>
-      <DialogContent className="h-[100dvh] max-h-[100dvh] w-screen max-w-none content-start overflow-y-auto rounded-none border-0 p-4 md:p-8">
+      <DialogContent
+        className="h-[100dvh] max-h-[100dvh] w-screen max-w-none content-start overflow-y-auto rounded-none border-0 p-4 md:p-8"
+        onInteractOutside={(event) => event.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{wallet ? "Multisig wallet" : "Create multisig wallet"}</DialogTitle>
           <DialogDescription>
