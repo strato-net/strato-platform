@@ -56,7 +56,7 @@ const ConfirmConversionDialog = ({
       <AlertDialogFooter>
         <AlertDialogCancel>Cancel</AlertDialogCancel>
         <AlertDialogAction
-          className="bg-green-600 hover:bg-green-700"
+          className="bg-strato-blue hover:bg-strato-blue/90"
           disabled={confirmDisabled}
           onClick={onConfirm}
         >
