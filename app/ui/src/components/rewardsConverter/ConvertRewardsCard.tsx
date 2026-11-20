@@ -146,10 +146,12 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
                 </p>
               )}
 
-              <div className="text-sm text-muted-foreground">
-                You receive:{" "}
-                {formatBalance(payout, stratoToken.symbol, stratoToken.decimals, 2, 6)}
-              </div>
+              {amount > 0n && (
+                <div className="text-sm text-muted-foreground">
+                  You receive:{" "}
+                  {formatBalance(payout, stratoToken.symbol, stratoToken.decimals, 2, 6)}
+                </div>
+              )}
 
               {isLoggedIn && (
                 <div className="text-sm text-muted-foreground">
