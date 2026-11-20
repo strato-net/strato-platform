@@ -123,7 +123,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">Rate</span>
                 <span>
-                  1 Rewards Point = <RateValue rate={state.rate} /> {stratoToken.symbol}
+                  1 Rewards Point = <RateValue rate={state.rate} bareWhole /> {stratoToken.symbol}
                 </span>
               </div>
               <div className="flex justify-between gap-2">

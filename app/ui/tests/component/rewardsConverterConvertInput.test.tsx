@@ -52,13 +52,13 @@ const account: RewardsConverterAccount = {
   conversionCount: 0,
 };
 
-const show = async () => {
+const show = async (rate = state.rate) => {
   chain.state = state;
   chain.account = account;
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <TooltipProvider>
-        <ConvertRewardsCard state={state} refetchState={async () => undefined} />
+        <ConvertRewardsCard state={{ ...state, rate }} refetchState={async () => undefined} />
       </TooltipProvider>
     </QueryClientProvider>,
   );
@@ -71,6 +71,19 @@ const convertButton = () => screen.getByRole("button", { name: "Convert Rewards 
 const type = (value: string) => fireEvent.change(input(), { target: { value } });
 
 afterEach(cleanup);
+
+describe("the convert card's rate", () => {
+  it.each([
+    [E18, "1 Rewards Point = 1 STRATO"],
+    [25n * E18, "1 Rewards Point = 25 STRATO"],
+    [E18 / 2n, "1 Rewards Point = 0.5000 STRATO"],
+    [333333333333333333n, "1 Rewards Point = 0.3333 STRATO"],
+    [E18 + E18 / 4n, "1 Rewards Point = 1.2500 STRATO"],
+  ])("shows a rate of %s as %s: a whole rate has no decimals", async (rate, line) => {
+    await show(rate.toString());
+    expect(screen.getByText("Rate").nextElementSibling?.textContent).toBe(line);
+  });
+});
 
 describe("the convert amount input", () => {
   it("is not marked while it is empty", async () => {
