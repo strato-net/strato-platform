@@ -17,6 +17,8 @@ const VIEWS: { view: View; label: string }[] = [
   { view: "monthly", label: "Monthly" },
 ];
 
+const MONTHS_SHOWN = 3;
+
 const currentMonth = (): string => new Date().toISOString().slice(0, 7);
 
 const shiftMonth = (month: string, by: number): string => {
@@ -24,8 +26,15 @@ const shiftMonth = (month: string, by: number): string => {
   return new Date(Date.UTC(year, monthNumber - 1 + by, 1)).toISOString().slice(0, 7);
 };
 
-const formatMonth = (month: string): string =>
-  new Date(`${month}-01`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+const formatMonth = (month: string, style: "long" | "short" = "long"): string =>
+  new Date(`${month}-01`).toLocaleDateString("en-US", { month: style, year: "numeric", timeZone: "UTC" });
+
+/** The `MONTHS_SHOWN` months ending at `month`, oldest first, with empty buckets where `buckets` has none. */
+const monthsEndingAt = (month: string, buckets: RewardsConverterVolumeBucket[]): RewardsConverterVolumeBucket[] =>
+  Array.from({ length: MONTHS_SHOWN }, (_, index) => {
+    const period = shiftMonth(month, index + 1 - MONTHS_SHOWN);
+    return buckets.find((bucket) => bucket.period === period) ?? { period, paid: "0", burned: "0", count: 0 };
+  });
 
 const ConversionVolume = ({ state }: { state: RewardsConverterInfo }) => {
   const [open, setOpen] = useState(false);
@@ -35,7 +44,9 @@ const ConversionVolume = ({ state }: { state: RewardsConverterInfo }) => {
   const monthly = useRewardsConverterMonthlyVolume(open && view === "monthly");
   const { data = [], isLoading } = view === "daily" ? daily : monthly;
   const { rewardsToken, stratoToken } = state;
-  const series = data.map((bucket) => ({ ...bucket, value: Number(formatUnits(bucket.paid, stratoToken.decimals)) }));
+  const monthStep = view === "daily" ? 1 : MONTHS_SHOWN;
+  const shown = view === "daily" || !data.length ? data : monthsEndingAt(month, data);
+  const series = shown.map((bucket) => ({ ...bucket, value: Number(formatUnits(bucket.paid, stratoToken.decimals)) }));
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} asChild>
@@ -64,30 +75,32 @@ const ConversionVolume = ({ state }: { state: RewardsConverterInfo }) => {
                   </Button>
                 ))}
               </div>
-              {view === "daily" && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="h-8 w-8"
-                    aria-label="Previous month"
-                    onClick={() => setMonth(shiftMonth(month, -1))}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <span className="min-w-32 text-center text-sm font-medium">{formatMonth(month)}</span>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="h-8 w-8"
-                    aria-label="Next month"
-                    disabled={month >= currentMonth()}
-                    onClick={() => setMonth(shiftMonth(month, 1))}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8"
+                  aria-label={view === "daily" ? "Previous month" : "Previous months"}
+                  onClick={() => setMonth(shiftMonth(month, -monthStep))}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="min-w-32 text-center text-sm font-medium">
+                  {view === "daily"
+                    ? formatMonth(month)
+                    : `${formatMonth(shiftMonth(month, 1 - MONTHS_SHOWN), "short")} – ${formatMonth(month, "short")}`}
+                </span>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8"
+                  aria-label={view === "daily" ? "Next month" : "Next months"}
+                  disabled={month >= currentMonth()}
+                  onClick={() => setMonth([shiftMonth(month, monthStep), currentMonth()].sort()[0])}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <div className="h-[220px] w-full">
               {series.length > 0 ? (
