@@ -114,7 +114,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
             <h3 className="font-medium mb-3">
               Convert {rewardsToken.symbol} to {stratoToken.symbol}
             </h3>
-            <p className="text-sm text-muted-foreground mb-3">
+            <p className="text-sm text-muted-foreground mb-11">
               Converted {rewardsToken.symbol} are burned and you receive{" "}
               {stratoToken.symbol} from the reserve at the current rate.
             </p>
@@ -135,7 +135,7 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
             </div>
 
             <div className="space-y-2">
-              <div className="relative">
+              <div className="relative mb-10">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Input
