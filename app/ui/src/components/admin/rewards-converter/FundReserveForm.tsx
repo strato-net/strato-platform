@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { RewardsConverterAdminStats, RewardsConverterInfo } from "@strato/shared-types";
 import { useFundConverterReserve, useRewardsConverterAccount } from "@/hooks/useRewardsConverter";
-import { parseUnitsWithTruncation, safeParseUnits } from "@/utils/numberUtils";
+import { safeParseUnits } from "@/utils/numberUtils";
 import { fundingForCoverage } from "@/utils/rewardsConverterMath";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,12 +21,13 @@ const FundReserveForm = ({ state, stats }: {
   const [value, setValue] = useState("");
   const { symbol, decimals } = state.stratoToken;
   const supply = BigInt(stats?.outstandingSupply ?? 0);
-  const coverage = parseUnitsWithTruncation(value, 18);
+  // A coverage is a percentage at 18 decimals. Either is read only when it is exact
+  const entered = safeParseUnits(value, byCoverage ? 18 : decimals);
   const amount = byCoverage
-    ? fundingForCoverage(coverage, supply, BigInt(state.rate), BigInt(state.reserve))
-    : safeParseUnits(value, decimals);
+    ? fundingForCoverage(entered, supply, BigInt(state.rate), BigInt(state.reserve))
+    : entered;
   const exceedsBalance = !!account && amount > BigInt(account.stratoBalance);
-  const unreadable = !!value.trim() && (byCoverage ? coverage : amount) <= 0n;
+  const unreadable = !!value.trim() && entered <= 0n;
   const invalid = unreadable || exceedsBalance;
 
   return (
@@ -69,7 +70,7 @@ const FundReserveForm = ({ state, stats }: {
               </span>
             )}
           </div>
-          {byCoverage && stats && coverage > 0n && (
+          {byCoverage && stats && entered > 0n && (
             <p className="text-xs text-muted-foreground">
               {amount > 0n
                 ? `Sends ${formatTokenAmount(amount.toString(), state.stratoToken)}`

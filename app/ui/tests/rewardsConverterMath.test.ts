@@ -42,17 +42,62 @@ test('maxConvertAmount is the smaller of the balance and max convertible', () =>
   assert.equal(maxConvertAmount(5n, 0n), 0n);
 });
 
-test('rateFromDecimal reads a decimal rate at 18 decimals without float loss', () => {
+test('rateFromDecimal reads a decimal rate exactly at 18 decimals', () => {
   assert.equal(rateFromDecimal('1'), E18);
   assert.equal(rateFromDecimal('0.333333333333333333'), 333333333333333333n);
-  assert.equal(rateFromDecimal('0.1'), 100000000000000000n);
+  assert.equal(rateFromDecimal('0.000000000000000001'), 1n);
   assert.equal(rateFromDecimal('1234.000000000000000001'), 1234000000000000000001n);
   assert.equal(rateFromDecimal('2.'), 2n * E18);
   assert.equal(rateFromDecimal('.5'), E18 / 2n);
-  // Digits past 18 places are dropped, not rounded
-  assert.equal(rateFromDecimal('0.3333333333333333339'), 333333333333333333n);
-  assert.equal(rateFromDecimal(''), 0n);
-  assert.equal(rateFromDecimal('abc'), 0n);
+  assert.equal(rateFromDecimal('007.50'), 7500000000000000000n);
+  // Decimals a float cannot hold
+  assert.equal(rateFromDecimal('0.1'), 100000000000000000n);
+  assert.equal(rateFromDecimal('0.7'), 700000000000000000n);
+  assert.equal(rateFromDecimal('0.30000000000000004'), 300000000000000040n);
+  assert.equal(rateFromDecimal('1.1') + rateFromDecimal('2.2'), rateFromDecimal('3.3'));
+  // Past 2^53, where a float skips integers
+  assert.equal(rateFromDecimal('9007199254740993'), 9007199254740993n * E18);
+  assert.equal(rateFromDecimal('9007199254740993.000000000000000001'), 9007199254740993000000000000000001n);
+  // Zeros past 18 places lose nothing
+  assert.equal(rateFromDecimal('1.50000000000000000000'), 1500000000000000000n);
+});
+
+test('rateFromDecimal reads nothing from a value it would have to cut or guess', () => {
+  const unreadable = [
+    // A digit past 18 places: reading it would drop that digit
+    '0.3333333333333333339',
+    '0.0000000000000000019',
+    '0.0000000000000000001',
+    '1.0000000000000000001',
+    // A comma: a decimal comma and a thousands separator read differently
+    '0,5',
+    '1,5',
+    '1,000.5',
+    // More than one point
+    '1.2.3',
+    '1..2',
+    // Notations the field does not take
+    '1e3',
+    '1e-3',
+    '0x10',
+    '+1',
+    '1/3',
+    '50%',
+    '١',
+    '１',
+    ' 1',
+    '1 ',
+    '1 000',
+    'abc',
+    'NaN',
+    'Infinity',
+    '.',
+    '',
+  ];
+  for (const value of unreadable) assert.equal(rateFromDecimal(value), 0n, JSON.stringify(value));
+  // A negative value is never a rate
+  assert.ok(rateFromDecimal('-1') < 0n);
+  assert.ok(rateFromDecimal('-0.000000000000000001') < 0n);
 });
 
 test('rateToDecimal gives the full value and round-trips', () => {
@@ -60,8 +105,15 @@ test('rateToDecimal gives the full value and round-trips', () => {
   assert.equal(rateToDecimal(333333333333333333n), '0.333333333333333333');
   assert.equal(rateToDecimal(1500000000000000000n), '1.5');
   assert.equal(rateToDecimal(1n), '0.000000000000000001');
+  assert.equal(rateToDecimal(9007199254740993000000000000000001n), '9007199254740993.000000000000000001');
   for (const rate of [1n, 333333333333333333n, E18, 1234000000000000000001n]) {
     assert.equal(rateFromDecimal(rateToDecimal(rate)), rate);
+  }
+  // Every digit survives the trip, whatever the size
+  const next = sequence(7n);
+  for (let i = 0; i < 2000; i++) {
+    const rate = next(10n ** BigInt(1 + (i % 40))) + 1n;
+    assert.equal(rateFromDecimal(rateToDecimal(rate)), rate, rate.toString());
   }
 });
 

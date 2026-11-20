@@ -1,5 +1,5 @@
 import { WAD } from '../lib/constants.ts';
-import { formatWeiToDecimalHP, parseUnitsWithTruncation } from './numberUtils.ts';
+import { formatWeiToDecimalHP, safeParseUnits } from './numberUtils.ts';
 
 // Amounts are raw token units and rates are STRATO per rewards token scaled by 1e18,
 // as the converter holds them. Everything rounds down, like the contract.
@@ -11,8 +11,11 @@ export const payoutFor = (amount: bigint, rate: bigint): bigint => (amount * rat
 export const maxConvertAmount = (balance: bigint, maxConvertible: bigint): bigint =>
   balance < maxConvertible ? balance : maxConvertible;
 
-/** A decimal rate ("0.3333") as the 18-decimal integer; digits past 18 places are dropped, invalid input is 0. */
-export const rateFromDecimal = (value: string): bigint => parseUnitsWithTruncation(value, 18);
+/**
+ * A decimal rate ("0.3333") as the 18-decimal integer, read only when that is exact: a value with a digit
+ * past 18 places, a comma or anything else that is not a plain decimal is 0.
+ */
+export const rateFromDecimal = (value: string): bigint => safeParseUnits(value, 18);
 
 /** The full decimal value of a rate, without trailing zeros ("0.333333333333333333"). */
 export const rateToDecimal = (rate: bigint): string => formatWeiToDecimalHP(rate.toString(), 18);
