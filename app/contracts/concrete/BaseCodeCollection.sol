@@ -32,6 +32,7 @@ import "./Metals/MetalForge.sol";
 
 //Rewards
 import "./Rewards/Rewards.sol";
+import "./Rewards/RewardsConverter.sol";
 
 //Lending
 import "Lending/CollateralVault.sol";
