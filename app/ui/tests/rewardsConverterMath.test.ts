@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  formatFraction,
   formatRate,
   formatRelevant,
   formatShare,
@@ -136,6 +137,16 @@ test('formatRate keeps the leading digits of a rate too small for 4 decimals, wi
   assert.equal(formatRate(12345678900000n), '0.0...1234');
   assert.equal(formatRate(7n), '0.0...7');
   assert.equal(formatRate(1n), '0.0...1');
+});
+
+test('formatFraction keeps the leading digits of an amount below one token, at any token decimals', () => {
+  assert.equal(formatFraction(500000000000000000n, 18), '0.50');
+  assert.equal(formatFraction(1234567890000000n, 18), '0.001234');
+  assert.equal(formatFraction(42n, 18), '0.0...42');
+  assert.equal(formatFraction(0n, 18), '0.00');
+  assert.equal(formatFraction(500000n, 6), '0.50');
+  assert.equal(formatFraction(42n, 6), '0.0...42');
+  assert.equal(formatFraction(420n, 6), '0.00042');
 });
 
 test('formatShare shows 2 decimals from 1% up, rounded down, or a dash when the whole is zero', () => {

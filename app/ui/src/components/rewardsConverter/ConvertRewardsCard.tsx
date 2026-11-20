@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import NetworkFee, { FeeNotices } from "@/components/NetworkFee";
 import { useToast } from "@/hooks/use-toast";
 import { useConvertRewards, useRewardsConverterAccount } from "@/hooks/useRewardsConverter";
 import { REWARDS_CONVERT_CALLS } from "@/lib/constants";
 import { formatBalance, formatUnits, safeParseUnits } from "@/utils/numberUtils";
-import { maxConvertAmount, payoutFor } from "@/utils/rewardsConverterMath";
+import { formatFraction, maxConvertAmount, payoutFor } from "@/utils/rewardsConverterMath";
 import ConfirmConversionDialog from "./ConfirmConversionDialog";
 import RateValue from "./RateValue";
 
@@ -161,7 +162,17 @@ const ConvertRewardsCard = ({ state, refetchState }: ConvertRewardsCardProps) =>
               {amount > 0n && !reserveEmpty && (
                 <div className="text-sm text-muted-foreground">
                   You receive:{" "}
-                  {formatBalance(payout, stratoToken.symbol, stratoToken.decimals, 2, 6)}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-help">
+                        {/* Under one whole token, 6 decimals can read as zero */}
+                        {payout < 10n ** BigInt(stratoToken.decimals)
+                          ? `${formatFraction(payout, stratoToken.decimals)} ${stratoToken.symbol}`
+                          : formatBalance(payout, stratoToken.symbol, stratoToken.decimals, 2, 6)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="font-mono text-xs">{received}</TooltipContent>
+                  </Tooltip>
                 </div>
               )}
 

@@ -21,20 +21,24 @@ export const rateFromDecimal = (value: string): bigint => safeParseUnits(value, 
 export const rateToDecimal = (rate: bigint): string => formatWeiToDecimalHP(rate.toString(), 18);
 
 /**
- * An 18-decimal value in short form, rounded down. From 1 up it has `places` decimals ("40.00"). Below 1
- * it runs to its first non-zero decimal and at most 3 digits after it, to `places` decimals at least
+ * A value at `decimals` decimals in short form, rounded down. From 1 up it has `places` decimals ("40.00").
+ * Below 1 it runs to its first non-zero decimal and at most 3 digits after it, to `places` decimals at least
  * ("0.50", "0.001234"), and dots stand in for 4 or more zeros before that decimal ("0.0...1234").
  */
-const shortDecimal = (value: bigint, places: number): string => {
-  const fraction = (value % WAD).toString().padStart(18, '0');
+const shortDecimal = (value: bigint, places: number, decimals = 18): string => {
+  const unit = 10n ** BigInt(decimals);
+  const fraction = (value % unit).toString().padStart(decimals, '0');
   const zeros = fraction.search(/[1-9]/);
-  if (value >= WAD || zeros < 0) return `${value / WAD}.${fraction.slice(0, places)}`;
+  if (value >= unit || zeros < 0) return `${value / unit}.${fraction.slice(0, places)}`;
   const digits = fraction.slice(zeros, zeros + 4).replace(/0+$/, '');
   return zeros < 4 ? `0.${`${fraction.slice(0, zeros)}${digits}`.padEnd(places, '0')}` : `0.0...${digits}`;
 };
 
 /** A rate in short form, 4 decimals at least ("0.3333", "0.0...7"). */
 export const formatRate = (rate: bigint): string => shortDecimal(rate, 4);
+
+/** A raw token amount below one whole token in short form, 2 decimals at least ("0.50", "0.0...42"). */
+export const formatFraction = (raw: bigint, decimals: number): string => shortDecimal(raw, 2, decimals);
 
 // `part` of `whole` as a percentage scaled by 1e18, rounded down
 const shareOf = (part: bigint, whole: bigint): bigint => (part * 100n * WAD) / whole;
