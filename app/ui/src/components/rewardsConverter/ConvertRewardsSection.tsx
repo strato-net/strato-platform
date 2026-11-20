@@ -13,7 +13,11 @@ const ConvertRewardsSection = () => {
     <div>
       <ConvertRewardsCard state={state} refetchState={refetch} />
       {isLoggedIn && (
-        <ConversionHistory rewardsToken={state.rewardsToken} stratoToken={state.stratoToken} />
+        <div className="px-2 md:px-6">
+          <div className="max-w-2xl mx-auto">
+            <ConversionHistory rewardsToken={state.rewardsToken} stratoToken={state.stratoToken} />
+          </div>
+        </div>
       )}
     </div>
   );
