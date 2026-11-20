@@ -30,6 +30,7 @@ contract MockToken {
 }
 
 contract Describe_VestingPoolClaim {
+    uint constant STEP = 2629800; // D5: one monthly step, 365.25 days / 12
     uint constant WEEK = 604800;
     uint128 constant MAX_UINT128 = 340282366920938463463374607431768211455;
     Token strato;
@@ -255,5 +256,56 @@ contract Describe_VestingPoolClaim {
         pool.claimVestedTokens(vestingHash, address(this), claimAmount);
         require(strato.balanceOf(address(this)) == claimAmount * 3, "fourth claim");
         _checkAmounts(vestingHash, vestingAmount, vestingAmount, "fully claimed");
+    }
+
+    // ---- D5 monthly steps ----
+
+    function _addStepVesting(uint128 amount, uint16 steps, uint64 startTime) internal returns (bytes32) {
+        strato.mint(address(pool), amount);
+        bytes32 vestingHash = pool.vestingHash(address(this), 2, true, steps, startTime, amount);
+        pool.addVesting(address(this), 2, true, steps, startTime, amount);
+        return vestingHash;
+    }
+
+    function it_steps_can_claim_one_slice_per_boundary() public {
+        uint128 amount = _units(2400);
+        uint64 start = _now();
+        bytes32 id = _addStepVesting(amount, 24, start);
+        _warpTo(uint256(start) + STEP - 1);
+        bool reverted = false;
+        try pool.claimVestedTokens(id, address(this), 1) { } catch Error(string e) { reverted = true; require(e == "Trying to claim too many tokens", e); }
+        require(reverted, "claimed before the first boundary");
+        _warpTo(uint256(start) + STEP);
+        pool.claimVestedTokens(id, address(this), MAX_UINT128);
+        require(strato.balanceOf(address(this)) == _units(100), "first slice: " + string(strato.balanceOf(address(this))));
+        _checkAmounts(id, _units(100), _units(100), "after the first claim");
+        _warpTo(uint256(start) + STEP + STEP / 2);
+        reverted = false;
+        try pool.claimVestedTokens(id, address(this), 1) { } catch Error(string e2) { reverted = true; require(e2 == "Trying to claim too many tokens", e2); }
+        require(reverted, "claimed between boundaries");
+        _warpTo(uint256(start) + 3 * STEP);
+        pool.claimVestedTokens(id, address(this), MAX_UINT128);
+        require(strato.balanceOf(address(this)) == _units(300), "two more slices: " + string(strato.balanceOf(address(this))));
+        _checkAmounts(id, _units(300), _units(300), "after the second claim");
+        require(pool.totalTokensInVesting() == amount - _units(300), "committed shrinks by the claims");
+        _warpTo(uint256(start) + 24 * STEP);
+        pool.claimVestedTokens(id, address(this), MAX_UINT128);
+        require(strato.balanceOf(address(this)) == amount, "everything claimed at the end");
+        require(pool.totalTokensInVesting() == 0, "nothing left committed");
+    }
+
+    function it_steps_partial_claims_never_exceed_the_completed_slices() public {
+        uint128 amount = _units(2400);
+        uint64 start = _now();
+        bytes32 id = _addStepVesting(amount, 24, start);
+        _warpTo(uint256(start) + 2 * STEP);
+        pool.claimVestedTokens(id, address(this), _units(150));
+        _checkAmounts(id, _units(200), _units(150), "partial claim");
+        bool reverted = false;
+        try pool.claimVestedTokens(id, address(this), _units(51)) { } catch Error(string e) { reverted = true; require(e == "Trying to claim too many tokens", e); }
+        require(reverted, "claimed past the second slice");
+        pool.claimVestedTokens(id, address(this), _units(50));
+        _checkAmounts(id, _units(200), _units(200), "rest of the second slice");
+        require(strato.balanceOf(address(this)) == _units(200), "balance " + string(strato.balanceOf(address(this))));
     }
 }

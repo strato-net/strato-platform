@@ -53,7 +53,7 @@ contract Describe_VestingPoolSetup {
         uint128 vestingAmount = _units(200000);
         _fund(vestingAmount);
         bool reverted = false;
-        try pool.addVesting(address(user2), 2, true, 104, _now(), vestingAmount) { } catch Error(string e) { reverted = true; require(e == "Invalid vesting curve", e); }
+        try pool.addVesting(address(user2), 3, true, 104, _now(), vestingAmount) { } catch Error(string e) { reverted = true; require(e == "Invalid vesting curve", e); }
         require(reverted, "invalid curve accepted");
     }
 
