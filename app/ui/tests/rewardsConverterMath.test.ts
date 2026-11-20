@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   formatRate,
+  formatRelevant,
   formatShare,
   fundingForCoverage,
   maxConvertAmount,
@@ -131,6 +132,31 @@ test('formatShare shows a percentage to 2 decimals, or a dash when the whole is 
   assert.equal(formatShare(1505999n, 1000000n), '150.59%');
   assert.equal(formatShare(0n, E18), '0.00%');
   assert.equal(formatShare(E18, 0n), '—');
+});
+
+test('formatRelevant keeps the first non-zero decimal and up to 4 digits after it', () => {
+  const plain = (raw: bigint, decimals = 18) => formatRelevant(raw, decimals).replace(/,/g, '');
+  assert.equal(plain(24201164227279683232499238n), '24201164.22727');
+  assert.equal(plain(3115847359999000000000n), '3115.84735');
+  // However far down the first digit is, it shows
+  assert.equal(plain(1n), '0.000000000000000001');
+  assert.equal(plain(750000000000000000005n), '750.000000000000000005');
+  assert.equal(plain(123456789000000n), '0.00012345');
+  assert.equal(plain(5000030000000000000n), '5.00003');
+  // Cut, not rounded
+  assert.equal(plain(999999999999999999n), '0.99999');
+  // No trailing zeros
+  assert.equal(plain(1100002340000000000n), '1.1');
+  assert.equal(plain(1500000000000000000n), '1.5');
+  assert.equal(plain(123400000000000n), '0.0001234');
+  assert.equal(plain(400n * E18), '400');
+  assert.equal(plain(0n), '0');
+  // Other decimals
+  assert.equal(plain(1123456n, 6), '1.12345');
+  assert.equal(plain(42n, 0), '42');
+  // The whole part is exact past 2^53 and grouped
+  assert.equal(plain(9007199254740993n * E18 + 1n), '9007199254740993.000000000000000001');
+  assert.match(formatRelevant(1234567n * E18, 18), /^1.234.567$/);
 });
 
 test('fundingForCoverage is what the reserve lacks to pay for that share of the supply', () => {

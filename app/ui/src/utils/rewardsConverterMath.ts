@@ -33,6 +33,17 @@ export const formatShare = (part: bigint, whole: bigint): string => {
   return `${hundredths / 100n}.${(hundredths % 100n).toString().padStart(2, '0')}%`;
 };
 
+/**
+ * A raw amount as a decimal cut to its relevant digits: the whole part, then the decimals up to the first
+ * non-zero one and at most 4 digits after it, without trailing zeros ("0.00012345", "1.5", "400").
+ */
+export const formatRelevant = (raw: bigint, decimals: number): string => {
+  const unit = 10n ** BigInt(decimals);
+  const fraction = (raw % unit).toString().padStart(decimals, '0');
+  const kept = fraction.slice(0, fraction.search(/[1-9]/) + 5).replace(/0+$/, '');
+  return `${(raw / unit).toLocaleString()}${kept && `.${kept}`}`;
+};
+
 const divideUp = (value: bigint, by: bigint): bigint => (value + by - 1n) / by;
 
 /**

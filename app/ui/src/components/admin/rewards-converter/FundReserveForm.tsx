@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { RewardsConverterAdminStats, RewardsConverterInfo } from "@strato/shared-types";
 import { useFundConverterReserve, useRewardsConverterAccount } from "@/hooks/useRewardsConverter";
 import { safeParseUnits } from "@/utils/numberUtils";
-import { fundingForCoverage } from "@/utils/rewardsConverterMath";
+import { formatRelevant, fundingForCoverage } from "@/utils/rewardsConverterMath";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -73,7 +73,7 @@ const FundReserveForm = ({ state, stats }: {
           {byCoverage && stats && entered > 0n && (
             <p className="text-xs text-muted-foreground">
               {amount > 0n
-                ? `Sends ${formatTokenAmount(amount.toString(), state.stratoToken)}`
+                ? `Sends ${formatRelevant(amount, decimals)} ${symbol}`
                 : "Nothing to send: the reserve already covers this."}
             </p>
           )}
