@@ -22,10 +22,3 @@ export const formatRate = (rate: bigint): string => {
   const scaled = rate / 10n ** 14n;
   return `${scaled / 10000n}.${(scaled % 10000n).toString().padStart(4, '0')}`;
 };
-
-/** Coverage (1e18 = fully covered) as a percentage to 2 decimals ("40.00%"); "—" when undefined. */
-export const formatCoverage = (coverage: string | null): string => {
-  if (coverage === null) return '—';
-  const hundredths = (BigInt(coverage) * 10000n) / WAD;
-  return `${hundredths / 100n}.${(hundredths % 100n).toString().padStart(2, '0')}%`;
-};

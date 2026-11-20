@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Info, Loader2 } from "lucide-react";
 import type { RewardsConverterAdminStats, RewardsConverterInfo } from "@strato/shared-types";
 import { truncateAddress } from "@/utils/numberUtils";
-import { formatCoverage, formatRate, rateToDecimal } from "@/utils/rewardsConverterMath";
+import { formatRate, rateToDecimal } from "@/utils/rewardsConverterMath";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import CopyButton from "@/components/ui/copy";
@@ -67,7 +67,6 @@ const ConverterNumbers = ({ state, stats }: {
       <Stat label="Total Burned" tip={`${rewardsToken.symbol} burned by all conversions so far.`}>{stats ? formatTokenAmount(stats.totalBurned, rewardsToken) : loading}</Stat>
       <Stat label={`Total ${stratoToken.symbol} Paid`} tip={`${stratoToken.symbol} paid out from the reserve by all conversions so far.`}>{stats ? formatTokenAmount(stats.totalPaid, stratoToken) : loading}</Stat>
       <Stat label="Outstanding Supply" tip={`${rewardsToken.symbol} in existence: everything not yet converted and burned.`}>{stats ? formatTokenAmount(stats.outstandingSupply, rewardsToken) : loading}</Stat>
-      <Stat label="Coverage" tip={`The share of the outstanding supply the reserve could pay for at the current rate. 100% means every one of the ${rewardsToken.symbol} could be converted.`}>{stats ? formatCoverage(stats.coverage) : loading}</Stat>
       <Stat
         label="Total Funded (net of withdrawals)"
         tip={`${stratoToken.symbol} put into the reserve minus reserve withdrawals.`}

@@ -56,8 +56,6 @@ export interface RewardsConverterAdminStats {
   conversionCount: number;
   /** Total supply of the rewards token. */
   outstandingSupply: string;
-  /** Reserve over what converting the whole supply would pay, scaled by 1e18; null when that is zero. */
-  coverage: string | null;
   /** STRATO funded into the reserve, net of withdrawals: reserve + totalPaid. */
   totalFunded: string;
   totalWithdrawn: string;

@@ -26,12 +26,6 @@ const Converted = `${RewardsConverter}-Converted`;
 export const maxConvertible = (reserve: bigint, rate: bigint): bigint =>
   rate === 0n ? 0n : (reserve * WAD) / rate;
 
-/** Reserve over the STRATO that converting the whole supply would pay, scaled by 1e18; null when that is zero. */
-export const coverage = (reserve: bigint, supply: bigint, rate: bigint): bigint | null => {
-  const payable = (supply * rate) / WAD;
-  return payable === 0n ? null : (reserve * WAD) / payable;
-};
-
 export const convertInputs = (
   converter: string,
   rewardsToken: string,
@@ -247,7 +241,7 @@ export const getConverterHistory = async (
 
 export const getConverterAdminStats = async (accessToken: string): Promise<RewardsConverterAdminStats> => {
   const address = constants.rewardsConverter;
-  const [{ rate, reserve, outstandingSupply }, totals, { data: withdrawals }] = await Promise.all([
+  const [{ reserve, outstandingSupply }, totals, { data: withdrawals }] = await Promise.all([
     loadConverter(accessToken, address),
     convertedTotals(accessToken, address),
     cirrus.get(accessToken, `/${RewardsConverter}-ReserveWithdrawn`, {
@@ -259,7 +253,6 @@ export const getConverterAdminStats = async (accessToken: string): Promise<Rewar
     totalPaid: totals.paid.toString(),
     conversionCount: totals.count,
     outstandingSupply: outstandingSupply.toString(),
-    coverage: coverage(reserve, outstandingSupply, rate)?.toString() ?? null,
     totalFunded: (reserve + totals.paid).toString(),
     totalWithdrawn: safeBigInt(withdrawals?.[0]?.withdrawn).toString(),
   };

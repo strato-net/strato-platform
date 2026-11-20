@@ -9,7 +9,6 @@ import { requestContext } from "../../utils/requestContext";
 import {
   convert,
   convertInputs,
-  coverage,
   dailyVolume,
   fundConverterReserve,
   getConverterAccount,
@@ -118,15 +117,6 @@ test("maxConvertible mirrors the contract: reserve × 1e18 ÷ rate, rounded down
   assert.equal(maxConvertible(495666666666666666667n, E18), 495666666666666666667n);
   assert.equal(maxConvertible(0n, E18), 0n);
   assert.equal(maxConvertible(1000n * E18, 0n), 0n);
-});
-
-test("coverage is the reserve over what converting the whole supply would pay", () => {
-  assert.equal(coverage(500n * E18, 1000n * E18, E18), E18 / 2n);
-  assert.equal(coverage(500n * E18, 1000n * E18, E18 / 2n), E18);
-  assert.equal(coverage(1500n * E18, 1000n * E18, E18), (3n * E18) / 2n);
-  assert.equal(coverage(0n, 1000n * E18, E18), 0n);
-  assert.equal(coverage(500n * E18, 0n, E18), null);
-  assert.equal(coverage(500n * E18, 1000n * E18, 0n), null);
 });
 
 test("convertInputs approves the exact amount, then converts it", () => {
@@ -321,7 +311,7 @@ test("history pages one account's conversions, newest first, with a total", asyn
   });
 });
 
-test("admin stats derive coverage and total funded from the reserve", async (t) => {
+test("admin stats derive total funded from the reserve", async (t) => {
   mockCirrus(t, {
     "BlockApps-RewardsConverter": [{ ...converterRow, rate: (E18 / 2n).toString() }],
     "BlockApps-Token": tokenRows,
@@ -337,8 +327,6 @@ test("admin stats derive coverage and total funded from the reserve", async (t) 
     totalPaid: "5333333333333333333",
     conversionCount: 3,
     outstandingSupply: (1000n * E18).toString(),
-    // 200 reserve against 1000 supply × 0.5
-    coverage: ((2n * E18) / 5n).toString(),
     totalFunded: "205333333333333333333",
     totalWithdrawn: "994666666666666666667",
   });

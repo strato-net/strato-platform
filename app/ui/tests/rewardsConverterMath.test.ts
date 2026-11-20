@@ -3,7 +3,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  formatCoverage,
   formatRate,
   maxConvertAmount,
   payoutFor,
@@ -60,12 +59,4 @@ test('formatRate shows 4 decimals, rounded down', () => {
   assert.equal(formatRate(999999999999999999n), '0.9999');
   assert.equal(formatRate(12345678900000000000n), '12.3456');
   assert.equal(formatRate(1n), '0.0000');
-});
-
-test('formatCoverage shows a percentage, or a dash when there is nothing to cover', () => {
-  assert.equal(formatCoverage('400000000000000000'), '40.00%');
-  assert.equal(formatCoverage('1000000000000000000'), '100.00%');
-  assert.equal(formatCoverage('1505999999999999999'), '150.59%');
-  assert.equal(formatCoverage('0'), '0.00%');
-  assert.equal(formatCoverage(null), '—');
 });
