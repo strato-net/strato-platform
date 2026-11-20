@@ -68,6 +68,15 @@ const ConverterNumbers = ({ state, stats }: {
           <CopyButton address={state.address} />
         </div>
       </Stat>
+      <Stat label="Token Addresses" tip={`The ${rewardsToken.symbol} token the converter burns and the ${stratoToken.symbol} token it pays, on this network.`}>
+        {[rewardsToken, stratoToken].map((token) => (
+          <div key={token.address} className="flex items-center gap-1 text-sm">
+            <span className="font-normal text-muted-foreground">{token.symbol}</span>
+            {truncateAddress(token.address)}
+            <CopyButton address={token.address} />
+          </div>
+        ))}
+      </Stat>
       <Stat label="Total Burned" tip={`${rewardsToken.symbol} burned by all conversions so far.`}>{stats ? formatTokenAmount(stats.totalBurned, rewardsToken) : loading}</Stat>
       <Stat label={`Total ${stratoToken.symbol} Paid`} tip={`${stratoToken.symbol} paid out from the reserve by all conversions so far.`}>{stats ? formatTokenAmount(stats.totalPaid, stratoToken) : loading}</Stat>
       <Stat label="Outstanding Supply" tip={`${rewardsToken.symbol} in existence: everything not yet converted and burned.`}>{stats ? formatTokenAmount(stats.outstandingSupply, rewardsToken) : loading}</Stat>
