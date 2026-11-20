@@ -33,3 +33,6 @@ export * from './nft-types';
 
 // Export the network fee quote
 export * from './fee-types';
+
+// Export all rewards converter types
+export * from './rewards-converter-types';

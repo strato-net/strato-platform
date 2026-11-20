@@ -533,7 +533,7 @@ const ISSUE_EVENT_TIMEOUT_MS = 8000;
 
 // The issueId from whichever vote event the transaction emitted, or null if it
 // emitted neither — meaning nothing reached the registry
-const findIssueIdForTx = async (accessToken: string, hash: string): Promise<string | null> => {
+export const findIssueIdForTx = async (accessToken: string, hash: string): Promise<string | null> => {
   // The vote already succeeded on chain, so a lookup failure must never fail it
   const firstRow = (event: string) =>
     cirrus

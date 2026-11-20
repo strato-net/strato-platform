@@ -192,6 +192,10 @@ export const defaultDirectMintPsmFor: Record<string, string> = {
   "33056204878082667": "b1efdc86eecfbedf83d0295671214fee451786f3"
 };
 
+export const defaultRewardsConverterFor: Record<string, string> = {
+  "114784819836269": "030e03d145f8a63b77544cc8c75f6a6629398a64", // Helium testnet
+};
+
 export const defaultSaveUsdstVaultFor: Record<string, string> = {
   "114784819836269": "ceeb982f671b4ee2b4471e5b49f3126739537f15", // Helium testnet
   "33056204878082667": "22550671fcad04a213697ac7ae4f4366e96446ed", // Upquark mainnet
@@ -261,6 +265,7 @@ export let ethCarryVault: string = '';
 export let hypeYieldVault: string = '';
 export let wbtcCarryVault: string = '';
 export let directMintPsm: string = '';
+export let rewardsConverter: string = '';
 export let stratoNativeBridge: string = '';
 export let stratoNativeCustodyVault: string = '';
 export let stratoToken: string = '';
@@ -391,6 +396,10 @@ export function setDirectMintPsmConfig(networkId: string) {
   }
 }
 
+export function setRewardsConverterConfig(networkId: string) {
+  rewardsConverter = process.env.REWARDS_CONVERTER || defaultRewardsConverterFor[networkId] || "";
+}
+
 export function setVaultConfig(networkId: string) {
   if (process.env.VAULT) {
     vault = process.env.VAULT;
@@ -448,6 +457,7 @@ export async function initNetworkConfig() {
   setVaultConfig(networkId);
   setCarryVaultConfig(networkId);
   setDirectMintPsmConfig(networkId);
+  setRewardsConverterConfig(networkId);
   setUsdcYieldVaultConfig(networkId);
   setMetalYieldVaultConfig(networkId);
   setExecutedIssuesLookbackConfig(networkId);

@@ -59,6 +59,20 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/psm/info": "PSM Info Error",
   "/psm": "PSM Error",
 
+  // Rewards converter operations
+  "/rewards-converter/state": "Converter State Error",
+  "/rewards-converter/account": "Rewards Balance Error",
+  "/rewards-converter/history": "Conversion History Error",
+  "/rewards-converter/convert": "Conversion Error",
+  "/rewards-converter/admin/stats": "Converter Stats Error",
+  "/rewards-converter/admin/volume": "Conversion Volume Error",
+  "/rewards-converter/admin/set-rate": "Set Rate Error",
+  "/rewards-converter/admin/pause": "Pause Converter Error",
+  "/rewards-converter/admin/unpause": "Unpause Converter Error",
+  "/rewards-converter/admin/withdraw-reserve": "Reserve Withdrawal Error",
+  "/rewards-converter/admin/fund-reserve": "Funding Error",
+  "/rewards-converter": "Rewards Converter Error",
+
   // Default
   "default": "API Error"
 };

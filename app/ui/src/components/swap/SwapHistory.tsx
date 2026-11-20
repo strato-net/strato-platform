@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Copy, Loader2 } from 'lucide-react';
+import { EmptyRow, LoadingRow, PaginationControls, PaginationInfo } from '@/components/common/HistoryTable';
 import { useTradeForm } from '@/context/TradeFormContext';
 import { useTradeHistory } from '@/hooks/trade/useTradeHistory';
 import { useUser } from '@/context/UserContext';
@@ -31,22 +32,6 @@ const formatTimestamp = (timestamp: Date) => {
 // ============================================================================
 // UI COMPONENTS
 // ============================================================================
-const LoadingRow = ({ colSpan }: { colSpan: number }) => (
-  <TableRow>
-    <TableCell colSpan={colSpan} className="text-center py-8">
-      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-    </TableCell>
-  </TableRow>
-);
-
-const EmptyRow = ({ colSpan }: { colSpan: number }) => (
-  <TableRow>
-    <TableCell colSpan={colSpan} className="text-center py-8">
-      <p className="text-muted-foreground">No trade history found for this pair</p>
-    </TableCell>
-  </TableRow>
-);
-
 const SenderCell = ({ sender, copiedHash, onCopy }: { sender: string; copiedHash: string | null; onCopy: (text: string) => void }) => (
   <TableCell className="font-mono text-xs">
     <TooltipProvider>
@@ -97,65 +82,6 @@ const SwapRow = ({ swap, copiedHash, onCopy }: { swap: SwapHistoryEntry & { time
     <SenderCell sender={swap.sender} copiedHash={copiedHash} onCopy={onCopy} />
   </TableRow>
 );
-
-const PaginationInfo = ({ currentPage, itemsPerPage, totalCount, pageLength }: {
-  currentPage: number;
-  itemsPerPage: number;
-  totalCount: number;
-  pageLength: number;
-}) => {
-  const start = (currentPage - 1) * itemsPerPage + 1;
-  const end = Math.min(currentPage * itemsPerPage, totalCount);
-
-  return (
-    <div className="text-sm text-muted-foreground">
-      {start === 1 && end === totalCount ? (
-        `Showing ${pageLength} trade${pageLength !== 1 ? 's' : ''}`
-      ) : (
-        `Showing ${start} to ${end} of ${totalCount} trades`
-      )}
-    </div>
-  );
-};
-
-const PaginationControls = ({
-  currentPage,
-  totalPages,
-  loading,
-  onPageChange
-}: {
-  currentPage: number;
-  totalPages: number;
-  loading: boolean;
-  onPageChange: (page: number) => void;
-}) => {
-  if (totalPages <= 1) return null;
-
-  return (
-    <div className="flex items-center gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-        disabled={currentPage === 1 || loading}
-      >
-        Previous
-      </Button>
-      <span className="text-sm text-muted-foreground">
-        Page {currentPage} of {totalPages}
-        {loading && <span className="ml-2 text-blue-500">Loading...</span>}
-      </span>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-        disabled={currentPage === totalPages || loading}
-      >
-        Next
-      </Button>
-    </div>
-  );
-};
 
 // ============================================================================
 // MAIN SWAP HISTORY COMPONENT
@@ -248,7 +174,7 @@ const SwapHistory: React.FC = () => {
                   />
                 ))
               ) : (
-                <EmptyRow colSpan={columnCount} />
+                <EmptyRow colSpan={columnCount} message="No trade history found for this pair" />
               )}
             </TableBody>
           </Table>
@@ -259,6 +185,7 @@ const SwapHistory: React.FC = () => {
               itemsPerPage={ITEMS_PER_PAGE}
               totalCount={totalCount}
               pageLength={entries.length}
+              noun="trade"
             />
             <PaginationControls
               currentPage={currentPage}

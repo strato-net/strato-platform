@@ -48,6 +48,7 @@ export const constants = (() => {
   const MetalForge = `${CONTRACT_PREFIX}MetalForge`;
   const SafetyModule = `${CONTRACT_PREFIX}SafetyModule`;
   const DirectMintPSM = `${CONTRACT_PREFIX}DirectMintPSM`;
+  const RewardsConverter = `${CONTRACT_PREFIX}RewardsConverter`;
   const Event = "event";
     
   const tokenSelectFields = [
@@ -170,6 +171,8 @@ export const constants = (() => {
     SafetyModule,
     DirectMintPSM,
     get directMintPsm() { return config.directMintPsm; },
+    RewardsConverter,
+    get rewardsConverter() { return config.rewardsConverter; },
     get metalForge() { return config.metalForge; },
     get saveUsdstVault() { return config.saveUsdstVault; },
     get vaultFactory() { return config.vaultFactory; },  // Use getter to get current value after init

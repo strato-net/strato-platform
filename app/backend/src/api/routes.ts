@@ -30,6 +30,7 @@ import contactRoutes from "./routes/contact.routes";
 import metricsRoutes from "./routes/metrics.routes";
 import stakingRoutes from "./routes/staking.routes";
 import psmRoutes from "./routes/psm.routes";
+import rewardsConverterRoutes from "./routes/rewardsConverter.routes";
 
 const router = Router();
 
@@ -107,6 +108,9 @@ router.use("/staking", stakingRoutes);
 
 // ----- PSM Routes -----
 router.use("/psm", psmRoutes);
+
+// ----- Rewards Converter Routes -----
+router.use("/rewards-converter", rewardsConverterRoutes);
 
 // ----- Contact Routes -----
 router.use("/contact", contactRoutes);
