@@ -13,7 +13,7 @@ const message = ({ executed, issueId, hash }: GovernedCallResult): ReactNode => 
       {executed && "Executed: "}
       {issueId && "issue "}
       {formatHash(id)}
-      <CopyButton address={id} />
+      <CopyButton address={id} label={issueId ? "issue ID" : "transaction ID"} />
     </>
   );
 };

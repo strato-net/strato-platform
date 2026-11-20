@@ -112,7 +112,9 @@ describe("Set Rate, through its vote", () => {
     rateButton("Set Rate");
     // The issue stands in until the lookup returns the transaction another admin's vote sent
     expect(note()).toBe("Executed: issue cdcdcd...cdcd");
+    screen.getByRole("button", { name: "Copy issue ID" });
     await waitFor(() => expect(note()).toBe("Executed: efefef...efef"));
+    screen.getByRole("button", { name: "Copy transaction ID" });
 
     // The form takes the next rate
     fireEvent.change(rateInput(), { target: { value: "0.25" } });
