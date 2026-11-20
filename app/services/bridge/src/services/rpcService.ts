@@ -73,6 +73,9 @@ export const getChainLogs = async (
   return unwrapRpcResult(response, "eth_getLogs", chainId) || [];
 };
 
+const normalizeTxHash = (txHash: string): string =>
+  ensureHexPrefix(txHash).toLowerCase();
+
 // Batch get transaction receipts
 export const getTransactionReceiptsBatch = async (
   chainId: number,
@@ -84,24 +87,37 @@ export const getTransactionReceiptsBatch = async (
   // Split into requests the node will accept
   for (let i = 0; i < txHashes.length; i += RPC_BATCH_LIMIT) {
     const batch = txHashes.slice(i, i + RPC_BATCH_LIMIT);
+    const idToTxHash = new Map<number, string>();
 
     // Create batch request
-    const batchRequest = batch.map((txHash, index) => ({
-      jsonrpc: "2.0",
-      id: index + 1,
-      method: "eth_getTransactionReceipt",
-      params: [ensureHexPrefix(txHash)],
-    }));
+    const batchRequest = batch.map((txHash, index) => {
+      const id = index + 1;
+      idToTxHash.set(id, txHash);
+      return {
+        jsonrpc: "2.0",
+        id,
+        method: "eth_getTransactionReceipt",
+        params: [ensureHexPrefix(txHash)],
+      };
+    });
 
     const response: any[] = await fetch.post(rpcUrl, batchRequest);
 
-    // Map responses back to tx hashes
+    // Map responses back to tx hashes by JSON-RPC id and verify returned tx hash
     if (Array.isArray(response)) {
-      response.forEach((item, index) => {
-        if (item?.result) {
-          result.set(batch[index], item.result);
+      for (const item of response) {
+        if (!item || item.error || !item.result) continue;
+        const txHash = idToTxHash.get(item.id);
+        if (!txHash) continue;
+        if (
+          typeof item.result.transactionHash !== "string" ||
+          normalizeTxHash(item.result.transactionHash) !== normalizeTxHash(txHash)
+        ) {
+          continue;
         }
-      });
+        result.set(txHash, item.result);
+        idToTxHash.delete(item.id);
+      }
     }
   }
 
@@ -114,27 +130,46 @@ export const getInternalTransactionsBatch = async (
   txHashes: string[],
 ): Promise<Map<string, any[]>> => {
   const rpcUrl = getChainRpcUrl(chainId);
-  
-  // Create batch request
-  const batchRequest = txHashes.map((txHash, index) => ({
-    jsonrpc: "2.0",
-    id: index + 1,
-    method: "trace_transaction",
-    params: [ensureHexPrefix(txHash)],
-  }));
-
-  const response: any[] = await fetch.post(rpcUrl, batchRequest);
-  
-  // Map responses back to tx hashes
   const result = new Map<string, any[]>();
-  if (Array.isArray(response)) {
-    response.forEach((item, index) => {
-      if (item?.result) {
-        result.set(txHashes[index], item.result || []);
-      }
+
+  // Split into requests the node will accept
+  for (let i = 0; i < txHashes.length; i += RPC_BATCH_LIMIT) {
+    const batch = txHashes.slice(i, i + RPC_BATCH_LIMIT);
+    const idToTxHash = new Map<number, string>();
+
+    // Create batch request
+    const batchRequest = batch.map((txHash, index) => {
+      const id = index + 1;
+      idToTxHash.set(id, txHash);
+      return {
+        jsonrpc: "2.0",
+        id,
+        method: "trace_transaction",
+        params: [ensureHexPrefix(txHash)],
+      };
     });
+
+    const response: any[] = await fetch.post(rpcUrl, batchRequest);
+
+    // Map responses back to tx hashes by JSON-RPC id and verify returned tx hashes
+    if (Array.isArray(response)) {
+      for (const item of response) {
+        if (!item || item.error || !Array.isArray(item.result)) continue;
+        const txHash = idToTxHash.get(item.id);
+        if (!txHash) continue;
+        const expectedHash = normalizeTxHash(txHash);
+        const allMatch = item.result.every(
+          (trace: any) =>
+            typeof trace?.transactionHash === "string" &&
+            normalizeTxHash(trace.transactionHash) === expectedHash,
+        );
+        if (!allMatch) continue;
+        result.set(txHash, item.result);
+        idToTxHash.delete(item.id);
+      }
+    }
   }
-  
+
   return result;
 };
 
