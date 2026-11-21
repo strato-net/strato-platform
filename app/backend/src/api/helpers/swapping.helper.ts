@@ -125,6 +125,14 @@ export const buildPoolParams = (rawParams: Record<string, string | undefined>, u
   }),
 });
 
+export const filterRegisteredPools = <T extends { address: string }>(
+  pools: T[],
+  rows: { value?: string }[]
+): T[] => {
+  const registered = new Set(rows.map((row) => normalizeAddress(row.value)));
+  return pools.filter((pool) => registered.has(normalizeAddress(pool.address)));
+};
+
 export const extractTokenAddresses = <T extends { tokenA: { address: string }; tokenB: { address: string } }>(poolData: T[]): string[] => [
   ...new Set([
     ...poolData.map(p => p.tokenA.address),

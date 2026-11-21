@@ -28,15 +28,23 @@ export const env = {
   RPC_URL: "/rpc",
 } as const;
 
+const normalizeFactoryAddress = (address: unknown): string => {
+  const value = typeof address === "string" ? address.replace(/^0x/i, "").toLowerCase() : "";
+  return /^[0-9a-f]{40}$/.test(value) ? value : "";
+};
+
+let multisigConfigError = "";
+
 export const runtime = {
   chainId: () => window.ENV?.CHAIN_ID ?? null,
   networkName: () => window.ENV?.NETWORK_NAME ?? "",
   rpcUrl: () => window.ENV?.RPC_URL || env.RPC_URL,
   explorerUrl: () => window.ENV?.EXPLORER_URL ?? "",
   wagmiProjectId: () => window.ENV?.WAGMI_PROJECT_ID ?? "",
-  multisigFactoryAddress: () =>
-    (window.ENV?.MULTISIG_FACTORY_ADDRESS ?? "").replace(/^0x/, "").toLowerCase(),
+  multisigFactoryAddress: () => normalizeFactoryAddress(window.ENV?.MULTISIG_FACTORY_ADDRESS),
 };
+
+export const getMultisigConfigError = (): string => multisigConfigError;
 
 export async function loadBackendConfig(timeoutMs = 5_000): Promise<void> {
   const controller = new AbortController();
@@ -46,14 +54,21 @@ export async function loadBackendConfig(timeoutMs = 5_000): Promise<void> {
       credentials: "include",
       signal: controller.signal,
     });
-    if (!response.ok) return;
+    if (!response.ok) {
+      multisigConfigError = "Multisig wallets could not be loaded. Refresh to try again.";
+      window.ENV = { ...window.ENV, MULTISIG_FACTORY_ADDRESS: "" };
+      return;
+    }
     const config = (await response.json())?.data;
+    const factory = normalizeFactoryAddress(config?.multisigFactory);
+    multisigConfigError = factory ? "" : "The multisig wallet configuration is missing or invalid.";
     window.ENV = {
       ...window.ENV,
-      MULTISIG_FACTORY_ADDRESS: typeof config?.multisigFactory === "string" ? config.multisigFactory : "",
+      MULTISIG_FACTORY_ADDRESS: factory,
     };
   } catch {
-    // The rest of SMD remains available; dedicated multisig actions stay disabled.
+    multisigConfigError = "Multisig wallets could not be loaded. Refresh to try again.";
+    window.ENV = { ...window.ENV, MULTISIG_FACTORY_ADDRESS: "" };
   } finally {
     window.clearTimeout(timeout);
   }

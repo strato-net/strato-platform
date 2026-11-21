@@ -1,9 +1,11 @@
 import { useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction";
 import { api } from "@/lib/api";
 import { formatVariadicArg, parseJsonExact, typedVariadicArg, variadicArgValue } from "@/lib/args";
 import { env, runtime } from "@/lib/env";
+import { fetchFunctionByAddress } from "@/services/contracts";
+import { simulateStratoTx } from "@/services/simulation";
 import {
   ADMIN_REGISTRY_ADDRESS,
   ZERO_ADDRESS,
@@ -106,6 +108,7 @@ export interface DedicatedWalletState {
   requiredApprovals: number;
   transactionTimelock: number;
   signers: string[];
+  pendingNominees: string[];
   pendingUpgrade?: {
     targetLogic: string;
     fromVersion: string;
@@ -114,6 +117,7 @@ export interface DedicatedWalletState {
     executableAt: number;
     expiresAt: number;
   };
+  provenanceVerified: boolean;
   verified: boolean;
   verificationErrors: string[];
 }
@@ -153,7 +157,12 @@ export interface DedicatedIssue {
   approvedSigners: string[];
   executableAt: number;
   expiresAt: number;
+  /** Block time the proposal was created, in seconds; 0 if unknown. */
+  createdAt: number;
 }
+
+const VERSION_NOT_APPROVED = "This multisig wallet's version is no longer approved";
+export const WALLET_NOT_ACTIVE = "This multisig wallet is not active";
 
 export interface DedicatedSetupState {
   setupHash: string;
@@ -173,9 +182,21 @@ export interface DedicatedFactoryState {
   owner: string;
   registryGovernance: string;
   approvedVersions: { version: string; logic: string }[];
+  approvedUpgradePaths: { fromVersion: string; toVersion: string }[];
   verified: boolean;
   verificationErrors: string[];
 }
+
+export const parseDedicatedUpgradePaths = (
+  pathRows: any[]
+): DedicatedFactoryState["approvedUpgradePaths"] =>
+  pathRows
+    .filter((row) => row?.value === true || row?.value === "true")
+    .map((row) => ({
+      fromVersion: String(row?.key?.key ?? ""),
+      toVersion: String(row?.key?.key2 ?? ""),
+    }))
+    .filter((path) => path.fromVersion && path.toVersion);
 
 const fetchDedicatedFactoryState = async (): Promise<DedicatedFactoryState> => {
   const address = runtime.multisigFactoryAddress();
@@ -186,13 +207,15 @@ const fetchDedicatedFactoryState = async (): Promise<DedicatedFactoryState> => {
       owner: "",
       registryGovernance: "",
       approvedVersions: [],
+      approvedUpgradePaths: [],
       verified: false,
-      verificationErrors: ["No factory is pinned for this network"],
+      verificationErrors: ["Multisig wallets are not configured for this network"],
     };
   }
-  const [storageRows, versionRows] = await Promise.all([
+  const [storageRows, versionRows, pathRows] = await Promise.all([
     rows("storage", `address=eq.${address}&select=data`),
     rows("mapping", `address=eq.${address}&collection_name=eq.logicVersions&select=key,value`),
+    rows("mapping", `address=eq.${address}&collection_name=eq.upgradePaths&value=eq.true&select=key,value`),
   ]);
   const data = storageRows[0]?.data ?? {};
   const logic = strip0x(String(data.logicContract ?? ""));
@@ -209,12 +232,12 @@ const fetchDedicatedFactoryState = async (): Promise<DedicatedFactoryState> => {
     .map(({ version, logic: versionLogic }) => ({ version, logic: versionLogic }))
     .sort((left, right) => left.version.localeCompare(right.version, undefined, { numeric: true }));
   const verificationErrors = [
-    ...(!logic ? ["Factory proxy has no implementation"] : []),
+    ...(!logic ? ["The multisig service on this network is not set up correctly"] : []),
     ...(![ADMIN_REGISTRY_ADDRESS, ZERO_ADDRESS].includes(owner)
-      ? ["Factory proxy is not owned by AdminRegistry or frozen"]
+      ? ["The multisig service is not under the expected network governance"]
       : []),
     ...(registryGovernance !== ADMIN_REGISTRY_ADDRESS
-      ? ["Factory registry is not governed by AdminRegistry"]
+      ? ["Multisig wallet versions are not under the expected network governance"]
       : []),
   ];
   return {
@@ -223,6 +246,7 @@ const fetchDedicatedFactoryState = async (): Promise<DedicatedFactoryState> => {
     owner,
     registryGovernance,
     approvedVersions,
+    approvedUpgradePaths: parseDedicatedUpgradePaths(pathRows),
     verified: verificationErrors.length === 0,
     verificationErrors,
   };
@@ -238,6 +262,7 @@ export function useDedicatedFactoryState() {
 
 export interface MultisigWalletSummary {
   address: string;
+  setupHash: string;
   label: string;
   requiredApprovals: number;
   signerCount: number;
@@ -247,6 +272,8 @@ export interface MultisigWalletSummary {
   nomineeAddress?: string;
   nomineeUsername?: string;
   active: boolean;
+  /** When the registry created it, as Cirrus reports the block time. */
+  createdAt?: string;
 }
 
 export interface PendingMultisigSetupSummary {
@@ -296,32 +323,54 @@ export function useMyMultisigWallets(ownerAddress?: string | null) {
           `collection_name=eq.nominations&key-%3E%3Ekey=in.(${controlled.join(",")})&${dedicatedSelect}`
         ),
       ]);
-      const allRows = [...signerRows, ...nominationRows];
-      const addresses = [...new Set(
-        allRows.map((row) => strip0x(String(row?.address ?? ""))).filter(Boolean)
-      )];
-      if (!addresses.length) return [];
-      const setupHashes = [...new Set(
-        allRows.map((row) => String(storageData(row)?.multisigSetupHash ?? "")).filter(Boolean)
-      )];
-      const [registeredRows, setupRows, allSignerRows] = await Promise.all([
-        inBatches(addresses, (batch) => pagedRows(
+      const verifyWalletRows = async (candidateRows: any[]): Promise<any[]> => {
+        const addresses = [...new Set(
+          candidateRows.map((row) => strip0x(String(row?.address ?? ""))).filter(Boolean)
+        )];
+        if (!addresses.length) return [];
+        const registeredRows = await inBatches(addresses, (batch) => pagedRows(
           "mapping",
           `address=eq.${factory}&collection_name=eq.factoryWallets` +
             `&key-%3E%3Ekey=in.(${batch.join(",")})&value=eq.true&select=key`
-        )),
+        ));
+        const registered = new Set(
+          registeredRows.map((row) => strip0x(String(row?.key?.key ?? "")))
+        );
+        return candidateRows.filter((row) => {
+          const address = strip0x(String(row?.address ?? ""));
+          return registered.has(address) &&
+            strip0x(String(storageData(row)?.multisigFactory ?? "")) === factory;
+        });
+      };
+      const directRows = await verifyWalletRows([...signerRows, ...nominationRows]);
+      const verifiedSignerRows = signerRows.filter((row) => directRows.includes(row));
+      const verifiedNominationRows = nominationRows.filter((row) => directRows.includes(row));
+      const verifiedRows = [...verifiedSignerRows, ...verifiedNominationRows];
+      if (!verifiedRows.length) return [];
+      const verifiedAddresses = [...new Set(
+        verifiedRows.map((row) => strip0x(String(row?.address ?? "")))
+      )];
+      const setupHashes = [...new Set(
+        verifiedRows.map((row) => String(storageData(row)?.multisigSetupHash ?? "")).filter(Boolean)
+      )];
+      const [setupRows, allSignerRows, createdRows] = await Promise.all([
         inBatches(setupHashes, (batch) => pagedRows(
           "mapping",
           `address=eq.${factory}&collection_name=eq.pendingSetups` +
             `&key-%3E%3Ekey=in.(${batch.join(",")})&select=key,value`
         )),
-        inBatches(addresses, (batch) => pagedRows(
+        inBatches(verifiedAddresses, (batch) => pagedRows(
           "mapping",
           `address=in.(${batch.join(",")})&collection_name=eq.signerMap&value=gt.0&select=address`
         )),
+        inBatches(verifiedAddresses, (batch) => pagedRows(
+          "event",
+          `address=eq.${factory}&event_name=eq.MultisigCreated` +
+            `&attributes-%3E%3Ewallet=in.(${batch.join(",")})&select=block_timestamp,attributes-%3E%3Ewallet`
+        )),
       ]);
-      const registered = new Set(
-        registeredRows.map((row) => strip0x(String(row?.key?.key ?? "")))
+      const createdAt = new Map(
+        createdRows.map((row) => [strip0x(String(row?.wallet ?? "")), String(row?.block_timestamp ?? "")])
       );
       const labels = new Map(
         setupRows.map((row) => [String(row?.key?.key ?? ""), String(row?.value?.label ?? "")])
@@ -333,16 +382,16 @@ export function useMyMultisigWallets(ownerAddress?: string | null) {
       }
 
       const summaries = new Map<string, MultisigWalletSummary>();
-      for (const row of signerRows) {
+      for (const row of verifiedSignerRows) {
         const address = strip0x(String(row?.address ?? ""));
         const signerAddress = strip0x(String(row?.key?.key ?? ""));
         const data = storageData(row);
-        if (!registered.has(address) || strip0x(String(data.multisigFactory ?? "")) !== factory) continue;
         const existing = summaries.get(address);
         if (existing && existing.signerAddress === controlled[0]) continue;
         if (existing && signerAddress !== controlled[0]) continue;
         summaries.set(address, {
           address,
+          setupHash: String(data.multisigSetupHash ?? ""),
           label: labels.get(String(data.multisigSetupHash ?? "")) ?? "",
           requiredApprovals: Number(data.requiredApprovals ?? 0),
           signerCount: signerCounts.get(address) ?? 0,
@@ -350,9 +399,10 @@ export function useMyMultisigWallets(ownerAddress?: string | null) {
           signerUsername: usernames.get(signerAddress) ?? "",
           pendingSigner: false,
           active: data.multisigActive === true || data.multisigActive === "true",
+          createdAt: createdAt.get(address),
         });
       }
-      for (const row of nominationRows) {
+      for (const row of verifiedNominationRows) {
         const address = strip0x(String(row?.address ?? ""));
         const nomineeAddress = strip0x(String(row?.key?.key ?? ""));
         const data = storageData(row);
@@ -360,8 +410,7 @@ export function useMyMultisigWallets(ownerAddress?: string | null) {
         const live = (value.exists === true || value.exists === "true") &&
           Number(value.epoch ?? 0) === Number(data.multisigEpoch ?? 0) &&
           Number(value.expiresAt ?? 0) >= Date.now() / 1000;
-        if (!live || !registered.has(address) ||
-            strip0x(String(data.multisigFactory ?? "")) !== factory) continue;
+        if (!live) continue;
         const current = summaries.get(address);
         if (current) {
           current.pendingSigner = true;
@@ -370,6 +419,7 @@ export function useMyMultisigWallets(ownerAddress?: string | null) {
         } else {
           summaries.set(address, {
             address,
+            setupHash: String(data.multisigSetupHash ?? ""),
             label: labels.get(String(data.multisigSetupHash ?? "")) ?? "",
             requiredApprovals: Number(data.requiredApprovals ?? 0),
             signerCount: signerCounts.get(address) ?? 0,
@@ -532,43 +582,6 @@ export function useDedicatedSetup(setupHash?: string | null) {
   });
 }
 
-export function useDedicatedSetupLifecycle(setupHash?: string | null) {
-  return useQuery({
-    queryKey: ["dedicated-multisig-setup-lifecycle", setupHash],
-    enabled: !!setupHash && !!runtime.multisigFactoryAddress(),
-    refetchInterval: 3_000,
-    queryFn: async (): Promise<"pending" | "cancelled" | "deployed" | "unknown"> => {
-      const events = await rows(
-        "event",
-        `address=eq.${runtime.multisigFactoryAddress()}` +
-          `&event_name=in.(MultisigSetupRegistered,MultisigSetupCancelled,MultisigCreated)` +
-          `&attributes-%3E%3EsetupHash=eq.${String(setupHash)}` +
-          `&order=block_number.desc,event_index.desc&limit=1&select=event_name`
-      );
-      if (events[0]?.event_name === "MultisigCreated") return "deployed";
-      if (events[0]?.event_name === "MultisigSetupCancelled") return "cancelled";
-      if (events[0]?.event_name === "MultisigSetupRegistered") return "pending";
-      return "unknown";
-    },
-  });
-}
-
-export function useDedicatedCreatedWallet(setupHash?: string | null, deployed = false) {
-  return useQuery({
-    queryKey: ["dedicated-multisig-created-wallet", setupHash],
-    enabled: deployed && !!setupHash && !!runtime.multisigFactoryAddress(),
-    queryFn: async (): Promise<string> => {
-      const events = await rows(
-        "event",
-        `address=eq.${runtime.multisigFactoryAddress()}&event_name=eq.MultisigCreated` +
-          `&attributes-%3E%3EsetupHash=eq.${String(setupHash)}` +
-          `&order=block_number.desc,event_index.desc&limit=1&select=attributes`
-      );
-      return strip0x(String(events[0]?.attributes?.wallet ?? ""));
-    },
-  });
-}
-
 export function useDedicatedWalletState(walletAddress?: string | null) {
   return useQuery({
     queryKey: ["dedicated-multisig-state", walletAddress],
@@ -577,11 +590,15 @@ export function useDedicatedWalletState(walletAddress?: string | null) {
     queryFn: async (): Promise<DedicatedWalletState> => {
       const address = strip0x(walletAddress!);
       const pinnedFactory = runtime.multisigFactoryAddress();
-      const [storageRows, signerRows, factoryRows, versionRows, factoryState] = await Promise.all([
+      const [storageRows, signerRows, nominationRows, factoryRows, versionRows, factoryState] = await Promise.all([
         rows("storage", `address=eq.${address}&select=data`),
         rows(
           "mapping",
           `address=eq.${address}&collection_name=eq.signerMap&value=gt.0&select=key,value`
+        ),
+        rows(
+          "mapping",
+          `address=eq.${address}&collection_name=eq.nominations&select=key,value`
         ),
         pinnedFactory
           ? rows(
@@ -611,12 +628,15 @@ export function useDedicatedWalletState(walletAddress?: string | null) {
           value.revoked !== true && value.revoked !== "true";
       });
       const approvedVersion = !!registeredVersion;
-      const verificationErrors = [
+      const provenanceErrors = [
         ...factoryState.verificationErrors,
-        ...(factory !== pinnedFactory ? ["Stored factory does not match the pinned factory"] : []),
-        ...(!registered ? ["Wallet is not registered by the pinned factory"] : []),
-        ...(!approvedVersion ? ["Current logic/version is not registry-approved"] : []),
-        ...(!(data.multisigActive === true || data.multisigActive === "true") ? ["Wallet is not active"] : []),
+        ...(factory !== pinnedFactory ? ["This multisig wallet was created by a different service than this network uses"] : []),
+        ...(!registered ? ["This multisig wallet is not registered on this network"] : []),
+        ...(!(data.multisigActive === true || data.multisigActive === "true") ? [WALLET_NOT_ACTIVE] : []),
+      ];
+      const verificationErrors = [
+        ...provenanceErrors,
+        ...(!approvedVersion ? [VERSION_NOT_APPROVED] : []),
       ];
       return {
         address,
@@ -631,7 +651,17 @@ export function useDedicatedWalletState(walletAddress?: string | null) {
         signers: signerRows
           .map((row) => strip0x(String(row?.key?.key ?? "")))
           .filter((signer) => signer.length === 40),
+        pendingNominees: nominationRows
+          .filter((row) => {
+            const value = row?.value ?? {};
+            return (value.exists === true || value.exists === "true") &&
+              Number(value.epoch ?? 0) === Number(data.multisigEpoch ?? 0) &&
+              Number(value.expiresAt ?? 0) >= Date.now() / 1000;
+          })
+          .map((row) => strip0x(String(row?.key?.key ?? "")))
+          .filter((nominee) => nominee.length === 40),
         pendingUpgrade: parseDedicatedPendingUpgrade(data.multisigPendingUpgrade),
+        provenanceVerified: provenanceErrors.length === 0,
         verified: verificationErrors.length === 0,
         verificationErrors,
       };
@@ -695,47 +725,153 @@ export function useDedicatedIssues(walletAddress?: string | null, epoch?: number
             approvedSigners: approvalsById.get(issueId) ?? [],
             executableAt: Number(value.executableAt ?? 0),
             expiresAt: Number(value.expiresAt ?? 0),
+            createdAt: Number(value.createdAt ?? 0),
           };
         });
     },
   });
 }
 
-export interface DedicatedExecutedIssue {
+export interface DedicatedHistoryItem {
+  key: string;
+  timestamp?: string;
+  /** How a proposal ended. Absent for wallet events that are not proposals. */
+  outcome?: "executed" | "dismissed" | "cancelled" | "superseded" | "withdrawn" | "unqueued";
   issueId: string;
   target: string;
   functionName: string;
   arguments: string[];
-  executor: string;
-  timestamp?: string;
-  transactionHash?: string;
+  /** Wallet events that are not proposals: setup, creation, a signer joining, an upgrade. */
+  headline?: string;
+  account?: { label: string; value: string };
 }
 
-export function useDedicatedHistory(walletAddress?: string | null, limit = 10) {
+const HISTORY_EVENTS = [
+  "IssueExecuted", "IssueExecutedNoArgs", "IssueCreated", "IssueCreatedNoArgs", "IssueDismissed",
+  "IssueCancelled", "IssueApprovalRevoked", "IssueUnqueued", "SignerAdded", "UpgradeExecuted",
+  "ConfigurationAdvanced",
+];
+
+/** Turns a wallet's events, newest first, into the entries shown under History. */
+export const buildDedicatedHistory = (events: any[], limit: number): DedicatedHistoryItem[] => {
+  const created = new Map<string, any>();
+  const ended = new Set<string>();
+  const advances: { epoch: number; timestamp?: string }[] = [];
+  for (const event of events) {
+    const attributes = event?.attributes ?? {};
+    const name = String(event?.event_name ?? "");
+    if (name.startsWith("IssueCreated")) created.set(String(attributes.issueId ?? ""), event);
+    else if (name.startsWith("IssueExecuted") || name === "IssueDismissed" || name === "IssueCancelled") {
+      ended.add(String(attributes.issueId ?? ""));
+    }
+    if (name === "ConfigurationAdvanced" || name === "UpgradeExecuted") {
+      advances.push({ epoch: Number(attributes.epoch ?? 0), timestamp: event?.block_timestamp });
+    }
+  }
+  const issue = (attributes: any) => ({
+    issueId: String(attributes.issueId ?? ""),
+    target: strip0x(String(attributes.target ?? "")),
+    functionName: String(attributes.functionName ?? ""),
+    arguments: normalizeDedicatedArguments(attributes.arguments),
+  });
+  const walletEvent = (headline: string, label: string, value: unknown) => ({
+    ...issue({}),
+    headline,
+    account: { label, value: strip0x(String(value ?? "")) },
+  });
+  const items: DedicatedHistoryItem[] = [];
+  for (const event of events) {
+    const attributes = event?.attributes ?? {};
+    const name = String(event?.event_name ?? "");
+    const base = { key: `${event?.transaction_hash}:${name}:${attributes.issueId ?? ""}`, timestamp: event?.block_timestamp };
+    if (name.startsWith("IssueExecuted")) {
+      items.push({ ...base, outcome: "executed", ...issue(attributes) });
+    } else if (name === "IssueDismissed" || name === "IssueCancelled") {
+      const origin = created.get(String(attributes.issueId ?? ""));
+      if (origin) {
+        items.push({
+          ...base,
+          outcome: name === "IssueDismissed" ? "dismissed" : "cancelled",
+          ...issue(origin.attributes),
+        });
+      }
+    } else if (name === "IssueApprovalRevoked" || name === "IssueUnqueued") {
+      const origin = created.get(String(attributes.issueId ?? ""));
+      if (origin) {
+        items.push({
+          ...base,
+          outcome: name === "IssueUnqueued" ? "unqueued" : "withdrawn",
+          ...issue(origin.attributes),
+          ...(attributes.signer
+            ? { account: { label: "Withdrawn by", value: strip0x(String(attributes.signer)) } }
+            : {}),
+        });
+      }
+    } else if (name === "SignerAdded") {
+      items.push({ ...base, ...walletEvent("Signer joined", "Signer", attributes.signer) });
+    } else if (name === "UpgradeExecuted") {
+      items.push({
+        ...base,
+        ...walletEvent(
+          `Upgraded from version ${attributes.fromVersion} to ${attributes.targetVersion}`,
+          "Applied by",
+          attributes.executor
+        ),
+      });
+    } else if (name === "MultisigCreated") {
+      items.push({ ...base, ...walletEvent("Multisig wallet created", "Created by", attributes.creator) });
+    } else if (name === "MultisigSetupRegistered") {
+      items.push({ ...base, ...walletEvent("Multisig wallet setup started", "Started by", attributes.creator) });
+    } else if (name === "InitialSignerConfirmed") {
+      items.push({
+        ...base,
+        key: `${base.key}${attributes.signer}`,
+        ...walletEvent(
+          `Signer confirmed the setup (${attributes.confirmations} of ${attributes.totalSigners})`,
+          "Signer",
+          attributes.signer
+        ),
+      });
+    }
+  }
+  for (const [issueId, origin] of created) {
+    if (ended.has(issueId)) continue;
+    // Advances are newest first, so the last match is the change that ended the proposal's epoch.
+    const advance = advances.filter((entry) => entry.epoch > Number(origin.attributes.epoch ?? 0)).pop();
+    if (advance) {
+      items.push({
+        key: `superseded:${issueId}`,
+        timestamp: advance.timestamp,
+        outcome: "superseded",
+        ...issue(origin.attributes),
+      });
+    }
+  }
+  return items
+    .sort((left, right) => String(right.timestamp ?? "").localeCompare(String(left.timestamp ?? "")))
+    .slice(0, limit);
+};
+
+export function useDedicatedHistory(walletAddress?: string | null, setupHash = "", limit = 10) {
   return useQuery({
-    queryKey: ["dedicated-multisig-history", walletAddress, limit],
+    queryKey: ["dedicated-multisig-history", walletAddress, setupHash, limit],
     enabled: !!walletAddress,
     refetchInterval: 15_000,
-    queryFn: async (): Promise<DedicatedExecutedIssue[]> => {
+    placeholderData: keepPreviousData,
+    queryFn: async (): Promise<DedicatedHistoryItem[]> => {
       const address = strip0x(walletAddress!);
+      const factory = runtime.multisigFactoryAddress();
       const events = await rows(
         "event",
-        `address=eq.${address}&event_name=in.(IssueExecuted,IssueExecutedNoArgs)` +
-          `&order=block_timestamp.desc&limit=${limit}` +
-          `&select=attributes,block_timestamp,transaction_hash`
+        `or=(and(address.eq.${address},event_name.in.(${HISTORY_EVENTS.join(",")}))` +
+          (factory && setupHash
+            ? `,and(address.eq.${factory},attributes-%3E%3EsetupHash.eq.${setupHash},` +
+              `event_name.in.(MultisigSetupRegistered,InitialSignerConfirmed,MultisigCreated))`
+            : "") +
+          `)&order=block_timestamp.desc&limit=${limit * 10}` +
+          `&select=event_name,attributes,block_timestamp,transaction_hash`
       );
-      return events.map((event) => {
-        const attributes = event?.attributes ?? {};
-        return {
-          issueId: String(attributes.issueId ?? ""),
-          target: strip0x(String(attributes.target ?? "")),
-          functionName: String(attributes.functionName ?? ""),
-          arguments: normalizeDedicatedArguments(attributes.arguments),
-          executor: strip0x(String(attributes.executor ?? "")),
-          timestamp: event?.block_timestamp,
-          transactionHash: event?.transaction_hash,
-        };
-      });
+      return buildDedicatedHistory(events, limit);
     },
   });
 }
@@ -751,8 +887,9 @@ export interface RegisterDedicatedSetup {
 export const canonicalizeSetupSigners = (signers: string[]): string[] =>
   [...new Set(signers.map(strip0x).filter((signer) => signer.length === 40))].sort();
 
+/** An allowance with no practical limit. Operator permissions have their own warning. */
 export const isUnlimitedTokenApproval = (functionName: string, args: string[]): boolean => {
-  if (functionName !== "approve" || args.length < 2) return false;
+  if ((functionName !== "approve" && functionName !== "increaseAllowance") || args.length < 2) return false;
   try {
     return BigInt(args[1] || "0") > (1n << 255n);
   } catch {
@@ -913,6 +1050,37 @@ export function buildDedicatedProtocolWorkflow(
   ];
 }
 
+/**
+ * Dry-run a call as if the multisig wallet made it, so the target contract itself says
+ * whether it would succeed. Resolves to the contract's refusal, or "" when it would run.
+ */
+export function useDedicatedCallCheck(walletAddress: string, call: DedicatedCall | null) {
+  return useQuery({
+    queryKey: ["dedicated-multisig-call-check", walletAddress, call?.target, call?.functionName, JSON.stringify(call?.arguments)],
+    enabled: !!call,
+    staleTime: 15_000,
+    // Another proposal running can change the answer, such as the permission a paired action needs.
+    refetchInterval: 15_000,
+    retry: false,
+    queryFn: async (): Promise<string> => {
+      const declared = await fetchFunctionByAddress(call!.target, call!.functionName);
+      if (!declared.found || declared.args.length !== call!.arguments.length) {
+        throw new Error("The target function could not be resolved");
+      }
+      const result = await simulateStratoTx("FUNCTION", {
+        contractAddress: strip0x(call!.target),
+        method: call!.functionName,
+        args: Object.fromEntries(declared.args.map((argument, index) => [argument.name, call!.arguments[index]])),
+        value: 0,
+        metadata: {},
+      }, { address: walletAddress, trace: false });
+      return result.status === "Success"
+        ? ""
+        : String(result.error || "The contract refused it").replace(/^solidity require failed:\s*/i, "");
+    },
+  });
+}
+
 export function useDedicatedMultisigActions(walletAddress?: string) {
   const { submit } = useSubmitTransaction();
   const queryClient = useQueryClient();
@@ -932,7 +1100,7 @@ export function useDedicatedMultisigActions(walletAddress?: string) {
 
   const walletCall = useCallback(
     (method: string, args: Record<string, unknown>, username?: string) => {
-      if (!walletAddress) throw new Error("Wallet address is required");
+      if (!walletAddress) throw new Error("Multisig wallet address is required");
       return submit(
         "FUNCTION",
         buildDedicatedCallPayload(
@@ -959,7 +1127,12 @@ export function useDedicatedMultisigActions(walletAddress?: string) {
         queryClient.invalidateQueries({ queryKey: ["my-pending-multisig-setups"] })
       ),
     confirmSetup: (setupHash: string, username?: string) =>
-      factoryCall("confirmSetup", { _setupHash: setupHash }, username).finally(() => {
+      factoryCall("confirmSetup", { _setupHash: setupHash }, username).catch((error) => {
+        // The multisig wallet's address was taken before it could be created; only a new invitation gets a new address.
+        throw /already exists/i.test(String(error?.message))
+          ? new Error("This invitation can no longer be completed. Create a new invitation.")
+          : error;
+      }).finally(() => {
         queryClient.invalidateQueries({ queryKey: ["my-pending-multisig-setups"] });
         queryClient.invalidateQueries({ queryKey: ["my-multisig-wallets"] });
       }),

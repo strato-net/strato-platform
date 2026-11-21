@@ -71,6 +71,8 @@ The nginx configuration is generated at runtime from templates:
 | `SMD_HOST` | SMD service host | `smd:3002` |
 | `JSONRPC_ENABLED` | Enable the `/rpc` reverse proxy to Ethereum JSON-RPC | `false` |
 | `RPC_PORT` | Internal Ethereum JSON-RPC upstream port used by nginx | `8545` |
+| `RPC_RATE_LIMIT_PER_IP` | Requests per second `/rpc` accepts from one client address | `25` |
+| `RPC_RATE_LIMIT_TOTAL` | Requests per second `/rpc` accepts from all clients together | `200` |
 | `STRATO_HOSTNAME` | STRATO service hostname | `strato` |
 | `STRATO_PORT_API` | STRATO API port | `3000` |
 | `STRATO_PORT_VAULT_PROXY` | Vault proxy port | `8013` |
@@ -131,6 +133,9 @@ All responses include:
 - Default: 80 requests/second per IP
 - Burst: 100 requests
 - Docker network traffic bypassed (for service-to-service calls)
+- `/rpc` has its own limits on top: 25 requests/second per IP (`RPC_RATE_LIMIT_PER_IP`; burst of 100, delayed like the default) and 200 requests/second for all clients together (`RPC_RATE_LIMIT_TOTAL`; burst of the same size, requests over it get 429 at once). A JSON-RPC batch counts as one request.
+- Both are read when the container is created: recreate the container to change them.
+- Behind a load balancer a per-IP limit needs the balancer's address range trusted (`NGINX_TRUST_PROXY_CIDRS`; `10.0.0.0/16` is trusted already). Otherwise every client shares the balancer's address and its limit.
 
 ## Monitoring
 

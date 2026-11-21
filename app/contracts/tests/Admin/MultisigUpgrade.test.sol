@@ -50,6 +50,12 @@ contract HollowLogic {
     function initialize(address[] _signers, uint _requiredApprovals, uint _transactionTimelock) external {}
 }
 
+contract UpgradeTrigger {
+    function trigger(address _wallet) public {
+        MultisigWallet(_wallet).executeUpgrade();
+    }
+}
+
 contract Describe_MultisigUpgrade {
     MultisigFactory factory;
     MultisigLogic v1;
@@ -452,9 +458,8 @@ contract Describe_MultisigUpgrade {
             wallet,
             "proposeIssue",
             wallet,
-            "applyConfiguration",
-            ["address[]", "uint256"],
-            [address(a), address(b), address(c)],
+            "setRequiredApprovals",
+            ["uint256"],
             2
         );
         b.invoke(
@@ -462,12 +467,26 @@ contract Describe_MultisigUpgrade {
             "approveIssue",
             configIssue,
             wallet,
-            "applyConfiguration",
-            ["address[]", "uint256"],
-            [address(a), address(b), address(c)],
+            "setRequiredApprovals",
+            ["uint256"],
             2
         );
         (,,,,,,, bool exists) = MultisigWallet(wallet).multisigPendingUpgrade();
         require(!exists, "Configuration change preserved pending upgrade");
+    }
+
+    function it_refuses_to_apply_an_upgrade_while_an_issue_is_executing() {
+        address wallet = deploy(0);
+        schedule(wallet, "migrate");
+        fastForward(604800);
+        UpgradeTrigger trigger = new UpgradeTrigger();
+        string issueId = a.invoke(wallet, "proposeIssue", address(trigger), "trigger", ["address"], wallet);
+        require(
+            rejects(b, wallet, "approveIssue", issueId, address(trigger), "trigger", ["address"], wallet),
+            "Upgrade applied in the middle of an issue"
+        );
+        require(MultisigWallet(wallet).multisigCurrentVersion() == "1", "Version changed in the middle of an issue");
+        outsider.invoke(wallet, "executeUpgrade");
+        require(MultisigWallet(wallet).multisigCurrentVersion() == "2", "Upgrade could not be applied afterwards");
     }
 }

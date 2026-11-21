@@ -34,6 +34,7 @@ benchConfig = do
     SequencerConfig
       { blockstanbulBlockPeriod = 0,
         blockstanbulRoundPeriod = 1000000,
+        blockstanbulProposalTimeout = 10,
         blockstanbulTimeouts = ch,
         cablePackage = cp
       }

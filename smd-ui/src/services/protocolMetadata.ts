@@ -71,35 +71,6 @@ export interface V3AllowanceMetadata {
   positions: PositionV3Metadata[];
 }
 
-export function resolveV3AllowanceInputs(
-  func: string,
-  args: string[],
-  metadata?: V3AllowanceMetadata
-): { tokenAddress: string; amount: string }[] {
-  let poolAddress = "";
-  let amount0 = "0";
-  let amount1 = "0";
-  if (func === "mint" && args.length >= 9) {
-    poolAddress = args[0] ?? "";
-    amount0 = args[3] ?? "0";
-    amount1 = args[4] ?? "0";
-  } else if (func === "increaseLiquidity" && args.length >= 6) {
-    poolAddress = metadata?.positions.find((position) =>
-      position.tokenId === String(args[0] ?? "")
-    )?.poolAddress ?? "";
-    amount0 = args[1] ?? "0";
-    amount1 = args[2] ?? "0";
-  }
-  const pool = metadata?.pools.find((item) =>
-    strip0x(item.address) === strip0x(poolAddress)
-  );
-  if (!pool) return [];
-  return [
-    { tokenAddress: pool.token0.address, amount: amount0 },
-    { tokenAddress: pool.token1.address, amount: amount1 },
-  ];
-}
-
 export interface DeployedCollateralPosition {
   asset: string;
   symbol: string;

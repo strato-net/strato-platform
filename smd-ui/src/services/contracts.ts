@@ -203,26 +203,12 @@ export async function fetchFunctionByAddress(
   fnName: string
 ): Promise<ResolvedContractFunction> {
   const normalized = address.replace(/^0x/i, "").toLowerCase();
-  const { data: groups } = await api.get(`${env.BLOC_URL}/contracts`, {
-    params: { name: normalized, limit: 20, ...chainParam() },
+  const { data: info } = await api.get(`${env.BLOC_URL}/contracts/contract/${normalized}/details`, {
+    params: chainParam(),
   });
-  if (!groups || typeof groups !== "object") return { found: false, args: [] };
-
-  for (const [name, rawInstances] of Object.entries(groups as Record<string, any>)) {
-    const instances = Array.isArray(rawInstances) ? rawInstances : rawInstances?.instances ?? [];
-    const found = instances.some((instance: any) => {
-      const candidate = typeof instance === "string" ? instance : instance?.address;
-      return String(candidate ?? "").replace(/^0x/i, "").toLowerCase() === normalized;
-    });
-    if (!found) continue;
-    const { data: info } = await api.get(`${env.BLOC_URL}/contracts/${name}/${normalized}`, {
-      params: chainParam(),
-    });
-    if (info?._functions?.[fnName]) {
-      return { found: true, args: functionArgs(info, fnName) };
-    }
-  }
-  return { found: false, args: [] };
+  return info?._functions?.[fnName]
+    ? { found: true, args: functionArgs(info, fnName) }
+    : { found: false, args: [] };
 }
 
 /** Resolve a deployed contract by address and return one function's declared arguments. */
@@ -237,6 +223,24 @@ export function useFunctionByAddress(address: string, fnName: string) {
     enabled: !!address && !!fnName,
     staleTime: 5 * 60_000,
     queryFn: (): Promise<ResolvedContractFunction> => fetchFunctionByAddress(address, fnName),
+  });
+}
+
+/** A deployed contract's numeric constant, or null when it declares none by that name. */
+export function useContractConstant(address: string | undefined, name: string) {
+  return useQuery({
+    queryKey: ["contract-constant", address, name],
+    enabled: !!address,
+    staleTime: Infinity,
+    queryFn: async (): Promise<number | null> => {
+      const normalized = address!.replace(/^0x/i, "").toLowerCase();
+      const { data: info } = await api.get(`${env.BLOC_URL}/contracts/contract/${normalized}/details`, {
+        params: chainParam(),
+      });
+      const value = info?._constants?.[name]?._constInitialVal;
+      const number = value?.tag === "NumberLiteral" ? Number(value.contents?.[1]) : NaN;
+      return Number.isFinite(number) ? number : null;
+    },
   });
 }
 

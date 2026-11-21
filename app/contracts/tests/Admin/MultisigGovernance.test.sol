@@ -133,6 +133,58 @@ contract Describe_MultisigGovernance {
         require(token.balanceOf(address(outsider)) == 0, "Cancelled issue moved funds");
     }
 
+    function it_ends_the_waiting_period_when_an_approval_is_withdrawn() {
+        address wallet = deploy(100);
+        GovernanceToken token = new GovernanceToken(wallet);
+        string issueId = a.invoke(wallet, "proposeIssue", address(token), "transfer", ["address", "uint256"], address(outsider), 100);
+        b.invoke(wallet, "approveIssue", issueId, address(token), "transfer", ["address", "uint256"], address(outsider), 100);
+        fastForward(60);
+        require(rejects(c, wallet, "revokeIssueApproval", issueId), "A signer who had not approved withdrew");
+        b.invoke(wallet, "revokeIssueApproval", issueId);
+        fastForward(100);
+        require(
+            rejects(a, wallet, "executeIssue", issueId, address(token), "transfer", ["address", "uint256"], address(outsider), 100),
+            "Issue executed after falling below quorum"
+        );
+
+        c.invoke(wallet, "approveIssue", issueId, address(token), "transfer", ["address", "uint256"], address(outsider), 100);
+        fastForward(60);
+        require(
+            rejects(a, wallet, "executeIssue", issueId, address(token), "transfer", ["address", "uint256"], address(outsider), 100),
+            "Restored issue did not wait a fresh timelock"
+        );
+        fastForward(40);
+        a.invoke(wallet, "executeIssue", issueId, address(token), "transfer", ["address", "uint256"], address(outsider), 100);
+        require(token.balanceOf(address(outsider)) == 100, "Restored issue did not execute");
+    }
+
+    function it_lets_one_approver_stop_a_queued_issue_in_a_three_of_four() {
+        address wallet = deployThreeOfFour(100);
+        GovernanceToken token = new GovernanceToken(wallet);
+        string issueId = a.invoke(wallet, "proposeIssue", address(token), "transfer", ["address", "uint256"], address(outsider), 100);
+        b.invoke(wallet, "approveIssue", issueId, address(token), "transfer", ["address", "uint256"], address(outsider), 100);
+        c.invoke(wallet, "approveIssue", issueId, address(token), "transfer", ["address", "uint256"], address(outsider), 100);
+        c.invoke(wallet, "revokeIssueApproval", issueId);
+        fastForward(100);
+        require(
+            rejects(a, wallet, "executeIssue", issueId, address(token), "transfer", ["address", "uint256"], address(outsider), 100),
+            "Two of four executed a three-of-four issue"
+        );
+        require(token.balanceOf(address(outsider)) == 0, "Stopped issue moved funds");
+    }
+
+    function it_lets_a_signer_approve_again_after_withdrawing() {
+        address wallet = deploy(100);
+        GovernanceToken token = new GovernanceToken(wallet);
+        string issueId = a.invoke(wallet, "proposeIssue", address(token), "transfer", ["address", "uint256"], address(outsider), 100);
+        b.invoke(wallet, "approveIssue", issueId, address(token), "transfer", ["address", "uint256"], address(outsider), 100);
+        b.invoke(wallet, "revokeIssueApproval", issueId);
+        b.invoke(wallet, "approveIssue", issueId, address(token), "transfer", ["address", "uint256"], address(outsider), 100);
+        fastForward(100);
+        a.invoke(wallet, "executeIssue", issueId, address(token), "transfer", ["address", "uint256"], address(outsider), 100);
+        require(token.balanceOf(address(outsider)) == 100, "Re-approved issue did not execute");
+    }
+
     function it_prevents_the_creator_dismissing_after_another_signer_approves() {
         address wallet = deployThreeOfFour(100);
         GovernanceToken token = new GovernanceToken(wallet);
@@ -155,25 +207,8 @@ contract Describe_MultisigGovernance {
         address wallet = deploy(0);
         GovernanceToken token = new GovernanceToken(wallet);
         string staleIssue = a.invoke(wallet, "proposeIssue", address(token), "transfer", ["address", "uint256"], address(outsider), 100);
-        string configIssue = a.invoke(
-            wallet,
-            "proposeIssue",
-            wallet,
-            "applyConfiguration",
-            ["address[]", "uint256"],
-            [address(a), address(b), address(c)],
-            2
-        );
-        b.invoke(
-            wallet,
-            "approveIssue",
-            configIssue,
-            wallet,
-            "applyConfiguration",
-            ["address[]", "uint256"],
-            [address(a), address(b), address(c)],
-            2
-        );
+        string configIssue = a.invoke(wallet, "proposeIssue", wallet, "setRequiredApprovals", ["uint256"], 2);
+        b.invoke(wallet, "approveIssue", configIssue, wallet, "setRequiredApprovals", ["uint256"], 2);
         require(
             rejects(b, wallet, "approveIssue", staleIssue, address(token), "transfer", ["address", "uint256"], address(outsider), 100),
             "Old issue survived epoch change"
@@ -182,156 +217,145 @@ contract Describe_MultisigGovernance {
 
     function it_requires_nominee_control_before_adding_a_signer() {
         address wallet = deploy(0);
-        string issueId = a.invoke(
-            wallet,
-            "proposeIssue",
-            wallet,
-            "nominateConfiguration",
-            ["address", "address[]", "uint256"],
-            address(d),
-            [address(a), address(b), address(c), address(d)],
-            2
-        );
-        b.invoke(
-            wallet,
-            "approveIssue",
-            issueId,
-            wallet,
-            "nominateConfiguration",
-            ["address", "address[]", "uint256"],
-            address(d),
-            [address(a), address(b), address(c), address(d)],
-            2
-        );
+        string issueId = a.invoke(wallet, "proposeIssue", wallet, "nominateSigner", ["address"], address(d));
+        b.invoke(wallet, "approveIssue", issueId, wallet, "nominateSigner", ["address"], address(d));
         require(MultisigLogic(wallet).signerMap(address(d)) == 0, "Nominee activated without acceptance");
         require(rejects(outsider, wallet, "acceptNomination"), "Wrong account accepted nomination");
         d.invoke(wallet, "acceptNomination");
-        require(MultisigLogic(wallet).signerMap(address(d)) > 0, "Nominee did not activate");
+        require(MultisigLogic(wallet).signerMap(address(d)) == 4, "Nominee did not activate");
     }
 
-    function it_rejects_a_nomination_that_drops_a_signer() {
+    function it_adds_only_the_nominee_and_keeps_required_approvals() {
         address wallet = deploy(0);
-        string issueId = a.invoke(
-            wallet,
-            "proposeIssue",
-            wallet,
-            "nominateConfiguration",
-            ["address", "address[]", "uint256"],
-            address(d),
-            [address(a), address(b), address(d)],
-            2
-        );
+        uint indexA = MultisigLogic(wallet).signerMap(address(a));
+        uint indexB = MultisigLogic(wallet).signerMap(address(b));
+        uint indexC = MultisigLogic(wallet).signerMap(address(c));
+        string issueId = a.invoke(wallet, "proposeIssue", wallet, "nominateSigner", ["address"], address(d));
+        b.invoke(wallet, "approveIssue", issueId, wallet, "nominateSigner", ["address"], address(d));
+        d.invoke(wallet, "acceptNomination");
+        require(MultisigLogic(wallet).signerMap(address(a)) == indexA, "Existing signer changed");
+        require(MultisigLogic(wallet).signerMap(address(b)) == indexB, "Existing signer changed");
+        require(MultisigLogic(wallet).signerMap(address(c)) == indexC, "Existing signer changed");
+        require(MultisigLogic(wallet).signers(3) == address(d), "Nominee was not appended");
+        require(MultisigLogic(wallet).requiredApprovals() == 2, "Adding a signer changed required approvals");
+        require(MultisigLogic(wallet).multisigHealthCheck(), "Signer set is inconsistent");
+        require(rejects(d, wallet, "acceptNomination"), "Nomination was accepted twice");
+    }
+
+    function it_rejects_nominating_a_signer_or_the_wallet() {
+        address wallet = deploy(0);
+        string existing = a.invoke(wallet, "proposeIssue", wallet, "nominateSigner", ["address"], address(c));
         require(
-            rejects(
-                b,
-                wallet,
-                "approveIssue",
-                issueId,
-                wallet,
-                "nominateConfiguration",
-                ["address", "address[]", "uint256"],
-                address(d),
-                [address(a), address(b), address(d)],
-                2
-            ),
-            "Nomination dropped a signer"
+            rejects(b, wallet, "approveIssue", existing, wallet, "nominateSigner", ["address"], address(c)),
+            "Existing signer was nominated"
+        );
+        string self = a.invoke(wallet, "proposeIssue", wallet, "nominateSigner", ["address"], wallet);
+        require(
+            rejects(b, wallet, "approveIssue", self, wallet, "nominateSigner", ["address"], wallet),
+            "Wallet was nominated as its own signer"
         );
     }
 
-    function it_rejects_a_nomination_that_changes_required_approvals() {
+    function it_keeps_only_the_latest_nomination_open() {
         address wallet = deploy(0);
-        string higher = a.invoke(
-            wallet,
-            "proposeIssue",
-            wallet,
-            "nominateConfiguration",
-            ["address", "address[]", "uint256"],
-            address(d),
-            [address(a), address(b), address(c), address(d)],
-            3
-        );
+        string first = a.invoke(wallet, "proposeIssue", wallet, "nominateSigner", ["address"], address(d));
+        b.invoke(wallet, "approveIssue", first, wallet, "nominateSigner", ["address"], address(d));
+        string second = a.invoke(wallet, "proposeIssue", wallet, "nominateSigner", ["address"], address(outsider));
+        b.invoke(wallet, "approveIssue", second, wallet, "nominateSigner", ["address"], address(outsider));
+        require(rejects(d, wallet, "acceptNomination"), "Replaced nomination was accepted");
+        outsider.invoke(wallet, "acceptNomination");
+        require(MultisigLogic(wallet).signerMap(address(outsider)) == 4, "Latest nominee did not activate");
+    }
+
+    function removeAndCheck(GovernanceSigner _removed) internal {
+        address wallet = deployThreeOfFour(0);
+        address removed = address(_removed);
+        uint removedIndex = MultisigLogic(wallet).signerMap(removed);
+        address last = MultisigLogic(wallet).signers(3);
+        address[] all = [address(a), address(b), address(c), address(d)];
+        uint[] expected = [uint(0), 0, 0, 0];
+        for (uint i = 0; i < all.length; i++) {
+            expected[i] = all[i] == removed ? 0
+                : all[i] == last ? removedIndex
+                : MultisigLogic(wallet).signerMap(all[i]);
+        }
+
+        string issueId = a.invoke(wallet, "proposeIssue", wallet, "removeSigner", ["address", "uint256"], removed, 2);
+        b.invoke(wallet, "approveIssue", issueId, wallet, "removeSigner", ["address", "uint256"], removed, 2);
+        c.invoke(wallet, "approveIssue", issueId, wallet, "removeSigner", ["address", "uint256"], removed, 2);
+
+        for (uint j = 0; j < all.length; j++) {
+            require(MultisigLogic(wallet).signerMap(all[j]) == expected[j], "Signer index is wrong after removal");
+            if (expected[j] > 0) {
+                require(MultisigLogic(wallet).signers(expected[j] - 1) == all[j], "Signer list is wrong after removal");
+            }
+        }
+        require(MultisigLogic(wallet).requiredApprovals() == 2, "Required approvals were not set");
+        require(MultisigLogic(wallet).multisigHealthCheck(), "Signer set is inconsistent");
+        require(rejects(_removed, wallet, "proposeIssueNoArgs", wallet, "cancelUpgrade"), "Removed signer proposed");
+    }
+
+    function it_removes_any_one_signer_and_keeps_indexes_consistent() {
+        removeAndCheck(a);
+        removeAndCheck(b);
+        removeAndCheck(c);
+        removeAndCheck(d);
+    }
+
+    function it_adds_a_signer_back_after_removal_with_clean_indexes() {
+        address wallet = deployThreeOfFour(0);
+        string removal = a.invoke(wallet, "proposeIssue", wallet, "removeSigner", ["address", "uint256"], address(b), 2);
+        b.invoke(wallet, "approveIssue", removal, wallet, "removeSigner", ["address", "uint256"], address(b), 2);
+        c.invoke(wallet, "approveIssue", removal, wallet, "removeSigner", ["address", "uint256"], address(b), 2);
+        string nomination = a.invoke(wallet, "proposeIssue", wallet, "nominateSigner", ["address"], address(b));
+        c.invoke(wallet, "approveIssue", nomination, wallet, "nominateSigner", ["address"], address(b));
+        b.invoke(wallet, "acceptNomination");
+        require(MultisigLogic(wallet).signerMap(address(b)) == 4, "Returning signer has the wrong index");
+        require(MultisigLogic(wallet).signers(3) == address(b), "Returning signer was not appended");
+        require(MultisigLogic(wallet).multisigHealthCheck(), "Signer set is inconsistent");
+    }
+
+    function it_rejects_a_removal_that_breaks_the_signer_rules() {
+        address wallet = deploy(0);
+        string tooFew = a.invoke(wallet, "proposeIssue", wallet, "removeSigner", ["address", "uint256"], address(c), 2);
         require(
-            rejects(
-                b,
-                wallet,
-                "approveIssue",
-                higher,
-                wallet,
-                "nominateConfiguration",
-                ["address", "address[]", "uint256"],
-                address(d),
-                [address(a), address(b), address(c), address(d)],
-                3
-            ),
-            "Nomination raised required approvals"
+            rejects(b, wallet, "approveIssue", tooFew, wallet, "removeSigner", ["address", "uint256"], address(c), 2),
+            "Removal left fewer than three signers"
+        );
+        string notSigner = a.invoke(wallet, "proposeIssue", wallet, "removeSigner", ["address", "uint256"], address(d), 2);
+        require(
+            rejects(b, wallet, "approveIssue", notSigner, wallet, "removeSigner", ["address", "uint256"], address(d), 2),
+            "Removed an account that is not a signer"
         );
 
         wallet = deployThreeOfFour(0);
-        string lower = a.invoke(
-            wallet,
-            "proposeIssue",
-            wallet,
-            "nominateConfiguration",
-            ["address", "address[]", "uint256"],
-            address(outsider),
-            [address(a), address(b), address(c), address(d), address(outsider)],
-            2
-        );
-        b.invoke(
-            wallet,
-            "approveIssue",
-            lower,
-            wallet,
-            "nominateConfiguration",
-            ["address", "address[]", "uint256"],
-            address(outsider),
-            [address(a), address(b), address(c), address(d), address(outsider)],
-            2
-        );
+        string allRequired = a.invoke(wallet, "proposeIssue", wallet, "removeSigner", ["address", "uint256"], address(d), 3);
+        b.invoke(wallet, "approveIssue", allRequired, wallet, "removeSigner", ["address", "uint256"], address(d), 3);
         require(
-            rejects(
-                c,
-                wallet,
-                "approveIssue",
-                lower,
-                wallet,
-                "nominateConfiguration",
-                ["address", "address[]", "uint256"],
-                address(outsider),
-                [address(a), address(b), address(c), address(d), address(outsider)],
-                2
-            ),
-            "Nomination lowered required approvals"
+            rejects(c, wallet, "approveIssue", allRequired, wallet, "removeSigner", ["address", "uint256"], address(d), 3),
+            "Removal left every signer required"
         );
+        require(MultisigLogic(wallet).signerMap(address(d)) > 0, "Rejected removal changed the signer set");
     }
 
-    function it_rejects_a_nomination_that_adds_two_accounts() {
-        address wallet = deploy(0);
-        string issueId = a.invoke(
-            wallet,
-            "proposeIssue",
-            wallet,
-            "nominateConfiguration",
-            ["address", "address[]", "uint256"],
-            address(d),
-            [address(a), address(b), address(c), address(d), address(outsider)],
-            2
-        );
+    function it_changes_required_approvals_within_the_signer_rules() {
+        address wallet = deployThreeOfFour(0);
+        string all = a.invoke(wallet, "proposeIssue", wallet, "setRequiredApprovals", ["uint256"], 4);
+        b.invoke(wallet, "approveIssue", all, wallet, "setRequiredApprovals", ["uint256"], 4);
         require(
-            rejects(
-                b,
-                wallet,
-                "approveIssue",
-                issueId,
-                wallet,
-                "nominateConfiguration",
-                ["address", "address[]", "uint256"],
-                address(d),
-                [address(a), address(b), address(c), address(d), address(outsider)],
-                2
-            ),
-            "Nomination added two accounts"
+            rejects(c, wallet, "approveIssue", all, wallet, "setRequiredApprovals", ["uint256"], 4),
+            "Every signer became required"
         );
+        string one = a.invoke(wallet, "proposeIssue", wallet, "setRequiredApprovals", ["uint256"], 1);
+        b.invoke(wallet, "approveIssue", one, wallet, "setRequiredApprovals", ["uint256"], 1);
+        require(
+            rejects(c, wallet, "approveIssue", one, wallet, "setRequiredApprovals", ["uint256"], 1),
+            "A single approval became enough"
+        );
+        string lower = a.invoke(wallet, "proposeIssue", wallet, "setRequiredApprovals", ["uint256"], 2);
+        b.invoke(wallet, "approveIssue", lower, wallet, "setRequiredApprovals", ["uint256"], 2);
+        c.invoke(wallet, "approveIssue", lower, wallet, "setRequiredApprovals", ["uint256"], 2);
+        require(MultisigLogic(wallet).requiredApprovals() == 2, "Required approvals did not change");
     }
 
     function it_applies_the_old_timelock_to_timelock_changes() {
@@ -365,24 +389,54 @@ contract Describe_MultisigGovernance {
             wallet,
             "proposeIssue",
             wallet,
-            "nominateConfiguration",
-            ["address", "address[]", "uint256"],
-            address(d),
-            [address(a), address(b), address(c), address(d)],
-            2
+            "nominateSigner",
+            ["address"],
+            address(d)
         );
         b.invoke(
             wallet,
             "approveIssue",
             issueId,
             wallet,
-            "nominateConfiguration",
-            ["address", "address[]", "uint256"],
-            address(d),
-            [address(a), address(b), address(c), address(d)],
-            2
+            "nominateSigner",
+            ["address"],
+            address(d)
         );
         fastForward(2592001);
         require(rejects(d, wallet, "acceptNomination"), "Expired nomination was accepted");
+    }
+
+    function it_revokes_a_nomination_with_quorum_without_waiting_the_timelock() {
+        address wallet = deploy(100);
+        string issueId = a.invoke(
+            wallet,
+            "proposeIssue",
+            wallet,
+            "nominateSigner",
+            ["address"],
+            address(d)
+        );
+        b.invoke(
+            wallet,
+            "approveIssue",
+            issueId,
+            wallet,
+            "nominateSigner",
+            ["address"],
+            address(d)
+        );
+        fastForward(100);
+        c.invoke(
+            wallet,
+            "executeIssue",
+            issueId,
+            wallet,
+            "nominateSigner",
+            ["address"],
+            address(d)
+        );
+        string revokeIssue = a.invoke(wallet, "proposeIssue", wallet, "revokeNomination", ["address"], address(d));
+        b.invoke(wallet, "approveIssue", revokeIssue, wallet, "revokeNomination", ["address"], address(d));
+        require(rejects(d, wallet, "acceptNomination"), "Revoked nomination was accepted");
     }
 }

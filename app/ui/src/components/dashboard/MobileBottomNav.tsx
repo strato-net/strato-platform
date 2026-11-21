@@ -18,10 +18,12 @@ import {
   Layers,
   ArrowDownToLine,
   Compass,
+  Hourglass,
   X
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
 import { useUser } from '@/context/UserContext';
+import { useVestings } from '@/hooks/useVestings';
 import { LucideIcon } from 'lucide-react';
 
 interface MoreNavItem {
@@ -30,6 +32,7 @@ interface MoreNavItem {
   path: string;
   adminOnly?: boolean;
   badge?: string;
+  visible?: boolean;
 }
 
 interface MoreNavCategory {
@@ -63,6 +66,7 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
     items: [
       { icon: Layers, label: 'Stake', path: '/dashboard/earn-staking' },
       { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
+      { icon: Hourglass, label: 'Vesting', path: '/dashboard/vesting' },
     ],
   },
   {
@@ -77,11 +81,16 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
   },
 ];
 
+// The nav list is a module constant, so the per-identity Vesting visibility is resolved in the component.
+const withVisibility = (item: MoreNavItem, hasVesting: boolean): MoreNavItem =>
+  item.path === '/dashboard/vesting' ? { ...item, visible: hasVesting } : item;
+
 const MobileBottomNav = () => {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { isAdmin } = useUser();
+  const { hasVesting } = useVestings();
 
   const isActive = (path: string) => {
     if (path === '/dashboard') return pathname === '/dashboard';
@@ -145,7 +154,9 @@ const MobileBottomNav = () => {
           {/* Menu Items */}
           <div className="min-h-0 overflow-y-auto overscroll-contain px-3 pb-3">
             {MORE_CATEGORIES.map((category, idx) => {
-              const visibleItems = category.items.filter(item => !item.adminOnly || isAdmin);
+              const visibleItems = category.items
+                .map(item => withVisibility(item, hasVesting))
+                .filter(item => (!item.adminOnly || isAdmin) && item.visible !== false);
               if (visibleItems.length === 0) return null;
               return (
                 <div key={idx} className={idx > 0 ? 'mt-2' : ''}>

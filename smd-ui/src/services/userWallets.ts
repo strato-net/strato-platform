@@ -1,13 +1,42 @@
 import { useQuery } from "@tanstack/react-query";
+import { keccak256, stringToHex, toRlp, type Hex } from "viem";
 import { api } from "@/lib/api";
 import { env } from "@/lib/env";
 
 /** UserRegistry is deployed at 0x720 in genesis; createUser() lives here. */
 export const USER_REGISTRY_ADDRESS = "0000000000000000000000000000000000000720";
 export const ADMIN_REGISTRY_ADDRESS = "000000000000000000000000000000000000100c";
+export const TOKEN_FACTORY_ADDRESS = "000000000000000000000000000000000000100b";
 export const ZERO_ADDRESS = "0000000000000000000000000000000000000000";
 
 export const strip0x = (s: string): string => (s || "").replace(/^0x/, "").toLowerCase();
+
+export const deriveCanonicalUserAddress = (username: string, registryCodeHash: string): string => {
+  const codeHash = strip0x(registryCodeHash);
+  if (!username || !/^[0-9a-f]{64}$/.test(codeHash)) return "";
+  const encoded = toRlp([
+    "0xff",
+    `0x${USER_REGISTRY_ADDRESS}`,
+    stringToHex(username),
+    `0x${codeHash}`,
+    stringToHex("User"),
+    stringToHex(username),
+  ] as Hex[]);
+  return strip0x(keccak256(encoded).slice(-40));
+};
+
+let userRegistryCodeHash = "";
+
+export async function fetchUserRegistryCodeHash(): Promise<string> {
+  if (userRegistryCodeHash) return userRegistryCodeHash;
+  const { data } = await api.get(
+    `${env.CIRRUS_URL}/contract?address=eq.${USER_REGISTRY_ADDRESS}&select=code_hash&limit=1`
+  );
+  const codeHash = strip0x(String(Array.isArray(data) ? data[0]?.code_hash ?? "" : ""));
+  if (!/^[0-9a-f]{64}$/.test(codeHash)) throw new Error("Could not verify UserRegistry");
+  userRegistryCodeHash = codeHash;
+  return codeHash;
+}
 
 export interface UserWallet {
   /** User-wallet contract address. */
@@ -33,16 +62,21 @@ export function useMyUserWallets(ownerAddress?: string | null) {
     queryFn: async (): Promise<UserWallet[]> => {
       const key = strip0x(ownerAddress!);
       const select = "select=address,storage(data-%3E%3Eusername)";
-      const ownedRes = await api.get(
-        `${env.CIRRUS_URL}/mapping?collection_name=eq.userAddressMap&key-%3E%3Ekey=eq.${key}&value=gt.0&${select}`
-      );
+      const [ownedRes, registryCodeHash] = await Promise.all([
+        api.get(
+          `${env.CIRRUS_URL}/mapping?collection_name=eq.userAddressMap&key-%3E%3Ekey=eq.${key}&value=gt.0&${select}`
+        ),
+        fetchUserRegistryCodeHash(),
+      ]);
       const ownedRows = Array.isArray(ownedRes.data) ? ownedRes.data : [];
       return ownedRows
         .map((row: any) => ({
           address: strip0x(String(row?.address ?? "")),
           username: String(extractUsername(row)),
         }))
-        .filter((wallet: UserWallet) => wallet.address && wallet.username);
+        .filter((wallet: UserWallet) =>
+          wallet.address === deriveCanonicalUserAddress(wallet.username, registryCodeHash)
+        );
     },
     refetchInterval: 15000,
   });
