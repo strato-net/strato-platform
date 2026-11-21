@@ -198,3 +198,45 @@ test("reconcile reads no pins while the governance link is off, as the contract 
   assert.deepEqual(candidates, ["1".repeat(40), "f".repeat(40)]);
   assert.equal(governanceReads, 0);
 });
+
+test("staking info counts the operator's self-bond in their position, at the rate it earns", async (t) => {
+  process.env.OAUTH_DISCOVERY_URL ??= "http://localhost/discovery";
+  process.env.NODE_URL ??= "http://localhost";
+  const { bloc, cirrus } = await import("../../utils/appApiHelper");
+  const config = await import("../../config/config");
+  const { getStratoStakingInfo } = await import("./staking.service");
+
+  const staking = "6".repeat(40);
+  const [user, owned, other] = ["a", "b", "c"].map((c) => c.repeat(40));
+  const stake = (units: number) => (BigInt(units) * 10n ** 18n).toString();
+
+  const previousStaking = config.stratoStaking;
+  (config as any).stratoStaking = staking;
+  t.after(() => {
+    (config as any).stratoStaking = previousStaking;
+  });
+
+  t.mock.method(bloc, "get", (async () => ({
+    status: 200,
+    data: {
+      creditBlockReward: "function (address) returns ()",
+      maxCommissionBps: "2000",
+      operators: {
+        [owned]: { exists: true, active: true, operator: user, commissionBps: "1000", selfBond: stake(3000), delegatedStake: stake(650) },
+        [other]: { exists: true, active: true, selfBond: stake(6300), delegatedStake: stake(1000) },
+      },
+      delegatedStake: { [user]: { [other]: stake(1000) } },
+    },
+  })) as any);
+  // A week's block rewards of 7 each: 10% a year on the 3650 behind `owned`, 5% on the 7300 behind `other`.
+  t.mock.method(cirrus, "get", (async (_token: string, _path: string, options: any) => ({
+    data: options.params.event_name?.includes("BlockRewardCredited")
+      ? [owned, other].map((validator) => ({ validator, amount: stake(7) }))
+      : [],
+  })) as any);
+
+  const info = await getStratoStakingInfo("access-token", user);
+  assert.equal(info.userTotalStake, stake(4000));
+  // 3000 of self-bond at the full 10% (no commission on it) and 1000 delegated at 5%.
+  assert.equal(info.estimatedApy, "8.75");
+});
