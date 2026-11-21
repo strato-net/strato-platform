@@ -140,6 +140,7 @@ export interface StratoStakingInfo {
   unattributedFees: string;
   totalFeesCredited: string;
   totalRewardsCredited: string;
+  totalEmitted?: string;
   userTotalStake: string;
   userTotalStakeUsd: string;
   claimableRewards: string;
@@ -1642,6 +1643,7 @@ const getV2StakingInfo = async (
     unattributedFees: uintString(state.unattributedFees),
     totalFeesCredited: uintString(state.totalFeesCredited),
     totalRewardsCredited: uintString(state.totalRewardsCredited),
+    totalEmitted: uintString(state.totalEmitted),
     userTotalStake: userTotalStake.toString(),
     userTotalStakeUsd: stratoPriceWad > 0n ? ((userTotalStake * stratoPriceWad) / WAD).toString() : "0",
     claimableRewards: claimableRewards.toString(),
