@@ -28,6 +28,10 @@ defineFlag
   "blockstanbul_round_period_s"
   (3600 :: Int)
   "Seconds without progress before a forced PBFT round change (overridden by ethconf roundPeriodS)"
+defineFlag
+  "blockstanbul_proposal_timeout_s"
+  (10 :: Int)
+  "Seconds to wait for the current proposer before rotating past it (overridden by ethconf proposalTimeoutS)"
 defineFlag "validatorBehavior" (True :: Bool) "Whether to disable validator behavior if enabled"
 
 defineFlag "seq_debug_mode" (True :: Bool) "Whether to run sequencer debug mode"
@@ -50,6 +54,7 @@ exportFlagsAsMetrics = do
   set "kafkaclientid" $ show flags_kafkaclientid
   set "blockstanbul_block_period_ms" $ show (Conf.blockPeriodMs (networkConfig ethConf))
   set "blockstanbul_round_period_s" $ show (Conf.roundPeriodS (networkConfig ethConf))
+  set "blockstanbul_proposal_timeout_s" $ show (Conf.proposalTimeoutS (networkConfig ethConf))
   set "blockstanbul_max_timestamp_drift_s" $ show (Conf.maxTimestampDriftS (networkConfig ethConf))
   set "validatorBehavior" $ show flags_validatorBehavior
   set "seq_debug_mode" $ show flags_seq_debug_mode

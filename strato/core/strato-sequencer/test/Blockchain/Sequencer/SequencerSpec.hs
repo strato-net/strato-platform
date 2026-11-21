@@ -142,6 +142,7 @@ withTemporaryDepBlockDB genesisBlock m = do
                                , seenTransactionDBSize = dedupWindow
                                , blockstanbulBlockPeriod = BlockPeriod 0
                                , blockstanbulRoundPeriod = RoundPeriod 10000000
+                               , blockstanbulProposalTimeout = ProposalTimeout 10
                                , blockstanbulTimeouts = tch
                                , cablePackage = pkg
                                , maxUsPerIter = 200

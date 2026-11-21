@@ -24,6 +24,7 @@ module Blockchain.Sequencer.Monad
     SequencerRow,
     BlockPeriod (..),
     RoundPeriod (..),
+    ProposalTimeout (..),
     runSequencerM,
     commitSequencerState,
     pairToVmTx,
@@ -124,6 +125,7 @@ type MonadBlockstanbul m =
     Mod.Accessible (TMChan View) m,
     Mod.Accessible BlockPeriod m,
     Mod.Accessible RoundPeriod m,
+    Mod.Accessible ProposalTimeout m,
     Mod.Modifiable BestSequencedBlock m,
     HasVault m
   )
@@ -132,6 +134,10 @@ newtype BlockPeriod = BlockPeriod {unBlockPeriod :: NominalDiffTime}
 
 newtype RoundPeriod = RoundPeriod {unRoundPeriod :: NominalDiffTime}
 
+-- | How long a non-proposer waits for the current proposer to propose a block
+-- before driving a round change to rotate past it.
+newtype ProposalTimeout = ProposalTimeout {unProposalTimeout :: NominalDiffTime}
+
 data SequencerConfig = SequencerConfig
   { dependentBlockDB :: DependentBlockDB,
     depBlockDBCacheSize :: Int,
@@ -139,6 +145,7 @@ data SequencerConfig = SequencerConfig
     seenTransactionDBSize :: Int,
     blockstanbulBlockPeriod :: BlockPeriod,
     blockstanbulRoundPeriod :: RoundPeriod,
+    blockstanbulProposalTimeout :: ProposalTimeout,
     blockstanbulTimeouts :: TMChan View,
     cablePackage :: CablePackage,
     maxEventsPerIter :: Int,
@@ -190,6 +197,9 @@ instance Mod.Accessible BlockPeriod SequencerM where
 
 instance Mod.Accessible RoundPeriod SequencerM where
   access _ = asks blockstanbulRoundPeriod
+
+instance Mod.Accessible ProposalTimeout SequencerM where
+  access _ = asks blockstanbulProposalTimeout
 
 instance Mod.Accessible View SequencerM where
   access _ = currentView
@@ -348,6 +358,7 @@ createNewViewTimer = do
   -- block to commit (see 'updateViewTimer'); then it times the round out.
   when (voting && not leading) $ do
     updateViewTimer
+    proposalWait <- unProposalTimeout <$> Mod.access (Mod.Proxy @ProposalTimeout)
     vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
     (v, pCur) <- liftIO (readIORef vpref)
     armedRef <- Mod.access (Mod.Proxy @(IORef (Maybe ViewTimer)))
@@ -395,10 +406,6 @@ carryViewTimer vw = do
   armed <- liftIO $ readIORef armedRef
   let pending vt = _sequence (vtView vt) == _sequence vw && _round (vtView vt) < _round vw
   when (maybe False pending armed) createNewViewTimer
-
--- | How long a non-proposer waits for the proposal before changing round.
-proposalWait :: NominalDiffTime
-proposalWait = 30
 
 -- | Extra time, on top of the proposal's own latency, allowed for an accepted
 -- proposal to commit before changing round.
