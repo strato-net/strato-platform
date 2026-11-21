@@ -31,7 +31,7 @@ it.each(["v1", "v2"])("shows the operator's bonded stake and rewards on %s", asy
   };
   vi.mocked(api.get).mockResolvedValue({ data: {
     contractVersion, isOperator: true, operatorAddress: contractVersion === "v1" ? owned.operator : owned.address,
-    operatedValidators: [owned.address], validators: [owned, other], userTotalStake: other.userStake,
+    operatedValidators: [owned.address], validators: [owned, other], userTotalStake: parseEther("10034.5").toString(),
     operatorClaimableRewards: owned.operatorPendingRewards, unbondingRequests: [],
   } });
   window.scrollTo = vi.fn();

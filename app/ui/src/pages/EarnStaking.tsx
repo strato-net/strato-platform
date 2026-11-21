@@ -836,7 +836,6 @@ const EarnStaking = () => {
       : info?.isOperator && operatorValidator ? [operatorValidator] : []),
     [info?.operatedValidators, info?.isOperator, isV2, operatorValidator, validators]
   );
-  const totalBonded = operatedValidators.reduce((total, validator) => total + BigInt(validator.selfBond || "0"), 0n);
   const stakeWithSelfBond = (validator: StakingValidator) =>
     BigInt(validator.userStake || "0") + (operatedValidators.includes(validator) ? BigInt(validator.selfBond || "0") : 0n);
   // A backend that predates the flag still reports the full validator set, so only an
@@ -1364,7 +1363,7 @@ const EarnStaking = () => {
           <StatCard
             label="Amount Staked"
             tooltip="Your delegated STRATO plus your operator self-bond across all validators."
-            value={`${formatToken(BigInt(info.userTotalStake || "0") + totalBonded, decimals)} ${symbol}`}
+            value={`${formatToken(info.userTotalStake, decimals)} ${symbol}`}
             icon={Layers}
           />
           <StatCard

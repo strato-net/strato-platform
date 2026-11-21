@@ -141,6 +141,7 @@ export interface StratoStakingInfo {
   totalFeesCredited: string;
   totalRewardsCredited: string;
   totalEmitted?: string;
+  // The user's delegations plus the self-bond of every record they operate.
   userTotalStake: string;
   userTotalStakeUsd: string;
   claimableRewards: string;
@@ -1318,6 +1319,10 @@ const getV1StakingInfo = async (
       operatorPendingSelfBondRewards = operatorRewards.selfBond;
       operatorPendingFees = recordFees;
       currentOperatorCommissionBps = commissionBps;
+      // Self-bond is part of the operator's position; it earns the stake rate with no
+      // commission taken.
+      userTotalStake += selfBond;
+      userWeightedApyBps += selfBond * validatorApyBps(state, 0n, currentIndexes.stakeRewardRate);
     }
 
     if (active && apyBps > bestActiveApyBps) {
@@ -1362,7 +1367,7 @@ const getV1StakingInfo = async (
     };
   });
 
-  // Your actual (stake-weighted) APY once you're delegated; best available
+  // Your actual (stake-weighted) APY once you hold stake; best available
   // across active validators until then.
   const estimatedApy = userTotalStake > 0n
     ? formatBpsAsPercent(userWeightedApyBps / userTotalStake)
@@ -1536,6 +1541,10 @@ const getV2StakingInfo = async (
     if (user && record.operator === user) {
       operated.push({ record, rewards: operatorPendingRewards, fees: operatorPendingFees });
       operatorClaimableTotal += operatorPendingRewards;
+      // Self-bond is part of the operator's position; _creditRewards pays it the per-stake
+      // rate with no commission taken.
+      userTotalStake += record.selfBond;
+      userWeightedApyBps += record.selfBond * realizedApyBps(recentRewards.get(validator) || 0n, record.totalStake, 0n);
     }
     if (record.active) activeValidatorCount += 1n;
 
@@ -1578,7 +1587,7 @@ const getV2StakingInfo = async (
     };
   });
 
-  // Your actual (stake-weighted) APY once you're delegated; the network's realized APY
+  // Your actual (stake-weighted) APY once you hold stake; the network's realized APY
   // until then.
   const networkBps = networkApyBps(state, recentRewards);
   const estimatedApy = userTotalStake > 0n
