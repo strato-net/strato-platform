@@ -112,6 +112,7 @@ type StakingInfo = {
   selfBondGraceUntil?: string;
   selfBondRuleActive?: boolean;
   totalRewardsCredited?: string;
+  totalEmitted?: string;
   // V2: validator addresses the connected account operates.
   operatedValidators?: string[];
   stakingAddress: string;
@@ -174,7 +175,7 @@ const formatToken = (value: string | bigint | undefined, decimals: number, maxFr
   }
 };
 
-const formatReward = (value: string | undefined, decimals: number): string =>
+const formatReward = (value: string | bigint | undefined, decimals: number): string =>
   formatToken(value, decimals, decimals);
 
 const formatAmountInput = (value: bigint, decimals: number): string => {
@@ -1320,6 +1321,8 @@ const EarnStaking = () => {
       );
     }
 
+    const creditedBlockRewards = BigInt(info.totalRewardsCredited || "0") + BigInt(info.totalEmitted || "0");
+
     return (
       <div className="space-y-5 [overflow-wrap:anywhere]">
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
@@ -1338,7 +1341,7 @@ const EarnStaking = () => {
           <StatCard
             label="APY"
             tooltip={isV2
-              ? "Annual yield delegators realized over the last 7 days from STRATO block rewards, net of validator commission. Rewards APY comes from platform reward emissions."
+              ? "The native rate annualizes the past 7 days of STRATO block rewards using current stake. Active platform rewards add to the displayed rate."
               : "Estimated annual yield for delegating STRATO. Native APY comes from the staking reward schedule, net of validator commission. Rewards APY comes from platform reward emissions."}
             value={apyWithBreakdown(info.estimatedApy)}
             icon={TrendingUp}
@@ -1384,8 +1387,9 @@ const EarnStaking = () => {
                   <p className="text-xs text-muted-foreground">Staking Rewards</p>
                   <p className="mt-1 text-lg font-semibold">STRATO block rewards</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Validators earn STRATO for each block they propose plus USDST proposer fees, split between the
-                    operator's self-bond and delegators after commission. APY is what delegators realized over the last 7 days.
+                    Eligible validators earn STRATO for producing blocks. Operators and delegators share each reward in
+                    proportion to stake, and commission comes from the delegators’ share. The native rate annualizes
+                    block rewards credited over the past 7 days.
                   </p>
                 </>
               ) : (
@@ -1399,7 +1403,7 @@ const EarnStaking = () => {
               )}
               <p className="mt-2 text-sm text-muted-foreground">
                 {isV2
-                  ? `${formatReward(info.totalRewardsCredited, decimals)} ${symbol} credited to date`
+                  ? `${formatReward(creditedBlockRewards, decimals)} ${symbol} credited to date`
                   : formatRewardPeriodStatus(info.periodStart, info.periodFinish)}
                 {" · "}
                 <a
@@ -1682,7 +1686,7 @@ const EarnStaking = () => {
                         <TipLabel
                           label={apyLabel}
                           tooltip={isV2
-                            ? "Annual yield this validator's delegators realized from STRATO block rewards over the last 7 days, after its commission, plus platform Rewards APY when active."
+                            ? "The native rate annualizes this validator's past 7 days of STRATO block rewards using its current stake and commission. Active platform rewards add to the displayed rate."
                             : "Estimated annual yield from this validator: Native APY after its commission, plus platform Rewards APY when active."}
                         />
                       </th>

@@ -47,3 +47,18 @@ it.each(["v1", "v2"])("shows the operator's bonded stake and exact rewards on %s
   expect(within(otherRow).getByText("34.5")).toBeTruthy();
   expect(screen.getByText("63.771377327521498918 STRATO")).toBeTruthy();
 });
+
+it.each([
+  ["0", "2378845471274302262", "2.378845471274302262"],
+  ["1000000000000000000", "2378845471274302262", "3.378845471274302262"],
+  ["1000000000000000000", undefined, "1"],
+])("includes legacy credits %s and scheduled emissions %s in total block rewards", async (legacy, emitted, total) => {
+  vi.mocked(api.get).mockResolvedValue({ data: {
+    contractVersion: "v2", validatorSetDeployed: false, validators: [], unbondingRequests: [],
+    totalRewardsCredited: legacy, totalEmitted: emitted,
+  } });
+  window.scrollTo = vi.fn();
+  render(<MemoryRouter><EarnStaking /></MemoryRouter>);
+
+  expect(await screen.findByText(`${total} STRATO credited to date`, { exact: false })).toBeTruthy();
+});
