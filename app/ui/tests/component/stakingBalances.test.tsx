@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { parseEther } from "ethers";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
@@ -61,4 +61,24 @@ it.each([
   render(<MemoryRouter><EarnStaking /></MemoryRouter>);
 
   expect(await screen.findByText(`${total} STRATO credited to date`, { exact: false })).toBeTruthy();
+});
+
+it("lists every validator by total stake and re-sorts from the column headers", async () => {
+  const validators = Array.from({ length: 12 }, (_, i) => ({
+    name: `Seat ${i}`, address: `seat-${i}`, operator: `operator-${i}`, active: true,
+    totalStake: parseEther(String(i + 1)).toString(), commissionBps: String(((i * 5) % 12) * 100),
+  }));
+  vi.mocked(api.get).mockResolvedValue({ data: { contractVersion: "v2", validators, unbondingRequests: [] } });
+  window.scrollTo = vi.fn();
+  render(<MemoryRouter><EarnStaking /></MemoryRouter>);
+
+  const order = () => screen.getAllByRole("row").slice(1).map((row) => row.textContent?.match(/Seat \d+/)?.[0]);
+  await screen.findByRole("row", { name: /Seat 0/ });
+  expect(order()).toEqual(validators.map((validator) => validator.name).reverse());
+
+  const commission = screen.getByRole("button", { name: /Commission/ });
+  fireEvent.click(commission);
+  expect(order()[0]).toBe("Seat 7");
+  fireEvent.click(commission);
+  expect(order()[0]).toBe("Seat 0");
 });
