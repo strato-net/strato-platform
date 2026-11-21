@@ -254,6 +254,7 @@ genEthConf nodeRole = do
         , txSizeLimit = flags_txSizeLimit
         , blockPeriodMs = flags_blockstanbul_block_period_ms
         , roundPeriodS = flags_blockstanbul_round_period_s
+        , proposalTimeoutS = flags_blockstanbul_proposal_timeout_s
         , maxTimestampDriftS = flags_blockstanbul_max_timestamp_drift_s
         , stakingActivationBlock =
             if flags_stakingActivationBlock < 0

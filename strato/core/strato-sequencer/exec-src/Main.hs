@@ -72,11 +72,14 @@ main = do
   ctx <- do
     let blockPeriodMs' = Conf.blockPeriodMs (networkConfig ethConf)
     let roundPeriodS' = Conf.roundPeriodS (networkConfig ethConf)
+    let proposalTimeoutS' = Conf.proposalTimeoutS (networkConfig ethConf)
     let maxTimestampDriftS' = Conf.maxTimestampDriftS (networkConfig ethConf)
     unless (blockPeriodMs' >= 0) . ioError . userError $
       "blockPeriodMs must be nonnegative"
     unless (roundPeriodS' > 0) . ioError . userError $
       "roundPeriodS must be positive"
+    unless (proposalTimeoutS' > 0) . ioError . userError $
+      "proposalTimeoutS must be positive"
     unless (maxTimestampDriftS' > 0) . ioError . userError $
       "maxTimestampDriftS must be positive"
 
@@ -108,6 +111,7 @@ main = do
             seenTransactionDBSize = flags_txdedupwindow,
             blockstanbulBlockPeriod = BlockPeriod $ fromIntegral (Conf.blockPeriodMs (networkConfig ethConf)) / 1000.0,
             blockstanbulRoundPeriod = RoundPeriod $ fromIntegral (Conf.roundPeriodS (networkConfig ethConf)),
+            blockstanbulProposalTimeout = ProposalTimeout $ fromIntegral (Conf.proposalTimeoutS (networkConfig ethConf)),
             blockstanbulTimeouts = cht,
             cablePackage = pkg,
             maxEventsPerIter = flags_seq_max_events_per_iter,
