@@ -1,15 +1,38 @@
-Security Policy
+# Security Policy
 
-Reporting a Vulnerability
+## Reporting a Vulnerability
 
-Please report security issues to security@strato.nexus.
+**Please do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.**
 
-Do not open a public issue or disclose details publicly until we have had a
-chance to investigate. Include as much detail as possible:
+Report them privately through GitHub Security Advisories:
 
-- A clear description of the issue and potential impact
-- Steps to reproduce (proof-of-concept, if available)
-- Affected components or versions
-- Any relevant logs, screenshots, or configuration details
+1. Go to the [Security tab](https://github.com/strato-net/strato-platform/security) of this repository
+2. Click **Report a vulnerability**
+3. Fill in the advisory form
 
-We will acknowledge receipt and provide a timeline for next steps.
+Please include as much of the following as you can:
+
+- Type of issue and affected component (e.g. SolidVM, consensus, P2P, API, smart contracts, UI)
+- Affected version, commit, or network
+- Step-by-step reproduction instructions or a proof of concept
+- Impact: what an attacker could achieve
+
+## What to Expect
+
+We will review your report and respond through the advisory thread.
+
+## Disclosure
+
+We follow coordinated disclosure. Please keep details of the issue private while we work on it.
+
+## Scope
+
+In scope: code in this repository and its deployed networks.
+
+Out of scope: social engineering, physical attacks, denial of service by volumetric traffic, and issues in third-party dependencies without a demonstrated impact on this project.
+
+Please do not test against production networks in ways that could affect other users' funds or data. Use a local node or testnet.
+
+## Safe Harbor
+
+We will not pursue legal action against researchers who act in good faith, follow this policy, and avoid privacy violations, data destruction, and service disruption.
