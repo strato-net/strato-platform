@@ -174,9 +174,6 @@ const formatToken = (value: string | bigint | undefined, decimals: number, maxFr
   }
 };
 
-const formatReward = (value: string | bigint | undefined, decimals: number): string =>
-  formatToken(value, decimals, decimals);
-
 const formatAmountInput = (value: bigint, decimals: number): string => {
   const [whole, fraction = ""] = formatUnits(value, decimals).split(".");
   const trimmedFraction = fraction.replace(/0+$/, "");
@@ -571,7 +568,7 @@ const OperatorPanel = ({
         <div className={`mt-4 grid gap-3 ${active || selfBond > 0n ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
           <div className="rounded-md bg-muted/30 p-3">
             <p className="text-xs text-muted-foreground">Operator Rewards</p>
-            <p className="mt-1 font-semibold">{formatReward(claimableRewards, decimals)} {symbol}</p>
+            <p className="mt-1 font-semibold">{formatToken(claimableRewards, decimals)} {symbol}</p>
             {rewardBreakdown && (
               <p className="mt-1 text-xs text-muted-foreground">{rewardBreakdown}</p>
             )}
@@ -1356,7 +1353,7 @@ const EarnStaking = () => {
     const creditedBlockRewards = BigInt(info.totalRewardsCredited || "0") + BigInt(info.totalEmitted || "0");
 
     return (
-      <div className="space-y-5 [overflow-wrap:anywhere]">
+      <div className="space-y-5">
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
           <StatCard
             label="Available to Stake"
@@ -1381,13 +1378,13 @@ const EarnStaking = () => {
           <StatCard
             label="Total Rewards"
             tooltip="Lifetime STRATO you've earned through staking, including rewards already claimed."
-            value={`${formatReward(info.totalEarned, decimals)} ${symbol}`}
+            value={`${formatToken(info.totalEarned, decimals)} ${symbol}`}
             icon={Trophy}
           />
           <StatCard
             label="Claimable"
             tooltip="Rewards you've earned and can claim now without unstaking your delegated STRATO. Claiming doesn't affect your staked balance."
-            value={`${formatReward(info.claimableRewards, decimals)} ${symbol}`}
+            value={`${formatToken(info.claimableRewards, decimals)} ${symbol}`}
             icon={Gift}
           />
           {claimableFees > 0n && (
@@ -1435,7 +1432,7 @@ const EarnStaking = () => {
               )}
               <p className="mt-2 text-sm text-muted-foreground">
                 {isV2
-                  ? `${formatReward(creditedBlockRewards, decimals)} ${symbol} credited to date`
+                  ? `${formatToken(creditedBlockRewards, decimals)} ${symbol} credited to date`
                   : formatRewardPeriodStatus(info.periodStart, info.periodFinish)}
                 {" · "}
                 <a
@@ -1454,7 +1451,7 @@ const EarnStaking = () => {
         {isLoggedIn && !isV2 && info.isOperator && renderOperatorPanel(info.operatorAddress, operatorValidator, {
           claimableRewards: info.operatorClaimableRewards,
           claimableFees: info.operatorClaimableFees,
-          rewardBreakdown: `Base ${formatReward(info.operatorPendingBaseRewards, decimals)} · Commission ${formatReward(info.operatorPendingCommission, decimals)} · Self-bond ${formatReward(info.operatorPendingSelfBondRewards, decimals)}`,
+          rewardBreakdown: `Base ${formatToken(info.operatorPendingBaseRewards, decimals)} · Commission ${formatToken(info.operatorPendingCommission, decimals)} · Self-bond ${formatToken(info.operatorPendingSelfBondRewards, decimals)}`,
           currentCommissionBps: info.currentOperatorCommissionBps,
         })}
 
@@ -1463,7 +1460,7 @@ const EarnStaking = () => {
           claimableFees: validator.operatorPendingFees || "0",
           // The info-level split describes a single operated validator; with several there is no per-validator split.
           rewardBreakdown: operatedValidators.length === 1
-            ? `Self-bond ${formatReward(info.operatorPendingSelfBondRewards, decimals)} · Commission ${formatReward(info.operatorPendingCommission, decimals)}`
+            ? `Self-bond ${formatToken(info.operatorPendingSelfBondRewards, decimals)} · Commission ${formatToken(info.operatorPendingCommission, decimals)}`
             : "",
           currentCommissionBps: validator.commissionBps,
         }))}
@@ -1622,7 +1619,7 @@ const EarnStaking = () => {
                         </div>
                         <div className="rounded-md bg-muted/30 px-3 py-2">
                           <p className="text-xs text-muted-foreground">Rewards</p>
-                          <p className="font-semibold">{formatReward(validator.pendingRewards, decimals)} {symbol}</p>
+                          <p className="font-semibold">{formatToken(validator.pendingRewards, decimals)} {symbol}</p>
                         </div>
                         <div className="rounded-md bg-muted/30 px-3 py-2">
                           <p className="text-xs text-muted-foreground">{apyLabel}</p>
@@ -1745,7 +1742,7 @@ const EarnStaking = () => {
                           )}
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.totalStake, decimals)}</td>
                           <td className="px-4 py-3 text-right text-sm">{formatToken(stakeWithSelfBond(validator), decimals)}</td>
-                          <td className="px-4 py-3 text-right text-sm">{formatReward(validator.pendingRewards, decimals)}</td>
+                          <td className="px-4 py-3 text-right text-sm">{formatToken(validator.pendingRewards, decimals)}</td>
                           <td className="px-4 py-3 text-right text-sm">{apyWithBreakdown(validator.estimatedApy)}</td>
                           <td className="px-4 py-3 text-right text-sm">{formatPercentFromBps(validator.commissionBps)}</td>
                           <td className="px-4 py-3">
@@ -1964,7 +1961,7 @@ const EarnStaking = () => {
                   {actionMode === "claim" && (
                     <div className="rounded-md bg-muted/40 px-3 py-2 text-sm">
                       <p className="text-xs text-muted-foreground">Claimable</p>
-                      <p className="break-all font-semibold">{formatReward(actionValidator.pendingRewards, decimals)} {symbol}</p>
+                      <p className="font-semibold">{formatToken(actionValidator.pendingRewards, decimals)} {symbol}</p>
                     </div>
                   )}
 

@@ -19,10 +19,10 @@ vi.mock("@/components/dashboard/MobileBottomNav", () => ({ default: () => null }
 
 afterEach(cleanup);
 
-it.each(["v1", "v2"])("shows the operator's bonded stake and exact rewards on %s", async (contractVersion) => {
+it.each(["v1", "v2"])("shows the operator's bonded stake and rewards on %s", async (contractVersion) => {
   const owned = {
     name: "Owned seat", address: "seat", operator: "operator", active: true,
-    selfBond: parseEther("10000").toString(), userStake: "0", pendingRewards: "1",
+    selfBond: parseEther("10000").toString(), userStake: "0", pendingRewards: parseEther("1.23456789").toString(),
     operatorPendingRewards: parseEther("63.771377327521498918").toString(),
   };
   const other = {
@@ -40,17 +40,17 @@ it.each(["v1", "v2"])("shows the operator's bonded stake and exact rewards on %s
   expect(await screen.findByText("10,034.5 STRATO")).toBeTruthy();
   const row = screen.getByRole("row", { name: /Owned seat/ });
   expect(within(row).getByText("10,000")).toBeTruthy();
-  expect(within(row).getByText("0.000000000000000001")).toBeTruthy();
-  expect(screen.getByText("0.000000000000000001 STRATO", { selector: "p.font-semibold" })).toBeTruthy();
+  expect(within(row).getByText("1.2345")).toBeTruthy();
+  expect(screen.getByText("1.2345 STRATO", { selector: "p.font-semibold" })).toBeTruthy();
   expect(within(row).getByRole<HTMLButtonElement>("button", { name: "Unstake" }).disabled).toBe(true);
   const otherRow = screen.getByRole("row", { name: /Other seat/ });
   expect(within(otherRow).getByText("34.5")).toBeTruthy();
-  expect(screen.getByText("63.771377327521498918 STRATO")).toBeTruthy();
+  expect(screen.getByText("63.7713 STRATO")).toBeTruthy();
 });
 
 it.each([
-  ["0", "2378845471274302262", "2.378845471274302262"],
-  ["1000000000000000000", "2378845471274302262", "3.378845471274302262"],
+  ["0", "2378845471274302262", "2.3788"],
+  ["1000000000000000000", "2378845471274302262", "3.3788"],
   ["1000000000000000000", undefined, "1"],
 ])("includes legacy credits %s and scheduled emissions %s in total block rewards", async (legacy, emitted, total) => {
   vi.mocked(api.get).mockResolvedValue({ data: {
