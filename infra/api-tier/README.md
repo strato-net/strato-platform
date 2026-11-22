@@ -67,7 +67,11 @@ the front door, CloudFront's origin-facing ranges (the managed prefix list
 rate limits: the VPC's NAT gateways (the data plane's `NatGatewayAddresses`
 output). The app backend calls the node through the public hostname, so its
 calls all arrive from them, a few hundred for one page of the app, and one
-client's 80 requests a second would hold them back.
+client's 80 requests a second would hold them back. A data plane placed in an
+existing VPC (the data plane's own `-c vpcId`) has no such output: list the
+addresses that VPC's tasks leave from yourself. `scripts/ha.sh` always lets
+the data plane create the VPC, and stops until a data plane deployed before
+this output existed has been deployed again.
 
 The stack owns two weighted records for the node hostname: `node` (the
 existing address) and `api-tier` (the ALB). Delete the hostname's existing
