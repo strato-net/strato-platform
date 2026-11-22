@@ -1,4 +1,4 @@
-import { CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
+import { CfnOutput, Duration, Fn, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as rds from "aws-cdk-lib/aws-rds";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
@@ -148,5 +148,14 @@ export class PostgresStack extends Stack {
     new CfnOutput(this, "NodeLogin", { value: props.nodeLogin, description: "--pguser for the core; the tiers' Postgres user" });
     new CfnOutput(this, "NodeLoginSecretName", { value: props.nodeLoginSecretName, description: "Its credentials (JSON with username/password)" });
     new CfnOutput(this, "ClusterSecurityGroupId", { value: securityGroup.securityGroupId });
+    // The addresses the tiers' tasks leave the VPC from. The app backend calls the node through
+    // its public hostname, so the API tier's nginx sees every such call come from them.
+    if (vpc instanceof ec2.Vpc) {
+      const natAddresses = vpc.publicSubnets.flatMap((subnet) => {
+        const eip = subnet.node.tryFindChild("EIP");
+        return eip instanceof ec2.CfnEIP ? [eip.ref] : [];
+      });
+      new CfnOutput(this, "NatGatewayAddresses", { value: Fn.join(",", natAddresses) });
+    }
   }
 }

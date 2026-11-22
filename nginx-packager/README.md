@@ -73,6 +73,7 @@ The nginx configuration is generated at runtime from templates:
 | `RPC_PORT` | Internal Ethereum JSON-RPC upstream port used by nginx | `8545` |
 | `RPC_RATE_LIMIT_PER_IP` | Requests per second `/rpc` accepts from one client address | `25` |
 | `RPC_RATE_LIMIT_TOTAL` | Requests per second `/rpc` accepts from all clients together | `200` |
+| `NGINX_RATE_LIMIT_BYPASS_CIDRS` | Comma-separated addresses or CIDRs exempt from the rate limits other than those of `/rpc` and transaction simulation | none |
 | `STRATO_HOSTNAME` | STRATO service hostname | `strato` |
 | `STRATO_PORT_API` | STRATO API port | `3000` |
 | `STRATO_PORT_VAULT_PROXY` | Vault proxy port | `8013` |
@@ -133,6 +134,7 @@ All responses include:
 - Default: 80 requests/second per IP
 - Burst: 100 requests
 - Docker network traffic bypassed (for service-to-service calls)
+- `NGINX_RATE_LIMIT_BYPASS_CIDRS` exempts more addresses: those of the node's own services that reach nginx from outside the docker network, such as an app backend on another host, whose every call to the node would otherwise share one client's limit. List only addresses you own. The exemption does not cover the `/rpc` and transaction simulation limits, because such an address can carry public requests too: an app nginx that relays `/rpc`, or a backend endpoint that simulates for an anonymous caller.
 - `/rpc` has its own limits on top: 25 requests/second per IP (`RPC_RATE_LIMIT_PER_IP`; burst of 100, delayed like the default) and 200 requests/second for all clients together (`RPC_RATE_LIMIT_TOTAL`; burst of the same size, requests over it get 429 at once). A JSON-RPC batch counts as one request.
 - Both are read when the container is created: recreate the container to change them.
 - Behind a load balancer a per-IP limit needs the balancer's address range trusted (`NGINX_TRUST_PROXY_CIDRS`; `10.0.0.0/16` is trusted already). Otherwise every client shares the balancer's address and its limit.
