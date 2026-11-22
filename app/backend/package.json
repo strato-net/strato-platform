@@ -39,7 +39,6 @@
     "json-bigint": "^1.0.0",
     "jsonrepair": "^3.13.1",
     "pg": "^8.16.0",
-    "stripe": "^20.3.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "joi": "^17.13.9"

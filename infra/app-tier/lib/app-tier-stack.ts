@@ -276,9 +276,6 @@ function containerImage(scope: Construct, id: string, uri: string): ecs.Containe
 /** Optional backend API keys, each a field of one JSON secret: those named, or all of them. */
 function backendSecretFields(secret: secretsmanager.ISecret, keys?: string[]): Record<string, ecs.Secret> {
   const known = [
-    "STRIPE_SECRET_KEY",
-    "STRIPE_PUBLISHABLE_KEY",
-    "STRIPE_WEBHOOK_SECRET",
     "SENDGRID_API_KEY",
     "WAGMI_PROJECT_ID",
     "RPC_URL_MAINNET",

@@ -4,7 +4,6 @@ export interface ConfigData {
   projectId: string;
   networkId?: string;
   featuredEarnOpportunity?: string;
-  stripePublishableKey: string | null;
   contactEnabled?: boolean;
 }
 

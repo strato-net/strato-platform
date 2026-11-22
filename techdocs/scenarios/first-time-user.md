@@ -44,7 +44,6 @@ For supported assets and mechanics, see the [Bridge Guide](../guides/bridge.md).
 
 **Other ways to get funds:**
 
-- **Buy Crypto** (`/dashboard/onramp` on app.strato.nexus): pay by card, bank transfer or Apple Pay through Stripe; the purchased crypto is credited to your STRATO account.
 - **Send**: another STRATO user can send tokens to your STRATO address.
 
 ---

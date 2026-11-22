@@ -44,7 +44,6 @@ import EarnLending from "./pages/EarnLending";
 import EarnPools from "./pages/EarnPools";
 import EarnYieldVault from "./pages/EarnYieldVault";
 import EarnStaking from "./pages/EarnStaking";
-import OnrampPage from "./pages/OnrampPage";
 
 // Import dashboard components
 
@@ -486,15 +485,6 @@ const App = () => {
                                                   element={
                                                     <ProtectedRoute>
                                                       <PriceTracking />
-                                                    </ProtectedRoute>
-                                                  }
-                                                />
-      
-                                                <Route
-                                                  path="/dashboard/onramp"
-                                                  element={
-                                                    <ProtectedRoute>
-                                                      <OnrampPage />
                                                     </ProtectedRoute>
                                                   }
                                                 />

@@ -31,8 +31,7 @@ export async function initOpenIdConfig() {
 
 // Optional OAuth client credentials. When present, anonymous requests to the
 // node carry a client-credentials ("service") token, as they did when the
-// node's APIs required one; when absent they are sent unauthenticated. The
-// bridge deposit flow (onramp.service) also needs them for its password grant.
+// node's APIs required one; when absent they are sent unauthenticated.
 export const clientId = process.env.OAUTH_CLIENT_ID;
 export const clientSecret = process.env.OAUTH_CLIENT_SECRET;
 export const hasClientCredentials = Boolean(clientId && clientSecret);
