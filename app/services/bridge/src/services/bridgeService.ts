@@ -29,6 +29,8 @@ import {
 
 let cachedStratoNetworkId: bigint | null = null;
 const announcedManualNativeWithdrawals = new Map<string, string | null>();
+// Withdrawals already reported as needing manual resolution, so each is logged once
+const reportedRejectedNativeWithdrawals = new Set<string>();
 const pendingNativeInstantWithdrawalTxHashes = new Map<string, string>();
 const inFlightSafeProposalWithdrawals = new Set<string>();
 
@@ -145,16 +147,16 @@ const syncManualNativeMintProposal = async (
     return true;
   }
 
+  // A rejected proposal proves nothing about the mint: another proposal carrying the same attestation
+  // may have executed it, or still can. Never refund automatically.
   if (result.status === "rejected") {
-    await execute({
-      contractName: "StratoNativeBridge",
-      contractAddress: config.nativeBridge.address!,
-      method: "abortWithdrawal",
-      args: {
-        id: Number(withdrawal.withdrawalId),
-      },
-    });
-    announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
+    if (!reportedRejectedNativeWithdrawals.has(withdrawal.withdrawalId)) {
+      reportedRejectedNativeWithdrawals.add(withdrawal.withdrawalId);
+      logError(
+        "BridgeService",
+        new Error(`Native withdrawal ${withdrawal.withdrawalId} mint proposal ${proposalReference} was rejected; leaving it for manual resolution`),
+      );
+    }
     return true;
   }
 
