@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// ADVERSARIAL: FlashMint x SafetyModule, FlashMint x YieldVault, and FlashMint fee routing.
+// ADVERSARIAL: FlashMint x YieldVault and FlashMint fee routing.
 //
 // Q4: do these price shares or rewards off a live balance / totalSupply that a 2,000,000e18
 //     flash mint can move inside the callback window?
@@ -10,7 +10,6 @@ import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/YieldVault/YieldVault.sol";
-import "../../concrete/Lending/SafetyModule.sol";
 import "../../concrete/Pools/DirectMintPSM.sol";
 import "../../concrete/Flash/FlashMint.sol";
 
@@ -24,7 +23,6 @@ contract User {
 contract YsRaider {
     FlashMint public lender;
     YieldVault public yv;
-    SafetyModule public sm;
     DirectMintPSM public psm;
     address public usdst;
     address public usdc;
@@ -39,10 +37,9 @@ contract YsRaider {
     uint public freeIdleInside;
     string public innerErr;
 
-    function init(address _lender, address _yv, address _sm, address _psm, address _usdst, address _usdc) public {
+    function init(address _lender, address _yv, address _psm, address _usdst, address _usdc) public {
         lender = FlashMint(_lender);
         yv = YieldVault(_yv);
-        sm = SafetyModule(_sm);
         psm = DirectMintPSM(_psm);
         usdst = _usdst;
         usdc = _usdc;
@@ -90,24 +87,6 @@ contract YsRaider {
             uint b0 = IERC20(usdst).balanceOf(address(this));
             yv.redeem(sharesGot, address(this), address(this));
             assetsBack = IERC20(usdst).balanceOf(address(this)) - b0;
-        } else if (mode == 4) {
-            // SafetyModule: stake then try to redeem in the same transaction
-            IERC20(usdst).approve(address(sm), amount);
-            paidIn = amount;
-            sharesGot = sm.stake(amount, 0);
-            rateInside = sm.exchangeRate();
-            try sm.redeem(sharesGot, 0) { } catch Error(string e) { innerErr = e; }
-        } else if (mode == 5) {
-            // SafetyModule: stake, start cooldown, redeem immediately
-            IERC20(usdst).approve(address(sm), amount);
-            sharesGot = sm.stake(amount, 0);
-            sm.startCooldown();
-            try sm.redeem(sharesGot, 0) { } catch Error(string e) { innerErr = e; }
-        } else if (mode == 6) {
-            // SafetyModule: donate and read exchangeRate from inside the callback
-            rateInside = sm.exchangeRate();
-            IERC20(usdst).transfer(address(sm), amount);
-            baseInside = sm.totalAssets();
         } else if (mode == 7) {
             // Fee routing: repay out of own float, having done a supply-neutral PSM round trip
             uint avail = psm.availableRedemptionLiquidity(usdc);
@@ -120,11 +99,6 @@ contract YsRaider {
         }
 
         return "FlashMint.onFlashMint";
-    }
-
-    function ysStake(uint amount) public {
-        IERC20(usdst).approve(address(sm), amount);
-        sharesGot = sm.stake(amount, 0);
     }
 
     function yvDeposit(uint amount) public {
@@ -147,15 +121,12 @@ contract Describe_Adv_Peg_YieldSafetyFees {
     Mercata m;
     FlashMint fm;
     YieldVault yv;
-    SafetyModule sm;
     DirectMintPSM psm;
     AdminRegistry areg;
     Token USDST;
-    Token sUSDST;
     Token USDC;
 
     User lp;
-    User staker;
     User distributor;
 
     function beforeAll() public {
@@ -168,24 +139,6 @@ contract Describe_Adv_Peg_YieldSafetyFees {
         (executed, ret) = areg.castVoteOnIssue(address(m.tokenFactory()), "createToken", "USDC","Strato USDC",[],[],[],"USDC",0,18);
         USDC = Token(address(ret));
         areg.castVoteOnIssue(address(USDC), "setStatus", 2);
-        (executed, ret) = areg.castVoteOnIssue(address(m.tokenFactory()), "createToken", "sUSDST","Staked USDST",[],[],[],"sUSDST",0,18);
-        sUSDST = Token(address(ret));
-        areg.castVoteOnIssue(address(sUSDST), "setStatus", 2);
-
-        // ── SafetyModule
-        sm = new SafetyModule(address(this));
-        sm.initialize(address(m.lendingRegistry()), address(m.tokenFactory()));
-        areg.castVoteOnIssue(address(m.poolConfigurator()), "setBorrowableAsset", address(USDST));
-        areg.castVoteOnIssue(address(m.poolConfigurator()), "setMToken", address(sUSDST));
-        sm.syncFromRegistry();
-        sm.setTokens(address(sUSDST), address(USDST));
-        areg.castVoteOnIssue(address(areg), "addWhitelist", address(sUSDST), "mint", address(sm));
-        areg.castVoteOnIssue(address(areg), "addWhitelist", address(sUSDST), "burn", address(sm));
-
-        staker = new User();
-        areg.castVoteOnIssue(address(USDST), "mint", address(staker), 500000e18);
-        staker.do(address(USDST), "approve", address(sm), INFINITY);
-        staker.do(address(sm), "stake", 500000e18, 0);
 
         // ── YieldVault
         yv = new YieldVault(address(this));
@@ -221,8 +174,6 @@ contract Describe_Adv_Peg_YieldSafetyFees {
 
         log("── fixture ──");
         log("USDST totalSupply    = " + string(USDST.totalSupply() / WAD));
-        log("SM managedAssets     = " + string(sm.totalAssets() / WAD) + "  shares " + string(sm.totalShares() / WAD));
-        log("SM cooldown seconds  = " + string(sm.COOLDOWN_SECONDS()));
         log("YV totalAssets       = " + string(yv.totalAssets() / WAD) + "  shares " + string(yv.totalSupply() / WAD));
         log("YV accrualBaseAssets = " + string(yv.accrualBaseAssets() / WAD));
         log("PSM USDC reserve     = " + string(USDC.balanceOf(address(psm)) / WAD));
@@ -233,70 +184,8 @@ contract Describe_Adv_Peg_YieldSafetyFees {
 
     function _raider(uint bankroll) internal returns (YsRaider r) {
         r = new YsRaider();
-        r.init(address(fm), address(yv), address(sm), address(psm), address(USDST), address(USDC));
+        r.init(address(fm), address(yv), address(psm), address(USDST), address(USDC));
         if (bankroll > 0) areg.castVoteOnIssue(address(USDST), "mint", address(r), bankroll);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // Q4a  SAFETY MODULE
-    // ─────────────────────────────────────────────────────────────────────
-
-    /// The cooldown makes every atomic flash-mint round trip impossible.
-    function it_y1_safetymodule_cooldown_blocks_atomic_round_trips() public {
-        YsRaider r = _raider(1e18);
-        uint ta0 = sm.totalAssets();
-        uint ts0 = sm.totalShares();
-        uint rate0 = sm.exchangeRate();
-
-        string err = "";
-        try r.attack(4, MAXLOAN) { } catch Error(string e) { err = e; }
-
-        log("── y1 SM stake+redeem in one tx ──");
-        log("outer revert           = " + err);
-        log("inner redeem revert    = " + r.innerErr());
-        log("SM totalAssets after   = " + string(sm.totalAssets()));
-        log("SM totalShares after   = " + string(sm.totalShares()));
-        log("SM rate before/after   = " + string(rate0) + " / " + string(sm.exchangeRate()));
-        require(err == "FlashMint: not repaid", "outer tx must unwind");
-        require(sm.totalAssets() == ta0 && sm.totalShares() == ts0, "SM state must be intact");
-
-        YsRaider r2 = _raider(1e18);
-        string err2 = "";
-        try r2.attack(5, MAXLOAN) { } catch Error(string e) { err2 = e; }
-        log("with startCooldown():");
-        log("  outer revert         = " + err2);
-        log("  inner redeem revert  = " + r2.innerErr());
-        require(err2 == "FlashMint: not repaid", "outer tx must unwind");
-        require(sm.totalAssets() == ta0 && sm.totalShares() == ts0, "SM state must be intact");
-    }
-
-    /// SM prices off internal _managedAssets, so no live-balance read exists to move.
-    function it_y2_safetymodule_price_is_donation_immune() public {
-        uint ta0 = sm.totalAssets();
-        uint rate0 = sm.exchangeRate();
-        uint live0 = USDST.balanceOf(address(sm));
-
-        // (a) flash-minted donation: unrecoverable, whole tx unwinds
-        YsRaider r = _raider(0);
-        string err = "";
-        try r.attack(6, MAXLOAN) { } catch Error(string e) { err = e; }
-
-        log("── y2 SM donation ──");
-        log("flash-donation revert  = " + err);
-        require(err == "FlashMint: not repaid", "flash donation cannot be recovered");
-
-        // (b) real-capital donation that survives: internal accounting must ignore it entirely
-        User donor = new User();
-        areg.castVoteOnIssue(address(USDST), "mint", address(donor), MAXLOAN);
-        donor.do(address(USDST), "transfer", address(sm), MAXLOAN);
-        log("after 2,000,000 REAL donation:");
-        log("  SM live before/after = " + string(live0) + " / " + string(USDST.balanceOf(address(sm))));
-        log("  SM totalAssets       = " + string(sm.totalAssets()) + " (was " + string(ta0) + ")");
-        log("  SM rate              = " + string(sm.exchangeRate()) + " (was " + string(rate0) + ")");
-        log("  previewStake(1e18)   = " + string(sm.previewStake(1e18)));
-        require(sm.totalAssets() == ta0, "internal _managedAssets ignores strays");
-        require(sm.exchangeRate() == rate0, "rate unchanged by a 2,000,000 donation");
-        require(sm.previewStake(1e18) == 1e18, "stake price unmoved");
     }
 
     // ─────────────────────────────────────────────────────────────────────

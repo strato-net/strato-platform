@@ -171,38 +171,9 @@ contract record SafetyModule is Ownable {
     // ─────────────────────────────────────────
     // User actions
 
-    /// @notice Stake `assetsIn` USDST; mints shares using balance-delta to account for fee-on-transfer tokens.
-    /// @dev Guards:
-    ///  - Active underlying (prevents deposits into offboarded market)
-    ///  - Donation guard on first mint (no pre-loaded funds)
-    ///  - Slippage (minSharesOut)
-    function stake(uint assetsIn, uint minSharesOut) external onlyActiveToken(asset) onlyActiveToken(sToken) returns (uint sharesOut) {
-        require(assetsIn > 0, "SM:zero");
-        uint s = totalShares();
-        uint beforeBal = totalAssets();
-
-        if (s == 0) {
-            require(beforeBal == 0, "SM:init stray funds"); // donation guard
-        } else {
-            require(beforeBal > 0, "SM:price=0");  // prevent (s>0, a==0)
-        }
-
-        uint256 bal = IERC20(asset).balanceOf(address(this));
-        require(IERC20(asset).transferFrom(msg.sender, address(this), assetsIn), "SM: stake transfer failed");
-        uint256 delta = IERC20(asset).balanceOf(address(this)) - bal;
-        require(delta > 0, "SM:no delta");
-        _managedAssets += delta;
-
-        sharesOut = (s == 0) ? delta : (delta * s) / beforeBal;
-        require(sharesOut > 0, "SM:dust");
-        require(sharesOut >= minSharesOut, "SM:slippage");
-
-        AdminRegistry(Ownable(sToken).owner()).castVoteOnIssue(sToken, "mint", msg.sender, sharesOut);
-
-        // Reset cooldown on new stake
-        cooldownStart[msg.sender] = 0;
-
-        emit Staked(msg.sender, delta, sharesOut);
+    /// @notice Staking is closed for the lending sunset: every call reverts. Redeeming stays open.
+    function stake(uint assetsIn, uint minSharesOut) external returns (uint sharesOut) {
+        require(false, "Staking is closed");
     }
 
     /// @notice Start cooldown. After COOLDOWN_SECONDS elapse, you have UNSTAKE_WINDOW to redeem.
@@ -242,6 +213,48 @@ contract record SafetyModule is Ownable {
         if (IERC20(sToken).balanceOf(msg.sender) == 0) cooldownStart[msg.sender] = 0;
 
         emit Redeemed(msg.sender, sharesIn, delta);
+    }
+
+    // ─────────────────────────────────────────
+    // Sunset
+
+    /// @notice Redeem holders' entire share balances on their behalf, with no cooldown, paying each
+    ///         one `shares × totalAssets / totalShares` exactly as redeem would.
+    /// @param holders Share holders to redeem. Accounts with no shares are skipped, so a list may
+    ///        safely contain duplicates or already-redeemed accounts.
+    /// @return redeemed Number of holders whose shares were burned
+    /// @dev Callable by the cached LendingPool (from its sunset) or by the owner (a governance vote).
+    /// @dev Never reverts on a per-holder condition: a holder whose payout the module's balance cannot
+    ///      cover is left intact, so one account can never fail the whole call. Ends with a sanity
+    ///      check that the module's accounting still matches its balance and its share supply.
+    function redeemAllFor(address[] holders) external returns (uint redeemed) {
+        require(msg.sender == address(lendingPool) || msg.sender == owner(), "SM: not LendingPool or owner");
+        require(asset != address(0) && sToken != address(0), "SM:tokens not set");
+
+        for (uint i = 0; i < holders.length; i++) {
+            address holder = holders[i];
+            uint sharesIn = IERC20(sToken).balanceOf(holder);
+            if (sharesIn == 0) continue;
+
+            uint assetsOut = (sharesIn * totalAssets()) / totalShares();
+            if (assetsOut > IERC20(asset).balanceOf(address(this))) continue;
+
+            // burn then transfer, as redeem does
+            AdminRegistry(Ownable(sToken).owner()).castVoteOnIssue(sToken, "burn", holder, sharesIn);
+            if (assetsOut > 0) {
+                require(IERC20(asset).transfer(holder, assetsOut), "SM: redeem transfer failed");
+                _managedAssets -= assetsOut;
+            }
+            cooldownStart[holder] = 0;
+
+            emit Redeemed(holder, sharesIn, assetsOut);
+            redeemed++;
+        }
+
+        // Sanity check: what the module manages is still backed, and no shares means nothing managed
+        require(_managedAssets <= IERC20(asset).balanceOf(address(this)), "SM: assets not backed");
+        require(totalShares() > 0 || _managedAssets == 0, "SM: assets left without shares");
+        return redeemed;
     }
 
     // ─────────────────────────────────────────

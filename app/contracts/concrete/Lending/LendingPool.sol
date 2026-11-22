@@ -39,6 +39,8 @@ contract record LendingPool is Ownable, Pausable {
     event BadDebtCovered(uint cover, uint remainingBadDebt);
     event BadDebtWrittenOffFromReserves(uint writeOff, uint badDebt, uint reservesAccrued);
     event DepositorHaircutApplied(uint writeOff, uint badDebt, string calldata reason);
+    event LoanSettled(address indexed borrower, uint debt, address indexed payer);
+    event SunsetExecuted(uint loansSettled, uint collateralReturned, uint suppliersRedeemed, uint stakersRedeemed, uint refunded);
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
@@ -195,57 +197,17 @@ contract record LendingPool is Ownable, Pausable {
     // ═══════════════════════════════════════════════════════════════════════════════
 
     /**
-     * @notice Deposit liquidity and receive interest-bearing mTokens
-     * @param amount The amount to deposit
+     * @notice Lending is closed for the sunset: every call reverts. Withdrawals stay open.
      */
-    function depositLiquidity(uint amount) external onlyTokenFactory(borrowableAsset) {
-        require(amount > 0, "Invalid amount");
-        require(mToken != address(0), "mToken not set");
-
-        // 1) bring index & reserves current
-        _accrue();
-
-        // 2) compute mTokens to mint from exchange rate
-        uint exchangeRate = getExchangeRate();
-        require(exchangeRate > 0, "Invalid rate");
-        uint mTokenAmount = (amount * 1e18) / exchangeRate;
-        require(mTokenAmount > 0, "Mint calc");
-
-        // 3) move funds & mint
-        LiquidityPool(_liquidityPool()).deposit(amount, mTokenAmount, msg.sender);
-
-        // cash ↑ (after deposit)
-        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
-        emit Deposited(msg.sender, borrowableAsset, amount);
+    function depositLiquidity(uint amount) external {
+        require(false, "Lending is closed");
     }
 
     /**
-     * @notice Deposit liquidity on another's behalf
-     * @param user The user for whom to deposit; will receive the mTokens
-     * @param amount The amount of the underlying asset to deposit
+     * @notice Lending is closed for the sunset: every call reverts. Withdrawals stay open.
      */
-    function depositLiquidityOnBehalfOf(address user, uint amount) external onlyTokenFactory(borrowableAsset) {
-        require(mToken != address(0), "mToken not set");
-        require(amount > 0, "Invalid amount");
-        require(user != address(0), "Invalid user address");
-        require(user != msg.sender, "Please call depositLiquidity instead");
-
-        // 1) bring index & reserves current
-        _accrue();
-
-        // 2) compute mTokens to mint from exchange rate
-        uint exchangeRate = getExchangeRate();
-        require(exchangeRate > 0, "Invalid rate");
-        uint mTokenAmount = (amount * 1e18) / exchangeRate;
-        require(mTokenAmount > 0, "Mint calc");
-
-        // 3) move funds & mint
-        LiquidityPool(_liquidityPool()).depositOnBehalfOf(user, amount, mTokenAmount, msg.sender);
-
-        // cash ↑ (after deposit)
-        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
-        emit DepositedOnBehalfOf(msg.sender, user, borrowableAsset, amount);
-        emit Deposited(user, borrowableAsset, amount); // Recipient gets credit for the deposit
+    function depositLiquidityOnBehalfOf(address user, uint amount) external {
+        require(false, "Lending is closed");
     }
 
     /**
@@ -277,25 +239,10 @@ contract record LendingPool is Ownable, Pausable {
     // ═══════════════════════════════════════════════════════════════════════════════
 
     /**
-     * @notice Supply collateral assets to the vault for future borrowing
-     * @param asset The collateral asset address
-     * @param amount The amount of collateral to supply
-     * @dev User must approve CollateralVault to spend their tokens before calling this function
+     * @notice Lending is closed for the sunset: every call reverts. Collateral withdrawals stay open.
      */
-    function supplyCollateral(address asset, uint amount) external onlyTokenFactory(asset) {
-        require(amount > 0, "Invalid amount");
-
-        // Check that asset is configured as eligible collateral
-        AssetConfig memory config = assetConfigs[asset];
-        require(config.ltv > 0, "Asset not configured as collateral");
-        require(config.liquidationThreshold > 0, "Asset missing liquidation threshold");
-        require(config.liquidationBonus >= 10000, "Asset missing liquidation bonus");
-
-        // The CollateralVault will handle the token transfer from msg.sender
-        // User must have approved CollateralVault to spend their tokens
-        CollateralVault(_collateralVault()).addCollateral(msg.sender, asset, amount);
-
-        emit SuppliedCollateral(msg.sender, asset, amount);
+    function supplyCollateral(address asset, uint amount) external {
+        require(false, "Lending is closed");
     }
 
     /**
@@ -326,36 +273,10 @@ contract record LendingPool is Ownable, Pausable {
     // ═══════════════════════════════════════════════════════════════════════════════
 
     /**
-    * @notice Borrow against total collateral supplied
-    * @param amount The amount to borrow (underlying units, 18 decimals)
-    * @dev Uses global borrow index; enforces system-wide debt ceilings.
+    * @notice Lending is closed for the sunset: every call reverts. Repayments stay open.
     */
-    function borrow(uint amount) external whenNotPaused onlyTokenFactory(borrowableAsset) {
-        require(amount > 0, "Invalid amount");
-
-        // 1) bring index & reserves current, then enforce global caps
-        _accrue();
-        _checkDebtLimits(amount);
-
-        // 2) user-level collateral check (asset units)
-        uint maxBorrowAmount = calculateMaxBorrowingPower(msg.sender, address(0), 0);
-        uint currentOwed = getUserDebt(msg.sender); // index-based
-        require(currentOwed + amount <= maxBorrowAmount, "Insufficient collateral for borrow");
-
-        // 3) update index-based loan storage
-        LoanInfo storage loan = userLoan[msg.sender];
-        uint scaledAdd = (amount * RAY + borrowIndex - 1) / borrowIndex;
-        require(scaledAdd > 0, "Insufficient loan amount");
-        loan.scaledDebt += scaledAdd;
-        loan.lastUpdated = block.timestamp;
-        totalScaledDebt += scaledAdd;
-
-        // 4) move funds
-        LiquidityPool(_liquidityPool()).borrow(amount, msg.sender);
-
-        // exchange rate reflects: cash ↓, debt ↑ (after _accrue)
-        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
-        emit Borrowed(msg.sender, borrowableAsset, amount);
+    function borrow(uint amount) external {
+        require(false, "Lending is closed");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -416,38 +337,10 @@ contract record LendingPool is Ownable, Pausable {
     }
 
     /**
-     * @notice Borrow the maximum amount allowed by current collateral (minus 1 wei safety)
-     * @return amountBorrowed The amount actually borrowed
+     * @notice Lending is closed for the sunset: every call reverts. Repayments stay open.
      */
-    function borrowMax() external whenNotPaused onlyTokenFactory(borrowableAsset) returns (uint amountBorrowed) {
-        // Bring index & reserves current, then enforce system caps on the final amount
-        _accrue();
-
-        uint maxBorrowAmount = calculateMaxBorrowingPower(msg.sender, address(0), 0);
-        uint currentOwed = getUserDebt(msg.sender);
-        require(maxBorrowAmount > currentOwed, "No borrowing power");
-
-        uint available = maxBorrowAmount - currentOwed;
-        // 1 wei safety to keep HF strictly > 1 after rounding
-        amountBorrowed = available > 1 ? (available - 1) : 0;
-        require(amountBorrowed > 0, "No borrowing power");
-
-        _checkDebtLimits(amountBorrowed);
-
-        // Update index-based loan storage
-        LoanInfo storage loan = userLoan[msg.sender];
-        uint scaledAdd = (amountBorrowed * RAY + borrowIndex - 1) / borrowIndex;
-        require(scaledAdd > 0, "Insufficient loan amount");
-        loan.scaledDebt += scaledAdd;
-        loan.lastUpdated = block.timestamp;
-        totalScaledDebt += scaledAdd;
-
-        // Move funds
-        LiquidityPool(_liquidityPool()).borrow(amountBorrowed, msg.sender);
-
-        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
-        emit Borrowed(msg.sender, borrowableAsset, amountBorrowed);
-        return amountBorrowed;
+    function borrowMax() external returns (uint amountBorrowed) {
+        require(false, "Lending is closed");
     }
 
     /**
@@ -1026,6 +919,217 @@ contract record LendingPool is Ownable, Pausable {
 
         emit ReservesSweptSafety(toSafety, address(safetyModule));
         emit ReservesSweptTreasury(toTreas, address(feeCollector));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // SUNSET
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @notice Wind the pool down in one transaction. Settles every loan by pulling its debt in
+     *         USDST from the payer, handing the payer collateral worth exactly the debt at oracle
+     *         price (no bonus); returns every remaining collateral position; redeems every
+     *         supplier's mTokens at the exchange rate; redeems every SafetyModule staker; sends
+     *         what is left in the LiquidityPool (reserves and rounding dust) to the FeeCollector;
+     *         refunds any USDST this contract already holds to the payer; pauses the pool.
+     * @param borrowers         Every account with an open loan
+     * @param collateralHolders Every account holding collateral (borrowers included)
+     * @param suppliers         Every mToken holder
+     * @param stakers           Every SafetyModule share holder
+     * @param payer             Account that pays the debts. Must have approved this contract for
+     *                          at least the debt. Receives the settled loans' collateral and any
+     *                          USDST this contract already holds.
+     * @return loansSettled, collateralReturned, suppliersRedeemed, stakersRedeemed: accounts handled
+     * @dev Owner only, and onlyOwner must remain the only modifier. With the AdminRegistry as owner
+     *      the approved vote re-enters this function from the registry, and a nonReentrant guard
+     *      placed before onlyOwner would reject that call. Not gated by whenNotPaused.
+     * @dev All or nothing. Every loan must be funded in full (the payer absorbs any loan its priced
+     *      collateral cannot cover, unless that loan also holds unpriced collateral) and every claim
+     *      paid in full, or the call reverts. It ends by checking the pool's accounting against the
+     *      chain, never against its arguments, so a list that misses a borrower, supplier or staker
+     *      fails the vote instead of leaving a half-swept pool behind. Fix the lists or the funding
+     *      and vote again; accounts listed twice or with nothing to settle are harmless.
+     */
+    function sunset(
+        address[] borrowers,
+        address[] collateralHolders,
+        address[] suppliers,
+        address[] stakers,
+        address payer
+    ) external onlyOwner returns (uint loansSettled, uint collateralReturned, uint suppliersRedeemed, uint stakersRedeemed) {
+        require(payer != address(0), "Invalid payer");
+        require(mToken != address(0), "mToken not set");
+
+        // 1) bring index & reserves current
+        _accrue();
+
+        // 2) settle loans from the payer, at oracle price with no bonus
+        for (uint i = 0; i < borrowers.length; i++) {
+            if (_settleLoan(borrowers[i], payer)) loansSettled++;
+        }
+
+        // 3) return every collateral position
+        for (uint i = 0; i < collateralHolders.length; i++) {
+            if (_returnCollateral(collateralHolders[i])) collateralReturned++;
+        }
+
+        // 4) redeem suppliers at the exchange rate
+        for (uint i = 0; i < suppliers.length; i++) {
+            if (_redeemSupplier(suppliers[i])) suppliersRedeemed++;
+        }
+
+        // 5) redeem SafetyModule stakers
+        stakersRedeemed = safetyModule.redeemAllFor(stakers);
+
+        // 6) the LiquidityPool now holds only reserves and rounding dust
+        address asset = borrowableAsset;
+        LiquidityPool pool = _liquidityPool();
+        uint remaining = IERC20(asset).balanceOf(address(pool));
+        if (remaining > 0) {
+            pool.transferReserve(remaining, address(feeCollector));
+            emit ReservesSweptTreasury(remaining, address(feeCollector));
+        }
+        reservesAccrued = 0;
+
+        // 7) refund any USDST already held here, and pause
+        uint refund = IERC20(asset).balanceOf(address(this));
+        if (refund > 0) {
+            require(IERC20(asset).transfer(payer, refund), "Refund failed");
+        }
+        if (!paused()) _pause();
+
+        _requireSunsetComplete();
+
+        emit SunsetExecuted(loansSettled, collateralReturned, suppliersRedeemed, stakersRedeemed, refund);
+        return (loansSettled, collateralReturned, suppliersRedeemed, stakersRedeemed);
+    }
+
+    /**
+     * @dev Pull `borrower`'s whole debt from `payer` into the LiquidityPool and hand `payer`
+     *      collateral worth exactly that debt at oracle price, in configuredAssets order. When the
+     *      collateral is worth less than the debt, the payer gets all of it and bears the shortfall.
+     *      Returns false when there is no loan; reverts when such a borrower also holds unpriced
+     *      collateral (unpriced assets stay with the borrower) or the payer cannot pay the debt.
+     */
+    function _settleLoan(address borrower, address payer) internal returns (bool) {
+        LoanInfo storage loan = userLoan[borrower];
+        if (loan.scaledDebt == 0) return false;
+        uint debt = (loan.scaledDebt * borrowIndex) / RAY;
+
+        address asset = borrowableAsset;
+        PriceOracle oracle = _priceOracle();
+        uint priceDebt = oracle.prices(asset);
+        require(priceDebt > 0, "Sunset: borrowable asset unpriced");
+
+        CollateralVault vault = _collateralVault();
+        uint n = configuredAssets.length;
+        uint owed = debt * priceDebt;
+
+        // Priced collateral must cover the debt unless every collateral asset is priced, in which
+        // case the payer takes all of it and absorbs the shortfall; count each asset once
+        uint covered = 0;
+        bool unpriced = false;
+        for (uint i = 0; i < n; i++) {
+            if (!_isFirstEntry(i)) continue;
+            address collateral = configuredAssets[i];
+            uint held = vault.userCollaterals(borrower, collateral);
+            if (held == 0) continue;
+            uint price = oracle.prices(collateral);
+            if (price == 0) unpriced = true;
+            covered += held * price;
+        }
+        require(covered >= owed || !unpriced, "Sunset: unpriced collateral below debt");
+
+        // Pull the repayment from the payer into the LiquidityPool and zero the loan
+        LiquidityPool pool = _liquidityPool();
+        require(IERC20(asset).transferFrom(payer, address(pool), debt), "Settlement transfer failed");
+        totalScaledDebt -= loan.scaledDebt;
+        delete userLoan[borrower].scaledDebt;
+        delete userLoan[borrower].lastUpdated;
+
+        // Seize collateral worth the debt for the payer (a repeated entry finds nothing left)
+        uint remaining = owed;
+        for (uint i = 0; i < n && remaining > 0; i++) {
+            address collateral = configuredAssets[i];
+            uint price = oracle.prices(collateral);
+            uint held = vault.userCollaterals(borrower, collateral);
+            if (price == 0 || held == 0) continue;
+            uint toSeize = remaining / price;
+            if (toSeize > held) toSeize = held;
+            if (toSeize == 0) continue;
+            vault.seizeCollateral(borrower, payer, collateral, toSeize);
+            remaining -= toSeize * price;
+        }
+
+        emit ExchangeRateUpdated(asset, getExchangeRate());
+        emit Repaid(borrower, asset, debt);
+        emit LoanSettled(borrower, debt, payer);
+        return true;
+    }
+
+    /**
+     * @dev Give `holder` back every collateral position. Returns false when nothing is held or a
+     *      loan is still open (the completeness check then fails the call).
+     */
+    function _returnCollateral(address holder) internal returns (bool returned) {
+        if (userLoan[holder].scaledDebt > 0) return false;
+
+        CollateralVault vault = _collateralVault();
+        uint n = configuredAssets.length;
+        for (uint i = 0; i < n; i++) {
+            address collateral = configuredAssets[i];
+            uint held = vault.userCollaterals(holder, collateral);
+            if (held == 0) continue; // a repeated entry finds nothing left
+            vault.removeCollateral(holder, collateral, held);
+            emit WithdrawnCollateral(holder, collateral, held);
+            returned = true;
+        }
+        return returned;
+    }
+
+    /**
+     * @dev Redeem `supplier`'s whole mToken balance at the current exchange rate, the valuation
+     *      withdrawLiquidityAll uses. Returns false when nothing is held; the LiquidityPool reverts
+     *      when its cash net of reserves cannot pay the claim in full.
+     */
+    function _redeemSupplier(address supplier) internal returns (bool) {
+        uint shares = IERC20(mToken).balanceOf(supplier);
+        if (shares == 0) return false;
+        uint underlying = (shares * getExchangeRate()) / 1e18;
+
+        LiquidityPool(_liquidityPool()).withdraw(shares, supplier, underlying);
+
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
+        emit Withdrawn(supplier, borrowableAsset, underlying);
+        return true;
+    }
+
+    /**
+     * @dev The protocol's own accounting must read as sunset, whatever the call was given: no debt,
+     *      no mToken, no reserves, nothing in this contract, no SafetyModule share or managed asset,
+     *      and the pool paused. Only accounting is checked, never a balance a third party can move:
+     *      the LiquidityPool is emptied by the sweep in step 6 (donations included), the SafetyModule
+     *      is judged by what it manages, and the CollateralVault keeps no total, so a stray donation
+     *      there cannot block the sunset and collateral completeness is checked off-chain. A holder
+     *      left out keeps their position and gets it back from a follow-up call that lists them.
+     */
+    function _requireSunsetComplete() internal view {
+        require(totalScaledDebt == 0, "Sunset: debt outstanding");
+        require(IERC20(mToken).totalSupply() == 0, "Sunset: mTokens outstanding");
+        require(reservesAccrued == 0, "Sunset: reserves left");
+        require(IERC20(borrowableAsset).balanceOf(address(this)) == 0, "Sunset: value left in the pool");
+        require(IERC20(safetyModule.sToken()).totalSupply() == 0, "Sunset: SafetyModule shares outstanding");
+        require(safetyModule.totalAssets() == 0, "Sunset: SafetyModule assets left");
+        require(paused(), "Sunset: not paused");
+    }
+
+    /// @dev configuredAssets can list an asset more than once (mainnet lists USDST twice); only its
+    ///      first entry counts when values are summed, so nothing is valued twice.
+    function _isFirstEntry(uint i) internal view returns (bool) {
+        for (uint j = 0; j < i; j++) {
+            if (configuredAssets[j] == configuredAssets[i]) return false;
+        }
+        return true;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════

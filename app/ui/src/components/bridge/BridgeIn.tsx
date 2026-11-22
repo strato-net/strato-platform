@@ -107,15 +107,13 @@ const combinedActionFeeBps = (action: DepositAction): string => {
 const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: string }): string => {
   switch (info.source) {
     case "lending":
-      return "/dashboard/earn-lending";
+      return "/dashboard/earn-save";
     case "vault":
       // Yield vaults are listed on the Earn page
       return "/dashboard/earn";
     case "swap":
     case "weighted_swap":
       return info.poolAddress ? `/dashboard/earn-pools?pool=${info.poolAddress}` : "/dashboard/earn-pools";
-    case "safety":
-      return "/dashboard/advanced?tab=safety";
     case "staking":
       return "/dashboard/earn-staking";
     default:

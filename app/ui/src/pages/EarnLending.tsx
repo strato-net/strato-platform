@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { formatUnits } from "ethers";
-import { ArrowLeft, CircleArrowDown, CircleArrowUp, Gauge, HelpCircle, Landmark, PauseCircle, Wallet } from "lucide-react";
+import { ArrowLeft, CircleArrowUp, Gauge, HelpCircle, Landmark, PauseCircle, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -233,13 +233,18 @@ const EarnLending = () => {
                         />
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">USDST</span>
                       </div>
-                      <Button
-                        onClick={() => handleLiquidityAction("deposit")}
-                        className="h-11 sm:w-36"
-                        disabled={tokensLoading || isProcessing || !isDepositAmountValid() || !isLoggedIn}
-                      >
-                        {isProcessing ? "Processing..." : <><CircleArrowDown className="mr-2 h-4 w-4" />Deposit</>}
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="sm:w-36 w-full">
+                            <Button className="h-11 w-full" disabled>
+                              <PauseCircle className="mr-2 h-4 w-4" />Deposit
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>The Lending Pool is closed to new deposits. Withdrawals stay open.</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
 
                     <div className="text-sm text-muted-foreground">
