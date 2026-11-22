@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { nodeUrl, bridgeUrl } from "../config/config";
 import { requestContext } from "./requestContext";
-import { sharedLoadContext } from "./sharedPromise";
+import { markFailedNodeCall, nodeCallWatch } from "./sharedPromise";
 import { traceparentHeader } from "./tracing";
 
 const createApiClient = (baseURL: string): AxiosInstance =>
@@ -41,22 +41,17 @@ _bloc.interceptors.request.use(unsignedTxInterceptor);
 _cirrus.interceptors.request.use(unsignedTxInterceptor);
 _eth.interceptors.request.use(unsignedTxInterceptor);
 
-// A node call that fails inside a shared load marks it (see sharedPromise.ts), also when
-// its caller catches the error. A 4xx answer other than 429 is the node's answer, not a
-// failure: it would be the same next time.
-function sharedLoadFailureInterceptor(error: any) {
-  const status = error?.response?.status;
-  if (!status || status >= 500 || status === 429) {
-    const load = sharedLoadContext.getStore();
-    if (load) load.failedCall ??= `${error?.config?.url} ${status ?? error?.code}`;
-  }
+// A node call that fails inside watched work marks it (see sharedPromise.ts), also when
+// its caller catches the error.
+function nodeCallFailureInterceptor(error: any) {
+  markFailedNodeCall(nodeCallWatch.getStore(), error);
   return Promise.reject(error);
 }
 
-_strato.interceptors.response.use(undefined, sharedLoadFailureInterceptor);
-_cirrus.interceptors.response.use(undefined, sharedLoadFailureInterceptor);
-_bloc.interceptors.response.use(undefined, sharedLoadFailureInterceptor);
-_eth.interceptors.response.use(undefined, sharedLoadFailureInterceptor);
+_strato.interceptors.response.use(undefined, nodeCallFailureInterceptor);
+_cirrus.interceptors.response.use(undefined, nodeCallFailureInterceptor);
+_bloc.interceptors.response.use(undefined, nodeCallFailureInterceptor);
+_eth.interceptors.response.use(undefined, nodeCallFailureInterceptor);
 
 // An empty token is an anonymous call: no Authorization header at all (the
 // node's nginx rejects a present-but-empty bearer token).

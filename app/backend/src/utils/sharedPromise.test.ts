@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test, { TestContext } from "node:test";
-import { createSharedPromiseCache, sharedLoadContext } from "./sharedPromise";
+import { createSharedPromiseCache, nodeCallWatch } from "./sharedPromise";
 
 const TTL_MS = 5_000;
 const MAX_LOAD_MS = 15_000;
@@ -55,7 +55,7 @@ test("does not keep a load during which a node call failed", async (t) => {
   let loads = 0;
   const load = async () => {
     loads++;
-    sharedLoadContext.getStore()!.failedCall = "/BlockApps-Pool 503";
+    nodeCallWatch.getStore()!.failedCall = "/BlockApps-Pool 503";
     return "degraded";
   };
 
@@ -65,6 +65,28 @@ test("does not keep a load during which a node call failed", async (t) => {
   assert.deepEqual(warn.mock.calls.map((call) => call.arguments), [
     ["Shared state key not cached: node call failed: /BlockApps-Pool 503"],
   ]);
+});
+
+test("marks a watched caller with the failed call of the load it starts or joins, not after a clean load", async (t) => {
+  t.mock.method(console, "warn", () => {});
+  const shared = createSharedPromiseCache(TTL_MS, MAX_LOAD_MS);
+  const failing = async () => {
+    await Promise.resolve();
+    nodeCallWatch.getStore()!.failedCall = "/BlockApps-Pool 503";
+    return "degraded";
+  };
+  const starter: { failedCall?: string } = {};
+  const joiner: { failedCall?: string } = {};
+  const clean: { failedCall?: string } = {};
+
+  const started = nodeCallWatch.run(starter, () => shared("key", failing));
+  const joined = nodeCallWatch.run(joiner, () => shared("key", failing));
+  assert.equal(joined, started);
+  assert.equal(await started, "degraded");
+  assert.deepEqual([starter.failedCall, joiner.failedCall], ["/BlockApps-Pool 503", "/BlockApps-Pool 503"]);
+
+  assert.equal(await nodeCallWatch.run(clean, () => shared("clean", async () => "fine")), "fine");
+  assert.equal(clean.failedCall, undefined);
 });
 
 test("bypasses a load after maxLoadMs; its late result does not replace a newer one", async (t) => {

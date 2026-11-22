@@ -3,7 +3,7 @@ import { constants } from "../../config/constants";
 import * as config from "../../config/config";
 import { getServiceToken } from "../../utils/authHelper";
 import { isMissingTableError } from "../../utils/cirrusErrors";
-import { createSharedPromiseCache } from "../../utils/sharedPromise";
+import { createSharedPromiseCache, nodeCallWatch } from "../../utils/sharedPromise";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getOraclePrices, getRebaseFactors } from "./oracle.service";
 import { getSaveUsdstInfo, getSaveUsdstUserInfo } from "./saveUsdst.service";
@@ -42,14 +42,23 @@ const sharedSaveUsdstInfo = (accessToken: string) =>
   sharedState("saveUsdstInfo", () => getServiceToken().then(getSaveUsdstInfo))
     .catch(() => getSaveUsdstInfo(accessToken));
 
+// The asset list shows what it could read. The net balance (`strict`) is a sum: a read that
+// fails rejects instead of counting as zero. A table that does not exist yet (no row so far)
+// is not a failure.
+const orElse = <T>(strict: boolean, fallback: T) => (error: unknown): T => {
+  if (strict && !isMissingTableError(error)) throw error;
+  return fallback;
+};
+
 // One oracle read for all yield vaults (each reads its own when that one fails); a vault
-// that cannot be read is null.
+// that cannot be read is null in the asset list's load and rejects the net balance's
+// (value-only) load.
 const sharedYieldVaultInfos = (valueOnly = false) =>
   sharedState(`yieldVaultInfos:${valueOnly}`, async () => {
     const serviceToken = await getServiceToken();
     const oraclePrices = await getOraclePrices(serviceToken).catch(() => undefined);
     return Promise.all(
-      listVaultDefs().map((def) => getYieldVaultInfo(serviceToken, def.key, { valueOnly, oraclePrices }).catch(() => null))
+      listVaultDefs().map((def) => getYieldVaultInfo(serviceToken, def.key, { valueOnly, oraclePrices }).catch(orElse(valueOnly, null)))
     );
   });
 
@@ -207,7 +216,9 @@ export const getTokens = async (
 // `valueOnly` is for the net balance calculation too: it skips the reads that do not feed
 // an asset's `value` (token images and attributes, rebase data, vault asset symbol, APY
 // and strategy holdings); the result's other fields are then incomplete. With it, a
-// saveUSDST or yield vault position that cannot be read rejects the call.
+// saveUSDST, yield vault or staked balance failure that reaches `orElse` rejects the call;
+// the reads those services answer with a default themselves fail the result only under
+// `getNetBalance`'s watch.
 // The saveUSDST and yield vault user reads are value-only in every case: an asset entry
 // carries the position's shares and value, not the wallet balance or the flow totals.
 export const getEarningAssets = async (
@@ -215,16 +226,14 @@ export const getEarningAssets = async (
   userAddress: string,
   { includeHeldNonActive = false, valueOnly = false }: { includeHeldNonActive?: boolean; valueOnly?: boolean } = {}
 ): Promise<EarningAsset[]> => {
-  // The list shows what it could read. The net balance is a sum: a position's own read that
-  // fails rejects instead of counting the position as zero. A table that does not exist yet
-  // (no holder so far) is not a failure.
-  const orNull = (error: unknown): null => {
-    if (valueOnly && !isMissingTableError(error)) throw error;
-    return null;
-  };
-  const saveUsdstInfoPromise = sharedSaveUsdstInfo(accessToken).catch(() => null);
-  const yieldVaultInfosPromise = sharedYieldVaultInfos(valueOnly).catch(() => []);
-  const [tokens, collaterals, cdps, rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, stakedStrato] = await Promise.all([
+  const saveUsdstInfoPromise = sharedSaveUsdstInfo(accessToken).catch(orElse(valueOnly, null));
+  const yieldVaultPairsPromise = sharedYieldVaultInfos(valueOnly)
+    .catch(orElse(valueOnly, []))
+    .then((infos) => Promise.all(infos.map(async (info) => ({
+      info,
+      userInfo: info && (await getYieldVaultUserInfo(accessToken, info.key, userAddress, { vaultInfo: info, valueOnly: true }).catch(orElse(valueOnly, null))),
+    }))));
+  const [tokens, collaterals, cdps, rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, stakedStrato, yieldVaultPairs] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, {
       params: {
         "balances.key": `eq.${userAddress}`,
@@ -254,9 +263,10 @@ export const getEarningAssets = async (
     saveUsdstInfoPromise,
     saveUsdstInfoPromise
       .then((info) => info && getSaveUsdstUserInfo(accessToken, userAddress, { vaultInfo: info, valueOnly: true }))
-      .catch(orNull),
+      .catch(orElse(valueOnly, null)),
     valueOnly ? new Map<string, string>() : getRebaseFactors(accessToken),
-    getUserStakedStratoBalance(accessToken, userAddress).catch(() => ({ tokenAddress: "", amount: 0n })),
+    getUserStakedStratoBalance(accessToken, userAddress).catch(orElse(valueOnly, { tokenAddress: "", amount: 0n })),
+    yieldVaultPairsPromise,
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -326,13 +336,6 @@ export const getEarningAssets = async (
     }
   }
 
-  const yieldVaultInfos = await yieldVaultInfosPromise;
-  const yieldVaultPairs = await Promise.all(
-    yieldVaultInfos.map(async (info) => ({
-      info,
-      userInfo: info && (await getYieldVaultUserInfo(accessToken, info.key, userAddress, { vaultInfo: info, valueOnly: true }).catch(orNull)),
-    }))
-  );
   for (const { info, userInfo } of yieldVaultPairs) {
     if (!info?.deployed) continue;
     const yvAsset = buildYieldVaultEarningAsset(info, userInfo ?? undefined);
@@ -1200,14 +1203,20 @@ export const getNetBalance = async (
   userAddress: string
 ): Promise<{ netBalance: number; totalBorrowed: number; totalAssetValue: number }> => {
   // A part that cannot be read fails the request: counted as zero it would give a wrong
-  // balance (minus the debt when it is the assets).
-  const [earningAssets, loan, vaults, v3Value] = await Promise.all([
-    // Held PENDING/LEGACY tokens count towards the balance, matching the history graph.
-    getEarningAssets(accessToken, userAddress, { includeHeldNonActive: true, valueOnly: true }),
-    getLoan(accessToken, userAddress),
-    getVaults(accessToken, userAddress),
-    getV3PositionsValue(accessToken, userAddress),
-  ]);
+  // balance (minus the debt when it is the assets). The services answer some failed reads
+  // with a default for their other callers (no vaults, nothing claimable), so the node calls
+  // made for this balance are watched as well: one that failed fails the request.
+  const calls: { failedCall?: string } = {};
+  const [earningAssets, loan, vaults, v3Value] = await nodeCallWatch.run(calls, () =>
+    Promise.all([
+      // Held PENDING/LEGACY tokens count towards the balance, matching the history graph.
+      getEarningAssets(accessToken, userAddress, { includeHeldNonActive: true, valueOnly: true }),
+      getLoan(accessToken, userAddress),
+      getVaults(accessToken, userAddress),
+      getV3PositionsValue(accessToken, userAddress),
+    ])
+  );
+  if (calls.failedCall) throw new Error(`Net balance: node call failed: ${calls.failedCall}`);
 
   let totalAssetValue = 0;
   for (const asset of earningAssets) {

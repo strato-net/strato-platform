@@ -3,8 +3,9 @@ import test, { TestContext } from "node:test";
 import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import * as config from "../../config/config";
+import { nodeCallWatch } from "../../utils/sharedPromise";
 import * as oracleHelper from "../helpers/oracle.helper";
-import { getNetBalance } from "./tokens.v2.service";
+import { getEarningAssets, getNetBalance } from "./tokens.v2.service";
 
 // Each test starts a minute after the previous one, past the TTL of the shared state it left.
 let clock = Date.now();
@@ -82,6 +83,11 @@ test("getNetBalance fails when a deployed saveUSDST vault's share balance cannot
   });
 
   await assert.rejects(getNetBalance("access-token", user), /Cirrus unavailable/);
+  // The asset list stays tolerant: it shows the vault without the position.
+  assert.deepEqual(
+    (await getEarningAssets("access-token", user)).map(({ address, balance }) => ({ address, balance })),
+    [{ address: vault, balance: "0" }]
+  );
 
   shareBalanceError = { response: { data: { code: "42P01" } } };
   assert.deepEqual(await getNetBalance("access-token", user), {
@@ -89,4 +95,62 @@ test("getNetBalance fails when a deployed saveUSDST vault's share balance cannot
     totalBorrowed: 0,
     totalAssetValue: 0,
   });
+});
+
+// The node's answers for a wallet that holds and owes nothing.
+const emptyWallet = (path: string) => {
+  if (path === `/${constants.LendingRegistry}`) {
+    return {
+      data: [{ lendingPool: { borrowableAsset: constants.USDST, assetConfigs: [{ asset: constants.USDST }] } }],
+    };
+  }
+
+  if (path === `/${constants.CDPRegistry}`) {
+    return { data: [{ cdpEngine: { address: "2222222222222222222222222222222222222222" } }] };
+  }
+
+  return { data: [] };
+};
+
+test("getNetBalance fails when a read that a service answers with a default had a failed node call", async (t) => {
+  const user = "1111111111111111111111111111111111111111";
+  const vaultsRead = `/${constants.CDPEngine}-vaults`;
+
+  freshSharedState(t);
+  t.mock.method(console, "warn", () => {});
+  t.mock.method(oracleHelper, "getCompletePriceMap", async () => new Map());
+
+  t.mock.method(cirrus, "get", async (_token: string, path: string, options?: { params?: Record<string, string> }) => {
+    // The debt read (the one filtered by engine address) fails as the axios interceptor
+    // reports it. getUserVaults answers it with no vaults.
+    if (path === vaultsRead && options?.params?.address) {
+      nodeCallWatch.getStore()!.failedCall = `${vaultsRead} 503`;
+      throw new Error("Cirrus unavailable");
+    }
+
+    return emptyWallet(path);
+  });
+
+  await assert.rejects(getNetBalance("access-token", user), {
+    message: `Net balance: node call failed: ${vaultsRead} 503`,
+  });
+});
+
+test("getNetBalance fails when a node call failed inside the shared load that answers it", async (t) => {
+  freshSharedState(t);
+  const warn = t.mock.method(console, "warn", () => {});
+  // The price map load carries on after a failed read, as the real one does for some.
+  t.mock.method(oracleHelper, "getCompletePriceMap", async () => {
+    nodeCallWatch.getStore()!.failedCall = "/BlockApps-Pool 503";
+    return new Map();
+  });
+  t.mock.method(cirrus, "get", async (_token: string, path: string) => emptyWallet(path));
+
+  await assert.rejects(getNetBalance("access-token", "1111111111111111111111111111111111111111"), {
+    message: "Net balance: node call failed: /BlockApps-Pool 503",
+  });
+  // The mark was the load's own, not the request's.
+  assert.deepEqual(warn.mock.calls.map((call) => call.arguments), [
+    ["Shared state priceMap not cached: node call failed: /BlockApps-Pool 503"],
+  ]);
 });
