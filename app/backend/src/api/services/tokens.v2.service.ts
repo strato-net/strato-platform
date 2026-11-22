@@ -2,6 +2,7 @@ import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import * as config from "../../config/config";
 import { getServiceToken } from "../../utils/authHelper";
+import { isMissingTableError } from "../../utils/cirrusErrors";
 import { createSharedPromiseCache } from "../../utils/sharedPromise";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getOraclePrices, getRebaseFactors } from "./oracle.service";
@@ -205,7 +206,8 @@ export const getTokens = async (
 // The default stays ACTIVE-only so the My Tokens list is unaffected.
 // `valueOnly` is for the net balance calculation too: it skips the reads that do not feed
 // an asset's `value` (token images and attributes, rebase data, vault asset symbol, APY
-// and strategy holdings); the result's other fields are then incomplete.
+// and strategy holdings); the result's other fields are then incomplete. With it, a
+// saveUSDST or yield vault position that cannot be read rejects the call.
 // The saveUSDST and yield vault user reads are value-only in every case: an asset entry
 // carries the position's shares and value, not the wallet balance or the flow totals.
 export const getEarningAssets = async (
@@ -213,6 +215,13 @@ export const getEarningAssets = async (
   userAddress: string,
   { includeHeldNonActive = false, valueOnly = false }: { includeHeldNonActive?: boolean; valueOnly?: boolean } = {}
 ): Promise<EarningAsset[]> => {
+  // The list shows what it could read. The net balance is a sum: a position's own read that
+  // fails rejects instead of counting the position as zero. A table that does not exist yet
+  // (no holder so far) is not a failure.
+  const orNull = (error: unknown): null => {
+    if (valueOnly && !isMissingTableError(error)) throw error;
+    return null;
+  };
   const saveUsdstInfoPromise = sharedSaveUsdstInfo(accessToken).catch(() => null);
   const yieldVaultInfosPromise = sharedYieldVaultInfos(valueOnly).catch(() => []);
   const [tokens, collaterals, cdps, rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, stakedStrato] = await Promise.all([
@@ -245,7 +254,7 @@ export const getEarningAssets = async (
     saveUsdstInfoPromise,
     saveUsdstInfoPromise
       .then((info) => info && getSaveUsdstUserInfo(accessToken, userAddress, { vaultInfo: info, valueOnly: true }))
-      .catch(() => null),
+      .catch(orNull),
     valueOnly ? new Map<string, string>() : getRebaseFactors(accessToken),
     getUserStakedStratoBalance(accessToken, userAddress).catch(() => ({ tokenAddress: "", amount: 0n })),
   ]);
@@ -321,7 +330,7 @@ export const getEarningAssets = async (
   const yieldVaultPairs = await Promise.all(
     yieldVaultInfos.map(async (info) => ({
       info,
-      userInfo: info && (await getYieldVaultUserInfo(accessToken, info.key, userAddress, { vaultInfo: info, valueOnly: true }).catch(() => null)),
+      userInfo: info && (await getYieldVaultUserInfo(accessToken, info.key, userAddress, { vaultInfo: info, valueOnly: true }).catch(orNull)),
     }))
   );
   for (const { info, userInfo } of yieldVaultPairs) {
