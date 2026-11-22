@@ -162,13 +162,17 @@ export async function fetchStorageHistory(
   // $1 = endTime, $2 = startTime, $3 = address list
   // The history table is indexed by contract address only. The contracts of the
   // wanted kinds are found in the (small) current storage table first, so that
-  // the history lookup goes by address instead of scanning every row.
+  // the history lookup goes by address instead of scanning every row. A pool
+  // row also gives its LP token, so that an LP token whose symbol was changed
+  // later (setNameAndSymbol) keeps the history it had under its "-LP" symbol.
   const sql = `
     SELECT address, data, valid_from, valid_to
     FROM "history@storage"
     WHERE valid_from <= $1
       AND valid_to >= $2
-      AND address = ANY(ARRAY(SELECT address FROM storage WHERE ${STORAGE_HISTORY_KINDS}) || $3::text[])
+      AND address = ANY(ARRAY(
+        SELECT unnest(ARRAY[address, data->>'lpToken']) FROM storage WHERE ${STORAGE_HISTORY_KINDS}
+      ) || $3::text[])
       AND (
         ${STORAGE_HISTORY_KINDS}
         OR address = ANY($3)
