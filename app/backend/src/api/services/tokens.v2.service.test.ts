@@ -3,7 +3,7 @@ import test, { TestContext } from "node:test";
 import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import * as config from "../../config/config";
-import { nodeCallWatch } from "../../utils/sharedPromise";
+import { markFailedNodeCall, nodeCallWatch } from "../../utils/sharedPromise";
 import * as oracleHelper from "../helpers/oracle.helper";
 import { getEarningAssets, getNetBalance } from "./tokens.v2.service";
 
@@ -153,4 +153,60 @@ test("getNetBalance fails when a node call failed inside the shared load that an
   assert.deepEqual(warn.mock.calls.map((call) => call.arguments), [
     ["Shared state priceMap not cached: node call failed: /BlockApps-Pool 503"],
   ]);
+});
+
+test("getNetBalance answers zeros and the asset list resolves on a network whose collateral, lending and CDP tables do not exist yet", async (t) => {
+  const user = "1111111111111111111111111111111111111111";
+  // The node's error answer, passed through what the axios interceptor does with it.
+  const nodeError = (path: string, status: number, code: string) => {
+    const error = { config: { url: path }, response: { status, data: { code, message: `${code} at ${path}` } } };
+    markFailedNodeCall(nodeCallWatch.getStore(), error);
+    return error;
+  };
+
+  freshSharedState(t);
+  const warn = t.mock.method(console, "warn", () => {});
+  t.mock.method(oracleHelper, "getCompletePriceMap", async () => new Map());
+  t.mock.method(cirrus, "get", async (_token: string, path: string) => {
+    // The mapping tables appear with their first row; a select that embeds one is refused.
+    if (path === `/${constants.CollateralVault}-userCollaterals` || path === `/${constants.CDPEngine}-vaults`) {
+      throw nodeError(path, 404, "42P01");
+    }
+    if (path === `/${constants.LendingRegistry}` || path === `/${constants.CDPRegistry}`) {
+      throw nodeError(path, 400, "PGRST200");
+    }
+
+    return { data: [] };
+  });
+
+  assert.deepEqual(await getNetBalance("access-token", user), {
+    netBalance: 0,
+    totalBorrowed: 0,
+    totalAssetValue: 0,
+  });
+  // Debt counted as none is said so, with the node's message.
+  assert.deepEqual(warn.mock.calls.map((call) => call.arguments[0]).sort(), [
+    `Net balance: CDP tables not there yet, no debt counted: PGRST200 at /${constants.CDPRegistry}`,
+    `Net balance: lending tables not there yet, no debt counted: PGRST200 at /${constants.LendingRegistry}`,
+  ]);
+  assert.deepEqual(await getEarningAssets("access-token", user), []);
+});
+
+test("getNetBalance fails when the lending or the CDP registry has no row, unlike a table that does not exist yet", async (t) => {
+  const user = "1111111111111111111111111111111111111111";
+  let registry = `/${constants.LendingRegistry}`;
+  let answer: { data: unknown[] } = { data: [] };
+
+  freshSharedState(t);
+  const warn = t.mock.method(console, "warn", () => {});
+  t.mock.method(console, "error", () => {});
+  t.mock.method(oracleHelper, "getCompletePriceMap", async () => new Map());
+  t.mock.method(cirrus, "get", async (_token: string, path: string) => (path === registry ? answer : emptyWallet(path)));
+
+  await assert.rejects(getNetBalance("access-token", user), /Error fetching LendingRegistry data from Cirrus/);
+
+  registry = `/${constants.CDPRegistry}`;
+  answer = { data: [{}] };
+  await assert.rejects(getNetBalance("access-token", user), /CDP Engine not found/);
+  assert.equal(warn.mock.callCount(), 0);
 });

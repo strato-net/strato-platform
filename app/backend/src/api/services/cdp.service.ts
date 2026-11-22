@@ -3,6 +3,7 @@
  */
 
 import { strato, cirrus } from "../../utils/appApiHelper";
+import { isMissingRelationError } from "../../utils/cirrusErrors";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { governedInput } from "./user.service";
 import { FunctionInput } from "../../types/types";
@@ -155,6 +156,9 @@ export const getCDPRegistry = async (
 
     return registryData;
   } catch (error: any) {
+    // A table, column or embedded table that does not exist yet keeps its code, so a caller
+    // can tell it from a failure.
+    if (isMissingRelationError(error)) throw error;
     console.error("Error in getCDPRegistry:", {
       cdpRegistry,
       params,

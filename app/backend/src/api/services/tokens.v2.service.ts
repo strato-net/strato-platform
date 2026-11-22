@@ -2,7 +2,7 @@ import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import * as config from "../../config/config";
 import { getServiceToken } from "../../utils/authHelper";
-import { isMissingTableError } from "../../utils/cirrusErrors";
+import { isMissingRelationError, emptyOnMissingTable } from "../../utils/cirrusErrors";
 import { createSharedPromiseCache, nodeCallWatch } from "../../utils/sharedPromise";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getOraclePrices, getRebaseFactors } from "./oracle.service";
@@ -43,10 +43,10 @@ const sharedSaveUsdstInfo = (accessToken: string) =>
     .catch(() => getSaveUsdstInfo(accessToken));
 
 // The asset list shows what it could read. The net balance (`strict`) is a sum: a read that
-// fails rejects instead of counting as zero. A table that does not exist yet (no row so far)
-// is not a failure.
+// fails rejects instead of counting as zero. A table, column or embedded table that does not
+// exist yet (no row so far) is not a failure.
 const orElse = <T>(strict: boolean, fallback: T) => (error: unknown): T => {
-  if (strict && !isMissingTableError(error)) throw error;
+  if (strict && !isMissingRelationError(error)) throw error;
   return fallback;
 };
 
@@ -245,20 +245,21 @@ export const getEarningAssets = async (
         ...(includeHeldNonActive ? {} : { status: "eq.2" }),
       },
     }),
+    // A collateral table that does not exist yet (nobody has supplied any) holds none.
     cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
       params: {
         select: "user:key,asset:key2,amount:value::text",
         key: `eq.${userAddress}`,
         value: `gt.0`,
       },
-    }),
+    }).catch(emptyOnMissingTable),
     cirrus.get(accessToken, `/${CDPEngine}-vaults`, {
       params: {
         select: "user:key,asset:key2,amount:value->>collateral::text",
         key: `eq.${userAddress}`,
         "value->>collateral": `gt.0`,
       },
-    }),
+    }).catch(emptyOnMissingTable),
     sharedPriceMap(accessToken),
     saveUsdstInfoPromise,
     saveUsdstInfoPromise
@@ -1205,14 +1206,21 @@ export const getNetBalance = async (
   // A part that cannot be read fails the request: counted as zero it would give a wrong
   // balance (minus the debt when it is the assets). The services answer some failed reads
   // with a default for their other callers (no vaults, nothing claimable), so the node calls
-  // made for this balance are watched as well: one that failed fails the request.
+  // made for this balance are watched as well: one that failed fails the request. A lending
+  // or CDP table that does not exist yet means no debt, and is logged: a relationship the
+  // node does not know for another reason answers the same.
+  const noDebt = <T>(part: string, fallback: T) => (error: any): T => {
+    const value = orElse(true, fallback)(error);
+    console.warn(`Net balance: ${part} tables not there yet, no debt counted: ${error?.response?.data?.message ?? error?.message}`);
+    return value;
+  };
   const calls: { failedCall?: string } = {};
   const [earningAssets, loan, vaults, v3Value] = await nodeCallWatch.run(calls, () =>
     Promise.all([
       // Held PENDING/LEGACY tokens count towards the balance, matching the history graph.
       getEarningAssets(accessToken, userAddress, { includeHeldNonActive: true, valueOnly: true }),
-      getLoan(accessToken, userAddress),
-      getVaults(accessToken, userAddress),
+      getLoan(accessToken, userAddress).catch(noDebt("lending", null)),
+      getVaults(accessToken, userAddress).catch(noDebt("CDP", [])),
       getV3PositionsValue(accessToken, userAddress),
     ])
   );
