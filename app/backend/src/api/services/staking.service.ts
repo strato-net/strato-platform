@@ -1,4 +1,5 @@
 import { bloc, cirrus, strato } from "../../utils/appApiHelper";
+import { markFailedNodeCall, nodeCallWatch } from "../../utils/sharedPromise";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { authorizationDigest, findOperatedValidator, mapRegistryRevert, profileText, splitSignature } from "./stakingAuthorization";
@@ -372,7 +373,13 @@ const getBlocState = (
 ): Promise<Record<string, any>> => {
   const cacheKey = `${contractName}:${address}`;
   const cached = blocStateCache.get(cacheKey);
-  if (!fresh && cached && Date.now() < cached.expiresAt) return cached.state;
+  if (!fresh && cached && Date.now() < cached.expiresAt) {
+    // A watched caller (see nodeCallWatch) that joins a read another request made is marked
+    // when that read fails: the failed call itself marked only the request that made it.
+    const watcher = nodeCallWatch.getStore();
+    if (watcher) cached.state.catch((error) => markFailedNodeCall(watcher, error));
+    return cached.state;
+  }
 
   const state = bloc.get(accessToken, `/contracts/${contractName}/${address}/state`)
     .then(({ data }: { data: unknown }) => {

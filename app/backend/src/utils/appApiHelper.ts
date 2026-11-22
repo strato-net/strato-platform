@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { nodeUrl, bridgeUrl } from "../config/config";
 import { requestContext } from "./requestContext";
+import { markFailedNodeCall, nodeCallWatch } from "./sharedPromise";
 import { traceparentHeader } from "./tracing";
 
 const createApiClient = (baseURL: string): AxiosInstance =>
@@ -39,6 +40,18 @@ _bloc.interceptors.request.use(unsignedTxInterceptor);
 // Reads carry the trace too (the interceptor only rewrites signing calls).
 _cirrus.interceptors.request.use(unsignedTxInterceptor);
 _eth.interceptors.request.use(unsignedTxInterceptor);
+
+// A node call that fails inside watched work marks it (see sharedPromise.ts), also when
+// its caller catches the error.
+function nodeCallFailureInterceptor(error: any) {
+  markFailedNodeCall(nodeCallWatch.getStore(), error);
+  return Promise.reject(error);
+}
+
+_strato.interceptors.response.use(undefined, nodeCallFailureInterceptor);
+_cirrus.interceptors.response.use(undefined, nodeCallFailureInterceptor);
+_bloc.interceptors.response.use(undefined, nodeCallFailureInterceptor);
+_eth.interceptors.response.use(undefined, nodeCallFailureInterceptor);
 
 // An empty token is an anonymous call: no Authorization header at all (the
 // node's nginx rejects a present-but-empty bearer token).

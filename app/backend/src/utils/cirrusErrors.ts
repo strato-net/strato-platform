@@ -10,6 +10,15 @@ export const isMissingTableError = (err: unknown): boolean => {
   return code === "42P01" || code === "42703";
 };
 
+/** `isMissingTableError`, or a select that embeds a table that does not exist yet, which
+ *  PostgREST refuses itself (PGRST200, no relationship to it). An embed without a foreign
+ *  key answers the same code, so a caller that reads this as "no data yet" should know the
+ *  tables its select embeds. The node call watch (sharedPromise.ts) uses it only to tell
+ *  what is not a failed call. */
+export const isMissingRelationError = (err: unknown): boolean =>
+  isMissingTableError(err) ||
+  (err as { response?: { data?: { code?: string } } })?.response?.data?.code === "PGRST200";
+
 /** `.catch` handler for a Cirrus read: yield an empty result only when the table/column
  *  doesn't exist yet; rethrow anything else. */
 export const emptyOnMissingTable = (err: unknown): { data: [] } => {

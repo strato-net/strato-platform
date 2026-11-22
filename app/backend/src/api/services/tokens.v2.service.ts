@@ -1,8 +1,11 @@
 import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import * as config from "../../config/config";
+import { getServiceToken } from "../../utils/authHelper";
+import { isMissingRelationError, emptyOnMissingTable } from "../../utils/cirrusErrors";
+import { createSharedPromiseCache, nodeCallWatch } from "../../utils/sharedPromise";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
-import { getRebaseFactors } from "./oracle.service";
+import { getOraclePrices, getRebaseFactors } from "./oracle.service";
 import { getSaveUsdstInfo, getSaveUsdstUserInfo } from "./saveUsdst.service";
 import { getUserStakedStratoBalance } from "./staking.service";
 import { getLoan } from "./lending.service";
@@ -17,7 +20,47 @@ import { getPositions as getV3Positions, getPoolTokenPairs as getV3PoolTokenPair
 import * as v3Math from "../helpers/poolV3Math.helper";
 import { safeBigInt } from "../helpers/safeBigInt.helper";
 
-const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, priceOracle } = constants;
+const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, priceOracle, SHARED_STATE_TTL_MS, SHARED_STATE_MAX_LOAD_MS } = constants;
+
+// Chain state that is the same for every wallet (the price map, saveUSDST info, yield vault
+// info), shared between requests for a few seconds: every open page polls net-balance and
+// earning-assets, and a rebuild costs 60 to 120 node calls. It is read with the service
+// token, so every caller gets the same state whatever the Cirrus column-level ACL on their
+// own token. Only these read endpoints go through it; deposits, redeems and quotes call the
+// services directly and always read fresh state. A wallet's own balances are always read
+// fresh, so right after its own transaction they can be a few seconds ahead of this state
+// (the first deposit into an empty saveUSDST vault is valued at zero until the next load).
+const sharedState = createSharedPromiseCache(SHARED_STATE_TTL_MS, SHARED_STATE_MAX_LOAD_MS);
+
+// When the shared load fails (no service token, for example), the request loads its own
+// with the caller's token, as it did before the state was shared.
+const sharedPriceMap = (accessToken: string): Promise<ReadonlyMap<string, string>> =>
+  sharedState("priceMap", () => getServiceToken().then(getCompletePriceMap))
+    .catch(() => getCompletePriceMap(accessToken));
+
+const sharedSaveUsdstInfo = (accessToken: string) =>
+  sharedState("saveUsdstInfo", () => getServiceToken().then(getSaveUsdstInfo))
+    .catch(() => getSaveUsdstInfo(accessToken));
+
+// The asset list shows what it could read. The net balance (`strict`) is a sum: a read that
+// fails rejects instead of counting as zero. A table, column or embedded table that does not
+// exist yet (no row so far) is not a failure.
+const orElse = <T>(strict: boolean, fallback: T) => (error: unknown): T => {
+  if (strict && !isMissingRelationError(error)) throw error;
+  return fallback;
+};
+
+// One oracle read for all yield vaults (each reads its own when that one fails); a vault
+// that cannot be read is null in the asset list's load and rejects the net balance's
+// (value-only) load.
+const sharedYieldVaultInfos = (valueOnly = false) =>
+  sharedState(`yieldVaultInfos:${valueOnly}`, async () => {
+    const serviceToken = await getServiceToken();
+    const oraclePrices = await getOraclePrices(serviceToken).catch(() => undefined);
+    return Promise.all(
+      listVaultDefs().map((def) => getYieldVaultInfo(serviceToken, def.key, { valueOnly, oraclePrices }).catch(orElse(valueOnly, null)))
+    );
+  });
 
 // Queries MercataBridge config for the unanimous externalSymbol for each given strato token address.
 // Returns a map of stratoToken -> externalSymbol.
@@ -170,42 +213,61 @@ export const getTokens = async (
 // `includeHeldNonActive` is for the net balance calculation only: it widens the query to
 // every status and then keeps non-ACTIVE tokens only where the user actually holds them.
 // The default stays ACTIVE-only so the My Tokens list is unaffected.
+// `valueOnly` is for the net balance calculation too: it skips the reads that do not feed
+// an asset's `value` (token images and attributes, rebase data, vault asset symbol, APY
+// and strategy holdings); the result's other fields are then incomplete. With it, a
+// saveUSDST, yield vault or staked balance failure that reaches `orElse` rejects the call;
+// the reads those services answer with a default themselves fail the result only under
+// `getNetBalance`'s watch.
+// The saveUSDST and yield vault user reads are value-only in every case: an asset entry
+// carries the position's shares and value, not the wallet balance or the flow totals.
 export const getEarningAssets = async (
   accessToken: string,
   userAddress: string,
-  includeHeldNonActive = false
+  { includeHeldNonActive = false, valueOnly = false }: { includeHeldNonActive?: boolean; valueOnly?: boolean } = {}
 ): Promise<EarningAsset[]> => {
-  const [tokens, collaterals, cdps, rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, stakedStrato] = await Promise.all([
+  const saveUsdstInfoPromise = sharedSaveUsdstInfo(accessToken).catch(orElse(valueOnly, null));
+  const yieldVaultPairsPromise = sharedYieldVaultInfos(valueOnly)
+    .catch(orElse(valueOnly, []))
+    .then((infos) => Promise.all(infos.map(async (info) => ({
+      info,
+      userInfo: info && (await getYieldVaultUserInfo(accessToken, info.key, userAddress, { vaultInfo: info, valueOnly: true }).catch(orElse(valueOnly, null))),
+    }))));
+  const [tokens, collaterals, cdps, rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, stakedStrato, yieldVaultPairs] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, {
       params: {
         "balances.key": `eq.${userAddress}`,
         select: buildTokenSelectFields({
-          images: true,
-          attributes: true,
+          images: !valueOnly,
+          attributes: !valueOnly,
           balance: true,
         }).join(","),
         ...(includeHeldNonActive ? {} : { status: "eq.2" }),
       },
     }),
+    // A collateral table that does not exist yet (nobody has supplied any) holds none.
     cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
       params: {
         select: "user:key,asset:key2,amount:value::text",
         key: `eq.${userAddress}`,
         value: `gt.0`,
       },
-    }),
+    }).catch(emptyOnMissingTable),
     cirrus.get(accessToken, `/${CDPEngine}-vaults`, {
       params: {
         select: "user:key,asset:key2,amount:value->>collateral::text",
         key: `eq.${userAddress}`,
         "value->>collateral": `gt.0`,
       },
-    }),
-    getCompletePriceMap(accessToken),
-    getSaveUsdstInfo(accessToken).catch(() => null),
-    getSaveUsdstUserInfo(accessToken, userAddress).catch(() => null),
-    getRebaseFactors(accessToken),
-    getUserStakedStratoBalance(accessToken, userAddress).catch(() => ({ tokenAddress: "", amount: 0n })),
+    }).catch(emptyOnMissingTable),
+    sharedPriceMap(accessToken),
+    saveUsdstInfoPromise,
+    saveUsdstInfoPromise
+      .then((info) => info && getSaveUsdstUserInfo(accessToken, userAddress, { vaultInfo: info, valueOnly: true }))
+      .catch(orElse(valueOnly, null)),
+    valueOnly ? new Map<string, string>() : getRebaseFactors(accessToken),
+    getUserStakedStratoBalance(accessToken, userAddress).catch(orElse(valueOnly, { tokenAddress: "", amount: 0n })),
+    yieldVaultPairsPromise,
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -275,12 +337,6 @@ export const getEarningAssets = async (
     }
   }
 
-  const yieldVaultPairs = await Promise.all(
-    listVaultDefs().map(async (def) => ({
-      info: await getYieldVaultInfo(accessToken, def.key).catch(() => null),
-      userInfo: await getYieldVaultUserInfo(accessToken, def.key, userAddress).catch(() => null),
-    }))
-  );
   for (const { info, userInfo } of yieldVaultPairs) {
     if (!info?.deployed) continue;
     const yvAsset = buildYieldVaultEarningAsset(info, userInfo ?? undefined);
@@ -312,10 +368,11 @@ export const getPublicEarningAssets = async (
   };
 
   // Fetch only tokens and prices (skip user-specific collateral data)
-  const [tokens, rawPrices, saveUsdstInfo] = await Promise.all([
+  const [tokens, rawPrices, saveUsdstInfo, yieldVaultInfos] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, { params: tokenParams }),
-    getCompletePriceMap(accessToken),
-    getSaveUsdstInfo(accessToken).catch(() => null),
+    sharedPriceMap(accessToken),
+    sharedSaveUsdstInfo(accessToken).catch(() => null),
+    sharedYieldVaultInfos().catch(() => []),
   ]);
 
   const earningAssets = (tokens.data || []).map((t: any) => {
@@ -343,9 +400,6 @@ export const getPublicEarningAssets = async (
     earningAssets.push(saveUsdstAsset);
   }
 
-  const yieldVaultInfos = await Promise.all(
-    listVaultDefs().map((def) => getYieldVaultInfo(accessToken, def.key).catch(() => null))
-  );
   for (const info of yieldVaultInfos) {
     if (!info?.deployed) continue;
     const yvAsset = buildYieldVaultEarningAsset(info, null);
@@ -1127,7 +1181,7 @@ const getV3PositionsValue = async (accessToken: string, userAddress: string): Pr
   const poolAddresses = [...new Set(positions.map((p) => p.poolAddress))];
   const [pairs, priceMap] = await Promise.all([
     getV3PoolTokenPairs(accessToken, poolAddresses),
-    getCompletePriceMap(accessToken),
+    sharedPriceMap(accessToken),
   ]);
 
   let totalWadWad = 0n; // 1e36-scaled (wei amount × wei price)
@@ -1149,28 +1203,39 @@ export const getNetBalance = async (
   accessToken: string,
   userAddress: string
 ): Promise<{ netBalance: number; totalBorrowed: number; totalAssetValue: number }> => {
-  const [earningAssetsResult, loanResult, vaultsResult, v3Result] = await Promise.allSettled([
-    // Held PENDING/LEGACY tokens count towards the balance, matching the history graph.
-    getEarningAssets(accessToken, userAddress, true),
-    getLoan(accessToken, userAddress),
-    getVaults(accessToken, userAddress),
-    getV3PositionsValue(accessToken, userAddress),
-  ]);
+  // A part that cannot be read fails the request: counted as zero it would give a wrong
+  // balance (minus the debt when it is the assets). The services answer some failed reads
+  // with a default for their other callers (no vaults, nothing claimable), so the node calls
+  // made for this balance are watched as well: one that failed fails the request. A lending
+  // or CDP table that does not exist yet means no debt, and is logged: a relationship the
+  // node does not know for another reason answers the same.
+  const noDebt = <T>(part: string, fallback: T) => (error: any): T => {
+    const value = orElse(true, fallback)(error);
+    console.warn(`Net balance: ${part} tables not there yet, no debt counted: ${error?.response?.data?.message ?? error?.message}`);
+    return value;
+  };
+  const calls: { failedCall?: string } = {};
+  const [earningAssets, loan, vaults, v3Value] = await nodeCallWatch.run(calls, () =>
+    Promise.all([
+      // Held PENDING/LEGACY tokens count towards the balance, matching the history graph.
+      getEarningAssets(accessToken, userAddress, { includeHeldNonActive: true, valueOnly: true }),
+      getLoan(accessToken, userAddress).catch(noDebt("lending", null)),
+      getVaults(accessToken, userAddress).catch(noDebt("CDP", [])),
+      getV3PositionsValue(accessToken, userAddress),
+    ])
+  );
+  if (calls.failedCall) throw new Error(`Net balance: node call failed: ${calls.failedCall}`);
 
   let totalAssetValue = 0;
-  if (earningAssetsResult.status === "fulfilled") {
-    for (const asset of earningAssetsResult.value) {
-      totalAssetValue += parseFloat(asset.value || "0");
-    }
+  for (const asset of earningAssets) {
+    totalAssetValue += parseFloat(asset.value || "0");
   }
-  if (v3Result.status === "fulfilled") {
-    totalAssetValue += v3Result.value;
-  }
+  totalAssetValue += v3Value;
 
   let lendingDebt = 0;
-  if (loanResult.status === "fulfilled" && loanResult.value?.totalAmountOwed) {
+  if (loan?.totalAmountOwed) {
     try {
-      const raw = BigInt(loanResult.value.totalAmountOwed);
+      const raw = BigInt(loan.totalAmountOwed);
       if (raw > 1n) {
         lendingDebt = Number(raw) / 1e18;
       }
@@ -1178,15 +1243,13 @@ export const getNetBalance = async (
   }
 
   let cdpDebt = 0;
-  if (vaultsResult.status === "fulfilled") {
-    for (const vault of vaultsResult.value) {
-      try {
-        const raw = BigInt(vault.debtAmount || "0");
-        if (raw > 1n) {
-          cdpDebt += Number(raw) / 1e18;
-        }
-      } catch { /* dust or invalid */ }
-    }
+  for (const vault of vaults) {
+    try {
+      const raw = BigInt(vault.debtAmount || "0");
+      if (raw > 1n) {
+        cdpDebt += Number(raw) / 1e18;
+      }
+    } catch { /* dust or invalid */ }
   }
 
   const totalBorrowed = lendingDebt + cdpDebt;
