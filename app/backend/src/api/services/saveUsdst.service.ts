@@ -463,11 +463,15 @@ export const getSaveUsdstInfo = async (accessToken: string): Promise<SaveUsdstIn
   };
 };
 
+// `vaultInfo` is the vault's info when the caller already has it. `valueOnly` is for the
+// net balance calculation only: it skips the wallet balance and the deposit/withdraw event
+// scan, so the wallet, deposit, withdrawal and earnings fields are not meaningful.
 export const getSaveUsdstUserInfo = async (
   accessToken: string,
-  userAddress: string
+  userAddress: string,
+  { vaultInfo, valueOnly = false }: { vaultInfo?: SaveUsdstInfo; valueOnly?: boolean } = {}
 ): Promise<SaveUsdstUserInfo> => {
-  const info = await getSaveUsdstInfo(accessToken);
+  const info = vaultInfo ?? (await getSaveUsdstInfo(accessToken));
   if (!info.deployed) {
     return {
       ...emptyUserInfo(),
@@ -477,9 +481,11 @@ export const getSaveUsdstUserInfo = async (
   }
 
   const [walletAssetsRaw, userSharesRaw, flows] = await Promise.all([
-    getAssetBalance(accessToken, info.assetAddress, userAddress),
+    valueOnly ? "0" : getAssetBalance(accessToken, info.assetAddress, userAddress),
     getVaultShareBalance(accessToken, info.vaultAddress, userAddress),
-    getUserFlowTotals(accessToken, info.vaultAddress, userAddress),
+    valueOnly
+      ? { totalDepositedAssets: 0n, totalWithdrawnAssets: 0n }
+      : getUserFlowTotals(accessToken, info.vaultAddress, userAddress),
   ]);
 
   const walletAssets = parseBigIntLike(walletAssetsRaw);
