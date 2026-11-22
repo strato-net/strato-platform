@@ -287,6 +287,13 @@ test("rejects routed ETH deposit when router event fields or payment source do n
     assert.match(results.get(txHash)?.message ?? "", /No matching DepositRouter event/);
   });
 
+  // Wrong STRATO token: the record names a different target than the event
+  await withMockedRpc(validReceipt, validTraces, async () => {
+    const d = makeEthDeposit(txHash, "1000000000000000", { stratoToken: "0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010" });
+    const results = await verifyDepositsBatch([d]);
+    assert.match(results.get(txHash)?.message ?? "", /No matching DepositRouter event/);
+  });
+
   // Wrong depositId in key
   await withMockedRpc(validReceipt, validTraces, async () => {
     const key = `${txHash}#99`;

@@ -128,6 +128,7 @@ const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string, re
   const depositRouter = normalizeAddress(ensureHexPrefix(deposit.depositRouter));
   const externalSender = normalizeAddress(ensureHexPrefix(deposit.externalSender));
   const stratoRecipient = normalizeAddress(ensureHexPrefix(deposit.stratoRecipient));
+  const stratoToken = normalizeAddress(ensureHexPrefix(deposit.stratoToken));
   const depositId = depositKeyId(deposit.externalTxHash);
   
   return {
@@ -137,6 +138,7 @@ const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string, re
     depositRouter,
     externalSender,
     stratoRecipient,
+    stratoToken,
     depositId,
     stratoTokenAmount: safeToBigInt(deposit.stratoTokenAmount),
     externalDecimals: deposit.externalDecimals,
@@ -174,6 +176,7 @@ const verifyEthDeposit = (
       if (event.externalToken !== ctx.externalToken) return false;
       if (event.externalSender !== ctx.externalSender) return false;
       if (event.stratoRecipient !== ctx.stratoRecipient) return false;
+      if (event.targetStratoToken !== ctx.stratoToken) return false;
       return expectedStratoAmount(safeToBigInt(event.externalTokenAmount), ctx) === ctx.stratoTokenAmount;
     });
 
