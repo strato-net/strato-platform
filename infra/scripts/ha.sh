@@ -364,13 +364,14 @@ ctx_core_nlb() {
 
 ctx_api() {
   load_images
-  local pg="$P-data-postgres" cell core login login_secret cdn
+  local pg="$P-data-postgres" cell core login login_secret cdn nat
   local vpc writer reader pg_sg cell_sg nlb_sg grafana_tg
   cell=$(host_stack "$FIRST_CELL")
   # Each on its own line: a failed lookup inside the array below would not stop the script.
   login=$(need "$pg" NodeLogin)
   login_secret=$(need "$pg" NodeLoginSecretName)
   cdn=$(cloudfront_cidrs)
+  nat=$(need "$pg" NatGatewayAddresses)
   vpc=$(vpc_id)
   writer=$(need "$pg" WriterEndpoint)
   reader=$(need "$pg" ReaderEndpoint)
@@ -390,7 +391,7 @@ ctx_api() {
     -c createSessionSecret=true -c oauthJsonSecretName="$OAUTH_SECRET" -c csrfStateless=true
     -c desiredCount="$API_DESIRED_COUNT" -c albCertificateArn="$CERTIFICATE_ARN" -c chainId="$CHAIN_ID" -c networkName="$NETWORK"
     -c prometheusHost="$core:9090" -c grafanaTargetGroupArn="$grafana_tg"
-    -c trustedProxyCidrs="$cdn")
+    -c trustedProxyCidrs="$cdn" -c rateLimitBypassCidrs="$nat")
   otel_ecs
 }
 # The partner referrals service the app backend reports to, when the

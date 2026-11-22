@@ -138,6 +138,12 @@ export interface ApiTierConfig {
    * hop appends the peer it saw, so a client cannot pass a forged address through them.
    */
   trustedProxyCidrs: string[];
+  /**
+   * Client addresses nginx exempts from its rate limits (NGINX_RATE_LIMIT_BYPASS_CIDRS): the
+   * VPC's NAT gateways. The app backend calls the node through the public hostname, so all of
+   * its calls arrive from them and would otherwise share one client's limit.
+   */
+  rateLimitBypassCidrs: string[];
 }
 
 function present(v: unknown): boolean {
@@ -213,5 +219,6 @@ export function loadConfig(app: App): ApiTierConfig {
     grafanaTargetGroupArn: optional(app, "grafanaTargetGroupArn"),
     grafanaPort: Number(ctx(app, "grafanaPort", "3001")),
     trustedProxyCidrs: String(ctx(app, "trustedProxyCidrs", "")).split(",").map((s) => s.trim()).filter(Boolean),
+    rateLimitBypassCidrs: String(ctx(app, "rateLimitBypassCidrs", "")).split(",").map((s) => s.trim()).filter(Boolean),
   };
 }

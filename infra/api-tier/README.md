@@ -63,6 +63,11 @@ client's address from `X-Forwarded-For` behind the load balancer (the VPC's
 range is always trusted) and behind what `-c trustedProxyCidrs` lists: with
 the front door, CloudFront's origin-facing ranges (the managed prefix list
 `com.amazonaws.global.cloudfront.origin-facing`, comma-separated).
+`-c rateLimitBypassCidrs` lists the client addresses nginx exempts from its
+rate limits: the VPC's NAT gateways (the data plane's `NatGatewayAddresses`
+output). The app backend calls the node through the public hostname, so its
+calls all arrive from them, a few hundred for one page of the app, and one
+client's 80 requests a second would hold them back.
 
 The stack owns two weighted records for the node hostname: `node` (the
 existing address) and `api-tier` (the ALB). Delete the hostname's existing

@@ -163,7 +163,9 @@ counted here.
   node. If that zone fails, the tasks in the other zone lose their way out,
   unless `NAT_GATEWAYS=2`. There are no VPC endpoints.
 - The app backend reaches the node only through the public hostname, so it
-  depends on the NAT gateway, CloudFront and the API tier.
+  depends on the NAT gateway, CloudFront and the API tier. All of its calls
+  reach the API tier's nginx from the NAT gateway's address, which that nginx
+  exempts from its per-address rate limits.
 - The writer lease lives in Aurora. Each cell looks at it every ten seconds
   and claims it after three stale looks in a row, which is about a minute of
   silence from the writer.
