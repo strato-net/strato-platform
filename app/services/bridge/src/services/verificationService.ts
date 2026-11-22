@@ -16,7 +16,6 @@ interface ValidEthTransfer {
   from: string;
   to: string;
   value: bigint;
-  isRoot: boolean;
 }
 
 interface TxAttributionState {
@@ -72,7 +71,6 @@ const findValidEthTransfersToSafe = (traces: any[], safeAddr: string): ValidEthT
       from,
       to,
       value,
-      isRoot: Array.isArray(trace.traceAddress) && trace.traceAddress.length === 0,
     });
   });
 
@@ -214,29 +212,8 @@ const verifyEthDeposit = (
     return null;
   }
 
-  // Direct-to-custody ETH deposit (no router events, no #<depositId>):
-  // Require top-level call to Safe with exact value, consumed once per tx, and attributed to either
-  // the actual root sender or the custody Safe sentinel recorded by Stripe onramp (onramp.service.ts).
-  const to = receipt.to ? normalizeAddress(receipt.to) : "";
-  if (to !== ctx.safe) {
-    return new Error(
-      `ETH deposit has no DepositRouter event from ${ctx.depositRouter} and receipt.to (${to || "null"}) is not Safe ${ctx.safe}`,
-    );
-  }
-
-  const directTransfer = validTransfers.find(
-    (transfer) =>
-      transfer.isRoot &&
-      !attribution.usedEthTraceIndices.has(transfer.index) &&
-      expectedStratoAmount(transfer.value, ctx) === ctx.stratoTokenAmount &&
-      (ctx.externalSender === transfer.from || ctx.externalSender === ctx.safe),
-  );
-  if (!directTransfer) {
-    return new Error(`No matching direct ETH transfer to Safe ${ctx.safe} found`);
-  }
-
-  attribution.usedEthTraceIndices.add(directTransfer.index);
-  return null;
+  // ETH sent straight to custody carries no router event, so nothing binds it to a recipient
+  return new Error(`ETH deposit has no DepositRouter event from ${ctx.depositRouter}`);
 };
 
 const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {

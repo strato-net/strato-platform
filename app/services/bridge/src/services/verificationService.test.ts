@@ -382,46 +382,20 @@ test("accounts for each payment once across two equal-sized ETH deposits in one 
   });
 });
 
-test("enforces explicit attribution for direct-to-custody ETH deposits", async () => {
+test("rejects ETH sent directly to custody, whoever it is attributed to", async () => {
   const txHash = `0x${"11".repeat(32)}`;
   const receipt = { status: "0x1", transactionHash: txHash, from: EOA, to: SAFE, logs: [] };
   const traces = withTxHash(txHash, [
     { type: "call", traceAddress: [], action: { callType: "call", from: EOA, to: SAFE, value: "0x38d7ea4c68000" } },
   ]);
 
-  // Direct send attributed to actual tx sender
-  await withMockedRpc(receipt, traces, async () => {
-    const deposit = makeEthDeposit(txHash, "1000000000000000", { externalSender: EOA });
-    const results = await verifyDepositsBatch([deposit]);
-    assert.equal(results.get(txHash), null);
-  });
-
-  // Direct send attributed via Stripe onramp sentinel (externalSender === custody Safe)
-  await withMockedRpc(receipt, traces, async () => {
-    const deposit = makeEthDeposit(txHash, "1000000000000000", { externalSender: SAFE });
-    const results = await verifyDepositsBatch([deposit]);
-    assert.equal(results.get(txHash), null);
-  });
-
-  // Direct send with unrelated externalSender is rejected
-  await withMockedRpc(receipt, traces, async () => {
-    const deposit = makeEthDeposit(txHash, "1000000000000000", { externalSender: USER_SAFE });
-    const results = await verifyDepositsBatch([deposit]);
-    assert.match(results.get(txHash)?.message ?? "", /No matching direct ETH transfer/);
-  });
-
-  // Direct call to Safe with zero ETH value is rejected
-  await withMockedRpc(
-    receipt,
-    withTxHash(txHash, [
-      { type: "call", traceAddress: [], action: { callType: "call", from: EOA, to: SAFE, value: "0x0" } },
-    ]),
-    async () => {
-      const deposit = makeEthDeposit(txHash, "1000000000000000", { externalSender: EOA });
+  for (const externalSender of [EOA, SAFE]) {
+    await withMockedRpc(receipt, traces, async () => {
+      const deposit = makeEthDeposit(txHash, "1000000000000000", { externalSender });
       const results = await verifyDepositsBatch([deposit]);
-      assert.match(results.get(txHash)?.message ?? "", /No matching direct ETH transfer/);
-    },
-  );
+      assert.match(results.get(txHash)?.message ?? "", /no DepositRouter event/);
+    });
+  }
 });
 
 test("rejects delegatecall, direct revert, reverted ancestor, and self-call traces even with router log", async () => {
@@ -483,7 +457,7 @@ test("rejects delegatecall, direct revert, reverted ancestor, and self-call trac
     ]),
     async () => {
       const results = await verifyDepositsBatch([makeEthDeposit(txHash, "1000000000000000", { externalSender: EOA })]);
-      assert.match(results.get(txHash)?.message ?? "", /No matching direct ETH transfer/);
+      assert.match(results.get(txHash)?.message ?? "", /no DepositRouter event/);
     },
   );
 
