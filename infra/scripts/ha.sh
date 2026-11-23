@@ -54,7 +54,7 @@ ENV_REQUIRED=(ENV_NAME AWS_REGION NETWORK CHAIN_ID NODE_HOSTNAME CERTIFICATE_ARN
 # Present in the file, but may be left empty: without a snapshot a cell syncs from the genesis block.
 ENV_MAY_BE_EMPTY=(SNAPSHOT_BUCKET SNAPSHOT_SOURCE)
 ENV_OPTIONAL=(BACKEND_SECRET BACKEND_SECRET_KEYS GRAFANA_ADMIN_GROUPS GRAFANA_VIEWER_GROUPS PARTNER_REFERRALS_URL PARTNER_INTERNAL_KEY_SECRET
-  READY_TIMEOUT_MINUTES NAT_GATEWAYS)
+  READY_TIMEOUT_MINUTES NAT_GATEWAYS POSTHOG_KEY POSTHOG_HOST GOOGLE_ANALYTICS_ID)
 # Only the file sets them: a value inherited from the caller's shell (the
 # pipeline exports ENV_NAME and AWS_REGION) would hide a missing line.
 # READY_TIMEOUT_MINUTES alone may also come from the caller.
@@ -92,6 +92,10 @@ env_check() {
   is BACKEND_SECRET_KEYS '^[A-Z0-9_]+( [A-Z0-9_]+)*$' "setting names separated by single spaces"
   for name in CHAIN_ID PG_READERS CELL_DATA_GIB API_DESIRED_COUNT APP_DESIRED_COUNT READY_TIMEOUT_MINUTES; do is "$name" '^[0-9]+$' "a whole number"; done
   is NAT_GATEWAYS '^[12]$' "1 (one for both zones) or 2 (one for each)"
+  # These three are written into the app UI's config.js as quoted strings.
+  is POSTHOG_KEY '^[A-Za-z0-9_-]+$' "a PostHog project key: letters, digits, _ and -"
+  is POSTHOG_HOST '^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$' "an https URL, like https://us.i.posthog.com"
+  is GOOGLE_ANALYTICS_ID '^[A-Z]+-[A-Z0-9-]+$' "a Google Analytics id, like G-XXXXXXXXXX"
   for cell in ${CELLS:-}; do
     [[ $cell =~ ^[a-z][a-z0-9-]{0,30}:[a-z]{2}(-[a-z]+)+-[0-9][a-z]$ ]] || problems+=("CELLS: $cell is not <cellId>:<zone>, the id a short lowercase name starting with a letter")
     [[ " $ids " != *" ${cell%%:*} "* ]] || problems+=("CELLS: cell ${cell%%:*} is listed twice")
@@ -99,6 +103,7 @@ env_check() {
   done
   [[ ${PARTNER_REFERRALS_URL:+set} == "${PARTNER_INTERNAL_KEY_SECRET:+set}" ]] \
     || problems+=("PARTNER_REFERRALS_URL and PARTNER_INTERNAL_KEY_SECRET go together: set both or neither")
+  [[ -z ${POSTHOG_HOST:-} || -n ${POSTHOG_KEY:-} ]] || problems+=("POSTHOG_HOST is set without POSTHOG_KEY")
   ((${#problems[@]} == 0)) && return 0
   echo "ha.sh: $envfile:" >&2
   printf '  %s\n' "${problems[@]}" >&2
@@ -442,6 +447,10 @@ ctx_front_door() {
   api_origin=$(need "$P-api-tier" AlbDnsName)
   ctx+=(-c frontDoorDomainName="$NODE_HOSTNAME" -c frontDoorCertificateArn="$CERTIFICATE_ARN"
     -c apiOriginDomainName="$api_origin" -c deployAppUi=true -c deploySmdUi=true)
+  # The app UI's analytics, for its config.js; it runs none when the environment names none.
+  [[ -z ${POSTHOG_KEY:-} ]] || ctx+=(-c appUiPosthogKey="$POSTHOG_KEY")
+  [[ -z ${POSTHOG_HOST:-} ]] || ctx+=(-c appUiPosthogHost="$POSTHOG_HOST")
+  [[ -z ${GOOGLE_ANALYTICS_ID:-} ]] || ctx+=(-c appUiGoogleAnalyticsId="$GOOGLE_ANALYTICS_ID")
   [[ ${1:-} == without-app-tier ]] && return 0
   app_origin=$(need "$P-app-tier" AlbDnsName)
   ctx+=(-c appOriginDomainName="$app_origin")
