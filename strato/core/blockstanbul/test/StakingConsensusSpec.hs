@@ -349,3 +349,19 @@ spec = describe "stake-weighted consensus" $ do
         [rn | OMsg _ (RoundChange (View rn _) _) <- farFuture] `shouldBe` [1]
         past <- runWith ctx $ sendMessages [propose $ posixSecondsToUTCTime 0]
         length [() | RunPreprepare _ <- past] `shouldBe` 1
+
+  -- What this node prepares and commits must be the proposal on the table, the
+  -- one its VM checked.
+  describe "the proposal on the table" $ do
+    let ctx = activeCtx {_validators = S.singleton (Validator me), _stakes = M.fromList [(Validator me, 7)], _proposer = Validator me}
+        sealed = let b = Block (v3 [Validator me] [(Validator me, 7)] 0 [] []) [] [] in addProposerSeal (signMsg myPriv (proposalMessage b)) b
+        propose blk = IMsg (MsgAuth me dummySig) (Preprepare (View 0 10) blk)
+
+    -- The proposer signs the hash, which leaves the commitment seals out, so a
+    -- relay can change them; such a copy is still the locked proposal.
+    it "takes a locked proposal relayed with other commitment seals" $ do
+      out <- runWith ctx $ do
+        blockLock .= Just sealed
+        sendMessages [propose $ addCommitmentSeals [dummySig] sealed]
+      [() | OMsg _ RoundChange {} <- out] `shouldBe` []
+      length [() | RunPreprepare _ <- out] `shouldBe` 1

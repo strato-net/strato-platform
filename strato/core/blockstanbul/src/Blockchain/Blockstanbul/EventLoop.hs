@@ -517,7 +517,12 @@ eventLoop ctx = execStateC ctx $
                 -- holding an old proposal skip the proposer, so ignore it and
                 -- wait for the real proposal or the view timer.
                 when (v < v') roundChange
-              | isJust mBlockLock && Just pp /= mBlockLock -> do
+              -- Compared by hash: the proposer signs the hash, which leaves
+              -- out the commitment seals, so anyone relaying the proposal can
+              -- change them, and a copy that differs only there is the same
+              -- proposal. Compared whole, such a copy broke the lock and forced
+              -- a round change.
+              | isJust mBlockLock && (blockHash <$> mBlockLock) /= Just (blockHash pp) -> do
                 $logWarnS "blockstanbul/ppl" "Rejecting proposal: block does not match lock"
                 $logInfoS "blockstanbul/roundchange" "lock mismatch"
                 roundChange
