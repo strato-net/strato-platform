@@ -233,12 +233,14 @@ spec = describe "stake-weighted consensus" $ do
           commitsOut out = length [() | OMsg _ Commit {} <- out]
       out <- runWith activeCtx {_stakes = M.fromList [(Validator me, 1000)]} $ do
         proposal .= Just blk
+        vmAccepted .= True
         o1 <- sendMessages [prepare other]
         o2 <- sendMessages [prepare me]
         pure (commitsOut o1, commitsOut o2)
       out `shouldBe` (0, 1)
       legacy <- runWith legacyCtx $ do
         proposal .= Just blk
+        vmAccepted .= True
         o1 <- sendMessages [prepare other]
         o2 <- sendMessages [prepare me]
         pure (commitsOut o1, commitsOut o2)
@@ -376,3 +378,16 @@ spec = describe "stake-weighted consensus" $ do
         current <- sendMessages [PreprepareResponse $ AcceptPreprepare (blockHash sealed)]
         pure (prepares stale, prepares current)
       out `shouldBe` ([], [blockHash sealed])
+
+    -- A PREPARE quorum is not enough: the node commits only a proposal its own
+    -- VM accepted, and still commits it when that answer comes after the quorum.
+    it "commits a prepared proposal only once this node's VM accepted it" $ do
+      let blk = Block (v3 [Validator me, Validator other] [(Validator me, 1000)] 0 [] []) [] []
+          di = blockHash blk
+          commits out = [d | OMsg _ (Commit _ d _) <- out]
+      out <- runWith activeCtx {_stakes = M.fromList [(Validator me, 1000)]} $ do
+        proposal .= Just blk
+        prepared <- sendMessages [IMsg (MsgAuth me dummySig) (Prepare (View 0 10) di)]
+        accepted <- sendMessages [PreprepareResponse $ AcceptPreprepare di]
+        pure (commits prepared, commits accepted)
+      out `shouldBe` ([], [di])

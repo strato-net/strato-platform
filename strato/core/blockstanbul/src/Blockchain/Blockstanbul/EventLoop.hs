@@ -155,6 +155,26 @@ checkProposalTimestamp maxDrift now pp
 hasSameHash :: (StateMachineM m) => Keccak256 -> m Bool
 hasSameHash di = uses proposal $ maybe False ((== di) . blockHash)
 
+-- | Lock on the proposal on the table and COMMIT it, once more than two thirds
+-- of the weight has prepared it and this node's VM has accepted it, whichever
+-- comes last. A PREPARE quorum alone is not enough: without the VM's answer the
+-- node would seal a block it never checked, and might yet reject.
+commitIfPrepared :: StateMachineM m => View -> Keccak256 -> ConduitM InEvent EOutEvent m ()
+commitIfPrepared v di = do
+  ps <- use prepared
+  weights <- gets currentVoteWeights
+  let quorum = hasSupermajority weights . M.keysSet . M.filter (== di) $ ps
+  sameHash <- hasSameHash di
+  accepted <- use vmAccepted
+  hasSent <- use hasPrepared
+  when (quorum && sameHash && accepted && not hasSent) $ do
+    hasPrepared .= True
+    setLock
+    seal <- commitmentSeal di
+    whenM mayVote $ do
+      msg <- signMessage (Commit v di seal)
+      yieldR msg
+
 createRoundChangeMessage :: MonadIO m => View -> m TrustedMessage
 createRoundChangeMessage vw = do
   nonce' <- bytesToWord256 <$> liftIO (getEntropy 32)
@@ -301,6 +321,7 @@ nextRound nt = do
   hasPreprepared .= False
   hasCommitted .= False
   hasPrepared .= False
+  vmAccepted .= False
   pendingRound .= Nothing
   sentRoundChange .= Nothing
 
@@ -500,9 +521,12 @@ eventLoop ctx = execStateC ctx $
             -- still on the table is prepared, so a late answer is never
             -- signed into another view.
             AcceptPreprepare bh -> whenM (hasSameHash bh) $ do
+              vmAccepted .= True
               whenM mayVote $ do
                 msg <- signMessage (Prepare v bh)
                 yieldR msg
+              -- The PREPARE quorum may have arrived before the VM's answer.
+              commitIfPrepared v bh
             RejectPreprepare -> roundChange
         IMsg auth ppp@(Preprepare v' pp) -> do
           pr <- use proposer
@@ -560,18 +584,8 @@ eventLoop ctx = execStateC ctx $
          when (v == v') $ do
           preparers <- use prepared
           unless (M.member (Validator $ sender auth) preparers) . yieldL $ OMsg auth ppp
-          ps <- prepared <%= M.insert (Validator $ sender auth) di
-          weights <- gets currentVoteWeights
-          let quorum = hasSupermajority weights . M.keysSet . M.filter (== di) $ ps
-          sameHash <- hasSameHash di
-          hasSent <- use hasPrepared
-          when (quorum && sameHash && not hasSent) $ do
-            hasPrepared .= True
-            setLock
-            seal <- commitmentSeal di
-            whenM mayVote $ do
-              msg <- signMessage (Commit v di seal)
-              yieldR msg
+          prepared %= M.insert (Validator $ sender auth) di
+          commitIfPrepared v di
         IMsg auth ccc@(Commit v' di seal) -> do
          when (_sequence v == _sequence v' && aheadWithinReach v (_round v')) $ noteCatchUp auth v' ccc
          when (v == v') $ do
