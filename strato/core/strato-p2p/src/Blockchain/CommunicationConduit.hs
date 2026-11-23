@@ -44,7 +44,7 @@ import           Blockchain.Strato.Model.Util
 import           Blockchain.SyncDB
 import           Blockchain.Threads
 import           Conduit
-import           Control.Monad                         (forever, unless, when)
+import           Control.Monad                         (forM_, forever, unless, when)
 import qualified Control.Monad.Change.Modify           as Mod
 import           Crypto.Types.PubKey.ECC
 import           Data.Bits                             (shiftL)
@@ -71,15 +71,22 @@ blockstanbulVersion = 1
 debounceTxSendsAndUnseq :: (MonadIO m, m `Mod.Outputs` [IngestEvent]) => ConduitT (Either P2PCNC Message) Message m ()
 debounceTxSendsAndUnseq = do
   txq <- atomically $ newTBQueue 10000
+  let flushTxs = do
+        txs <- atomically $ flushTBQueue txq
+        recordEmptyQueue
+        yieldMany . map W.Transactions $ chunksOf 100 txs
   awaitForever $ \case
     Right (W.Transactions txs) -> do
-      atomically $ mapM_ (writeTBQueue txq) txs
+      -- This thread is also the only one that empties the queue, so it
+      -- flushes a full queue itself: blocked writing to it, it would wait
+      -- forever and take the connection down.
+      forM_ txs $ \tx -> do
+        full <- atomically $ isFullTBQueue txq
+        when full flushTxs
+        atomically $ writeTBQueue txq tx
       recordQueuedTxs txs
     Right other -> yield other
-    Left TXQueueTimeout -> do
-      txs <- atomically $ flushTBQueue txq
-      recordEmptyQueue
-      yieldMany . map W.Transactions $ chunksOf 100 txs
+    Left TXQueueTimeout -> flushTxs
     Left (ToUnseq ie) -> lift $ Mod.output ie
 
 handleMsgClientConduit ::
