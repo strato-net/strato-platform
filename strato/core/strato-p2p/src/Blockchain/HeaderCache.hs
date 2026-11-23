@@ -31,6 +31,15 @@ import qualified Data.Text as T
 import Text.Tools
 import Prelude hiding (lookup)
 
+-- | The most headers one connection keeps waiting for their bodies: two
+-- GetBlockHeaders answers' worth. A peer may send headers it was not asked for
+-- (P2pPushBlocks does, to help a lagging node catch up), so without a bound a
+-- peer streaming made-up headers above our tip grew the cache until the
+-- process ran out of memory. The oldest waiting headers are kept: they are the
+-- ones sync needs next.
+remainingHeadersCap :: Int
+remainingHeadersCap = 2 * Conf.maxReturnedHeaders (p2pConfig ethConf)
+
 class HasHeaderCache m where
   isBodyRequestActive :: m Bool
   addToHeaderCache :: [BlockHeader] -> m ()
@@ -53,9 +62,10 @@ instance MonadP2P m => HasHeaderCache m where
     -- wipe. Stale sub-tip entries similarly accumulated forever.
     let inFlightHashes = Set.fromList $ blockHeaderHash <$> inFlight
         !combined =
-          filter ((`Set.notMember` inFlightHashes) . blockHeaderHash)
+          take remainingHeadersCap
+            . filter ((`Set.notMember` inFlightHashes) . blockHeaderHash)
             . pruneAndDedupHeaders myBest
-            $ alreadyRequestedRemainingHeaders ++ headers
+            $ alreadyRequestedRemainingHeaders ++ take remainingHeadersCap headers
     length combined `seq` putRemainingBHeaders combined
 
   getBodiesToFetch = do
