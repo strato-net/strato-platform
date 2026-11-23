@@ -30,6 +30,8 @@ contract MultisigWallet {
     bool public multisigActive;
     bool public multisigUpgradesFrozen;
     PendingUpgrade public multisigPendingUpgrade;
+    // Set by the logic while an issue runs. Every logic version must keep this name.
+    bool private multisigExecuting;
 
     event UpgradeScheduled(address targetLogic, string fromVersion, string targetVersion, string migrationFunction, uint epoch, uint executableAt, uint expiresAt);
     event UpgradeCancelled(address targetLogic, string targetVersion);
@@ -123,6 +125,7 @@ contract MultisigWallet {
     }
 
     function executeUpgrade() external {
+        require(!multisigExecuting, "An issue is executing");
         require(!multisigUpgradesFrozen, "Upgrades are frozen");
         PendingUpgrade storage pending = multisigPendingUpgrade;
         require(pending.exists, "No pending upgrade");

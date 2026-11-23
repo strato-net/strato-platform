@@ -1887,6 +1887,35 @@ contract Describe_StratoStaking {
         require(staking.unmaturedStake(VALIDATOR_A) == 0 && gov.validatorStake(VALIDATOR_A) == 1000e18, "nothing waiting, the vote untouched");
     }
 
+    // A storage-to-storage copy of an unwritten (zero) scalar is a silent no-op in SolidVM.
+    // After an unstake empties the newer waiting bucket (newAmount -> 0), the next window's
+    // shift in _notePending copies that 0 into oldAmount; without the `+ 0` fix the copy is
+    // skipped and a stale oldAmount lingers, attributed to the wrong window. _dropPending
+    // then subtracts the phantom from an already-drained pendingWeight bucket and underflows,
+    // freezing an honest delegator's unstake of matured principal.
+    function it_unstakes_matured_principal_after_a_window_with_zeroed_pending() public {
+        _bondBoth();
+        staking.setStakeDelay(100);
+
+        // Window W: the principal begins its wait.
+        _stake(user1, VALIDATOR_A, 400e18);
+
+        // Window W+1: a small stake then its full unstake zeroes the newer bucket, while the
+        // principal waits on in the older bucket.
+        fastForward(100, 1);
+        _stake(user1, VALIDATOR_A, 10e18);
+        user1.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 10e18);
+
+        // Window W+2: the W principal has matured. Another small stake runs the window shift,
+        // whose `p.oldAmount = p.newAmount + 0` must write 0 rather than keep a phantom 400e18.
+        fastForward(100, 1);
+        _stake(user1, VALIDATOR_A, 10e18);
+
+        // Taking back the matured principal must succeed; the phantom made this revert on
+        // pendingWeight underflow before the fix.
+        user1.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 400e18);
+    }
+
     // The delay covers a new seat: a seat by right is taken with a bond that has already
     // waited, or a join would go around the delay.
     function it_seats_a_newcomer_only_once_its_bond_has_waited() public {

@@ -1516,9 +1516,13 @@ const computeApy = async (
   }
 };
 
+// `valueOnly` is for the net balance calculation only: it skips the reads behind the asset
+// symbol, strategy holdings and APY, which then keep their defaults.
+// `oraclePrices` is the service-token oracle price map when the caller already has it.
 export const getYieldVaultInfo = async (
   _accessToken: string,
-  key: string
+  key: string,
+  { valueOnly = false, oraclePrices }: { valueOnly?: boolean; oraclePrices?: Map<string, string> } = {}
 ): Promise<YieldVaultInfo> => {
   const def = resolveVaultDef(key);
   const fallback = emptyInfo(def, key);
@@ -1541,12 +1545,12 @@ export const getYieldVaultInfo = async (
   // the vault's underlying) so that `computeStrategyBaseApyPct` can USD-price
   // every asset the strategy holds.
   const [assetTokenData, liveAssetBalance, priceMap, baseApyMap] = await Promise.all([
-    cirrus.get(serviceToken, `/${Token}`, {
+    valueOnly ? null : cirrus.get(serviceToken, `/${Token}`, {
       params: { address: `eq.${assetAddress}`, select: "_symbol" },
     }),
     getAssetBalance(serviceToken, assetAddress, def.address),
-    getOraclePrices(serviceToken),
-    getStrategyBaseApyMap(serviceToken),
+    oraclePrices ?? getOraclePrices(serviceToken),
+    valueOnly ? new Map<string, number>() : getStrategyBaseApyMap(serviceToken),
   ]);
 
   const idleAssets = parseBigIntLike(liveAssetBalance);
@@ -1608,7 +1612,7 @@ export const getYieldVaultInfo = async (
     vaultAssetDecimals: decimals,
     vaultAssetPriceWad: assetPrice,
   };
-  const strategyHoldings = await getStrategyHoldings(
+  const strategyHoldings = valueOnly ? [] : await getStrategyHoldings(
     serviceToken,
     def.address,
     apyCtx
@@ -1620,7 +1624,7 @@ export const getYieldVaultInfo = async (
     assetPrice,
     decimals
   );
-  const apy = accrualInitialized
+  const apy = accrualInitialized || valueOnly
     ? "-"
     : await computeApy(serviceToken, def.address, assetAddress, activeAssets, totalShares);
   const fundedApy = accrualInitialized
@@ -1770,17 +1774,21 @@ export const getYieldVaultHistory = async (
   return points;
 };
 
+// `vaultInfo` is the vault's info when the caller already has it. `valueOnly` is for the
+// net balance calculation only: it skips the wallet balance read, so `walletAssets` and
+// `maxDeposit` are "0".
 export const getYieldVaultUserInfo = async (
   accessToken: string,
   key: string,
-  userAddress: string
+  userAddress: string,
+  { vaultInfo, valueOnly = false }: { vaultInfo?: YieldVaultInfo; valueOnly?: boolean } = {}
 ): Promise<YieldVaultUserInfo> => {
-  const info = await getYieldVaultInfo(accessToken, key);
+  const info = vaultInfo ?? (await getYieldVaultInfo(accessToken, key));
   const def = resolveVaultDef(key);
   if (!info.deployed) return emptyUserInfo(def, key);
 
   const [walletAssetsRaw, userSharesRaw] = await Promise.all([
-    getAssetBalance(accessToken, info.assetAddress, userAddress),
+    valueOnly ? "0" : getAssetBalance(accessToken, info.assetAddress, userAddress),
     getShareBalance(accessToken, info.vaultAddress, userAddress),
   ]);
 

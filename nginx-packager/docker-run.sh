@@ -301,6 +301,21 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   DOCKER_NETWORK_CIDR=$(ip route | awk '/src/ {print $1}')
   sed -i "s|__DOCKER_NETWORK_CIDR__|$DOCKER_NETWORK_CIDR|g" /tmp/nginx.conf
 
+  # Generate the rate limit exemptions of the node's own services that reach
+  # nginx from outside the docker network (an app backend on another host).
+  # They get the value 2, which the simulate and /rpc limits do not exempt.
+  RATE_LIMIT_BYPASS_LINES=""
+  if [ -n "${NGINX_RATE_LIMIT_BYPASS_CIDRS:-}" ]; then
+    IFS=',' read -ra CIDRS <<< "$NGINX_RATE_LIMIT_BYPASS_CIDRS"
+    for cidr in "${CIDRS[@]}"; do
+      cidr=$(echo "$cidr" | xargs) # trim whitespace
+      if [ -n "$cidr" ]; then
+        RATE_LIMIT_BYPASS_LINES="${RATE_LIMIT_BYPASS_LINES}      ${cidr}   2;\n"
+      fi
+    done
+  fi
+  sed -i "s|__RATE_LIMIT_BYPASS_CIDRS__|${RATE_LIMIT_BYPASS_LINES%\\\\n}|g" /tmp/nginx.conf
+
   # Generate set_real_ip_from directives for trusted proxy IPs
   TRUST_PROXY_LINES=""
   if [ -n "${NGINX_TRUST_PROXY_CIDRS:-}" ]; then

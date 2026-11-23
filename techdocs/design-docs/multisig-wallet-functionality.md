@@ -58,18 +58,30 @@ signer changes, upgrades.
 | Not enough approvals within 30 days | The proposal expires |
 | Not executed within 7 days of becoming executable | The proposal expires |
 | A signer changes their mind before `M` is reached | They can withdraw their approval |
+| An approver changes their mind during the waiting period | They can withdraw their approval. The waiting period ends and the proposal goes back to collecting approvals; reaching `M` again starts a fresh, full waiting period. If more than 30 days have passed since the proposal was created, it expires instead and must be proposed again |
 | The proposer wants to drop it | Allowed only while no other signer has approved |
 | Signers want to stop a proposal already in its waiting period | A "cancel" proposal, which runs as soon as it reaches `M` approvals, with no waiting period |
 | The action fails when executed | The whole transaction is undone; the proposal can be retried until it expires |
 
 Only signers can propose, approve, and execute.
+
+**A known limit of withdrawing during the waiting period.** While a proposal is waiting, no
+further signer can approve it, so it has exactly `M` approvals and any one withdrawal ends the
+wait. An approver acting against the others can withdraw and approve again just before each
+waiting period ends, and so keep a proposal they approved from ever running, until it expires
+30 days after it was created. This is accepted as the safer behaviour: it can only stop an
+action, never cause one, and nothing moves without `M` approvals. Signers who want an action
+to go through avoid it by having `M` cooperating signers propose and approve first; a signer
+outside that group then has no approval to withdraw. Multisig wallets with no waiting period
+are not affected.
 Proposal function names must be plain names; signature-style names containing `(` are rejected.
 
 ## Changing signers, approvals, or the waiting period
 
 | Change | How | Extra step |
 |---|---|---|
-| Remove a signer or change required approvals | Proposal | None |
+| Remove a signer (and set required approvals in the same step) | Proposal | None |
+| Change required approvals | Proposal | None |
 | Add a signer | Proposal that nominates the new account | The nominee must accept within 30 days |
 | Change the waiting period (max 30 days) | Proposal | None |
 
@@ -77,12 +89,14 @@ Nuances:
 
 - All of these wait out the **current** waiting period. Shortening the waiting period
   still takes the old one.
-- A nomination adds exactly one new signer, keeps every current signer, and cannot change
-  the approvals needed. To replace a signer, add and activate the replacement first, then
-  remove the old signer with a separate proposal.
+- Each proposal changes one thing: add one signer, remove one signer, or change the
+  approvals needed. No signer list is passed, so a proposal cannot add or drop anyone
+  other than the account it names.
+- Adding a signer never changes the approvals needed. To replace a signer, add and
+  activate the replacement first, then remove the old signer with a separate proposal.
 - Only one nomination is open at a time. A new one replaces it.
-- Withdrawing a nomination is a normal proposal and waits the waiting period, so the
-  nominee can still accept in the meantime.
+- Withdrawing a nomination runs as soon as its proposal reaches `M` approvals, with no
+  waiting period, so the nominee cannot accept first.
 - **Any** of these changes invalidates every open proposal, the open nomination, and a
   pending upgrade. Signers must propose them again. This prevents approvals collected
   under the old signer set from being used under the new one.
@@ -107,7 +121,11 @@ This is what the 7-day upgrade delay is for. Publishing new rules never changes 
 multisig wallet on its own; each multisig wallet opts in.
 
 1. **Platform side, once.** The new rules are published in the registry as a version,
-   and an upgrade path from the old version to the new one is approved.
+   and an upgrade path from the old version to the new one is approved. Before the
+   publish vote, the candidate must pass `MultisigPublication.test.sol`, which runs every
+   action on a new multisig wallet and on one upgraded from the published version,
+   including one created by the published registry, and checks an upgrade is still
+   refused in the middle of a proposal.
 2. Signers **propose** the upgrade and reach `M` approvals.
 3. The multisig wallet's **waiting period** passes.
 4. The **7-day upgrade delay** runs.
@@ -145,10 +163,10 @@ Deprecating (revoking) a version in the registry:
 - Does not force anything. A multisig wallet stays on the deprecated version until its
   own signers upgrade.
 
-SMD currently treats a deprecated version as a failed check and makes the multisig
-wallet read-only, including the upgrade controls. Until that changes, publish the
-replacement version and its upgrade path, and let affected multisig wallets upgrade,
-**before** deprecating the old version.
+SMD follows the contract: a multisig wallet on a deprecated version keeps working in
+full. SMD shows a notice that the version has been retired and, when an approved upgrade
+path exists, that an upgrade is available. So versions can be deprecated in any order,
+with or without an upgrade path.
 
 ## Changing the registry
 
@@ -185,6 +203,9 @@ Consequences:
   `strato/api/bloc/bloc2/src/Bloc/Database/Queries.hs` and a node release.
 - `logicContract` is a reserved name. A rules version must never declare a variable
   with that name, or with any other name the shell uses.
+- `multisigExecuting` is the one name both sides share on purpose. The rules set it while
+  a proposal runs, and the shell reads it to refuse an upgrade in the middle of a
+  proposal. Every rules version must keep using that name for that flag.
 
 ## Timings
 
