@@ -30,6 +30,8 @@ module Blockchain.Context
     , emptyActionTimestamp
     , PbftWindow(..)
     , admitPbftMessage
+    , MPNodesWindow(..)
+    , admitMPNodes
     , maxPbftMessagesPerSecond
     , PeerAddress(..)
     , GenesisBlockHash(..)
@@ -194,6 +196,26 @@ admitPbftMessage = do
   Mod.put (Proxy @PbftWindow) $ PbftWindow (now, n')
   pure $ n' <= maxPbftMessagesPerSecond
 
+-- | Trie nodes this connection has asked this node for in the current second:
+-- (second, count). Each one is a lookup in the VM's main loop.
+newtype MPNodesWindow = MPNodesWindow (Integer, Int)
+
+-- | The most trie nodes one connection may ask this node for in a second. The
+-- only asker, a node diagnosing a state-root mismatch (fetchMPNode), asks for
+-- one at a time; unbounded, a peer could keep the VM busy with lookups.
+maxMPNodesPerSecond :: Int
+maxMPNodesPerSecond = 16
+
+-- | The part of a GetMPNodes request that fits in this connection's second.
+admitMPNodes :: (MonadIO m, Mod.Modifiable MPNodesWindow m) => [a] -> m [a]
+admitMPNodes srs = do
+  now <- liftIO $ floor <$> getPOSIXTime
+  MPNodesWindow (second, n) <- Mod.get (Proxy @MPNodesWindow)
+  let used = if second == now then n else 0
+      admitted = take (maxMPNodesPerSecond - used) srs
+  Mod.put (Proxy @MPNodesWindow) $ MPNodesWindow (now, used + length admitted)
+  pure admitted
+
 newtype RemainingBlockHeaders = RemainingBlockHeaders {unRemainingBlockHeaders :: [BlockHeader]}
 
 -- | Last missing-parent resync this connection asked for: (fetch number, when).
@@ -209,6 +231,7 @@ data Context = Context
   , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp       :: ActionTimestamp
   , pbftWindow            :: PbftWindow
+  , mpNodesWindow         :: MPNodesWindow
   , _blockstanbulPeerAddr :: PeerAddress
   , _outboundWireMessages :: S.OSet (Host, Keccak256)
   }
@@ -409,6 +432,10 @@ instance Mod.Modifiable PbftWindow ContextM where
   get _ = pbftWindow <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {pbftWindow = k}, ()))
 
+instance Mod.Modifiable MPNodesWindow ContextM where
+  get _ = mpNodesWindow <$> Mod.get (Proxy @Context)
+  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {mpNodesWindow = k}, ()))
+
 instance Mod.Accessible ActionTimestamp ContextM where
   access _ = Mod.get (Proxy @ActionTimestamp)
 
@@ -556,7 +583,8 @@ type MonadP2P m =
       '[Mod.Modifiable]
       '[ BestBlock,
          BestSequencedBlock,
-         PbftWindow
+         PbftWindow,
+         MPNodesWindow
        ]
       m,
     All2
@@ -674,6 +702,7 @@ initContext =
   return $
     Context { actionTimestamp = emptyActionTimestamp
             , pbftWindow = PbftWindow (0, 0)
+            , mpNodesWindow = MPNodesWindow (0, 0)
             , blockHeaders = ([], jamshidBirth)
             , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
             , _blockstanbulPeerAddr = PeerAddress Nothing

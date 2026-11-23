@@ -357,10 +357,13 @@ handleEvents peer = awaitForever $ \case
   MsgEvt (GetChainDetails _) -> return ()
   MsgEvt (ChainDetails _) -> return ()
 
-  -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
+  -- Each requested node is a lookup in the VM's main loop, so a peer gets only
+  -- so many a second (see admitMPNodes).
   MsgEvt (GetMPNodes srs) -> do
-    let txo = Origin.PeerString (peerString peer)
-    yieldL $ ToUnseq [IEGetMPNodesRequest txo srs]
+    admitted <- lift $ admitMPNodes srs
+    unless (null admitted) $ do
+      let txo = Origin.PeerString (peerString peer)
+      yieldL $ ToUnseq [IEGetMPNodesRequest txo admitted]
   MsgEvt (MPNodes nds) -> do
     yieldL $ ToUnseq [IEMPNodesReceived nds]
   MsgEvt (Disconnect _) -> do
