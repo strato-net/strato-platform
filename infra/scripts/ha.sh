@@ -709,9 +709,24 @@ check_hostname() {
   local seen other
   absent "$P-api-frontdoor" || return 0
   command -v dig >/dev/null || { log "warning: no dig here: cannot check where $NODE_HOSTNAME points before the front door is created"; return 0; }
-  seen=$(dig +short "$NODE_HOSTNAME" 2>/dev/null | tr 'A-Z' 'a-z') || true
+  seen=$(hostname_dns)
   other=$(grep -m1 '\.cloudfront\.net\.\{0,1\}$' <<<"$seen" || true)
   [[ -z $other ]] || die "$NODE_HOSTNAME is still a CNAME to ${other%.}, another CloudFront distribution: CloudFront will not create this environment's front door until that DNS record is deleted. Delete it; wait-hostname names the new target once the front door exists"
+}
+
+# Where NODE_HOSTNAME leads (its CNAME and addresses, in lower case), read
+# from a name server of the zone it is in. A resolver that was asked before
+# the record existed goes on answering "no such name" for the zone's negative
+# TTL: on a first build that held wait_hostname for half an hour after the
+# record was set. The resolver gets the name only when no such server is
+# found or it does not answer.
+hostname_dns() {
+  local zone=${NODE_HOSTNAME#*.} ns=
+  while [[ -z $ns && $zone == *.* ]]; do
+    ns=$(dig +noall +answer NS "$zone" 2>/dev/null | awk '$4 == "NS" { print $5; exit }') || true
+    zone=${zone#*.}
+  done
+  { [[ -n $ns ]] && dig +short "$NODE_HOSTNAME" "@$ns" || dig +short "$NODE_HOSTNAME"; } 2>/dev/null | grep -v '^;' | tr 'A-Z' 'a-z' || true
 }
 
 first_front_door() {
@@ -750,7 +765,7 @@ wait_hostname() {
   deadline=$(( $(date +%s) + limit * 60 ))
   while :; do
     # The name's CNAME chain and addresses, on one line, in lower case.
-    seen=$(dig +short "$NODE_HOSTNAME" 2>/dev/null | tr 'A-Z\n' 'a-z ' | sed 's/ *$//') || true
+    seen=$(hostname_dns | tr '\n' ' ' | sed 's/ *$//') || true
     if [[ " $seen " == *" $target. "* ]] && synced; then break; fi
     if synced --connect-to "$NODE_HOSTNAME:443:$dist:443"; then
       down=0
