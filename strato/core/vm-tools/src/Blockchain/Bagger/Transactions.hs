@@ -284,17 +284,27 @@ holdsNoFeeToken address = do
         BInteger n -> n
         _ -> 0
 
--- | Whether @address@ clearly holds enough for one fee route: a whole voucher, a
--- cent of USDST (the legacy fee, and more than any STRATO shortfall costs), or
--- STRATO covering @quote@ when one is set. Weaker than execution's own check,
--- which can also combine STRATO with a USDST purchase, so it only decides what
--- counts as work a block can take, never admission.
+-- | The most USDST FeeRouter spends buying a signer's STRATO fee: USD_FEE plus
+-- the router's premium (_maxSwapPremiumBps, 100%).
+stratoPurchaseCapUsd :: Integer
+stratoPurchaseCapUsd = 2 * legacyUsdFee
+
+-- | Whether @address@ clearly holds enough for one fee route: a whole voucher,
+-- STRATO covering @quote@ when one is set, or USDST for the route that takes it.
+-- Without a quote that is a cent, the legacy fee. With one, a signer short of
+-- STRATO buys the quote in the pool, which costs more than a cent (the pool's
+-- fee and price impact on top), so only the router's purchase cap is clear; a
+-- cent was not, and a sender holding just that was work no proposer could put
+-- in a block. Weaker than execution's own check, which can also combine STRATO
+-- with a USDST purchase, so it only decides what counts as work a block can
+-- take, never admission.
 canClearlyPayFee :: HasSolidStorageDB m => Integer -> Address -> m Bool
 canClearlyPayFee quote address = do
   vouchers <- balanceIn 0x100e
   usdst <- balanceIn 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010
   strato <- maybe (pure 0) balanceIn . Conf.stratoTokenAddress . Conf.network $ Conf.networkConfig ethConf
-  pure $ vouchers >= 1000000000000000000 || usdst >= legacyUsdFee || (quote > 0 && strato >= quote)
+  let usdNeeded = if quote > 0 then stratoPurchaseCapUsd else legacyUsdFee
+  pure $ vouchers >= 1000000000000000000 || usdst >= usdNeeded || (quote > 0 && strato >= quote)
   where
     balanceIn token = do
       held <- getSolidStorageKeyVal' token (StoragePath [Field "_balances", Index (BC.pack $ show address)])

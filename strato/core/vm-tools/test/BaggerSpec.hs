@@ -247,6 +247,17 @@ spec = do
       dusty `shouldBe` False
       paying `shouldBe` True
 
+  describe "Bagger.canClearlyPayFee" $
+    it "counts a sender paying in USDST under a STRATO quote only once it holds the router's purchase cap" $ do
+      let twoCents = 0x2c
+          heliumQuote = 4590660990727397 -- 0.00459 STRATO, about a cent on 2026-11-23
+      (cent, cap, unquoted) <- inContext $ do
+        _ <- startHolding [(funded, legacyUsdFee), (twoCents, 2 * legacyUsdFee)]
+        withBagger $ (,,) <$> canClearlyPayFee heliumQuote funded <*> canClearlyPayFee heliumQuote twoCents <*> canClearlyPayFee 0 funded
+      cent `shouldBe` False
+      cap `shouldBe` True
+      unquoted `shouldBe` True
+
   describe "Bagger.hasPendingWork" $
     it "sees payable work left pending, and none from a sender that cannot clearly pay" $ do
       (dustOnly, withPaying) <- inContext $ do
