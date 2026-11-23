@@ -315,6 +315,13 @@ applyValidatorChanges hdr = do
   validators %= (flip S.difference $ S.fromList removed)
   stakes %= applyStakeDelta removed (M.fromList $ getBlockStakeUpdates hdr)
 
+-- | A round ahead of this node's, but near enough to move it. Rounds grow by one
+-- per round change, so no honest validator is ever remotely this far ahead. A
+-- round further out can only be a bid to wrap the round counter, a Word256, back
+-- to zero, after which round changes would no longer advance it.
+aheadWithinReach :: View -> RoundNumber -> Bool
+aheadWithinReach v rn = _round v < rn && rn - _round v <= 2 ^ (32 :: Int)
+
 -- | A PREPARE or COMMIT for a higher round of the current sequence is a round-change
 -- certificate: evidence the network moved on. Buffer the sender, keep the message
 -- moving through the mesh, and once more than a third of the weight has shown at that
@@ -549,7 +556,7 @@ eventLoop ctx = execStateC ctx $
                       -- run in vm before sending prepare
                       whenM mayVote . yieldR $ RunPreprepare pp
         IMsg auth ppp@(Prepare v' di) -> do
-         when (_sequence v == _sequence v' && _round v < _round v') $ noteCatchUp auth v' ppp
+         when (_sequence v == _sequence v' && aheadWithinReach v (_round v')) $ noteCatchUp auth v' ppp
          when (v == v') $ do
           preparers <- use prepared
           unless (M.member (Validator $ sender auth) preparers) . yieldL $ OMsg auth ppp
@@ -566,7 +573,7 @@ eventLoop ctx = execStateC ctx $
               msg <- signMessage (Commit v di seal)
               yieldR msg
         IMsg auth ccc@(Commit v' di seal) -> do
-         when (_sequence v == _sequence v' && _round v < _round v') $ noteCatchUp auth v' ccc
+         when (_sequence v == _sequence v' && aheadWithinReach v (_round v')) $ noteCatchUp auth v' ccc
          when (v == v') $ do
           committors <- use committed
           unless (M.member (Validator $ sender auth) committors) . yieldL $ OMsg auth ccc
@@ -591,7 +598,7 @@ eventLoop ctx = execStateC ctx $
           let intSeq = fromIntegral . _sequence
           when (_sequence v < _sequence vn) $
             yieldR $ GapFound (intSeq v) (intSeq vn) (sender auth)
-          when (_sequence v == _sequence vn && _round v < _round vn) $ do
+          when (_sequence v == _sequence vn && aheadWithinReach v (_round vn)) $ do
             let rn = _round vn
             mSigners <- use $ roundChanged . at rn
             case S.member (Validator $ sender auth) <$> mSigners of
