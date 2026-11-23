@@ -33,6 +33,8 @@ module Blockchain.Context
     , MPNodesWindow(..)
     , admitMPNodes
     , maxPbftMessagesPerSecond
+    , HasSignerBudget(..)
+    , maxPbftMessagesPerSigner
     , PeerAddress(..)
     , GenesisBlockHash(..)
     , PeerRunner
@@ -76,6 +78,7 @@ import qualified Data.ByteString.Char8                   as BC
 import           Data.Conduit.Network
 import           Data.Foldable                           (toList)
 import qualified Data.Kind                               as DK
+import qualified Data.Map.Strict                         as M
 import           Data.Maybe
 import           Data.Proxy
 import qualified Data.Set.Ordered                        as S
@@ -168,6 +171,9 @@ data Config = Config
     -- while the world best derived from it is written to Redis, so those writes
     -- land in the order the claims changed.
     configPeerClaims               :: MVar (PeerClaims Unique),
+    -- Process-wide: each validator's consensus messages taken in during the
+    -- current second, over all connections: signer -> (second, count).
+    configSignerWindows            :: IORef (M.Map Address (Integer, Int)),
     -- This connection's key in configPeerClaims; swapped in by the peer runner.
     configConnectionId             :: Unique
   }
@@ -195,6 +201,23 @@ admitPbftMessage = do
   let n' = if second == now then n + 1 else 1
   Mod.put (Proxy @PbftWindow) $ PbftWindow (now, n')
   pure $ n' <= maxPbftMessagesPerSecond
+
+-- | The most consensus messages this node takes in from one validator in a
+-- second, over all its connections. With at most a block a second
+-- (blockPeriodMs), a validator signs about four messages a height plus its
+-- round changes; this leaves several times that, and a third of a large set
+-- flooding at once still stays well under what one link takes
+-- (maxPbftMessagesPerSecond).
+maxPbftMessagesPerSigner :: Int
+maxPbftMessagesPerSigner = 20
+
+-- | Node-wide share of each validator's consensus messages. Like
+-- 'HasResyncGate', a single atomic step: every connection counts against the
+-- same signer at once.
+class HasSignerBudget m where
+  -- | Count a message from this validator against its second; False once
+  -- that second is full.
+  admitSignerMessage :: Address -> m Bool
 
 -- | Trie nodes this connection has asked this node for in the current second:
 -- (second, count). Each one is a lookup in the VM's main loop.
@@ -469,6 +492,16 @@ instance HasResyncGate ContextM where
             then (old, False)
             else (LastResync (Just (n, now)), True)
 
+instance HasSignerBudget ContextM where
+  admitSignerMessage signer = do
+    ref <- asks configSignerWindows
+    now <- liftIO $ floor <$> getPOSIXTime
+    liftIO . atomicModifyIORef' ref $ \windows ->
+      let n = case M.lookup signer windows of
+            Just (second, k) | second == now -> k + 1
+            _ -> 1
+       in (M.insert signer (now, n) windows, n <= maxPbftMessagesPerSigner)
+
 instance Mod.Modifiable [BlockHeader] ContextM where
   get _ = do
     (bHeaders, lastUpdateTS) <- blockHeaders <$> Mod.get (Proxy @Context)
@@ -558,6 +591,7 @@ type MonadP2P m =
   ( MonadIO m,
     MonadLogger m,
     HasResyncGate m,
+    HasSignerBudget m,
     HasPeerClaims m,
     MonadResource m,
     MonadUnliftIO m,
@@ -684,6 +718,7 @@ initConfig wireMessagesRef = do
   streamEnvVar <- newMVar streamEnv
   lastResyncRef <- newIORef $ LastResync Nothing
   peerClaimsVar <- newMVar noClaims
+  signerWindowsRef <- newIORef M.empty
   connectionId <- liftIO newUnique
   return $ Config
     { configSQLDB = sqlDB' dbs
@@ -694,6 +729,7 @@ initConfig wireMessagesRef = do
     , configStreamEnv = streamEnvVar
     , configLastResync = lastResyncRef
     , configPeerClaims = peerClaimsVar
+    , configSignerWindows = signerWindowsRef
     , configConnectionId = connectionId
     }
 
