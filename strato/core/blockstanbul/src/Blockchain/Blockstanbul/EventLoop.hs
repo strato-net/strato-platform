@@ -488,7 +488,11 @@ eventLoop ctx = execStateC ctx $
                 ++ "; staking is active but the block was not built as version 3 (check stakingActivationBlock)"
             else handleUnannouncedBlock blk'
         PreprepareResponse decision -> case decision of
-            AcceptPreprepare bh -> do
+            -- The VM answers some time after the proposal reached it, and a
+            -- round change in between clears the proposal. Only the proposal
+            -- still on the table is prepared, so a late answer is never
+            -- signed into another view.
+            AcceptPreprepare bh -> whenM (hasSameHash bh) $ do
               whenM mayVote $ do
                 msg <- signMessage (Prepare v bh)
                 yieldR msg

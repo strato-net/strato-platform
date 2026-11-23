@@ -365,3 +365,14 @@ spec = describe "stake-weighted consensus" $ do
         sendMessages [propose $ addCommitmentSeals [dummySig] sealed]
       [() | OMsg _ RoundChange {} <- out] `shouldBe` []
       length [() | RunPreprepare _ <- out] `shouldBe` 1
+
+    -- The VM answers some time after the proposal reached it, and a round
+    -- change in between clears the proposal.
+    it "prepares only the VM's acceptance of the proposal on the table" $ do
+      let prepares out = [di | OMsg _ (Prepare _ di) <- out]
+      out <- runWith ctx $ do
+        _ <- sendMessages [propose sealed]
+        stale <- sendMessages [PreprepareResponse $ AcceptPreprepare (hash "another block")]
+        current <- sendMessages [PreprepareResponse $ AcceptPreprepare (blockHash sealed)]
+        pure (prepares stale, prepares current)
+      out `shouldBe` ([], [blockHash sealed])
