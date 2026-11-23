@@ -63,6 +63,13 @@ runEthServer listenPort runner =
   runServer (TCPPort listenPort) runner $ \c a p ->
     ethServerHandler (c ^. peerSource) (c ^. peerSink) (c ^. seqSource) a p
 
+-- | The most connections one address may hold open to this node at once,
+-- including those still in their handshake. Above 1 because several of an
+-- operator's nodes can share an address behind NAT; low enough that one host
+-- cannot take a node's connection slots or tie up its handshakes.
+maxInboundPerHost :: Int
+maxInboundPerHost = 5
+
 ethServerHandler ::
   MonadP2P m =>
   ConduitM () B.ByteString m () ->
@@ -71,7 +78,22 @@ ethServerHandler ::
   Host ->
   TCPPort ->
   m ()
-ethServerHandler pSource pSink seqSrc host (TCPPort port) = do
+ethServerHandler pSource pSink seqSrc host tcpPort = do
+  fromHost <- liftIO . countInboundFrom $ hostToString host
+  if fromHost >= maxInboundPerHost
+    then $logInfoS "runEthServer" . T.pack $
+      "Refusing a connection from " ++ hostToString host ++ ": it already has " ++ show fromHost
+    else serveConnection pSource pSink seqSrc host tcpPort
+
+serveConnection ::
+  MonadP2P m =>
+  ConduitM () B.ByteString m () ->
+  ConduitM B.ByteString Void m () ->
+  ConduitM () P2pEvent m () ->
+  Host ->
+  TCPPort ->
+  m ()
+serveConnection pSource pSink seqSrc host (TCPPort port) = do
   -- One label per connection: several from one host would otherwise share a
   -- label and count once against maxConnections.
   let peerStr = "<" ++ hostToString host ++ ":" ++ show port

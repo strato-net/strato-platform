@@ -8,7 +8,8 @@ module Blockchain.Threads (
   changeThreadStatus,
   formatThread,
   getPeersByThreads,
-  countEstablishedPeers
+  countEstablishedPeers,
+  countInboundFrom
   ) where
 
 import Control.Monad
@@ -104,6 +105,10 @@ isPeerLabel []      = False
 -- attempts arriving together do not refuse each other.
 countEstablishedPeers :: IO Int
 countEstablishedPeers = length . filter ((== "CONNECTED") . snd) <$> getPeersByThreads
+
+-- | Inbound connections from @host@, established or still in their handshake.
+countInboundFrom :: String -> IO Int
+countInboundFrom host = length . filter (isPrefixOf ('<' : host ++ ":") . fst) <$> getPeersByThreads
 
 summarizeThreadState :: [(String, Maybe String)] -> String
 summarizeThreadState [
