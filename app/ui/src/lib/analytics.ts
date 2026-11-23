@@ -90,7 +90,6 @@ export type ApiAction =
   | 'nft_transfer'
   | 'nft_burn'
   // money in / rewards / referral
-  | 'onramp_session'
   | 'contact_submit'
   | 'rewards_claim'
   | 'rewards_claim_all'
@@ -224,7 +223,6 @@ const API_EVENT_MAP: Record<string, ApiAction> = {
   'POST /nfts/*/burn': 'nft_burn',
 
   // money in / rewards / referral
-  'POST /onramp/session': 'onramp_session',
   'POST /contact': 'contact_submit',
   'POST /rewards/claim-all': 'rewards_claim_all',
   'POST /rewards/claim/*': 'rewards_claim',

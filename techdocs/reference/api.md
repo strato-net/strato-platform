@@ -77,7 +77,6 @@ Keep client secrets out of source code and logs.
 | `/metal-forge` | Metal token purchases |
 | `/earn` | Earn opportunities and token APYs |
 | `/refer` | Referral deposits and redemptions |
-| `/onramp` | Fiat on-ramp sessions |
 | `/oracle` | Prices and price history |
 | `/events` | Contract events and activity |
 | `/protocol-fees` | Protocol revenue |

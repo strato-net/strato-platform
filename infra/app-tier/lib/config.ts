@@ -41,8 +41,8 @@ export interface AppTierConfig {
   /**
    * Secrets Manager names. `oauth` is JSON {discoveryUrl, clientId, clientSecret} for
    * nginx's login flow (the backend gets no client credentials: the node's read APIs are open);
-   * `backend` is JSON with the backend's optional API keys (STRIPE_SECRET_KEY,
-   * SENDGRID_API_KEY, ...); the other two are plain strings.
+   * `backend` is JSON with the backend's optional API keys (SENDGRID_API_KEY,
+   * WAGMI_PROJECT_ID, ...); the other two are plain strings.
    */
   secrets: {
     oauth: string;
