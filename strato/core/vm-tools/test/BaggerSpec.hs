@@ -171,7 +171,17 @@ replay parentRoot blk = do
 
 spec :: Spec
 spec = do
-  describe "Bagger.makeNewBlock" $
+  describe "Bagger.makeNewBlock" $ do
+    it "runs the rest of a batch after dropping a transaction that cannot pay" $ do
+      (built, replayed) <- inContext $ do
+        parentRoot <- startOnParent
+        promote (tx unfunded)
+        promote (tx funded)
+        blk <- makeNewBlock mine proposer
+        (,) blk <$> replay parentRoot blk
+      map otSigner (obReceiptTransactions built) `shouldBe` [funded]
+      replayed `shouldBe` Right (stateRoot (obBlockData built))
+
     it "builds a block that verifies after a run whose only transaction was rejected" $ do
       (built, replayed) <- inContext $ do
         parentRoot <- startOnParent
