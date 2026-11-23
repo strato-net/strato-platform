@@ -926,29 +926,37 @@ contract record LendingPool is Ownable, Pausable {
     // ═══════════════════════════════════════════════════════════════════════════════
 
     /**
-     * @notice Wind the pool down in one transaction. Settles every loan by pulling its debt in
-     *         USDST from the payer, handing the payer collateral worth exactly the debt at oracle
-     *         price (no bonus); returns every remaining collateral position; redeems every
-     *         supplier's mTokens at the exchange rate; redeems every SafetyModule staker; sends
-     *         what is left in the LiquidityPool (reserves and rounding dust) to the FeeCollector;
-     *         refunds any USDST this contract already holds to the payer; pauses the pool.
-     * @param borrowers         Every account with an open loan
-     * @param collateralHolders Every account holding collateral (borrowers included)
-     * @param suppliers         Every mToken holder
-     * @param stakers           Every SafetyModule share holder
+     * @notice Wind the pool down, over as many calls as its size needs. Each call settles the listed
+     *         loans by pulling their debt in USDST from the payer, handing the payer collateral worth
+     *         exactly the debt at oracle price (no bonus); returns the listed collateral positions;
+     *         redeems the listed suppliers' mTokens at the exchange rate; redeems the listed
+     *         SafetyModule stakers; refunds any USDST this contract already holds to the payer. The
+     *         call that leaves nothing outstanding also sends what is left in the LiquidityPool
+     *         (reserves and rounding dust) to the FeeCollector and pauses the pool.
+     * @param borrowers         Accounts with an open loan
+     * @param collateralHolders Accounts holding collateral (a borrower's is returned once its loan is settled)
+     * @param suppliers         mToken holders. Every loan must be settled, and any bad debt
+     *                          covered or written off, before any is redeemed.
+     * @param stakers           SafetyModule share holders
      * @param payer             Account that pays the debts. Must have approved this contract for
-     *                          at least the debt. Receives the settled loans' collateral and any
-     *                          USDST this contract already holds.
+     *                          at least the listed debt. Receives the settled loans' collateral and
+     *                          any USDST this contract already holds.
      * @return loansSettled, collateralReturned, suppliersRedeemed, stakersRedeemed: accounts handled
      * @dev Owner only, and onlyOwner must remain the only modifier. With the AdminRegistry as owner
      *      the approved vote re-enters this function from the registry, and a nonReentrant guard
      *      placed before onlyOwner would reject that call. Not gated by whenNotPaused.
-     * @dev All or nothing. Every loan must be funded in full (the payer absorbs any loan its priced
-     *      collateral cannot cover, unless that loan also holds unpriced collateral) and every claim
-     *      paid in full, or the call reverts. It ends by checking the pool's accounting against the
-     *      chain, never against its arguments, so a list that misses a borrower, supplier or staker
-     *      fails the vote instead of leaving a half-swept pool behind. Fix the lists or the funding
-     *      and vote again; accounts listed twice or with nothing to settle are harmless.
+     * @dev A transaction runs on a fixed gas budget, which one call over every account of a live
+     *      pool exceeds, so the lists are batches: loans and collateral first, then suppliers. A
+     *      call is all or nothing for what it lists. Every listed loan must be funded in full (the
+     *      payer absorbs any loan its priced collateral cannot cover, unless that loan also holds
+     *      unpriced collateral) and every listed claim paid in full, or the call reverts. Suppliers
+     *      are paid at one rate whatever batch they are in: with no loan and no bad debt left the
+     *      rate is cash per mToken and no longer moves, which is why a call listing suppliers
+     *      reverts until then. Accounts listed twice or with nothing to settle are harmless.
+     * @dev The pool is paused by the call that completes the sunset and by no other, so paused()
+     *      is the on-chain sign that every loan, mToken and SafetyModule share is gone. Until then
+     *      withdrawals and repayments stay open and an account left out of the lists keeps its
+     *      position for a later call.
      */
     function sunset(
         address[] borrowers,
@@ -968,37 +976,42 @@ contract record LendingPool is Ownable, Pausable {
             if (_settleLoan(borrowers[i], payer)) loansSettled++;
         }
 
-        // 3) return every collateral position
+        // 3) return collateral positions
         for (uint i = 0; i < collateralHolders.length; i++) {
             if (_returnCollateral(collateralHolders[i])) collateralReturned++;
         }
 
-        // 4) redeem suppliers at the exchange rate
+        // 4) redeem suppliers at the exchange rate, which counts open loans and bad debt as assets:
+        //    no supplier is paid before the pool's cash backs every mToken at that rate
+        if (suppliers.length > 0) {
+            require(totalScaledDebt == 0, "Sunset: loans outstanding");
+            require(badDebt == 0, "Sunset: bad debt outstanding");
+        }
         for (uint i = 0; i < suppliers.length; i++) {
             if (_redeemSupplier(suppliers[i])) suppliersRedeemed++;
         }
 
         // 5) redeem SafetyModule stakers
-        stakersRedeemed = safetyModule.redeemAllFor(stakers);
+        if (stakers.length > 0) stakersRedeemed = safetyModule.redeemAllFor(stakers);
 
-        // 6) the LiquidityPool now holds only reserves and rounding dust
+        // 6) refund any USDST already held here
         address asset = borrowableAsset;
-        LiquidityPool pool = _liquidityPool();
-        uint remaining = IERC20(asset).balanceOf(address(pool));
-        if (remaining > 0) {
-            pool.transferReserve(remaining, address(feeCollector));
-            emit ReservesSweptTreasury(remaining, address(feeCollector));
-        }
-        reservesAccrued = 0;
-
-        // 7) refund any USDST already held here, and pause
         uint refund = IERC20(asset).balanceOf(address(this));
         if (refund > 0) {
             require(IERC20(asset).transfer(payer, refund), "Refund failed");
         }
-        if (!paused()) _pause();
 
-        _requireSunsetComplete();
+        // 7) with nothing outstanding the LiquidityPool holds only reserves and rounding dust
+        if (_sunsetComplete()) {
+            LiquidityPool pool = _liquidityPool();
+            uint remaining = IERC20(asset).balanceOf(address(pool));
+            if (remaining > 0) {
+                pool.transferReserve(remaining, address(feeCollector));
+                emit ReservesSweptTreasury(remaining, address(feeCollector));
+            }
+            reservesAccrued = 0;
+            if (!paused()) _pause();
+        }
 
         emit SunsetExecuted(loansSettled, collateralReturned, suppliersRedeemed, stakersRedeemed, refund);
         return (loansSettled, collateralReturned, suppliersRedeemed, stakersRedeemed);
@@ -1069,7 +1082,7 @@ contract record LendingPool is Ownable, Pausable {
 
     /**
      * @dev Give `holder` back every collateral position. Returns false when nothing is held or a
-     *      loan is still open (the completeness check then fails the call).
+     *      loan is still open (the position then waits for the call that settles it).
      */
     function _returnCollateral(address holder) internal returns (bool returned) {
         if (userLoan[holder].scaledDebt > 0) return false;
@@ -1105,22 +1118,19 @@ contract record LendingPool is Ownable, Pausable {
     }
 
     /**
-     * @dev The protocol's own accounting must read as sunset, whatever the call was given: no debt,
-     *      no mToken, no reserves, nothing in this contract, no SafetyModule share or managed asset,
-     *      and the pool paused. Only accounting is checked, never a balance a third party can move:
-     *      the LiquidityPool is emptied by the sweep in step 6 (donations included), the SafetyModule
-     *      is judged by what it manages, and the CollateralVault keeps no total, so a stray donation
-     *      there cannot block the sunset and collateral completeness is checked off-chain. A holder
-     *      left out keeps their position and gets it back from a follow-up call that lists them.
+     * @dev True once the protocol's own accounting reads as sunset, whatever the calls were given:
+     *      no debt, no mToken, no SafetyModule share or managed asset. Only accounting is read,
+     *      never a balance a third party can move: the LiquidityPool is emptied by the sweep in
+     *      step 7 (donations included), the SafetyModule is judged by what it manages, and the
+     *      CollateralVault keeps no total, so a stray donation there cannot hold the sunset open
+     *      and collateral completeness is checked off-chain. A holder left out keeps their
+     *      position and gets it back from a later call that lists them.
      */
-    function _requireSunsetComplete() internal view {
-        require(totalScaledDebt == 0, "Sunset: debt outstanding");
-        require(IERC20(mToken).totalSupply() == 0, "Sunset: mTokens outstanding");
-        require(reservesAccrued == 0, "Sunset: reserves left");
-        require(IERC20(borrowableAsset).balanceOf(address(this)) == 0, "Sunset: value left in the pool");
-        require(IERC20(safetyModule.sToken()).totalSupply() == 0, "Sunset: SafetyModule shares outstanding");
-        require(safetyModule.totalAssets() == 0, "Sunset: SafetyModule assets left");
-        require(paused(), "Sunset: not paused");
+    function _sunsetComplete() internal view returns (bool) {
+        if (totalScaledDebt > 0) return false;
+        if (IERC20(mToken).totalSupply() > 0) return false;
+        if (IERC20(safetyModule.sToken()).totalSupply() > 0) return false;
+        return safetyModule.totalAssets() == 0;
     }
 
     /// @dev configuredAssets can list an asset more than once (mainnet lists USDST twice); only its

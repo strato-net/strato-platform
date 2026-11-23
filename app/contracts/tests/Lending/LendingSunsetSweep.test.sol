@@ -580,16 +580,13 @@ contract Describe_LendingSunsetSweep {
         _requireSeedIntact(3300e18, 3300e18, 1700e18);
     }
 
-    function it_rejects_an_incomplete_address_set() {
+    function it_refuses_suppliers_while_a_loan_is_open() {
         _seed();
         _upgrade();
         _fund(3300e18);
 
+        // The rate suppliers are paid at counts borrower2's open loan: the call reverts and nothing moves
         require(_sunsetReverts(_one(borrower1), _collateralHolders(), _suppliers(), _stakers()), "a missing borrower must revert");
-        _requireSeedIntact(3300e18, 3300e18, 1700e18);
-        require(_sunsetReverts(_borrowers(), _collateralHolders(), _two(supplier1, borrower1), _stakers()), "a missing supplier must revert");
-        _requireSeedIntact(3300e18, 3300e18, 1700e18);
-        require(_sunsetReverts(_borrowers(), _collateralHolders(), _suppliers(), _one(staker1)), "a missing staker must revert");
         _requireSeedIntact(3300e18, 3300e18, 1700e18);
 
         (uint loans, uint collateral, uint suppliers, uint stakers) = _sunsetAll();
@@ -597,7 +594,102 @@ contract Describe_LendingSunsetSweep {
         require(lendingPool.paused(), "paused");
     }
 
-    function it_catches_receipt_tokens_that_moved_after_the_snapshot() {
+    function it_refuses_suppliers_while_bad_debt_is_unresolved() {
+        _seed();
+        _upgrade();
+
+        // SILVST collapses to $1: borrower2 is liquidated out of its collateral and the rest of its loan becomes bad debt
+        oracle.setAssetPrice(SILVST, 1e18);
+        Token(USDST).mint(address(stranger), 100e18);
+        stranger.do(USDST, "approve", address(liquidityPool), MAX_UINT);
+        stranger.do(lendingPoolAddress, "liquidationCallAll", SILVST, address(borrower2), 0);
+        uint bad = lendingPool.badDebt();
+        require(bad > 0 && _debt(borrower2) == 0 && lendingPool.getExchangeRate() == 1e18, "fixture: bad debt the rate still counts");
+        _fund(3000e18);
+
+        // Paid at that rate the first suppliers would empty the pool and the last would find it short
+        require(_sunsetReverts(_borrowers(), _collateralHolders(), _suppliers(), _stakers()), "suppliers must wait for the bad debt");
+        require(IERC20(lendUSDST).totalSupply() == 5000e18 && _debt(borrower1) == 3000e18, "nothing moved");
+
+        // Loans, collateral and stakers do not depend on it
+        (uint loans, uint collateral, uint suppliers, uint stakers) = _sunset(_borrowers(), _collateralHolders(), _none(), _stakers());
+        require(loans == 1 && collateral == 2 && suppliers == 0 && stakers == 2, "counts");
+        require(_sunsetReverts(_none(), _none(), _suppliers(), _none()), "still waiting for the bad debt");
+
+        // Governance writes it off; every supplier then takes the same haircut, whatever its batch
+        adminRegistry.castVoteOnIssue(address(poolConfigurator), "writeOffBadDebtWithHaircut", bad, "sunset");
+        uint rate = lendingPool.getExchangeRate();
+        require(rate < 1e18, "haircut");
+        _assertApprox(rate * 5000, _bal(USDST, address(liquidityPool)), "the rate is cash per mToken");
+        (loans, collateral, suppliers, stakers) = _sunset(_none(), _none(), _two(supplier1, supplier2), _none());
+        require(suppliers == 2 && !lendingPool.paused(), "first batch");
+        (loans, collateral, suppliers, stakers) = _sunset(_none(), _none(), _one(borrower1), _none());
+        require(suppliers == 1 && lendingPool.paused(), "last batch completes the sunset");
+        require(_bal(USDST, address(supplier1)) == 3000 * rate, "supplier1 takes the haircut");
+        _assertApprox(_bal(USDST, address(supplier2)), 1000 * rate, "supplier2 takes the same haircut");
+        _assertApprox(_bal(USDST, address(borrower1)), 3000e18 + 1000 * rate, "the last batch is paid in full at the same rate");
+        require(_bal(USDST, address(liquidityPool)) == 0, "pool emptied");
+    }
+
+    function it_sweeps_the_pool_in_batches_at_one_rate() {
+        _seed();
+        _upgrade();
+        fastForward(YEAR);
+        uint debt = lendingPool.getUserDebtPreview(address(borrower1)) + lendingPool.getUserDebtPreview(address(borrower2));
+        uint cashBefore = _bal(USDST, address(liquidityPool));
+        _fund(debt);
+
+        // Call 1: loans, collateral and stakers. Suppliers and reserves are untouched, the pool stays open
+        (uint loans, uint collateral, uint suppliers, uint stakers) = _sunset(_borrowers(), _collateralHolders(), _none(), _stakers());
+        require(loans == 2 && collateral == 3 && suppliers == 0 && stakers == 2, "call 1 counts");
+        require(lendingPool.totalScaledDebt() == 0 && !lendingPool.paused(), "loans settled, pool still open");
+        require(_bal(USDST, address(liquidityPool)) == cashBefore + debt && _bal(USDST, address(payer)) == 0, "the debt is in the pool");
+        uint reserves = lendingPool.reservesAccrued();
+        require(IERC20(lendUSDST).totalSupply() == 5000e18 && reserves > 0 && _bal(USDST, address(feeCollector)) == 0, "suppliers and reserves untouched");
+        uint rate = lendingPool.getExchangeRate();
+        require(rate > 1e18, "suppliers earned the interest");
+
+        // Call 2, a month later: with no loan left the rate has not moved
+        fastForward(2592000);
+        (loans, collateral, suppliers, stakers) = _sunset(_none(), _none(), _two(supplier1, supplier2), _none());
+        require(loans == 0 && collateral == 0 && suppliers == 2 && stakers == 0, "call 2 counts");
+        require(!lendingPool.paused() && lendingPool.reservesAccrued() == reserves, "not complete: open, reserves kept");
+        require(_bal(USDST, address(supplier1)) == (3000e18 * rate) / 1e18, "supplier1 paid at the rate");
+        _assertApprox(_bal(USDST, address(supplier2)), (1000e18 * rate) / 1e18, "supplier2 paid at the rate");
+
+        // Call 3 redeems the last supplier, which completes the sunset: reserves swept, pool paused
+        fastForward(2592000);
+        (loans, collateral, suppliers, stakers) = _sunset(_none(), _none(), _one(borrower1), _none());
+        require(loans == 0 && collateral == 0 && suppliers == 1 && stakers == 0, "call 3 counts");
+        _assertApprox(_bal(USDST, address(borrower1)), 3000e18 + (1000e18 * rate) / 1e18, "borrower1 paid at the rate");
+        require(IERC20(lendUSDST).totalSupply() == 0 && _bal(USDST, address(liquidityPool)) == 0, "pool emptied");
+        _assertApprox(_bal(USDST, address(feeCollector)), reserves, "reserves swept to the FeeCollector");
+        require(lendingPool.reservesAccrued() == 0 && lendingPool.paused(), "completed: reserves cleared, paused");
+    }
+
+    function it_leaves_an_account_off_the_lists_for_a_later_call() {
+        _seed();
+        _upgrade();
+        _fund(3300e18);
+
+        // supplier2 and staker2 are missing: the call pays what it lists and does not complete
+        (uint loans, uint collateral, uint suppliers, uint stakers) = _sunset(_borrowers(), _collateralHolders(), _two(supplier1, borrower1), _one(staker1));
+        require(loans == 2 && collateral == 3 && suppliers == 2 && stakers == 1, "counts");
+        require(!lendingPool.paused(), "not complete, not paused");
+        require(_bal(lendUSDST, address(supplier2)) == 1000e18 && _bal(USDST, address(liquidityPool)) == 1000e18, "supplier2's claim is still in the pool");
+        require(_bal(safetyUSDST, address(staker2)) == 74e18 && safetyModule.totalAssets() == 74e18, "staker2's claim is still in the module");
+
+        // The pool is still open, so supplier2 need not wait for the next vote
+        supplier2.do(lendingPoolAddress, "withdrawLiquidity", 400e18);
+        require(_bal(USDST, address(supplier2)) == 400e18, "withdrawals stay open between calls");
+
+        (loans, collateral, suppliers, stakers) = _sunset(_none(), _none(), _one(supplier2), _one(staker2));
+        require(loans == 0 && collateral == 0 && suppliers == 1 && stakers == 1, "follow-up counts");
+        require(_bal(USDST, address(supplier2)) == 1000e18 && _bal(USDST, address(staker2)) == 74e18, "paid in full");
+        require(IERC20(lendUSDST).totalSupply() == 0 && IERC20(safetyUSDST).totalSupply() == 0 && lendingPool.paused(), "completed");
+    }
+
+    function it_pays_receipt_tokens_that_moved_after_the_snapshot_on_a_later_call() {
         _seed();
         _upgrade();
         _fund(3300e18);
@@ -605,18 +697,16 @@ contract Describe_LendingSunsetSweep {
         // lendUSDST and safetyUSDST are plain transferable tokens: a holder moves them after the lists were drawn up
         supplier2.do(lendUSDST, "transfer", address(stranger), 400e18);
         staker2.do(safetyUSDST, "transfer", address(stranger), 74e18);
-        require(_sunsetReverts(_borrowers(), _collateralHolders(), _suppliers(), _stakers()), "moved balances must revert");
+        (uint loans, uint collateral, uint suppliers, uint stakers) = _sunsetAll();
+        require(loans == 2 && collateral == 3 && suppliers == 3 && stakers == 1, "counts");
+        require(_bal(USDST, address(supplier2)) == 600e18, "paid by current balance");
+        require(IERC20(lendUSDST).totalSupply() == 400e18 && IERC20(safetyUSDST).totalSupply() == 74e18 && !lendingPool.paused(), "the moved balances keep the sunset open");
 
-        // Listing the new holder settles everything, each at the balance held at execution
-        address[] suppliers = new address[](4);
-        suppliers[0] = address(supplier1);
-        suppliers[1] = address(supplier2);
-        suppliers[2] = address(borrower1);
-        suppliers[3] = address(stranger);
-        (uint loans, uint collateral, uint supplierCount, uint stakers) = _sunset(_borrowers(), _collateralHolders(), suppliers, _two(staker1, stranger));
-        require(loans == 2 && collateral == 3 && supplierCount == 4 && stakers == 2, "counts");
-        require(_bal(USDST, address(supplier2)) == 600e18 && _bal(USDST, address(stranger)) == 400e18 + 74e18, "paid by current balance");
-        require(IERC20(lendUSDST).totalSupply() == 0 && IERC20(safetyUSDST).totalSupply() == 0, "all redeemed");
+        // Listing the new holder completes it
+        (loans, collateral, suppliers, stakers) = _sunset(_none(), _none(), _one(stranger), _one(stranger));
+        require(loans == 0 && collateral == 0 && suppliers == 1 && stakers == 1, "follow-up counts");
+        require(_bal(USDST, address(stranger)) == 400e18 + 74e18, "new holder paid");
+        require(IERC20(lendUSDST).totalSupply() == 0 && IERC20(safetyUSDST).totalSupply() == 0 && lendingPool.paused(), "all redeemed");
     }
 
     function it_sweeps_with_the_receipt_tokens_paused() {
