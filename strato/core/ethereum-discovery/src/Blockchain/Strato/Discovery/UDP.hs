@@ -6,6 +6,7 @@
 module Blockchain.Strato.Discovery.UDP
   ( dataToPacket,
     sendPacket,
+    packetExpiration,
     ndPacketToRLP,
     pongSenderTcpPort,
     NodeDiscoveryPacket (..),
@@ -37,6 +38,7 @@ import           Data.Binary
 import           Data.Bits
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
+import           Data.IP                               (IP)
 import           Data.List.Split
 import           Data.Maybe
 import qualified Data.Text                             as T
@@ -233,6 +235,8 @@ pongSenderTcpPort o
   where
     p = rlpDecode o :: Integer
 
+-- | Sign the packet and send it to the peer. The address it went to, when the
+-- peer's host resolved.
 sendPacket ::
   ( HasVault m
   , MonadLogger m
@@ -241,7 +245,7 @@ sendPacket ::
   , A.Selectable (Maybe Host, UDPPort) SockAddr m ) =>
   PPeer ->
   NodeDiscoveryPacket ->
-  m ()
+  m (Maybe IP)
 sendPacket thePeer packet = do
   mPeerAddr <- A.select (A.Proxy @SockAddr) (Just $ pPeerHost thePeer, UDPPort . fromIntegral $ pPeerUdpPort thePeer)
   forM_ mPeerAddr $ \addr -> do
@@ -263,4 +267,12 @@ sendPacket thePeer packet = do
        Pong{}          -> "Pong"
        FindNeighbors{} -> "FindNeighbors"
        Neighbors{}     -> "Neighbors"
+  pure $ addressIP <$> mPeerAddr
+
+-- | When the packet stops being valid, as its sender stamped it.
+packetExpiration :: NodeDiscoveryPacket -> Integer
+packetExpiration (Ping _ _ _ expiration) = expiration
+packetExpiration (Pong _ _ expiration _) = expiration
+packetExpiration (FindNeighbors _ expiration) = expiration
+packetExpiration (Neighbors _ expiration) = expiration
 

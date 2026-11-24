@@ -22,6 +22,10 @@ module Blockchain.Strato.Discovery.ContextLite
     DiscoveryRow,
     runDiscoveryM,
     UDPPacket (..),
+    Ask (..),
+    Asked,
+    noteAsked,
+    wasAsked,
     initContextLite,
     addPeer,
     DiscoveryRunner,
@@ -53,10 +57,13 @@ import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Reader
 import qualified Data.ByteString                       as B
+import           Data.IORef
 import           Data.IP
 import           Data.List
+import qualified Data.Map.Strict                       as M
 import           Data.Maybe
 import qualified Data.Text                             as T
+import           Data.Time.Clock.POSIX                 (getPOSIXTime)
 import qualified Database.Persist.Postgresql           as SQL
 import qualified Database.Redis                        as Redis
 import           Network.Socket
@@ -70,10 +77,41 @@ data ContextLite = ContextLite
     redisBlockDB :: RBDB.RedisConnection,
     sock         :: Socket,
     myUdpPort    :: UDPPort,
-    myTcpPort    :: TCPPort
+    myTcpPort    :: TCPPort,
+    liteAsked    :: Asked
   }
 
 newtype UDPPacket = UDPPacket { getUDPPacket :: (B.ByteString, SockAddr) }
+
+-- | The requests whose answers this node waits for.
+data Ask = AskPing | AskNeighbors
+  deriving (Eq, Ord)
+
+-- | When this node last asked each address, by request. A Pong or a Neighbors
+-- is taken only from an address asked within 'answerWindow': a UDP source
+-- address can be forged, so otherwise anyone could bond any address or fill
+-- the peer table.
+newtype Asked = Asked (IORef (M.Map (Ask, IP) Integer))
+
+-- | Seconds an answer is waited for: the expiration this node puts on its
+-- requests.
+answerWindow :: Integer
+answerWindow = 50
+
+-- | Record that @ip@ was just sent the request.
+noteAsked :: (MonadIO m, Accessible Asked m) => Ask -> IP -> m ()
+noteAsked kind ip = do
+  Asked ref <- access (Mod.Proxy @Asked)
+  now <- liftIO $ round <$> getPOSIXTime
+  liftIO . atomicModifyIORef' ref $ \asked ->
+    (M.insert (kind, ip) now $ M.filter (> now - answerWindow) asked, ())
+
+-- | Whether @ip@ was sent the request within 'answerWindow'.
+wasAsked :: (MonadIO m, Accessible Asked m) => Ask -> IP -> m Bool
+wasAsked kind ip = do
+  Asked ref <- access (Mod.Proxy @Asked)
+  now <- liftIO $ round <$> getPOSIXTime
+  maybe False (> now - answerWindow) . M.lookup (kind, ip) <$> liftIO (readIORef ref)
 
 -- | The discovery monad: 'ContextLite' over resources, the vault and the logger.
 type DiscoveryRow = '[ReaderEnv ContextLite, InternalState, VaultData, Logger]
@@ -101,6 +139,9 @@ instance Accessible UDPPort DiscoveryM where
 
 instance Accessible TCPPort DiscoveryM where
   access _ = asks myTcpPort
+
+instance Accessible Asked DiscoveryM where
+  access _ = asks liteAsked
 
 instance Accessible RBDB.RedisConnection DiscoveryM where
   access _ = asks redisBlockDB
@@ -185,6 +226,7 @@ type MonadDiscovery m =
     A.Replaceable SockAddr B.ByteString m,
     Mod.Accessible UDPPort m,
     Mod.Accessible TCPPort m,
+    Mod.Accessible Asked m,
     Mod.Accessible [Validator] m,
     Mod.Awaitable UDPPacket m,
     A.Selectable (Maybe Host, UDPPort) SockAddr m
@@ -194,6 +236,7 @@ initContextLite :: MonadUnliftIO m => UDPPort -> TCPPort -> m ContextLite
 initContextLite udpPort tcpPort = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+  asked <- liftIO $ newIORef M.empty
   return
     ContextLite
       { liteSQLDB = sqlDB' dbs,
@@ -201,7 +244,8 @@ initContextLite udpPort tcpPort = do
         redisBlockDB = RBDB.RedisConnection redisBDBPool,
         sock = error "initContextLite: Uninitialized socket",
         myUdpPort = udpPort,
-        myTcpPort = tcpPort
+        myTcpPort = tcpPort,
+        liteAsked = Asked asked
       }
 
 addPeer :: A.Replaceable Host PPeer m => PPeer -> m ()

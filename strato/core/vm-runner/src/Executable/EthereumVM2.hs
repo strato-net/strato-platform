@@ -71,7 +71,10 @@ handleVmTasks InBatch {..} = do
     nds <- catMaybes <$> traverse MP.lookupNode srs
     pure $! OutMPNodesResponse o nds
   mapM_ emitOut mpResps
-  for_ (concat mpNodesResps) MP.insertNode
+  -- Trie nodes peers send (mpNodesResps) are not stored here. The one reader
+  -- that asks for them, the state-root mismatch diagnosis (fetchMPNode), takes
+  -- the node it asked for off the task topic, checks its hash and keeps it.
+  -- Stored here, any peer could write nodes nobody asked for to disk for good.
 
   rpcResps <- do
     bbHash <- do

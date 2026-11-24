@@ -25,7 +25,7 @@ where
 
 import           BlockApps.Logging
 import           Blockchain.Blockstanbul.Authentication (authenticate, bodyMatchesHeader, verifyCommitmentSeal)
-import           Blockchain.Blockstanbul.Messages      (InEvent (IMsg), TrustedMessage (Commit, Preprepare), WireMessage (..))
+import           Blockchain.Blockstanbul.Messages      (InEvent (IMsg), TrustedMessage (Commit, Preprepare), View (..), WireMessage (..), messageView)
 import           Blockchain.Blockstanbul               (blockstanbulSender)
 import           Blockchain.Context
 import           Blockchain.Data.Block
@@ -315,7 +315,7 @@ handleEvents peer = awaitForever $ \case
     if not admitted
       then $logDebugS "handleEvents/Blockstanbul" . T.pack $ "Dropping a consensus message from " ++ peerString peer ++ ": over " ++ show maxPbftMessagesPerSecond ++ " this second"
       else do
-        validators <- lift $ bestSequencedBlockValidators <$> Mod.get (Proxy @BestSequencedBlock)
+        BestSequencedBlock _ myNumber validators _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
         signed <- authenticate (Conf.networkID $ networkConfig ethConf) (IMsg auth tm)
         let sender' = blockstanbulSender wm
             unsignedPartsHold = case tm of
@@ -335,6 +335,19 @@ handleEvents peer = awaitForever $ \case
             let msgHash = rlpHash wm
             lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerHost peer, msgHash) Proxy
             msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
+            -- The sequencer passes each validator's round change for a new
+            -- round, and its first vote in a view, on to every peer. Unbounded,
+            -- a seated validator signing round changes for one far round after
+            -- another had every honest node relay them all to all its peers,
+            -- filling each link's maxPbftMessagesPerSecond and pushing honest
+            -- votes past it. So each validator gets maxPbftMessagesPerSigner of
+            -- this node's second. Messages below this node's height are not
+            -- counted: none is passed on, and counting them would let anyone
+            -- replay a validator's old votes to use up its share.
+            fits <-
+              if msgExists || toInteger (_sequence $ messageView tm) < myNumber
+                then pure True
+                else lift $ admitSignerMessage sender'
             if msgExists
               then
                 $logInfoS "handleEvents/Blockstanbul" . T.pack $
@@ -343,6 +356,10 @@ handleEvents peer = awaitForever $ \case
                       format msgHash,
                       ". Not forwarding to Sequencer."
                     ]
+              else if not fits
+              then
+                $logDebugS "handleEvents/Blockstanbul" . T.pack $
+                  "Dropping a consensus message signed by " ++ format sender' ++ ": over " ++ show maxPbftMessagesPerSigner ++ " from that validator this second"
               else do
                 $logInfoS "handleEvents/Blockstanbul" . T.pack $
                   concat
@@ -357,10 +374,13 @@ handleEvents peer = awaitForever $ \case
   MsgEvt (GetChainDetails _) -> return ()
   MsgEvt (ChainDetails _) -> return ()
 
-  -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
+  -- Each requested node is a lookup in the VM's main loop, so a peer gets only
+  -- so many a second (see admitMPNodes).
   MsgEvt (GetMPNodes srs) -> do
-    let txo = Origin.PeerString (peerString peer)
-    yieldL $ ToUnseq [IEGetMPNodesRequest txo srs]
+    admitted <- lift $ admitMPNodes srs
+    unless (null admitted) $ do
+      let txo = Origin.PeerString (peerString peer)
+      yieldL $ ToUnseq [IEGetMPNodesRequest txo admitted]
   MsgEvt (MPNodes nds) -> do
     yieldL $ ToUnseq [IEMPNodesReceived nds]
   MsgEvt (Disconnect _) -> do

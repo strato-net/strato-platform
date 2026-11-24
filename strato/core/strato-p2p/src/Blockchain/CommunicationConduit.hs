@@ -44,7 +44,7 @@ import           Blockchain.Strato.Model.Util
 import           Blockchain.SyncDB
 import           Blockchain.Threads
 import           Conduit
-import           Control.Monad                         (forever, unless, when)
+import           Control.Monad                         (forM_, forever, unless, when)
 import qualified Control.Monad.Change.Modify           as Mod
 import           Crypto.Types.PubKey.ECC
 import           Data.Bits                             (shiftL)
@@ -71,15 +71,22 @@ blockstanbulVersion = 1
 debounceTxSendsAndUnseq :: (MonadIO m, m `Mod.Outputs` [IngestEvent]) => ConduitT (Either P2PCNC Message) Message m ()
 debounceTxSendsAndUnseq = do
   txq <- atomically $ newTBQueue 10000
+  let flushTxs = do
+        txs <- atomically $ flushTBQueue txq
+        recordEmptyQueue
+        yieldMany . map W.Transactions $ chunksOf 100 txs
   awaitForever $ \case
     Right (W.Transactions txs) -> do
-      atomically $ mapM_ (writeTBQueue txq) txs
+      -- This thread is also the only one that empties the queue, so it
+      -- flushes a full queue itself: blocked writing to it, it would wait
+      -- forever and take the connection down.
+      forM_ txs $ \tx -> do
+        full <- atomically $ isFullTBQueue txq
+        when full flushTxs
+        atomically $ writeTBQueue txq tx
       recordQueuedTxs txs
     Right other -> yield other
-    Left TXQueueTimeout -> do
-      txs <- atomically $ flushTBQueue txq
-      recordEmptyQueue
-      yieldMany . map W.Transactions $ chunksOf 100 txs
+    Left TXQueueTimeout -> flushTxs
     Left (ToUnseq ie) -> lift $ Mod.output ie
 
 handleMsgClientConduit ::
@@ -105,7 +112,7 @@ handleMsgClientConduit myId peer = do
           nodeId = myId
         }
   $logDebugS "handleMsgClientConduit" "about to parse message"
-  awaitMsg >>= \case
+  awaitMsgWithin handshakeWaitSeconds >>= \case
     Just Hello {} ->
       yield
         =<< lift
@@ -121,7 +128,7 @@ handleMsgClientConduit myId peer = do
               return $ Right s
           )
     other -> assertHandshake other
-  awaitMsg >>= \case
+  awaitMsgWithin handshakeWaitSeconds >>= \case
     Just Status {protocolVersion = ver, highestBlockNum = highestBlockNum', genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
       (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
       when (peerGH /= genHash) $ throwIO WrongGenesisBlock
@@ -140,28 +147,14 @@ handleMsgServerConduit ::
   MonadP2P m =>
   Point ->
   PPeer ->
+  m () ->
   ConduitM Event (Either P2PCNC Message) m ()
-handleMsgServerConduit myPubkey peer = do
+handleMsgServerConduit myPubkey peer markEstablished = do
   $logDebugS "handleMsgServerConduit" "about to parse message"
 
   lift clearAllSyncTasks
 
-  -- This connection is past its handshake and counted, so the limit is the
-  -- number of established peers.
-  numActivePeers <- liftIO countEstablishedPeers
-  validators <- lift $ bestSequencedBlockValidators <$> Mod.get (Mod.Proxy @BestSequencedBlock)
-
-  -- A validator is not held to the limit: full of other peers, a node would turn
-  -- away the validators it votes with. Its key is only claimed until the Hello
-  -- below authenticates it, so a claimed validator gets at most one slot per
-  -- validator past the limit, and must send that Hello within helloWaitSeconds.
-  let limit = Conf.maxConnections (p2pConfig ethConf)
-      claimsValidator = isValidatorKey validators $ pPeerPubkey peer
-  when (numActivePeers > limit && not (claimsValidator && numActivePeers <= limit + length validators)) $ do
-    yield $ Right $ Disconnect TooManyPeers
-    throwIO CurrentlyTooManyPeers
-
-  awaitMsgWithin helloWaitSeconds >>= \case
+  awaitMsgWithin handshakeWaitSeconds >>= \case
     Just Hello {} -> do
       $logInfoS "handshake/Hello{}" "received hello"
       -- The key from the RLPx handshake is only a claim until the first frame
@@ -171,6 +164,26 @@ handleMsgServerConduit myPubkey peer = do
       -- This is the only place that bans for it: a self-dial always lands
       -- here, and only here is the key proven rather than claimed.
       when (pPeerPubkey peer == Just myPubkey) $ throwIO SelfConnection
+
+      -- Only now does this connection count as an established peer, so the
+      -- limit is the number of peers whose Hello has proven their key. A
+      -- connection still in its handshake holds no slot and takes none from
+      -- anyone else.
+      lift markEstablished
+      numActivePeers <- liftIO countEstablishedPeers
+      validators <- lift $ bestSequencedBlockValidators <$> Mod.get (Mod.Proxy @BestSequencedBlock)
+
+      -- A validator is not held to the limit: full of other peers, a node would
+      -- turn away the validators it votes with, so it gets at most one slot per
+      -- validator past the limit. This is decided on the key the Hello proved.
+      -- Decided on the key the RLPx handshake only claimed, anyone could fill
+      -- those slots by presenting validators' public keys.
+      let limit = Conf.maxConnections (p2pConfig ethConf)
+          isValidator = isValidatorKey validators $ pPeerPubkey peer
+      when (numActivePeers > limit && not (isValidator && numActivePeers <= limit + length validators)) $ do
+        yield $ Right $ Disconnect TooManyPeers
+        throwIO CurrentlyTooManyPeers
+
       let helloMsg' =
             Hello
               { version = 4,
@@ -181,7 +194,7 @@ handleMsgServerConduit myPubkey peer = do
               }
       yield $ Right helloMsg'
     other -> assertHandshake other
-  awaitMsg >>= \case
+  awaitMsgWithin handshakeWaitSeconds >>= \case
     Just Status {protocolVersion = ver, highestBlockNum = theirHighestBlockNum, genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
       $logInfoS "serverHandshake/Status{}" "received status"
       -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
@@ -215,14 +228,8 @@ handleMsgServerConduit myPubkey peer = do
     other -> assertHandshake other
   handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
 
-awaitMsg :: (MonadIO m) => ConduitM Event (Either P2PCNC Message) m (Maybe Message)
-awaitMsg =
-  await >>= \case
-    Just (MsgEvt msg) -> return (Just msg)
-    Nothing           -> return Nothing
-    _                 -> awaitMsg
-
--- | 'awaitMsg', giving up after @n@ timer ticks (a second each) without one.
+-- | The peer's next message, giving up after @n@ timer ticks (a second each)
+-- without one.
 awaitMsgWithin :: (MonadIO m) => Int -> ConduitM Event (Either P2PCNC Message) m (Maybe Message)
 awaitMsgWithin n =
   await >>= \case
@@ -233,9 +240,12 @@ awaitMsgWithin n =
     Nothing           -> return Nothing
     _                 -> awaitMsgWithin n
 
--- | How long an inbound peer has to send its Hello after the RLPx handshake.
-helloWaitSeconds :: Int
-helloWaitSeconds = 10
+-- | How long a peer has to send each handshake message (its Hello after the
+-- RLPx handshake, then its Status). Without a deadline on every one, a peer
+-- that went quiet partway through held its connection, and the slot it
+-- counts against, for good.
+handshakeWaitSeconds :: Int
+handshakeWaitSeconds = 10
 
 -- | Take a new sync task for this peer and ask it for the task's headers, or
 -- mark the task 'NotReady' when they lie beyond the peer's (version-normalized) tip.

@@ -5,9 +5,11 @@ module Blockchain.Threads (
   labelPeerThread,
   labelPeerThreadM,
   changeLabelStatusM,
+  changeThreadStatus,
   formatThread,
   getPeersByThreads,
-  countEstablishedPeers
+  countEstablishedPeers,
+  countInboundFrom
   ) where
 
 import Control.Monad
@@ -40,10 +42,15 @@ labelPeerThread peerStr location status doit = do
   doit
 
 changeLabelStatusM :: MonadIO m => String -> m ()
-changeLabelStatusM status = do
-  myCurrentLabel <- liftIO $ fmap (fromMaybe "") $ threadLabel =<< myThreadId
-  let (ParsedLabel p l _) = parseLabel myCurrentLabel
-  labelPeerThreadM p l $ Just status
+changeLabelStatusM status = liftIO myThreadId >>= flip changeThreadStatus status
+
+-- | 'changeLabelStatusM' for another thread: a connection's handler marks its
+-- Peer Manager thread once the peer has proven its key.
+changeThreadStatus :: MonadIO m => ThreadId -> String -> m ()
+changeThreadStatus threadId status = liftIO $ do
+  currentLabel <- fromMaybe "" <$> threadLabel threadId
+  let (ParsedLabel p l _) = parseLabel currentLabel
+  labelThread threadId $ p ++ "/" ++ l ++ "/" ++ status
 
 formatThread :: MonadIO m =>
                 ThreadId -> m String
@@ -92,11 +99,16 @@ isPeerLabel :: String -> Bool
 isPeerLabel (c : _) = c == '<' || c == '>'
 isPeerLabel []      = False
 
--- | Peers past the RLPx handshake: what the connection limit is spent on. A
--- dial or an accept still in its handshake is labelled otherwise and is not
--- counted, so attempts arriving together do not refuse each other.
+-- | Established peers: what the connection limit is spent on. A dial counts
+-- once past the RLPx handshake, an accept once the peer's Hello has proven its
+-- key. One still in its handshake is labelled otherwise and is not counted, so
+-- attempts arriving together do not refuse each other.
 countEstablishedPeers :: IO Int
 countEstablishedPeers = length . filter ((== "CONNECTED") . snd) <$> getPeersByThreads
+
+-- | Inbound connections from @host@, established or still in their handshake.
+countInboundFrom :: String -> IO Int
+countInboundFrom host = length . filter (isPrefixOf ('<' : host ++ ":") . fst) <$> getPeersByThreads
 
 summarizeThreadState :: [(String, Maybe String)] -> String
 summarizeThreadState [
