@@ -255,7 +255,16 @@ export const processPendingWithdrawals = async (): Promise<void> => {
       else if (st === "not_found") neverProposed.push(withdrawal);
     }
     if (neverProposed.length) {
-      toReject.push(...(await proposeRecordedCustodyTxs(neverProposed, Number(chainId))));
+      // A failure on one chain must not hold back finalize/abort on the others
+      try {
+        toReject.push(...(await proposeRecordedCustodyTxs(neverProposed, Number(chainId))));
+      } catch (e) {
+        logError("StratoPolling", e as Error, {
+          operation: "proposeRecordedCustodyTxs",
+          chainId: String(chainId),
+          withdrawalIds: neverProposed.map((w) => String(w.id)),
+        });
+      }
     }
   }
 
