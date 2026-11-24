@@ -86,6 +86,12 @@ export class PostgresStack extends Stack {
         // a crawl within hours. Ten minutes is far past any legitimate
         // idle gap (vm-query re-pins its epoch every 30 s).
         idle_in_transaction_session_timeout: "600000",
+        // Cirrus lists sort and group far more rows than they return (an
+        // event view groups a month of rows to show ten), and at the 4 MB
+        // default those sorts go to temporary files: on the production
+        // readers the executed-issues list took 7.2 s, and 4.7 s from 16 MB
+        // up. In kB.
+        work_mem: "32768",
       },
     });
 

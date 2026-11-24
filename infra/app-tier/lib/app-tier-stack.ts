@@ -80,7 +80,10 @@ export class AppTierStack extends Stack {
     const task = new ecs.FargateTaskDefinition(this, "Task", {
       family: name,
       cpu: 1024,
-      memoryLimitMiB: 2048,
+      // A wider margin for the backend: at 2048 one very large Cirrus
+      // response got the task killed for its memory. What bounds such a
+      // response is a limit where it is requested, not this.
+      memoryLimitMiB: 4096,
       runtimePlatform: { cpuArchitecture: ecs.CpuArchitecture.X86_64, operatingSystemFamily: ecs.OperatingSystemFamily.LINUX },
     });
 
@@ -140,6 +143,9 @@ export class AppTierStack extends Stack {
         DOCS_HOST: "127.0.0.1:1",
         PROMETHEUS_HOST: "127.0.0.1:1",
         POSTGREST_HOST: "127.0.0.1:1",
+        // The front door serves the app UI from S3 and sends only the backend's paths here:
+        // anything else that reaches this nginx gets 404, not a 502 from a UI that is not in the task.
+        SERVE_UI: "false",
         // TLS terminates at CloudFront / the ALB; nginx itself speaks HTTP.
         ssl: "false",
         // Browsers reach this nginx over https through CloudFront: the OpenID redirect goes back the same way.
