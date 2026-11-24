@@ -20,7 +20,7 @@ const router = Router();
  *       - name: limit
  *         in: query
  *         required: false
- *         description: Maximum number of events to return
+ *         description: Maximum number of events to return (default 10, at most 1000)
  *         schema:
  *           type: string
  *       - name: offset
@@ -97,13 +97,13 @@ router.get("/contracts", authHandler.authorizeRequest(true), EventsController.ge
  *       - name: limit
  *         in: query
  *         required: false
- *         description: Maximum number of activities to return
+ *         description: Maximum number of activities to return (default 10, at most 1000)
  *         schema:
  *           type: string
  *       - name: offset
  *         in: query
  *         required: false
- *         description: Number of activities to skip for pagination
+ *         description: Number of activities to skip for pagination (limit + offset at most 10000)
  *         schema:
  *           type: string
  *     responses:

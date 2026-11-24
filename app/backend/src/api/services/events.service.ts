@@ -7,6 +7,16 @@ import type {
   ContractInfoResponse,
 } from "@strato/shared-types";
 
+// Without a limit Cirrus returns up to its max-rows (1,000,000)
+export const clampEventsLimit = (limit: unknown): number =>
+  Math.max(
+    1,
+    Math.min(
+      constants.EVENTS_MAX_LIMIT,
+      parseInt(String(limit), 10) || constants.EVENTS_DEFAULT_LIMIT
+    )
+  );
+
 export const getEvents = async (
   accessToken: string,
   query: Record<string, string> = {}
@@ -14,6 +24,7 @@ export const getEvents = async (
   const storageSelect = "storage!inner(contract!inner(contract_name))";
   const params = {
     ...query,
+    limit: clampEventsLimit(query.limit).toString(),
     order: query.order || "block_timestamp.desc",
     select: `*,${storageSelect}`,
   };
