@@ -97,6 +97,7 @@ contract  StratoStaking is Ownable {
     event ValidatorEvicted(address indexed operator, address indexed validator, address indexed by);
     event ExitRequested(address indexed operator, address indexed validator, uint256 readyTime);
     event ExitCancelled(address indexed operator, address indexed validator);
+    event ValidatorSyncFailed(address indexed operator, address indexed validator);
     // Shape and emission pattern are relied on by the node's stake-event parser (Delta.hs).
     event ValidatorSynced(address indexed operator, address indexed validator, bool registered, uint256 weight);
     event BlockRewardCredited(address indexed operator, address indexed validator, address indexed funder, uint256 amount);
@@ -1013,6 +1014,23 @@ contract  StratoStaking is Ownable {
         _syncValidator(validator);
     }
 
+    // An exit never waits on governance. Once this contract is renounced the admins still own
+    // governance, and one that refuses staking's calls (another staking contract set, an
+    // upgrade) would otherwise hold every unstake and unbondSelf for good. Since the
+    // caught-failure fork a caught try block is atomic: a failed sync leaves no storage write
+    // or event behind, here or in governance, and anyone may retry it with syncValidator.
+    // Running out of gas is never caught.
+    function _syncOnExit(address validator) internal returns (bool) {
+        bool synced = false;
+        try {
+            _syncValidator(validator);
+            synced = true;
+        } catch {
+            emit ValidatorSyncFailed(operatorOf(validator), validator);
+        }
+        return synced;
+    }
+
     // ---- income accounting ---------------------------------------------------------
 
     function _commissionBps(StakingValidator storage v) internal view returns (uint256) {
@@ -1418,7 +1436,7 @@ contract  StratoStaking is Ownable {
         uint256 requestId = _createUnbondRequest(msg.sender, amount);
 
         emit UnbondingStarted(msg.sender, validator, requestId, amount, block.timestamp + unbondingSeconds);
-        _syncValidator(validator);
+        _syncOnExit(validator);
     }
 
     // Self-bond is the operator's own stake behind a validator: it earns the self-bond share
@@ -1460,8 +1478,9 @@ contract  StratoStaking is Ownable {
         uint256 requestId = _createUnbondRequest(msg.sender, amount);
 
         emit SelfBondUnbondingStarted(msg.sender, validator, requestId, amount, block.timestamp + unbondingSeconds);
-        _syncValidator(validator);
-        _requireNoSeatWithoutBond(validator);
+        // A seat that cannot leave keeps its bond (see _requireNoSeatWithoutBond). A governance
+        // that refuses the sync is no reason to hold it: then the bond leaves anyway.
+        if (_syncOnExit(validator)) _requireNoSeatWithoutBond(validator);
     }
 
     // ---- block rewards, fee routing and liveness ----------------------------------------

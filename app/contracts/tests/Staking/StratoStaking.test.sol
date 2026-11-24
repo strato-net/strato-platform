@@ -1839,6 +1839,42 @@ contract Describe_StratoStaking {
         require(_selfBondOf(VALIDATOR_A) == 1000e18, "bond unchanged");
     }
 
+    // ---- exits never wait on governance ---------------------------------------------------
+
+    // Governance pointed at another staking contract (as one admin vote can do once this one
+    // is renounced) refuses every call staking makes. A delegator leaves anyway; the failed
+    // sync leaves nothing behind, and a later sync publishes the new weight.
+    function it_lets_a_delegator_unstake_while_governance_refuses_the_sync() public {
+        _bondBoth();
+        _stake(user1, VALIDATOR_A, 400e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1400e18 && staking.lastSyncedWeight(VALIDATOR_A) == 1400e18, "published");
+        gov.setStakingContract(address(0xdead));
+        user2.doExpectingFailure(address(staking), "stake(address,uint256)", "Only the staking contract can manage staked validators", VALIDATOR_A, 1e18);
+
+        user1.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 400e18);
+        require(staking.totalUserStake() == 0 && staking.totalUnbonding() == 400e18, "the stake is unbonding");
+        require(gov.validatorStake(VALIDATOR_A) == 1400e18 && staking.lastSyncedWeight(VALIDATOR_A) == 1400e18, "the failed sync left both sides as they were");
+
+        gov.setStakingContract(address(staking));
+        staking.syncValidator(VALIDATOR_A);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18 && staking.lastSyncedWeight(VALIDATOR_A) == 1000e18, "a later sync publishes it");
+    }
+
+    // The operator's own bond leaves too. With governance working, a seat that cannot leave
+    // still keeps its bond (the tests above); a governance that refuses the sync holds nothing.
+    function it_lets_an_operator_unbond_while_governance_refuses_the_sync() public {
+        _bondBoth();
+        gov.setStakingContract(address(0xdead));
+
+        operatorA.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 1000e18);
+        require(_selfBondOf(VALIDATOR_A) == 0 && staking.totalUnbonding() == 1000e18, "the bond is unbonding");
+        require(gov.isValidator(VALIDATOR_A) && staking.isValidator(VALIDATOR_A), "the seat stays until a sync gets through");
+
+        gov.setStakingContract(address(staking));
+        staking.syncValidator(VALIDATOR_A);
+        require(!gov.isValidator(VALIDATOR_A) && !staking.isValidator(VALIDATOR_A), "then it leaves with its bond gone");
+    }
+
     // ---- the door check ----------------------------------------------------------------
 
     // Governance as a network has it before staking has seated anyone: validators listed by
