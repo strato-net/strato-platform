@@ -213,6 +213,9 @@ export const constants = (() => {
     // Use getter to get current value after init
     get EXECUTED_ISSUES_LOOKBACK_DAYS() { return config.executedIssuesLookbackDays; },
     BPS_DIVISOR: 10000,
+    EVENTS_DEFAULT_LIMIT: 10,
+    EVENTS_MAX_LIMIT: 1000,
+    ACTIVITIES_MAX_DEPTH: 10000, // limit + offset: the activities query fetches that many rows per contract group
     voucher,
   };
 })();

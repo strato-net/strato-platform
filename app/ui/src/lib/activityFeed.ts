@@ -1,9 +1,16 @@
 import { api } from './axios';
 import type { EventResponse, ContractInfoResponse } from '@strato/shared-types';
 
+// Backend caps (app/backend/src/config/constants.ts)
+export const EVENTS_MAX_LIMIT = 1000;
+export const ACTIVITIES_MAX_DEPTH = 10000;
+
 export interface EventsFilters {
   limit?: number;
   offset?: number;
+  order?: string;
+  max_id?: number;
+  count?: boolean;
   contract_name?: string;
   event_name?: string;
   transaction_sender?: string;
@@ -18,6 +25,9 @@ export const activityFeedApi = {
     
     if (filters.limit) params.append('limit', filters.limit.toString());
     if (filters.offset) params.append('offset', filters.offset.toString());
+    if (filters.order) params.append('order', filters.order);
+    if (filters.max_id) params.append('id', `lte.${filters.max_id}`);
+    if (filters.count === false) params.append('count', 'false');
     
     if (filters.contract_name) params.append('storage.contract.contract_name', filters.contract_name);
     if (filters.event_name) params.append('event_name', filters.event_name);

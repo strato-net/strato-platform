@@ -7,13 +7,26 @@ import type {
   ContractInfoResponse,
 } from "@strato/shared-types";
 
+// Without a limit Cirrus returns up to its max-rows (1,000,000)
+export const clampEventsLimit = (limit: unknown): number =>
+  Math.max(
+    1,
+    Math.min(
+      constants.EVENTS_MAX_LIMIT,
+      parseInt(String(limit), 10) || constants.EVENTS_DEFAULT_LIMIT
+    )
+  );
+
+// count=false skips the count, which scans every matching event: a caller
+// that pages through the events needs the total once
 export const getEvents = async (
   accessToken: string,
-  query: Record<string, string> = {}
+  { count, ...query }: Record<string, string> = {}
 ): Promise<EventResponse> => {
   const storageSelect = "storage!inner(contract!inner(contract_name))";
   const params = {
     ...query,
+    limit: clampEventsLimit(query.limit).toString(),
     order: query.order || "block_timestamp.desc",
     select: `*,${storageSelect}`,
   };
@@ -26,13 +39,15 @@ export const getEvents = async (
   };
 
   const [countResponse, eventsResponse] = await Promise.all([
-    cirrus.get(accessToken, `/${constants.Event}`, {
-      params: countParams,
-    }),
+    count === "false"
+      ? undefined
+      : cirrus.get(accessToken, `/${constants.Event}`, {
+          params: countParams,
+        }),
     cirrus.get(accessToken, `/${constants.Event}`, { params }),
   ]);
 
-  const total = countResponse.data?.[0]?.count || 0;
+  const total = countResponse?.data?.[0]?.count || 0;
   const data = eventsResponse.data;
 
   const events = (data || []).map((event: any) => {
