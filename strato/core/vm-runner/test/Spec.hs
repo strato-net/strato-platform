@@ -11,6 +11,7 @@ import Blockchain.Data.BlockSummary (blockHeaderToBSum)
 import Blockchain.Data.ProposalFacts (noProposalFacts)
 import Blockchain.Event (BlockDelta (..), BlockVerificationFailureDetails (..))
 import Blockchain.Verifier (checkTimestampMonotonic)
+import qualified EthCallSpec
 --import qualified Blockchain.Blockstanbul.BenchmarkLib as BML
 --import Blockchain.DB.CodeDB
 --import Blockchain.Data.AddressStateDB
@@ -57,6 +58,7 @@ main = do
 
 spec :: Spec
 spec = do
+  EthCallSpec.spec
   {-
   describe "monad transformer over map tests" $ do
     it "stateT get its puts for a map" $ do
