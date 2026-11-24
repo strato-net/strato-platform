@@ -131,6 +131,13 @@ export class PostgresStack extends Stack {
       deletionProtection: true,
       removalPolicy: RemovalPolicy.RETAIN,
     });
+    // RETAIN reaches the instances too, and a reader the settings no longer
+    // ask for then stays in the cluster outside this stack: behind the reader
+    // endpoint, and paid for. The data is on the cluster's volume, not on an
+    // instance, so a reader goes with its resource. The writer keeps RETAIN.
+    for (let i = 1; i <= props.readerCount; i++) {
+      (this.cluster.node.findChild(`reader${i}`).node.defaultChild as rds.CfnDBInstance).applyRemovalPolicy(RemovalPolicy.DESTROY);
+    }
 
     // The node's own login, so that nothing but its creation uses the master
     // login. Aurora knows nothing of it: the password is generated here and
