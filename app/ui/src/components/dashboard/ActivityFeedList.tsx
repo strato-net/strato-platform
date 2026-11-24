@@ -213,12 +213,15 @@ const ActivityFeedList = () => {
           offset,
           order: 'block_timestamp.desc,id.desc',
           max_id: maxId,
+          count: offset === 0, // the total is needed once
           ...apiFilters
         });
         const page = response.events || [];
-        if (maxId === undefined) maxId = page[0]?.id;
+        if (offset === 0) {
+          maxId = page[0]?.id;
+          total = response.total || 0;
+        }
         allEvents.push(...page);
-        total = response.total || 0;
         if (page.length < EVENTS_MAX_LIMIT) break;
       }
       

@@ -29,6 +29,12 @@ const router = Router();
  *         description: Number of events to skip for pagination
  *         schema:
  *           type: string
+ *       - name: count
+ *         in: query
+ *         required: false
+ *         description: Set to false to skip counting the matching events; total is then 0
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: Event list with total count
