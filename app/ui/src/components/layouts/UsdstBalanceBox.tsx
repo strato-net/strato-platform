@@ -7,6 +7,7 @@ import { Link, useLocation } from "react-router-dom";
 import { formatBalance, formatWeiAmount, formatCurrency } from "@/utils/numberUtils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Token } from "@/interface";
 
 // Warn at this many transactions or fewer, or when only gas sponsored ones are left; none left is critical
@@ -174,17 +175,22 @@ const UsdstBalanceBox: React.FC = () => {
             {loadingUsdstBalance ? (
               <p className="text-sm font-semibold text-foreground animate-pulse">Loading...</p>
             ) : fees ? (
-              <p className="text-sm font-semibold text-foreground">
+              <div className="text-sm font-semibold text-foreground">
                 {fees.total.toLocaleString()} {fees.total === 1n ? "Transaction" : "Transactions"} remaining
-                <button
-                  type="button"
-                  aria-label="How transactions remaining is calculated"
-                  className="ml-1 inline-flex align-middle rounded-full text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowBreakdown(true)}
-                >
-                  <HelpCircle className="h-3.5 w-3.5" />
-                </button>
-              </p>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="How transactions remaining is calculated"
+                      className="ml-1 inline-flex align-middle rounded-full text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowBreakdown(true)}
+                    >
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Click for more information</TooltipContent>
+                </Tooltip>
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground">Transactions remaining unavailable</p>
             )}
