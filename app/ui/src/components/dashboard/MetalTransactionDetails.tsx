@@ -5,7 +5,7 @@ import { FrownOutlined } from "@ant-design/icons";
 import { ITEMS_PER_PAGE } from "@/lib/bridge/constants";
 import { formatDate } from "@/lib/bridge/utils";
 import { formatWeiToDecimalHP } from "@/utils/numberUtils";
-import { activityFeedApi } from "@/lib/activityFeed";
+import { activityFeedApi, ACTIVITIES_MAX_DEPTH } from "@/lib/activityFeed";
 import { METAL_ACTIVITY_PAIR, MetalTx, resolveTokenSymbols, collectMetalTokenAddrs, mapEventsToMetalTxs } from "@/lib/metalActivity";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -88,11 +88,11 @@ const MetalTransactionDetails = () => {
         scroll={isMobile ? { x: 'max-content' } : undefined}
         pagination={{
           current: currentPage,
-          total: totalCount,
+          total: Math.min(totalCount, ACTIVITIES_MAX_DEPTH),
           pageSize: ITEMS_PER_PAGE,
           onChange: handlePageChange,
           showSizeChanger: false,
-          showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+          showTotal: (_, range) => `${range[0]}-${range[1]} of ${totalCount} items`,
           simple: isMobile,
         }}
         locale={{

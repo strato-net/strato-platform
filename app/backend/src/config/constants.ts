@@ -208,9 +208,14 @@ export const constants = (() => {
     ZERO_ADDRESS: "0000000000000000000000000000000000000000",
     FEE_ADDRESS: "dead5712a70000000000000000000dead5712a70", // where the fee router sends STRATO fees
     DAY_MS: 24 * 60 * 60 * 1000,
+    SHARED_STATE_TTL_MS: 5 * 1000,
+    SHARED_STATE_MAX_LOAD_MS: 15 * 1000,
     // Use getter to get current value after init
     get EXECUTED_ISSUES_LOOKBACK_DAYS() { return config.executedIssuesLookbackDays; },
     BPS_DIVISOR: 10000,
+    EVENTS_DEFAULT_LIMIT: 10,
+    EVENTS_MAX_LIMIT: 1000,
+    ACTIVITIES_MAX_DEPTH: 10000, // limit + offset: the activities query fetches that many rows per contract group
     voucher,
   };
 })();

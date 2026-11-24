@@ -1,4 +1,4 @@
-import { CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
+import { CfnOutput, Duration, Fn, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as rds from "aws-cdk-lib/aws-rds";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
@@ -86,6 +86,12 @@ export class PostgresStack extends Stack {
         // a crawl within hours. Ten minutes is far past any legitimate
         // idle gap (vm-query re-pins its epoch every 30 s).
         idle_in_transaction_session_timeout: "600000",
+        // Cirrus lists sort and group far more rows than they return (an
+        // event view groups a month of rows to show ten), and at the 4 MB
+        // default those sorts go to temporary files: on the production
+        // readers the executed-issues list took 7.2 s, and 4.7 s from 16 MB
+        // up. In kB.
+        work_mem: "32768",
       },
     });
 
@@ -125,6 +131,13 @@ export class PostgresStack extends Stack {
       deletionProtection: true,
       removalPolicy: RemovalPolicy.RETAIN,
     });
+    // RETAIN reaches the instances too, and a reader the settings no longer
+    // ask for then stays in the cluster outside this stack: behind the reader
+    // endpoint, and paid for. The data is on the cluster's volume, not on an
+    // instance, so a reader goes with its resource. The writer keeps RETAIN.
+    for (let i = 1; i <= props.readerCount; i++) {
+      (this.cluster.node.findChild(`reader${i}`).node.defaultChild as rds.CfnDBInstance).applyRemovalPolicy(RemovalPolicy.DESTROY);
+    }
 
     // The node's own login, so that nothing but its creation uses the master
     // login. Aurora knows nothing of it: the password is generated here and
@@ -148,5 +161,14 @@ export class PostgresStack extends Stack {
     new CfnOutput(this, "NodeLogin", { value: props.nodeLogin, description: "--pguser for the core; the tiers' Postgres user" });
     new CfnOutput(this, "NodeLoginSecretName", { value: props.nodeLoginSecretName, description: "Its credentials (JSON with username/password)" });
     new CfnOutput(this, "ClusterSecurityGroupId", { value: securityGroup.securityGroupId });
+    // The addresses the tiers' tasks leave the VPC from. The app backend calls the node through
+    // its public hostname, so the API tier's nginx sees every such call come from them.
+    if (vpc instanceof ec2.Vpc) {
+      const natAddresses = vpc.publicSubnets.flatMap((subnet) => {
+        const eip = subnet.node.tryFindChild("EIP");
+        return eip instanceof ec2.CfnEIP ? [eip.ref] : [];
+      });
+      new CfnOutput(this, "NatGatewayAddresses", { value: Fn.join(",", natAddresses) });
+    }
   }
 }

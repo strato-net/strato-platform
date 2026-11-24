@@ -135,6 +135,14 @@ export interface NetBalanceMappingFilterParams {
   stratoTokenAddress?: string;
 }
 
+// Contracts whose storage history every portfolio needs: pools, LP and vault
+// share tokens, the safety module and the lending pool.
+const STORAGE_HISTORY_KINDS = `data->>'lpToken' != ''
+        OR data->>'_symbol' LIKE '%-LP'
+        OR data->>'_symbol' IN ('MUSDST','SUSDST','safetyUSDST','lendUSDST','saveUSDST')
+        OR (data->>'sToken' IS NOT NULL AND data->>'sToken' > '0')
+        OR (data->>'mToken' IS NOT NULL AND data->>'mToken' > '0' AND data->>'borrowIndex' IS NOT NULL AND data->>'borrowIndex' > '0')`;
+
 /**
  * Fetch storage history rows directly from Postgres.
  *
@@ -152,17 +160,22 @@ export async function fetchStorageHistory(
   if (filters.vaultShareToken) addressList.push(filters.vaultShareToken);
 
   // $1 = endTime, $2 = startTime, $3 = address list
+  // The history table is indexed by contract address only. The contracts of the
+  // wanted kinds are found in the (small) current storage table first, so that
+  // the history lookup goes by address instead of scanning every row. A pool,
+  // lending pool or safety module row also gives the token it names, so that a
+  // token whose symbol was changed later (setNameAndSymbol) keeps the history it
+  // had under its earlier symbol.
   const sql = `
     SELECT address, data, valid_from, valid_to
     FROM "history@storage"
     WHERE valid_from <= $1
       AND valid_to >= $2
+      AND address = ANY(ARRAY(
+        SELECT unnest(ARRAY[address, data->>'lpToken', data->>'mToken', data->>'sToken']) FROM storage WHERE ${STORAGE_HISTORY_KINDS}
+      ) || $3::text[])
       AND (
-        data->>'lpToken' != ''
-        OR data->>'_symbol' LIKE '%-LP'
-        OR data->>'_symbol' IN ('MUSDST','SUSDST','safetyUSDST','lendUSDST','saveUSDST')
-        OR (data->>'sToken' IS NOT NULL AND data->>'sToken' > '0')
-        OR (data->>'mToken' IS NOT NULL AND data->>'mToken' > '0' AND data->>'borrowIndex' IS NOT NULL AND data->>'borrowIndex' > '0')
+        ${STORAGE_HISTORY_KINDS}
         OR address = ANY($3)
       )
   `;
@@ -197,7 +210,7 @@ const GLOBAL_MAPPING_COLLECTIONS = [
  * Pass 1: Fetch user-specific mapping rows and specific-path rows.
  *
  * Returns rows matching any of:
- * - User-specific paths (path LIKE '%userAddress%') → user's balances/collaterals/loans/CDP positions
+ * - User-specific rows (first mapping key = userAddress) → user's balances/collaterals/loans/CDP positions
  * - Specific `_balances` paths (liquidity pool, vault bot executor, carry vault idle assets)
  * - Carry vault claimable assets for this user
  * - User's pending withdrawal requests
@@ -215,7 +228,7 @@ export async function fetchUserMappingHistory(
     ...USER_MAPPING_COLLECTIONS,
     ...(filters.requestFilters.length > 0 ? ['requests'] : []),
     // PoolV3 positions[owner][tickLower][tickUpper] — the owner in the path is the
-    // user, so the existing `path LIKE %user%` clause selects exactly their rows.
+    // user, so the existing user-key clause selects exactly their rows.
     // NFT positions live under the manager's positions[tokenId] instead, selected by
     // the dedicated manager + tokenId clause below (along with _owners for ownership).
     ...(filters.includeV3Positions || hasNftPositions ? ['positions'] : []),
@@ -252,9 +265,14 @@ export async function fetchUserMappingHistory(
   // Staking-specific address filter (only fetch staking data from the staking contract)
   const stakingAddress = filters.stratoStakingAddress || '';
 
-  // FIX: Exclude staking collections from general path LIKE to prevent matching
-  // delegatedStake[userA][operatorB] when querying for operatorB (as the user).
-  // Staking data is fetched via the specific key->>'key' condition instead.
+  // FIX: Exclude staking collections from the general user-key branch: staking
+  // data is fetched from the staking contract only, via the specific
+  // key->>'key' condition instead.
+  //
+  // Every branch names contract addresses, because the history table is indexed
+  // by address first and a branch without one scans all of it. The user's rows
+  // (the user is the first mapping key) and the listed _balances paths get their
+  // contracts from the current mapping table, whose rows are never deleted.
   const sql = `
     SELECT address, collection_name, key, path, value, valid_from, valid_to
     FROM "history@mapping"
@@ -262,8 +280,10 @@ export async function fetchUserMappingHistory(
       AND valid_to >= $2
       AND collection_name = ANY($3)
       AND (
-        (path LIKE $4 AND collection_name NOT IN ('delegatedStake', 'unbondingQueue', 'operators', '_owners'))
-        OR path = ANY($5)
+        (address = ANY(ARRAY(SELECT DISTINCT address FROM mapping WHERE collection_name = ANY($3) AND key->>'key' = $11))
+          AND key->>'key' = $11 AND collection_name NOT IN ('delegatedStake', 'unbondingQueue', 'operators', '_owners'))
+        OR (address = ANY(ARRAY(SELECT DISTINCT address FROM mapping WHERE collection_name = '_balances' AND key->>'key' = ANY($4)))
+          AND path = ANY($5))
         OR (address = ANY($6) AND path = $7)
         OR (address = ANY($8) AND path = ANY($9))
         OR (address = $10 AND collection_name IN ('delegatedStake', 'unbondingQueue', 'operators') AND key->>'key' = $11)
@@ -275,7 +295,7 @@ export async function fetchUserMappingHistory(
     endTime,
     startTime,
     collections,
-    `%${filters.userAddress}%`,
+    balancePaths.map((path) => path.slice('_balances['.length, -1)),
     balancePaths,
     filters.carryVaultAddrs,
     claimablePath,
@@ -315,6 +335,7 @@ export async function fetchGlobalMappingHistory(
       AND valid_to >= $2
       AND collection_name = ANY($3)
       AND key->>'key' = ANY($4)
+      AND address = ANY(ARRAY(SELECT DISTINCT address FROM mapping WHERE collection_name = ANY($3) AND collection_name != 'prices') || $5::text)
       AND (collection_name != 'prices' OR address = $5)
   `;
 
@@ -503,11 +524,12 @@ export async function fetchUserV3PoolMeta(
       SELECT DISTINCT address
       FROM "history@mapping"
       WHERE collection_name = 'positions'
-        AND path LIKE $3
+        AND address = ANY(ARRAY(SELECT DISTINCT address FROM mapping WHERE collection_name = 'positions' AND key->>'key' = $3))
+        AND key->>'key' = $3
         AND valid_from <= $1
         AND valid_to >= $2
       `,
-      [endTime, startTime, `%${userAddress}%`],
+      [endTime, startTime, userAddress],
     );
     const poolAddrs = [...new Set([...poolRows.map((r) => r.address), ...extraPoolAddrs])];
     if (poolAddrs.length === 0) return meta;

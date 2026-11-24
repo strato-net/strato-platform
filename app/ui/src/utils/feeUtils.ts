@@ -19,10 +19,10 @@ export const feeCoverage = (quote: FeeQuote, calls: number): FeeCoverage => {
 
 const fmt = (wei: bigint, decimals: number) => truncateDecimals(formatWeiAmount(wei.toString()), decimals);
 
-/** "Covered by 1 voucher", "0.0221 STRATO · 0.02 USDST equivalent", "0.02 USDST", or a mix of the two. */
+/** "Covered by 1 gas sponsored transaction", "0.0221 STRATO · 0.02 USDST equivalent", "0.02 USDST", or a mix of the two. */
 export const describeFee = (quote: FeeQuote, calls: number): string => {
   const { vouchersUsed, uncoveredCalls, chargeWei } = feeCoverage(quote, calls);
-  const vouchers = vouchersUsed ? `${vouchersUsed} voucher${vouchersUsed === 1 ? "" : "s"}` : "";
+  const vouchers = vouchersUsed ? `${vouchersUsed} gas sponsored transaction${vouchersUsed === 1 ? "" : "s"}` : "";
   if (!uncoveredCalls) return `Covered by ${vouchers}`;
   const charge = `${fmt(chargeWei, 4)} ${quote.currency}`;
   const usd = quote.currency === "STRATO"
@@ -79,7 +79,7 @@ export const describeFallback = (quote: FeeQuote, calls: number, currencyWei = 0
 export const feeShortfall = (quote: FeeQuote, calls: number, spend = NO_SPEND): string => {
   const { uncoveredCalls, chargeWei } = feeCoverage(quote, calls);
   if (!uncoveredCalls) return "";
-  if (!quote.valid) return "Network fee price unavailable: only vouchers can pay right now";
+  if (!quote.valid) return "Network fee price unavailable: only gas sponsored transactions can pay right now";
   if (chargeWei + spend.currencyWei <= BigInt(quote.balanceWei)) return "";
   // USDST buys only the fee: what the action itself spends must already be there.
   if (spend.currencyWei > BigInt(quote.balanceWei)) return `Insufficient ${quote.currency}`;

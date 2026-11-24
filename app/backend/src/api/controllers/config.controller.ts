@@ -17,7 +17,6 @@ class ConfigController {
           networkId: networkId,
           networkName: networkName,
           featuredEarnOpportunity: featuredEarnOpportunity || undefined,
-          stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null,
           contactEnabled: !!process.env.SENDGRID_API_KEY,
           multisigFactory,
         }

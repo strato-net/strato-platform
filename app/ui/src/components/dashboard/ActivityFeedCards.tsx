@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { activityTypes } from "./activityTypes";
-import { activityFeedApi } from "@/lib/activityFeed";
+import { activityFeedApi, ACTIVITIES_MAX_DEPTH } from "@/lib/activityFeed";
 import { useUser } from "@/context/UserContext";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -352,7 +352,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
       }
 
       setCardData(allCardData);
-      setTotalPages(Math.ceil((response.total || 0) / itemsPerPage));
+      setTotalPages(Math.ceil(Math.min(response.total || 0, ACTIVITIES_MAX_DEPTH) / itemsPerPage));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch activities");
     } finally {

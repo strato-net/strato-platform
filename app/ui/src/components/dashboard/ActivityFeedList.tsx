@@ -30,9 +30,11 @@ import {
   Download
 } from "lucide-react";
 import { formatUnits } from "viem";
-import { activityFeedApi } from "@/lib/activityFeed";
+import { activityFeedApi, EVENTS_MAX_LIMIT } from "@/lib/activityFeed";
 import type { Event } from "@strato/shared-types";
 import { useUser } from "@/context/UserContext";
+
+const CSV_EXPORT_MAX_ROWS = 10000;
 
 const ActivityFeedList = () => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -192,7 +194,7 @@ const ActivityFeedList = () => {
     try {
       setLoading(true);
       
-      // Get all events without pagination
+      // Get the newest events, one backend page at a time
       const apiFilters = {
         ...filters,
         contract_name: filters.contract_name ? `eq.${filters.contract_name}` : undefined,
@@ -200,13 +202,28 @@ const ActivityFeedList = () => {
         transaction_sender: filters.transaction_sender ? `eq.${filters.transaction_sender}` : undefined
       };
       
-      const response = await activityFeedApi.getEvents({
-        limit: totalEvents || 10000, // Get all events or a large number
-        offset: 0,
-        ...apiFilters
-      });
-      
-      const allEvents = response.events || [];
+      const allEvents: Event[] = [];
+      let total = 0;
+      // Event ids are serial: capping them at the first row's keeps events
+      // added during the export from shifting the later pages
+      let maxId: number | undefined;
+      for (let offset = 0; offset < CSV_EXPORT_MAX_ROWS; offset += EVENTS_MAX_LIMIT) {
+        const response = await activityFeedApi.getEvents({
+          limit: EVENTS_MAX_LIMIT,
+          offset,
+          order: 'block_timestamp.desc,id.desc',
+          max_id: maxId,
+          count: offset === 0, // the total is needed once
+          ...apiFilters
+        });
+        const page = response.events || [];
+        if (offset === 0) {
+          maxId = page[0]?.id;
+          total = response.total || 0;
+        }
+        allEvents.push(...page);
+        if (page.length < EVENTS_MAX_LIMIT) break;
+      }
       
       if (allEvents.length === 0) {
         alert('No data to export');
@@ -275,13 +292,17 @@ const ActivityFeedList = () => {
         link.click();
         document.body.removeChild(link);
       }
+
+      if (total > CSV_EXPORT_MAX_ROWS) {
+        alert(`Exported the newest ${allEvents.length} of ${total} events. Use the filters to export the rest.`);
+      }
     } catch (error) {
       console.error('Error downloading CSV:', error);
       alert('Failed to download CSV. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [filters, totalEvents, formatTimestamp, formatValue]);
+  }, [filters, formatTimestamp, formatValue]);
 
   // Memoized computed values to prevent unnecessary recalculations
   const paginationInfo = useMemo(() => {

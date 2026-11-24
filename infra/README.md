@@ -153,9 +153,13 @@ same run builds the environment from nothing and updates it:
    no app tier yet (the first run) it first deploys the front door without
    the app tier's paths, then waits up to 12 hours (`HOSTNAME_WAIT_MINUTES`)
    for the DNS record, which is set by hand; the build log names the
-   distribution the record has to point at, every minute.
+   distribution the record has to point at, every minute. The record is read
+   from the zone's own name servers, so it is seen within a minute of being
+   set.
 8. `app-tier`, the front door
-   (with freshly built app UI and SMD) and `obs-alarms`, then smoke checks through CloudFront by name, and the
+   (with freshly built app UI and SMD; the app UI's `config.js` carries the
+   environment file's `POSTHOG_KEY`, `POSTHOG_HOST` and `GOOGLE_ANALYTICS_ID`,
+   when it names them) and `obs-alarms`, then smoke checks through CloudFront by name, and the
    image set and both commits are recorded (`/ha-testnet-app/deploy/*`).
    A run with neither repo changed since does nothing.
 

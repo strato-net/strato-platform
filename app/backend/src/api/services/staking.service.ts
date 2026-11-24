@@ -1,4 +1,5 @@
 import { bloc, cirrus, strato } from "../../utils/appApiHelper";
+import { markFailedNodeCall, nodeCallWatch } from "../../utils/sharedPromise";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { authorizationDigest, findOperatedValidator, mapRegistryRevert, profileText, splitSignature } from "./stakingAuthorization";
@@ -140,6 +141,8 @@ export interface StratoStakingInfo {
   unattributedFees: string;
   totalFeesCredited: string;
   totalRewardsCredited: string;
+  totalEmitted?: string;
+  // The user's delegations plus the self-bond of every record they operate.
   userTotalStake: string;
   userTotalStakeUsd: string;
   claimableRewards: string;
@@ -370,7 +373,13 @@ const getBlocState = (
 ): Promise<Record<string, any>> => {
   const cacheKey = `${contractName}:${address}`;
   const cached = blocStateCache.get(cacheKey);
-  if (!fresh && cached && Date.now() < cached.expiresAt) return cached.state;
+  if (!fresh && cached && Date.now() < cached.expiresAt) {
+    // A watched caller (see nodeCallWatch) that joins a read another request made is marked
+    // when that read fails: the failed call itself marked only the request that made it.
+    const watcher = nodeCallWatch.getStore();
+    if (watcher) cached.state.catch((error) => markFailedNodeCall(watcher, error));
+    return cached.state;
+  }
 
   const state = bloc.get(accessToken, `/contracts/${contractName}/${address}/state`)
     .then(({ data }: { data: unknown }) => {
@@ -1317,6 +1326,10 @@ const getV1StakingInfo = async (
       operatorPendingSelfBondRewards = operatorRewards.selfBond;
       operatorPendingFees = recordFees;
       currentOperatorCommissionBps = commissionBps;
+      // Self-bond is part of the operator's position; it earns the stake rate with no
+      // commission taken.
+      userTotalStake += selfBond;
+      userWeightedApyBps += selfBond * validatorApyBps(state, 0n, currentIndexes.stakeRewardRate);
     }
 
     if (active && apyBps > bestActiveApyBps) {
@@ -1361,7 +1374,7 @@ const getV1StakingInfo = async (
     };
   });
 
-  // Your actual (stake-weighted) APY once you're delegated; best available
+  // Your actual (stake-weighted) APY once you hold stake; best available
   // across active validators until then.
   const estimatedApy = userTotalStake > 0n
     ? formatBpsAsPercent(userWeightedApyBps / userTotalStake)
@@ -1535,6 +1548,10 @@ const getV2StakingInfo = async (
     if (user && record.operator === user) {
       operated.push({ record, rewards: operatorPendingRewards, fees: operatorPendingFees });
       operatorClaimableTotal += operatorPendingRewards;
+      // Self-bond is part of the operator's position; _creditRewards pays it the per-stake
+      // rate with no commission taken.
+      userTotalStake += record.selfBond;
+      userWeightedApyBps += record.selfBond * realizedApyBps(recentRewards.get(validator) || 0n, record.totalStake, 0n);
     }
     if (record.active) activeValidatorCount += 1n;
 
@@ -1577,7 +1594,7 @@ const getV2StakingInfo = async (
     };
   });
 
-  // Your actual (stake-weighted) APY once you're delegated; the network's realized APY
+  // Your actual (stake-weighted) APY once you hold stake; the network's realized APY
   // until then.
   const networkBps = networkApyBps(state, recentRewards);
   const estimatedApy = userTotalStake > 0n
@@ -1642,6 +1659,7 @@ const getV2StakingInfo = async (
     unattributedFees: uintString(state.unattributedFees),
     totalFeesCredited: uintString(state.totalFeesCredited),
     totalRewardsCredited: uintString(state.totalRewardsCredited),
+    totalEmitted: uintString(state.totalEmitted),
     userTotalStake: userTotalStake.toString(),
     userTotalStakeUsd: stratoPriceWad > 0n ? ((userTotalStake * stratoPriceWad) / WAD).toString() : "0",
     claimableRewards: claimableRewards.toString(),

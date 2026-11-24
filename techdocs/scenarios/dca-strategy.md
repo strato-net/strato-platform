@@ -32,7 +32,6 @@ DCA does not prevent losses: if the price keeps falling, the position is still w
 ### 1. Fund Your Account
 
 - **Bridge in:** Open **Fund → Bridge In**, choose your network and a stablecoin, and under **You Receive On STRATO** choose **USDST**. Each confirmed deposit also mints vouchers to your account for transaction fees. See the [Bridge Guide](../guides/bridge.md).
-- **Or buy with a card or bank:** Use the Buy Crypto page (`/dashboard/onramp` on app.strato.nexus).
 
 Every bridge deposit pays gas on the source network, so fewer, larger deposits cost less in gas than many small ones.
 

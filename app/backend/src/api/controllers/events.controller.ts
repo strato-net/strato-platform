@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getEvents, getContractInfo, getActivitiesByTypes, type ActivityTypePair } from "../services/events.service";
+import { getEvents, getContractInfo, getActivitiesByTypes, clampEventsLimit, type ActivityTypePair } from "../services/events.service";
 import { ACTIVITY_FILTER_CONFIGS } from "../services/activityFilterConfigs";
+import { constants } from "../../config/constants";
 
 class EventsController {
   static async getEvents(
@@ -60,8 +61,12 @@ class EventsController {
         activityTypePairs.push({ contract_name, event_name, filterConfig });
       }
 
-      const limit = parseInt(query.limit as string || "10");
+      const limit = clampEventsLimit(query.limit);
       const offset = parseInt(query.offset as string || "0");
+      if (limit + offset > constants.ACTIVITIES_MAX_DEPTH) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: `limit + offset must not exceed ${constants.ACTIVITIES_MAX_DEPTH}` });
+        return;
+      }
       const userAddress = query.my_activity === 'true' ? address : undefined;
       const timeRange = query.time_range as string | undefined;
 

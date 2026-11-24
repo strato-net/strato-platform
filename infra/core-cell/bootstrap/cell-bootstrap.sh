@@ -366,13 +366,13 @@ systemctl enable --now strato-cell.service
 # ethereum-discover both open the new peer store, and the one that finds it
 # locked exits. So see that the node stays up, and start it again when it did
 # not; that also starts the node of a bootstrap that is run again.
-for attempt in 1 2 3 4 5; do
+for attempt in 1 2 3 4 5 6; do
   sleep 45
   pgrep -x convoke >/dev/null && break
+  (( attempt < 6 )) || { log "the node does not stay up: see $NODE_DIR/logs/convoke.log"; exit 1; }
   log "the node is not running after its start (attempt $attempt of 5): $(grep 'ERROR: Process' "$NODE_DIR/logs/convoke.log" 2>/dev/null | tail -1 || true) Starting it again"
   systemctl restart strato-cell.service
 done
-pgrep -x convoke >/dev/null || { log "the node does not stay up: see $NODE_DIR/logs/convoke.log"; exit 1; }
 
 # Runs a container on the node's compose network: on_node_network <name>
 # <docker run arguments>. That network comes and goes with the node (a node

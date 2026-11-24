@@ -34,6 +34,17 @@ export const canonicalDepositKey = (key: string): string => {
 // The source transaction hash a deposit key refers to
 export const depositKeyTxHash = (key: string): string => key.split("#")[0];
 
+// The router deposit id carried by a multi-deposit key ("<hash>#<depositId>"), if any
+export const depositKeyId = (key: string): string | undefined => {
+  const hashIndex = key.indexOf("#");
+  if (hashIndex === -1) return undefined;
+  const suffix = key.slice(hashIndex + 1);
+  if (!/^\d+$/.test(suffix)) {
+    throw new Error(`Invalid deposit id in key ${key}`);
+  }
+  return BigInt(suffix).toString();
+};
+
 type ParsedDepositLog = Omit<WindowDeposit, "depositKey" | "sharesTransaction">;
 
 export const parseDepositLog = (

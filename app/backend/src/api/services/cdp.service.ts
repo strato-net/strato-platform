@@ -3,6 +3,7 @@
  */
 
 import { strato, cirrus } from "../../utils/appApiHelper";
+import { isMissingRelationError } from "../../utils/cirrusErrors";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { governedInput } from "./user.service";
 import { FunctionInput } from "../../types/types";
@@ -155,6 +156,9 @@ export const getCDPRegistry = async (
 
     return registryData;
   } catch (error: any) {
+    // A table, column or embedded table that does not exist yet keeps its code, so a caller
+    // can tell it from a failure.
+    if (isMissingRelationError(error)) throw error;
     console.error("Error in getCDPRegistry:", {
       cdpRegistry,
       params,
@@ -169,10 +173,11 @@ export const getCDPRegistry = async (
  */
 export const getUserVaults = async (
   accessToken: string,
-  userAddress: string
+  userAddress: string,
+  knownRegistry?: Record<string, any>
 ): Promise<any[]> => {
   try {
-    const registry = await getCDPRegistry(accessToken, userAddress, {}, "getUserVaults");
+    const registry = knownRegistry ?? (await getCDPRegistry(accessToken, userAddress, {}, "getUserVaults"));
     
     if (!registry?.cdpEngine) {
       return [];
@@ -206,25 +211,34 @@ const calculateHealthFactor = (cr: number, liquidationRatio: number): number => 
   return cr / liquidationRatio;
 };
 
+// Helper function to get token info for several tokens in one query
+const getTokenInfos = async (
+  accessToken: string,
+  tokenAddresses: string[]
+): Promise<Record<string, { symbol: string; decimals: number }>> => {
+  const { data } = await cirrus.get(accessToken, `/${Token}`, {
+    params: {
+      address: `in.(${tokenAddresses.join(",")})`,
+      select: "address,_symbol,customDecimals",
+    }
+  });
+
+  const tokens = new Map<string, any>((data || []).map((t: any) => [t.address, t]));
+  return Object.fromEntries(
+    tokenAddresses.map((address) => {
+      const token = tokens.get(address);
+      return [address, { symbol: token?._symbol || "UNKNOWN", decimals: token?.customDecimals || 18 }];
+    })
+  );
+};
+
 // Helper function to get health status
 // Helper function to get token info
 const getTokenInfo = async (
   accessToken: string,
   tokenAddress: string
-): Promise<{ symbol: string; decimals: number }> => {
-  const { data } = await cirrus.get(accessToken, `/${Token}`, {
-    params: {
-      address: "eq." + tokenAddress,
-      select: "_symbol,customDecimals",
-    }
-  });
-  
-  const token = data?.[0];
-  return {
-    symbol: token?._symbol || "UNKNOWN",
-    decimals: token?.customDecimals || 18,
-  };
-};
+): Promise<{ symbol: string; decimals: number }> =>
+  (await getTokenInfos(accessToken, [tokenAddress]))[tokenAddress];
 
 // Helper function to check if a single token is active (status === 2 and in factory)
 const isTokenActive = async (
@@ -348,18 +362,20 @@ export const getVaults = async (
   }
 
   // Use efficient user-specific vault query
-  const userVaults = await getUserVaults(accessToken, userAddress);
+  const userVaults = await getUserVaults(accessToken, userAddress, registry);
 
   if (userVaults.length === 0) {
     return [];
   }
+
+  const tokenInfos = await getTokenInfos(accessToken, userVaults.map((v: any) => v.asset));
 
   const vaultPromises = userVaults.map(async (vaultEntry: any) => {
     const asset = vaultEntry.asset;
     const vault = vaultEntry.Vault;
     
     // Get token info
-    const tokenInfo = await getTokenInfo(accessToken, asset);
+    const tokenInfo = tokenInfos[asset];
     
     // Get asset config and global state
     const config = registry.cdpEngine.collateralConfigs?.find(

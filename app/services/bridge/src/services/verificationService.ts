@@ -1,4 +1,4 @@
-import { config, ZERO_ADDRESS, TRANSFER_EVENT_SIGNATURE, WAD } from "../config";
+import { config, DEPOSIT_EVENT_SIGNATURES, ZERO_ADDRESS, TRANSFER_EVENT_SIGNATURE, WAD } from "../config";
 import { 
   getTransactionReceiptsBatch, 
   getInternalTransactionsBatch 
@@ -7,7 +7,21 @@ import { getRebaseFactors } from "./cirrusService";
 import { normalizeAddress, safeToBigInt, ensureHexPrefix, convertToStratoDecimals, parseUint256, decodeTopicAddr, isOkStatus } from "../utils/utils";
 import { logInfo } from "../utils/logger";
 import { DepositInfo } from "../types";
-import { depositKeyTxHash } from "./depositEventService";
+import { depositKeyId, depositKeyTxHash, parseDepositLog, RawDepositLog } from "./depositEventService";
+
+const DEPOSIT_EVENT_TOPICS = new Set(DEPOSIT_EVENT_SIGNATURES.map((sig) => sig.toLowerCase()));
+
+interface ValidEthTransfer {
+  index: number;
+  from: string;
+  to: string;
+  value: bigint;
+}
+
+interface TxAttributionState {
+  usedRouterEventIndices: Set<number>;
+  usedEthTraceIndices: Set<number>;
+}
 
 const decodeTransferLog = (log: any, sig: string) => {
   if (!log?.topics || log.topics.length < 3) return null;
@@ -20,15 +34,90 @@ const decodeTransferLog = (log: any, sig: string) => {
   };
 };
 
-const findInternalEthTransfer = (traces: any[], toAddr: string, expectedAmount: bigint): boolean => 
-  traces.some((trace: any) => {
-    if (trace.type === 'call' && trace.action?.to) {
-      const traceTo = normalizeAddress(trace.action.to);
-      const traceValue = safeToBigInt(trace.action.value || '0');
-      return traceTo === toAddr && traceValue === expectedAmount;
-    }
-    return false;
+const hasErroredAncestor = (traceAddress: unknown, failedPaths: Set<string>): boolean => {
+  if (!Array.isArray(traceAddress)) return false;
+  for (let i = 0; i < traceAddress.length; i++) {
+    if (failedPaths.has(traceAddress.slice(0, i).join("."))) return true;
+  }
+  return false;
+};
+
+const findValidEthTransfersToSafe = (traces: any[], safeAddr: string): ValidEthTransfer[] => {
+  const failedPaths = new Set(
+    traces
+      .filter((trace) => Boolean(trace?.error) && Array.isArray(trace?.traceAddress))
+      .map((trace) => trace.traceAddress.join(".")),
+  );
+
+  const valid: ValidEthTransfer[] = [];
+  traces.forEach((trace, index) => {
+    if (trace?.type !== "call" || trace?.error) return;
+    if (hasErroredAncestor(trace.traceAddress, failedPaths)) return;
+
+    const callType = typeof trace.action?.callType === "string"
+      ? trace.action.callType.toLowerCase()
+      : "";
+    if (callType !== "call" || !trace.action?.to) return;
+
+    const from = trace.action.from ? normalizeAddress(trace.action.from) : "";
+    const to = normalizeAddress(trace.action.to);
+    if (to !== safeAddr || from === safeAddr) return;
+
+    const value = safeToBigInt(trace.action.value || "0");
+    if (value <= 0n) return;
+
+    valid.push({
+      index,
+      from,
+      to,
+      value,
+    });
   });
+
+  return valid;
+};
+
+const extractRouterDepositEvents = (
+  receipt: any,
+  depositRouter: string,
+  chainId: number,
+  sourceTxHash: string,
+) => {
+  const logs = Array.isArray(receipt.logs) ? receipt.logs : [];
+  const expectedTxHash = ensureHexPrefix(sourceTxHash).toLowerCase();
+  const parsed: ReturnType<typeof parseDepositLog>[] = [];
+
+  for (const log of logs) {
+    if (!log?.address || normalizeAddress(log.address) !== depositRouter) continue;
+    const topic0 = typeof log.topics?.[0] === "string" ? log.topics[0].toLowerCase() : "";
+    if (!DEPOSIT_EVENT_TOPICS.has(topic0)) continue;
+    if (log.transactionHash && ensureHexPrefix(log.transactionHash).toLowerCase() !== expectedTxHash) {
+      continue;
+    }
+    parsed.push(
+      parseDepositLog(
+        {
+          ...log,
+          transactionHash: log.transactionHash ?? receipt.transactionHash ?? expectedTxHash,
+        } as RawDepositLog,
+        chainId,
+      ),
+    );
+  }
+
+  return parsed;
+};
+
+const expectedStratoAmount = (externalAmount: bigint, ctx: any): bigint => {
+  const convertedAmount = convertToStratoDecimals(externalAmount, ctx.externalDecimals);
+  if (ctx.rebaseFactor && ctx.rebaseFactor > 0n) {
+    const rebasedAmount = (convertedAmount * WAD) / ctx.rebaseFactor;
+    // Truncate to external token decimal precision to match oracle's integer truncation
+    const precision = 10n ** BigInt(18 - ctx.externalDecimals);
+    return (rebasedAmount / precision) * precision;
+  }
+  return convertedAmount;
+};
 
 const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string, rebaseFactor?: bigint) => {
   if (Number(deposit.externalChainId) !== chainId) {
@@ -36,35 +125,98 @@ const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string, re
   }
 
   const externalToken = normalizeAddress(ensureHexPrefix(deposit.externalToken));
-  const depositRouter = normalizeAddress(deposit.depositRouter);
+  const depositRouter = normalizeAddress(ensureHexPrefix(deposit.depositRouter));
+  const externalSender = normalizeAddress(ensureHexPrefix(deposit.externalSender));
+  const stratoRecipient = normalizeAddress(ensureHexPrefix(deposit.stratoRecipient));
+  const stratoToken = normalizeAddress(ensureHexPrefix(deposit.stratoToken));
+  const depositId = depositKeyId(deposit.externalTxHash);
   
   return {
     safe,
     isETH: externalToken === ZERO_ADDRESS,
     externalToken,
     depositRouter,
+    externalSender,
+    stratoRecipient,
+    stratoToken,
+    depositId,
     stratoTokenAmount: safeToBigInt(deposit.stratoTokenAmount),
     externalDecimals: deposit.externalDecimals,
     rebaseFactor,
   };
 };
 
-const verifyEthDeposit = (receipt: any, traces: any[], ctx: any): Error | null => {
-  const to = receipt.to ? normalizeAddress(receipt.to) : "";
-  
-  if (to === ctx.safe) {
+const verifyEthDeposit = (
+  receipt: any,
+  traces: any[],
+  ctx: any,
+  chainId: number,
+  sourceTxHash: string,
+  attribution: TxAttributionState,
+): Error | null => {
+  if (ctx.stratoTokenAmount <= 0n) {
+    return new Error(`Invalid ETH deposit amount ${ctx.stratoTokenAmount}`);
+  }
+
+  const routerEvents = extractRouterDepositEvents(receipt, ctx.depositRouter, chainId, sourceTxHash);
+  const validTransfers = findValidEthTransfersToSafe(traces, ctx.safe);
+
+  // Routed ETH deposit: match the configured router's event and consume a corresponding router-to-custody payment
+  if (routerEvents.length > 0 || ctx.depositId !== undefined) {
+    if (routerEvents.length === 0) {
+      return new Error(`No DepositRouter event found for router ${ctx.depositRouter}`);
+    }
+    if (ctx.depositId === undefined && routerEvents.length > 1) {
+      return new Error(`Ambiguous multi-deposit transaction without #<depositId> suffix`);
+    }
+
+    const eventIndex = routerEvents.findIndex((event, idx) => {
+      if (attribution.usedRouterEventIndices.has(idx)) return false;
+      if (ctx.depositId !== undefined && event.depositId !== ctx.depositId) return false;
+      if (event.externalToken !== ctx.externalToken) return false;
+      if (event.externalSender !== ctx.externalSender) return false;
+      if (event.stratoRecipient !== ctx.stratoRecipient) return false;
+      if (event.targetStratoToken !== ctx.stratoToken) return false;
+      return expectedStratoAmount(safeToBigInt(event.externalTokenAmount), ctx) === ctx.stratoTokenAmount;
+    });
+
+    if (eventIndex === -1) {
+      return new Error(
+        `No matching DepositRouter event from ${ctx.depositRouter} for deposit ${ctx.depositId ?? sourceTxHash}`,
+      );
+    }
+
+    const expectedWei = safeToBigInt(routerEvents[eventIndex].externalTokenAmount);
+    const ethRouterEventCountForAmount = routerEvents.filter(
+      (event) =>
+        event.externalToken === ZERO_ADDRESS &&
+        safeToBigInt(event.externalTokenAmount) === expectedWei,
+    ).length;
+    const routerTransfersForAmount = validTransfers.filter(
+      (transfer) => transfer.from === ctx.depositRouter && transfer.value === expectedWei,
+    );
+    if (routerTransfersForAmount.length < ethRouterEventCountForAmount) {
+      return new Error(
+        `Insufficient ETH transfers from DepositRouter ${ctx.depositRouter} to Safe ${ctx.safe} for amount ${expectedWei}`,
+      );
+    }
+
+    const transfer = routerTransfersForAmount.find(
+      (candidate) => !attribution.usedEthTraceIndices.has(candidate.index),
+    );
+    if (!transfer) {
+      return new Error(
+        `No unallocated ETH transfer from DepositRouter ${ctx.depositRouter} to Safe ${ctx.safe} found`,
+      );
+    }
+
+    attribution.usedRouterEventIndices.add(eventIndex);
+    attribution.usedEthTraceIndices.add(transfer.index);
     return null;
   }
 
-  if (to !== ctx.depositRouter) {
-    return new Error(`ETH receiver mismatch. Expected: ${ctx.depositRouter}, Got: ${to || "null"}`);
-  }
-  
-  if (!findInternalEthTransfer(traces, ctx.safe, ctx.stratoTokenAmount)) {
-    return new Error(`No internal ETH transfer to Safe ${ctx.safe} found`);
-  }
-  
-  return null;
+  // ETH sent straight to custody carries no router event, so nothing binds it to a recipient
+  return new Error(`ETH deposit has no DepositRouter event from ${ctx.depositRouter}`);
 };
 
 const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
@@ -147,6 +299,20 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
       getInternalTransactionsBatch(chainId, txHashes)
     ]);
 
+    const txAttributions = new Map<string, TxAttributionState>();
+    const getTxAttribution = (txHash: string): TxAttributionState => {
+      const key = ensureHexPrefix(txHash).toLowerCase();
+      let state = txAttributions.get(key);
+      if (!state) {
+        state = {
+          usedRouterEventIndices: new Set<number>(),
+          usedEthTraceIndices: new Set<number>(),
+        };
+        txAttributions.set(key, state);
+      }
+      return state;
+    };
+
     // Verify each deposit using the batched data
     for (const deposit of chainDeposits) {
       try {
@@ -172,7 +338,14 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
 
         // Branch to appropriate verifier
         const error = ctx.isETH 
-          ? verifyEthDeposit(receipt, internalTxsMap.get(sourceTxHash) || [], ctx)
+          ? verifyEthDeposit(
+              receipt,
+              internalTxsMap.get(sourceTxHash) || [],
+              ctx,
+              chainId,
+              sourceTxHash,
+              getTxAttribution(sourceTxHash),
+            )
           : verifyErc20Deposit(receipt, ctx);
 
         results.set(deposit.externalTxHash, error);

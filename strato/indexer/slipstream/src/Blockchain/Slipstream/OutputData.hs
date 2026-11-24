@@ -1388,6 +1388,7 @@ initialSlipstreamQueries =
       []
   , RawSQL backfillInheritanceSQL
   , RawSQL genericBaseTableIndexesSQL
+  , RawSQL eventStatisticsAnalyzeSQL
   , RawSQL "DROP INDEX IF EXISTS mapping_idx, storage_status_address_idx;"
   , RawSQL jsonbMergeDeepSQL
   , RawSQL jsonbObjToArraySQL
@@ -1507,6 +1508,27 @@ genericBaseTableIndexesSQL = T.unlines
   , ""
   , "CREATE STATISTICS IF NOT EXISTS event_attr_strato_recipient_stats"
   , "  ON (attributes->>'stratoRecipient') FROM event;"
+  ]
+
+-- CREATE STATISTICS only defines the statistics above: they hold no data
+-- until event is analysed, and autoanalyze waits for a tenth of the table to
+-- change. Until then the planner assumes that an attribute value matches 0.5%
+-- of the rows and walks event_timestamp_idx instead of using the hash
+-- indexes. The check keeps later startups from sampling the table again; an
+-- empty table never fills them, and analysing it costs nothing. It must never
+-- stop slipstream from starting.
+eventStatisticsAnalyzeSQL :: Text
+eventStatisticsAnalyzeSQL = T.unlines
+  [ "DO $fn$"
+  , "BEGIN"
+  , "  IF EXISTS (SELECT 1 FROM pg_stats_ext_exprs"
+  , "              WHERE schemaname = current_schema() AND tablename = 'event' AND n_distinct IS NULL) THEN"
+  , "    ANALYZE event;"
+  , "  END IF;"
+  , "EXCEPTION WHEN OTHERS THEN"
+  , "  RAISE WARNING 'event statistics not collected: %', SQLERRM;"
+  , "END;"
+  , "$fn$;"
   ]
 
 -- PostgREST runs this inside every request's transaction (db-pre-request in
