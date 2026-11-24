@@ -25,6 +25,7 @@ import Control.Monad.Composable.Vault
 import Control.Monad.IO.Class
 import "cipher-aes" Crypto.Cipher.AES
 import "cryptonite" Crypto.Hash (hashInitWith, hashUpdate)
+import "cryptonite" Crypto.Random.Entropy (getEntropy)
 import Crypto.Hash.Algorithms (Keccak_256 (..))
 import Crypto.Types.PubKey.ECC
 import Data.Binary
@@ -47,8 +48,14 @@ ethCryptConnect ::
   PublicPoint ->
   ConduitM B.ByteString B.ByteString m (EthCryptState, EthCryptState)
 ethCryptConnect otherPubKey = do
-  let myNonce = word256ToBytes 20 --TODO- Important!  Don't hardcode this
-  handshakeInitBytes <- getHandshakeBytes otherPubKey myNonce
+  -- Fresh for every connection. The nonce goes to the peer encrypted to its
+  -- static key and into the session keys, so only the peer we dialed can
+  -- derive them: with a fixed nonce, anyone answering in its place could. The
+  -- ephemeral key keeps a later leak of our static key from opening this
+  -- session.
+  myNonce <- liftIO $ getEntropy 32
+  ephemeralPriv <- liftIO newPrivateKey
+  handshakeInitBytes <- getHandshakeBytes ephemeralPriv otherPubKey myNonce
   yield handshakeInitBytes
 
   handshakeReplyBytes <- CB.take 210
@@ -57,9 +64,8 @@ ethCryptConnect otherPubKey = do
 
   let ackMsg = bytesToAckMsg $ either (error . ("error in ethCryptConnect" ++)) id eAckBS
 
-  SharedKey shared <- getShared $ pointToSecPubKey $ ackEphemeralPubKey ackMsg
-
-  let m_originated = False -- hardcoded for now, I can only connect as client
+  let SharedKey shared = deriveSharedKey ephemeralPriv $ pointToSecPubKey $ ackEphemeralPubKey ackMsg
+      m_originated = False -- hardcoded for now, I can only connect as client
       otherNonce = word256ToBytes $ ackNonce ackMsg
       frameDecKey = myNonce `add` otherNonce `add` shared `add` shared
       macEncKey = frameDecKey `add` shared

@@ -22,7 +22,6 @@ import Data.Binary.Put
 import Data.Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import Data.Maybe
 
 data AckMessage = AckMessage
   { ackEphemeralPubKey :: Point,
@@ -72,21 +71,18 @@ bytesToAckMsg bytes
       }
 bytesToAckMsg _ = error "wrong number of bytes in call to bytesToECIESMsg"
 
-getHandshakeBytes :: (MonadIO m, HasVault m) => PublicPoint -> B.ByteString -> m B.ByteString
-getHandshakeBytes otherPubKey myNonce = do
+-- | The auth message that opens an outbound RLPx handshake. The connection's
+-- ephemeral key signs it, so the receiver recovers that key from the signature
+-- and derives the session secret from it rather than from our static key.
+getHandshakeBytes :: (MonadIO m, HasVault m) => PrivateKey -> PublicPoint -> B.ByteString -> m B.ByteString
+getHandshakeBytes ephemeralPriv otherPubKey myNonce = do
   myPublic' <- getPub
   SharedKey sharedKey <- getShared $ pointToSecPubKey otherPubKey
 
   let myPublic = secPubKeyToPoint myPublic'
       msg = word256ToBytes $ bytesToWord256 sharedKey `xor` bytesToWord256 myNonce
-
-  sig <- sign msg
-
-  -- this signature recovery is pointless - the "ephermal" key is actually just myPublic
-  let ephemeral =
-        fromMaybe (error "malformed signature given to call getHandshakeBytes") $
-          recoverPub sig msg
-      hepubk = keccak256ToByteString $ hash $ pointToBytes $ secPubKeyToPoint ephemeral
+      sig = signMsg ephemeralPriv msg
+      hepubk = keccak256ToByteString $ hash $ pointToBytes $ secPubKeyToPoint $ derivePublicKey ephemeralPriv
       pubk = pointToBytes myPublic
       theData =
         (exportSignature sig)
