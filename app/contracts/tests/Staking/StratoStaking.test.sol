@@ -852,6 +852,68 @@ contract Describe_StratoStaking {
         require(strato.balanceOf(address(operatorA)) - before == 1e18, "all of it claimable");
     }
 
+    // ---- the launch recommit -------------------------------------------------------------
+
+    // Mainnet's launch: the first schedule was committed small (R0 = 10k), the launch reserve
+    // is minted straight to the contract, and one owner call takes it in and installs the
+    // launch schedule. Here the first reserve is 10k, so this tops it up to exactly 8M.
+    uint256 constant LAUNCH_MINT = 7990000e18;
+
+    function _recommitRejected() internal returns (bool) {
+        bool rejected = false;
+        try staking.recommitEmissionSchedule() {
+        } catch {
+            rejected = true;
+        }
+        return rejected;
+    }
+
+    function it_recommits_the_launch_schedule_once_taking_in_strato_sent_straight_to_it() public {
+        _fundReserve(10000e18);
+        require(_recommitRejected(), "nothing to replace before the first commitment");
+        staking.commitEmissionSchedule(36500e18, 1561984e18, 10000e18, 0);
+        uint256 start = staking.emissionStartTime();
+
+        require(_recommitRejected(), "the launch STRATO has not arrived");
+        strato.mint(address(staking), LAUNCH_MINT - 1);
+        require(_recommitRejected(), "a reserve one wei short of the launch R0 is refused");
+        strato.mint(address(staking), 1);
+        require(staking.emissionReserve() == 10000e18 && staking.recoverableUntrackedStrato() == LAUNCH_MINT, "sent straight in, it is not yet reserve");
+
+        bool rejected = false;
+        try user1.do(address(staking), "recommitEmissionSchedule()") {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "only the owner recommits");
+
+        staking.recommitEmissionSchedule();
+        require(staking.emissionRateE0() == 500000e18 && staking.emissionStakeS0() == 5000000e18 && staking.emissionReserveR0() == 8000000e18, "the launch schedule");
+        require(staking.emissionReserve() == 10000e18 + LAUNCH_MINT, "what was sent in joins the reserve");
+        require(staking.recoverableUntrackedStrato() == 0, "and is no longer the owner's to recover");
+        require(staking.emissionStartTime() == start && staking.emissionRecommitted(), "the start stands; the recommit is recorded");
+        require(_recommitRejected(), "once");
+        require(_commitRejected(500e18, 1000e18, 1000e18), "and the first commitment stays closed");
+    }
+
+    // A launch-sized reserve is only ever priced against the launch schedule: sent straight in
+    // it does not move the rate, and the recommit prices it with the launch E0, S0 and R0.
+    function it_prices_the_launch_reserve_only_against_the_launch_schedule() public {
+        _bondBoth();                          // weight 3,000
+        _mintAndApprove(user1, 40000e18);
+        _stake(user1, VALIDATOR_A, 47000e18); // weight 50,000, so S * S0 = 2.5e47 has an exact root
+        _fundReserve(10000e18);
+        staking.commitEmissionSchedule(36500e18, 1561984e18, 10000e18, 0);
+        uint256 firstRate = staking.emissionAnnualRate();
+
+        strato.mint(address(staking), LAUNCH_MINT);
+        require(staking.emissionAnnualRate() == firstRate, "STRATO sent straight in leaves the rate alone");
+
+        staking.recommitEmissionSchedule();
+        // 500k * sqrt(50,000 / 5M) * (8M / 8M) = 50,000 a year
+        require(staking.emissionAnnualRate() == 50000e18, "the launch formula");
+    }
+
     // ---- discretionary rewards -----------------------------------------------------------
 
     function _fundedToken(string symbol) internal returns (Token) {
