@@ -4,7 +4,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useQuery } from "@tanstack/react-query";
-import { useAccount, useDisconnect, useSignMessage, useWalletClient } from "wagmi";
+import { useAccount, useConnections, useDisconnect, useSignMessage, useWalletClient } from "wagmi";
 import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
 import { isAuthenticated, logout as authLogout, redirectToSignedOutLanding, WALLET_CONNECT_REQUEST_EVENT } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE } from "@/lib/constants";
@@ -66,6 +66,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const account = useAccount();
   const { openConnectModal } = useConnectModal();
   const { disconnect } = useDisconnect();
+  const connections = useConnections();
   const { data: walletClient } = useWalletClient();
   const { signMessageAsync } = useSignMessage();
   const [stratoAddress, setStratoAddress] = useState<string | null>(null);
@@ -313,7 +314,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const isExternalWalletConnected = !!externalWalletAddress;
   const externalEvmWalletAddress = !isStratoConnector(account.connector) ? externalWalletAddress : null;
   const isExternalEvmWalletConnected = !!externalEvmWalletAddress;
-  const shouldUseExternalWallet = !sessionExpiryLogoutStartedRef.current && !loading && !isLoggedIn && isExternalWalletConnected;
+  const shouldUseExternalWallet = !sessionExpiryLogoutStartedRef.current && !loading && !isLoggedIn && isExternalEvmWalletConnected;
+  // The STRATO connector is only valid with a vault session. Without one, wagmi stays
+  // connected and RainbowKit's openConnectModal becomes a no-op, wedging Connect Wallet.
+  const isStaleStratoConnection = !loading && !isLoggedIn && account.isConnected && isStratoConnector(account.connector);
   // The vault identity wins whenever a vault session exists: the backend suppresses the
   // X-Wallet-Address header and resolves data for the vault address, so the UI must not
   // display or filter by an external wallet connected on the Fund page. Guests fall back
@@ -395,6 +399,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     externalEvmConnectedRef.current = isExternalEvmWalletConnected;
   }, [isExternalEvmWalletConnected]);
+
+  useEffect(() => {
+    if (isStaleStratoConnection) disconnect();
+  }, [isStaleStratoConnection, disconnect]);
 
   // A guest's external wallet confirms the partner ref link it arrived
   // through, once (claimWalletReferral keeps track). Signed through wagmi's
@@ -481,7 +489,9 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     // next login in this browser.
     clearExternalWalletActive();
     try {
-      disconnect();
+      // disconnect() alone only drops the active connector; a second one (e.g. STRATO
+      // behind MetaMask) would stay persisted and reconnect after logout.
+      connections.forEach(({ connector }) => disconnect({ connector }));
     } catch {
       // Continue STRATO logout even if wallet disconnect fails.
     }
@@ -497,7 +507,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     if (gtag) gtag('set', { user_id: null });
     resetUser();
     authLogout();
-  }, [disconnect]);
+  }, [connections, disconnect]);
 
   useEffect(() => {
     checkAuthenticationStatus(true);

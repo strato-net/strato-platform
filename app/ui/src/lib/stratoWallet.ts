@@ -276,12 +276,7 @@ function stratoConnector(walletDetails: Record<string, unknown> = {}) {
 
     async isAuthorized() {
       if (_suppressReconnect || isExternalWalletActive()) return false;
-      if (currentAddress) return true;
-      const stored = getStoredStratoConnection(config.state);
-      if (stored) {
-        currentAddress = stored.address;
-        return true;
-      }
+      // Always ask the server: the cached connection outlives the vault session.
       try {
         const res = await fetch("/api/user/me", { credentials: "include" });
         if (!res.ok) return false;
