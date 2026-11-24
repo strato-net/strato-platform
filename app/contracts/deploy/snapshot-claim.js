@@ -12,8 +12,9 @@
 //
 // Env: NODE_URL; for deploy, load and close also OAUTH_URL, OAUTH_CLIENT_ID,
 // OAUTH_CLIENT_SECRET, GLOBAL_ADMIN_NAME, GLOBAL_ADMIN_PASSWORD (the loader account).
-// SNAPSHOT_CLAIM: the contract (40 hex) for load, close and verify. BATCH_SIZE (default 25):
-// rows per setAllocations transaction.
+// SNAPSHOT_CLAIM: the contract (40 hex) for load, close and verify. BATCH_SIZE (default 400):
+// rows per setAllocations transaction. On helium (2026-11-24) 401 and 800 rows each fit one
+// transaction; a 1500-row request was dropped by the node.
 // deploy: STRATO_TOKEN, CLAIM_OWNER (the funding multisig), UNCLAIMED_RECIPIENT, and
 // CLAIM_WINDOW in seconds (default 7776000, 90 days). verify checks the contract against any
 // of those that are set, and against LOADER.
@@ -22,8 +23,10 @@
 // STRATO, up to 18 places), then one row per account. Accounts are 40 hex, with or without
 // 0x, each at most once; amounts are > 0. The sha256 printed is of the file's bytes.
 //
-// Reads go through the node's JSON-RPC eth_call, never Cirrus: a contract deployed by a
-// plain account gets no Cirrus tables. Removing a row from the manifest after loading it is
+// Reads never use Cirrus: a contract deployed by a plain account gets no Cirrus tables.
+// Scalars come from the node's JSON-RPC eth_call; per-account allocations from its storage
+// API, because eth_call of a public mapping getter keyed by an address returns 0 on current
+// nodes (checked on helium 2026-11-24). Removing a row from the manifest after loading it is
 // not undone by `load`; verify then reports more accounts on-chain than in the file.
 // Nothing is funded before close, so the remedy is a fresh deployment.
 require('dotenv').config();
@@ -82,7 +85,7 @@ function loadManifest(file) {
     total += amount;
   });
   if (!rows.length) throw new Error('the manifest has no rows');
-  const batchSize = Number(process.env.BATCH_SIZE || 25);
+  const batchSize = Number(process.env.BATCH_SIZE || 400);
   if (!Number.isInteger(batchSize) || batchSize < 1) throw new Error('BATCH_SIZE must be a positive integer');
   return { file, rows, total, count: BigInt(rows.length), sha256: crypto.createHash('sha256').update(bytes).digest('hex'), batchSize };
 }
@@ -92,10 +95,10 @@ function printManifest(m) {
   console.log(`  ${m.count} accounts, total ${m.total} wei (${fmtTokens(m.total)} STRATO), ${Math.ceil(m.rows.length / m.batchSize)} batch(es) of up to ${m.batchSize}`);
 }
 
-// ---- reads: JSON-RPC eth_call, no login ---------------------------------------------------
+// ---- reads: no login ------------------------------------------------------------------------
 
 const SEL = {
-  allocation: 'b81b8630', claimed: 'c884ef83', totalAllocated: '45f7f249', allocationCount: 'cd8227f9',
+  totalAllocated: '45f7f249', allocationCount: 'cd8227f9',
   totalClaimed: 'd54ad2a1', loadingClosed: '84949862', deadline: '29dcb0cf', token: 'fc0c546a',
   loader: 'f74e2c3f', unclaimedRecipient: '6a2bfdda', claimWindow: 'c5d37ae1', owner: '8da5cb5b',
   balanceOf: '70a08231',
@@ -112,14 +115,23 @@ async function ethCall(to, data) {
 const uintAt = async (to, sel, arg = '') => BigInt('0x' + await ethCall(to, sel + arg));
 const addressAt = async (to, sel) => (await ethCall(to, sel)).slice(24);
 
-// Every manifest account's on-chain allocation, a few calls at a time.
+// One account's allocation from the node's storage API (no row: never set, or set to 0).
+async function storedAllocation(claim, account) {
+  const { data } = await axios.get(`${config.nodes[0].url.replace(/\/$/, '')}/strato-api/eth/v1.2/storage`, { params: { address: claim, key: `allocation[${account}]` }, timeout: 30000 });
+  if (!Array.isArray(data)) throw new Error(`storage read for ${account} failed: ${JSON.stringify(data).slice(0, 200)}`);
+  if (!data.length) return 0n;
+  if (!/^\d+$/.test(String(data[0].value))) throw new Error(`unexpected stored allocation for ${account}: ${JSON.stringify(data[0]).slice(0, 200)}`);
+  return BigInt(data[0].value);
+}
+
+// Every manifest account's on-chain allocation, a few reads at a time.
 async function onChainAllocations(claim, rows) {
   const out = new Array(rows.length);
   let next = 0;
   await Promise.all(Array.from({ length: 8 }, async () => {
     while (next < rows.length) {
       const i = next++;
-      out[i] = await uintAt(claim, SEL.allocation, addressWord(rows[i].account));
+      out[i] = await storedAllocation(claim, rows[i].account);
     }
   }));
   return out;
