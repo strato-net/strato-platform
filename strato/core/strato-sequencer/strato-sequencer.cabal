@@ -113,6 +113,27 @@ executable strato-sequencer
     , warp
   default-language: Haskell2010
 
+test-suite dependent-block-db-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Paths_strato_sequencer
+  hs-source-dirs:
+      test-db
+  ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto -dynamic
+  build-depends:
+      QuickCheck
+    , base
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
+    , composable-monads-base
+    , hspec
+    , strato-model
+    , strato-sequencer
+    , temporary
+  default-language: Haskell2010
+
 test-suite transaction-intake-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
@@ -125,9 +146,9 @@ test-suite transaction-intake-test
       aeson
     , base
     , blockDB
-    , blockstanbul
     , blockapps-data
     , blockapps-datadefs
+    , blockstanbul
     , bytestring
     , common-log
     , conduit
@@ -150,25 +171,30 @@ test-suite transaction-intake-test
     , time
   default-language: Haskell2010
 
-test-suite dependent-block-db-test
+test-suite view-timer-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
       Paths_strato_sequencer
   hs-source-dirs:
-      test-db
+      test-view-timer
   ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto -dynamic
   build-depends:
-      QuickCheck
+      alarmclock
     , base
     , blockDB
     , blockapps-data
-    , blockapps-datadefs
-    , composable-monads-base
+    , blockstanbul
     , hspec
+    , lens
+    , monad-alter
+    , mtl
+    , stm
+    , stm-chans
     , strato-model
     , strato-sequencer
-    , temporary
+    , time
+    , vault-monad
   default-language: Haskell2010
 
 benchmark send-to-blockstanbul
