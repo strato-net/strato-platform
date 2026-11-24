@@ -6,6 +6,7 @@
 module Blockchain.Strato.Discovery.UDP
   ( dataToPacket,
     sendPacket,
+    packetHash,
     packetExpiration,
     ndPacketToRLP,
     pongSenderTcpPort,
@@ -31,7 +32,7 @@ import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Control.Error                         (note)
-import           Control.Monad                         (forM_)
+import           Control.Monad                         (forM)
 import qualified Control.Monad.Change.Alter            as A
 import           Control.Monad.Composable.Vault
 import           Data.Binary
@@ -51,9 +52,10 @@ import           Text.Format
 
 data NodeDiscoveryPacket
   = Ping Integer Endpoint Endpoint Integer
-  | -- | The last field is the sender's TCP port, which nodes from before it
-    -- was added neither send nor accept.
-    Pong Endpoint Integer Integer (Maybe TCPPort)
+  | -- | The second field is the hash of the Ping answered (see 'packetHash'),
+    -- where nodes from before it put 4. The last is the sender's TCP port,
+    -- which nodes from before it was added neither send nor accept.
+    Pong Endpoint B.ByteString Integer (Maybe TCPPort)
   | FindNeighbors NodeID Integer
   | Neighbors [Neighbor] Integer
   deriving (Show, Read, Eq)
@@ -235,8 +237,13 @@ pongSenderTcpPort o
   where
     p = rlpDecode o :: Integer
 
--- | Sign the packet and send it to the peer. The address it went to, when the
--- peer's host resolved.
+-- | A received packet's hash, over everything after the hash it starts with:
+-- what a Pong echoes of the Ping it answers.
+packetHash :: B.ByteString -> B.ByteString
+packetHash = keccak256ToByteString . hash . B.drop 32
+
+-- | Sign the packet and send it to the peer. The address it went to and the
+-- packet's hash, when the peer's host resolved.
 sendPacket ::
   ( HasVault m
   , MonadLogger m
@@ -245,10 +252,10 @@ sendPacket ::
   , A.Selectable (Maybe Host, UDPPort) SockAddr m ) =>
   PPeer ->
   NodeDiscoveryPacket ->
-  m (Maybe IP)
+  m (Maybe (IP, B.ByteString))
 sendPacket thePeer packet = do
   mPeerAddr <- A.select (A.Proxy @SockAddr) (Just $ pPeerHost thePeer, UDPPort . fromIntegral $ pPeerUdpPort thePeer)
-  forM_ mPeerAddr $ \addr -> do
+  sent <- forM mPeerAddr $ \addr -> do
     let ip = addressIP addr
     updateIP thePeer ip
     $logInfoS "sendPacket" $ T.pack $ CL.green "sending to" ++ " (" ++ show addr ++ ") " ++ format packet
@@ -261,13 +268,14 @@ sendPacket thePeer packet = do
         theHash = keccak256ToByteString $ hash $ sigBS <> B.singleton theType' <> theData
 
     A.replace (A.Proxy @B.ByteString) addr $ theHash <> sigBS <> B.singleton theType' <> theData
+    pure (ip, theHash)
   updateLastMessage thePeer $
     case packet of
        Ping{}          -> "Ping"
        Pong{}          -> "Pong"
        FindNeighbors{} -> "FindNeighbors"
        Neighbors{}     -> "Neighbors"
-  pure $ addressIP <$> mPeerAddr
+  pure sent
 
 -- | When the packet stops being valid, as its sender stamped it.
 packetExpiration :: NodeDiscoveryPacket -> Integer

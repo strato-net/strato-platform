@@ -25,6 +25,7 @@ module Blockchain.Strato.Discovery.ContextLite
     Ask (..),
     Asked,
     noteAsked,
+    askedFor,
     wasAsked,
     initContextLite,
     addPeer,
@@ -87,31 +88,42 @@ newtype UDPPacket = UDPPacket { getUDPPacket :: (B.ByteString, SockAddr) }
 data Ask = AskPing | AskNeighbors
   deriving (Eq, Ord)
 
--- | When this node last asked each address, by request. A Pong or a Neighbors
--- is taken only from an address asked within 'answerWindow': a UDP source
--- address can be forged, so otherwise anyone could bond any address or fill
--- the peer table.
-newtype Asked = Asked (IORef (M.Map (Ask, IP) Integer))
+-- | When this node last asked each address, by request, and what the answer
+-- must carry. A Pong or a Neighbors is taken only from an address asked within
+-- 'answerWindow', and only carrying that: a UDP source address can be forged,
+-- and anyone can sign, so otherwise anyone could bond any address or fill the
+-- peer table.
+newtype Asked = Asked (IORef (M.Map (Ask, IP) (Integer, B.ByteString)))
 
 -- | Seconds an answer is waited for: the expiration this node puts on its
 -- requests.
 answerWindow :: Integer
 answerWindow = 50
 
--- | Record that @ip@ was just sent the request.
-noteAsked :: (MonadIO m, Accessible Asked m) => Ask -> IP -> m ()
-noteAsked kind ip = do
+-- | Record that @ip@ was just sent the request, and what its answer must carry:
+-- the Ping's hash, which only a node that received the Ping can echo in its
+-- Pong, or the key of the peer asked for neighbors, which signs its Neighbors.
+noteAsked :: (MonadIO m, Accessible Asked m) => Ask -> IP -> B.ByteString -> m ()
+noteAsked kind ip expected = do
   Asked ref <- access (Mod.Proxy @Asked)
   now <- liftIO $ round <$> getPOSIXTime
   liftIO . atomicModifyIORef' ref $ \asked ->
-    (M.insert (kind, ip) now $ M.filter (> now - answerWindow) asked, ())
+    (M.insert (kind, ip) (now, expected) $ M.filter ((> now - answerWindow) . fst) asked, ())
+
+-- | What an answer from @ip@ must carry, when it was sent the request within
+-- 'answerWindow'.
+askedFor :: (MonadIO m, Accessible Asked m) => Ask -> IP -> m (Maybe B.ByteString)
+askedFor kind ip = do
+  Asked ref <- access (Mod.Proxy @Asked)
+  now <- liftIO $ round <$> getPOSIXTime
+  asked <- liftIO $ readIORef ref
+  pure $ case M.lookup (kind, ip) asked of
+    Just (at, expected) | at > now - answerWindow -> Just expected
+    _ -> Nothing
 
 -- | Whether @ip@ was sent the request within 'answerWindow'.
 wasAsked :: (MonadIO m, Accessible Asked m) => Ask -> IP -> m Bool
-wasAsked kind ip = do
-  Asked ref <- access (Mod.Proxy @Asked)
-  now <- liftIO $ round <$> getPOSIXTime
-  maybe False (> now - answerWindow) . M.lookup (kind, ip) <$> liftIO (readIORef ref)
+wasAsked kind = fmap isJust . askedFor kind
 
 -- | The discovery monad: 'ContextLite' over resources, the vault and the logger.
 type DiscoveryRow = '[ReaderEnv ContextLite, InternalState, VaultData, Logger]

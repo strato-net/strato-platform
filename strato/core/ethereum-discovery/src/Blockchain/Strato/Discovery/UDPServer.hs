@@ -116,7 +116,7 @@ addPeersIfNeeded minPeers = do
         time <- liftIO $ round `fmap` getPOSIXTime
         randomBytes <- liftIO $ getEntropy 64
         asked <- sendPacket thePeer $ FindNeighbors (NodeID randomBytes) (time + 50)
-        for_ asked $ noteAsked AskNeighbors
+        for_ asked $ \(ip, _) -> for_ (pPeerPubkey thePeer) $ noteAsked AskNeighbors ip . pointToBytes
         eErr <- disableUDPPeerForSeconds thePeer 10
         whenLeft eErr $ \err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to disable peer: " ++ show err
 
@@ -132,8 +132,8 @@ attemptBond = do
       whenLeft eErr $ \err -> $logErrorS "handleValidPacket/attemptBond" . T.pack $ "Unable to disable peer: " ++ show err
     pingPeer p
 
--- | Ping the peer and note that its address was asked: only a Pong from an
--- address this node pinged bonds it (see 'acceptsPacket').
+-- | Ping the peer and note that its address was asked: only a Pong from that
+-- address echoing this Ping's hash bonds it (see 'acceptsPacket').
 pingPeer :: MonadDiscovery m => PPeer -> m ()
 pingPeer p = do
   udpPort <- Mod.access (Mod.Proxy @UDPPort)
@@ -154,20 +154,22 @@ pingPeer p = do
                 (TCPPort . fromIntegral $ pPeerTcpPort p)
             )
             (time + 50)
-        for_ pinged $ noteAsked AskPing
+        for_ pinged $ uncurry (noteAsked AskPing)
 
--- | Whether a packet is taken at all. It must not have expired, which stops
--- old packets being replayed, and a Pong or a Neighbors must come from an
--- address this node asked: their source address can be forged, so unasked
--- they would let anyone bond any address or fill the peer table.
-acceptsPacket :: MonadDiscovery m => IP -> NodeDiscoveryPacket -> m Bool
-acceptsPacket ip packet = do
+-- | Whether a packet, signed with @key@, is taken at all. It must not have
+-- expired, which stops old packets being replayed, and a Pong or a Neighbors
+-- must answer a request this node sent that address: their source address can
+-- be forged, so unasked they would let anyone bond any address or fill the
+-- peer table. A Pong must echo the Ping's hash, which only a node that got the
+-- Ping knows, and a Neighbors must be signed by the peer that was asked.
+acceptsPacket :: MonadDiscovery m => IP -> ECC.Point -> NodeDiscoveryPacket -> m Bool
+acceptsPacket ip key packet = do
   now <- liftIO $ round `fmap` getPOSIXTime
   if packetExpiration packet < now
     then pure False
     else case packet of
-      Pong {} -> wasAsked AskPing ip
-      Neighbors {} -> wasAsked AskNeighbors ip
+      Pong _ echo _ _ -> (== Just echo) <$> askedFor AskPing ip
+      Neighbors {} -> (== Just (pointToBytes key)) <$> askedFor AskNeighbors ip
       _ -> pure True
 
 udpHandshakeServer :: MonadDiscovery m => Int -> m ()
@@ -186,9 +188,9 @@ udpHandshakeServer minPeers = do
       Left msgErr -> $logInfoS "udpHandshakeServer/handler" $ T.pack $ "Invalid message: " ++ show msgErr ++ " -- " ++ show msg
       Right (packet, otherPubKey, otherPort) -> do
         _ <- $logInfoS "udpHandshakeServer/handler" $ T.pack $ CL.cyan "receiving " ++ " (" ++ show addr ++ " " ++ BC.unpack (B.take 10 $ B16.encode $ pointToBytes otherPubKey) ++ "....) " ++ format packet
-        accepted <- acceptsPacket (addressIP addr) packet
+        accepted <- acceptsPacket (addressIP addr) otherPubKey packet
         if accepted
-          then handleValidPacket addr otherPort packet otherPubKey
+          then handleValidPacket addr otherPort packet otherPubKey (packetHash msg)
           else $logInfoS "udpHandshakeServer/handler" $ T.pack $ "Dropping an expired or unrequested packet from " ++ show addr
     argValidator :: B.ByteString -> SockAddr -> Either DiscoverException (NodeDiscoveryPacket, ECC.Point, UDPPort)
     argValidator msg sockAddr = do
@@ -203,8 +205,9 @@ handleValidPacket ::
   UDPPort ->
   NodeDiscoveryPacket ->
   ECC.Point ->
+  B.ByteString ->
   m ()
-handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
+handleValidPacket addr otherUdpPort packet otherPubKey receivedHash = case packet of
   Ping _ ep@(Endpoint _ _ otherTcpPort) _ _ -> do
     time <- liftIO $ round `fmap` getPOSIXTime
     mPeer <- getPeerByIP' ip
@@ -228,7 +231,7 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
       Just peer -> do
         let (UDPPort up') = otherUdpPort
         ownTcpPort <- Mod.access (Mod.Proxy @TCPPort)
-        void . sendPacket peer{pPeerUdpPort = up'} $ Pong ep 4 (time + 50) (Just ownTcpPort)
+        void . sendPacket peer{pPeerUdpPort = up'} $ Pong ep receivedHash (time + 50) (Just ownTcpPort)
         -- A Ping's source address can be forged, so a Ping alone does not bond
         -- its sender: it is pinged back, and its Pong bonds it.
         pinged <- wasAsked AskPing ip
