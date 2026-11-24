@@ -33,8 +33,11 @@ module Blockchain.Context
     , MPNodesWindow(..)
     , admitMPNodes
     , maxPbftMessagesPerSecond
-    , HasSignerBudget(..)
+    , Admission(..)
+    , HasConsensusAdmission(..)
     , maxPbftMessagesPerSigner
+    , HasInboundSlots(..)
+    , maxInboundPerHost
     , PeerAddress(..)
     , GenesisBlockHash(..)
     , PeerRunner
@@ -174,6 +177,9 @@ data Config = Config
     -- Process-wide: each validator's consensus messages taken in during the
     -- current second, over all connections: signer -> (second, count).
     configSignerWindows            :: IORef (M.Map Address (Integer, Int)),
+    -- Process-wide: inbound connections each host holds open, including
+    -- those still in their handshake.
+    configInboundSlots             :: IORef (M.Map Host Int),
     -- This connection's key in configPeerClaims; swapped in by the peer runner.
     configConnectionId             :: Unique
   }
@@ -211,13 +217,35 @@ admitPbftMessage = do
 maxPbftMessagesPerSigner :: Int
 maxPbftMessagesPerSigner = 20
 
--- | Node-wide share of each validator's consensus messages. Like
--- 'HasResyncGate', a single atomic step: every connection counts against the
--- same signer at once.
-class HasSignerBudget m where
-  -- | Count a message from this validator against its second; False once
-  -- that second is full.
-  admitSignerMessage :: Address -> m Bool
+-- | What became of a consensus message offered to this node.
+data Admission = Duplicate | OverBudget | Admitted
+  deriving (Eq, Show)
+
+-- | Node-wide admission of consensus messages, over all connections. Like
+-- 'HasResyncGate', the seen check and the insert are a single atomic step:
+-- copies of one message arriving together on several connections would
+-- otherwise all pass as new and each be charged to its validator.
+class HasConsensusAdmission m where
+  -- | Claim the message's hash in the seen set, then, given its signer, count
+  -- it against that validator's second. One over the budget gives its claim
+  -- back, so a later copy can still be taken.
+  admitConsensusMessage :: Keccak256 -> Maybe Address -> m Admission
+
+-- | The most connections one address may hold open to this node at once,
+-- including those still in their handshake. Above 1 because several of an
+-- operator's nodes can share an address behind NAT; low enough that one host
+-- cannot take a node's connection slots or tie up its handshakes.
+maxInboundPerHost :: Int
+maxInboundPerHost = 5
+
+-- | Node-wide count of each host's inbound connections. Taking a slot is a
+-- single atomic step, so accepts arriving together from one host cannot all
+-- pass the cap before any of them is counted.
+class HasInboundSlots m where
+  -- | Take one of the host's 'maxInboundPerHost' slots; False when all are held.
+  reserveInboundSlot :: Host -> m Bool
+  -- | Give back a slot 'reserveInboundSlot' took.
+  releaseInboundSlot :: Host -> m ()
 
 -- | Trie nodes this connection has asked this node for in the current second:
 -- (second, count). Each one is a lookup in the VM's main loop.
@@ -388,18 +416,7 @@ instance (Keccak256 `A.Alters` Proxy (Inbound WireMessage)) ContextM where
     pure $ if b then Just (Proxy @(Inbound WireMessage)) else Nothing
   insert _ k _ =
     asks configBlockstanbulWireMessages
-      >>= flip
-        atomicModifyIORef'
-        ( \wms ->
-            let s = S.size wms
-                wms' = if s >= 2000
-                         then case toList wms of
-                                (x:_) -> S.delete x wms
-                                _ -> wms
-                         else wms
-                !wms'' = wms' S.>| k
-             in (wms'', ())
-        )
+      >>= flip atomicModifyIORef' (\wms -> (rememberWireMessage k wms, ()))
   delete _ k =
     asks configBlockstanbulWireMessages
       >>= flip
@@ -492,15 +509,50 @@ instance HasResyncGate ContextM where
             then (old, False)
             else (LastResync (Just (n, now)), True)
 
-instance HasSignerBudget ContextM where
-  admitSignerMessage signer = do
-    ref <- asks configSignerWindows
+-- | Add a wire message's hash to the seen set, which keeps the latest 2000.
+rememberWireMessage :: Keccak256 -> S.OSet Keccak256 -> S.OSet Keccak256
+rememberWireMessage k wms =
+  let wms' = if S.size wms >= 2000
+               then case toList wms of
+                      (x:_) -> S.delete x wms
+                      _ -> wms
+               else wms
+      !wms'' = wms' S.>| k
+   in wms''
+
+instance HasConsensusAdmission ContextM where
+  admitConsensusMessage msgHash mSigner = do
+    seenRef <- asks configBlockstanbulWireMessages
+    windowsRef <- asks configSignerWindows
     now <- liftIO $ floor <$> getPOSIXTime
-    liftIO . atomicModifyIORef' ref $ \windows ->
-      let n = case M.lookup signer windows of
-            Just (second, k) | second == now -> k + 1
-            _ -> 1
-       in (M.insert signer (now, n) windows, n <= maxPbftMessagesPerSigner)
+    liftIO $ do
+      claimed <- atomicModifyIORef' seenRef $ \wms ->
+        if S.member msgHash wms then (wms, False) else (rememberWireMessage msgHash wms, True)
+      case (claimed, mSigner) of
+        (False, _) -> pure Duplicate
+        (True, Nothing) -> pure Admitted
+        (True, Just signer) -> do
+          fits <- atomicModifyIORef' windowsRef $ \windows ->
+            let n = case M.lookup signer windows of
+                  Just (second, k) | second == now -> k + 1
+                  _ -> 1
+             in (M.insert signer (now, n) windows, n <= maxPbftMessagesPerSigner)
+          if fits
+            then pure Admitted
+            else OverBudget <$ atomicModifyIORef' seenRef (\wms -> (S.delete msgHash wms, ()))
+
+instance HasInboundSlots ContextM where
+  reserveInboundSlot h = do
+    ref <- asks configInboundSlots
+    liftIO . atomicModifyIORef' ref $ \slots ->
+      let held = M.findWithDefault 0 h slots
+       in if held >= maxInboundPerHost
+            then (slots, False)
+            else (M.insert h (held + 1) slots, True)
+  releaseInboundSlot h = do
+    ref <- asks configInboundSlots
+    liftIO . atomicModifyIORef' ref $ \slots ->
+      (M.update (\held -> if held > 1 then Just (held - 1) else Nothing) h slots, ())
 
 instance Mod.Modifiable [BlockHeader] ContextM where
   get _ = do
@@ -591,7 +643,8 @@ type MonadP2P m =
   ( MonadIO m,
     MonadLogger m,
     HasResyncGate m,
-    HasSignerBudget m,
+    HasConsensusAdmission m,
+    HasInboundSlots m,
     HasPeerClaims m,
     MonadResource m,
     MonadUnliftIO m,
@@ -719,6 +772,7 @@ initConfig wireMessagesRef = do
   lastResyncRef <- newIORef $ LastResync Nothing
   peerClaimsVar <- newMVar noClaims
   signerWindowsRef <- newIORef M.empty
+  inboundSlotsRef <- newIORef M.empty
   connectionId <- liftIO newUnique
   return $ Config
     { configSQLDB = sqlDB' dbs
@@ -730,6 +784,7 @@ initConfig wireMessagesRef = do
     , configLastResync = lastResyncRef
     , configPeerClaims = peerClaimsVar
     , configSignerWindows = signerWindowsRef
+    , configInboundSlots = inboundSlotsRef
     , configConnectionId = connectionId
     }
 

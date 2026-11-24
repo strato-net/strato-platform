@@ -334,40 +334,35 @@ handleEvents peer = awaitForever $ \case
               $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
             let msgHash = rlpHash wm
             lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerHost peer, msgHash) Proxy
-            msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
             -- The sequencer passes each validator's round change for a new
             -- round, and its first vote in a view, on to every peer. Unbounded,
             -- a seated validator signing round changes for one far round after
             -- another had every honest node relay them all to all its peers,
             -- filling each link's maxPbftMessagesPerSecond and pushing honest
             -- votes past it. So each validator gets maxPbftMessagesPerSigner of
-            -- this node's second. Messages below this node's height are not
-            -- counted: none is passed on, and counting them would let anyone
-            -- replay a validator's old votes to use up its share.
-            fits <-
-              if msgExists || toInteger (_sequence $ messageView tm) < myNumber
-                then pure True
-                else lift $ admitSignerMessage sender'
-            if msgExists
-              then
+            -- this node's second. Messages at or below this node's last block
+            -- are not counted: that height is decided, none is passed on, and
+            -- counting them would let anyone replay a validator's old votes to
+            -- use up its share.
+            let counted = toInteger (_sequence $ messageView tm) > myNumber
+            lift (admitConsensusMessage msgHash $ if counted then Just sender' else Nothing) >>= \case
+              Duplicate ->
                 $logInfoS "handleEvents/Blockstanbul" . T.pack $
                   concat
                     [ "Already seen inbound wire message ",
                       format msgHash,
                       ". Not forwarding to Sequencer."
                     ]
-              else if not fits
-              then
+              OverBudget ->
                 $logDebugS "handleEvents/Blockstanbul" . T.pack $
                   "Dropping a consensus message signed by " ++ format sender' ++ ": over " ++ show maxPbftMessagesPerSigner ++ " from that validator this second"
-              else do
+              Admitted -> do
                 $logInfoS "handleEvents/Blockstanbul" . T.pack $
                   concat
                     [ "First time seeing inbound wire message ",
                       format msgHash,
                       ". Forwarding to Sequencer."
                     ]
-                lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
                 yieldL $ ToUnseq [IEBlockstanbul wm]
 
   -- private chains
