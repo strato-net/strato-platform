@@ -29,3 +29,13 @@ export function CopyButton({ value, className }: { value: string; className?: st
     </button>
   );
 }
+
+/** A compressed address with its copy control; hovering shows it in full. */
+export function CopyableAddress({ value, className }: { value: string; className?: string }) {
+  const address = value.replace(/^0x/i, "");
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 break-all font-mono", className)}>
+      <span>0x{address}</span>
+      <CopyButton value={`0x${address}`} className="shrink-0" />
+    </span>
+  );}

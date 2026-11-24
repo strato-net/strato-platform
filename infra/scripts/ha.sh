@@ -54,7 +54,7 @@ ENV_REQUIRED=(ENV_NAME AWS_REGION NETWORK CHAIN_ID NODE_HOSTNAME CERTIFICATE_ARN
 # Present in the file, but may be left empty: without a snapshot a cell syncs from the genesis block.
 ENV_MAY_BE_EMPTY=(SNAPSHOT_BUCKET SNAPSHOT_SOURCE)
 ENV_OPTIONAL=(BACKEND_SECRET BACKEND_SECRET_KEYS GRAFANA_ADMIN_GROUPS GRAFANA_VIEWER_GROUPS PARTNER_REFERRALS_URL PARTNER_INTERNAL_KEY_SECRET
-  READY_TIMEOUT_MINUTES NAT_GATEWAYS)
+  READY_TIMEOUT_MINUTES NAT_GATEWAYS PG_READER_INSTANCE_CLASS POSTHOG_KEY POSTHOG_HOST GOOGLE_ANALYTICS_ID)
 # Only the file sets them: a value inherited from the caller's shell (the
 # pipeline exports ENV_NAME and AWS_REGION) would hide a missing line.
 # READY_TIMEOUT_MINUTES alone may also come from the caller.
@@ -85,13 +85,17 @@ env_check() {
   is OBSERVABILITY '^(true|false)$' "true or false"
   is AWS_REGION '^[a-z]{2}(-[a-z]+)+-[0-9]$' "an AWS region, like us-east-1"
   is NETWORK '^[a-z][a-z0-9-]*$' "a network name, like helium"
-  for name in CELL_INSTANCE_TYPE PG_INSTANCE_CLASS; do is "$name" '^[a-z][a-z0-9-]*\.[a-z0-9-]+$' "an instance type, like m6i.xlarge"; done
+  for name in CELL_INSTANCE_TYPE PG_INSTANCE_CLASS PG_READER_INSTANCE_CLASS; do is "$name" '^[a-z][a-z0-9-]*\.[a-z0-9-]+$' "an instance type, like m6i.xlarge"; done
   is PG_ENGINE_VERSION '^[0-9]+\.[0-9]+$' "an Aurora PostgreSQL version, like 14.18"
   is SNAPSHOT_BUCKET '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$' "a bucket name"
   for name in OAUTH_SECRET BACKEND_SECRET PARTNER_INTERNAL_KEY_SECRET; do is "$name" '^[A-Za-z0-9/_+=.@:-]+$' "a Secrets Manager name or ARN"; done
   is BACKEND_SECRET_KEYS '^[A-Z0-9_]+( [A-Z0-9_]+)*$' "setting names separated by single spaces"
   for name in CHAIN_ID PG_READERS CELL_DATA_GIB API_DESIRED_COUNT APP_DESIRED_COUNT READY_TIMEOUT_MINUTES; do is "$name" '^[0-9]+$' "a whole number"; done
   is NAT_GATEWAYS '^[12]$' "1 (one for both zones) or 2 (one for each)"
+  # These three are written into the app UI's config.js as quoted strings.
+  is POSTHOG_KEY '^[A-Za-z0-9_-]+$' "a PostHog project key: letters, digits, _ and -"
+  is POSTHOG_HOST '^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$' "an https URL, like https://us.i.posthog.com"
+  is GOOGLE_ANALYTICS_ID '^[A-Z]+-[A-Z0-9-]+$' "a Google Analytics id, like G-XXXXXXXXXX"
   for cell in ${CELLS:-}; do
     [[ $cell =~ ^[a-z][a-z0-9-]{0,30}:[a-z]{2}(-[a-z]+)+-[0-9][a-z]$ ]] || problems+=("CELLS: $cell is not <cellId>:<zone>, the id a short lowercase name starting with a letter")
     [[ " $ids " != *" ${cell%%:*} "* ]] || problems+=("CELLS: cell ${cell%%:*} is listed twice")
@@ -99,6 +103,7 @@ env_check() {
   done
   [[ ${PARTNER_REFERRALS_URL:+set} == "${PARTNER_INTERNAL_KEY_SECRET:+set}" ]] \
     || problems+=("PARTNER_REFERRALS_URL and PARTNER_INTERNAL_KEY_SECRET go together: set both or neither")
+  [[ -z ${POSTHOG_HOST:-} || -n ${POSTHOG_KEY:-} ]] || problems+=("POSTHOG_HOST is set without POSTHOG_KEY")
   ((${#problems[@]} == 0)) && return 0
   echo "ha.sh: $envfile:" >&2
   printf '  %s\n' "${problems[@]}" >&2
@@ -277,7 +282,7 @@ otel_ecs() {
 ctx_data_plane() {
   # The bus (MSK) stays off until the API tier submits through it.
   ctx=(-c envName="$ENV_NAME" -c engineVersion="$PG_ENGINE_VERSION" -c writerInstanceClass="$PG_INSTANCE_CLASS"
-    -c readerInstanceClass="$PG_INSTANCE_CLASS" -c readerCount="$PG_READERS" -c bus=false)
+    -c readerInstanceClass="${PG_READER_INSTANCE_CLASS:-$PG_INSTANCE_CLASS}" -c readerCount="$PG_READERS" -c bus=false)
   # One NAT gateway for both zones unless the environment asks for one each.
   [[ -z ${NAT_GATEWAYS:-} ]] || ctx+=(-c natGateways="$NAT_GATEWAYS")
 }
@@ -364,13 +369,14 @@ ctx_core_nlb() {
 
 ctx_api() {
   load_images
-  local pg="$P-data-postgres" cell core login login_secret cdn
+  local pg="$P-data-postgres" cell core login login_secret cdn nat
   local vpc writer reader pg_sg cell_sg nlb_sg grafana_tg
   cell=$(host_stack "$FIRST_CELL")
   # Each on its own line: a failed lookup inside the array below would not stop the script.
   login=$(need "$pg" NodeLogin)
   login_secret=$(need "$pg" NodeLoginSecretName)
   cdn=$(cloudfront_cidrs)
+  nat=$(need "$pg" NatGatewayAddresses)
   vpc=$(vpc_id)
   writer=$(need "$pg" WriterEndpoint)
   reader=$(need "$pg" ReaderEndpoint)
@@ -390,7 +396,7 @@ ctx_api() {
     -c createSessionSecret=true -c oauthJsonSecretName="$OAUTH_SECRET" -c csrfStateless=true
     -c desiredCount="$API_DESIRED_COUNT" -c albCertificateArn="$CERTIFICATE_ARN" -c chainId="$CHAIN_ID" -c networkName="$NETWORK"
     -c prometheusHost="$core:9090" -c grafanaTargetGroupArn="$grafana_tg"
-    -c trustedProxyCidrs="$cdn")
+    -c trustedProxyCidrs="$cdn" -c rateLimitBypassCidrs="$nat")
   otel_ecs
 }
 # The partner referrals service the app backend reports to, when the
@@ -441,6 +447,10 @@ ctx_front_door() {
   api_origin=$(need "$P-api-tier" AlbDnsName)
   ctx+=(-c frontDoorDomainName="$NODE_HOSTNAME" -c frontDoorCertificateArn="$CERTIFICATE_ARN"
     -c apiOriginDomainName="$api_origin" -c deployAppUi=true -c deploySmdUi=true)
+  # The app UI's analytics, for its config.js; it runs none when the environment names none.
+  [[ -z ${POSTHOG_KEY:-} ]] || ctx+=(-c appUiPosthogKey="$POSTHOG_KEY")
+  [[ -z ${POSTHOG_HOST:-} ]] || ctx+=(-c appUiPosthogHost="$POSTHOG_HOST")
+  [[ -z ${GOOGLE_ANALYTICS_ID:-} ]] || ctx+=(-c appUiGoogleAnalyticsId="$GOOGLE_ANALYTICS_ID")
   [[ ${1:-} == without-app-tier ]] && return 0
   app_origin=$(need "$P-app-tier" AlbDnsName)
   ctx+=(-c appOriginDomainName="$app_origin")
@@ -699,9 +709,24 @@ check_hostname() {
   local seen other
   absent "$P-api-frontdoor" || return 0
   command -v dig >/dev/null || { log "warning: no dig here: cannot check where $NODE_HOSTNAME points before the front door is created"; return 0; }
-  seen=$(dig +short "$NODE_HOSTNAME" 2>/dev/null | tr 'A-Z' 'a-z') || true
+  seen=$(hostname_dns)
   other=$(grep -m1 '\.cloudfront\.net\.\{0,1\}$' <<<"$seen" || true)
   [[ -z $other ]] || die "$NODE_HOSTNAME is still a CNAME to ${other%.}, another CloudFront distribution: CloudFront will not create this environment's front door until that DNS record is deleted. Delete it; wait-hostname names the new target once the front door exists"
+}
+
+# Where NODE_HOSTNAME leads (its CNAME and addresses, in lower case), read
+# from a name server of the zone it is in. A resolver that was asked before
+# the record existed goes on answering "no such name" for the zone's negative
+# TTL: on a first build that held wait_hostname for half an hour after the
+# record was set. The resolver gets the name only when no such server is
+# found or it does not answer.
+hostname_dns() {
+  local zone=${NODE_HOSTNAME#*.} ns=
+  while [[ -z $ns && $zone == *.* ]]; do
+    ns=$(dig +noall +answer NS "$zone" 2>/dev/null | awk '$4 == "NS" { print $5; exit }') || true
+    zone=${zone#*.}
+  done
+  { [[ -n $ns ]] && dig +short "$NODE_HOSTNAME" "@$ns" || dig +short "$NODE_HOSTNAME"; } 2>/dev/null | grep -v '^;' | tr 'A-Z' 'a-z' || true
 }
 
 first_front_door() {
@@ -740,7 +765,7 @@ wait_hostname() {
   deadline=$(( $(date +%s) + limit * 60 ))
   while :; do
     # The name's CNAME chain and addresses, on one line, in lower case.
-    seen=$(dig +short "$NODE_HOSTNAME" 2>/dev/null | tr 'A-Z\n' 'a-z ' | sed 's/ *$//') || true
+    seen=$(hostname_dns | tr '\n' ' ' | sed 's/ *$//') || true
     if [[ " $seen " == *" $target. "* ]] && synced; then break; fi
     if synced --connect-to "$NODE_HOSTNAME:443:$dist:443"; then
       down=0

@@ -27,7 +27,6 @@ contract MultisigLogic {
     }
 
     struct Nomination {
-        uint requiredApprovals;
         uint epoch;
         uint expiresAt;
         bool exists;
@@ -49,7 +48,6 @@ contract MultisigLogic {
     mapping (string => mapping (address => bool)) public issueApprovals;
 
     mapping (address => Nomination) public nominations;
-    mapping (address => address[]) public nominationSigners;
     address private openNominee;
 
     event IssueCreated(address creator, string issueId, uint nonce, uint epoch, address target, string functionName, string[] argumentTypes, uint approvalExpiresAt, variadic arguments);
@@ -57,13 +55,16 @@ contract MultisigLogic {
     event IssueApproved(address signer, string issueId, uint approvals);
     event IssueApprovalRevoked(address signer, string issueId, uint approvals);
     event IssueQueued(string issueId, uint executableAt, uint expiresAt);
+    event IssueUnqueued(string issueId, uint approvalExpiresAt);
     event IssueCancelled(string issueId);
     event IssueExecuted(address executor, string issueId, address target, string functionName, variadic arguments);
     event IssueExecutedNoArgs(address executor, string issueId, address target, string functionName);
     event IssueDismissed(address creator, string issueId);
 
-    event ConfigurationChanged(uint epoch, address[] signers, uint requiredApprovals);
-    event ConfigurationNominated(address nominee, uint epoch, uint expiresAt, address[] signers, uint requiredApprovals);
+    event SignerNominated(address nominee, uint epoch, uint expiresAt);
+    event SignerAdded(address signer, uint epoch);
+    event SignerRemoved(address signer, uint requiredApprovals, uint epoch);
+    event RequiredApprovalsChanged(uint requiredApprovals, uint epoch);
     event NominationRevoked(address nominee);
     event TransactionTimelockChanged(uint delay, uint epoch);
 
@@ -87,7 +88,7 @@ contract MultisigLogic {
     function initialize(address[] _signers, uint _requiredApprovals, uint _transactionTimelock) external {
         require(!multisigInitialized, "Already initialized");
         require(msg.sender == multisigFactory, "Only the factory may initialize");
-        _validateConfiguration(_signers, _requiredApprovals);
+        _requireValidApprovals(_signers.length, _requiredApprovals);
         require(_transactionTimelock <= MAX_TRANSACTION_TIMELOCK, "Timelock exceeds maximum");
 
         multisigInitialized = true;
@@ -95,6 +96,8 @@ contract MultisigLogic {
         transactionTimelock = _transactionTimelock;
         nextIssueNonce = 1;
         for (uint i = 0; i < _signers.length; i++) {
+            _requireValidSigner(_signers[i]);
+            require(signerMap[_signers[i]] == 0, "Duplicate signer");
             signers.push(_signers[i]);
             signerMap[_signers[i]] = signers.length;
         }
@@ -103,9 +106,10 @@ contract MultisigLogic {
     /// @dev Read-only. The shell requires this to pass before adopting a logic version.
     function multisigHealthCheck() external returns (bool) {
         require(multisigInitialized, "Multisig is not initialized");
-        _validateConfiguration(signers, requiredApprovals);
+        _requireValidApprovals(signers.length, requiredApprovals);
         require(transactionTimelock <= MAX_TRANSACTION_TIMELOCK, "Timelock exceeds maximum");
         for (uint i = 0; i < signers.length; i++) {
+            _requireValidSigner(signers[i]);
             require(signerMap[signers[i]] == i + 1, "Signer index does not match");
         }
         return true;
@@ -169,11 +173,16 @@ contract MultisigLogic {
     function revokeIssueApproval(string _issueId) external onlySigner notExecuting {
         Issue storage issue = issues[_issueId];
         _requireLiveIssue(issue);
-        require(issue.executableAt == 0, "Queued approval cannot be revoked");
         require(issueApprovals[_issueId][msg.sender], "Approval does not exist");
         issueApprovals[_issueId][msg.sender] = false;
         issue.approvals--;
         emit IssueApprovalRevoked(msg.sender, _issueId, issue.approvals);
+        // A queued issue that falls below M leaves its waiting period and must earn a fresh one.
+        if (issue.executableAt > 0 && issue.approvals < requiredApprovals) {
+            issue.executableAt = 0;
+            issue.expiresAt = issue.createdAt + ISSUE_APPROVAL_LIFETIME;
+            emit IssueUnqueued(_issueId, issue.expiresAt);
+        }
     }
 
     function dismissIssue(string _issueId) external notExecuting {
@@ -221,39 +230,17 @@ contract MultisigLogic {
         return result;
     }
 
-    function nominateConfiguration(address _nominee, address[] _resultingSigners, uint _requiredApprovals) external onlyWallet {
-        require(_nominee != address(0), "Invalid nominee");
+    function nominateSigner(address _nominee) external onlyWallet {
+        _requireValidSigner(_nominee);
         require(signerMap[_nominee] == 0, "Nominee is already a signer");
-        _validateConfiguration(_resultingSigners, _requiredApprovals);
-
-        bool containsNominee = false;
-        for (uint i = 0; i < _resultingSigners.length; i++) {
-            if (_resultingSigners[i] == _nominee) containsNominee = true;
-        }
-        require(
-            containsNominee && _resultingSigners.length == signers.length + 1,
-            "Nomination can only add the nominee"
-        );
-        for (uint j = 0; j < signers.length; j++) {
-            bool containsSigner = false;
-            for (uint k = 0; k < _resultingSigners.length; k++) {
-                if (_resultingSigners[k] == signers[j]) containsSigner = true;
-            }
-            require(containsSigner, "Nomination can only add the nominee");
-        }
-        require(_requiredApprovals == requiredApprovals, "Nomination cannot change required approvals");
 
         _clearNominations();
         Nomination storage nomination = nominations[_nominee];
-        nomination.requiredApprovals = _requiredApprovals;
         nomination.epoch = multisigEpoch;
         nomination.expiresAt = block.timestamp + NOMINATION_LIFETIME;
         nomination.exists = true;
-        for (uint m = 0; m < _resultingSigners.length; m++) {
-            nominationSigners[_nominee].push(_resultingSigners[m]);
-        }
         openNominee = _nominee;
-        emit ConfigurationNominated(_nominee, multisigEpoch, nomination.expiresAt, _resultingSigners, _requiredApprovals);
+        emit SignerNominated(_nominee, multisigEpoch, nomination.expiresAt);
     }
 
     function acceptNomination() external notExecuting {
@@ -261,7 +248,10 @@ contract MultisigLogic {
         require(nomination.exists, "No nomination");
         require(nomination.epoch == multisigEpoch, "Nomination is stale");
         require(block.timestamp <= nomination.expiresAt, "Nomination has expired");
-        _applyConfiguration(nominationSigners[msg.sender], nomination.requiredApprovals);
+        signers.push(msg.sender);
+        signerMap[msg.sender] = signers.length;
+        _advanceConfiguration();
+        emit SignerAdded(msg.sender, multisigEpoch);
     }
 
     function revokeNomination(address _nominee) external onlyWallet {
@@ -270,18 +260,35 @@ contract MultisigLogic {
         emit NominationRevoked(_nominee);
     }
 
-    function applyConfiguration(address[] _resultingSigners, uint _requiredApprovals) external onlyWallet {
-        for (uint i = 0; i < _resultingSigners.length; i++) {
-            require(signerMap[_resultingSigners[i]] > 0, "New signer requires nomination");
-        }
-        _applyConfiguration(_resultingSigners, _requiredApprovals);
+    function removeSigner(address _signer, uint _requiredApprovals) external onlyWallet {
+        uint index = signerMap[_signer];
+        require(index > 0, "Not a signer");
+        uint lastIndex = signers.length - 1;
+        _requireValidApprovals(lastIndex, _requiredApprovals);
+
+        // The last signer fills the gap, so removal never depends on the signer count.
+        address lastSigner = signers[lastIndex];
+        signers[index - 1] = lastSigner;
+        signerMap[lastSigner] = index;
+        signers[lastIndex] = address(0);
+        signers.length = lastIndex;
+        signerMap[_signer] = 0;
+        requiredApprovals = _requiredApprovals;
+        _advanceConfiguration();
+        emit SignerRemoved(_signer, _requiredApprovals, multisigEpoch);
+    }
+
+    function setRequiredApprovals(uint _requiredApprovals) external onlyWallet {
+        _requireValidApprovals(signers.length, _requiredApprovals);
+        requiredApprovals = _requiredApprovals;
+        _advanceConfiguration();
+        emit RequiredApprovalsChanged(_requiredApprovals, multisigEpoch);
     }
 
     function setTransactionTimelock(uint _delay) external onlyWallet {
         require(_delay <= MAX_TRANSACTION_TIMELOCK, "Timelock exceeds maximum");
         transactionTimelock = _delay;
-        address(this).call("advanceConfiguration");
-        _clearNominations();
+        _advanceConfiguration();
         emit TransactionTimelockChanged(_delay, multisigEpoch);
     }
 
@@ -296,7 +303,9 @@ contract MultisigLogic {
         emit IssueApproved(_approver, _issueId, issue.approvals);
 
         if (issue.approvals >= requiredApprovals) {
-            if (_target == address(this) && (_functionName == "cancelUpgrade" || _functionName == "cancelIssue")) {
+            if (_target == address(this) && (
+                _functionName == "cancelUpgrade" || _functionName == "cancelIssue" || _functionName == "revokeNomination"
+            )) {
                 _executeIssue(_issueId, issue, _target, _functionName, _approver, _arguments);
                 return true;
             }
@@ -455,33 +464,20 @@ contract MultisigLogic {
         return false;
     }
 
-    function _applyConfiguration(address[] _resultingSigners, uint _requiredApprovals) internal {
-        _validateConfiguration(_resultingSigners, _requiredApprovals);
-        for (uint i = 0; i < signers.length; i++) {
-            signerMap[signers[i]] = 0;
-            signers[i] = address(0);
-        }
-        signers.length = 0;
-        for (uint j = 0; j < _resultingSigners.length; j++) {
-            signers.push(_resultingSigners[j]);
-            signerMap[_resultingSigners[j]] = signers.length;
-        }
-        requiredApprovals = _requiredApprovals;
+    /// @dev Every signer, approval or timelock change invalidates open issues, the open nomination and a pending upgrade.
+    function _advanceConfiguration() internal {
         address(this).call("advanceConfiguration");
-        emit ConfigurationChanged(multisigEpoch, _resultingSigners, _requiredApprovals);
         _clearNominations();
     }
 
-    function _validateConfiguration(address[] _signers, uint _requiredApprovals) internal {
-        require(_signers.length >= MIN_SIGNERS, "At least three signers are required");
-        require(_requiredApprovals >= 2 && _requiredApprovals < _signers.length, "Required approvals must satisfy 2 <= M < N");
-        for (uint i = 0; i < _signers.length; i++) {
-            require(_signers[i] != address(0), "Invalid signer");
-            require(_signers[i] != address(this), "Wallet cannot sign for itself");
-            for (uint j = i + 1; j < _signers.length; j++) {
-                require(_signers[i] != _signers[j], "Duplicate signer");
-            }
-        }
+    function _requireValidApprovals(uint _signerCount, uint _requiredApprovals) internal {
+        require(_signerCount >= MIN_SIGNERS, "At least three signers are required");
+        require(_requiredApprovals >= 2 && _requiredApprovals < _signerCount, "Required approvals must satisfy 2 <= M < N");
+    }
+
+    function _requireValidSigner(address _signer) internal {
+        require(_signer != address(0), "Invalid signer");
+        require(_signer != address(this), "Wallet cannot sign for itself");
     }
 
     function _clearNominations() internal {
@@ -491,11 +487,6 @@ contract MultisigLogic {
     }
 
     function _deleteNomination(address _nominee) internal {
-        for (uint i = 0; i < nominationSigners[_nominee].length; i++) {
-            nominationSigners[_nominee][i] = address(0);
-        }
-        nominationSigners[_nominee].length = 0;
-        nominations[_nominee].requiredApprovals = 0;
         nominations[_nominee].epoch = 0;
         nominations[_nominee].expiresAt = 0;
         nominations[_nominee].exists = false;

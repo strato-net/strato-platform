@@ -176,13 +176,15 @@ queryEvents mAddr0 mBlockHash fromBlock toBlock mEventName limit = do
 
 -- | All events emitted by a single transaction, ordered by event index. The
 -- Cirrus @event@ table stores @transaction_hash@ without a @0x@ prefix, so any
--- prefix on the argument is stripped before comparison.
+-- prefix on the argument is stripped before comparison. The column is compared
+-- as stored (slipstream writes lower-case hex): wrapped in @LOWER@ it cannot
+-- use @event_transaction_hash_idx@ and the lookup scans the whole table.
 queryEventsByTxHash :: Text -> Int -> CodeDBM '[] [EventRow]
 queryEventsByTxHash txHash limit = do
   let norm = if T.isPrefixOf "0x" txHash then T.drop 2 txHash else txHash
       q =
         "SELECT address, block_hash, transaction_hash, block_number, transaction_sender, event_index::int, event_name, attributes::text, contract_name \
-        \FROM \"event\" WHERE LOWER(transaction_hash) = LOWER(?) ORDER BY event_index LIMIT ?"
+        \FROM \"event\" WHERE transaction_hash = LOWER(?) ORDER BY event_index LIMIT ?"
       params = [SQL.PersistText norm, SQL.PersistInt64 (fromIntegral limit)]
   rows <- cirrusQuery $ SQL.rawSql (T.pack q) params
   return $ map toEventRow rows

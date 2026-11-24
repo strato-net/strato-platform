@@ -105,13 +105,21 @@ tests:
   ethereum-discover-test:
     source-dirs: test/
     main: Spec.hs
-    ghc-options: -Wall -Werror -dynamic
+    ghc-options: -Wall -Werror -dynamic -threaded
     dependencies:
+      - blockDB
+      - blockapps-data
+      - common-log
       - crypto-pubkey-types
       - ethereum-discovery
       - ethereum-encryption
       - ethereum-rlp
+      - filepath
       - format
       - hspec
       - network
+      - persistent
+      - persistent-sqlite
       - strato-model
+      - text
+      - unliftio

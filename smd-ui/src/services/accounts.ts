@@ -1,6 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { env } from "@/lib/env";
+import {
+  deriveCanonicalUserAddress,
+  fetchUserRegistryCodeHash,
+  strip0x,
+} from "@/services/userWallets";
 
 export interface AccountDetail {
   address: string;
@@ -46,6 +51,19 @@ function extractUsername(row: any): string {
   return data?.username ?? row?.["storage.data.username"] ?? "";
 }
 
+async function canonicalUsers(rows: any[]): Promise<UserRecord[]> {
+  const registryCodeHash = await fetchUserRegistryCodeHash();
+  return rows
+    .map((row) => ({
+      username: extractUsername(row),
+      address: strip0x(String(row?.address ?? "")),
+    }))
+    .filter((user) =>
+      user.username &&
+      user.address === deriveCanonicalUserAddress(user.username, registryCodeHash)
+    );
+}
+
 /**
  * Registered users on the network, from the `User` contract's Cirrus state:
  *   /cirrus/search/contract?contract_name=eq.User&storage.data->>username=neq.&select=*,storage(*)
@@ -59,9 +77,7 @@ export function useUsers() {
         `${env.CIRRUS_URL}/contract?contract_name=eq.User&storage.data->>username=neq.&select=*,storage(*)`
       );
       if (!Array.isArray(data)) return [];
-      return data
-        .map((row) => ({ username: extractUsername(row), address: row?.address ?? "" }))
-        .filter((u) => u.username);
+      return canonicalUsers(data);
     },
   });
 }
@@ -76,9 +92,7 @@ export async function searchUsers(term: string): Promise<UserRecord[]> {
     `${env.CIRRUS_URL}/contract?contract_name=eq.User&storage.data->>username=ilike.${pattern}&select=*,storage(*)`
   );
   if (!Array.isArray(data)) return [];
-  return data
-    .map((row) => ({ username: extractUsername(row), address: row?.address ?? "" }))
-    .filter((u) => u.username);
+  return canonicalUsers(data);
 }
 
 /** Live username search (for recipient autocomplete); runs once `term` is >= 2 chars. */

@@ -236,6 +236,7 @@ export class ApiTierStack extends Stack {
         // The client's address is the X-Forwarded-For entry before the proxies listed here:
         // the load balancer (the VPC's range) and what stands in front of it.
         NGINX_TRUST_PROXY_CIDRS: [vpc.vpcCidrBlock, ...config.trustedProxyCidrs].join(","),
+        ...(config.rateLimitBypassCidrs.length ? { NGINX_RATE_LIMIT_BYPASS_CIDRS: config.rateLimitBypassCidrs.join(",") } : {}),
       },
       secrets: {
         ...ethconfEnv,

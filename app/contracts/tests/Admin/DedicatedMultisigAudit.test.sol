@@ -107,9 +107,8 @@ contract Describe_DedicatedMultisigAudit {
             wallet,
             "proposeIssue",
             wallet,
-            "applyConfiguration",
-            ["address[]", "uint256"],
-            [address(a), address(b), address(c)],
+            "setRequiredApprovals",
+            ["uint256"],
             1
         );
         require(
@@ -119,9 +118,8 @@ contract Describe_DedicatedMultisigAudit {
                 "approveIssue",
                 issueId,
                 wallet,
-                "applyConfiguration",
-                ["address[]", "uint256"],
-                [address(a), address(b), address(c)],
+                "setRequiredApprovals",
+                ["uint256"],
                 1
             ),
             "One-of-three threshold was accepted"
@@ -150,10 +148,8 @@ contract Describe_DedicatedMultisigAudit {
             rejects(
                 evil,
                 wallet,
-                "nominateConfiguration",
-                address(evil),
-                [address(a), address(b), address(c), address(evil)],
-                2
+                "nominateSigner",
+                address(evil)
             ),
             "Creator or outsider nominated without quorum"
         );

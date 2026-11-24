@@ -39,6 +39,12 @@ function withTimeout(promise, what) {
 }
 
 function getClient() {
+  // redis_host=none: this apex has no block cache to read (the HA API tier's,
+  // whose task says so). Its callers read SQL at once, instead of after the
+  // connect timeout on every /health and /status.
+  if (process.env.redis_host === "none") {
+    return Promise.reject(new Error("no Redis block cache here (redis_host=none)"));
+  }
   if (clientPromise) return clientPromise;
 
   const host = process.env.redis_host || "redis";

@@ -128,18 +128,27 @@ test-suite ethereum-discover-test
   main-is: Spec.hs
   other-modules:
       Blockchain.Strato.Discovery.UDPSpec
+      Executable.EthDiscoverySetupSpec
       Paths_ethereum_discovery
   hs-source-dirs:
       test/
-  ghc-options: -Wall -O2 -Wall -Werror -dynamic
+  ghc-options: -Wall -O2 -Wall -Werror -dynamic -threaded
   build-depends:
       base
+    , blockDB
+    , blockapps-data
+    , common-log
     , crypto-pubkey-types
     , ethereum-discovery
     , ethereum-encryption
     , ethereum-rlp
+    , filepath
     , format
     , hspec
     , network
+    , persistent
+    , persistent-sqlite
     , strato-model
+    , text
+    , unliftio
   default-language: Haskell2010

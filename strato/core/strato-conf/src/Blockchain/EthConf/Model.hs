@@ -275,6 +275,12 @@ data NetworkConf = NetworkConf
   , txSizeLimit :: Int
   , blockPeriodMs :: Int
   , roundPeriodS :: Int
+  -- | Seconds a non-proposing validator waits for the current proposer to
+  -- propose a block before driving a round change to rotate past it. Local
+  -- policy, not consensus: it only governs when this node initiates a round
+  -- change, so nodes with different values do not fork, they only differ on
+  -- how quickly they abandon a slow or dead proposer. Must be positive.
+  , proposalTimeoutS :: Int
   -- | Seconds a proposed block's header timestamp may run ahead of this node's
   -- clock before the node refuses to vote for it (a rejected proposal triggers
   -- a round change). Local policy, not consensus: it is consulted only while
@@ -313,6 +319,7 @@ instance FromJSON NetworkConf where
       <*> v .:? "txSizeLimit" .!= 2097152
       <*> v .:? "blockPeriodMs" .!= 1000
       <*> v .:? "roundPeriodS" .!= 3600
+      <*> v .:? "proposalTimeoutS" .!= 10
       <*> v .:? "maxTimestampDriftS" .!= defaultMaxTimestampDriftS
       <*> (fixedHeight net (defaultStakingActivationBlock net) <$> v .:? "stakingActivationBlock" .!= defaultStakingActivationBlock net)
       <*> v .:? "stakingContractAddress" .!= defaultStakingContractAddress net
@@ -571,6 +578,7 @@ instance Default NetworkConf where
     , txSizeLimit = 2097152  -- 2 MiB
     , blockPeriodMs = 1000   -- minimum delay between blocks
     , roundPeriodS = 3600    -- backstop: seconds without progress before a forced round change
+    , proposalTimeoutS = 10  -- seconds to wait for the current proposer before rotating past it
     , maxTimestampDriftS = defaultMaxTimestampDriftS
     , stakingActivationBlock = defaultStakingActivationBlock "upquark"
     , stakingContractAddress = defaultStakingContractAddress "upquark"

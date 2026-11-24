@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAccount } from "wagmi";
 import { formatUnits } from "ethers";
-import { ArrowLeft, CheckCircle2, Clock, Gift, Info, Layers, Loader2, RefreshCw, Search, TrendingUp, Trophy, Wallet, type LucideIcon } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, CheckCircle2, Clock, Gift, Info, Layers, Loader2, RefreshCw, Search, TrendingUp, Trophy, Wallet, type LucideIcon } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
@@ -91,8 +91,7 @@ type StakingActionMode = "stake" | "claim" | "unstake" | "move";
 // endpoint remain intact so it can be re-enabled by flipping this flag.
 const SHOW_MOVE_BUTTON = false;
 
-// Validators shown before the "Show all" toggle expands the list.
-const VALIDATOR_DISPLAY_LIMIT = 10;
+type ValidatorSortKey = "blocks" | "uptime" | "totalStake" | "userStake" | "rewards" | "apy" | "commission";
 type ProcessingAction =
   | "stake" | "claim" | "unstake" | "move" | "withdraw" | "operator-claim" | "commission" | "bond" | "self-unbond"
   | "claim-fees" | "operator-claim-fees" | "register" | "operator" | "activate" | "exit" | "cancel-exit" | "profile";
@@ -112,6 +111,7 @@ type StakingInfo = {
   selfBondGraceUntil?: string;
   selfBondRuleActive?: boolean;
   totalRewardsCredited?: string;
+  totalEmitted?: string;
   // V2: validator addresses the connected account operates.
   operatedValidators?: string[];
   stakingAddress: string;
@@ -163,15 +163,12 @@ type StakingInfo = {
   unbondingRequests: UnbondingRequest[];
 };
 
-const formatToken = (value: string | undefined, decimals: number, maxFractionDigits = 4): string => {
+const formatToken = (value: string | bigint | undefined, decimals: number, maxFractionDigits = 4): string => {
   try {
     // Truncate (never round) so displayed amounts match the portfolio's formatBalance convention.
-    const amount = Number(truncateDecimals(formatUnits(value || "0", decimals), maxFractionDigits));
-    if (!Number.isFinite(amount) || amount === 0) return "0";
-    return amount.toLocaleString("en-US", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: maxFractionDigits,
-    });
+    const [whole, fraction] = truncateDecimals(formatUnits(value || "0", decimals), maxFractionDigits).split(".");
+    const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return fraction ? `${grouped}.${fraction}` : grouped;
   } catch {
     return "0";
   }
@@ -301,6 +298,17 @@ const TipLabel = ({ label, tooltip, className }: { label: string; tooltip: strin
       </TooltipContent>
     </Tooltip>
   </TooltipProvider>
+);
+
+const SortHeader = ({ label, tooltip, active, desc, onSort }: { label: string; tooltip: string; active: boolean; desc: boolean; onSort: () => void }) => (
+  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground" aria-sort={active ? (desc ? "descending" : "ascending") : "none"}>
+    <button type="button" className="inline-flex items-center gap-1 hover:text-foreground" onClick={onSort}>
+      <TipLabel label={label} tooltip={tooltip} />
+      {active
+        ? desc ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />
+        : <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />}
+    </button>
+  </th>
 );
 
 const StatCard = ({ label, tooltip, value, icon: Icon }: { label: string; tooltip?: string; value: ReactNode; icon?: LucideIcon }) => (
@@ -712,7 +720,7 @@ const EarnStaking = () => {
   const [moveTargetOperator, setMoveTargetOperator] = useState("");
   const [validatorSearch, setValidatorSearch] = useState("");
   const [showInactiveValidators, setShowInactiveValidators] = useState(false);
-  const [showAllValidators, setShowAllValidators] = useState(false);
+  const [validatorSort, setValidatorSort] = useState<{ key: ValidatorSortKey; desc: boolean }>({ key: "totalStake", desc: true });
   const [showWithdrawnHistory, setShowWithdrawnHistory] = useState(false);
   const [actionMode, setActionMode] = useState<StakingActionMode | null>(null);
   // Validator key of the row the action modal is open for.
@@ -825,9 +833,11 @@ const EarnStaking = () => {
       ? (info?.operatedValidators || [])
         .map((address) => validators.find((validator) => sameAddress(validator.address, address)))
         .filter((validator): validator is StakingValidator => Boolean(validator))
-      : []),
-    [info?.operatedValidators, isV2, validators]
+      : info?.isOperator && operatorValidator ? [operatorValidator] : []),
+    [info?.operatedValidators, info?.isOperator, isV2, operatorValidator, validators]
   );
+  const stakeWithSelfBond = (validator: StakingValidator) =>
+    BigInt(validator.userStake || "0") + (operatedValidators.includes(validator) ? BigInt(validator.selfBond || "0") : 0n);
   // A backend that predates the flag still reports the full validator set, so only an
   // explicit false hides these controls.
   const validatorSetDeployed = info?.validatorSetDeployed !== false;
@@ -888,9 +898,31 @@ const EarnStaking = () => {
     ].some((value) => (value || "").toLowerCase().includes(query)));
   }, [showInactiveValidators, validatorSearch, validators]);
 
-  const displayedValidators = showAllValidators
-    ? filteredValidators
-    : filteredValidators.slice(0, VALIDATOR_DISPLAY_LIMIT);
+  const validatorSortValue = (validator: StakingValidator): bigint | number => {
+    switch (validatorSort.key) {
+      case "blocks": return Number(validator.blocksProposed || "0");
+      case "uptime": {
+        const proposed = Number(validator.blocksProposed || "0");
+        const slots = proposed + Number(validator.missedProposals || "0");
+        return slots > 0 ? proposed / slots : -1;
+      }
+      case "totalStake": return BigInt(validator.totalStake || "0");
+      case "userStake": return stakeWithSelfBond(validator);
+      case "rewards": return BigInt(validator.pendingRewards || "0");
+      case "apy": return parseFloat(validator.estimatedApy) || 0;
+      case "commission": return Number(validator.commissionBps || "0");
+    }
+  };
+  const displayedValidators = [...filteredValidators].sort((a, b) => {
+    const av = validatorSortValue(a);
+    const bv = validatorSortValue(b);
+    return (av < bv ? -1 : av > bv ? 1 : 0) * (validatorSort.desc ? -1 : 1);
+  });
+  const sortHeaderProps = (key: ValidatorSortKey) => ({
+    active: validatorSort.key === key,
+    desc: validatorSort.desc,
+    onSort: () => setValidatorSort((current) => ({ key, desc: current.key === key ? !current.desc : true })),
+  });
 
   const actionValidator = useMemo(
     () => validators.find((validator) => validatorKey(validator, isV2) === actionOperator),
@@ -1317,6 +1349,8 @@ const EarnStaking = () => {
       );
     }
 
+    const creditedBlockRewards = BigInt(info.totalRewardsCredited || "0") + BigInt(info.totalEmitted || "0");
+
     return (
       <div className="space-y-5">
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
@@ -1328,14 +1362,14 @@ const EarnStaking = () => {
           />
           <StatCard
             label="Amount Staked"
-            tooltip="Total STRATO you currently have delegated across all validators."
+            tooltip="Your delegated STRATO plus your operator self-bond across all validators."
             value={`${formatToken(info.userTotalStake, decimals)} ${symbol}`}
             icon={Layers}
           />
           <StatCard
             label="APY"
             tooltip={isV2
-              ? "Annual yield delegators realized over the last 7 days from STRATO block rewards, net of validator commission. Rewards APY comes from platform reward emissions."
+              ? "The native rate annualizes the past 7 days of STRATO block rewards using current stake. Active platform rewards add to the displayed rate."
               : "Estimated annual yield for delegating STRATO. Native APY comes from the staking reward schedule, net of validator commission. Rewards APY comes from platform reward emissions."}
             value={apyWithBreakdown(info.estimatedApy)}
             icon={TrendingUp}
@@ -1381,8 +1415,9 @@ const EarnStaking = () => {
                   <p className="text-xs text-muted-foreground">Staking Rewards</p>
                   <p className="mt-1 text-lg font-semibold">STRATO block rewards</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Validators earn STRATO for each block they propose plus USDST proposer fees, split between the
-                    operator's self-bond and delegators after commission. APY is what delegators realized over the last 7 days.
+                    Eligible validators earn STRATO for producing blocks. Operators and delegators share each reward in
+                    proportion to stake, and commission comes from the delegators’ share. The native rate annualizes
+                    block rewards credited over the past 7 days.
                   </p>
                 </>
               ) : (
@@ -1396,7 +1431,7 @@ const EarnStaking = () => {
               )}
               <p className="mt-2 text-sm text-muted-foreground">
                 {isV2
-                  ? `${formatToken(info.totalRewardsCredited, decimals)} ${symbol} credited to date`
+                  ? `${formatToken(creditedBlockRewards, decimals)} ${symbol} credited to date`
                   : formatRewardPeriodStatus(info.periodStart, info.periodFinish)}
                 {" · "}
                 <a
@@ -1579,7 +1614,7 @@ const EarnStaking = () => {
                         )}
                         <div className="rounded-md bg-muted/30 px-3 py-2">
                           <p className="text-xs text-muted-foreground">Your Stake</p>
-                          <p className="font-semibold">{formatToken(validator.userStake, decimals)} {symbol}</p>
+                          <p className="font-semibold">{formatToken(stakeWithSelfBond(validator), decimals)} {symbol}</p>
                         </div>
                         <div className="rounded-md bg-muted/30 px-3 py-2">
                           <p className="text-xs text-muted-foreground">Rewards</p>
@@ -1657,35 +1692,22 @@ const EarnStaking = () => {
                         />
                       </th>
                       {validatorSetDeployed && (
-                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                          <TipLabel label="Blocks" tooltip="Blocks this validator has proposed." />
-                        </th>
+                        <SortHeader label="Blocks" tooltip="Blocks this validator has proposed." {...sortHeaderProps("blocks")} />
                       )}
                       {validatorSetDeployed && (
-                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                          <TipLabel label="Uptime" tooltip="Share of this validator's proposal slots it actually produced: blocks proposed over blocks proposed plus proposals missed." />
-                        </th>
+                        <SortHeader label="Uptime" tooltip="Share of this validator's proposal slots it actually produced: blocks proposed over blocks proposed plus proposals missed." {...sortHeaderProps("uptime")} />
                       )}
-                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                        <TipLabel label="Total Stake" tooltip="All STRATO staked with this validator, including delegations and the operator's self-bond." />
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                        <TipLabel label="Your Stake" tooltip="STRATO you have delegated to this validator." />
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                        <TipLabel label="Rewards" tooltip="Rewards you've accrued from this validator and can claim now." />
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                        <TipLabel
-                          label={apyLabel}
-                          tooltip={isV2
-                            ? "Annual yield this validator's delegators realized from STRATO block rewards over the last 7 days, after its commission, plus platform Rewards APY when active."
-                            : "Estimated annual yield from this validator: Native APY after its commission, plus platform Rewards APY when active."}
-                        />
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                        <TipLabel label="Commission" tooltip="The percentage of your staking rewards this validator keeps as a fee for operating the node." />
-                      </th>
+                      <SortHeader label="Total Stake" tooltip="All STRATO staked with this validator, including delegations and the operator's self-bond." {...sortHeaderProps("totalStake")} />
+                      <SortHeader label="Your Stake" tooltip="Your delegation to this validator plus any self-bond you hold as its operator." {...sortHeaderProps("userStake")} />
+                      <SortHeader label="Rewards" tooltip="Rewards you've accrued from this validator and can claim now." {...sortHeaderProps("rewards")} />
+                      <SortHeader
+                        label={apyLabel}
+                        tooltip={isV2
+                          ? "The native rate annualizes this validator's past 7 days of STRATO block rewards using its current stake and commission. Active platform rewards add to the displayed rate."
+                          : "Estimated annual yield from this validator: Native APY after its commission, plus platform Rewards APY when active."}
+                        {...sortHeaderProps("apy")}
+                      />
+                      <SortHeader label="Commission" tooltip="The percentage of your staking rewards this validator keeps as a fee for operating the node." {...sortHeaderProps("commission")} />
                       <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Actions</th>
                     </tr>
                   </thead>
@@ -1718,7 +1740,7 @@ const EarnStaking = () => {
                             <td className="px-4 py-3 text-right text-sm tabular-nums">{formatUptime(validator.blocksProposed, validator.missedProposals)}</td>
                           )}
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.totalStake, decimals)}</td>
-                          <td className="px-4 py-3 text-right text-sm">{formatToken(validator.userStake, decimals)}</td>
+                          <td className="px-4 py-3 text-right text-sm">{formatToken(stakeWithSelfBond(validator), decimals)}</td>
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.pendingRewards, decimals)}</td>
                           <td className="px-4 py-3 text-right text-sm">{apyWithBreakdown(validator.estimatedApy)}</td>
                           <td className="px-4 py-3 text-right text-sm">{formatPercentFromBps(validator.commissionBps)}</td>
@@ -1773,14 +1795,6 @@ const EarnStaking = () => {
                   </tbody>
                 </table>
               </div>
-
-              {filteredValidators.length > VALIDATOR_DISPLAY_LIMIT && (
-                <div className="flex justify-center">
-                  <Button variant="ghost" size="sm" onClick={() => setShowAllValidators((current) => !current)}>
-                    {showAllValidators ? "Show less" : `Show all ${filteredValidators.length} validators`}
-                  </Button>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -1971,7 +1985,7 @@ const EarnStaking = () => {
                         disabled={!isLoggedIn || actionValidatorStake <= 0n}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Your stake: {formatToken(actionValidator.userStake, decimals)} {symbol} · unbonding {formatDuration(info?.unbondingSeconds)}
+                        Your delegation: {formatToken(actionValidator.userStake, decimals)} {symbol} · unbonding {formatDuration(info?.unbondingSeconds)}
                       </p>
                     </div>
                   )}
@@ -2021,7 +2035,7 @@ const EarnStaking = () => {
                           disabled={!isLoggedIn || actionValidatorStake <= 0n}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Your stake: {formatToken(actionValidator.userStake, decimals)} {symbol}
+                          Your delegation: {formatToken(actionValidator.userStake, decimals)} {symbol}
                         </p>
                       </div>
                     </div>

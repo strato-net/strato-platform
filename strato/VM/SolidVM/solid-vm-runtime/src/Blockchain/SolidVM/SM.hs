@@ -37,6 +37,7 @@ module Blockchain.SolidVM.SM
     getCurrentCodeAddress,
     withCallInfo,
     withContractConstruction,
+    assertNotConstructing,
     getCodeHashForDerivation,
     withStaticCallInfo,
     attempt,
@@ -946,6 +947,18 @@ withContractConstruction address f = do
                 callStack = callStack previous,
                 _action = _action previous
               })
+
+-- An address whose constructor is still running holds a bare, code-less account
+-- record (construction publishes the code only once the constructor finishes),
+-- which getNewAddressWithSalt's bare-account check would treat as reusable.
+-- Refuse to re-enter construction at an address already being constructed, so a
+-- salted CREATE2 cannot build the same contract twice at one address from inside
+-- its own constructor.
+assertNotConstructing :: MonadSM m => Address -> m ()
+assertNotConstructing address = do
+  constructing <- gets constructingContracts
+  when (S.member address constructing) $
+    throw (DuplicateContract $ "The address " ++ show address ++ " already exists. Try using a different salt or constructor arguments.")
 
 getCodeHashForDerivation :: MonadSM m => Address -> m Keccak256
 getCodeHashForDerivation address = do

@@ -22,6 +22,7 @@ import {
   V3_POOL_APY_MIN_TVL_USD,
 } from "../../config/poolV3Constants";
 import * as v3 from "../helpers/poolV3Math.helper";
+import { filterRegisteredPools } from "../helpers/swapping.helper";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 import { getOraclePrices } from "./oracle.service";
 import { getNFTItem } from "./nfts.service";
@@ -48,6 +49,7 @@ const {
   PoolV3Ticks,
   PoolV3Positions,
   PoolV3SwapEvent,
+  PoolV3Factory,
   PoolV3FactoryFeeTiers,
   PositionManagerV3Positions,
   PositionManagerV3Owners,
@@ -454,7 +456,9 @@ export const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>, window?
 // READ OPERATIONS
 // ============================================================================
 
-const fetchRawPools = async (
+const REGISTRY_PAGE_SIZE = 500;
+
+export const fetchRawPools = async (
   accessToken: string,
   filters: Record<string, string> = {},
   /** drop the current-factory scope — for EXACT-address lookups only, where historical
@@ -471,7 +475,26 @@ const fetchRawPools = async (
       ...filters,
     },
   });
-  return data as RawV3Pool[];
+  const pools = data as RawV3Pool[];
+  if (anyFactory || pools.length === 0) return pools;
+  // A pool names its own factory, so a listing keeps only pools the factory recorded. The
+  // record is read page by page so a long one is never cut short.
+  const registered: { value?: string }[] = [];
+  for (let offset = 0; ; offset += REGISTRY_PAGE_SIZE) {
+    const { data: page } = await cirrus.get(accessToken, `/${PoolV3Factory}-allPools`, {
+      params: {
+        address: `eq.${config.poolV3Factory}`,
+        select: "value",
+        order: "key.asc",
+        limit: String(REGISTRY_PAGE_SIZE),
+        offset: String(offset),
+      },
+    });
+    const rows = Array.isArray(page) ? page : [];
+    registered.push(...rows);
+    if (rows.length < REGISTRY_PAGE_SIZE) break;
+  }
+  return filterRegisteredPools(pools, registered);
 };
 
 const attachPrices = async (accessToken: string, rawPools: RawV3Pool[]): Promise<PoolV3[]> => {
