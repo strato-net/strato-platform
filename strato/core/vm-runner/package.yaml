@@ -130,15 +130,19 @@ tests:
       - blockstanbul
       - bytestring
       - common-log
+      - composable-monads-base
       - containers
       #- ethereum-vm
       - hflags
       - hspec
       - hspec-expectations-lifted
       - labeled-error
+      - lens
       - statedb-monad
       - monad-alter
+      - solid-vm
       - strato-model
+      - text
       - time
       - vm-runner
       - vm-tools
