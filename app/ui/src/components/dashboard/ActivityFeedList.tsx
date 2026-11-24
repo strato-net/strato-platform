@@ -203,22 +203,21 @@ const ActivityFeedList = () => {
       };
       
       const allEvents: Event[] = [];
-      const seenIds = new Set<number>();
       let total = 0;
+      // Event ids are serial: capping them at the first row's keeps events
+      // added during the export from shifting the later pages
+      let maxId: number | undefined;
       for (let offset = 0; offset < CSV_EXPORT_MAX_ROWS; offset += EVENTS_MAX_LIMIT) {
         const response = await activityFeedApi.getEvents({
           limit: EVENTS_MAX_LIMIT,
           offset,
           order: 'block_timestamp.desc,id.desc',
+          max_id: maxId,
           ...apiFilters
         });
         const page = response.events || [];
-        // Events added during the export shift rows into the next page
-        for (const event of page) {
-          if (seenIds.has(event.id)) continue;
-          seenIds.add(event.id);
-          allEvents.push(event);
-        }
+        if (maxId === undefined) maxId = page[0]?.id;
+        allEvents.push(...page);
         total = response.total || 0;
         if (page.length < EVENTS_MAX_LIMIT) break;
       }
