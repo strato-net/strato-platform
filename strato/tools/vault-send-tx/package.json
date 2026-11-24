@@ -1,0 +1,21 @@
+{
+  "name": "vault-sepolia",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "across:test": "node across-bridge.js",
+    "token:deploy": "node deploy-test-token.js",
+    "token:mint": "node mint-test-token.js",
+    "self-relay:test": "node self-relay-fill.js",
+    "refund:check": "node check-relayer-refund.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ethers": "^6.16.0",
+    "solc": "^0.8.30"
+  }
+}
