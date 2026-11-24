@@ -156,7 +156,7 @@ const UsdstBalanceBox: React.FC = () => {
 
   return (
     <Card
-      className={`fixed bottom-20 md:bottom-4 right-4 z-50 w-80 shadow-lg ${getCardClasses()} backdrop-blur-sm`}
+      className={`fixed bottom-20 md:bottom-4 right-4 z-50 w-80 md:w-96 shadow-lg ${getCardClasses()} backdrop-blur-sm`}
     >
       <CardContent className="p-3">
         <div className="flex items-center space-x-2">
@@ -176,23 +176,26 @@ const UsdstBalanceBox: React.FC = () => {
               <p className="text-sm font-semibold text-foreground animate-pulse">Loading...</p>
             ) : fees ? (
               <div className="text-sm font-semibold text-foreground">
-                {fees.total.toLocaleString()} {fees.total === 1n ? "Transaction" : "Transactions"} remaining
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="How transactions remaining is calculated"
-                      className="ml-1 inline-flex align-middle rounded-full text-muted-foreground hover:text-foreground"
-                      onClick={() => setShowBreakdown(true)}
-                    >
-                      <HelpCircle className="h-3.5 w-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Click for more information</TooltipContent>
-                </Tooltip>
+                Gas remaining for{" "}
+                <span className="whitespace-nowrap">
+                  {fees.total.toLocaleString()} {fees.total === 1n ? "transaction" : "transactions"}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="How gas remaining is calculated"
+                        className="ml-1 inline-flex align-middle rounded-full text-muted-foreground hover:text-foreground"
+                        onClick={() => setShowBreakdown(true)}
+                      >
+                        <HelpCircle className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Click for more information</TooltipContent>
+                  </Tooltip>
+                </span>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Transactions remaining unavailable</p>
+              <p className="text-sm text-muted-foreground">Gas remaining unavailable</p>
             )}
           </div>
           <Button
