@@ -24,6 +24,7 @@ module Blockchain.DB.SQLDB
     setGlobalSQLPool,
     guardPeerStore,
     peerStoreIsSqlite,
+    openPeerSqlite,
     createPeerStorePool,
     withPeerStoreConn,
     runPeerStoreMigration,
@@ -37,12 +38,12 @@ import BlockApps.Logging (runNoLoggingT)
 import Blockchain.EthConf (ethConf, peerConnStr, peerSqlitePath)
 import Control.DeepSeq
 import Control.Lens ((&), (.~))
-import Control.Monad (forM_, when)
+import Control.Monad (forM_, void, when)
 import Control.Monad.Composable.Base
 import Control.Monad.IO.Class
 import Control.Monad.IO.Unlift
-import UnliftIO.Exception (catch, throwIO)
-import Control.Monad.Logger (MonadLoggerIO)
+import UnliftIO.Exception (catch, finally, onException, throwIO)
+import Control.Monad.Logger (MonadLoggerIO, runLoggingT)
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
 import Data.IORef
@@ -203,8 +204,8 @@ notePeerStoreBusy = do
 peerStoreIsSqlite :: Bool
 peerStoreIsSqlite = maybe False (const True) (peerSqlitePath ethConf)
 
--- | Connection settings for the SQLite peer store. WAL mode (persistent's
--- default) lets ethereum-discover and strato-p2p, two processes on the
+-- | Connection settings for the SQLite peer store. WAL mode (set in
+-- 'openPeerSqlite') lets ethereum-discover and strato-p2p, two processes on the
 -- same host, read and write the file concurrently; the busy timeout makes
 -- a writer wait for the other process's transaction instead of failing.
 -- Five seconds is generous for writes that take under a millisecond: a
@@ -213,19 +214,36 @@ peerStoreIsSqlite = maybe False (const True) (peerSqlitePath ethConf)
 peerSqliteInfo :: FilePath -> SQLITE.SqliteConnectionInfo
 peerSqliteInfo path =
   SQLITE.mkSqliteConnectionInfo (T.pack path)
+    & SQLITE.walEnabled .~ False
     & SQLITE.extraPragmas .~ ["PRAGMA busy_timeout = 5000"]
+
+-- | One connection to the SQLite peer store at this path. The journal mode
+-- is set here and not by persistent: on a new file the switch to WAL fails
+-- at once while the other process is making it too, and persistent retries
+-- it without finalizing the statement that failed, after which the
+-- connection cannot be closed ("unable to close due to unfinalized
+-- statements"). ethereum-discover closes its setup connection as soon as
+-- setup is done, and an exception there ends the process.
+openPeerSqlite :: FilePath -> SQL.LogFunc -> IO SQL.SqlBackend
+openPeerSqlite path logFunc = do
+  conn <- SQLITE3.open (T.pack path)
+  (`onException` SQLITE3.close conn) $ do
+    flip runLoggingT logFunc . SQLITE.retryOnBusy . liftIO $ do
+      stmt <- SQLITE3.prepare conn "PRAGMA journal_mode=WAL"
+      void (SQLITE3.stepConn conn stmt) `finally` (SQLITE3.reset conn stmt >> SQLITE3.finalize stmt)
+    SQLITE.wrapConnectionInfo (peerSqliteInfo path) conn logFunc
 
 -- | Opens the peer store: the SQLite file when 'peerSqlitePath' is set,
 -- else Postgres at 'peerConnStr' exactly as before.
 createPeerStorePool :: (MonadUnliftIO m, MonadLoggerIO m) => Int -> m SQLDB
 createPeerStorePool n = case peerSqlitePath ethConf of
-  Just path -> sqlDB <$> SQLITE.createSqlitePoolFromInfo (peerSqliteInfo path) n
+  Just path -> sqlDB <$> SQL.createSqlPool (openPeerSqlite path) n
   Nothing -> createPostgresqlPool peerConnStr n
 
 -- | One connection to the peer store, for setup steps.
 withPeerStoreConn :: (MonadUnliftIO m, MonadLoggerIO m) => (SQL.SqlBackend -> m a) -> m a
 withPeerStoreConn act = case peerSqlitePath ethConf of
-  Just path -> SQLITE.withSqliteConnInfo (peerSqliteInfo path) act
+  Just path -> SQL.withSqlConn (openPeerSqlite path) act
   Nothing -> PSQL.withPostgresqlConn peerConnStr act
 
 -- | Runs a peer-store migration. On Postgres this is persistent's
@@ -243,6 +261,19 @@ runPeerStoreMigration migration = do
   if rdbms /= "sqlite"
     then SQL.runMigration migration
     else do
+      -- ethereum-discover and strato-p2p both run this when a node starts.
+      -- persistent begins a deferred transaction and the steps below read
+      -- before they write; SQLite fails such a write at once, whatever the
+      -- busy timeout, when the other process holds the write lock or has
+      -- committed since the read: on 2026-11-17 strato-p2p exited with
+      -- "database is locked" 0.4 s into a new node's first start, and on
+      -- 2026-11-23 at six starts in a row, each one stopping the node
+      -- before either table was kept. An immediate transaction takes the
+      -- write lock before it reads, and waits for it under the busy
+      -- timeout. Nothing precedes a migration in its transaction, so
+      -- ending the deferred one loses nothing.
+      SQL.rawExecute "COMMIT" []
+      SQL.rawExecute "BEGIN IMMEDIATE" []
       statements <- SQL.getMigration migration
       forM_ statements $ \statement ->
         when ("CREATE TABLE" `T.isPrefixOf` statement) $ do
