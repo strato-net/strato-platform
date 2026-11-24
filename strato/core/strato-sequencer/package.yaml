@@ -108,6 +108,27 @@ tests:
       - strato-sequencer
       - temporary
 
+  # The view timer that votes a silent proposer out (see test-view-timer/Main.hs).
+  view-timer-test:
+    source-dirs: test-view-timer
+    main: Main.hs
+    ghc-options: -dynamic
+    dependencies:
+      - alarmclock
+      - blockapps-data
+      - blockDB
+      - blockstanbul
+      - hspec
+      - lens
+      - monad-alter
+      - mtl
+      - stm
+      - stm-chans
+      - strato-model
+      - strato-sequencer
+      - time
+      - vault-monad
+
   # Loose-transaction intake through the HTTP, gossip and sequencer handlers,
   # against recorded mainnet transactions (see test-intake/Main.hs).
   transaction-intake-test:

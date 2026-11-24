@@ -233,12 +233,14 @@ spec = describe "stake-weighted consensus" $ do
           commitsOut out = length [() | OMsg _ Commit {} <- out]
       out <- runWith activeCtx {_stakes = M.fromList [(Validator me, 1000)]} $ do
         proposal .= Just blk
+        vmAccepted .= True
         o1 <- sendMessages [prepare other]
         o2 <- sendMessages [prepare me]
         pure (commitsOut o1, commitsOut o2)
       out `shouldBe` (0, 1)
       legacy <- runWith legacyCtx $ do
         proposal .= Just blk
+        vmAccepted .= True
         o1 <- sendMessages [prepare other]
         o2 <- sendMessages [prepare me]
         pure (commitsOut o1, commitsOut o2)
@@ -349,3 +351,43 @@ spec = describe "stake-weighted consensus" $ do
         [rn | OMsg _ (RoundChange (View rn _) _) <- farFuture] `shouldBe` [1]
         past <- runWith ctx $ sendMessages [propose $ posixSecondsToUTCTime 0]
         length [() | RunPreprepare _ <- past] `shouldBe` 1
+
+  -- What this node prepares and commits must be the proposal on the table, the
+  -- one its VM checked.
+  describe "the proposal on the table" $ do
+    let ctx = activeCtx {_validators = S.singleton (Validator me), _stakes = M.fromList [(Validator me, 7)], _proposer = Validator me}
+        sealed = let b = Block (v3 [Validator me] [(Validator me, 7)] 0 [] []) [] [] in addProposerSeal (signMsg myPriv (proposalMessage b)) b
+        propose blk = IMsg (MsgAuth me dummySig) (Preprepare (View 0 10) blk)
+
+    -- The proposer signs the hash, which leaves the commitment seals out, so a
+    -- relay can change them; such a copy is still the locked proposal.
+    it "takes a locked proposal relayed with other commitment seals" $ do
+      out <- runWith ctx $ do
+        blockLock .= Just sealed
+        sendMessages [propose $ addCommitmentSeals [dummySig] sealed]
+      [() | OMsg _ RoundChange {} <- out] `shouldBe` []
+      length [() | RunPreprepare _ <- out] `shouldBe` 1
+
+    -- The VM answers some time after the proposal reached it, and a round
+    -- change in between clears the proposal.
+    it "prepares only the VM's acceptance of the proposal on the table" $ do
+      let prepares out = [di | OMsg _ (Prepare _ di) <- out]
+      out <- runWith ctx $ do
+        _ <- sendMessages [propose sealed]
+        stale <- sendMessages [PreprepareResponse $ AcceptPreprepare (hash "another block")]
+        current <- sendMessages [PreprepareResponse $ AcceptPreprepare (blockHash sealed)]
+        pure (prepares stale, prepares current)
+      out `shouldBe` ([], [blockHash sealed])
+
+    -- A PREPARE quorum is not enough: the node commits only a proposal its own
+    -- VM accepted, and still commits it when that answer comes after the quorum.
+    it "commits a prepared proposal only once this node's VM accepted it" $ do
+      let blk = Block (v3 [Validator me, Validator other] [(Validator me, 1000)] 0 [] []) [] []
+          di = blockHash blk
+          commits out = [d | OMsg _ (Commit _ d _) <- out]
+      out <- runWith activeCtx {_stakes = M.fromList [(Validator me, 1000)]} $ do
+        proposal .= Just blk
+        prepared <- sendMessages [IMsg (MsgAuth me dummySig) (Prepare (View 0 10) di)]
+        accepted <- sendMessages [PreprepareResponse $ AcceptPreprepare di]
+        pure (commits prepared, commits accepted)
+      out `shouldBe` ([], [di])

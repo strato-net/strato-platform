@@ -9,6 +9,7 @@ import BlockApps.Logging
 import Blockchain.Blockstanbul
 import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Keccak256 (zeroHash)
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Control.Lens hiding (view)
@@ -139,6 +140,19 @@ spec = describe "ROUNDCHANGE emission" $ do
       pure (a, b)
     length (roundChangeEvents first) `shouldBe` 1
     roundChangeEvents again `shouldBe` []
+
+  it "is not moved to a round implausibly far ahead" $ do
+    let fakeAuth a = MsgAuth a (signMsg myPriv (B.replicate 32 0))
+        far = View (20 + 2 ^ (40 :: Int)) 18
+        ctx =
+          baseCtx True (Just me)
+            & validators .~ S.fromList [Validator me, Validator other, Validator third]
+    (got, r) <- runTest ctx $ do
+      a <- sendMessages [IMsg (fakeAuth a') (RoundChange far 0xdeadbeef) | a' <- [other, third]]
+      b <- sendMessages [IMsg (fakeAuth a') (Prepare far zeroHash) | a' <- [other, third]]
+      (,) (a ++ b) . _round <$> use view
+    roundChanges got `shouldBe` []
+    r `shouldBe` 20
 
   it "rebroadcasts an inbound ROUNDCHANGE with the original nonce" $ do
     let auth = MsgAuth other (signMsg myPriv (B.replicate 32 0))

@@ -25,6 +25,8 @@ module Blockchain.Sequencer.Monad
     BlockPeriod (..),
     RoundPeriod (..),
     ProposalTimeout (..),
+    ViewTimer,
+    WorkPending (..),
     runSequencerM,
     commitSequencerState,
     pairToVmTx,
@@ -95,6 +97,12 @@ data ViewTimer = ViewTimer
     vtClock :: AlarmClock UTCTime
   }
 
+-- | The height at which work last arrived for a block (see
+-- 'createNewViewTimer'), whether or not this node armed a timer for it: a
+-- proposer arms none for its own round, and the work still waits if that
+-- round fails.
+newtype WorkPending = WorkPending (IORef (Maybe SequenceNumber))
+
 data SequencerContext = SequencerContext
   { _seenTransactionDB :: !SeenTransactionDB,
     _blockstanbulContext :: BlockstanbulContext,
@@ -102,6 +110,7 @@ data SequencerContext = SequencerContext
     -- | The view timer currently armed, if any. Keeps 'createNewViewTimer' to
     -- one live AlarmClock per view.
     _armedViewTimer :: IORef (Maybe ViewTimer),
+    _workPending :: WorkPending,
     -- | The round timer's one shared AlarmClock (allocated on first use), and
     -- the (view, fire time) it is currently armed for. Keeps 'createNewTimer'
     -- to a single live AlarmClock no matter how many times it is re-armed.
@@ -120,6 +129,7 @@ type MonadBlockstanbul m =
     HasBlockstanbulContext m,
     Mod.Accessible (IORef (View, Maybe Block)) m,
     Mod.Accessible (IORef (Maybe ViewTimer)) m,
+    Mod.Accessible WorkPending m,
     Mod.Accessible (IORef (Maybe (AlarmClock UTCTime))) m,
     Mod.Accessible (IORef (Maybe (View, UTCTime))) m,
     Mod.Accessible (TMChan View) m,
@@ -182,6 +192,9 @@ instance Mod.Accessible (IORef (View, Maybe Block)) SequencerM where
 
 instance Mod.Accessible (IORef (Maybe ViewTimer)) SequencerM where
   access _ = use armedViewTimer
+
+instance Mod.Accessible WorkPending SequencerM where
+  access _ = use workPending
 
 instance Mod.Accessible (IORef (Maybe (AlarmClock UTCTime))) SequencerM where
   access _ = use roundTimerClock
@@ -249,6 +262,7 @@ runSequencerM vaultUrl' c bc m = do
     depBlock <- openDependentBlockDB dbPath dbCS
     latestVandP <- liftIO $ newIORef (View 0 0, Nothing)
     armedVT <- liftIO $ newIORef Nothing
+    workAt <- liftIO $ newIORef Nothing
     roundClock <- liftIO $ newIORef Nothing
     armedRT <- liftIO $ newIORef Nothing
     withReaderEnv c{dependentBlockDB = depBlock} $ evalStateEff
@@ -257,6 +271,7 @@ runSequencerM vaultUrl' c bc m = do
           _blockstanbulContext = bc,
           _latestViewAndProposal = latestVandP,
           _armedViewTimer = armedVT,
+          _workPending = WorkPending workAt,
           _roundTimerClock = roundClock,
           _armedRoundTimer = armedRT,
           _pendingBestSequencedBlock = Nothing
@@ -338,11 +353,12 @@ createNewTimer vw = do
 
 -- | Arm the view timer for the current view. Called when a new transaction
 -- arrives (there is now work the proposer should turn into a block), and when
--- the round changes while a timer was armed at the same height (that work is
--- still pending).
+-- the round changes while that work is still pending at the same height.
 createNewViewTimer :: MonadBlockstanbul m => m ()
 createNewViewTimer = do
   ctx <- getBlockstanbulContext
+  WorkPending workAt <- Mod.access (Mod.Proxy @WorkPending)
+  liftIO . writeIORef workAt . Just . _sequence $ _view ctx
   let voting = case _selfAddr ctx of
         Just a -> _validatorBehavior ctx && Validator a `S.member` _validators ctx
         Nothing -> False
@@ -397,15 +413,16 @@ createNewViewTimer = do
         atomicModifyIORef' armedRef $ \_ -> (Just (ViewTimer v now due alarm), ())
         setAlarm alarm due
 
--- | On entering a new view: a timer armed for an earlier round at the same
--- height means its transactions are still waiting for a block, so the new
--- round gets a timer too. A new height means they were committed.
+-- | On entering a new view: work that arrived at this height is still waiting
+-- for a block, so the new round gets a timer. That holds whether or not this
+-- node armed one before: as the failed round's proposer it armed none, and
+-- carrying only an armed timer left it with no timeout in the next round. A
+-- new height means the work was committed.
 carryViewTimer :: MonadBlockstanbul m => View -> m ()
 carryViewTimer vw = do
-  armedRef <- Mod.access (Mod.Proxy @(IORef (Maybe ViewTimer)))
-  armed <- liftIO $ readIORef armedRef
-  let pending vt = _sequence (vtView vt) == _sequence vw && _round (vtView vt) < _round vw
-  when (maybe False pending armed) createNewViewTimer
+  WorkPending workAt <- Mod.access (Mod.Proxy @WorkPending)
+  pending <- liftIO $ readIORef workAt
+  when (pending == Just (_sequence vw)) createNewViewTimer
 
 -- | Extra time, on top of the proposal's own latency, allowed for an accepted
 -- proposal to commit before changing round.

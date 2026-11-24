@@ -83,6 +83,8 @@ data BlockstanbulContext = BlockstanbulContext
     _hasPreprepared :: Bool,
     _hasPrepared :: Bool,
     _hasCommitted :: Bool,
+    -- This node's VM ran the proposal on the table and accepted it
+    _vmAccepted :: Bool,
     _pendingRound :: Maybe RoundNumber,
     -- The ROUNDCHANGE this node signed for the current view, re-sent unchanged
     -- on every later timeout until the view changes
@@ -177,6 +179,7 @@ newContext network' chainId' (Checkpoint v as mParent stakes' lastRound') addr v
           _hasPreprepared = False,
           _hasPrepared = False,
           _hasCommitted = False,
+          _vmAccepted = False,
           _pendingRound = Nothing,
           _sentRoundChange = Nothing,
           _roundChanged = M.empty,
