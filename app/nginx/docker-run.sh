@@ -87,6 +87,15 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i "s|__UI_HOST__|$HOST_IP|g" /tmp/nginx.conf
   fi
 
+  # SERVE_UI=false: the app UI is served elsewhere (the HA front door serves
+  # it from S3), so a request for it here gets 404 instead of a 502 from an
+  # upstream that is not there.
+  if [ "${SERVE_UI:-true}" = false ]; then
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_NO_UI//g' /tmp/nginx.conf
+  else
+    sed -i '/#TEMPLATE_MARK_NO_UI/d' /tmp/nginx.conf
+  fi
+
   # Strip trailing slash from NODE_URL so `__NODE_URL__/rpc` is well-formed
   NODE_URL_STRIPPED="${NODE_URL%/}"
   sed -i "s|__NODE_URL__|$NODE_URL_STRIPPED|g" /tmp/nginx.conf
