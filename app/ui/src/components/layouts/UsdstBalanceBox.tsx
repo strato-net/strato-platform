@@ -4,49 +4,28 @@ import { useTokenContext } from "@/context/TokenContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Coins, AlertTriangle, HelpCircle, Minus } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { formatWeiAmount, formatCurrency } from "@/utils/numberUtils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatBalance, formatWeiAmount, formatCurrency } from "@/utils/numberUtils";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Token } from "@/interface";
-import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
 
-// Warn when vouchers plus the fee currency cover fewer calls than this
-const LOW_CALLS = 1000;
-const CRITICAL_CALLS = 3;
+// Warn at this many transactions or fewer, or when only gas sponsored ones are left; none left is critical
+const LOW_CALLS = 10n;
+// USDST buying STRATO pays the pool's 0.30% fee on top of the $0.01 a transaction is worth
+const POOL_FEE_BPS = 30n;
+// Fixed-point scale for fractional transaction counts
+const ONE = 10n ** 18n;
 
-// Optimized InfoTooltip component using hook
-const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
-  const { isMobile, showTooltip, handleToggle } = useMobileTooltip('usdst-balance-tooltip-container');
+interface FeeSourceRow {
+  label: string;
+  detail: string;
+  /** Transactions this balance pays for, scaled by ONE. */
+  calls: bigint;
+}
 
-  if (isMobile) {
-    return (
-      <div className="relative usdst-balance-tooltip-container">
-        <div 
-          className="cursor-help"
-          onClick={handleToggle}
-        >
-          {children}
-        </div>
-        {showTooltip && (
-          <div className="absolute bottom-full left-0 mb-2 z-50 bg-popover border rounded-md px-3 py-1.5 text-sm text-popover-foreground shadow-md max-w-xs">
-            <p>{content}</p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        {children}
-      </TooltipTrigger>
-      <TooltipContent className="max-w-xs">
-        <p>{content}</p>
-      </TooltipContent>
-    </Tooltip>
-  );
-};
+/** A scaled transaction count truncated to two decimals: "2,722.97", "5". */
+const formatCalls = (scaled: bigint) =>
+  (Number(scaled / 10n ** 16n) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
 const UsdstBalanceBox: React.FC = () => {
   const { userAddress, isLoggedIn } = useUser();
@@ -54,6 +33,7 @@ const UsdstBalanceBox: React.FC = () => {
   const currency = feeQuote?.currency ?? "STRATO";
   const location = useLocation();
   const [isMinimized, setIsMinimized] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const [feeToken, setFeeToken] = useState<Token | null>(null);
 
   useEffect(() => {
@@ -71,18 +51,44 @@ const UsdstBalanceBox: React.FC = () => {
       .catch((error) => console.error(`Error fetching ${currency} token:`, error));
   }, [getToken, currencyAddress, currency]);
 
-  // Calls the user can still pay for: vouchers first, then the fee currency, then USDST buying STRATO.
-  const affordableCalls = useMemo(() => {
-    if (loadingUsdstBalance || !feeQuote) return 0;
+  // Transactions each balance pays for: STRATO at the per-transaction quote, USDST at $0.01
+  // plus the pool's fee when it buys STRATO, and one per gas sponsored transaction. Without a
+  // live STRATO price only the sponsored ones can pay. One transaction can draw on STRATO and
+  // USDST together, so the total is the whole part of their exact sum.
+  const fees = useMemo(() => {
+    if (!feeQuote) return null;
     const feeWei = BigInt(feeQuote.feeWei);
-    if (!feeQuote.valid || feeWei === 0n) return Number(feeQuote.vouchers);
-    const { fallback } = feeQuote;
-    const fromFallback = fallback ? BigInt(fallback.balanceWei) / BigInt(fallback.maxWei) : 0n;
-    return Number(BigInt(feeQuote.vouchers) + BigInt(feeQuote.balanceWei) / feeWei + fromFallback);
-  }, [feeQuote, loadingUsdstBalance]);
+    const priced = feeQuote.valid && feeWei > 0n;
+    const stratoQuoted = feeQuote.currency === "STRATO";
+    const usdstWei = stratoQuoted ? feeQuote.fallback?.balanceWei ?? "0" : feeQuote.balanceWei;
+    const usdstPerTxWei = BigInt(feeQuote.usdFeeWei) * (10_000n + (stratoQuoted ? POOL_FEE_BPS : 0n)) / 10_000n;
+    const amount = (wei: string) => formatCurrency(formatWeiAmount(wei));
+    const paidRows: FeeSourceRow[] = [
+      ...(stratoQuoted
+        ? [{
+            label: "STRATO",
+            detail: `${amount(feeQuote.balanceWei)} STRATO ÷ ${formatBalance(feeQuote.feeWei, "STRATO", 18, undefined, 8)} per transaction`,
+            calls: priced ? BigInt(feeQuote.balanceWei) * ONE / feeWei : 0n,
+          }]
+        : []),
+      {
+        label: "USDST",
+        detail: `${amount(usdstWei)} USDST ÷ ${formatWeiAmount(usdstPerTxWei.toString())} USDST per transaction`,
+        calls: priced ? BigInt(usdstWei) * ONE / usdstPerTxWei : 0n,
+      },
+    ];
+    const sponsored = BigInt(feeQuote.vouchers);
+    const paid = paidRows.reduce((sum, row) => sum + row.calls, 0n) / ONE;
+    const rows = [
+      ...paidRows,
+      { label: "Gas sponsored transactions", detail: "One transaction each, used first", calls: sponsored * ONE },
+    ];
+    return { rows, stratoQuoted, priced, paid, total: rows.reduce((sum, row) => sum + row.calls, 0n) / ONE };
+  }, [feeQuote]);
 
-  const isLowBalance = affordableCalls < LOW_CALLS && affordableCalls > CRITICAL_CALLS;
-  const isCriticalBalance = affordableCalls <= CRITICAL_CALLS;
+  const total = loadingUsdstBalance ? null : fees?.total ?? null;
+  const isCriticalBalance = total === 0n;
+  const isLowBalance = total !== null && total > 0n && (total <= LOW_CALLS || fees?.paid === 0n);
 
   // Don't render if user is not logged in or if on homepage
   if (!userAddress || location.pathname === "/") {
@@ -90,7 +96,6 @@ const UsdstBalanceBox: React.FC = () => {
   }
 
   const getCardClasses = () => {
-    if (loadingUsdstBalance) return "border-blue-200 dark:border-blue-800 bg-card/95";
     if (isCriticalBalance) return "border-red-300 dark:border-red-700 bg-red-200/95 dark:bg-red-900/95";
     if (isLowBalance) return "border-orange-300 dark:border-orange-700 bg-orange-200/95 dark:bg-orange-900/95";
     return "border-blue-200 dark:border-blue-800 bg-card/95";
@@ -113,11 +118,6 @@ const UsdstBalanceBox: React.FC = () => {
           className={`${sizeClasses[size]} rounded-full object-cover`}
         />
       );
-    }
-
-    // Don't show warning icons when loading
-    if (loadingUsdstBalance) {
-      return <Coins className={`${sizeClasses[size]} text-blue-600 dark:text-blue-400`} />;
     }
 
     // Fallback to warning/normal icons
@@ -155,15 +155,13 @@ const UsdstBalanceBox: React.FC = () => {
 
   return (
     <Card
-      className={`fixed bottom-20 md:bottom-4 right-4 z-50 w-60 shadow-lg ${getCardClasses()} backdrop-blur-sm`}
+      className={`fixed bottom-20 md:bottom-4 right-4 z-50 w-80 shadow-lg ${getCardClasses()} backdrop-blur-sm`}
     >
       <CardContent className="p-3">
         <div className="flex items-center space-x-2">
           <div
             className={`p-1.5 rounded-full ${
-              loadingUsdstBalance
-                ? "bg-blue-100 dark:bg-blue-900/50"
-                : isCriticalBalance
+              isCriticalBalance
                 ? "bg-red-100 dark:bg-red-900/50"
                 : isLowBalance
                 ? "bg-orange-100 dark:bg-orange-900/50"
@@ -173,25 +171,23 @@ const UsdstBalanceBox: React.FC = () => {
             {renderIcon("lg")}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1">
-              <p className="text-xs font-medium text-muted-foreground">{currency} Balance</p>
-              <InfoTooltip content={`${currency} pays the network fees on STRATO; vouchers cover one call each`}>
-                <HelpCircle className="h-3 w-3 text-muted-foreground hover:text-foreground cursor-help" />
-
-              </InfoTooltip>
-            </div>
-            <p className="text-sm font-semibold text-foreground truncate">
-              {loadingUsdstBalance ? (
-                <span className="animate-pulse">Loading...</span>
-              ) : (
-                `${formatCurrency(formatWeiAmount(feeQuote?.balanceWei || "0"))} ${currency}`
-              )}
-            </p>
-            <p className="text-xs text-muted-foreground truncate">
-              {loadingUsdstBalance
-                ? "Calculating voucher credits…"
-                : `${Number(feeQuote?.vouchers || 0).toLocaleString()} vouchers`}
-            </p>
+            {loadingUsdstBalance ? (
+              <p className="text-sm font-semibold text-foreground animate-pulse">Loading...</p>
+            ) : fees ? (
+              <p className="text-sm font-semibold text-foreground">
+                {fees.total.toLocaleString()} {fees.total === 1n ? "Transaction" : "Transactions"} remaining
+                <button
+                  type="button"
+                  aria-label="How transactions remaining is calculated"
+                  className="ml-1 inline-flex align-middle rounded-full text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowBreakdown(true)}
+                >
+                  <HelpCircle className="h-3.5 w-3.5" />
+                </button>
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">Transactions remaining unavailable</p>
+            )}
           </div>
           <Button
             variant="ghost"
@@ -203,7 +199,7 @@ const UsdstBalanceBox: React.FC = () => {
           </Button>
         </div>
 
-        {(isLowBalance || isCriticalBalance) && !loadingUsdstBalance && (
+        {(isLowBalance || isCriticalBalance) && (
           <div className="mt-2 pt-2 border-t border-border">
             <div
               className={`flex items-start space-x-1 ${
@@ -228,6 +224,44 @@ const UsdstBalanceBox: React.FC = () => {
           </div>
         )}
       </CardContent>
+
+      {fees && (
+        <Dialog open={showBreakdown} onOpenChange={setShowBreakdown}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Transactions remaining</DialogTitle>
+              <DialogDescription>
+                {fees.stratoQuoted
+                  ? "Every transaction pays a network fee worth $0.01. Gas sponsored transactions pay first, then STRATO at its current price, then USDST buys the STRATO needed, plus the pool's 0.3% fee. The total is an estimate, since the STRATO price moves with the market, rounded down to a whole number."
+                  : "Every transaction pays a network fee of 0.01 USDST. Gas sponsored transactions pay first, then USDST. The total is an estimate, rounded down to a whole number."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 text-sm">
+              {fees.rows.map((row, i) => (
+                <div key={row.label} className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="font-medium text-foreground">{row.label}</p>
+                    <p className="text-xs text-muted-foreground">{row.detail}</p>
+                  </div>
+                  <p className="tabular-nums whitespace-nowrap text-foreground">
+                    {i > 0 ? "+ " : ""}
+                    {formatCalls(row.calls)}
+                  </p>
+                </div>
+              ))}
+              <div className="flex items-center justify-between gap-4 border-t border-border pt-3 font-semibold text-foreground">
+                <p>Total</p>
+                <p className="tabular-nums whitespace-nowrap">= {fees.total.toLocaleString()}</p>
+              </div>
+              {!fees.priced && (
+                <p className="text-xs text-orange-600 dark:text-orange-400">
+                  The STRATO price is unavailable right now, so only gas sponsored transactions can pay until it returns.
+                </p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Card>
   );
 };
