@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { ApySource, PoolV3 } from "@strato/shared-types";
 import { hiddenSwapPools } from "../../config/config";
+import { computeLendingAPY } from "../helpers/earnYield.helper";
 import { addV3PoolApys } from "./earn.service";
 
 const WAD = 10n ** 18n;
@@ -94,4 +95,12 @@ test("pool addresses are normalized before hidden-pool and key lookups", () => {
 
   assert.ok(map.has(POOL));
   assert.equal(map.get(TOKEN0)![0].poolAddress, POOL);
+});
+
+test("lending APY tolerates an emptied pool, whose balance Cirrus returns as `\"\"`", () => {
+  const cfg = { interestRate: 500, reserveFactor: 1000 };
+  const debt = { totalScaledDebt: (100n * WAD).toString(), borrowIndex: (10n ** 27n).toString() };
+
+  assert.equal(computeLendingAPY({}, cfg, '""'), null);
+  assert.equal(computeLendingAPY(debt, cfg, '""'), computeLendingAPY(debt, cfg, "0"));
 });
