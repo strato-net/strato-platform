@@ -84,7 +84,7 @@ debounceTxSendsAndUnseq = do
         full <- atomically $ isFullTBQueue txq
         when full flushTxs
         atomically $ writeTBQueue txq tx
-      recordQueuedTxs txs
+        recordQueuedTxs [tx]
     Right other -> yield other
     Left TXQueueTimeout -> flushTxs
     Left (ToUnseq ie) -> lift $ Mod.output ie
