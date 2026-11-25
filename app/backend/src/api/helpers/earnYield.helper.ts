@@ -258,7 +258,7 @@ export function computeExchangeRateAPY(
 export function computeLendingAPY(lp: any, cfg: any, availableLiquidity: string): string | null {
   const { supplyAPY: maxSupplyAPY } = calculateAPYs(cfg.interestRate ?? 0, cfg.reserveFactor ?? 1000);
   const debt = BigInt(totalDebtFromScaled(lp.totalScaledDebt ?? "0", lp.borrowIndex ?? "0"));
-  const cash = BigInt(availableLiquidity);
+  const cash = safeBigInt(availableLiquidity); // Cirrus returns a zero balance as `""`
   const reserves = BigInt(lp.reservesAccrued ?? "0");
   const total = cash + debt;
   const denom = total - (reserves < total ? reserves : total);

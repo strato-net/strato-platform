@@ -87,7 +87,7 @@ export const ensureFeeCoverage = async (calls: number, accessToken: string, user
   const quote = await getFeeQuote(accessToken, userAddress);
   const uncovered = BigInt(calls) - BigInt(quote.vouchers);
   if (uncovered <= 0n) return;
-  if (!quote.valid) throw new Error("Network fee price unavailable: only vouchers can pay right now");
+  if (!quote.valid) throw new Error("Network fee price unavailable: only gas sponsored transactions can pay right now");
   const feeWei = BigInt(quote.feeWei);
   const short = feeWei * uncovered - BigInt(quote.balanceWei);
   if (short <= 0n) return;

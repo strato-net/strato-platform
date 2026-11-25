@@ -1398,7 +1398,7 @@ const EarnStaking = () => {
 
         {isLoggedIn && !canCoverStakeFee && (
           <p className="text-xs text-yellow-600">
-            You need {feeQuote?.currency ?? "STRATO"} or vouchers to cover transaction fees — fund your account before staking.
+            You need {feeQuote?.currency ?? "STRATO"} or gas sponsored transactions to cover transaction fees — fund your account before staking.
           </p>
         )}
 

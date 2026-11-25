@@ -54,7 +54,7 @@ ENV_REQUIRED=(ENV_NAME AWS_REGION NETWORK CHAIN_ID NODE_HOSTNAME CERTIFICATE_ARN
 # Present in the file, but may be left empty: without a snapshot a cell syncs from the genesis block.
 ENV_MAY_BE_EMPTY=(SNAPSHOT_BUCKET SNAPSHOT_SOURCE)
 ENV_OPTIONAL=(BACKEND_SECRET BACKEND_SECRET_KEYS GRAFANA_ADMIN_GROUPS GRAFANA_VIEWER_GROUPS PARTNER_REFERRALS_URL PARTNER_INTERNAL_KEY_SECRET
-  READY_TIMEOUT_MINUTES NAT_GATEWAYS POSTHOG_KEY POSTHOG_HOST GOOGLE_ANALYTICS_ID)
+  READY_TIMEOUT_MINUTES NAT_GATEWAYS PG_READER_INSTANCE_CLASS POSTHOG_KEY POSTHOG_HOST GOOGLE_ANALYTICS_ID)
 # Only the file sets them: a value inherited from the caller's shell (the
 # pipeline exports ENV_NAME and AWS_REGION) would hide a missing line.
 # READY_TIMEOUT_MINUTES alone may also come from the caller.
@@ -85,7 +85,7 @@ env_check() {
   is OBSERVABILITY '^(true|false)$' "true or false"
   is AWS_REGION '^[a-z]{2}(-[a-z]+)+-[0-9]$' "an AWS region, like us-east-1"
   is NETWORK '^[a-z][a-z0-9-]*$' "a network name, like helium"
-  for name in CELL_INSTANCE_TYPE PG_INSTANCE_CLASS; do is "$name" '^[a-z][a-z0-9-]*\.[a-z0-9-]+$' "an instance type, like m6i.xlarge"; done
+  for name in CELL_INSTANCE_TYPE PG_INSTANCE_CLASS PG_READER_INSTANCE_CLASS; do is "$name" '^[a-z][a-z0-9-]*\.[a-z0-9-]+$' "an instance type, like m6i.xlarge"; done
   is PG_ENGINE_VERSION '^[0-9]+\.[0-9]+$' "an Aurora PostgreSQL version, like 14.18"
   is SNAPSHOT_BUCKET '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$' "a bucket name"
   for name in OAUTH_SECRET BACKEND_SECRET PARTNER_INTERNAL_KEY_SECRET; do is "$name" '^[A-Za-z0-9/_+=.@:-]+$' "a Secrets Manager name or ARN"; done
@@ -282,7 +282,7 @@ otel_ecs() {
 ctx_data_plane() {
   # The bus (MSK) stays off until the API tier submits through it.
   ctx=(-c envName="$ENV_NAME" -c engineVersion="$PG_ENGINE_VERSION" -c writerInstanceClass="$PG_INSTANCE_CLASS"
-    -c readerInstanceClass="$PG_INSTANCE_CLASS" -c readerCount="$PG_READERS" -c bus=false)
+    -c readerInstanceClass="${PG_READER_INSTANCE_CLASS:-$PG_INSTANCE_CLASS}" -c readerCount="$PG_READERS" -c bus=false)
   # One NAT gateway for both zones unless the environment asks for one each.
   [[ -z ${NAT_GATEWAYS:-} ]] || ctx+=(-c natGateways="$NAT_GATEWAYS")
 }

@@ -85,7 +85,7 @@ import LocalApi (formatClientError, runLocal, sharedManager)
 import Network.HTTP.Client (RequestBody (..), httpLbs, method, parseRequest, requestBody, requestHeaders, responseBody, responseStatus, responseTimeout, responseTimeoutMicro)
 import Network.HTTP.Types (statusCode)
 import qualified Strato.Tracing as Tr
-import SqlState (NativeBalance (..), feeQuoteFromSql, nativeBalanceFromSql, nativeToken, storageAtFromSql)
+import SqlState (NativeBalance (..), effectiveNativeBalanceFromSql, feeQuoteFromSql, nativeToken, storageAtFromSql)
 import Control.Monad.Composable.CodeDB (EventRow (..), runCodeDBM, lookupCode, queryEvents, queryEventsByTxHash)
 
 type Server = IO
@@ -465,7 +465,10 @@ eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "b
     f addr _blockString = do
       -- Served from the SQL state mirror (latest block); the vm-runner round
       -- trip remains only as a fallback for chains the mirror cannot answer.
-      fromSql <- liftIO $ nativeBalanceFromSql addr
+      -- The mirror value is the effective STRATO balance (native STRATO plus
+      -- USDST and Vouchers valued in STRATO at the fee system's per-block quote),
+      -- so a wallet's affordability check counts every token that can pay gas.
+      fromSql <- liftIO $ effectiveNativeBalanceFromSql addr
       case fromSql of
         NativeBalance n -> return $ "0x" ++ showHex n ""
         NativeBalanceUnavailable why -> do
