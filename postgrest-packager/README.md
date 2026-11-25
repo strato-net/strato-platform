@@ -12,6 +12,14 @@ so a PostgREST pointed at a read replica would never learn about them.
 its reload signal, only when the fingerprint changes. Set it to `0` to
 disable the watcher.
 
+## Row limit
+
+A response carries at most `POSTGREST_MAX_ROWS` rows (default `50000`,
+PostgREST's `max-rows`). PostgREST drops the rest without an error: the
+status is still 200 and only the `Content-Range` header shows the range
+returned. A client that needs more reads in pages. The default is due to go
+down to `10000`.
+
 ## Statement timeout
 
 Every request runs `public.postgrest_pre_request()` first (PostgREST's

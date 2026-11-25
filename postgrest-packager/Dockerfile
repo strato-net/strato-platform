@@ -4,13 +4,14 @@ MAINTAINER BlockApps Inc.
 
 ENV POSTGREST_VERSION=v12.0.0
 
+# POSTGREST_MAX_ROWS is due to go down to 10000: see "Cirrus row limit" in AGENTS.md
 ENV POSTGREST_SOURCE=https://github.com/PostgREST/postgrest/releases/download \
     POSTGREST_LISTEN_PORT=3001 \
     POSTGREST_FILE=postgrest-${POSTGREST_VERSION}-linux-static-x64.tar.xz \
     POSTGREST_SCHEMA=public \
     POSTGREST_ANONYMOUS=postgres \
     POSTGREST_JWT_SECRET=thisisnotarealsecret \
-    POSTGREST_MAX_ROWS=1000000 \
+    POSTGREST_MAX_ROWS=50000 \
     POSTGREST_POOL=200 \
     POSTGREST_STATEMENT_TIMEOUT=60s \
     DEBIAN_FRONTEND=noninteractive

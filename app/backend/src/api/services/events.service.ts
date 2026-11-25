@@ -7,7 +7,7 @@ import type {
   ContractInfoResponse,
 } from "@strato/shared-types";
 
-// Without a limit Cirrus returns up to its max-rows (1,000,000)
+// Without a limit Cirrus returns up to its max-rows (POSTGREST_MAX_ROWS)
 export const clampEventsLimit = (limit: unknown): number =>
   Math.max(
     1,
