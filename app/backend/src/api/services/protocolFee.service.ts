@@ -3,6 +3,7 @@
  */
 
 import { cirrus } from "../../utils/appApiHelper";
+import { emptyOnMissingTable } from "../../utils/cirrusErrors";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 import { constants } from "../../config/constants";
 import { POOL_V3_CONTRACTS } from "../../config/poolV3Constants";
@@ -1332,12 +1333,13 @@ const getYieldVaultPendingFees = async (
       }
       // Accrued events after the savings anchor are summed in Cirrus; the first of
       // them and the last one up to the anchor are read for the proration below
-      // (no Accrued table yet — treat as no events)
+      // (no Accrued table yet — treat as no events; any other failure skips the
+      // vault, so the proration is never applied without the sum)
       const savingsAnchor = toUTCTime(new Date(savingsAnchorTs * 1000));
       const fetchAccrued = (params: Record<string, string>) =>
         cirrus.get(accessToken, `/${YieldVault}-Accrued`, {
           params: { address: `eq.${def.address}`, ...params }
-        }).then(({ data }) => data?.[0]).catch(() => undefined);
+        }).catch(emptyOnMissingTable).then(({ data }) => data?.[0]);
       const [accruedSum, firstAccrued, prevAccrued] = await Promise.all([
         fetchAccrued({ block_timestamp: `gt.${savingsAnchor}`, select: "total:targetAmount.sum()::text" }),
         fetchAccrued({
