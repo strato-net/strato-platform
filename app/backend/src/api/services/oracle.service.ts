@@ -312,8 +312,17 @@ const getOracleAddress = async (accessToken: string): Promise<string> => {
 // Boundaries of the epoch-aligned intervals from startMs up to the end of the
 // current one, as fetchSampledPrices takes them
 export const intervalBoundaries = (startMs: number, intervalMs: number): number[] => {
-    const boundaries = [startMs];
     const now = Date.now();
+    // startMs and intervalMs follow the request's `end`: one far in the past asks
+    // for millions of intervals, and one before the chain's start makes the `all`
+    // interval negative, which never reaches `now`
+    if (
+      !Number.isFinite(intervalMs) || intervalMs <= 0 ||
+      !((now - startMs) / intervalMs <= constants.PRICE_HISTORY_MAX_INTERVALS)
+    ) {
+      throw new Error("Price history range is out of bounds");
+    }
+    const boundaries = [startMs];
     let next = (Math.floor(startMs / intervalMs) + 1) * intervalMs;
     for (; next <= now; next += intervalMs) boundaries.push(next);
     boundaries.push(next);

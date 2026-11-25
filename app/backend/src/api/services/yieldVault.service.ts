@@ -1709,10 +1709,10 @@ export const getYieldVaultHistory = async (
       },
       historyTimestamps
     ),
-    // the last price update up to each timestamp
+    // the last price update up to each timestamp, however old for the first one
     fetchSampledPrices(serviceToken, priceOracle, [assetAddress], [
-      historyTimestamps[0],
-      ...historyTimestamps.slice(1).map((timestamp) => timestamp + 1),
+      0,
+      ...historyTimestamps.map((timestamp) => timestamp + 1),
     ]).then((samples) => samples.get(assetAddress) ?? []),
   ]);
 

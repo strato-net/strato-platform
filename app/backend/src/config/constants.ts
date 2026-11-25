@@ -216,6 +216,7 @@ export const constants = (() => {
     EVENTS_DEFAULT_LIMIT: 10,
     EVENTS_MAX_LIMIT: 1000,
     ACTIVITIES_MAX_DEPTH: 10000, // limit + offset: the activities query fetches that many rows per contract group
+    PRICE_HISTORY_MAX_INTERVALS: 1000, // the longest chart, a month of hours, has about 745
     voucher,
   };
 })();
