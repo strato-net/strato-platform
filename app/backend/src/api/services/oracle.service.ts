@@ -317,13 +317,21 @@ export const intervalBoundaries = (startMs: number, endMs: number, intervalMs: n
     if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
       throw new Error("Price history interval is out of bounds");
     }
-    // The `all` interval is a fraction of a millisecond off whole ones, and a
-    // query takes whole ones: rounded up, an update is on the same side of a
-    // boundary here as in the chart's intervals
+    // The first whole millisecond of an interval, by the division the chart
+    // puts an update in one with. The `all` interval is a fraction off whole
+    // milliseconds: rounding its multiples, or adding it up, is at times a
+    // millisecond away from that, and an update there is sampled into the
+    // wrong interval
+    const startOf = (index: number): number => {
+      let ms = Math.ceil(index * intervalMs);
+      while (Math.floor((ms - 1) / intervalMs) >= index) ms--;
+      while (Math.floor(ms / intervalMs) < index) ms++;
+      return ms;
+    };
     const boundaries = [startMs];
-    let next = (Math.floor(startMs / intervalMs) + 1) * intervalMs;
-    for (; next <= endMs; next += intervalMs) boundaries.push(Math.ceil(next));
-    boundaries.push(Math.ceil(next));
+    let index = Math.floor(startMs / intervalMs) + 1;
+    for (; index * intervalMs <= endMs; index++) boundaries.push(startOf(index));
+    boundaries.push(startOf(index));
     return boundaries;
 };
 
