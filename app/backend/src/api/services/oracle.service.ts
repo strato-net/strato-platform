@@ -565,8 +565,7 @@ const forwardFillPriceHistory = (
     const latestDataPoint = sortedEvents[sortedEvents.length - 1];
 
     // Start from the earliest actual data point (rounded to interval)
-    const earliestInterval = Math.floor(earliestDataPoint.blockTimestamp.getTime() / intervalMs) * intervalMs;
-    const earliestStartTime = new Date(earliestInterval);
+    const earliestIndex = Math.floor(earliestDataPoint.blockTimestamp.getTime() / intervalMs);
 
     // End at endMs, the current time by default (or latest data point if it's more recent)
     const end = new Date(endMs);
@@ -576,8 +575,11 @@ const forwardFillPriceHistory = (
     const filledPriceHistory: PriceHistoryEntry[] = [];
     let currentPrice = earliestDataPoint.price;
 
-    // Generate interval-based timestamps from first data point to now
-    for (let currentInterval = earliestStartTime.getTime(); currentInterval <= endInterval; currentInterval += intervalMs) {
+    // Generate interval-based timestamps from first data point to now. Each is
+    // its index times the interval, as the keys are made: adding the fractional
+    // `all` interval up, or passing it through a Date, never lands on a key
+    for (let index = earliestIndex; index * intervalMs <= endInterval; index++) {
+      const currentInterval = index * intervalMs;
       const intervalKey = currentInterval;
 
       if (intervalPrices.has(intervalKey)) {
