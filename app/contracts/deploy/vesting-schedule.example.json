@@ -38,7 +38,7 @@
       "name": "public",
       "managed": false,
       "cliffMonths": 0,
-      "durationWeeks": 0,
+      "durationMonths": 0,
       "entries": [
         {
           "account": "0000000000000000000000000000000000000cc1",
