@@ -155,6 +155,26 @@ checkProposalTimestamp maxDrift now pp
 hasSameHash :: (StateMachineM m) => Keccak256 -> m Bool
 hasSameHash di = uses proposal $ maybe False ((== di) . blockHash)
 
+-- | Lock on the proposal on the table and COMMIT it, once more than two thirds
+-- of the weight has prepared it and this node's VM has accepted it, whichever
+-- comes last. A PREPARE quorum alone is not enough: without the VM's answer the
+-- node would seal a block it never checked, and might yet reject.
+commitIfPrepared :: StateMachineM m => View -> Keccak256 -> ConduitM InEvent EOutEvent m ()
+commitIfPrepared v di = do
+  ps <- use prepared
+  weights <- gets currentVoteWeights
+  let quorum = hasSupermajority weights . M.keysSet . M.filter (== di) $ ps
+  sameHash <- hasSameHash di
+  accepted <- use vmAccepted
+  hasSent <- use hasPrepared
+  when (quorum && sameHash && accepted && not hasSent) $ do
+    hasPrepared .= True
+    setLock
+    seal <- commitmentSeal di
+    whenM mayVote $ do
+      msg <- signMessage (Commit v di seal)
+      yieldR msg
+
 createRoundChangeMessage :: MonadIO m => View -> m TrustedMessage
 createRoundChangeMessage vw = do
   nonce' <- bytesToWord256 <$> liftIO (getEntropy 32)
@@ -301,6 +321,7 @@ nextRound nt = do
   hasPreprepared .= False
   hasCommitted .= False
   hasPrepared .= False
+  vmAccepted .= False
   pendingRound .= Nothing
   sentRoundChange .= Nothing
 
@@ -314,6 +335,13 @@ applyValidatorChanges hdr = do
   validators %= (S.union . S.fromList $ getBlockNewValidators hdr)
   validators %= (flip S.difference $ S.fromList removed)
   stakes %= applyStakeDelta removed (M.fromList $ getBlockStakeUpdates hdr)
+
+-- | A round ahead of this node's, but near enough to move it. Rounds grow by one
+-- per round change, so no honest validator is ever remotely this far ahead. A
+-- round further out can only be a bid to wrap the round counter, a Word256, back
+-- to zero, after which round changes would no longer advance it.
+aheadWithinReach :: View -> RoundNumber -> Bool
+aheadWithinReach v rn = _round v < rn && rn - _round v <= 2 ^ (32 :: Int)
 
 -- | A PREPARE or COMMIT for a higher round of the current sequence is a round-change
 -- certificate: evidence the network moved on. Buffer the sender, keep the message
@@ -488,10 +516,17 @@ eventLoop ctx = execStateC ctx $
                 ++ "; staking is active but the block was not built as version 3 (check stakingActivationBlock)"
             else handleUnannouncedBlock blk'
         PreprepareResponse decision -> case decision of
-            AcceptPreprepare bh -> do
+            -- The VM answers some time after the proposal reached it, and a
+            -- round change in between clears the proposal. Only the proposal
+            -- still on the table is prepared, so a late answer is never
+            -- signed into another view.
+            AcceptPreprepare bh -> whenM (hasSameHash bh) $ do
+              vmAccepted .= True
               whenM mayVote $ do
                 msg <- signMessage (Prepare v bh)
                 yieldR msg
+              -- The PREPARE quorum may have arrived before the VM's answer.
+              commitIfPrepared v bh
             RejectPreprepare -> roundChange
         IMsg auth ppp@(Preprepare v' pp) -> do
           pr <- use proposer
@@ -517,7 +552,12 @@ eventLoop ctx = execStateC ctx $
                 -- holding an old proposal skip the proposer, so ignore it and
                 -- wait for the real proposal or the view timer.
                 when (v < v') roundChange
-              | isJust mBlockLock && Just pp /= mBlockLock -> do
+              -- Compared by hash: the proposer signs the hash, which leaves
+              -- out the commitment seals, so anyone relaying the proposal can
+              -- change them, and a copy that differs only there is the same
+              -- proposal. Compared whole, such a copy broke the lock and forced
+              -- a round change.
+              | isJust mBlockLock && (blockHash <$> mBlockLock) /= Just (blockHash pp) -> do
                 $logWarnS "blockstanbul/ppl" "Rejecting proposal: block does not match lock"
                 $logInfoS "blockstanbul/roundchange" "lock mismatch"
                 roundChange
@@ -540,24 +580,14 @@ eventLoop ctx = execStateC ctx $
                       -- run in vm before sending prepare
                       whenM mayVote . yieldR $ RunPreprepare pp
         IMsg auth ppp@(Prepare v' di) -> do
-         when (_sequence v == _sequence v' && _round v < _round v') $ noteCatchUp auth v' ppp
+         when (_sequence v == _sequence v' && aheadWithinReach v (_round v')) $ noteCatchUp auth v' ppp
          when (v == v') $ do
           preparers <- use prepared
           unless (M.member (Validator $ sender auth) preparers) . yieldL $ OMsg auth ppp
-          ps <- prepared <%= M.insert (Validator $ sender auth) di
-          weights <- gets currentVoteWeights
-          let quorum = hasSupermajority weights . M.keysSet . M.filter (== di) $ ps
-          sameHash <- hasSameHash di
-          hasSent <- use hasPrepared
-          when (quorum && sameHash && not hasSent) $ do
-            hasPrepared .= True
-            setLock
-            seal <- commitmentSeal di
-            whenM mayVote $ do
-              msg <- signMessage (Commit v di seal)
-              yieldR msg
+          prepared %= M.insert (Validator $ sender auth) di
+          commitIfPrepared v di
         IMsg auth ccc@(Commit v' di seal) -> do
-         when (_sequence v == _sequence v' && _round v < _round v') $ noteCatchUp auth v' ccc
+         when (_sequence v == _sequence v' && aheadWithinReach v (_round v')) $ noteCatchUp auth v' ccc
          when (v == v') $ do
           committors <- use committed
           unless (M.member (Validator $ sender auth) committors) . yieldL $ OMsg auth ccc
@@ -582,7 +612,7 @@ eventLoop ctx = execStateC ctx $
           let intSeq = fromIntegral . _sequence
           when (_sequence v < _sequence vn) $
             yieldR $ GapFound (intSeq v) (intSeq vn) (sender auth)
-          when (_sequence v == _sequence vn && _round v < _round vn) $ do
+          when (_sequence v == _sequence vn && aheadWithinReach v (_round vn)) $ do
             let rn = _round vn
             mSigners <- use $ roundChanged . at rn
             case S.member (Validator $ sender auth) <$> mSigners of

@@ -171,7 +171,17 @@ replay parentRoot blk = do
 
 spec :: Spec
 spec = do
-  describe "Bagger.makeNewBlock" $
+  describe "Bagger.makeNewBlock" $ do
+    it "runs the rest of a batch after dropping a transaction that cannot pay" $ do
+      (built, replayed) <- inContext $ do
+        parentRoot <- startOnParent
+        promote (tx unfunded)
+        promote (tx funded)
+        blk <- makeNewBlock mine proposer
+        (,) blk <$> replay parentRoot blk
+      map otSigner (obReceiptTransactions built) `shouldBe` [funded]
+      replayed `shouldBe` Right (stateRoot (obBlockData built))
+
     it "builds a block that verifies after a run whose only transaction was rejected" $ do
       (built, replayed) <- inContext $ do
         parentRoot <- startOnParent
@@ -246,6 +256,17 @@ spec = do
         (,) <$> addTransactionsToMempool [signed dust] <*> addTransactionsToMempool [signed funded]
       dusty `shouldBe` False
       paying `shouldBe` True
+
+  describe "Bagger.canClearlyPayFee" $
+    it "counts a sender paying in USDST under a STRATO quote only once it holds the router's purchase cap" $ do
+      let twoCents = 0x2c
+          heliumQuote = 4590660990727397 -- 0.00459 STRATO, about a cent on 2026-11-23
+      (cent, cap, unquoted) <- inContext $ do
+        _ <- startHolding [(funded, legacyUsdFee), (twoCents, 2 * legacyUsdFee)]
+        withBagger $ (,,) <$> canClearlyPayFee heliumQuote funded <*> canClearlyPayFee heliumQuote twoCents <*> canClearlyPayFee 0 funded
+      cent `shouldBe` False
+      cap `shouldBe` True
+      unquoted `shouldBe` True
 
   describe "Bagger.hasPendingWork" $
     it "sees payable work left pending, and none from a sender that cannot clearly pay" $ do

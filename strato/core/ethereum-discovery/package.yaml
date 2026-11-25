@@ -109,6 +109,7 @@ tests:
     dependencies:
       - blockDB
       - blockapps-data
+      - bytestring
       - common-log
       - crypto-pubkey-types
       - ethereum-discovery

@@ -14,6 +14,7 @@ module Blockchain.JsonRpcCommand
     runJsonRpcCommand',
     runJsonRpcCommandSandboxed,
     resolveFunction,
+    ethCallEx,
     traceToJson,
   )
 where
@@ -66,6 +67,7 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.List (intercalate)
 import qualified Data.Map as M
+import Data.Maybe (isNothing)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Read as TR
@@ -77,7 +79,7 @@ import SolidVM.Model.CodeCollection.Visibility (Visibility (..))
 import SolidVM.Model.SolidString (SolidString, labelToText, stringToLabel)
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
 import qualified SolidVM.Model.Type as SVMType
-import SolidVM.Model.Value (Variable(..), forceLoadVar, renderValue)
+import SolidVM.Model.Value (Value (SAddress), Variable(..), forceLoadVar, renderValue)
 import Numeric (showHex)
 import Text.Format (format)
 
@@ -300,7 +302,7 @@ ethCallEx blockHeader gas fromAddr toAddr callData = do
     Just (funcName, func) -> do
       let argTypes = funcArgTypes func
           retTypes = funcRetTypes func
-          argTexts = map valueToArgText $ decodeABIArgs argsBytes argTypes
+          argTexts = map (ethCallArgText func) $ decodeABIArgs argsBytes argTypes
           prettyArgs = intercalate ", " $ map T.unpack argTexts
           prettyCall = T.unpack (labelToText funcName) ++ "(" ++ prettyArgs ++ ")"
 
@@ -327,6 +329,16 @@ ethCallEx blockHeader gas fromAddr toAddr callData = do
             let encoded = encodeValueABI retTypes val
             $logInfoS "ethCall" . T.pack $ prettyCall ++ " => " ++ show val
             return (Right encoded, Just result)
+
+-- | A decoded argument as SolidVM call text. An address renders as "0x…", which SolidVM
+-- parses as an integer: a declared function's address parameter turns it back into an
+-- address, but a public variable's getter (the bodiless Func matchStorageGetter builds)
+-- keys its mapping with that integer's decimal digits and finds nothing, so every
+-- address-keyed getter read 0. An address() cast gives the getter a real address key.
+ethCallArgText :: CC.Func -> Value -> T.Text
+ethCallArgText func v@(SAddress _ _)
+  | isNothing (CC._funcContents func) = "address(" <> valueToArgText v <> ")"
+ethCallArgText _ v = valueToArgText v
 
 --------------------------------------------------------------------------------
 -- eth_call with no 'to': simulate a contract creation from source

@@ -89,6 +89,7 @@ contract  StratoStaking is Ownable {
     event ParamsUpdated(uint256 unbondingSeconds, uint256 maxCommissionBps, uint256 maxBatchSize);
     event EmissionScheduleCommitted(uint256 e0, uint256 s0, uint256 r0, uint256 startTime);
     event EmissionReserveFunded(address indexed funder, uint256 amount, uint256 reserve);
+    event EmissionScheduleRecommitted(uint256 e0, uint256 s0, uint256 r0, uint256 swept, uint256 reserve);
     event ProductionRewarded(address indexed operator, address indexed validator, uint256 amount, uint256 elapsed, uint256 stake, uint256 reserve);
     event ValidatorRecordSynced(address indexed validator, address indexed operator, bool active, uint256 commissionBps);
     event OperatorChanged(address indexed validator, address indexed oldOperator, address indexed newOperator);
@@ -96,6 +97,7 @@ contract  StratoStaking is Ownable {
     event ValidatorEvicted(address indexed operator, address indexed validator, address indexed by);
     event ExitRequested(address indexed operator, address indexed validator, uint256 readyTime);
     event ExitCancelled(address indexed operator, address indexed validator);
+    event ValidatorSyncFailed(address indexed operator, address indexed validator);
     // Shape and emission pattern are relied on by the node's stake-event parser (Delta.hs).
     event ValidatorSynced(address indexed operator, address indexed validator, bool registered, uint256 weight);
     event BlockRewardCredited(address indexed operator, address indexed validator, address indexed funder, uint256 amount);
@@ -130,6 +132,11 @@ contract  StratoStaking is Ownable {
     // rate is quoted over.
     uint256 public constant MAX_CREDITED_GAP_SECONDS = 3600;
     uint256 public constant YEAR = 31536000;
+    // The launch schedule recommitEmissionSchedule installs: 500k STRATO a year at 5M of
+    // consensus weight with 8M in reserve.
+    uint256 public constant RECOMMIT_E0 = 500000e18;
+    uint256 public constant RECOMMIT_S0 = 5000000e18;
+    uint256 public constant RECOMMIT_R0 = 8000000e18;
 
     Token public stratoToken;
     IERC20 public usdstToken;
@@ -237,7 +244,8 @@ contract  StratoStaking is Ownable {
     uint256 public totalRewardsCredited;
 
     // Emission schedule: E0 STRATO a year at S0 of consensus weight with R0 in reserve, scaled
-    // by sqrt(S / S0) and R / R0 (see _emission). Committed once. The reserve leaves only
+    // by sqrt(S / S0) and R / R0 (see _emission). Committed once, and replaced once by the
+    // launch schedule (recommitEmissionSchedule). The reserve leaves only
     // through _payProduction and is kept out of reward payouts and recoverable STRATO. Not
     // named rewardReserve: the retired schedule kept its reserve under that name, and SolidVM
     // storage is keyed by name.
@@ -246,6 +254,7 @@ contract  StratoStaking is Ownable {
     uint256 public emissionStakeS0;
     uint256 public emissionReserveR0;
     uint256 public emissionStartTime;       // 0 = not committed
+    bool public emissionRecommitted;        // the launch schedule has replaced the first
     uint256 public totalEmitted;
     // The last processed block's timestamp, and the highest one before it: the interval the
     // last block closed. previousBlockTime never moves back, so no time is paid twice.
@@ -1005,6 +1014,23 @@ contract  StratoStaking is Ownable {
         _syncValidator(validator);
     }
 
+    // An exit never waits on governance. Once this contract is renounced the admins still own
+    // governance, and one that refuses staking's calls (another staking contract set, an
+    // upgrade) would otherwise hold every unstake and unbondSelf for good. Since the
+    // caught-failure fork a caught try block is atomic: a failed sync leaves no storage write
+    // or event behind, here or in governance, and anyone may retry it with syncValidator.
+    // Running out of gas is never caught.
+    function _syncOnExit(address validator) internal returns (bool) {
+        bool synced = false;
+        try {
+            _syncValidator(validator);
+            synced = true;
+        } catch {
+            emit ValidatorSyncFailed(operatorOf(validator), validator);
+        }
+        return synced;
+    }
+
     // ---- income accounting ---------------------------------------------------------
 
     function _commissionBps(StakingValidator storage v) internal view returns (uint256) {
@@ -1410,7 +1436,7 @@ contract  StratoStaking is Ownable {
         uint256 requestId = _createUnbondRequest(msg.sender, amount);
 
         emit UnbondingStarted(msg.sender, validator, requestId, amount, block.timestamp + unbondingSeconds);
-        _syncValidator(validator);
+        _syncOnExit(validator);
     }
 
     // Self-bond is the operator's own stake behind a validator: it earns the self-bond share
@@ -1452,8 +1478,9 @@ contract  StratoStaking is Ownable {
         uint256 requestId = _createUnbondRequest(msg.sender, amount);
 
         emit SelfBondUnbondingStarted(msg.sender, validator, requestId, amount, block.timestamp + unbondingSeconds);
-        _syncValidator(validator);
-        _requireNoSeatWithoutBond(validator);
+        // A seat that cannot leave keeps its bond (see _requireNoSeatWithoutBond). A governance
+        // that refuses the sync is no reason to hold it: then the bond leaves anyway.
+        if (_syncOnExit(validator)) _requireNoSeatWithoutBond(validator);
     }
 
     // ---- block rewards, fee routing and liveness ----------------------------------------
@@ -1722,8 +1749,9 @@ contract  StratoStaking is Ownable {
 
     // Commit the schedule, once: e0 STRATO a year at s0 of consensus weight with r0 in
     // reserve, from startTime (a past time means now). The reserve must already hold r0, so
-    // what is advertised is funded. There is no pause, restart or re-calibration, and no
-    // owner call takes the reserve back; later top-ups only raise R.
+    // what is advertised is funded. There is no pause or restart, no re-calibration beyond
+    // the one recommitEmissionSchedule makes, and no owner call takes the reserve back;
+    // later top-ups only raise R.
     function commitEmissionSchedule(uint256 e0, uint256 s0, uint256 r0, uint256 startTime) external onlyOwner onlyInitialized {
         require(emissionStartTime == 0, "SS: schedule committed");
         require(e0 > 0 && s0 > 0 && r0 > 0, "SS: bad schedule");
@@ -1733,6 +1761,26 @@ contract  StratoStaking is Ownable {
         emissionReserveR0 = r0;
         emissionStartTime = startTime > block.timestamp ? startTime : block.timestamp;
         emit EmissionScheduleCommitted(e0, s0, r0, emissionStartTime);
+    }
+
+    // Replace the committed schedule with the launch one, once. STRATO sent straight to this
+    // contract (owed to nobody, see recoverableUntrackedStrato) joins the reserve in the same
+    // call, so a reserve that large is never priced against the old R0. The reserve must then
+    // hold RECOMMIT_R0, so what is advertised is funded; that also refuses a recommit made
+    // before that STRATO arrives. The start time and everything already paid or owed stay as
+    // they are.
+    function recommitEmissionSchedule() external onlyOwner onlyInitialized {
+        require(emissionStartTime != 0, "SS: schedule not committed");
+        require(!emissionRecommitted, "SS: recommitted");
+        uint256 swept = recoverableUntrackedStrato();
+        uint256 reserve = emissionReserve + swept;
+        require(reserve >= RECOMMIT_R0, "SS: reserve unfunded");
+        emissionRecommitted = true;
+        emissionReserve = reserve;
+        emissionRateE0 = RECOMMIT_E0;
+        emissionStakeS0 = RECOMMIT_S0;
+        emissionReserveR0 = RECOMMIT_R0;
+        emit EmissionScheduleRecommitted(RECOMMIT_E0, RECOMMIT_S0, RECOMMIT_R0, swept, reserve);
     }
 
     // Add STRATO to the emission reserve, pulled from the caller (approve this contract

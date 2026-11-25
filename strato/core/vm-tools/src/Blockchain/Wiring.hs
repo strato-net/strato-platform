@@ -142,19 +142,25 @@ withFetchMissingNodes f = ContextM $ withMissingNodeFetcher (unContextM . fetchM
 -- | Ask peers for a node missing locally and wait (up to 10s) for the reply
 -- on the VM's own task topic; used only while diagnosing a state-root mismatch,
 -- so when no peer replies there is nothing left to do but say so and stop.
+-- A peer answers only so many node requests a second and drops the rest
+-- unanswered, so the request is sent again every 2s of the 10.
 fetchMPNode :: MP.StateRoot -> ContextM (Maybe MP.TrieNode)
-fetchMPNode k = do
-  -- Read from the topic's end, not the VM's own group: block tasks queued
-  -- behind the failed one must stay unconsumed for the restart.
-  mnd <- timeout 10000000 $
-    consumeFromLatest seqVmTasksTopicName (void $ writeUnseqEvents [IEGetMPNodes [k]]) $ \evs -> do
-      let findND (VmMPNodesReceived [nd]) | k == MP.sha2StateRoot (rlpHash nd) = Just nd
-          findND _ = Nothing
-      pure $ foldr (<|>) Nothing (findND <$> evs)
-  case mnd of
-    Just nd -> pure (Just nd)
-    Nothing -> error $ "While diagnosing the stateRoot mismatch above, asked peers for MP node " ++ format k
-      ++ " to compare the block's state with ours; no reply reached the VM within 10s. Stopping here with what is known."
+fetchMPNode k = go (5 :: Int)
+  where
+    go tries = do
+      -- Read from the topic's end, not the VM's own group: block tasks queued
+      -- behind the failed one must stay unconsumed for the restart.
+      mnd <- timeout 2000000 $
+        consumeFromLatest seqVmTasksTopicName (void $ writeUnseqEvents [IEGetMPNodes [k]]) $ \evs -> do
+          let findND (VmMPNodesReceived [nd]) | k == MP.sha2StateRoot (rlpHash nd) = Just nd
+              findND _ = Nothing
+          pure $ foldr (<|>) Nothing (findND <$> evs)
+      case mnd of
+        Just nd -> pure (Just nd)
+        Nothing
+          | tries > 1 -> go (tries - 1)
+          | otherwise -> error $ "While diagnosing the stateRoot mismatch above, asked peers for MP node " ++ format k
+              ++ " to compare the block's state with ours; no reply reached the VM within 10s. Stopping here with what is known."
 
 -- | What answers an account read the block map does not: the trie, or the
 -- mirror when the context runs over one.

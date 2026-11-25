@@ -417,8 +417,11 @@ makeNewBlock mineTransactions mSelfAddress = do
           -- Only the first incremental run of a block pays its rewards; the
           -- flag is cleared in processNewBestBlock when the height advances.
           let payRewards = not $ B.blockRewardsPaid cache
-          withBagger $ do
+          built <- withBagger $ do
             (!mUnattached, !run) <- runFromStateRoot mineTransactions remGas tempBlockHeader promoted mSelfAddress payRewards
+            let refused = case run of
+                  Left RecoverableFailure {} -> True
+                  _ -> False
             (ranSR, ranGas, newRan, newUnexec) <- case run of
               Right (newSR', newRR', newGas') -> return (newSR', newGas', newRR', [])
               Left e -> do
@@ -461,9 +464,18 @@ makeNewBlock mineTransactions mSelfAddress = do
                     }
             $logDebugS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
             updateBaggerState (\s -> s {B.miningCache = newMiningCache})
-            !build <- buildFromMiningCache
-            $logInfoS "Bagger.makeNewBlock" . T.pack $ "Returned from buildFromMiningCache with stateRoot " ++ show (stateRoot $ obBlockData build)
-            return build
+            if refused && not (null newUnexec)
+              then pure Nothing
+              else do
+                !build <- buildFromMiningCache
+                $logInfoS "Bagger.makeNewBlock" . T.pack $ "Returned from buildFromMiningCache with stateRoot " ++ show (stateRoot $ obBlockData build)
+                return (Just build)
+          -- A refused transaction ends its run. The ones behind it would wait
+          -- for this node's next call, which a quiet chain may not make before
+          -- the round is out, so one transaction that cannot pay, run first as
+          -- the newest, would cost the proposer its turn. Run them now: each
+          -- refusal drops its sender's transactions, so the batch shrinks.
+          maybe (makeNewBlock mineTransactions mSelfAddress) return built
     else do
       -- some transactions which were cached have been evicted, need to recalculate entire block cache
       $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = False"

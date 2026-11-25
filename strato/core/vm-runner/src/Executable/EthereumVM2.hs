@@ -71,7 +71,10 @@ handleVmTasks InBatch {..} = do
     nds <- catMaybes <$> traverse MP.lookupNode srs
     pure $! OutMPNodesResponse o nds
   mapM_ emitOut mpResps
-  for_ (concat mpNodesResps) MP.insertNode
+  -- Trie nodes peers send (mpNodesResps) are not stored here. The one reader
+  -- that asks for them, the state-root mismatch diagnosis (fetchMPNode), takes
+  -- the node it asked for off the task topic, checks its hash and keeps it.
+  -- Stored here, any peer could write nodes nobody asked for to disk for good.
 
   rpcResps <- do
     bbHash <- do
@@ -116,11 +119,17 @@ handleVmTasks InBatch {..} = do
             droppedCount = length allTxs - length otxs
         when (droppedCount > 0) $
           $logWarnS "preprepare" . T.pack $
-            "Dropped " ++ show droppedCount ++ " of " ++ show (length allTxs)
-            ++ " tx(s) with unrecoverable signatures in preprepare block #"
-            ++ show (number bHeader) ++ " (" ++ format bHash ++ ")"
+            "Rejecting preprepare block #" ++ show (number bHeader) ++ " (" ++ format bHash ++ "): "
+            ++ show droppedCount ++ " of " ++ show (length allTxs)
+            ++ " tx(s) have unrecoverable signatures"
         mSumm <- A.lookup (A.Proxy @BlockSummary) (parentHash bHeader)
         case mSumm of
+          -- The sequencer turns a committed block into one it can emit only if
+          -- every signer is recoverable, and drops the whole block otherwise
+          -- (ingestBlockToSequencedBlock). Accepting such a proposal after
+          -- running the rest of it would let one proposer halt the chain at
+          -- the commit, so the proposal is refused before it can get there.
+          _ | droppedCount > 0 -> pure $ Just RejectPreprepare
           Nothing -> pure Nothing
           Just summ -> do
             let bHeader' = case bHeader of

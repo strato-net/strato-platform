@@ -38,6 +38,7 @@ import           Blockchain.Strato.Model.Host
 import           Blockchain.Threads
 import           Blockchain.TimerSource
 import           Conduit
+import qualified Control.Concurrent                    as Conc
 import           Control.Lens                          ((^.))
 import           Control.Monad
 import           Control.Monad.Composable.Vault
@@ -70,7 +71,22 @@ ethServerHandler ::
   Host ->
   TCPPort ->
   m ()
-ethServerHandler pSource pSink seqSrc host (TCPPort port) = do
+ethServerHandler pSource pSink seqSrc host tcpPort =
+  bracket (reserveInboundSlot host) (`when` releaseInboundSlot host) $ \reserved ->
+    if reserved
+      then serveConnection pSource pSink seqSrc host tcpPort
+      else $logInfoS "runEthServer" . T.pack $
+        "Refusing a connection from " ++ hostToString host ++ ": it already has " ++ show maxInboundPerHost
+
+serveConnection ::
+  MonadP2P m =>
+  ConduitM () B.ByteString m () ->
+  ConduitM B.ByteString Void m () ->
+  ConduitM () P2pEvent m () ->
+  Host ->
+  TCPPort ->
+  m ()
+serveConnection pSource pSink seqSrc host (TCPPort port) = do
   -- One label per connection: several from one host would otherwise share a
   -- label and count once against maxConnections.
   let peerStr = "<" ++ hostToString host ++ ":" ++ show port
@@ -163,7 +179,11 @@ runEthServerConduit p pSource pSink seqSrc peerStr = labelPeerThread peerStr "Pe
   case mConnectionResult of
     Nothing -> pure (p, Just $ toException $ HandshakeException "handshake timed out")
     Just (_, (otherPubKey, outCtx, inCtx)) -> do
-      changeLabelStatusM "CONNECTED"
+      -- The key is only claimed until the peer's Hello proves it, and until
+      -- then the connection does not count as an established peer (see
+      -- handleMsgServerConduit, which marks it).
+      changeLabelStatusM "AUTHENTICATING"
+      manager <- liftIO Conc.myThreadId
       let p' = p{pPeerPubkey = Just otherPubKey}
       ret <-
         fmap (either Just (const Nothing)) . try $
@@ -180,7 +200,7 @@ runEthServerConduit p pSource pSink seqSrc peerStr = labelPeerThread peerStr "Pe
         , labelPeerThread peerStr "Timer Source" Nothing timerSource
         ] `mergeConnect` (
         CL.iterM recordEvent
-          .| labelPeerThread peerStr "P2P Handler" Nothing (handleMsgServerConduit myPubkey p')
+          .| labelPeerThread peerStr "P2P Handler" Nothing (handleMsgServerConduit myPubkey p' (changeThreadStatus manager "CONNECTED"))
           .| debounceTxSendsAndUnseq
           .| CL.iterM recordMessage
           .| CL.iterM (displayMessage Outbound peerStr)

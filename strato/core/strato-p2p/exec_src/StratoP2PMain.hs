@@ -6,7 +6,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 
 import           Control.Monad.IO.Class
-import           Control.Exception (SomeException, try)
+import           Control.Exception (SomeException, finally, try)
 import           Blockchain.VMOptions       ()
 
 import           HFlags
@@ -34,7 +34,7 @@ import           Data.Unique (newUnique)
 import           Data.Set.Ordered (empty)
 import           Instrumentation
 import           Blockchain.Sequencer.Kafka (seqP2pEventsTopicName, unseqEventsTopicName)
-import           Control.Monad.Composable.Streaming (createStreamEnv, createTopicAndWait)
+import           Control.Monad.Composable.Streaming (closeStreamEnv, createStreamEnv, createTopicAndWait)
 import           Control.Concurrent.MVar (newMVar)
 
 main :: IO ()
@@ -59,7 +59,11 @@ initP2P = labelTheThread "initP2P" $ do
   bcast <- newSeqEventBroadcast
   let vaultUrl' = vaultUrl . urlConfig $ ethConf
       streamAddr = let k = streamingConfig ethConf in (streamingHost k, streamingPort k)
-      runner f = runEff . runLogging $ runVaultM vaultUrl' $ do
+      -- The producer is closed when the connection ends, whichever way it
+      -- ends: a JLog writer it opened holds file descriptors for good.
+      runner f = do
+       env <- createStreamEnv "strato-p2p" streamAddr
+       (`finally` closeStreamEnv env) . runEff . runLogging $ runVaultM vaultUrl' $ do
         c' <- initContext
         ctx <- liftIO $ newIORef c'
         -- Every peer connection gets its own producer. A single process-wide
@@ -69,7 +73,6 @@ initP2P = labelTheThread "initP2P" $ do
         -- each) and BlockBodies starved behind the gossip firehose during
         -- sync. The MVar stays, to keep milena's non-atomic KafkaState
         -- read-modify-write safe within a single connection.
-        env <- createStreamEnv "strato-p2p" streamAddr
         envVar <- liftIO $ newMVar env
         connId <- liftIO newUnique
         let cfg' = cfg { configContext = ctx, configStreamEnv = envVar, configConnectionId = connId }

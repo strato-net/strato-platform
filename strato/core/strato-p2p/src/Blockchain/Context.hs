@@ -30,7 +30,14 @@ module Blockchain.Context
     , emptyActionTimestamp
     , PbftWindow(..)
     , admitPbftMessage
+    , MPNodesWindow(..)
+    , admitMPNodes
     , maxPbftMessagesPerSecond
+    , Admission(..)
+    , HasConsensusAdmission(..)
+    , maxPbftMessagesPerSigner
+    , HasInboundSlots(..)
+    , maxInboundPerHost
     , PeerAddress(..)
     , GenesisBlockHash(..)
     , PeerRunner
@@ -74,6 +81,7 @@ import qualified Data.ByteString.Char8                   as BC
 import           Data.Conduit.Network
 import           Data.Foldable                           (toList)
 import qualified Data.Kind                               as DK
+import qualified Data.Map.Strict                         as M
 import           Data.Maybe
 import           Data.Proxy
 import qualified Data.Set.Ordered                        as S
@@ -166,6 +174,12 @@ data Config = Config
     -- while the world best derived from it is written to Redis, so those writes
     -- land in the order the claims changed.
     configPeerClaims               :: MVar (PeerClaims Unique),
+    -- Process-wide: each validator's consensus messages taken in during the
+    -- current second, over all connections: signer -> (second, count).
+    configSignerWindows            :: IORef (M.Map Address (Integer, Int)),
+    -- Process-wide: inbound connections each host holds open, including
+    -- those still in their handshake.
+    configInboundSlots             :: IORef (M.Map Host Int),
     -- This connection's key in configPeerClaims; swapped in by the peer runner.
     configConnectionId             :: Unique
   }
@@ -194,6 +208,65 @@ admitPbftMessage = do
   Mod.put (Proxy @PbftWindow) $ PbftWindow (now, n')
   pure $ n' <= maxPbftMessagesPerSecond
 
+-- | The most consensus messages this node takes in from one validator in a
+-- second, over all its connections. With at most a block a second
+-- (blockPeriodMs), a validator signs about four messages a height plus its
+-- round changes; this leaves several times that, and a third of a large set
+-- flooding at once still stays well under what one link takes
+-- (maxPbftMessagesPerSecond).
+maxPbftMessagesPerSigner :: Int
+maxPbftMessagesPerSigner = 20
+
+-- | What became of a consensus message offered to this node.
+data Admission = Duplicate | OverBudget | Admitted
+  deriving (Eq, Show)
+
+-- | Node-wide admission of consensus messages, over all connections. Like
+-- 'HasResyncGate', the seen check and the insert are a single atomic step:
+-- copies of one message arriving together on several connections would
+-- otherwise all pass as new and each be charged to its validator.
+class HasConsensusAdmission m where
+  -- | Claim the message's hash in the seen set, then, given its signer, count
+  -- it against that validator's second. One over the budget gives its claim
+  -- back, so a later copy can still be taken.
+  admitConsensusMessage :: Keccak256 -> Maybe Address -> m Admission
+
+-- | The most connections one address may hold open to this node at once,
+-- including those still in their handshake. Above 1 because several of an
+-- operator's nodes can share an address behind NAT; low enough that one host
+-- cannot take a node's connection slots or tie up its handshakes.
+maxInboundPerHost :: Int
+maxInboundPerHost = 5
+
+-- | Node-wide count of each host's inbound connections. Taking a slot is a
+-- single atomic step, so accepts arriving together from one host cannot all
+-- pass the cap before any of them is counted.
+class HasInboundSlots m where
+  -- | Take one of the host's 'maxInboundPerHost' slots; False when all are held.
+  reserveInboundSlot :: Host -> m Bool
+  -- | Give back a slot 'reserveInboundSlot' took.
+  releaseInboundSlot :: Host -> m ()
+
+-- | Trie nodes this connection has asked this node for in the current second:
+-- (second, count). Each one is a lookup in the VM's main loop.
+newtype MPNodesWindow = MPNodesWindow (Integer, Int)
+
+-- | The most trie nodes one connection may ask this node for in a second. The
+-- only asker, a node diagnosing a state-root mismatch (fetchMPNode), asks for
+-- one at a time; unbounded, a peer could keep the VM busy with lookups.
+maxMPNodesPerSecond :: Int
+maxMPNodesPerSecond = 16
+
+-- | The part of a GetMPNodes request that fits in this connection's second.
+admitMPNodes :: (MonadIO m, Mod.Modifiable MPNodesWindow m) => [a] -> m [a]
+admitMPNodes srs = do
+  now <- liftIO $ floor <$> getPOSIXTime
+  MPNodesWindow (second, n) <- Mod.get (Proxy @MPNodesWindow)
+  let used = if second == now then n else 0
+      admitted = take (maxMPNodesPerSecond - used) srs
+  Mod.put (Proxy @MPNodesWindow) $ MPNodesWindow (now, used + length admitted)
+  pure admitted
+
 newtype RemainingBlockHeaders = RemainingBlockHeaders {unRemainingBlockHeaders :: [BlockHeader]}
 
 -- | Last missing-parent resync this connection asked for: (fetch number, when).
@@ -209,6 +282,7 @@ data Context = Context
   , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp       :: ActionTimestamp
   , pbftWindow            :: PbftWindow
+  , mpNodesWindow         :: MPNodesWindow
   , _blockstanbulPeerAddr :: PeerAddress
   , _outboundWireMessages :: S.OSet (Host, Keccak256)
   }
@@ -342,18 +416,7 @@ instance (Keccak256 `A.Alters` Proxy (Inbound WireMessage)) ContextM where
     pure $ if b then Just (Proxy @(Inbound WireMessage)) else Nothing
   insert _ k _ =
     asks configBlockstanbulWireMessages
-      >>= flip
-        atomicModifyIORef'
-        ( \wms ->
-            let s = S.size wms
-                wms' = if s >= 2000
-                         then case toList wms of
-                                (x:_) -> S.delete x wms
-                                _ -> wms
-                         else wms
-                !wms'' = wms' S.>| k
-             in (wms'', ())
-        )
+      >>= flip atomicModifyIORef' (\wms -> (rememberWireMessage k wms, ()))
   delete _ k =
     asks configBlockstanbulWireMessages
       >>= flip
@@ -409,6 +472,10 @@ instance Mod.Modifiable PbftWindow ContextM where
   get _ = pbftWindow <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {pbftWindow = k}, ()))
 
+instance Mod.Modifiable MPNodesWindow ContextM where
+  get _ = mpNodesWindow <$> Mod.get (Proxy @Context)
+  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {mpNodesWindow = k}, ()))
+
 instance Mod.Accessible ActionTimestamp ContextM where
   access _ = Mod.get (Proxy @ActionTimestamp)
 
@@ -441,6 +508,51 @@ instance HasResyncGate ContextM where
        in if stillFresh
             then (old, False)
             else (LastResync (Just (n, now)), True)
+
+-- | Add a wire message's hash to the seen set, which keeps the latest 2000.
+rememberWireMessage :: Keccak256 -> S.OSet Keccak256 -> S.OSet Keccak256
+rememberWireMessage k wms =
+  let wms' = if S.size wms >= 2000
+               then case toList wms of
+                      (x:_) -> S.delete x wms
+                      _ -> wms
+               else wms
+      !wms'' = wms' S.>| k
+   in wms''
+
+instance HasConsensusAdmission ContextM where
+  admitConsensusMessage msgHash mSigner = do
+    seenRef <- asks configBlockstanbulWireMessages
+    windowsRef <- asks configSignerWindows
+    now <- liftIO $ floor <$> getPOSIXTime
+    liftIO $ do
+      claimed <- atomicModifyIORef' seenRef $ \wms ->
+        if S.member msgHash wms then (wms, False) else (rememberWireMessage msgHash wms, True)
+      case (claimed, mSigner) of
+        (False, _) -> pure Duplicate
+        (True, Nothing) -> pure Admitted
+        (True, Just signer) -> do
+          fits <- atomicModifyIORef' windowsRef $ \windows ->
+            let n = case M.lookup signer windows of
+                  Just (second, k) | second == now -> k + 1
+                  _ -> 1
+             in (M.insert signer (now, n) windows, n <= maxPbftMessagesPerSigner)
+          if fits
+            then pure Admitted
+            else OverBudget <$ atomicModifyIORef' seenRef (\wms -> (S.delete msgHash wms, ()))
+
+instance HasInboundSlots ContextM where
+  reserveInboundSlot h = do
+    ref <- asks configInboundSlots
+    liftIO . atomicModifyIORef' ref $ \slots ->
+      let held = M.findWithDefault 0 h slots
+       in if held >= maxInboundPerHost
+            then (slots, False)
+            else (M.insert h (held + 1) slots, True)
+  releaseInboundSlot h = do
+    ref <- asks configInboundSlots
+    liftIO . atomicModifyIORef' ref $ \slots ->
+      (M.update (\held -> if held > 1 then Just (held - 1) else Nothing) h slots, ())
 
 instance Mod.Modifiable [BlockHeader] ContextM where
   get _ = do
@@ -531,6 +643,8 @@ type MonadP2P m =
   ( MonadIO m,
     MonadLogger m,
     HasResyncGate m,
+    HasConsensusAdmission m,
+    HasInboundSlots m,
     HasPeerClaims m,
     MonadResource m,
     MonadUnliftIO m,
@@ -556,7 +670,8 @@ type MonadP2P m =
       '[Mod.Modifiable]
       '[ BestBlock,
          BestSequencedBlock,
-         PbftWindow
+         PbftWindow,
+         MPNodesWindow
        ]
       m,
     All2
@@ -656,6 +771,8 @@ initConfig wireMessagesRef = do
   streamEnvVar <- newMVar streamEnv
   lastResyncRef <- newIORef $ LastResync Nothing
   peerClaimsVar <- newMVar noClaims
+  signerWindowsRef <- newIORef M.empty
+  inboundSlotsRef <- newIORef M.empty
   connectionId <- liftIO newUnique
   return $ Config
     { configSQLDB = sqlDB' dbs
@@ -666,6 +783,8 @@ initConfig wireMessagesRef = do
     , configStreamEnv = streamEnvVar
     , configLastResync = lastResyncRef
     , configPeerClaims = peerClaimsVar
+    , configSignerWindows = signerWindowsRef
+    , configInboundSlots = inboundSlotsRef
     , configConnectionId = connectionId
     }
 
@@ -674,6 +793,7 @@ initContext =
   return $
     Context { actionTimestamp = emptyActionTimestamp
             , pbftWindow = PbftWindow (0, 0)
+            , mpNodesWindow = MPNodesWindow (0, 0)
             , blockHeaders = ([], jamshidBirth)
             , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
             , _blockstanbulPeerAddr = PeerAddress Nothing

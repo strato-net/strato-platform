@@ -852,6 +852,68 @@ contract Describe_StratoStaking {
         require(strato.balanceOf(address(operatorA)) - before == 1e18, "all of it claimable");
     }
 
+    // ---- the launch recommit -------------------------------------------------------------
+
+    // Mainnet's launch: the first schedule was committed small (R0 = 10k), the launch reserve
+    // is minted straight to the contract, and one owner call takes it in and installs the
+    // launch schedule. Here the first reserve is 10k, so this tops it up to exactly 8M.
+    uint256 constant LAUNCH_MINT = 7990000e18;
+
+    function _recommitRejected() internal returns (bool) {
+        bool rejected = false;
+        try staking.recommitEmissionSchedule() {
+        } catch {
+            rejected = true;
+        }
+        return rejected;
+    }
+
+    function it_recommits_the_launch_schedule_once_taking_in_strato_sent_straight_to_it() public {
+        _fundReserve(10000e18);
+        require(_recommitRejected(), "nothing to replace before the first commitment");
+        staking.commitEmissionSchedule(36500e18, 1561984e18, 10000e18, 0);
+        uint256 start = staking.emissionStartTime();
+
+        require(_recommitRejected(), "the launch STRATO has not arrived");
+        strato.mint(address(staking), LAUNCH_MINT - 1);
+        require(_recommitRejected(), "a reserve one wei short of the launch R0 is refused");
+        strato.mint(address(staking), 1);
+        require(staking.emissionReserve() == 10000e18 && staking.recoverableUntrackedStrato() == LAUNCH_MINT, "sent straight in, it is not yet reserve");
+
+        bool rejected = false;
+        try user1.do(address(staking), "recommitEmissionSchedule()") {
+        } catch {
+            rejected = true;
+        }
+        require(rejected, "only the owner recommits");
+
+        staking.recommitEmissionSchedule();
+        require(staking.emissionRateE0() == 500000e18 && staking.emissionStakeS0() == 5000000e18 && staking.emissionReserveR0() == 8000000e18, "the launch schedule");
+        require(staking.emissionReserve() == 10000e18 + LAUNCH_MINT, "what was sent in joins the reserve");
+        require(staking.recoverableUntrackedStrato() == 0, "and is no longer the owner's to recover");
+        require(staking.emissionStartTime() == start && staking.emissionRecommitted(), "the start stands; the recommit is recorded");
+        require(_recommitRejected(), "once");
+        require(_commitRejected(500e18, 1000e18, 1000e18), "and the first commitment stays closed");
+    }
+
+    // A launch-sized reserve is only ever priced against the launch schedule: sent straight in
+    // it does not move the rate, and the recommit prices it with the launch E0, S0 and R0.
+    function it_prices_the_launch_reserve_only_against_the_launch_schedule() public {
+        _bondBoth();                          // weight 3,000
+        _mintAndApprove(user1, 40000e18);
+        _stake(user1, VALIDATOR_A, 47000e18); // weight 50,000, so S * S0 = 2.5e47 has an exact root
+        _fundReserve(10000e18);
+        staking.commitEmissionSchedule(36500e18, 1561984e18, 10000e18, 0);
+        uint256 firstRate = staking.emissionAnnualRate();
+
+        strato.mint(address(staking), LAUNCH_MINT);
+        require(staking.emissionAnnualRate() == firstRate, "STRATO sent straight in leaves the rate alone");
+
+        staking.recommitEmissionSchedule();
+        // 500k * sqrt(50,000 / 5M) * (8M / 8M) = 50,000 a year
+        require(staking.emissionAnnualRate() == 50000e18, "the launch formula");
+    }
+
     // ---- discretionary rewards -----------------------------------------------------------
 
     function _fundedToken(string symbol) internal returns (Token) {
@@ -1775,6 +1837,42 @@ contract Describe_StratoStaking {
         staking.setGovernance(address(0), false);
         operatorA.doExpectingFailure(address(staking), "unbondSelf(address,uint256)", "SS: cannot leave the set", VALIDATOR_A, 1000e18);
         require(_selfBondOf(VALIDATOR_A) == 1000e18, "bond unchanged");
+    }
+
+    // ---- exits never wait on governance ---------------------------------------------------
+
+    // Governance pointed at another staking contract (as one admin vote can do once this one
+    // is renounced) refuses every call staking makes. A delegator leaves anyway; the failed
+    // sync leaves nothing behind, and a later sync publishes the new weight.
+    function it_lets_a_delegator_unstake_while_governance_refuses_the_sync() public {
+        _bondBoth();
+        _stake(user1, VALIDATOR_A, 400e18);
+        require(gov.validatorStake(VALIDATOR_A) == 1400e18 && staking.lastSyncedWeight(VALIDATOR_A) == 1400e18, "published");
+        gov.setStakingContract(address(0xdead));
+        user2.doExpectingFailure(address(staking), "stake(address,uint256)", "Only the staking contract can manage staked validators", VALIDATOR_A, 1e18);
+
+        user1.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 400e18);
+        require(staking.totalUserStake() == 0 && staking.totalUnbonding() == 400e18, "the stake is unbonding");
+        require(gov.validatorStake(VALIDATOR_A) == 1400e18 && staking.lastSyncedWeight(VALIDATOR_A) == 1400e18, "the failed sync left both sides as they were");
+
+        gov.setStakingContract(address(staking));
+        staking.syncValidator(VALIDATOR_A);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18 && staking.lastSyncedWeight(VALIDATOR_A) == 1000e18, "a later sync publishes it");
+    }
+
+    // The operator's own bond leaves too. With governance working, a seat that cannot leave
+    // still keeps its bond (the tests above); a governance that refuses the sync holds nothing.
+    function it_lets_an_operator_unbond_while_governance_refuses_the_sync() public {
+        _bondBoth();
+        gov.setStakingContract(address(0xdead));
+
+        operatorA.doSuccessfully(address(staking), "unbondSelf(address,uint256)", VALIDATOR_A, 1000e18);
+        require(_selfBondOf(VALIDATOR_A) == 0 && staking.totalUnbonding() == 1000e18, "the bond is unbonding");
+        require(gov.isValidator(VALIDATOR_A) && staking.isValidator(VALIDATOR_A), "the seat stays until a sync gets through");
+
+        gov.setStakingContract(address(staking));
+        staking.syncValidator(VALIDATOR_A);
+        require(!gov.isValidator(VALIDATOR_A) && !staking.isValidator(VALIDATOR_A), "then it leaves with its bond gone");
     }
 
     // ---- the door check ----------------------------------------------------------------
