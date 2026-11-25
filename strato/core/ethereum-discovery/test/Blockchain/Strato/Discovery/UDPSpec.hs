@@ -8,7 +8,7 @@ import Blockchain.Data.PubKey (secPubKeyToPoint)
 import Blockchain.Data.RLP
 import Blockchain.Strato.Discovery.Data.Peer (TCPPort (..), UDPPort (..))
 import Blockchain.Strato.Discovery.UDP
-import Blockchain.Strato.Discovery.UDPServer (keepsHeldKey)
+import Blockchain.Strato.Discovery.UDPServer (keepsHeldKey, pongAnswers)
 import Blockchain.Strato.Model.Address (fromPublicKey)
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Blockchain.Strato.Model.Secp256k1 (PrivateKey, derivePublicKey, exportSignature, newPrivateKey, signMsg)
@@ -90,6 +90,14 @@ spec = do
       case ndPacketToRLP pong of
         (_, RLPArray (_ : echo : _)) -> (rlpDecode echo :: Integer) `shouldSatisfy` (> 0)
         other -> expectationFailure $ show other
+
+    it "answers a Ping when it echoes the Ping's hash or is an old node's Pong, and only then" $ do
+      let pinged = B.replicate 32 7
+      pongAnswers (Just pinged) pinged `shouldBe` True
+      pongAnswers (Just pinged) (B.singleton 4) `shouldBe` True
+      pongAnswers (Just pinged) (B.replicate 32 8) `shouldBe` False
+      pongAnswers Nothing pinged `shouldBe` False
+      pongAnswers Nothing (B.singleton 4) `shouldBe` False
 
   describe "IAddr RLP Serialization" $ do
     it "parses ipv6 addresses" $ do

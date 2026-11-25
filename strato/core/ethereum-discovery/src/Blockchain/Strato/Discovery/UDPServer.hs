@@ -12,6 +12,7 @@ module Blockchain.Strato.Discovery.UDPServer
   ( runEthUDPServer,
     connectMe,
     keepsHeldKey,
+    pongAnswers,
   )
 where
 
@@ -133,7 +134,7 @@ attemptBond = do
     pingPeer p
 
 -- | Ping the peer and note that its address was asked: only a Pong from that
--- address echoing this Ping's hash bonds it (see 'acceptsPacket').
+-- address answering this Ping bonds it (see 'pongAnswers').
 pingPeer :: MonadDiscovery m => PPeer -> m ()
 pingPeer p = do
   udpPort <- Mod.access (Mod.Proxy @UDPPort)
@@ -160,17 +161,26 @@ pingPeer p = do
 -- expired, which stops old packets being replayed, and a Pong or a Neighbors
 -- must answer a request this node sent that address: their source address can
 -- be forged, so unasked they would let anyone bond any address or fill the
--- peer table. A Pong must echo the Ping's hash, which only a node that got the
--- Ping knows, and a Neighbors must be signed by the peer that was asked.
+-- peer table. A Pong must answer the Ping ('pongAnswers'), and a Neighbors
+-- must be signed by the peer that was asked.
 acceptsPacket :: MonadDiscovery m => IP -> ECC.Point -> NodeDiscoveryPacket -> m Bool
 acceptsPacket ip key packet = do
   now <- liftIO $ round `fmap` getPOSIXTime
   if packetExpiration packet < now
     then pure False
     else case packet of
-      Pong _ echo _ _ -> (== Just echo) <$> askedFor AskPing ip
+      Pong _ echo _ _ -> (`pongAnswers` echo) <$> askedFor AskPing ip
       Neighbors {} -> (== Just (pointToBytes key)) <$> askedFor AskNeighbors ip
       _ -> pure True
+
+-- | Whether a Pong carrying @echo@ answers this node's last Ping to its
+-- address, whose hash is @pinged@ ('Nothing' when none went there within the
+-- answer window). It must echo that hash, which only a node that got the Ping
+-- knows, or carry the 4 that nodes from before the echo put in its place.
+-- Taking the 4 is what lets this node bond nodes not yet upgraded, and a
+-- forged Pong can carry it too: it is to go once every node echoes the hash.
+pongAnswers :: Maybe B.ByteString -> B.ByteString -> Bool
+pongAnswers pinged echo = isJust pinged && (pinged == Just echo || echo == B.singleton 4)
 
 udpHandshakeServer :: MonadDiscovery m => Int -> m ()
 udpHandshakeServer minPeers = do
