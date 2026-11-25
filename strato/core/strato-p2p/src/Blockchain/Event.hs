@@ -340,11 +340,12 @@ handleEvents peer = awaitForever $ \case
             -- another had every honest node relay them all to all its peers,
             -- filling each link's maxPbftMessagesPerSecond and pushing honest
             -- votes past it. So each validator gets maxPbftMessagesPerSigner of
-            -- this node's second. Messages at or below this node's last block
-            -- are not counted: that height is decided, none is passed on, and
-            -- counting them would let anyone replay a validator's old votes to
-            -- use up its share.
-            let counted = toInteger (_sequence $ messageView tm) > myNumber
+            -- this node's second. A view's sequence is the last committed
+            -- block and its votes are for the next, so a message below this
+            -- node's last block votes on a decided block: it is not counted,
+            -- none is passed on, and counting them would let anyone replay a
+            -- validator's old votes to use up its share.
+            let counted = toInteger (_sequence $ messageView tm) >= myNumber
             lift (admitConsensusMessage msgHash $ if counted then Just sender' else Nothing) >>= \case
               Duplicate ->
                 $logInfoS "handleEvents/Blockstanbul" . T.pack $
