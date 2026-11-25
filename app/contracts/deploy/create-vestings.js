@@ -39,6 +39,10 @@
 // at the start date, one Nth of the grant every 2629800 s = 365.25 days / 12, so the first
 // slice lands one step after the cliff) or linearly per second ("durationWeeks": N, curve
 // type 0); give exactly one. "durationWeeks": 0 with managed=false is an instant unlock.
+// "durationWeeks" is refused unless the category also sets "allowLinearWeeks": true and
+// ALLOW_LINEAR_WEEKS=1 is in the environment, so a mistyped key cannot create a linear
+// grant ("durationMonths": 0 is an instant unlock too). Unknown keys, "curveType"
+// included, are refused.
 // startDate = TGE + cliffMonths calendar months (UTC, day clamped to the shorter
 // month), or TGE + cliffMonths * secondsPerMonth when that override is present.
 // Every entry's on-chain id is obtained from the pool itself (eth_call to
@@ -107,8 +111,21 @@ function addMonthsUtc(seconds, months) {
   return Math.floor(target.getTime() / 1000);
 }
 
+const ALLOWED_TOP_KEYS = new Set([
+  'manager', 'pool', 'token', 'decimals', 'adminRegistry', 'tge',
+  'secondsPerMonth', 'batchSize', 'categories', 'notes', 'generatedAt',
+]);
+const ALLOWED_CATEGORY_KEYS = new Set([
+  'name', 'managed', 'cliffMonths', 'durationMonths', 'durationWeeks',
+  'allowLinearWeeks', 'entries', 'notes',
+]);
+const ALLOWED_ENTRY_KEYS = new Set(['account', 'tokens', 'label', 'notes']);
+
 function loadSchedule(file) {
   const s = JSON.parse(fs.readFileSync(file, 'utf8'));
+  for (const k of Object.keys(s)) {
+    if (!ALLOWED_TOP_KEYS.has(k)) throw new Error(`unknown schedule key "${k}"`);
+  }
   for (const k of ['manager', 'pool', 'token']) {
     s[k] = clean(s[k]);
     if (!ADDRESS_RE.test(s[k])) throw new Error(`schedule.${k} must be a 20-byte hex address`);
@@ -125,23 +142,34 @@ function loadSchedule(file) {
   const names = new Set();
   const tuples = new Map(); // full parameter tuple -> category; ids are hashes of these, so a duplicate anywhere collides
   for (const c of s.categories) {
+    for (const k of Object.keys(c)) {
+      if (!ALLOWED_CATEGORY_KEYS.has(k)) {
+        if (k === 'curveType') throw new Error(`${c.name || '(unnamed)'}: do not set "curveType" directly; curve 2 (equal monthly steps) is selected ONLY by "durationMonths"`);
+        throw new Error(`${c.name || '(unnamed)'}: unknown category key "${k}"`);
+      }
+    }
     if (!c.name || names.has(c.name)) throw new Error(`category name missing or duplicated: "${c.name}"`);
     names.add(c.name);
     if (typeof c.managed !== 'boolean') throw new Error(`${c.name}: managed must be true/false`);
     const monthly = c.durationMonths !== undefined;
     if (monthly === (c.durationWeeks !== undefined)) throw new Error(`${c.name}: give exactly one of durationMonths (equal monthly steps) or durationWeeks (linear)`);
+    if (!monthly && (c.allowLinearWeeks !== true || process.env.ALLOW_LINEAR_WEEKS !== '1')) {
+      throw new Error(`${c.name}: durationWeeks creates linear weekly curve 0 (not monthly steps curve 2). Use durationMonths for monthly vesting, or set allowLinearWeeks: true AND ALLOW_LINEAR_WEEKS=1 explicitly.`);
+    }
     c.curveType = monthly ? 2 : 0;
     c.duration = monthly ? c.durationMonths : c.durationWeeks; // the on-chain uint16: steps for curve 2, weeks for curve 0
     if (!Number.isInteger(c.duration) || c.duration < 0 || c.duration > 65535) throw new Error(`${c.name}: ${monthly ? 'durationMonths' : 'durationWeeks'} must be 0..65535`);
     if (c.managed && c.duration === 0) throw new Error(`${c.name}: a managed vesting needs a duration; the manager refuses managed zero-duration grants (use managed=false for an instant unlock)`);
     c.durationSeconds = c.duration * (monthly ? STEP_SECONDS : 604800);
-    if (c.startDate !== undefined) throw new Error(`${c.name}: startDate is derived from tge + cliffMonths; remove it`);
     if (!Number.isInteger(c.cliffMonths) || c.cliffMonths < 0 || c.cliffMonths > 1200) throw new Error(`${c.name}: cliffMonths must be an integer 0..1200`);
     c.startDate = s.secondsPerMonth ? s.tgeSeconds + c.cliffMonths * s.secondsPerMonth : addMonthsUtc(s.tgeSeconds, c.cliffMonths);
     if (!Array.isArray(c.entries) || !c.entries.length) throw new Error(`${c.name}: no entries`);
     const seen = new Set();
     c.accounts = []; c.amounts = []; c.total = 0n;
     for (const e of c.entries) {
+      for (const ek of Object.keys(e)) {
+        if (!ALLOWED_ENTRY_KEYS.has(ek)) throw new Error(`${c.name}: unknown entry key "${ek}"`);
+      }
       const a = clean(e.account);
       if (!ADDRESS_RE.test(a)) throw new Error(`${c.name}: bad account "${e.account}"`);
       if (seen.has(a)) throw new Error(`${c.name}: ${a} appears twice (same parameters would collide on the vesting id)`);
@@ -226,7 +254,7 @@ async function onChainVestings(tokenObj, s) {
   const rows = await cirrus(tokenObj, 'BlockApps-VestingPool-vestings', { address: `eq.${s.pool}`, select: 'key,value::text', limit: '5000' });
   return rows.map((r) => {
     const v = typeof r.value === 'string' ? parseBigJson(r.value) : (r.value || {});
-    return { id: clean(r.key), account: clean(v.account), managed: v.managed === true || v.managed === 'true', durationWeeks: Number(v.durationWeeks), startDate: Number(v.startDate), amount: String(v.amount), amountClaimed: String(v.amountClaimed || '0'), pausingDate: Number(v.pausingDate || 0), cancelled: v.cancelled === true || v.cancelled === 'true' };
+    return { id: clean(r.key), account: clean(v.account), curveType: Number(v.curveType || 0), managed: v.managed === true || v.managed === 'true', durationWeeks: Number(v.durationWeeks), startDate: Number(v.startDate), amount: String(v.amount), amountClaimed: String(v.amountClaimed || '0'), pausingDate: Number(v.pausingDate || 0), cancelled: v.cancelled === true || v.cancelled === 'true' };
   });
 }
 
@@ -423,9 +451,23 @@ async function waitForExecution(tokenObj, s, submitted) {
   if (cmd === 'verify') {
     const report = await status(tokenObj, s, false);
     const missing = report.reduce((n, r) => n + (r.c.accounts.length - r.done), 0);
+    let mismatches = 0;
+    for (const r of report) {
+      r.found.forEach((v, j) => {
+        if (!v) return;
+        if (v.curveType !== r.c.curveType || v.managed !== r.c.managed || v.durationWeeks !== r.c.duration || v.amount !== r.c.amounts[j]) {
+          mismatches++;
+          console.error(`MISMATCH ${r.c.name} ${r.c.accounts[j]}: on-chain curveType=${v.curveType} managed=${v.managed} duration=${v.durationWeeks} amount=${v.amount} vs expected curveType=${r.c.curveType} managed=${r.c.managed} duration=${r.c.duration} amount=${r.c.amounts[j]}`);
+        }
+      });
+    }
     if (missing > 0) printFunding(s, await poolFunding(tokenObj, s), neededFor(report));
-    console.log(missing === 0 ? 'COMPLETE: every entry in the file is scheduled on-chain.' : `INCOMPLETE: ${missing} entries are not scheduled.`);
-    process.exit(missing === 0 ? 0 : 1);
+    if (missing === 0 && mismatches === 0) {
+      console.log('COMPLETE: every entry in the file is scheduled on-chain with exact curveType, managed flag, duration, and amount.');
+    } else {
+      console.log(`INCOMPLETE: ${missing} missing, ${mismatches} parameter mismatches.`);
+    }
+    process.exit(missing === 0 && mismatches === 0 ? 0 : 1);
   }
 
   if (cmd === 'create') {
