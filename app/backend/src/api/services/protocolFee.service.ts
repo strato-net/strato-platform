@@ -3,6 +3,7 @@
  */
 
 import { cirrus } from "../../utils/appApiHelper";
+import { emptyOnMissingTable } from "../../utils/cirrusErrors";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 import { constants } from "../../config/constants";
 import { POOL_V3_CONTRACTS } from "../../config/poolV3Constants";
@@ -125,54 +126,65 @@ const parseTimestamp = (timestampStr: string): number => {
 };
 
 /**
- * Helper function to categorize revenue by time periods
+ * Helper function to run one Cirrus aggregate per time period: the same filters, plus a
+ * block_timestamp lower bound for every period but allTime. Each request returns only
+ * the aggregate's rows (one, or one per group), however many events match.
  */
-const categorizeRevenueByPeriod = (
-  events: Array<{ value: bigint; timestamp: number; asset: string }>,
+const aggregateByPeriod = async (
+  accessToken: string,
+  table: string,
+  params: Record<string, string>,
   timeCutoffs: ReturnType<typeof getTimeCutoffs>
-): {
-  allTime: Record<string, bigint>;
-  daily: Record<string, bigint>;
-  weekly: Record<string, bigint>;
-  monthly: Record<string, bigint>;
-  ytd: Record<string, bigint>;
-} => {
+): Promise<Record<keyof RevenueByPeriod, any[]>> => {
   const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = timeCutoffs;
-  
-  const allTime: Record<string, bigint> = {};
-  const daily: Record<string, bigint> = {};
-  const weekly: Record<string, bigint> = {};
-  const monthly: Record<string, bigint> = {};
-  const ytd: Record<string, bigint> = {};
-  
-  events.forEach(({ value, timestamp, asset }) => {
+  const aggregateSince = async (since?: number): Promise<any[]> => {
+    const { data } = await cirrus.get(accessToken, table, {
+      params: {
+        ...params,
+        ...(since !== undefined && { block_timestamp: `gte.${toUTCTime(new Date(since * 1000))}` })
+      }
+    });
+    return data || [];
+  };
+  const [daily, weekly, monthly, ytd, allTime] = await Promise.all([
+    aggregateSince(oneDayAgo),
+    aggregateSince(oneWeekAgo),
+    aggregateSince(oneMonthAgo),
+    aggregateSince(ytdCutoff),
+    aggregateSince()
+  ]);
+  return { daily, weekly, monthly, ytd, allTime };
+};
+
+/**
+ * Helper function to build a value for every time period
+ */
+const byPeriod = <T>(build: (period: keyof RevenueByPeriod) => T): Record<keyof RevenueByPeriod, T> => ({
+  daily: build("daily"),
+  weekly: build("weekly"),
+  monthly: build("monthly"),
+  ytd: build("ytd"),
+  allTime: build("allTime")
+});
+
+/**
+ * Helper function to value per-asset sums ({ asset, total } rows) in USD
+ * total is in token units (18 decimals), price is in 18 decimals
+ * result = total * price / 1e18 (to avoid double scaling)
+ */
+const sumsToUsd = (
+  rows: Array<{ asset: string; total: string | null }>,
+  priceMap: Map<string, bigint>
+): Record<string, bigint> => {
+  const usdByAsset: Record<string, bigint> = {};
+  for (const { asset, total } of rows) {
+    const tokenAddress = asset.toLowerCase();
+    const valueInUsd = (BigInt(total || "0") * (priceMap.get(tokenAddress) || 0n)) / 10n ** 18n;
     // Skip if value is 0
-    if (value === 0n) return;
-    
-    // Track all-time
-    if (!allTime[asset]) allTime[asset] = 0n;
-    allTime[asset] += value;
-    
-    // Track by time period
-    if (timestamp >= oneDayAgo) {
-      if (!daily[asset]) daily[asset] = 0n;
-      daily[asset] += value;
-    }
-    if (timestamp >= oneWeekAgo) {
-      if (!weekly[asset]) weekly[asset] = 0n;
-      weekly[asset] += value;
-    }
-    if (timestamp >= oneMonthAgo) {
-      if (!monthly[asset]) monthly[asset] = 0n;
-      monthly[asset] += value;
-    }
-    if (timestamp >= ytdCutoff) {
-      if (!ytd[asset]) ytd[asset] = 0n;
-      ytd[asset] += value;
-    }
-  });
-  
-  return { allTime, daily, weekly, monthly, ytd };
+    if (valueInUsd === 0n) continue;
+    usdByAsset[tokenAddress] = (usdByAsset[tokenAddress] || 0n) + valueInUsd;
+  }
+  return usdByAsset;
 };
 
 /**
@@ -230,14 +242,14 @@ export const getCDPProtocolRevenue = async (
     }
     const cdpEngineAddress = registry.cdpEngine.address;
 
-    // Fetch FeesRouted events and CDPEngine state in parallel
-    const [{ data: feesRoutedEvents }, { data: engineData }] = await Promise.all([
-      cirrus.get(accessToken, `/${CDPEngine}-FeesRouted`, {
-        params: {
-          select: "asset,toCollector::text,block_timestamp",
-          address: `eq.${cdpEngineAddress}`
-        }
-      }),
+    const timeCutoffs = getTimeCutoffs();
+
+    // Fetch FeesRouted sums and CDPEngine state in parallel
+    const [feesRoutedSums, { data: engineData }] = await Promise.all([
+      aggregateByPeriod(accessToken, `/${CDPEngine}-FeesRouted`, {
+        select: "total:toCollector.sum()::text",
+        address: `eq.${cdpEngineAddress}`
+      }, timeCutoffs),
       cirrus.get(accessToken, `/${CDPEngine}`, {
         params: {
           address: `eq.${cdpEngineAddress}`,
@@ -246,19 +258,15 @@ export const getCDPProtocolRevenue = async (
       })
     ]);
 
-    const timeCutoffs = getTimeCutoffs();
     const { now } = timeCutoffs;
     const RAY = 10n ** 27n;
     const usdstAddress = constants.USDST.toLowerCase();
 
     // FeesRouted revenue (already realized)
-    const transformedEvents = (feesRoutedEvents || []).map((event: any) => ({
-      value: BigInt(event.toCollector || "0"),
-      timestamp: parseTimestamp(event.block_timestamp),
-      asset: usdstAddress
-    }));
-
-    const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
+    const periodRevenue = byPeriod((period): Record<string, bigint> => {
+      const total = BigInt(feesRoutedSums[period][0]?.total || "0");
+      return total === 0n ? {} : { [usdstAddress]: total };
+    });
 
     // Compute pending (un-accrued) stability fees across all assets
     const engine = engineData?.[0];
@@ -431,20 +439,18 @@ export const getLendingProtocolRevenue = async (
       }
     };
 
-    // Fetch all snapshots, sweep events, and pool state in parallel
+    // Fetch all snapshots, sweep sums, and pool state in parallel
     const [nowReserves, dailyStart, weeklyStart, monthlyStart, ytdStart,
-      sweptTreasuryRes, poolData] = await Promise.all([
+      sweptTreasurySums, poolData] = await Promise.all([
       getReservesAccruedAt(toIso(now)),
       getReservesAccruedAt(toIso(oneDayAgo)),
       getReservesAccruedAt(toIso(oneWeekAgo)),
       getReservesAccruedAt(toIso(oneMonthAgo)),
       getReservesAccruedAt(toIso(ytdCutoff)),
-      cirrus.get(accessToken, `/${LendingPool}-ReservesSweptTreasury`, {
-        params: {
-          address: `eq.${lendingPoolAddress}`,
-          select: "amount::text,block_timestamp"
-        }
-      }),
+      aggregateByPeriod(accessToken, `/${LendingPool}-ReservesSweptTreasury`, {
+        address: `eq.${lendingPoolAddress}`,
+        select: "total:amount.sum()::text"
+      }, timeCutoffs),
       cirrus.get(accessToken, `/${LendingPool}`, {
         params: {
           address: `eq.${lendingPoolAddress}`,
@@ -457,20 +463,7 @@ export const getLendingProtocolRevenue = async (
     const treasuryShareBps = 10000n - safetyShareBps;
 
     // Only treasury swept events count as revenue
-    interface SweptEvent { amount: bigint; timestamp: number }
-    const sweptEvents: SweptEvent[] = (sweptTreasuryRes.data || []).map((e: any) => ({
-      amount: BigInt(e.amount || "0"),
-      timestamp: parseTimestamp(e.block_timestamp)
-    }));
-
-    const sweptByPeriod = { daily: 0n, weekly: 0n, monthly: 0n, ytd: 0n, allTime: 0n };
-    for (const e of sweptEvents) {
-      sweptByPeriod.allTime += e.amount;
-      if (e.timestamp >= oneDayAgo) sweptByPeriod.daily += e.amount;
-      if (e.timestamp >= oneWeekAgo) sweptByPeriod.weekly += e.amount;
-      if (e.timestamp >= oneMonthAgo) sweptByPeriod.monthly += e.amount;
-      if (e.timestamp >= ytdCutoff) sweptByPeriod.ytd += e.amount;
-    }
+    const sweptByPeriod = byPeriod((period) => BigInt(sweptTreasurySums[period][0]?.total || "0"));
 
     // Treasury revenue = treasury share of delta(reservesAccrued) + swept treasury
     const calc = (startRes: bigint, swept: bigint): bigint => {
@@ -586,18 +579,15 @@ export const getSwapProtocolRevenue = async (
     
     const poolAddresses = volatilePoolsData.map((entry: any) => entry.address);
     
-    // Query all Transfer events where 'from' is any pool and 'to' is feeCollector
-    const { data: tokenTransferEvents } = await cirrus.get(accessToken, `/event`, {
-      params: {
-        event_name: `eq.Transfer`,
-        select: "address,attributes,block_timestamp",
-        "attributes->>from": `in.(${poolAddresses.join(',')})`,
-        "attributes->>to": `eq.${feeCollector}`,
-        order: "block_timestamp.desc"
-      }
-    });
+    // Sum all Transfer events where 'from' is any pool and 'to' is feeCollector, per token
+    const tokenTransferSums = await aggregateByPeriod(accessToken, `/event`, {
+      event_name: `eq.Transfer`,
+      select: "asset:address,total:attributes->>value::numeric.sum()::text",
+      "attributes->>from": `in.(${poolAddresses.join(',')})`,
+      "attributes->>to": `eq.${feeCollector}`
+    }, getTimeCutoffs());
     
-    if (!tokenTransferEvents || tokenTransferEvents.length === 0) {
+    if (tokenTransferSums.allTime.length === 0) {
       return {
         totalRevenue: "0",
         revenueByPeriod: {
@@ -610,10 +600,8 @@ export const getSwapProtocolRevenue = async (
       };
     }
     
-    const timeCutoffs = getTimeCutoffs();
-    
     // Get unique token addresses from events
-    const uniqueTokenAddresses: string[] = [...new Set<string>(tokenTransferEvents.map((event: any) => event.address.toLowerCase()))];
+    const uniqueTokenAddresses: string[] = tokenTransferSums.allTime.map((row: any) => row.asset.toLowerCase());
     
     // Fetch prices for all tokens in parallel
     const priceMap = new Map<string, bigint>();
@@ -629,24 +617,8 @@ export const getSwapProtocolRevenue = async (
       })
     );
     
-    // Transform events to common format, multiplying value by price
-    // value is in token units (18 decimals), price is in 18 decimals
-    // result = value * price / 1e18 (to avoid double scaling)
-    const DECIMALS = 10n ** 18n;
-    const transformedEvents = tokenTransferEvents.map((event: any) => {
-      const tokenAddress = event.address.toLowerCase();
-      const rawValue = BigInt(event.attributes?.value || "0");
-      const price = priceMap.get(tokenAddress) || 0n;
-      const valueInUsd = (rawValue * price) / DECIMALS;
-      
-      return {
-        value: valueInUsd,
-        timestamp: parseTimestamp(event.block_timestamp),
-        asset: tokenAddress // The token that emitted the Transfer event
-      };
-    });
-    
-    const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
+    // Multiply each token's sum by its price
+    const periodRevenue = byPeriod((period) => sumsToUsd(tokenTransferSums[period], priceMap));
     
     // Build revenue data with token symbols
     const tokenSymbolCache = new Map<string, string>();
@@ -746,48 +718,32 @@ export const getStablePoolProtocolRevenue = async (
       return map;
     };
 
-    // Fetch all snapshots and Transfer events in parallel
-    const [nowBalances, dailyStartBal, weeklyStartBal, monthlyStartBal, ytdStartBal, transferRes] =
+    // Fetch all snapshots and Transfer sums in parallel
+    const [nowBalances, dailyStartBal, weeklyStartBal, monthlyStartBal, ytdStartBal, transferSums] =
       await Promise.all([
         getAdminBalancesAt(toIso(timeCutoffs.now)),
         getAdminBalancesAt(toIso(oneDayAgo)),
         getAdminBalancesAt(toIso(oneWeekAgo)),
         getAdminBalancesAt(toIso(oneMonthAgo)),
         getAdminBalancesAt(toIso(ytdCutoff)),
-        cirrus.get(accessToken, `/event`, {
-          params: {
-            event_name: "eq.Transfer",
-            select: "address,attributes,block_timestamp",
-            "attributes->>from": poolFilter,
-            "attributes->>to": `eq.${feeCollector}`,
-            order: "block_timestamp.desc"
-          }
-        })
+        aggregateByPeriod(accessToken, `/event`, {
+          event_name: "eq.Transfer",
+          select: "address,total:attributes->>value::numeric.sum()::text",
+          "attributes->>from": poolFilter,
+          "attributes->>to": `eq.${feeCollector}`
+        }, timeCutoffs)
       ]);
 
-    const transferEvents: any[] = transferRes.data || [];
-
-    // Bucket Transfer events by period and token (raw token amounts)
-    const emptyBucket = () => new Map<string, bigint>();
-    const transferBuckets = {
-      daily: emptyBucket(), weekly: emptyBucket(), monthly: emptyBucket(),
-      ytd: emptyBucket(), allTime: emptyBucket()
-    };
-
-    for (const event of transferEvents) {
-      const token = event.address?.toLowerCase();
-      if (!token) continue;
-      const rawAmount = event.attributes?.value;
-      const amount = BigInt(rawAmount || "0");
-      if (amount === 0n) continue;
-      const ts = parseTimestamp(event.block_timestamp);
-
-      transferBuckets.allTime.set(token, (transferBuckets.allTime.get(token) || 0n) + amount);
-      if (ts >= oneDayAgo) transferBuckets.daily.set(token, (transferBuckets.daily.get(token) || 0n) + amount);
-      if (ts >= oneWeekAgo) transferBuckets.weekly.set(token, (transferBuckets.weekly.get(token) || 0n) + amount);
-      if (ts >= oneMonthAgo) transferBuckets.monthly.set(token, (transferBuckets.monthly.get(token) || 0n) + amount);
-      if (ts >= ytdCutoff) transferBuckets.ytd.set(token, (transferBuckets.ytd.get(token) || 0n) + amount);
-    }
+    // Bucket Transfer sums by period and token (raw token amounts)
+    const transferBuckets = byPeriod((period) => {
+      const bucket = new Map<string, bigint>();
+      for (const row of transferSums[period]) {
+        const amount = BigInt(row.total || "0");
+        if (amount === 0n) continue;
+        bucket.set(row.address.toLowerCase(), amount);
+      }
+      return bucket;
+    });
 
     // Revenue[T1,T2] = (adminBal@T2 − adminBal@T1) + transfers in [T1,T2]
     const computePeriodRevenue = (
@@ -963,46 +919,31 @@ export const getPoolV3ProtocolRevenue = async (
       addTo(nowFees, p.token1, safeBigInt(p.protocolFees1));
     }
 
-    // Fetch period-start snapshots and CollectProtocol events in parallel
-    const [dailyStartFees, weeklyStartFees, monthlyStartFees, ytdStartFees, collectRes] =
+    // Fetch period-start snapshots and CollectProtocol sums in parallel
+    const [dailyStartFees, weeklyStartFees, monthlyStartFees, ytdStartFees, collectSums] =
       await Promise.all([
         getAccruedFeesAt(toIso(oneDayAgo)),
         getAccruedFeesAt(toIso(oneWeekAgo)),
         getAccruedFeesAt(toIso(oneMonthAgo)),
         getAccruedFeesAt(toIso(ytdCutoff)),
-        cirrus.get(accessToken, `/event`, {
-          params: {
-            event_name: "eq.CollectProtocol",
-            address: poolFilter,
-            select: "address,attributes,block_timestamp",
-            order: "block_timestamp.desc"
-          }
-        })
+        aggregateByPeriod(accessToken, `/event`, {
+          event_name: "eq.CollectProtocol",
+          address: poolFilter,
+          select: "address,amount0:attributes->>amount0::numeric.sum()::text,amount1:attributes->>amount1::numeric.sum()::text"
+        }, timeCutoffs)
       ]);
 
-    // Bucket collected amounts by period and token (each event carries both sides)
-    const emptyBucket = () => new Map<string, bigint>();
-    const collectBuckets = {
-      daily: emptyBucket(), weekly: emptyBucket(), monthly: emptyBucket(),
-      ytd: emptyBucket(), allTime: emptyBucket()
-    };
-    for (const event of (collectRes.data as any[]) || []) {
-      const pool = poolByAddress.get(event.address);
-      if (!pool) continue;
-      const ts = parseTimestamp(event.block_timestamp);
-      const sides: Array<[string, bigint]> = [
-        [pool.token0, safeBigInt(event.attributes?.amount0)],
-        [pool.token1, safeBigInt(event.attributes?.amount1)]
-      ];
-      for (const [token, amount] of sides) {
-        if (amount === 0n) continue;
-        addTo(collectBuckets.allTime, token, amount);
-        if (ts >= oneDayAgo) addTo(collectBuckets.daily, token, amount);
-        if (ts >= oneWeekAgo) addTo(collectBuckets.weekly, token, amount);
-        if (ts >= oneMonthAgo) addTo(collectBuckets.monthly, token, amount);
-        if (ts >= ytdCutoff) addTo(collectBuckets.ytd, token, amount);
+    // Bucket collected amounts by period and token (each pool's sums carry both sides)
+    const collectBuckets = byPeriod((period) => {
+      const bucket = new Map<string, bigint>();
+      for (const row of collectSums[period]) {
+        const pool = poolByAddress.get(row.address);
+        if (!pool) continue;
+        addTo(bucket, pool.token0, safeBigInt(row.amount0));
+        addTo(bucket, pool.token1, safeBigInt(row.amount1));
       }
-    }
+      return bucket;
+    });
 
     // Current oracle prices for both sides of every pool
     const uniqueTokenAddresses = [...new Set(pools.flatMap(p => [p.token0, p.token1]))];
@@ -1088,43 +1029,20 @@ export const getGasCostRevenue = async (
     const usdstAddress = constants.USDST.toLowerCase();
     const feeCollector = await getSwapFeeCollector(accessToken);
 
-    // Query USDST Transfer events to feeCollector with exactly 0.01 USDST value (gas fee payments)
-    const { data: gasTransferEvents } = await cirrus.get(accessToken, `/event`, {
-      params: {
-        event_name: "eq.Transfer",
-        address: `eq.${usdstAddress}`,
-        "attributes->>to": `eq.${feeCollector}`,
-        "attributes->>value": `eq.${GAS_FEE_WEI}`,
-        select: "block_timestamp",
-        order: "block_timestamp.desc"
-      }
-    });
-    
-    if (!gasTransferEvents || gasTransferEvents.length === 0) {
-      return {
-        totalRevenue: "0",
-        revenueByPeriod: {
-          daily: { total: "0", byAsset: [] },
-          weekly: { total: "0", byAsset: [] },
-          monthly: { total: "0", byAsset: [] },
-          ytd: { total: "0", byAsset: [] },
-          allTime: { total: "0", byAsset: [] }
-        }
-      };
-    }
+    // Count USDST Transfer events to feeCollector with exactly 0.01 USDST value (gas fee payments)
+    const gasTransferCounts = await aggregateByPeriod(accessToken, `/event`, {
+      event_name: "eq.Transfer",
+      address: `eq.${usdstAddress}`,
+      "attributes->>to": `eq.${feeCollector}`,
+      "attributes->>value": `eq.${GAS_FEE_WEI}`,
+      select: "count()"
+    }, getTimeCutoffs());
     const fee = BigInt(GAS_FEE_WEI);
-    const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = getTimeCutoffs();
 
-    // Count events per period — each event is exactly 0.01 USDST
-    let daily = 0n, weekly = 0n, monthly = 0n, ytd = 0n, allTime = 0n;
-    for (const event of gasTransferEvents) {
-      const ts = parseTimestamp(event.block_timestamp);
-      allTime += fee;
-      if (ts >= oneDayAgo) daily += fee;
-      if (ts >= oneWeekAgo) weekly += fee;
-      if (ts >= oneMonthAgo) monthly += fee;
-      if (ts >= ytdCutoff) ytd += fee;
-    }
+    // Events per period — each event is exactly 0.01 USDST
+    const { daily, weekly, monthly, ytd, allTime } = byPeriod(
+      (period) => BigInt(gasTransferCounts[period][0]?.count ?? 0) * fee
+    );
 
     const buildByAsset = (total: bigint): RevenueByAsset[] =>
       total > 0n ? [{ asset: usdstAddress, symbol: "USDST", revenue: total.toString() }] : [];
@@ -1222,22 +1140,15 @@ export const getMetalForgeProtocolRevenue = async (
 
     if (!metalForgeAddress) return emptyRevenue;
 
-    const { data: mintEvents } = await cirrus.get(accessToken, `/${MetalForge}-MetalMinted`, {
-      params: {
-        address: `eq.${metalForgeAddress}`,
-        select: "payToken,feeAmount::text,block_timestamp",
-        order: "block_timestamp.desc"
-      }
-    });
+    const feeSums = await aggregateByPeriod(accessToken, `/${MetalForge}-MetalMinted`, {
+      address: `eq.${metalForgeAddress}`,
+      select: "asset:payToken,total:feeAmount.sum()::text"
+    }, getTimeCutoffs());
 
-    if (!mintEvents || mintEvents.length === 0) return emptyRevenue;
-
-    const timeCutoffs = getTimeCutoffs();
-    const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = timeCutoffs;
-    const DECIMALS = 10n ** 18n;
+    if (feeSums.allTime.length === 0) return emptyRevenue;
 
     // Get unique pay tokens and fetch prices
-    const payTokens = [...new Set<string>(mintEvents.map((e: any) => (e.payToken as string).toLowerCase()))];
+    const payTokens: string[] = feeSums.allTime.map((row: any) => (row.asset as string).toLowerCase());
     const priceMap = new Map<string, bigint>();
     await Promise.all(
       payTokens.map(async (tokenAddress) => {
@@ -1250,19 +1161,8 @@ export const getMetalForgeProtocolRevenue = async (
       })
     );
 
-    // Transform events: convert feeAmount to USD using payToken price
-    const transformedEvents = mintEvents.map((event: any) => {
-      const payToken = (event.payToken as string).toLowerCase();
-      const feeAmount = BigInt(event.feeAmount || "0");
-      const price = priceMap.get(payToken) || 0n;
-      return {
-        value: (feeAmount * price) / DECIMALS,
-        timestamp: parseTimestamp(event.block_timestamp),
-        asset: payToken
-      };
-    });
-
-    const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
+    // Convert each pay token's feeAmount sum to USD using payToken price
+    const periodRevenue = byPeriod((period) => sumsToUsd(feeSums[period], priceMap));
 
     const tokenSymbolCache = new Map<string, string>();
     const [allTimeArray, dailyArray, weeklyArray, monthlyArray, ytdArray] = await Promise.all([
@@ -1341,9 +1241,8 @@ const integrateGrossYield = (
 const getYieldVaultPendingFees = async (
   accessToken: string,
   vaultDefs: Array<{ key: string; address: string }>,
-  strategiesByVault: Map<string, Set<string>>,
-  transferEvents: any[],
-  distributorFundingEvents: any[]
+  sweepTsByVault: Map<string, number>,
+  fundingTsByDistributor: Map<string, number>
 ): Promise<{ pendingRevenue: bigint; lastAccrual: number }> => {
   const nowSec = Math.floor(Date.now() / 1000);
   let totalPendingUsd = 0n;
@@ -1360,17 +1259,10 @@ const getYieldVaultPendingFees = async (
       if (!info.accrualInitialized) return;
 
       const vaultAddress = def.address.toLowerCase();
-      const strategies = strategiesByVault.get(vaultAddress) || new Set<string>();
 
       // Window starts at the vault's most recent sweep transfer; before the first
       // sweep the whole deployment history is pending.
-      let anchorTs = 0;
-      for (const event of transferEvents) {
-        const from = String(event.attributes?.from || "").toLowerCase();
-        if (!strategies.has(from)) continue;
-        const ts = parseTimestamp(event.block_timestamp);
-        if (ts > anchorTs) anchorTs = ts;
-      }
+      const anchorTs = sweepTsByVault.get(vaultAddress) || 0;
       if (anchorTs > latestSweep) latestSweep = anchorTs;
 
       // A never-emitted event has no Cirrus table at all — treat as no events
@@ -1388,14 +1280,7 @@ const getYieldVaultPendingFees = async (
           blockNumber: Number(row.block_number || 0)
         }))).catch(() => []);
 
-      const [accruedEvents, deployedEvents, returnedEvents, lossEvents, storageRows] = await Promise.all([
-        cirrus.get(accessToken, `/${YieldVault}-Accrued`, {
-          params: {
-            address: `eq.${def.address}`,
-            select: "targetAmount::text,block_timestamp",
-            order: "block_timestamp.asc"
-          }
-        }).then(({ data }) => data || []).catch(() => []),
+      const [deployedEvents, returnedEvents, lossEvents, storageRows] = await Promise.all([
         fetchCapitalEvents("CapitalDeployed", "strategy"),
         fetchCapitalEvents("CapitalReturned", "strategy"),
         fetchCapitalEvents("StrategyLossReported", "strategy"),
@@ -1430,15 +1315,7 @@ const getYieldVaultPendingFees = async (
       const perSecondSavingsRate = BigInt(String(accrualState.perSecondSavingsRate || "0"));
       const distributor = String(accrualState.rewardDistributor || "").toLowerCase().replace(/^0x/, "");
 
-      let fundingAnchorTs = 0;
-      if (distributor && !/^0+$/.test(distributor)) {
-        for (const event of distributorFundingEvents) {
-          const to = String(event.attributes?.to || "").toLowerCase().replace(/^0x/, "");
-          if (to !== distributor) continue;
-          const ts = parseTimestamp(event.block_timestamp);
-          if (ts > fundingAnchorTs) fundingAnchorTs = ts;
-        }
-      }
+      const fundingAnchorTs = fundingTsByDistributor.get(distributor) || 0;
       const savingsAnchorTs = fundingAnchorTs > 0 ? fundingAnchorTs : anchorTs;
       const pendingFrom = Math.max(Number(accrualState.lastAccrual || 0), savingsAnchorTs);
       const totalShares = BigInt(info.totalShares || "0");
@@ -1454,22 +1331,39 @@ const getYieldVaultPendingFees = async (
         const growth = rpow(perSecondSavingsRate, BigInt(nowSec - pendingFrom), RAY);
         savingsAccrual = (accrualBaseAssets * (growth - RAY)) / RAY;
       }
-      // Accrued events are ordered ascending; an event whose accrual window
-      // straddles the savings anchor was partly settled before it — count only the
-      // post-anchor fraction (linear proration; compounding curvature over one
-      // window is negligible)
-      let prevAccruedTs = 0;
-      for (const event of accruedEvents) {
-        const ts = parseTimestamp(event.block_timestamp);
-        const amount = BigInt(String(event.targetAmount || "0"));
-        if (ts > savingsAnchorTs) {
-          if (prevAccruedTs > 0 && prevAccruedTs < savingsAnchorTs) {
-            savingsAccrual += (amount * BigInt(ts - savingsAnchorTs)) / BigInt(ts - prevAccruedTs);
-          } else {
-            savingsAccrual += amount;
-          }
-        }
-        prevAccruedTs = ts;
+      // Accrued events after the savings anchor are summed in Cirrus; the first of
+      // them and the last one up to the anchor are read for the proration below
+      // (no Accrued table yet — treat as no events; any other failure skips the
+      // vault, so the proration is never applied without the sum)
+      const savingsAnchor = toUTCTime(new Date(savingsAnchorTs * 1000));
+      const fetchAccrued = (params: Record<string, string>) =>
+        cirrus.get(accessToken, `/${YieldVault}-Accrued`, {
+          params: { address: `eq.${def.address}`, ...params }
+        }).catch(emptyOnMissingTable).then(({ data }) => data?.[0]);
+      const [accruedSum, firstAccrued, prevAccrued] = await Promise.all([
+        fetchAccrued({ block_timestamp: `gt.${savingsAnchor}`, select: "total:targetAmount.sum()::text" }),
+        fetchAccrued({
+          block_timestamp: `gt.${savingsAnchor}`,
+          select: "targetAmount::text,block_timestamp",
+          order: "block_timestamp.asc",
+          limit: "1"
+        }),
+        fetchAccrued({
+          block_timestamp: `lte.${savingsAnchor}`,
+          select: "block_timestamp",
+          order: "block_timestamp.desc",
+          limit: "1"
+        })
+      ]);
+      savingsAccrual += BigInt(String(accruedSum?.total || "0"));
+      // An event whose accrual window straddles the savings anchor was partly
+      // settled before it — count only the post-anchor fraction (linear proration;
+      // compounding curvature over one window is negligible)
+      const prevAccruedTs = prevAccrued ? parseTimestamp(prevAccrued.block_timestamp) : 0;
+      if (firstAccrued && prevAccruedTs > 0 && prevAccruedTs < savingsAnchorTs) {
+        const ts = parseTimestamp(firstAccrued.block_timestamp);
+        const amount = BigInt(String(firstAccrued.targetAmount || "0"));
+        savingsAccrual -= amount - (amount * BigInt(ts - savingsAnchorTs)) / BigInt(ts - prevAccruedTs);
       }
 
       // Piecewise-constant strategyDebt timeline per strategy — every capital event
@@ -1601,51 +1495,76 @@ export const getYieldVaultProtocolRevenue = async (
     const uniqueCollectors = [...new Set(collectorByVault.values())];
     const uniqueDistributors = [...new Set(distributorByVault.values())];
 
-    // Inflows: Transfer events strategy → collector. Strategies also pay the
+    // Inflows: Transfer sums strategy → collector, per token. Strategies also pay the
     // 0.01 USDST tx fee to the collector; those are gas revenue (already counted
     // by getGasCostRevenue), not fee sweeps
     const GAS_FEE_WEI = 10000000000000000n;
     const usdstAddress = constants.USDST.toLowerCase();
+    const notGasFee = `(address.neq.${usdstAddress},attributes->>value.neq.${GAS_FEE_WEI})`;
+    const tokenSumSelect = "asset:address,total:attributes->>value::numeric.sum()::text";
+    const timeCutoffs = getTimeCutoffs();
     const inflowsPromise = Promise.all(
       [...strategiesByCollector.entries()]
         .filter(([, strategies]) => strategies.length > 0)
         .map(([collector, strategies]) =>
-          cirrus.get(accessToken, `/event`, {
-            params: {
-              event_name: `eq.Transfer`,
-              select: "address,attributes,block_timestamp",
-              "attributes->>from": `in.(${strategies.join(',')})`,
-              "attributes->>to": `eq.${collector}`,
-              order: "block_timestamp.desc"
-            }
-          }).then(({ data }) => data || [])
-        )
-    ).then((results) => results.flat().filter((event: any) =>
-      !(event.address.toLowerCase() === usdstAddress &&
-        BigInt(event.attributes?.value || "0") === GAS_FEE_WEI)
-    ));
-
-    // Outflows: Transfer events collector → rewardDistributor (savings funding)
-    const outflowsPromise: Promise<any[]> = uniqueDistributors.length === 0
-      ? Promise.resolve([])
-      : cirrus.get(accessToken, `/event`, {
-          params: {
+          aggregateByPeriod(accessToken, `/event`, {
             event_name: `eq.Transfer`,
-            select: "address,attributes,block_timestamp",
-            "attributes->>from": `in.(${uniqueCollectors.join(',')})`,
-            "attributes->>to": `in.(${uniqueDistributors.join(',')})`,
-            order: "block_timestamp.desc"
-          }
-        }).then(({ data }) => data || []);
+            select: tokenSumSelect,
+            "attributes->>from": `in.(${strategies.join(',')})`,
+            "attributes->>to": `eq.${collector}`,
+            or: notGasFee
+          }, timeCutoffs)
+        )
+    ).then((results) => byPeriod((period) => results.flatMap((sums) => sums[period])));
 
-    const [tokenTransferEvents, distributorFundingEvents] =
-      await Promise.all([inflowsPromise, outflowsPromise]);
+    // Outflows: Transfer sums collector → rewardDistributor (savings funding), per token
+    const outflowsPromise = uniqueDistributors.length === 0
+      ? Promise.resolve(byPeriod((): any[] => []))
+      : aggregateByPeriod(accessToken, `/event`, {
+          event_name: `eq.Transfer`,
+          select: tokenSumSelect,
+          "attributes->>from": `in.(${uniqueCollectors.join(',')})`,
+          "attributes->>to": `in.(${uniqueDistributors.join(',')})`
+        }, timeCutoffs);
+
+    // Pending-fee window anchors: the latest sweep transfer per vault and the latest
+    // savings funding per rewardDistributor
+    const latestTransferTs = (filters: Record<string, string>): Promise<number> =>
+      cirrus.get(accessToken, `/event`, {
+        params: {
+          event_name: `eq.Transfer`,
+          select: "block_timestamp",
+          ...filters,
+          order: "block_timestamp.desc",
+          limit: "1"
+        }
+      }).then(({ data }) => (data?.[0] ? parseTimestamp(data[0].block_timestamp) : 0));
+    const sweepTsByVault = new Map<string, number>();
+    const fundingTsByDistributor = new Map<string, number>();
+    const anchorsPromise = Promise.all([
+      ...[...strategiesByVault.entries()].map(async ([vault, strategies]) => {
+        sweepTsByVault.set(vault, await latestTransferTs({
+          "attributes->>from": `in.(${[...strategies].join(',')})`,
+          "attributes->>to": `eq.${collectorByVault.get(vault) || DEFAULT_FEE_COLLECTOR}`,
+          or: notGasFee
+        }));
+      }),
+      ...uniqueDistributors.map(async (distributor) => {
+        fundingTsByDistributor.set(distributor, await latestTransferTs({
+          "attributes->>from": `in.(${uniqueCollectors.join(',')})`,
+          "attributes->>to": `eq.${distributor}`
+        }));
+      })
+    ]);
+
+    const [tokenTransferSums, distributorFundingSums] =
+      await Promise.all([inflowsPromise, outflowsPromise, anchorsPromise]);
 
     const pendingPromise = getYieldVaultPendingFees(
-      accessToken, vaultDefs, strategiesByVault, tokenTransferEvents, distributorFundingEvents
+      accessToken, vaultDefs, sweepTsByVault, fundingTsByDistributor
     );
 
-    if (tokenTransferEvents.length === 0 && distributorFundingEvents.length === 0) {
+    if (tokenTransferSums.allTime.length === 0 && distributorFundingSums.allTime.length === 0) {
       const { pendingRevenue, lastAccrual } = await pendingPromise;
       return {
         ...emptyRevenue,
@@ -1654,11 +1573,9 @@ export const getYieldVaultProtocolRevenue = async (
       };
     }
 
-    const timeCutoffs = getTimeCutoffs();
-
-    // Get unique token addresses from both event sets
+    // Get unique token addresses from both sum sets
     const uniqueTokenAddresses: string[] = [...new Set<string>(
-      [...tokenTransferEvents, ...distributorFundingEvents].map((event: any) => event.address.toLowerCase())
+      [...tokenTransferSums.allTime, ...distributorFundingSums.allTime].map((row: any) => row.asset.toLowerCase())
     )];
 
     // Fetch prices for all tokens in parallel
@@ -1675,30 +1592,16 @@ export const getYieldVaultProtocolRevenue = async (
       })
     );
 
-    // Transform events to common format, multiplying value by price
-    // value is in token units (18 decimals), price is in 18 decimals
-    // result = value * price / 1e18 (to avoid double scaling)
+    // Multiply each token's sum by its price
     // Inflows count positive, distributor-funding outflows negative, so period
     // totals and byAsset entries net to actual revenue
-    const DECIMALS = 10n ** 18n;
-    const toUsdEvent = (event: any, sign: bigint) => {
-      const tokenAddress = event.address.toLowerCase();
-      const rawValue = BigInt(event.attributes?.value || "0");
-      const price = priceMap.get(tokenAddress) || 0n;
-      const valueInUsd = (rawValue * price) / DECIMALS;
-
-      return {
-        value: sign * valueInUsd,
-        timestamp: parseTimestamp(event.block_timestamp),
-        asset: tokenAddress // The token that emitted the Transfer event
-      };
-    };
-    const transformedEvents = [
-      ...tokenTransferEvents.map((event: any) => toUsdEvent(event, 1n)),
-      ...distributorFundingEvents.map((event: any) => toUsdEvent(event, -1n))
-    ];
-
-    const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
+    const periodRevenue = byPeriod((period) => {
+      const netUsd = sumsToUsd(tokenTransferSums[period], priceMap);
+      for (const [asset, usd] of Object.entries(sumsToUsd(distributorFundingSums[period], priceMap))) {
+        netUsd[asset] = (netUsd[asset] || 0n) - usd;
+      }
+      return netUsd;
+    });
 
     // Build revenue data with token symbols
     const tokenSymbolCache = new Map<string, string>();
