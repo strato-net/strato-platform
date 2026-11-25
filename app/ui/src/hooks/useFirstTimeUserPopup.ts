@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from '@/context/UserContext';
 import { capture } from '@/lib/analytics';
-import { fetchHasAnyActivity, isPopupDone, markPopupDone } from '@/lib/firstTimeUser';
+import { fetchHasBridgedIn, isPopupDone, markPopupDone } from '@/lib/firstTimeUser';
 
 // For design review, `localStorage.setItem('first-time-popup-preview', '1')`
 // forces the popup for any logged-in account instead of the real check.
@@ -15,8 +15,8 @@ function previewForced(): boolean {
 
 /**
  * Drives the first-time user dialog on the dashboard. Shows it to a logged-in
- * account with no on-chain activity (lib/firstTimeUser -> Cirrus) until the
- * user closes it or acts on it; an account found to have activity is never
+ * account that has not bridged in yet (lib/firstTimeUser -> Cirrus) until the
+ * user closes it or acts on it; an account found to have bridged in is never
  * asked about again.
  */
 export function useFirstTimeUserPopup(): {
@@ -39,7 +39,7 @@ export function useFirstTimeUserPopup(): {
     (async () => {
       if (!previewForced()) {
         if (isPopupDone(userAddress)) return;
-        if (await fetchHasAnyActivity()) {
+        if (await fetchHasBridgedIn()) {
           markPopupDone(userAddress);
           return;
         }

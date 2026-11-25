@@ -55,9 +55,9 @@ const HexToken = ({ className, size, step }: { className: string; size: number; 
 );
 
 /**
- * First-time user popup: tells a brand-new account that bridging in is gas
- * sponsored and walks them to their first trade. See lib/firstTimeUser for
- * who counts as first-time.
+ * First-time user popup: tells an account that has not bridged in yet that
+ * bridging in is gas sponsored and walks them to their first trade. See
+ * lib/firstTimeUser for the eligibility check.
  */
 const FirstTimeUserDialog = ({ open, onDismiss, onCta }: FirstTimeUserDialogProps) => {
   const navigate = useNavigate();
