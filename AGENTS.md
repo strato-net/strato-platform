@@ -43,6 +43,12 @@
 - When a change moves these images to an OpenResty release built on nginx 1.31.9 or later, restore TLS 1.3 in the same change: `git grep CVE-2026-118899` lists every place (the six `nginx.tpl.conf` files and `techdocs/node/configuration.md`). Put back `ssl_protocols TLSv1.2 TLSv1.3;` (hoogle-nginx had no such line before; an explicit `TLSv1.2 TLSv1.3` line is fine there), remove the two comment lines above it, restore the docs sentence, and delete this section.
 - Do not restore it while any of the six images is still on nginx 1.31.8 or older. Check the nginx core version with `openresty -V` in the built image, not the OpenResty version string alone.
 
+## Cirrus row limit: stay at 10,000 or below
+
+- Cirrus (PostgREST) returns at most `POSTGREST_MAX_ROWS` rows per response and drops the rest without an error. The limit is 50,000 today (`postgrest-packager/Dockerfile`) and will be lowered to 10,000.
+- New code must not send a Cirrus `limit` above 10,000, and must not rely on a request without a `limit` returning more than 10,000 rows. Read a larger set in pages with a stable `order`, or ask Cirrus for `count()` / `sum()` instead of the rows.
+- The change that lowers the limit to 10,000 updates the default in `postgrest-packager/Dockerfile`, its README and this section.
+
 ## Learned Workspace Facts
 
 - STRATO network IDs exceed JS `Number.MAX_SAFE_INTEGER`; must guard with `Number.isSafeInteger()` before passing to viem/wagmi; MetaMask crashes on oversized chain IDs (`initProvider` → `numberToHex`)

@@ -88,12 +88,6 @@ router.post("/price", walletAuth, OracleController.setPrice);
  *         description: End timestamp (ISO string). Defaults to now.
  *         schema:
  *           type: string
- *       - name: order
- *         in: query
- *         required: false
- *         description: Optional order clause (defaults to block_timestamp.asc)
- *         schema:
- *           type: string
  *     responses:
  *       200:
  *         description: Historical price data

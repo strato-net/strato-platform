@@ -309,79 +309,103 @@ const getOracleAddress = async (accessToken: string): Promise<string> => {
     return registry.priceOracle.address || registry.priceOracle;
 };
 
-export const fetchPriceEvents = async (
+// Boundaries of the epoch-aligned intervals from startMs up to the end of the
+// one endMs is in, as fetchSampledPrices takes them
+export const intervalBoundaries = (startMs: number, endMs: number, intervalMs: number): number[] => {
+    // The `all` interval follows the request's `end`: one before the chain's
+    // start makes it negative, which never reaches endMs
+    if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
+      throw new Error("Price history interval is out of bounds");
+    }
+    // The first whole millisecond of an interval, by the division the chart
+    // puts an update in one with. The `all` interval is a fraction off whole
+    // milliseconds: rounding its multiples, or adding it up, is at times a
+    // millisecond away from that, and an update there is sampled into the
+    // wrong interval
+    const startOf = (index: number): number => {
+      let ms = Math.ceil(index * intervalMs);
+      while (Math.floor((ms - 1) / intervalMs) >= index) ms--;
+      while (Math.floor(ms / intervalMs) < index) ms++;
+      return ms;
+    };
+    const boundaries = [startMs];
+    let index = Math.floor(startMs / intervalMs) + 1;
+    for (; index * intervalMs <= endMs; index++) boundaries.push(startOf(index));
+    boundaries.push(startOf(index));
+    return boundaries;
+};
+
+const PRICE_SAMPLE_BATCH = 30;
+
+// The last price update of each asset between every two consecutive boundaries
+// (ms, ascending). The oracle writes a `prices` version per asset on every
+// update, so each of them is one history row: reading every update event
+// instead is 40,000+ rows of all assets' prices for a month.
+//
+// PostgREST prepares its statements, and from a connection's fifth run of one
+// Postgres plans it without the values: it then reads every row the plain
+// conditions leave and tests the windows on each (14 s for one asset's history
+// on mainnet). So the plain conditions name one asset and the span of the
+// request's windows, and the assets go one after another, which keeps the
+// requests in flight at one chart's worth.
+export const fetchSampledPrices = async (
   accessToken: string,
   oracleAddress: string,
-  assetAddress: string,
-  startTime: Date,
-  order: string
-): Promise<PriceHistoryEntry[]> => {
-    const params = {
-      address: `eq.${oracleAddress}`,
-      block_timestamp: `gte.${toUTCTime(startTime)}`,
-      order,
-    };
+  assetAddresses: string[],
+  boundaries: number[]
+): Promise<Map<string, PriceHistoryEntry[]>> => {
+    const samples = new Map<string, PriceHistoryEntry[]>(
+      assetAddresses.map((asset) => [asset, []])
+    );
 
-    // --- Query both tables ---
-    const [singleResponse, batchResponse] = await Promise.all([
-      cirrus.get(accessToken, `/${PriceOracleEvents}`, {
-        params: {
-          ...params,
-          asset: `eq.${assetAddress}`,
-          select: "id,timestamp,asset,price::text,block_timestamp",
-        },
-      }).catch(err => {
-        console.error(`[getPriceHistory] Error querying ${PriceOracleEvents}:`, err);
-        return { data: [] };
-      }),
-      cirrus.get(accessToken, `/${PriceOracleBatchUpdateEvents}`, {
-        params,
-      }).catch(err => {
-        console.error(`[getPriceHistory] Error querying ${PriceOracleBatchUpdateEvents}:`, err);
-        return { data: [] };
-      })
-    ]);
-
-    function toPlainString(num: number | string): string {
-      return typeof num === "string"
-        ? num
-        : num.toLocaleString("fullwide", { useGrouping: false });
-    }
-
-    const priceEvents: PriceHistoryEntry[] = [];
-
-    // --- Normalize single asset events ---
-    if (Array.isArray(singleResponse.data)) {
-      singleResponse.data.forEach((event: any) => {
-        priceEvents.push({
-          id: event.id.toString(),
-          timestamp: new Date(parseInt(event.timestamp) * 1000),
-          asset: event.asset,
-          price: toPlainString(event.price), // normalize to string
-          blockTimestamp: new Date(event.block_timestamp),
-        });
+    const batches: { and: string; or: string }[] = [];
+    for (let i = 0; i + 1 < boundaries.length; i += PRICE_SAMPLE_BATCH) {
+      const span = boundaries
+        .slice(i, i + PRICE_SAMPLE_BATCH + 1)
+        .map((boundary) => new Date(boundary).toISOString());
+      const windows = span.slice(1).map((to, j) =>
+        `and(valid_from.gte.${span[j]},valid_from.lt.${to},valid_to.gte.${to})`
+      );
+      batches.push({
+        and: `(valid_from.gte.${span[0]},valid_from.lt.${span[span.length - 1]})`,
+        or: `(${windows.join(",")})`,
       });
     }
 
-    // --- Normalize batch events ---
-    if (Array.isArray(batchResponse.data)) {
-      batchResponse.data.forEach((event: any) => {
-        const assets = JSON.parse(event.assets);
-        const priceValues = String(event.priceValues).match(/\d+/g) ?? [];
-        const idx = assets.indexOf(assetAddress);
-        if (idx !== -1 && priceValues[idx] !== undefined) {
-          priceEvents.push({
-            id: event.id.toString(),
-            timestamp: new Date(parseInt(event.timestamp) * 1000),
-            asset: assetAddress,
-            price: toPlainString(priceValues[idx]), // normalize to string
-            blockTimestamp: new Date(event.block_timestamp),
+    for (const asset of assetAddresses) {
+      const responses = await Promise.all(
+        batches.map((batch) =>
+          cirrus.get(accessToken, "/history@mapping", {
+            params: {
+              address: `eq.${oracleAddress}`,
+              collection_name: "eq.prices",
+              "key->>key": `eq.${asset}`,
+              ...batch,
+              select: "price:value::text,block_timestamp,block_number",
+            },
+          }).catch(err => {
+            console.error(`[getPriceHistory] Error querying price history:`, err);
+            return { data: [] };
+          })
+        )
+      );
+
+      for (const response of responses) {
+        if (!Array.isArray(response.data)) continue;
+        for (const row of response.data) {
+          const blockTimestamp = new Date(row.block_timestamp);
+          samples.get(asset)!.push({
+            id: String(row.block_number),
+            timestamp: blockTimestamp,
+            asset,
+            price: row.price,
+            blockTimestamp,
           });
         }
-      });
+      }
     }
 
-    return priceEvents;
+    return samples;
 };
 
 const createHourlyPriceMap = (priceEvents: PriceHistoryEntry[], intervalMs?: number): Map<number, PriceHistoryEntry> => {
@@ -525,6 +549,7 @@ const forwardFillPriceHistory = (
   intervalPrices: Map<number, PriceHistoryEntry>,
   assetAddress: string,
   intervalMs: number,
+  endMs: number = Date.now(),
 ): PriceHistoryEntry[] => {
     if (intervalPrices.size === 0) {
       console.log(`[getPriceHistory] No historical oracle data found for ${assetAddress}`);
@@ -540,19 +565,21 @@ const forwardFillPriceHistory = (
     const latestDataPoint = sortedEvents[sortedEvents.length - 1];
 
     // Start from the earliest actual data point (rounded to interval)
-    const earliestInterval = Math.floor(earliestDataPoint.blockTimestamp.getTime() / intervalMs) * intervalMs;
-    const earliestStartTime = new Date(earliestInterval);
+    const earliestIndex = Math.floor(earliestDataPoint.blockTimestamp.getTime() / intervalMs);
 
-    // End at current time (or latest data point if it's more recent)
-    const now = new Date();
-    const endTime = latestDataPoint.blockTimestamp > now ? latestDataPoint.blockTimestamp : now;
+    // End at endMs, the current time by default (or latest data point if it's more recent)
+    const end = new Date(endMs);
+    const endTime = latestDataPoint.blockTimestamp > end ? latestDataPoint.blockTimestamp : end;
     const endInterval = Math.ceil(endTime.getTime() / intervalMs) * intervalMs;
 
     const filledPriceHistory: PriceHistoryEntry[] = [];
     let currentPrice = earliestDataPoint.price;
 
-    // Generate interval-based timestamps from first data point to now
-    for (let currentInterval = earliestStartTime.getTime(); currentInterval <= endInterval; currentInterval += intervalMs) {
+    // Generate interval-based timestamps from first data point to now. Each is
+    // its index times the interval, as the keys are made: adding the fractional
+    // `all` interval up, or passing it through a Date, never lands on a key
+    for (let index = earliestIndex; index * intervalMs <= endInterval; index++) {
+      const currentInterval = index * intervalMs;
       const intervalKey = currentInterval;
 
       if (intervalPrices.has(intervalKey)) {
@@ -584,7 +611,7 @@ export const getPriceHistory = async (
     // If the asset is an LP token, calculate the price history as net asset value
     const matchingPool = await findPoolByLPToken(accessToken, assetAddress);
     if (matchingPool) {
-      return getLPTokenPriceHistory(accessToken, assetAddress, matchingPool, rawParams);
+      return getLPTokenPriceHistory(accessToken, assetAddress, matchingPool);
     }
 
     // If the asset is not an LP token, just get the oracle price history
@@ -594,18 +621,19 @@ export const getPriceHistory = async (
     const duration = rawParams.duration || '1m';
     const historyParams = getHistoryParams(duration, rawParams.end);
     const startTime = new Date(historyParams.endTimestamp - (historyParams.interval * historyParams.numTicks));
+    // The chart ends at `end`, or now when that is in the future
+    const endMs = Math.min(historyParams.endTimestamp, Date.now());
 
     // Calculate time range for the last month
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
-    const priceEvents = await fetchPriceEvents(
+    const priceEvents = (await fetchSampledPrices(
       accessToken,
       oracleAddress,
-      assetAddress,
-      startTime,
-      rawParams.order || "block_timestamp.asc"
-    );
+      [assetAddress],
+      intervalBoundaries(startTime.getTime(), endMs, historyParams.interval)
+    )).get(assetAddress) ?? [];
 
     if (priceEvents.length === 0) {
       console.log(`[getPriceHistory] No data found for ${assetAddress}`);
@@ -621,7 +649,7 @@ export const getPriceHistory = async (
       return { data: [], totalCount: 0 };
     }
 
-    const filledPriceHistory = forwardFillPriceHistory(hourlyPrices, assetAddress, historyParams?.interval);
+    const filledPriceHistory = forwardFillPriceHistory(hourlyPrices, assetAddress, historyParams?.interval, endMs);
 
     return { data: filledPriceHistory, totalCount: filledPriceHistory.length };
   } catch (error) {
@@ -633,8 +661,7 @@ export const getPriceHistory = async (
 const getLPTokenPriceHistory = async (
   accessToken: string,
   lpTokenAddress: string,
-  pool: { address: string; tokenA: string; tokenB: string },
-  rawParams: Record<string, string | undefined> = {}
+  pool: { address: string; tokenA: string; tokenB: string }
 ): Promise<PriceHistoryResponse> => {
   try {
     const poolAddress = pool.address;
@@ -644,15 +671,16 @@ const getLPTokenPriceHistory = async (
     const oracleAddress = await getOracleAddress(accessToken);
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    const order = rawParams.order || "block_timestamp.asc";
 
-    const [tokenAPriceEvents, tokenBPriceEvents] = await Promise.all([
-      fetchPriceEvents(accessToken, oracleAddress, tokenA, oneMonthAgo, order),
-      fetchPriceEvents(accessToken, oracleAddress, tokenB, oneMonthAgo, order)
-    ]);
+    const priceEvents = await fetchSampledPrices(
+      accessToken,
+      oracleAddress,
+      [tokenA, tokenB],
+      intervalBoundaries(oneMonthAgo.getTime(), Date.now(), 60 * 60 * 1000)
+    );
 
-    const tokenAPriceMap = extractHourlyPriceMap(tokenAPriceEvents);
-    const tokenBPriceMap = extractHourlyPriceMap(tokenBPriceEvents);
+    const tokenAPriceMap = extractHourlyPriceMap(priceEvents.get(tokenA) ?? []);
+    const tokenBPriceMap = extractHourlyPriceMap(priceEvents.get(tokenB) ?? []);
 
     const poolHistory = await fetchPoolHistory(accessToken, poolAddress, lpTokenAddress);
 
@@ -832,7 +860,8 @@ export const getStratoPriceHistory = async (
 
   try {
     const duration = rawParams.duration || '1m';
-    const historyParams = getHistoryParams(duration, rawParams.end);
+    // No `end` here: the result is cached by asset and duration alone
+    const historyParams = getHistoryParams(duration);
     const intervalMs = historyParams.interval;
     const startTime = new Date(historyParams.endTimestamp - (historyParams.interval * historyParams.numTicks));
 
@@ -860,8 +889,14 @@ export const getStratoPriceHistory = async (
     // Fetch oracle histories, pool storage histories, and multi-token swap events in parallel
     const oracleAddress = await getOracleAddress(accessToken);
 
+    const oracleSamples = fetchSampledPrices(
+      accessToken,
+      oracleAddress,
+      [...otherTokenAddrs],
+      intervalBoundaries(startTime.getTime(), historyParams.endTimestamp, intervalMs)
+    );
     const oraclePromises = [...otherTokenAddrs].map(async (tokenAddr) => {
-      const events = await fetchPriceEvents(accessToken, oracleAddress, tokenAddr, startTime, "block_timestamp.asc");
+      const events = (await oracleSamples).get(tokenAddr) ?? [];
       return { tokenAddr, filledMap: buildForwardFilledOracleMap(createHourlyPriceMap(events, intervalMs), intervalMs) };
     });
 

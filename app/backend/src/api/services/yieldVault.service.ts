@@ -11,7 +11,7 @@ import {
   OFF_CHAIN_EVENT_WINDOW_DAYS,
 } from "../../config/config";
 import { getServiceToken } from "../../utils/authHelper";
-import { fetchPriceEvents, getOraclePrices } from "./oracle.service";
+import { fetchSampledPrices, getOraclePrices } from "./oracle.service";
 import {
   computePerSecondRateApy,
   getYieldWindowBounds,
@@ -1683,9 +1683,6 @@ export const getYieldVaultHistory = async (
   const assetAddress = String(vaultState._asset);
   const decimals = Number(vaultState._underlyingDecimals ?? 18);
   const params = getHistoryParams(duration, end, 90);
-  const startTime = new Date(
-    params.endTimestamp - params.interval * params.numTicks
-  ).toISOString();
   const historyTimestamps = Array.from(
     { length: params.numTicks + 1 },
     (_, i) => params.endTimestamp - params.interval * (params.numTicks - i)
@@ -1712,12 +1709,22 @@ export const getYieldVaultHistory = async (
       },
       historyTimestamps
     ),
-    fetchPriceEvents(
-      serviceToken,
-      priceOracle,
-      assetAddress,
-      new Date(startTime),
-      "block_timestamp.asc"
+    // the last price update up to each timestamp, however old for the first
+    // one: that window goes in a request of its own, as a request is bounded
+    // by the span of its windows
+    Promise.all([
+      fetchSampledPrices(serviceToken, priceOracle, [assetAddress], [
+        0,
+        historyTimestamps[0] + 1,
+      ]),
+      fetchSampledPrices(
+        serviceToken,
+        priceOracle,
+        [assetAddress],
+        historyTimestamps.map((timestamp) => timestamp + 1)
+      ),
+    ]).then((samples) =>
+      samples.flatMap((sample) => sample.get(assetAddress) ?? [])
     ),
   ]);
 
