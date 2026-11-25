@@ -1709,11 +1709,23 @@ export const getYieldVaultHistory = async (
       },
       historyTimestamps
     ),
-    // the last price update up to each timestamp, however old for the first one
-    fetchSampledPrices(serviceToken, priceOracle, [assetAddress], [
-      0,
-      ...historyTimestamps.map((timestamp) => timestamp + 1),
-    ]).then((samples) => samples.get(assetAddress) ?? []),
+    // the last price update up to each timestamp, however old for the first
+    // one: that window goes in a request of its own, as a request is bounded
+    // by the span of its windows
+    Promise.all([
+      fetchSampledPrices(serviceToken, priceOracle, [assetAddress], [
+        0,
+        historyTimestamps[0] + 1,
+      ]),
+      fetchSampledPrices(
+        serviceToken,
+        priceOracle,
+        [assetAddress],
+        historyTimestamps.map((timestamp) => timestamp + 1)
+      ),
+    ]).then((samples) =>
+      samples.flatMap((sample) => sample.get(assetAddress) ?? [])
+    ),
   ]);
 
   const sortedPriceRows = priceRows.sort(

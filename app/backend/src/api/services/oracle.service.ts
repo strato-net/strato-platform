@@ -330,6 +330,13 @@ const PRICE_SAMPLE_BATCH = 30;
 // (ms, ascending). The oracle writes a `prices` version per asset on every
 // update, so each of them is one history row: reading every update event
 // instead is 40,000+ rows of all assets' prices for a month.
+//
+// PostgREST prepares its statements, and from a connection's fifth run of one
+// Postgres plans it without the values: it then reads every row the plain
+// conditions leave and tests the windows on each (14 s for one asset's history
+// on mainnet). So the plain conditions name one asset and the span of the
+// request's windows, and the assets go one after another, which keeps the
+// requests in flight at one chart's worth.
 export const fetchSampledPrices = async (
   accessToken: string,
   oracleAddress: string,
@@ -339,48 +346,51 @@ export const fetchSampledPrices = async (
     const samples = new Map<string, PriceHistoryEntry[]>(
       assetAddresses.map((asset) => [asset, []])
     );
-    if (assetAddresses.length === 0) return samples;
 
-    const windows: string[] = [];
-    for (let i = 1; i < boundaries.length; i++) {
-      const from = new Date(boundaries[i - 1]).toISOString();
-      const to = new Date(boundaries[i]).toISOString();
-      windows.push(`and(valid_from.gte.${from},valid_from.lt.${to},valid_to.gte.${to})`);
+    const batches: { and: string; or: string }[] = [];
+    for (let i = 0; i + 1 < boundaries.length; i += PRICE_SAMPLE_BATCH) {
+      const span = boundaries
+        .slice(i, i + PRICE_SAMPLE_BATCH + 1)
+        .map((boundary) => new Date(boundary).toISOString());
+      const windows = span.slice(1).map((to, j) =>
+        `and(valid_from.gte.${span[j]},valid_from.lt.${to},valid_to.gte.${to})`
+      );
+      batches.push({
+        and: `(valid_from.gte.${span[0]},valid_from.lt.${span[span.length - 1]})`,
+        or: `(${windows.join(",")})`,
+      });
     }
 
-    const batches: string[][] = [];
-    for (let i = 0; i < windows.length; i += PRICE_SAMPLE_BATCH) {
-      batches.push(windows.slice(i, i + PRICE_SAMPLE_BATCH));
-    }
+    for (const asset of assetAddresses) {
+      const responses = await Promise.all(
+        batches.map((batch) =>
+          cirrus.get(accessToken, "/history@mapping", {
+            params: {
+              address: `eq.${oracleAddress}`,
+              collection_name: "eq.prices",
+              "key->>key": `eq.${asset}`,
+              ...batch,
+              select: "price:value::text,block_timestamp,block_number",
+            },
+          }).catch(err => {
+            console.error(`[getPriceHistory] Error querying price history:`, err);
+            return { data: [] };
+          })
+        )
+      );
 
-    const responses = await Promise.all(
-      batches.map((batch) =>
-        cirrus.get(accessToken, "/history@mapping", {
-          params: {
-            address: `eq.${oracleAddress}`,
-            collection_name: "eq.prices",
-            "key->>key": `in.(${assetAddresses.join(",")})`,
-            or: `(${batch.join(",")})`,
-            select: "asset:key->>key,price:value::text,block_timestamp,block_number",
-          },
-        }).catch(err => {
-          console.error(`[getPriceHistory] Error querying price history:`, err);
-          return { data: [] };
-        })
-      )
-    );
-
-    for (const response of responses) {
-      if (!Array.isArray(response.data)) continue;
-      for (const row of response.data) {
-        const blockTimestamp = new Date(row.block_timestamp);
-        samples.get(row.asset)?.push({
-          id: String(row.block_number),
-          timestamp: blockTimestamp,
-          asset: row.asset,
-          price: row.price,
-          blockTimestamp,
-        });
+      for (const response of responses) {
+        if (!Array.isArray(response.data)) continue;
+        for (const row of response.data) {
+          const blockTimestamp = new Date(row.block_timestamp);
+          samples.get(asset)!.push({
+            id: String(row.block_number),
+            timestamp: blockTimestamp,
+            asset,
+            price: row.price,
+            blockTimestamp,
+          });
+        }
       }
     }
 
