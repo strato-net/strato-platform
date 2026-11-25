@@ -105,7 +105,7 @@ export type AnalyticsEvent =
   | 'landing_page_viewed'
   | 'landing_cta_clicked'
   | 'landing_step_clicked'
-  // retention (returning-user member-benefit popups)
+  // dashboard first-time user popup
   | 'benefit_popup_viewed'
   | 'benefit_popup_cta_clicked'
   | 'benefit_popup_dismissed'

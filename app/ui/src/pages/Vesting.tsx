@@ -38,7 +38,7 @@ const TOKEN_DECIMALS = 18;
 const REFRESH_DELAYS_MS = [2500, 9000];
 // A claim the confirmation poll gave up on (status "Pending") usually lands soon after; pull again later.
 const PENDING_REFRESH_DELAYS_MS = [15000, 45000];
-// The house hero banner (GuestPromoSection) and its eyebrow (MemberBenefitDialog).
+// The house hero banner (GuestPromoSection) and its eyebrow (FirstTimeUserDialog).
 const HERO_GRADIENT = "linear-gradient(135deg, #0A0F29 0%, #001B70 55%, #102a80 100%)";
 
 type ClaimTxConfig = AxiosRequestConfig & { walletAuth: true; walletTxProgress: WalletTxProgressHandler };

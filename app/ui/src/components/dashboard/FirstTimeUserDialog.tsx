@@ -2,7 +2,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ArrowRight, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
-import { SPONSORED_TXNS_PER_BRIDGE_IN } from "@/lib/memberBenefits";
+import { SPONSORED_TXNS_PER_BRIDGE_IN } from "@/lib/firstTimeUser";
 import STRATOLOGO from "@/assets/strato.png";
 import STRATOLOGODARK from "@/assets/strato-dark.png";
 import STRATOMARK from "@/assets/icon.png";
@@ -56,8 +56,8 @@ const HexToken = ({ className, size, step }: { className: string; size: number; 
 
 /**
  * First-time user popup: tells a brand-new account that bridging in is gas
- * sponsored and walks them to their first trade. Same frame as
- * MemberBenefitDialog, which takes over once the account has activity.
+ * sponsored and walks them to their first trade. See lib/firstTimeUser for
+ * who counts as first-time.
  */
 const FirstTimeUserDialog = ({ open, onDismiss, onCta }: FirstTimeUserDialogProps) => {
   const navigate = useNavigate();
@@ -188,9 +188,10 @@ const FirstTimeUserDialog = ({ open, onDismiss, onCta }: FirstTimeUserDialogProp
               </p>
             </div>
 
-            {/* Right column: the MemberBenefitDialog staircase, with the three
-                steps numbered along the path. On mobile it sits above the copy
-                at a fixed height so it's visible without scrolling the dialog. */}
+            {/* Right column: illustration — deep blue panel with an ascending
+                hexagon staircase, the three steps numbered along the path. On
+                mobile it sits above the copy at a fixed height so it's visible
+                without scrolling the dialog. */}
             <div className="relative order-first h-[200px] overflow-hidden rounded-2xl bg-gradient-to-br from-[#2F3DF2] via-[#2430D8] to-[#1A23A8] sm:h-[260px] lg:order-none lg:h-auto lg:min-h-[440px]">
               <div
                 className="absolute inset-0 opacity-[0.06]"
