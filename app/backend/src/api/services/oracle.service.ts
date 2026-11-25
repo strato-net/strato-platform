@@ -310,21 +310,16 @@ const getOracleAddress = async (accessToken: string): Promise<string> => {
 };
 
 // Boundaries of the epoch-aligned intervals from startMs up to the end of the
-// current one, as fetchSampledPrices takes them
-export const intervalBoundaries = (startMs: number, intervalMs: number): number[] => {
-    const now = Date.now();
-    // startMs and intervalMs follow the request's `end`: one far in the past asks
-    // for millions of intervals, and one before the chain's start makes the `all`
-    // interval negative, which never reaches `now`
-    if (
-      !Number.isFinite(intervalMs) || intervalMs <= 0 ||
-      !((now - startMs) / intervalMs <= constants.PRICE_HISTORY_MAX_INTERVALS)
-    ) {
-      throw new Error("Price history range is out of bounds");
+// one endMs is in, as fetchSampledPrices takes them
+export const intervalBoundaries = (startMs: number, endMs: number, intervalMs: number): number[] => {
+    // The `all` interval follows the request's `end`: one before the chain's
+    // start makes it negative, which never reaches endMs
+    if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
+      throw new Error("Price history interval is out of bounds");
     }
     const boundaries = [startMs];
     let next = (Math.floor(startMs / intervalMs) + 1) * intervalMs;
-    for (; next <= now; next += intervalMs) boundaries.push(next);
+    for (; next <= endMs; next += intervalMs) boundaries.push(next);
     boundaries.push(next);
     return boundaries;
 };
@@ -533,6 +528,7 @@ const forwardFillPriceHistory = (
   intervalPrices: Map<number, PriceHistoryEntry>,
   assetAddress: string,
   intervalMs: number,
+  endMs: number = Date.now(),
 ): PriceHistoryEntry[] => {
     if (intervalPrices.size === 0) {
       console.log(`[getPriceHistory] No historical oracle data found for ${assetAddress}`);
@@ -551,9 +547,9 @@ const forwardFillPriceHistory = (
     const earliestInterval = Math.floor(earliestDataPoint.blockTimestamp.getTime() / intervalMs) * intervalMs;
     const earliestStartTime = new Date(earliestInterval);
 
-    // End at current time (or latest data point if it's more recent)
-    const now = new Date();
-    const endTime = latestDataPoint.blockTimestamp > now ? latestDataPoint.blockTimestamp : now;
+    // End at endMs, the current time by default (or latest data point if it's more recent)
+    const end = new Date(endMs);
+    const endTime = latestDataPoint.blockTimestamp > end ? latestDataPoint.blockTimestamp : end;
     const endInterval = Math.ceil(endTime.getTime() / intervalMs) * intervalMs;
 
     const filledPriceHistory: PriceHistoryEntry[] = [];
@@ -602,6 +598,8 @@ export const getPriceHistory = async (
     const duration = rawParams.duration || '1m';
     const historyParams = getHistoryParams(duration, rawParams.end);
     const startTime = new Date(historyParams.endTimestamp - (historyParams.interval * historyParams.numTicks));
+    // The chart ends at `end`, or now when that is in the future
+    const endMs = Math.min(historyParams.endTimestamp, Date.now());
 
     // Calculate time range for the last month
     const oneMonthAgo = new Date();
@@ -611,7 +609,7 @@ export const getPriceHistory = async (
       accessToken,
       oracleAddress,
       [assetAddress],
-      intervalBoundaries(startTime.getTime(), historyParams.interval)
+      intervalBoundaries(startTime.getTime(), endMs, historyParams.interval)
     )).get(assetAddress) ?? [];
 
     if (priceEvents.length === 0) {
@@ -628,7 +626,7 @@ export const getPriceHistory = async (
       return { data: [], totalCount: 0 };
     }
 
-    const filledPriceHistory = forwardFillPriceHistory(hourlyPrices, assetAddress, historyParams?.interval);
+    const filledPriceHistory = forwardFillPriceHistory(hourlyPrices, assetAddress, historyParams?.interval, endMs);
 
     return { data: filledPriceHistory, totalCount: filledPriceHistory.length };
   } catch (error) {
@@ -655,7 +653,7 @@ const getLPTokenPriceHistory = async (
       accessToken,
       oracleAddress,
       [tokenA, tokenB],
-      intervalBoundaries(oneMonthAgo.getTime(), 60 * 60 * 1000)
+      intervalBoundaries(oneMonthAgo.getTime(), Date.now(), 60 * 60 * 1000)
     );
 
     const tokenAPriceMap = extractHourlyPriceMap(priceEvents.get(tokenA) ?? []);
@@ -839,7 +837,8 @@ export const getStratoPriceHistory = async (
 
   try {
     const duration = rawParams.duration || '1m';
-    const historyParams = getHistoryParams(duration, rawParams.end);
+    // No `end` here: the result is cached by asset and duration alone
+    const historyParams = getHistoryParams(duration);
     const intervalMs = historyParams.interval;
     const startTime = new Date(historyParams.endTimestamp - (historyParams.interval * historyParams.numTicks));
 
@@ -871,7 +870,7 @@ export const getStratoPriceHistory = async (
       accessToken,
       oracleAddress,
       [...otherTokenAddrs],
-      intervalBoundaries(startTime.getTime(), intervalMs)
+      intervalBoundaries(startTime.getTime(), historyParams.endTimestamp, intervalMs)
     );
     const oraclePromises = [...otherTokenAddrs].map(async (tokenAddr) => {
       const events = (await oracleSamples).get(tokenAddr) ?? [];
