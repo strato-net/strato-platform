@@ -17,7 +17,9 @@
 #      which reuses the `docker login`).
 #   3. Pushes the rest one by one. If a push still fails with the immutable-tag
 #      error (e.g. a race with a parallel build), it is logged and tolerated.
-#      Any other push failure fails the script.
+#      Any other push failure is retried twice, 30 s apart: the branch and PR
+#      jobs of one commit push the same layers at once, and GHCR answers
+#      "unknown blob" to one of them. A failure on the third try fails the script.
 #
 # Usage:
 #   scripts/docker-push-ecr.sh [-f compose.yml]... [--dry-run] [--registry-glob GLOB] [IMAGE]...
@@ -129,10 +131,15 @@ for img in "${TARGETS[@]}"; do
   fi
 
   log "PUSH  $img"
-  set +e
-  docker push "$img" 2>&1 | tee "$push_log"
-  rc=${PIPESTATUS[0]}
-  set -e
+  for attempt in 1 2 3; do
+    set +e
+    docker push "$img" 2>&1 | tee "$push_log"
+    rc=${PIPESTATUS[0]}
+    set -e
+    if [[ $rc -eq 0 || $attempt -eq 3 ]] || grep -q "$IMMUTABLE_TAG_MSG" "$push_log"; then break; fi
+    log "RETRY $img (docker push exited $rc, attempt $attempt of 3)"
+    sleep 30
+  done
 
   if [[ $rc -eq 0 ]]; then
     pushed=$((pushed + 1))
