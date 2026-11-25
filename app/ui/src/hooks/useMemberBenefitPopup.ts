@@ -13,13 +13,22 @@ import {
 // Live for all logged-in users: eligibility is read from the user's on-chain
 // history via Cirrus (lib/memberBenefits). For design review,
 // `localStorage.setItem('member-benefit-preview', 'milestone')` forces the
-// popup with sample 3-of-4 data instead of the real fetch.
+// popup with sample 3-of-4 data instead of the real fetch; 'first-time' forces
+// the first-time user popup.
 function forcedPopup(): MemberBenefitPopup | null {
+  let preview: string | null;
   try {
-    if (localStorage.getItem('member-benefit-preview') !== 'milestone') return null;
+    preview = localStorage.getItem('member-benefit-preview');
   } catch {
     return null;
   }
+  if (preview === 'first-time') {
+    return {
+      kind: 'first-time',
+      completion: { deposit: false, liquidity: false, borrow: false, stake: false },
+    };
+  }
+  if (preview !== 'milestone') return null;
   return {
     kind: 'milestone',
     completion: { deposit: true, liquidity: true, borrow: true, stake: false },

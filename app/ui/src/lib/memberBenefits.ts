@@ -65,11 +65,20 @@ export type ActionCompletion = Record<MilestoneActionKey, boolean>;
 
 // Only the milestone popup (mock slide 3) ships for now; the deposit-boost
 // popup (slide 2) was removed pending product sign-off — see git history.
-export type MemberBenefitPopup = {
+export type MilestonePopup = {
   kind: 'milestone';
   completion: ActionCompletion;
   completedCount: number;
 };
+
+// First-time user popup (bridge in is gas sponsored -> first trade). Preview
+// only for now: selectPopup does not return it yet.
+export type FirstTimePopup = { kind: 'first-time'; completion: ActionCompletion };
+
+export type MemberBenefitPopup = MilestonePopup | FirstTimePopup;
+
+/** Vouchers the bridge service mints per bridge-in (services/bridge config `voucher.mintCount`). */
+export const SPONSORED_TXNS_PER_BRIDGE_IN = 25;
 
 // ---------------------------------------------------------------------------
 // Eligibility from Cirrus

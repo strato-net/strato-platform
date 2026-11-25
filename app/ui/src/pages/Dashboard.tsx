@@ -23,6 +23,7 @@ import LiquidationAlertBanner, { CDPLiquidationAlertBanner } from "@/components/
 import GuestPromoSection from "@/components/dashboard/GuestPromoSection";
 import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
 import MemberBenefitDialog from "@/components/dashboard/MemberBenefitDialog";
+import FirstTimeUserDialog from "@/components/dashboard/FirstTimeUserDialog";
 import { useMemberBenefitPopup } from "@/hooks/useMemberBenefitPopup";
 import { useNetwork } from "@/context/NetworkContext";
 
@@ -418,12 +419,20 @@ const Dashboard = () => {
       {contactEnabled && (
         <ContactInquiryModal open={contactModalOpen} onOpenChange={setContactModalOpen} />
       )}
-      <MemberBenefitDialog
-        popup={benefitPopup}
-        open={benefitOpen}
-        onDismiss={dismissBenefit}
-        onCta={acknowledgeBenefitCta}
-      />
+      {benefitPopup?.kind === 'first-time' ? (
+        <FirstTimeUserDialog
+          open={benefitOpen}
+          onDismiss={dismissBenefit}
+          onCta={acknowledgeBenefitCta}
+        />
+      ) : (
+        <MemberBenefitDialog
+          popup={benefitPopup}
+          open={benefitOpen}
+          onDismiss={dismissBenefit}
+          onCta={acknowledgeBenefitCta}
+        />
+      )}
     </div>
   );
 };

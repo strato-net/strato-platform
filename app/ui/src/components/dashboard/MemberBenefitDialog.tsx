@@ -5,14 +5,14 @@ import { useTheme } from "next-themes";
 import {
   MILESTONE_ACTIONS,
   nextMoveRoute,
-  type MemberBenefitPopup,
+  type MilestonePopup,
 } from "@/lib/memberBenefits";
 import STRATOLOGO from "@/assets/strato.png";
 import STRATOLOGODARK from "@/assets/strato-dark.png";
 import STRATOMARK from "@/assets/icon.png";
 
 interface MemberBenefitDialogProps {
-  popup: MemberBenefitPopup | null;
+  popup: MilestonePopup | null;
   open: boolean;
   /** Close via X / "Maybe Later". */
   onDismiss: () => void;
