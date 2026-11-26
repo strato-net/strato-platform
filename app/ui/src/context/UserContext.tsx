@@ -338,7 +338,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const isAdminLoading = loading || walletAdmin.isLoading;
 
   // Layout effect, not a passive one: React runs children's passive effects
-  // before the parent's, so a consumer (e.g. the dashboard's member-benefit
+  // before the parent's, so a consumer (e.g. the dashboard's first-time popup
   // hook) that fires a request in the same commit that the wallet connects
   // would otherwise go out without X-Wallet-Address. For guest wallets that
   // silently drops the my_activity filter and returns everyone's history.

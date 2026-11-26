@@ -1,82 +1,75 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowRight, CheckCircle2, X } from "lucide-react";
+import { ArrowRight, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
-import {
-  MILESTONE_ACTIONS,
-  nextMoveRoute,
-  type MemberBenefitPopup,
-} from "@/lib/memberBenefits";
+import { SPONSORED_TXNS_PER_BRIDGE_IN } from "@/lib/firstTimeUser";
 import STRATOLOGO from "@/assets/strato.png";
 import STRATOLOGODARK from "@/assets/strato-dark.png";
 import STRATOMARK from "@/assets/icon.png";
 
-interface MemberBenefitDialogProps {
-  popup: MemberBenefitPopup | null;
+interface FirstTimeUserDialogProps {
   open: boolean;
   /** Close via X / "Maybe Later". */
   onDismiss: () => void;
-  /** Primary CTA — navigates to the next incomplete action. */
+  /** Any step or the primary CTA — the user is leaving for Fund or Trade. */
   onCta: () => void;
 }
 
+const FUND_ROUTE = "/dashboard/deposits";
+const TRADE_ROUTE = "/dashboard/swap";
+
+/** The path to a first trade. Step 2 happens on its own, so it has no route. */
+const STEPS: Array<{ title: string; detail: string; route?: string }> = [
+  {
+    title: "Bridge in",
+    detail: "Send USDC, USDT, ETH or WBTC from your wallet on Fund. No STRATO needed.",
+    route: FUND_ROUTE,
+  },
+  {
+    title: `Get ${SPONSORED_TXNS_PER_BRIDGE_IN} gas sponsored transactions`,
+    detail: "Added to your account automatically when your deposit arrives.",
+  },
+  {
+    title: "Make your first trade",
+    detail: "Swap into any asset on Trade. Your sponsored transactions pay the network fee.",
+    route: TRADE_ROUTE,
+  },
+];
+
 const HEX_CLIP = "polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)";
 
-/** White hexagon tile holding the STRATO mark — the floating tokens in the art. */
-const HexToken = ({ className, size }: { className: string; size: number }) => (
+/** White hexagon tile — a numbered step along the path, or the STRATO mark. */
+const HexToken = ({ className, size, step }: { className: string; size: number; step?: number }) => (
   <div
     className={`absolute flex items-center justify-center bg-white shadow-xl ${className}`}
     style={{ clipPath: HEX_CLIP, width: size, height: size }}
   >
-    <img src={STRATOMARK} alt="" style={{ width: size * 0.58, height: size * 0.58 }} />
+    {step ? (
+      <span className="font-extrabold text-strato-blue" style={{ fontSize: size * 0.42 }}>
+        {step}
+      </span>
+    ) : (
+      <img src={STRATOMARK} alt="" style={{ width: size * 0.58, height: size * 0.58 }} />
+    )}
   </div>
 );
 
-const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four'];
-const numberWord = (n: number) => NUMBER_WORDS[n] ?? String(n);
-
 /**
- * Returning-user milestone popup (mock slide 3). Shown on the dashboard to
- * returning users who have not completed all four milestone actions (0–3 of
- * 4) — see lib/memberBenefits for the selection. The 5-point bonus unlocks
- * when *all four* actions are done, so the copy counts how many remain:
- * "Complete All 4 Actions…" at 0 done, "2 More Moves Unlock…" at 2 done,
- * "One More Move Unlocks…" at 3 done.
+ * First-time user popup: tells an account that has not bridged in yet that
+ * bridging in is gas sponsored and walks them to their first trade. See
+ * lib/firstTimeUser for the eligibility check.
  */
-const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDialogProps) => {
+const FirstTimeUserDialog = ({ open, onDismiss, onCta }: FirstTimeUserDialogProps) => {
   const navigate = useNavigate();
   const { resolvedTheme } = useTheme();
   const logo = resolvedTheme === "dark" ? STRATOLOGODARK : STRATOLOGO;
-
-  if (!popup) return null;
 
   const goTo = (route: string) => {
     onCta();
     navigate(route);
   };
-  const handleCta = () => goTo(nextMoveRoute(popup.completion));
 
-  const total = MILESTONE_ACTIONS.length;
-  const remaining = total - popup.completedCount;
-  const lastOne = remaining === 1;
-  const headline = lastOne
-    ? 'One More Move Unlocks 5 Points.'
-    : popup.completedCount === 0
-      ? `Complete All ${total} Actions to Unlock 5 Points.`
-      : `${remaining} More Moves Unlock 5 Points.`;
-  const subtitle = lastOne
-    ? 'Complete one more eligible action to finish this milestone and collect your bonus.'
-    : popup.completedCount === 0
-      ? `Complete all ${numberWord(total)} eligible actions to finish this milestone and collect your bonus.`
-      : `Complete the remaining ${numberWord(remaining)} eligible actions to finish this milestone and collect your bonus.`;
-  const pickerLabel = lastOne
-    ? 'Finish your last one to unlock your bonus'
-    : popup.completedCount === 0
-      ? `Complete all ${numberWord(total)} to unlock your bonus`
-      : `Complete the remaining ${numberWord(remaining)} to unlock your bonus`;
-  const footnote = lastOne
-    ? 'Complete the remaining eligible action to unlock the campaign reward. Terms apply.'
-    : `Complete all ${numberWord(total)} eligible actions to unlock the campaign reward. Terms apply.`;
+  const headline = "Bridge In. Your Gas Is on Us.";
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(next) => !next && onDismiss()}>
@@ -88,13 +81,13 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
         >
           <DialogPrimitive.Title className="sr-only">{headline}</DialogPrimitive.Title>
 
-          {/* Header: logo | MEMBER BENEFIT pill + circled close */}
+          {/* Header: logo | GAS SPONSORED pill + circled close */}
           <div className="flex items-center justify-between border-b border-border px-6 py-4 sm:px-10">
             <img src={logo} alt="STRATO" className="h-9" />
             <div className="flex items-center gap-3">
               <span className="hidden items-center gap-2 rounded-full bg-strato-lightblue/10 px-4 py-1.5 text-xs font-semibold tracking-wide text-strato-blue dark:text-strato-lightblue sm:inline-flex">
                 <span className="h-2 w-2 rounded-full bg-strato-lightblue" />
-                MEMBER BENEFIT
+                GAS SPONSORED
               </span>
               <DialogPrimitive.Close className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted focus:outline-none">
                 <X className="h-4 w-4" />
@@ -109,7 +102,7 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
               <div className="flex items-center gap-3">
                 <span className="h-[3px] w-7 rounded-full bg-strato-orange" />
                 <span className="text-xs font-bold tracking-[0.22em] text-strato-lightblue">
-                  YOUR NEXT MILESTONE
+                  WELCOME TO STRATO
                 </span>
               </div>
 
@@ -117,64 +110,69 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
                 {headline}
               </h2>
 
-              <p className="mt-5 max-w-[34rem] text-lg text-muted-foreground">{subtitle}</p>
+              <p className="mt-5 max-w-[34rem] text-lg text-muted-foreground">
+                Every bridge in adds {SPONSORED_TXNS_PER_BRIDGE_IN} gas sponsored transactions to
+                your account, so you can start trading without buying STRATO for fees.
+              </p>
 
-              {/* Action checklist. All four are required, so each remaining
-                  action is a clickable row and already-done actions are ticked
-                  inline. */}
+              {/* Steps. Bridge in and trade are clickable rows; the sponsored
+                  transactions arrive on their own, so that row is static. */}
               <div className="mt-7 rounded-xl border border-border bg-card p-5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-strato-blue dark:text-foreground">
-                    {pickerLabel}
-                  </span>
-                  {popup.completedCount > 0 && (
-                    <span className="text-sm font-semibold text-muted-foreground">
-                      {popup.completedCount} of {total} done
-                    </span>
-                  )}
-                </div>
-                <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-                  {MILESTONE_ACTIONS.map((a) => {
-                    const done = popup.completion[a.key];
-                    if (done) {
+                <span className="font-bold text-strato-blue dark:text-foreground">
+                  Three steps to your first trade
+                </span>
+                <ol className="mt-4 grid gap-2">
+                  {STEPS.map((step, i) => {
+                    const body = (
+                      <>
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-strato-lightblue/10 text-sm font-bold text-strato-blue dark:text-strato-lightblue">
+                          {i + 1}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block font-semibold text-strato-blue dark:text-foreground">
+                            {step.title}
+                          </span>
+                          <span className="block text-muted-foreground">{step.detail}</span>
+                        </span>
+                      </>
+                    );
+                    if (!step.route) {
                       return (
                         <li
-                          key={a.key}
-                          className="flex items-center gap-2 rounded-lg border border-transparent px-3 py-2.5 text-sm"
+                          key={step.title}
+                          className="flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 text-sm"
                         >
-                          <CheckCircle2 className="h-4 w-4 shrink-0 text-strato-lightblue" />
-                          <span className="font-medium text-strato-blue line-through decoration-strato-lightblue/60 dark:text-foreground">
-                            {a.label}
+                          {body}
+                          <span className="ml-auto hidden shrink-0 text-xs font-semibold text-strato-lightblue sm:inline">
+                            Automatic
                           </span>
-                          <span className="ml-auto text-xs text-muted-foreground">Done</span>
                         </li>
                       );
                     }
                     return (
-                      <li key={a.key}>
+                      <li key={step.title}>
                         <button
                           type="button"
-                          onClick={() => goTo(a.route)}
-                          className="group flex w-full items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-left text-sm transition-colors hover:border-strato-lightblue hover:bg-strato-lightblue/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-strato-lightblue"
+                          onClick={() => goTo(step.route)}
+                          className="group flex w-full items-center gap-3 rounded-lg border border-border bg-background px-3 py-2.5 text-left text-sm transition-colors hover:border-strato-lightblue hover:bg-strato-lightblue/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-strato-lightblue"
                         >
-                          <span className="h-4 w-4 shrink-0 rounded-full border-2 border-strato-lightblue/60 group-hover:border-strato-lightblue" />
-                          <span className="font-medium text-strato-blue dark:text-foreground">{a.label}</span>
+                          {body}
                           <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-strato-lightblue" />
                         </button>
                       </li>
                     );
                   })}
-                </ul>
+                </ol>
               </div>
 
               {/* CTAs */}
               <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 lg:mt-auto lg:pt-10">
                 <button
                   type="button"
-                  onClick={handleCta}
+                  onClick={() => goTo(FUND_ROUTE)}
                   className="w-full rounded-lg bg-strato-blue px-7 py-3.5 text-sm font-semibold sm:w-auto text-white shadow-md transition-colors hover:bg-strato-blue/90 dark:bg-strato-lightblue dark:hover:bg-strato-lightblue/90"
                 >
-                  Choose Your Next Move
+                  Bridge In Now
                 </button>
                 <button
                   type="button"
@@ -184,15 +182,17 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
                   Maybe Later
                 </button>
               </div>
-              <p className="mt-4 text-xs text-muted-foreground/80">{footnote}</p>
+              <p className="mt-4 text-xs text-muted-foreground/80">
+                Each gas sponsored transaction covers the STRATO network fee for one transaction.
+                Gas on the chain you bridge from still applies.
+              </p>
             </div>
 
-            {/* Right column: illustration — deep blue panel with the ascending
-                hexagon "staircase" from the mockup, approximated in CSS. On
+            {/* Right column: illustration — deep blue panel with an ascending
+                hexagon staircase, the three steps numbered along the path. On
                 mobile it sits above the copy at a fixed height so it's visible
                 without scrolling the dialog. */}
             <div className="relative order-first h-[200px] overflow-hidden rounded-2xl bg-gradient-to-br from-[#2F3DF2] via-[#2430D8] to-[#1A23A8] sm:h-[260px] lg:order-none lg:h-auto lg:min-h-[440px]">
-              {/* faint grid, as in the mock's backdrop */}
               <div
                 className="absolute inset-0 opacity-[0.06]"
                 style={{
@@ -201,7 +201,6 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
                   backgroundSize: "36px 36px",
                 }}
               />
-              {/* dark plinths stepping up to the right */}
               <div
                 className="absolute bottom-[4%] left-[6%] h-20 w-20 bg-[#101B7E]/90 sm:h-28 sm:w-28 lg:h-36 lg:w-36"
                 style={{ clipPath: HEX_CLIP }}
@@ -214,7 +213,6 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
                 className="absolute bottom-[42%] right-[8%] h-28 w-28 bg-[#0C156A]/90 sm:h-36 sm:w-36 lg:h-44 lg:w-44"
                 style={{ clipPath: HEX_CLIP }}
               />
-              {/* glowing path connecting the plinths */}
               <svg
                 className="absolute inset-0 h-full w-full"
                 viewBox="0 0 100 100"
@@ -230,21 +228,19 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
                   opacity="0.9"
                 />
               </svg>
-              {/* floating hexagon tokens along the path */}
-              <HexToken className="bottom-[9%] left-[11%] rotate-[8deg]" size={44} />
-              <HexToken className="bottom-[30%] left-[40%] -rotate-[6deg]" size={52} />
-              <HexToken className="right-[24%] top-[36%] rotate-[4deg]" size={40} />
-              <HexToken className="right-[6%] top-[16%] -rotate-[8deg] scale-75 sm:scale-100" size={92} />
+              <HexToken className="bottom-[9%] left-[11%] rotate-[8deg]" size={48} step={1} />
+              <HexToken className="bottom-[30%] left-[40%] -rotate-[6deg]" size={52} step={2} />
+              <HexToken className="right-[24%] top-[36%] rotate-[4deg]" size={48} step={3} />
+              <HexToken className="right-[6%] top-[16%] hidden -rotate-[8deg] sm:flex" size={92} />
               <div className="absolute right-[30%] top-[24%] h-3 w-3 rounded-full bg-[#5FD0FF]" />
               <div className="absolute bottom-[16%] right-[16%] h-2 w-2 rounded-full bg-[#5FD0FF]/80" />
 
-              {/* milestone bonus card */}
               <div className="absolute left-[7%] top-[9%] -rotate-6 rounded-2xl bg-white px-4 py-3 shadow-2xl sm:px-6 sm:py-4">
                 <div className="text-[10px] font-bold tracking-[0.18em] text-gray-500">
-                  MILESTONE BONUS
+                  GAS SPONSORED
                 </div>
                 <div className="mt-1 text-2xl font-extrabold tracking-tight text-strato-blue sm:text-3xl">
-                  <span className="text-strato-lightblue">+5</span> PTS
+                  <span className="text-strato-lightblue">+{SPONSORED_TXNS_PER_BRIDGE_IN}</span> TXNS
                 </div>
               </div>
             </div>
@@ -255,4 +251,4 @@ const MemberBenefitDialog = ({ popup, open, onDismiss, onCta }: MemberBenefitDia
   );
 };
 
-export default MemberBenefitDialog;
+export default FirstTimeUserDialog;
