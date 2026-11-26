@@ -44,7 +44,8 @@ pipeline {
             strato-up mynode \\
               --network=helium \\
               --nodeHost='buildtest.testnet.strato.nexus' \\
-              --sslDir='/home/ec2-user/cloudflare-ssl/'
+              --sslDir='/home/ec2-user/cloudflare-ssl/' \\
+              --snapshot
           """
           sh "chmod +x run.sh"
           withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
