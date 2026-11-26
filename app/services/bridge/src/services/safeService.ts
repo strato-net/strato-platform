@@ -128,6 +128,17 @@ export const getSafeOnChainNonce = async (
   return Number(await protocolKit.getNonce());
 };
 
+// Replaced payouts already reported as needing manual resolution, so each is logged once
+const reportedReplacedPayouts = new Set<string>();
+
+// A Safe rejection is an empty call to the Safe itself: the only replacement that provably pays no one
+export const isSafeRejection = (tx: any, safeAddress: string): boolean =>
+  String(tx?.to ?? "").toLowerCase() === safeAddress.toLowerCase() &&
+  BigInt(tx?.value ?? 0) === 0n &&
+  (tx?.data == null || tx.data === "0x") &&
+  Number(tx?.operation ?? 0) === 0 &&
+  tx?.isSuccessful === true;
+
 export const checkSafeTxStatus = async (
   transactionKey: string,
   apiKit: SafeApiKit,
@@ -166,8 +177,19 @@ export const checkSafeTxStatus = async (
     );
 
     if (executedTx && executedTx.safeTxHash !== safeTxHash) {
-      logInfo("SafeService", `Safe transaction status: rejected (replaced by another tx)`, { safeTxHash });
-      return "rejected";
+      if (isSafeRejection(executedTx, safeAddress)) {
+        logInfo("SafeService", `Safe transaction status: rejected (replaced by a Safe rejection)`, { safeTxHash });
+        return "rejected";
+      }
+      // Any other replacement may have paid the withdrawal, so it is never refunded automatically
+      if (!reportedReplacedPayouts.has(safeTxHash)) {
+        reportedReplacedPayouts.add(safeTxHash);
+        logError(
+          "SafeService",
+          new Error(`Safe transaction ${safeTxHash} was replaced by ${executedTx.safeTxHash}, which is not a Safe rejection; leaving it for manual resolution`),
+        );
+      }
+      return "pending";
     }
 
     return "pending";
