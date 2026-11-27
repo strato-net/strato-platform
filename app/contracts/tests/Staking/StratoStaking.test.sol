@@ -1967,7 +1967,8 @@ contract Describe_StratoStaking {
     }
 
     // Stake that leaves takes the leaver's waiting stake first, so taking back a stake that
-    // never counted takes nothing from the vote, and a stake that did count leaves at once.
+    // never counted takes nothing from the vote, and a stake that did count stays in it for
+    // the delay, as an arriving one waits to count.
     function it_takes_the_leavers_waiting_stake_first() public {
         _bondBoth();
         _stake(user2, VALIDATOR_A, 300e18);
@@ -1979,10 +1980,14 @@ contract Describe_StratoStaking {
         require(staking.unmaturedStake(VALIDATOR_A) == 250e18 && gov.validatorStake(VALIDATOR_A) == 1300e18, "user1 took back part of what was waiting");
 
         user2.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 300e18);
-        require(staking.unmaturedStake(VALIDATOR_A) == 250e18 && gov.validatorStake(VALIDATOR_A) == 1000e18, "user2's counted stake left the vote at once");
+        require(staking.unmaturedStake(VALIDATOR_A) == 250e18 && gov.validatorStake(VALIDATOR_A) == 1300e18, "user2's counted stake stays in the vote for the delay");
 
         user1.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 250e18);
-        require(staking.unmaturedStake(VALIDATOR_A) == 0 && gov.validatorStake(VALIDATOR_A) == 1000e18, "nothing waiting, the vote untouched");
+        require(staking.unmaturedStake(VALIDATOR_A) == 0 && gov.validatorStake(VALIDATOR_A) == 1300e18, "nothing waiting, the vote untouched");
+
+        fastForward(200, 1);
+        staking.syncValidator(VALIDATOR_A);
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "user2's stake leaves the vote once the delay is over");
     }
 
     // A storage-to-storage copy of an unwritten (zero) scalar is a silent no-op in SolidVM.
@@ -2030,7 +2035,7 @@ contract Describe_StratoStaking {
         require(gov.isValidator(address(validatorC)) && gov.validatorStake(address(validatorC)) == 1000e18, "seated with its whole bond as its weight");
     }
 
-    // Moved stake leaves the old validator's vote at once and waits where it lands.
+    // Moved stake stays in the old validator's vote for the delay and waits where it lands.
     function it_makes_moved_stake_wait_where_it_lands() public {
         _bondBoth();
         _stake(user1, VALIDATOR_A, 400e18);
@@ -2038,12 +2043,13 @@ contract Describe_StratoStaking {
         require(gov.validatorStake(VALIDATOR_A) == 1400e18, "counted before the delay was set");
 
         user1.doSuccessfully(address(staking), "moveStake(address,address,uint256)", VALIDATOR_A, VALIDATOR_B, 400e18);
-        require(gov.validatorStake(VALIDATOR_A) == 1000e18, "it leaves A's vote at once");
+        require(gov.validatorStake(VALIDATOR_A) == 1400e18, "it stays in A's vote for the delay");
         require(gov.validatorStake(VALIDATOR_B) == 2000e18 && staking.unmaturedStake(VALIDATOR_B) == 400e18, "and waits behind B");
 
         fastForward(200, 1);
+        staking.syncValidator(VALIDATOR_A);
         staking.syncValidator(VALIDATOR_B);
-        require(gov.validatorStake(VALIDATOR_B) == 2400e18, "then counts");
+        require(gov.validatorStake(VALIDATOR_A) == 1000e18 && gov.validatorStake(VALIDATOR_B) == 2400e18, "then leaves A and counts for B");
     }
 
     // Changing the delay starts a new generation of windows: what was waiting under the
@@ -2065,8 +2071,9 @@ contract Describe_StratoStaking {
         require(gov.validatorStake(VALIDATOR_A) == 1600e18, "and new stake counts as it arrives");
     }
 
-    // The one-third alert follows the weights governance holds, the ones consensus counts.
-    // Stake whose wait is over is not among them until its validator is synced.
+    // The one-third alert counts each validator at the greater of the weight governance
+    // holds and the weight it can vote with, so stake whose wait is over trips it before
+    // anyone publishes it.
     function it_measures_one_third_on_the_weights_governance_holds() public {
         _bondBoth();
         _registerSelf(validatorC);
@@ -2079,7 +2086,9 @@ contract Describe_StratoStaking {
         _stake(user2, VALIDATOR_B, 4000e18);
         fastForward(200, 1);
         require(staking.votingWeight(VALIDATOR_B) == 6000e18 && gov.validatorStake(VALIDATOR_B) == 2000e18, "B's new stake has waited and is not published");
-        require(staking.exceedsOneThird(VALIDATOR_A) && !staking.exceedsOneThird(VALIDATOR_B), "consensus still counts 2500 of 6500 for A");
+        // B is measured with its own unpublished 6000; A only against what is published
+        require(staking.exceedsOneThird(VALIDATOR_B), "B's unpublished 6000 already trips the alert");
+        require(staking.exceedsOneThird(VALIDATOR_A), "A still does, against the published 6500");
 
         staking.syncValidator(VALIDATOR_B);
         require(!staking.exceedsOneThird(VALIDATOR_A) && staking.exceedsOneThird(VALIDATOR_B), "once published, B holds 6000 of 10500");
@@ -2193,5 +2202,66 @@ contract Describe_StratoStaking {
         staking.refileStake(address(validatorC), _two(NODE_1, NODE_2), _two(address(user1), address(user2)));
         require(pins.isValidator(NODE_1) && pins.isValidator(NODE_2) && staking.isValidator(NODE_1) && staking.isValidator(NODE_2), "seated in staking too");
         require(pins.validatorStake(NODE_1) == 3505e17 + 1 && pins.validatorStake(NODE_2) == 3505e17, "each votes with the stake filed behind it");
+    }
+
+    // ---- withdrawal delay and the one-third alarm --------------------------------------
+
+    // An unstake of delegated weight does not drop the validator's vote in the same
+    // block, so a crafted withdrawal cannot push another seat over a third at once. The weight only ages out a window
+    // later, by which time honest actors have had the same delay to respond.
+    function it_keeps_withdrawn_delegated_weight_in_the_vote_for_the_delay() public {
+        _bondBoth();                                 // A: 1000 self + 3000 below = set up next line
+        _stake(user1, VALIDATOR_A, 3000e18);         // A weight 4000
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1000e18);
+        _activate(address(validatorC));
+        staking.setSetParams(50, 50, 500, 10, 100, 100, 3300);
+        staking.setStakeDelay(100);
+        _stake(attacker, address(validatorC), 1300e18);
+        fastForward(200, 1);                         // attacker's 1300 matures: C votes 2300
+        staking.syncValidator(address(validatorC));
+        require(gov.validatorStake(address(validatorC)) == 2300e18 && !staking.exceedsOneThird(address(validatorC)), "pre: C under a third");
+
+        user1.doSuccessfully(address(staking), "unstake(address,uint256)", VALIDATOR_A, 3000e18);
+        // A's 3000 of matured delegated weight lingers for the delay window, so
+        // the set total is unchanged this block and C is still under a third.
+        require(staking.votingWeight(VALIDATOR_A) == 4000e18, "A's leaving weight stays in the vote this window");
+        require(!staking.exceedsOneThird(address(validatorC)), "a withdrawal does not cross a third in the same block");
+
+        // A window later the lingering weight ages out; the drop is now visible to all.
+        fastForward(200, 1);
+        staking.syncValidator(VALIDATOR_A);
+        require(staking.votingWeight(VALIDATOR_A) == 1000e18, "A's weight drops after the window");
+        require(staking.exceedsOneThird(address(validatorC)), "the drop lands a window later, after the delay");
+    }
+
+    // The alert reads matured weight that has not been republished, so a holder
+    // cannot hide stake it already controls by simply not calling syncValidator.
+    function it_alarms_on_matured_weight_not_yet_published() public {
+        _bondBoth();                                 // A 4000-to-be, B 2000
+        _stake(user1, VALIDATOR_A, 3000e18);         // A weight 4000, published on its sync
+        staking.syncValidator(VALIDATOR_A);
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 1000e18);
+        _activate(address(validatorC));              // C published 1000
+        staking.setStakeDelay(100);
+        _stake(attacker, address(validatorC), 5000e18);
+        fastForward(200, 1);                         // C's 5000 matures in votingWeight, but published still 1000
+        require(gov.validatorStake(address(validatorC)) == 1000e18, "published weight lags, not synced");
+        require(staking.votingWeight(address(validatorC)) == 6000e18, "actual matured weight is 6000");
+        require(staking.exceedsOneThird(address(validatorC)), "the alert trips on the weight it votes with, not the stale published one");
+    }
+
+    // A caller can tell before seating whether a waiter would hold over a third.
+    function it_tells_whether_seating_a_waiter_would_cross_a_third() public {
+        _bondBoth();                                 // A 1000, B 2000 published => set weight 3000
+        _registerSelf(validatorC);
+        _selfBond(validatorC, address(validatorC), 500e18);   // modest waiter, delay off
+        require(!gov.isValidator(address(validatorC)), "C is a waiter, not seated");
+        // 500*3 = 1500, not > 3000 + 500
+        require(!staking.wouldSeatingCrossOneThird(address(validatorC)), "a modest waiter would not cross a third");
+        _selfBond(validatorC, address(validatorC), 6500e18);  // now 7000
+        // 7000*3 = 21000 > 3000 + 7000
+        require(staking.wouldSeatingCrossOneThird(address(validatorC)), "seating a dominant waiter would cross a third");
     }
 }
