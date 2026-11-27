@@ -17,6 +17,16 @@ export interface Activity {
   sourceContract: string;
   stakeDenomination?: "token_units" | "usd_notional" | "unknown";
   stakeAssetAddress?: string | null;
+  rewardRouteType?:
+    | "direct_mint"
+    | "swap_lp"
+    | "save_usdst"
+    | "carry_vault"
+    | "vault"
+    | "lending"
+    | "cdp"
+    | "standalone";
+  rewardRouteId?: string | null;
 }
 
 export interface RewardsUserInfo {
@@ -109,6 +119,8 @@ export const fetchActivities = async (forceRefresh: boolean = false): Promise<Ac
     stakeDenomination?: "token_units" | "usd_notional" | "unknown";
     stakeAssetAddress?: string | null;
     stakeUnitPriceUsd?: string | null;
+    rewardRouteType?: Activity["rewardRouteType"];
+    rewardRouteId?: string | null;
   }): Activity => ({
     activityId: activity.activityId,
     name: activity.name,
@@ -123,6 +135,8 @@ export const fetchActivities = async (forceRefresh: boolean = false): Promise<Ac
     sourceContract: activity.sourceContract,
     stakeDenomination: activity.stakeDenomination,
     stakeAssetAddress: activity.stakeAssetAddress ?? null,
+    rewardRouteType: activity.rewardRouteType,
+    rewardRouteId: activity.rewardRouteId ?? null,
   }));
 };
 
@@ -175,6 +189,8 @@ export const fetchUserRewards = async (forceRefresh: boolean = false, options?: 
       stakeDenomination?: "token_units" | "usd_notional" | "unknown";
       stakeAssetAddress?: string | null;
       stakeUnitPriceUsd?: string | null;
+      rewardRouteType?: Activity["rewardRouteType"];
+      rewardRouteId?: string | null;
     }) => ({
       activityId: activity.activityId,
       userInfo: {
@@ -196,6 +212,8 @@ export const fetchUserRewards = async (forceRefresh: boolean = false, options?: 
         stakeDenomination: activity.stakeDenomination,
         stakeAssetAddress: activity.stakeAssetAddress ?? null,
         stakeUnitPriceUsd: activity.stakeUnitPriceUsd ?? null,
+        rewardRouteType: activity.rewardRouteType,
+        rewardRouteId: activity.rewardRouteId ?? null,
       },
       personalEmissionRate: activity.personalEmissionRate,
     })),
