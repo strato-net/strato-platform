@@ -85,6 +85,7 @@ contract record Rewards is Ownable {
     event EmissionRateUpdated(uint256 indexed activityId, uint256 oldRate, uint256 newRate);
     event SourceContractUpdated(uint256 indexed activityId, address oldSourceContract, address newSourceContract);
     event RewardsClaimed(address indexed user, uint256 amount);
+    event RewardsExpired(address indexed user, uint256 amount);
     event DirectPayoutApplied(uint256 indexed activityId, address indexed user, uint256 amount);
     event MaxBatchSizeUpdated(uint256 oldMaxBatchSize, uint256 newMaxBatchSize);
     event ActivityMinAmountUpdated(uint256 indexed activityId, uint256 oldMinAmount, uint256 newMinAmount);
@@ -624,6 +625,61 @@ contract record Rewards is Ownable {
         rewardToken.transfer(user, totalRewards);
 
         emit RewardsClaimed(user, totalRewards);
+    }
+
+    /**
+     * @dev Expire the unclaimed rewards of the given users: settled and accrued rewards are zeroed
+     * without any transfer, so the tokens stay in the contract. Stakes are kept.
+     * @param users Users whose unclaimed rewards expire
+     *
+     * Only while every emission rate is zero: the indices are then current and frozen,
+     * so every batch expires the same snapshot.
+     */
+    function expireRewards(address[] calldata users) external onlyOwner {
+        require(totalRewardsEmission == 0, "Emissions still running");
+
+        for (uint256 i = 0; i < users.length; i++) {
+            address user = users[i];
+            uint256 totalExpiredRewardsForUser = unclaimedRewards[user] + _accruedRewards(user);
+
+            unclaimedRewards[user] = 0;
+            emit RewardsExpired(user, totalExpiredRewardsForUser);
+        }
+    }
+
+    /**
+     * @dev Sum rewards earned since each activity's user index, and advance those indices to the current accRewardPerStake.
+     */
+    function _accruedRewards(address user) internal returns (uint256) {
+        uint256 totalAccruedRewardsForUser = 0;
+
+        for (uint256 i = 0; i < activityIds.length; i++) {
+            uint256 activityId = activityIds[i];
+            uint256 accruedOnActivity = _accruedRewardOnActivity(user, activityId);
+            totalAccruedRewardsForUser += accruedOnActivity;
+        }
+
+        return totalAccruedRewardsForUser;
+    }
+
+    /**
+     * @dev Rewards earned on one activity since the user's last index snapshot.
+     * A user with no stake has none. A staked user's index moves to the activity's current accRewardPerStake.
+     */
+    function _accruedRewardOnActivity(address user, uint256 activityId) internal returns (uint256) {
+        RewardsUserInfo storage userState = userInfo[user][activityId];
+        uint256 userStakeOnActivity = userState.stake;
+        if (userStakeOnActivity == 0) {
+            return 0;
+        }
+
+        uint256 currentRewardPerStake = activityStates[activityId].accRewardPerStake;
+        uint256 rewardPerStakeAtLastUpdate = userState.userIndex;
+        uint256 rewardPerStakeEarned = currentRewardPerStake - rewardPerStakeAtLastUpdate;
+        uint256 accruedRewardsForUserOnActivity = (userStakeOnActivity * rewardPerStakeEarned) / PRECISION_MULTIPLIER;
+
+        userState.userIndex = currentRewardPerStake;
+        return accruedRewardsForUserOnActivity;
     }
 
     /**
